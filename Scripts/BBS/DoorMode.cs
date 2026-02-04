@@ -14,6 +14,7 @@ namespace UsurperRemake.BBS
         private static BBSTerminalAdapter? _terminalAdapter;
         private static bool _forceStdio = false;
         private static string? _forceFossilPort = null; // Force FOSSIL mode on this COM port
+        private static bool _verboseMode = false; // Verbose debug output for troubleshooting
 
         public static BBSSessionInfo? SessionInfo => _sessionInfo;
         public static BBSTerminalAdapter? TerminalAdapter => _terminalAdapter;
@@ -25,6 +26,34 @@ namespace UsurperRemake.BBS
         /// </summary>
         public static bool ParseCommandLineArgs(string[] args)
         {
+            // First pass: process flags (--stdio, --verbose, --fossil, etc.)
+            // These need to be set before we load drop files
+            for (int i = 0; i < args.Length; i++)
+            {
+                var arg = args[i].ToLowerInvariant();
+
+                // --stdio forces console I/O even when drop file has socket handle
+                if (arg == "--stdio")
+                {
+                    _forceStdio = true;
+                }
+                // --verbose enables detailed debug output
+                else if (arg == "--verbose" || arg == "-v")
+                {
+                    _verboseMode = true;
+                    Console.Error.WriteLine("[VERBOSE] Verbose mode enabled - detailed debug output will be shown");
+                }
+                // --fossil or --com forces FOSSIL/serial mode
+                else if ((arg == "--fossil" || arg == "--com") && i + 1 < args.Length)
+                {
+                    _forceFossilPort = args[i + 1].ToUpperInvariant();
+                    if (!_forceFossilPort.StartsWith("COM"))
+                        _forceFossilPort = "COM" + _forceFossilPort;
+                    i++; // Skip the port arg
+                }
+            }
+
+            // Second pass: process commands (--door, --door32, etc.)
             for (int i = 0; i < args.Length; i++)
             {
                 var arg = args[i].ToLowerInvariant();
@@ -64,25 +93,6 @@ namespace UsurperRemake.BBS
                     return true;
                 }
 
-                // --stdio forces console I/O even when drop file has socket handle
-                // Use with Standard I/O mode in Synchronet
-                if (arg == "--stdio")
-                {
-                    _forceStdio = true;
-                    continue; // Keep processing other args
-                }
-
-                // --fossil or --com forces FOSSIL/serial mode on specified COM port
-                // Use when BBS uses FOSSIL driver for door I/O
-                if ((arg == "--fossil" || arg == "--com") && i + 1 < args.Length)
-                {
-                    _forceFossilPort = args[i + 1].ToUpperInvariant();
-                    if (!_forceFossilPort.StartsWith("COM"))
-                        _forceFossilPort = "COM" + _forceFossilPort; // Allow just number
-                    i++; // Skip the port arg
-                    continue; // Keep processing other args
-                }
-
                 // --help
                 if (arg == "--help" || arg == "-h" || arg == "-?")
                 {
@@ -101,11 +111,22 @@ namespace UsurperRemake.BBS
         {
             try
             {
+                // In verbose mode, dump the raw drop file contents first
+                if (_verboseMode)
+                {
+                    DumpDropFileContents(path);
+                }
+
                 _sessionInfo = DropFileParser.ParseDropFileAsync(path).GetAwaiter().GetResult();
 
                 if (_sessionInfo == null)
                 {
                     Console.Error.WriteLine($"Could not parse drop file: {path}");
+                    if (_verboseMode)
+                    {
+                        Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
+                        Console.ReadLine();
+                    }
                     return false;
                 }
 
@@ -118,7 +139,75 @@ namespace UsurperRemake.BBS
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error loading drop file: {ex.Message}");
+                if (_verboseMode)
+                {
+                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
+                    Console.ReadLine();
+                }
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Dump raw drop file contents for debugging
+        /// </summary>
+        private static void DumpDropFileContents(string path)
+        {
+            try
+            {
+                string actualPath = path;
+
+                // If directory, find the drop file
+                if (Directory.Exists(path))
+                {
+                    var door32Path = Path.Combine(path, "door32.sys");
+                    if (File.Exists(door32Path))
+                        actualPath = door32Path;
+                    else
+                    {
+                        door32Path = Path.Combine(path, "DOOR32.SYS");
+                        if (File.Exists(door32Path))
+                            actualPath = door32Path;
+                        else
+                        {
+                            var doorPath = Path.Combine(path, "door.sys");
+                            if (File.Exists(doorPath))
+                                actualPath = doorPath;
+                            else
+                            {
+                                doorPath = Path.Combine(path, "DOOR.SYS");
+                                if (File.Exists(doorPath))
+                                    actualPath = doorPath;
+                            }
+                        }
+                    }
+                }
+
+                if (!File.Exists(actualPath))
+                {
+                    Console.Error.WriteLine($"[VERBOSE] Drop file not found: {actualPath}");
+                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
+                    Console.ReadLine();
+                    return;
+                }
+
+                Console.Error.WriteLine($"[VERBOSE] === RAW DROP FILE CONTENTS: {actualPath} ===");
+                var lines = File.ReadAllLines(actualPath);
+                for (int i = 0; i < lines.Length && i < 20; i++) // First 20 lines
+                {
+                    Console.Error.WriteLine($"[VERBOSE] Line {i + 1}: {lines[i]}");
+                }
+                if (lines.Length > 20)
+                {
+                    Console.Error.WriteLine($"[VERBOSE] ... ({lines.Length - 20} more lines)");
+                }
+                Console.Error.WriteLine("[VERBOSE] === END DROP FILE ===");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[VERBOSE] Error reading drop file: {ex.Message}");
+                Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
+                Console.ReadLine();
             }
         }
 
@@ -129,13 +218,25 @@ namespace UsurperRemake.BBS
         {
             try
             {
+                if (_verboseMode)
+                {
+                    DumpDropFileContents(path);
+                }
+
                 _sessionInfo = DropFileParser.ParseDoor32SysAsync(path).GetAwaiter().GetResult();
                 Console.Error.WriteLine($"Loaded DOOR32.SYS: {path}");
+                Console.Error.WriteLine($"User: {_sessionInfo.UserName} ({_sessionInfo.UserAlias})");
+                Console.Error.WriteLine($"Connection: {_sessionInfo.CommType}, Handle: {_sessionInfo.SocketHandle}");
                 return true;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error loading DOOR32.SYS: {ex.Message}");
+                if (_verboseMode)
+                {
+                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
+                    Console.ReadLine();
+                }
                 return false;
             }
         }
@@ -147,13 +248,25 @@ namespace UsurperRemake.BBS
         {
             try
             {
+                if (_verboseMode)
+                {
+                    DumpDropFileContents(path);
+                }
+
                 _sessionInfo = DropFileParser.ParseDoorSysAsync(path).GetAwaiter().GetResult();
                 Console.Error.WriteLine($"Loaded DOOR.SYS: {path}");
+                Console.Error.WriteLine($"User: {_sessionInfo.UserName} ({_sessionInfo.UserAlias})");
+                Console.Error.WriteLine($"Connection: {_sessionInfo.CommType}, ComPort: {_sessionInfo.ComPort}");
                 return true;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error loading DOOR.SYS: {ex.Message}");
+                if (_verboseMode)
+                {
+                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
+                    Console.ReadLine();
+                }
                 return false;
             }
         }
@@ -186,6 +299,26 @@ namespace UsurperRemake.BBS
 
             try
             {
+                // Enable verbose logging if requested
+                if (_verboseMode)
+                {
+                    SocketTerminal.VerboseLogging = true;
+                    Console.Error.WriteLine("[VERBOSE] Session info from drop file:");
+                    Console.Error.WriteLine($"[VERBOSE]   CommType: {_sessionInfo.CommType}");
+                    Console.Error.WriteLine($"[VERBOSE]   SocketHandle: {_sessionInfo.SocketHandle} (0x{_sessionInfo.SocketHandle:X8})");
+                    Console.Error.WriteLine($"[VERBOSE]   ComPort: {_sessionInfo.ComPort}");
+                    Console.Error.WriteLine($"[VERBOSE]   BaudRate: {_sessionInfo.BaudRate}");
+                    Console.Error.WriteLine($"[VERBOSE]   UserName: {_sessionInfo.UserName}");
+                    Console.Error.WriteLine($"[VERBOSE]   UserAlias: {_sessionInfo.UserAlias}");
+                    Console.Error.WriteLine($"[VERBOSE]   BBSName: {_sessionInfo.BBSName}");
+                    Console.Error.WriteLine($"[VERBOSE]   Emulation: {_sessionInfo.Emulation}");
+                    Console.Error.WriteLine($"[VERBOSE]   SourceType: {_sessionInfo.SourceType}");
+                    Console.Error.WriteLine($"[VERBOSE]   SourcePath: {_sessionInfo.SourcePath}");
+                    Console.Error.WriteLine("");
+                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
+                    Console.ReadLine();
+                }
+
                 // If --stdio flag was used, force console I/O mode
                 // This is for Synchronet's "Standard" I/O mode where stdin/stdout are redirected
                 if (_forceStdio)
@@ -335,6 +468,7 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  --stdio              Use Standard I/O instead of socket (for Synchronet)");
             Console.WriteLine("  --fossil <port>      Force FOSSIL/serial mode on COM port (e.g., COM1)");
             Console.WriteLine("  --com <port>         Same as --fossil");
+            Console.WriteLine("  --verbose, -v        Enable detailed debug output for troubleshooting");
             Console.WriteLine("");
             Console.WriteLine("Examples:");
             Console.WriteLine("  UsurperReborn --door /sbbs/node1/door32.sys");
@@ -361,6 +495,15 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  Command: UsurperReborn --doorsys %f --fossil COM1");
             Console.WriteLine("  Drop File Type: Door.sys");
             Console.WriteLine("  The COM port should match your FOSSIL driver's virtual port");
+            Console.WriteLine("");
+            Console.WriteLine("Troubleshooting:");
+            Console.WriteLine("  If output shows locally but not remotely:");
+            Console.WriteLine("  1. Try --stdio flag for Standard I/O mode");
+            Console.WriteLine("  2. Use --verbose flag to see detailed connection info");
+            Console.WriteLine("  3. Check your DOOR32.SYS has correct CommType (2=telnet) and socket handle");
+            Console.WriteLine("");
+            Console.WriteLine("  Example with verbose debugging:");
+            Console.WriteLine("  UsurperReborn --door32 door32.sys --verbose");
             Console.WriteLine("");
         }
 

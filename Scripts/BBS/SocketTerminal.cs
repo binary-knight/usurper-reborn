@@ -224,42 +224,110 @@ namespace UsurperRemake.BBS
         }
 
         /// <summary>
+        /// Verbose logging for debugging
+        /// </summary>
+        public static bool VerboseLogging { get; set; } = false;
+
+        private static void LogVerbose(string message)
+        {
+            if (VerboseLogging)
+                Console.Error.WriteLine($"[SOCKET] {message}");
+        }
+
+        /// <summary>
         /// Initialize the socket from the inherited handle in the session info
         /// </summary>
         public bool Initialize()
         {
+            LogVerbose($"Initialize() called, CommType={_sessionInfo.CommType}");
+
             if (_sessionInfo.CommType == ConnectionType.Local)
             {
-                // Local mode - no socket needed
+                LogVerbose("Local mode - no socket needed");
                 return true;
             }
 
-            if (_sessionInfo.SocketHandle <= 0)
+            LogVerbose($"Socket handle from drop file: {_sessionInfo.SocketHandle}");
+            LogVerbose($"Handle as hex: 0x{_sessionInfo.SocketHandle:X8}");
+
+            // Note: Socket handles on Windows can be any positive integer
+            // Handle 0 is technically valid but usually means "no handle"
+            if (_sessionInfo.SocketHandle < 0)
             {
                 Console.Error.WriteLine($"Invalid socket handle: {_sessionInfo.SocketHandle}");
+                LogVerbose("Handle is negative - this is definitely invalid");
+                return false;
+            }
+
+            if (_sessionInfo.SocketHandle == 0)
+            {
+                Console.Error.WriteLine("Socket handle is 0 - this usually means no socket was passed");
+                LogVerbose("Handle is 0 - the BBS may not be passing a socket handle");
+                LogVerbose("Try using --stdio flag instead for Standard I/O mode");
                 return false;
             }
 
             try
             {
                 // Create socket from inherited handle
+                LogVerbose($"Attempting to create socket from handle {_sessionInfo.SocketHandle}...");
                 _socket = CreateSocketFromHandle(_sessionInfo.SocketHandle);
 
-                if (_socket == null || !_socket.Connected)
+                if (_socket == null)
                 {
-                    Console.Error.WriteLine("Failed to create socket from handle or socket not connected");
+                    Console.Error.WriteLine("Failed to create socket from handle");
+                    LogVerbose("CreateSocketFromHandle returned null");
                     return false;
                 }
 
+                LogVerbose($"Socket created. AddressFamily={_socket.AddressFamily}, SocketType={_socket.SocketType}");
+                LogVerbose($"Socket.Connected property: {_socket.Connected}");
+
+                // Note: Connected may return false for valid inherited sockets
+                // We try to create the stream anyway and see if I/O works
+                if (!_socket.Connected)
+                {
+                    LogVerbose("Socket reports not connected, but trying to use it anyway...");
+                    Console.Error.WriteLine("Warning: Socket reports not connected (this may be normal for inherited handles)");
+                }
+
+                LogVerbose("Creating NetworkStream...");
                 _stream = new NetworkStream(_socket, ownsSocket: false);
+                LogVerbose($"NetworkStream created. CanRead={_stream.CanRead}, CanWrite={_stream.CanWrite}");
+
                 _reader = new StreamReader(_stream, Encoding.ASCII);
                 _writer = new StreamWriter(_stream, Encoding.ASCII) { AutoFlush = true };
+
+                LogVerbose("Socket initialization complete - attempting test write");
+
+                // Try a test write to verify the socket works
+                try
+                {
+                    var testBytes = new byte[] { 0 }; // NUL character - invisible
+                    _stream.Write(testBytes, 0, 0); // Zero-length write to test
+                    LogVerbose("Test write succeeded");
+                }
+                catch (Exception writeEx)
+                {
+                    LogVerbose($"Test write failed: {writeEx.Message}");
+                    Console.Error.WriteLine($"Socket test write failed: {writeEx.Message}");
+                    // Continue anyway - some BBSes may have unusual socket behavior
+                }
+
+                // Pause in verbose mode so user can read socket diagnostics
+                if (VerboseLogging)
+                {
+                    Console.Error.WriteLine("[SOCKET] Socket initialization complete. Press Enter to continue...");
+                    Console.ReadLine();
+                }
 
                 return true;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Failed to initialize socket: {ex.Message}");
+                LogVerbose($"Exception type: {ex.GetType().Name}");
+                LogVerbose($"Stack trace: {ex.StackTrace}");
                 return false;
             }
         }
@@ -270,21 +338,57 @@ namespace UsurperRemake.BBS
         /// </summary>
         private Socket? CreateSocketFromHandle(int handle)
         {
+            LogVerbose($"CreateSocketFromHandle({handle})");
+            LogVerbose($"Running on: {Environment.OSVersion.Platform} ({Environment.OSVersion})");
+            LogVerbose($"Is 64-bit process: {Environment.Is64BitProcess}");
+
             try
             {
                 // Create SafeSocketHandle from the inherited handle
-                // On Windows: this is a SOCKET handle
+                // On Windows: this is a SOCKET handle (UINT_PTR)
                 // On Linux: this is a file descriptor (int)
-                // Both work with SafeSocketHandle in .NET 6+
-                var safeHandle = new SafeSocketHandle(new IntPtr(handle), ownsHandle: false);
-                var socket = new Socket(safeHandle);
+                var intPtrHandle = new IntPtr(handle);
+                LogVerbose($"IntPtr created: {intPtrHandle}");
 
-                // Verify the socket is valid
-                if (!socket.Connected)
+                var safeHandle = new SafeSocketHandle(intPtrHandle, ownsHandle: false);
+                LogVerbose($"SafeSocketHandle created. IsInvalid={safeHandle.IsInvalid}, IsClosed={safeHandle.IsClosed}");
+
+                if (safeHandle.IsInvalid)
                 {
-                    Console.Error.WriteLine($"Socket from handle {handle} is not connected");
-                    // On some systems, Connected may return false even for valid sockets
-                    // Try to use it anyway if no exception was thrown
+                    Console.Error.WriteLine($"Handle {handle} is reported as invalid by SafeSocketHandle");
+                    LogVerbose("The handle may not be a valid socket, or it may not have been inherited properly");
+                    // Continue anyway - sometimes IsInvalid gives false positives
+                }
+
+                var socket = new Socket(safeHandle);
+                LogVerbose("Socket object created from SafeSocketHandle");
+
+                // Log socket properties
+                try
+                {
+                    LogVerbose($"AddressFamily: {socket.AddressFamily}");
+                    LogVerbose($"SocketType: {socket.SocketType}");
+                    LogVerbose($"ProtocolType: {socket.ProtocolType}");
+                    LogVerbose($"Blocking: {socket.Blocking}");
+                    LogVerbose($"Connected: {socket.Connected}");
+                    LogVerbose($"Available bytes: {socket.Available}");
+                }
+                catch (Exception propEx)
+                {
+                    LogVerbose($"Error reading socket properties: {propEx.Message}");
+                }
+
+                // On Windows, try to get local/remote endpoints for diagnostics
+                try
+                {
+                    if (socket.LocalEndPoint != null)
+                        LogVerbose($"LocalEndPoint: {socket.LocalEndPoint}");
+                    if (socket.RemoteEndPoint != null)
+                        LogVerbose($"RemoteEndPoint: {socket.RemoteEndPoint}");
+                }
+                catch (Exception epEx)
+                {
+                    LogVerbose($"Could not get endpoints: {epEx.Message}");
                 }
 
                 return socket;
@@ -292,7 +396,9 @@ namespace UsurperRemake.BBS
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"CreateSocketFromHandle failed: {ex.Message}");
-                Console.Error.WriteLine("This may be normal on some Linux BBSes - falling back to console I/O");
+                LogVerbose($"Exception type: {ex.GetType().Name}");
+                LogVerbose($"Stack trace: {ex.StackTrace}");
+                Console.Error.WriteLine("This may be normal on some BBSes - try using --stdio flag for Standard I/O mode");
                 return null;
             }
         }
