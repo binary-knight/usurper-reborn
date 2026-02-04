@@ -95,6 +95,17 @@ namespace UsurperRemake.BBS
 
         public BBSSessionInfo SessionInfo => _sessionInfo;
 
+        /// <summary>
+        /// Verbose logging for debugging (set by DoorMode)
+        /// </summary>
+        public static bool VerboseLogging { get; set; } = false;
+
+        private static void LogVerbose(string message)
+        {
+            if (VerboseLogging)
+                Console.Error.WriteLine($"[SERIAL] {message}");
+        }
+
         public SerialTerminal(BBSSessionInfo sessionInfo)
         {
             _sessionInfo = sessionInfo;
@@ -105,36 +116,123 @@ namespace UsurperRemake.BBS
         /// </summary>
         public bool Initialize()
         {
+            LogVerbose("Initialize() called");
+            LogVerbose($"Requested COM port: {_sessionInfo.ComPort}");
+            LogVerbose($"Requested baud rate: {_sessionInfo.BaudRate}");
+
+            // List available COM ports for debugging
+            try
+            {
+                var availablePorts = SerialPort.GetPortNames();
+                LogVerbose($"Available COM ports on system: {(availablePorts.Length > 0 ? string.Join(", ", availablePorts) : "(none found)")}");
+            }
+            catch (Exception ex)
+            {
+                LogVerbose($"Could not enumerate COM ports: {ex.Message}");
+            }
+
             try
             {
                 if (string.IsNullOrEmpty(_sessionInfo.ComPort))
                 {
                     Console.Error.WriteLine("No COM port specified in session info");
+                    LogVerbose("ERROR: ComPort is null or empty");
+                    if (VerboseLogging)
+                    {
+                        Console.Error.WriteLine("[SERIAL] Press Enter to continue...");
+                        Console.ReadLine();
+                    }
                     return false;
                 }
 
                 Console.Error.WriteLine($"Opening serial port: {_sessionInfo.ComPort} at {_sessionInfo.BaudRate} baud");
+                LogVerbose($"Creating SerialPort object...");
+
+                int baudRate = _sessionInfo.BaudRate > 0 ? _sessionInfo.BaudRate : 115200;
+                LogVerbose($"Using baud rate: {baudRate}");
 
                 _serialPort = new SerialPort(
                     _sessionInfo.ComPort,
-                    _sessionInfo.BaudRate > 0 ? _sessionInfo.BaudRate : 115200,
+                    baudRate,
                     Parity.None,
                     8,
                     StopBits.One
                 );
 
+                LogVerbose("SerialPort object created");
+                LogVerbose($"Setting timeouts: Read=30000ms, Write=5000ms");
+
                 _serialPort.ReadTimeout = 30000; // 30 second timeout
                 _serialPort.WriteTimeout = 5000;
                 _serialPort.Encoding = Encoding.GetEncoding(437); // CP437 for BBS
 
+                LogVerbose($"Attempting to open {_sessionInfo.ComPort}...");
                 _serialPort.Open();
 
+                LogVerbose($"Serial port opened successfully");
+                LogVerbose($"IsOpen: {_serialPort.IsOpen}");
+                LogVerbose($"BytesToRead: {_serialPort.BytesToRead}");
+                LogVerbose($"BytesToWrite: {_serialPort.BytesToWrite}");
+
                 Console.Error.WriteLine($"Serial port {_sessionInfo.ComPort} opened successfully");
+
+                // Pause in verbose mode
+                if (VerboseLogging)
+                {
+                    Console.Error.WriteLine("[SERIAL] Serial initialization complete. Press Enter to continue...");
+                    Console.ReadLine();
+                }
+
                 return true;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.Error.WriteLine($"Failed to open serial port: Access denied - {ex.Message}");
+                LogVerbose($"UnauthorizedAccessException: {ex.Message}");
+                LogVerbose("This usually means the COM port is in use by another application");
+                LogVerbose("Or the port exists but you don't have permission to access it");
+                if (VerboseLogging)
+                {
+                    Console.Error.WriteLine("[SERIAL] Press Enter to continue...");
+                    Console.ReadLine();
+                }
+                return false;
+            }
+            catch (System.IO.IOException ex)
+            {
+                Console.Error.WriteLine($"Failed to open serial port: I/O error - {ex.Message}");
+                LogVerbose($"IOException: {ex.Message}");
+                LogVerbose("This usually means the COM port does not exist or is not accessible");
+                if (VerboseLogging)
+                {
+                    Console.Error.WriteLine("[SERIAL] Press Enter to continue...");
+                    Console.ReadLine();
+                }
+                return false;
+            }
+            catch (ArgumentException ex)
+            {
+                Console.Error.WriteLine($"Failed to open serial port: Invalid argument - {ex.Message}");
+                LogVerbose($"ArgumentException: {ex.Message}");
+                LogVerbose("This usually means the COM port name or settings are invalid");
+                if (VerboseLogging)
+                {
+                    Console.Error.WriteLine("[SERIAL] Press Enter to continue...");
+                    Console.ReadLine();
+                }
+                return false;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Failed to open serial port: {ex.Message}");
+                LogVerbose($"Exception type: {ex.GetType().Name}");
+                LogVerbose($"Message: {ex.Message}");
+                LogVerbose($"Stack trace: {ex.StackTrace}");
+                if (VerboseLogging)
+                {
+                    Console.Error.WriteLine("[SERIAL] Press Enter to continue...");
+                    Console.ReadLine();
+                }
                 return false;
             }
         }

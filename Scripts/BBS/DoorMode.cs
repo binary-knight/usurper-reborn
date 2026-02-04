@@ -303,6 +303,7 @@ namespace UsurperRemake.BBS
                 if (_verboseMode)
                 {
                     SocketTerminal.VerboseLogging = true;
+                    SerialTerminal.VerboseLogging = true;
                     Console.Error.WriteLine("[VERBOSE] Session info from drop file:");
                     Console.Error.WriteLine($"[VERBOSE]   CommType: {_sessionInfo.CommType}");
                     Console.Error.WriteLine($"[VERBOSE]   SocketHandle: {_sessionInfo.SocketHandle} (0x{_sessionInfo.SocketHandle:X8})");
@@ -345,6 +346,11 @@ namespace UsurperRemake.BBS
                     {
                         Console.Error.WriteLine("Failed to initialize serial terminal");
                         Console.Error.WriteLine("Falling back to local console mode");
+                        if (_verboseMode)
+                        {
+                            Console.Error.WriteLine("[VERBOSE] FOSSIL/Serial initialization failed. Press Enter to continue...");
+                            Console.ReadLine();
+                        }
                         _sessionInfo.CommType = ConnectionType.Local;
 
                         // Fall back to socket terminal in local mode
@@ -371,6 +377,11 @@ namespace UsurperRemake.BBS
                     if (_sessionInfo.CommType != ConnectionType.Local)
                     {
                         Console.Error.WriteLine("Falling back to local console mode");
+                        if (_verboseMode)
+                        {
+                            Console.Error.WriteLine("[VERBOSE] Socket initialization failed. Press Enter to continue...");
+                            Console.ReadLine();
+                        }
                         _sessionInfo.CommType = ConnectionType.Local;
                     }
                 }
@@ -382,6 +393,13 @@ namespace UsurperRemake.BBS
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Terminal initialization failed: {ex.Message}");
+                if (_verboseMode)
+                {
+                    Console.Error.WriteLine($"[VERBOSE] Exception type: {ex.GetType().Name}");
+                    Console.Error.WriteLine($"[VERBOSE] Stack trace: {ex.StackTrace}");
+                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
+                    Console.ReadLine();
+                }
                 return null;
             }
         }
