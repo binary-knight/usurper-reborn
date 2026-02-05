@@ -40,6 +40,15 @@ jobs:
         env:
           DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
 
+      - name: Restore Tests dependencies
+        run: |
+          if [ -d "Tests" ] && [ -f "Tests/Tests.csproj" ]; then
+            echo "Restoring Tests project dependencies..."
+            dotnet restore Tests/Tests.csproj
+          fi
+        env:
+          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+
       - name: Build C# project
         run: dotnet build usurper-reloaded.csproj --configuration Release --no-restore
         env:
