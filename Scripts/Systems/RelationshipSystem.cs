@@ -256,6 +256,12 @@ public partial class RelationshipSystem
             RomanceTracker.Instance?.AddSpouse(npc1.ID);
         }
 
+        // Sync with NPCMarriageRegistry for NPC-NPC marriages
+        if (character1 is NPC npc1Marriage && character2 is NPC npc2Marriage)
+        {
+            NPCMarriageRegistry.Instance.RegisterMarriage(npc1Marriage.ID, npc2Marriage.ID, npc1Marriage.Name2, npc2Marriage.Name2);
+        }
+
         // Log the marriage event
         DebugLogger.Instance.LogMarriage(character1.Name, character2.Name);
 

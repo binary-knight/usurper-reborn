@@ -645,6 +645,9 @@ public partial class MagicShopLocation : BaseLocation
             // Apply city control discount if player's team controls the city
             adjustedPrice = CityControlSystem.Instance.ApplyDiscount(adjustedPrice, player);
 
+            // Apply faction discount (The Crown gets 10% off at shops)
+            adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
+
             // Check restrictions
             if (item.OnlyForGood && player.Chivalry < 1 && player.Darkness > 0)
             {
@@ -721,36 +724,47 @@ public partial class MagicShopLocation : BaseLocation
     private void SellItem(Character player)
     {
         DisplayMessage("");
-        
+
         if (player.Inventory.Count == 0)
         {
             DisplayMessage("You have nothing to sell.", "gray");
             return;
         }
-        
+
+        // Get Shadows faction fence bonus modifier (1.0 normal, 1.2 with Shadows)
+        var fenceModifier = FactionSystem.Instance.GetFencePriceModifier();
+        bool hasFenceBonus = fenceModifier > 1.0f;
+
+        if (hasFenceBonus)
+        {
+            DisplayMessage("  [Shadows Bonus: +20% sell prices]", "bright_magenta");
+            DisplayMessage("");
+        }
+
         DisplayMessage("Your inventory:", "cyan");
         for (int i = 0; i < player.Inventory.Count; i++)
         {
             var item = player.Inventory[i];
-            DisplayMessage($"{i + 1}. {item.Name} (worth {item.Value / 2:N0} gold)", "white");
+            long displayPrice = (long)((item.Value / 2) * fenceModifier);
+            DisplayMessage($"{i + 1}. {item.Name} (worth {displayPrice:N0} gold)", "white");
         }
-        
+
         DisplayMessage("");
         DisplayMessage("Enter item # to sell (0 to cancel): ", "yellow", false);
         string input = Console.ReadLine();
-        
+
         if (int.TryParse(input, out int itemIndex) && itemIndex > 0 && itemIndex <= player.Inventory.Count)
         {
             var item = player.Inventory[itemIndex - 1];
-            long sellPrice = item.Value / 2; // Magic shop buys at 50% value
-            
+            long sellPrice = (long)((item.Value / 2) * fenceModifier); // Apply faction bonus
+
             // Check if shop wants this item type
             if (item.Type == ObjType.Magic || item.MagicType != MagicItemType.None)
             {
                 DisplayMessage($"Sell {item.Name} for {sellPrice:N0} gold? (Y/N): ", "yellow", false);
                 var confirm = Console.ReadKey().KeyChar.ToString().ToUpper();
                 DisplayMessage("");
-                
+
                 if (confirm == "Y")
                 {
                     player.Inventory.RemoveAt(itemIndex - 1);
@@ -909,6 +923,9 @@ public partial class MagicShopLocation : BaseLocation
             
             // Apply city control discount
             long adjustedCost = CityControlSystem.Instance.ApplyDiscount(totalCost, player);
+
+            // Apply faction discount (The Crown gets 10% off at shops)
+            adjustedCost = (long)(adjustedCost * FactionSystem.Instance.GetShopPriceModifier());
 
             if (player.Gold >= adjustedCost)
             {

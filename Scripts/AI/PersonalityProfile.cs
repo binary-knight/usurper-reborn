@@ -550,22 +550,62 @@ public class PersonalityProfile
 
     /// <summary>
     /// Calculate how likely this personality is to respond positively to flirting
+    /// Takes into account NPC personality, relationship level, and whether NPC is already committed
     /// </summary>
-    public float GetFlirtReceptiveness(float currentRelationshipLevel, bool isAttracted)
+    /// <param name="currentRelationshipLevel">0=Soulmate, 50=Neutral, 100=Hated</param>
+    /// <param name="isAttracted">Whether NPC is attracted to player's gender</param>
+    /// <param name="npcIsMarried">Whether this NPC is already married</param>
+    /// <param name="npcHasLover">Whether this NPC already has a lover</param>
+    public float GetFlirtReceptiveness(float currentRelationshipLevel, bool isAttracted,
+        bool npcIsMarried = false, bool npcHasLover = false)
     {
-        if (!isAttracted) return 0.1f; // Very unlikely if not attracted
+        // Not attracted = very unlikely (but not impossible for very high-flirt personalities)
+        if (!isAttracted)
+            return Flirtatiousness > 0.8f ? 0.05f : 0.02f;
 
-        // Base receptiveness from personality
-        float receptiveness = Flirtatiousness * 0.4f + Sensuality * 0.3f + Sociability * 0.2f;
+        // NPC is married with high commitment = impossible
+        if (npcIsMarried && Commitment > 0.7f)
+            return 0.01f; // Virtually impossible - they're loyal
 
-        // Better relationship = more receptive
-        receptiveness += (1f - currentRelationshipLevel / 110f) * 0.3f;
+        // NPC is married but lower commitment = very hard
+        if (npcIsMarried)
+            return ClampFloat(0.05f + (1f - Commitment) * 0.1f, 0.01f, 0.15f);
 
-        // Shy/reserved people need more relationship first
-        if (Sociability < 0.4f && currentRelationshipLevel > 50)
-            receptiveness *= 0.5f;
+        // NPC has a lover and is jealous/committed = very hard
+        if (npcHasLover && (Jealousy > 0.6f || Commitment > 0.6f))
+            return ClampFloat(0.08f + Flirtatiousness * 0.1f, 0.05f, 0.20f);
 
-        return ClampFloat(receptiveness, 0f, 1f);
+        // Base receptiveness from personality - LOWER baseline than before
+        // Flirtatiousness is the main driver, other traits contribute less
+        float receptiveness = Flirtatiousness * 0.35f + Sensuality * 0.15f;
+
+        // High commitment people are harder to flirt with (they want serious relationships, not casual flirting)
+        receptiveness -= Commitment * 0.15f;
+
+        // Sociability helps slightly
+        receptiveness += Sociability * 0.08f;
+
+        // Relationship level matters more now
+        // Need decent relationship (< 60) before flirting has good odds
+        if (currentRelationshipLevel > 70)
+            receptiveness *= 0.3f; // Strangers are very unreceptive
+        else if (currentRelationshipLevel > 50)
+            receptiveness *= 0.6f; // Acquaintances are somewhat unreceptive
+        else if (currentRelationshipLevel > 30)
+            receptiveness *= 0.85f; // Friends are more receptive
+        // Good friends and better get no penalty
+
+        // Shy/reserved people need even more relationship first
+        if (Sociability < 0.3f && currentRelationshipLevel > 40)
+            receptiveness *= 0.4f;
+        else if (Sociability < 0.5f && currentRelationshipLevel > 50)
+            receptiveness *= 0.6f;
+
+        // Tenderness affects approachability
+        if (Tenderness < 0.3f && currentRelationshipLevel > 40)
+            receptiveness *= 0.7f; // Cold personalities are harder to approach
+
+        return ClampFloat(receptiveness, 0.02f, 0.75f); // Cap at 75% even in best case
     }
 
     /// <summary>

@@ -476,6 +476,9 @@ public class ArmorShopLocation : BaseLocation
         // Apply city control discount if player's team controls the city
         adjustedPrice = CityControlSystem.Instance.ApplyDiscount(adjustedPrice, currentPlayer);
 
+        // Apply faction discount (The Crown gets 10% off at shops)
+        adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
+
         if (currentPlayer.Gold < adjustedPrice)
         {
             terminal.WriteLine("");
@@ -570,6 +573,17 @@ public class ArmorShopLocation : BaseLocation
         terminal.WriteLine("═══ Sell Armor ═══");
         terminal.WriteLine("");
 
+        // Get Shadows faction fence bonus modifier (1.0 normal, 1.2 with Shadows)
+        var fenceModifier = FactionSystem.Instance.GetFencePriceModifier();
+        bool hasFenceBonus = fenceModifier > 1.0f;
+
+        if (hasFenceBonus)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("  [Shadows Bonus: +20% sell prices]");
+            terminal.WriteLine("");
+        }
+
         // Track all sellable items - equipped and inventory
         var sellableItems = new List<(bool isEquipped, EquipmentSlot? slot, int? invIndex, string name, long value, bool isCursed)>();
         int num = 1;
@@ -584,7 +598,7 @@ public class ArmorShopLocation : BaseLocation
             if (item != null)
             {
                 sellableItems.Add((true, slot, null, item.Name, item.Value, item.IsCursed));
-                long sellPrice = item.Value / 2;
+                long sellPrice = (long)((item.Value / 2) * fenceModifier);
 
                 terminal.SetColor("bright_cyan");
                 terminal.Write($"{num}. ");
@@ -616,13 +630,14 @@ public class ArmorShopLocation : BaseLocation
             foreach (var (item, invIndex) in inventoryArmor)
             {
                 sellableItems.Add((false, null, invIndex, item.Name, item.Value, item.IsCursed));
+                long displayPrice = (long)((item.Value / 2) * fenceModifier);
                 terminal.SetColor("bright_cyan");
                 terminal.Write($"{num}. ");
                 terminal.SetColor("white");
                 terminal.Write($"{item.Name}");
                 terminal.Write($" (AC:{item.Armor})");
                 terminal.SetColor("yellow");
-                terminal.WriteLine($" - Sell for {FormatNumber(item.Value / 2)} gold");
+                terminal.WriteLine($" - Sell for {FormatNumber(displayPrice)} gold");
                 num++;
             }
         }
@@ -646,7 +661,7 @@ public class ArmorShopLocation : BaseLocation
         }
 
         var selected = sellableItems[sellChoice - 1];
-        long price = selected.value / 2;
+        long price = (long)((selected.value / 2) * fenceModifier);
 
         // Check if cursed
         if (selected.isCursed)
@@ -724,9 +739,10 @@ public class ArmorShopLocation : BaseLocation
                 .ThenBy(i => i.Value)
                 .ToList();
 
-            // Filter to only affordable items based on current gold
+            // Filter to only affordable items based on current gold (include faction discount)
+            var factionMod = FactionSystem.Instance.GetShopPriceModifier();
             var currentlyAffordable = affordableArmor
-                .Where(i => CityControlSystem.Instance.ApplyDiscount(i.Value, currentPlayer) <= currentPlayer.Gold)
+                .Where(i => (long)(CityControlSystem.Instance.ApplyDiscount(i.Value, currentPlayer) * factionMod) <= currentPlayer.Gold)
                 .ToList();
 
             if (currentlyAffordable.Count == 0)
@@ -752,6 +768,8 @@ public class ArmorShopLocation : BaseLocation
                 // Re-check affordability since gold may have changed
                 var armor = currentlyAffordable[armorIndex];
                 long itemPrice = CityControlSystem.Instance.ApplyDiscount(armor.Value, currentPlayer);
+                // Apply faction discount (The Crown gets 10% off at shops)
+                itemPrice = (long)(itemPrice * FactionSystem.Instance.GetShopPriceModifier());
 
                 if (itemPrice > currentPlayer.Gold)
                 {

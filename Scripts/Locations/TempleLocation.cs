@@ -163,6 +163,10 @@ public partial class TempleLocation : BaseLocation
                         await VisitMeditationChapel();
                         break;
 
+                    case "F": // The Faith faction recruitment
+                        await ShowFaithRecruitment();
+                        break;
+
                     case GameConfig.TempleMenuReturn: // "R"
                         exitLocation = true;
                         break;
@@ -416,6 +420,35 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("(someone prays alone...)");
         }
 
+        // The Faith faction option - only show if player isn't already a member
+        var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
+        if (factionSystem.PlayerFaction != UsurperRemake.Systems.Faction.TheFaith)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("F");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("The Faith ");
+            if (factionSystem.PlayerFaction == null)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("(seek the High Priestess...)");
+            }
+            else
+            {
+                terminal.SetColor("dark_red");
+                terminal.WriteLine("(you serve another...)");
+            }
+        }
+        else
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(" You are a member of The Faith.");
+        }
+
         terminal.SetColor("darkgray");
         terminal.Write(" [");
         terminal.SetColor("bright_red");
@@ -485,12 +518,11 @@ public partial class TempleLocation : BaseLocation
         
         if (goAhead)
         {
-            terminal.WriteLine("Select a God to worship", "white");
-            var selectedGod = await SelectGod();
-            
+            var selectedGod = await SelectGod("Choose a god to worship");
+
             if (selectedGod != null)
             {
-                terminal.WriteLine("Ok.", "green");
+                terminal.WriteLine("");
                 terminal.WriteLine($"You raise your hands and pray to the almighty {selectedGod.Name}", "white");
                 terminal.Write("for forgiveness", "white");
                 
@@ -539,9 +571,9 @@ public partial class TempleLocation : BaseLocation
             return;
         }
         
-        var selectedGod = await SelectGod("Select god to desecrate altar");
+        var selectedGod = await SelectGod("Select god to desecrate altar", requireConfirmation: false);
         if (selectedGod == null) return;
-        
+
         string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         if (!string.IsNullOrEmpty(playerGod) && playerGod == selectedGod.Name)
         {
@@ -550,9 +582,14 @@ public partial class TempleLocation : BaseLocation
             await Task.Delay(2000);
             return;
         }
-        
-        var confirmChoice = await terminal.GetInputAsync($"Desecrate {selectedGod.Name}'s altar? (Y/N) ");
-        if (confirmChoice.ToUpper() != "Y") return;
+
+        terminal.SetColor("red");
+        var confirmChoice = await terminal.GetInputAsync($"Are you SURE you want to desecrate {selectedGod.Name}'s altar? (Y/N) ");
+        if (confirmChoice.ToUpper() != "Y")
+        {
+            terminal.WriteLine("Wise choice. The gods remember those who show respect.", "gray");
+            return;
+        }
 
         await PerformEnhancedDesecration(selectedGod);
     }
@@ -572,10 +609,9 @@ public partial class TempleLocation : BaseLocation
             return;
         }
         
-        terminal.WriteLine("═══ Who shall receive your gift ═══", "cyan");
-        var selectedGod = await SelectGod();
+        var selectedGod = await SelectGod("Who shall receive your gift?", requireConfirmation: false);
         if (selectedGod == null) return;
-        
+
         string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         bool wrongGod = false;
         bool goAhead = true;
@@ -690,49 +726,150 @@ public partial class TempleLocation : BaseLocation
     
     /// <summary>
     /// Select a god from available options (Pascal Select_A_God function)
+    /// Shows the list automatically and supports partial name matching
     /// </summary>
-    private async Task<God> SelectGod(string prompt = "Select a god")
+    private async Task<God?> SelectGod(string prompt = "Select a god", bool requireConfirmation = true)
     {
-        var activeGods = godSystem.GetActiveGods();
+        var activeGods = godSystem.GetActiveGods().OrderBy(g => g.Name).ToList();
         if (activeGods.Count == 0)
         {
             terminal.WriteLine("No gods are available.", "red");
             await Task.Delay(1000);
             return null;
         }
-        
+
+        // Always show the list first
+        DisplayGodListCompact(activeGods);
+
         while (true)
         {
-            terminal.WriteLine($"{prompt} (press ? for list):", "white");
-            var input = await terminal.GetInputAsync("");
-            
-            if (input == "?")
-            {
-                await DisplayGodList();
-                continue;
-            }
-            
+            terminal.WriteLine("");
+            terminal.WriteLine($"{prompt} (or press Enter to cancel):", "white");
+            var input = await terminal.GetInputAsync("> ");
+
             if (string.IsNullOrEmpty(input))
             {
                 return null;
             }
-            
-            var selectedGod = activeGods.FirstOrDefault(g => 
-                g.Name.Equals(input, StringComparison.OrdinalIgnoreCase));
-                
-            if (selectedGod != null)
+
+            // Find matching gods (partial match, case-insensitive)
+            var matches = activeGods.Where(g =>
+                g.Name.StartsWith(input, StringComparison.OrdinalIgnoreCase) ||
+                g.Name.Contains(input, StringComparison.OrdinalIgnoreCase)
+            ).ToList();
+
+            if (matches.Count == 0)
             {
-                return selectedGod;
+                terminal.WriteLine($"No god found matching '{input}'. Try again.", "red");
+                continue;
             }
-            
-            terminal.WriteLine("God not found. Try again or press ? for list.", "red");
+
+            God selectedGod;
+            if (matches.Count == 1)
+            {
+                selectedGod = matches[0];
+            }
+            else
+            {
+                // Multiple matches - prefer exact start match, then show options
+                var startsWithMatch = matches.FirstOrDefault(g =>
+                    g.Name.StartsWith(input, StringComparison.OrdinalIgnoreCase));
+
+                if (startsWithMatch != null && matches.Count(g =>
+                    g.Name.StartsWith(input, StringComparison.OrdinalIgnoreCase)) == 1)
+                {
+                    selectedGod = startsWithMatch;
+                }
+                else
+                {
+                    // Show ambiguous matches
+                    terminal.WriteLine("");
+                    terminal.WriteLine("Multiple matches found:", "yellow");
+                    foreach (var match in matches)
+                    {
+                        string alignment = match.Goodness > match.Darkness ? "(Light)" : match.Darkness > match.Goodness ? "(Dark)" : "(Neutral)";
+                        terminal.WriteLine($"  - {match.Name} {alignment}", "white");
+                    }
+                    terminal.WriteLine("Please be more specific.", "gray");
+                    continue;
+                }
+            }
+
+            // Show selected god and ask for confirmation
+            string godAlignment = selectedGod.Goodness > selectedGod.Darkness ? "Light" :
+                                  selectedGod.Darkness > selectedGod.Goodness ? "Dark" : "Neutral";
+            string alignColor = godAlignment == "Light" ? "bright_cyan" :
+                               godAlignment == "Dark" ? "dark_red" : "yellow";
+
+            terminal.WriteLine("");
+            terminal.SetColor(alignColor);
+            terminal.WriteLine($"You have selected: {selectedGod.Name}, {selectedGod.GetTitle()}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  Alignment: {godAlignment} | Believers: {selectedGod.Believers}");
+
+            if (requireConfirmation)
+            {
+                terminal.WriteLine("");
+                var confirm = await terminal.GetInputAsync($"Are you sure you want to choose {selectedGod.Name}? (Y/N) ");
+                if (confirm.ToUpper() != "Y")
+                {
+                    terminal.WriteLine("Selection cancelled.", "gray");
+                    continue;
+                }
+            }
+
+            return selectedGod;
         }
     }
-    
+
     /// <summary>
-    /// Display list of available gods
+    /// Display a compact list of available gods for selection
     /// </summary>
-    private async Task DisplayGodList()
+    private void DisplayGodListCompact(List<God> gods)
+    {
+        terminal.WriteLine("");
+        terminal.WriteLine("═══ Available Gods ═══", "cyan");
+        terminal.WriteLine("");
+
+        if (gods.Count == 0)
+        {
+            terminal.WriteLine("No gods currently accept worshippers.", "gray");
+            return;
+        }
+
+        foreach (var god in gods)
+        {
+            // Get domain/title from properties or use GetTitle()
+            string domain = god.Properties.ContainsKey("Domain")
+                ? god.Properties["Domain"]?.ToString() ?? god.GetTitle()
+                : god.GetTitle();
+
+            // Color based on alignment
+            string color = "yellow";
+            string alignmentMarker = " ";
+            if (god.Goodness > god.Darkness * 2)
+            {
+                color = "bright_cyan";
+                alignmentMarker = "+";  // Light
+            }
+            else if (god.Darkness > god.Goodness * 2)
+            {
+                color = "dark_red";
+                alignmentMarker = "*";  // Dark
+            }
+
+            terminal.WriteLine($"  {alignmentMarker} {god.Name} - {domain}", color);
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine("(Type part of a god's name to select, e.g., 'Sol' for Solarius)");
+    }
+
+    /// <summary>
+    /// Display list of available gods (full details version)
+    /// </summary>
+    private void DisplayGodList()
     {
         terminal.WriteLine("");
         terminal.WriteLine("═══ Available Gods ═══", "cyan");
@@ -751,7 +888,7 @@ public partial class TempleLocation : BaseLocation
         {
             // Get domain/title from properties or use GetTitle()
             string domain = god.Properties.ContainsKey("Domain")
-                ? god.Properties["Domain"].ToString()
+                ? god.Properties["Domain"]?.ToString() ?? god.GetTitle()
                 : god.GetTitle();
 
             // Color based on alignment
@@ -920,12 +1057,66 @@ public partial class TempleLocation : BaseLocation
             }
         }
 
-        // Use good deed
-        currentPlayer.ChivNr--;
+        // Check if god is evil (Darkness > Goodness) to determine faction effect
+        bool isEvilGod = god.Darkness > god.Goodness;
+        int standingGain = Math.Max(1, (int)(goldAmount / 100));
+
+        if (isEvilGod)
+        {
+            // Evil god sacrifice - dark act
+            currentPlayer.DarkNr++;
+            currentPlayer.Darkness += standingGain;
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheShadows, standingGain);
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"The darkness accepts your offering. (+{standingGain} Shadows standing)");
+        }
+        else
+        {
+            // Good god sacrifice - light act
+            currentPlayer.ChivNr++;
+            currentPlayer.Chivalry += standingGain;
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, standingGain);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"Your devotion has been noted. (+{standingGain} Faith standing)");
+        }
+
+        // Divine Wrath System - record betrayal when sacrificing to wrong god
+        if (wrongGod && !string.IsNullOrEmpty(playerGod))
+        {
+            // Check if player's god is opposite alignment from the one they're sacrificing to
+            var playerGodData = godSystem.GetGod(playerGod);
+            bool playerGodIsEvil = playerGodData != null && playerGodData.Darkness > playerGodData.Goodness;
+            bool isOppositeAlignment = playerGodIsEvil != isEvilGod;
+
+            // Severity: 1 = same alignment different god, 2 = opposite alignment, 3 = opposite + large sacrifice
+            int severity = 1;
+            if (isOppositeAlignment) severity = 2;
+            if (isOppositeAlignment && goldAmount >= 500) severity = 3;
+
+            currentPlayer.RecordDivineWrath(playerGod, god.Name, severity);
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_red");
+            if (severity >= 3)
+            {
+                terminal.WriteLine($"*** {playerGod.ToUpper()} SEETHES WITH RAGE! ***");
+                terminal.WriteLine("Your betrayal will not be forgotten. The dungeons hold your fate.");
+            }
+            else if (severity == 2)
+            {
+                terminal.WriteLine($"{playerGod} grows furious at your treachery!");
+                terminal.WriteLine("Darkness awaits you in the depths below...");
+            }
+            else
+            {
+                terminal.WriteLine($"{playerGod} is displeased by your unfaithfulness.");
+                terminal.WriteLine("Beware the shadows in your future...");
+            }
+        }
 
         await Task.Delay(3000);
     }
-    
+
     /// <summary>
     /// Verify player's god still exists (Pascal TEMPLE.PAS)
     /// </summary>
@@ -1402,6 +1593,9 @@ public partial class TempleLocation : BaseLocation
         currentPlayer.WeapPow = 0;
         // Note: WeaponName is derived from equipment slots
 
+        // Apply faction effects based on god alignment
+        ApplyFactionEffectForSacrifice(godName, (int)Math.Max(1, powerGained / 10));
+
         // Generate news
         NewsSystem.Instance.Newsy(false, $"{currentPlayer.Name2} sacrificed their weapon to {godName} at the Temple.");
 
@@ -1441,6 +1635,9 @@ public partial class TempleLocation : BaseLocation
 
         currentPlayer.ArmPow = 0;
         // Note: ArmorName is derived from equipment slots
+
+        // Apply faction effects based on god alignment
+        ApplyFactionEffectForSacrifice(godName, (int)Math.Max(1, powerGained / 10));
 
         NewsSystem.Instance.Newsy(false, $"{currentPlayer.Name2} sacrificed their armor to {godName} at the Temple.");
 
@@ -1496,7 +1693,40 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine($"{godName} fully restores your health!", "bright_green");
         }
 
+        // Apply faction effects based on god alignment
+        ApplyFactionEffectForSacrifice(godName, Math.Max(1, amount / 2));
+
         await Task.Delay(2500);
+    }
+
+    /// <summary>
+    /// Apply faction standing effects based on god alignment
+    /// Good gods (Goodness > Darkness) = Light action → Faith standing
+    /// Evil gods (Darkness > Goodness) = Dark action → Shadows standing
+    /// </summary>
+    private void ApplyFactionEffectForSacrifice(string godName, int amount)
+    {
+        var god = godSystem.GetGod(godName);
+        if (god == null) return;
+
+        bool isEvilGod = god.Darkness > god.Goodness;
+
+        if (isEvilGod)
+        {
+            currentPlayer.DarkNr++;
+            currentPlayer.Darkness += amount;
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheShadows, amount);
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"The darkness notes your devotion. (+{amount} Shadows standing)");
+        }
+        else
+        {
+            currentPlayer.ChivNr++;
+            currentPlayer.Chivalry += amount;
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, amount);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"The light notes your devotion. (+{amount} Faith standing)");
+        }
     }
 
     /// <summary>
@@ -1752,6 +1982,22 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("Your prayers go unanswered today...", "gray");
         }
 
+        // Apply small faction effect for daily prayer based on god alignment
+        if (alignment > 0.3f)
+        {
+            // Good god - light action
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, 1);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("(+1 Faith standing)");
+        }
+        else if (alignment < -0.3f)
+        {
+            // Evil god - dark action
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheShadows, 1);
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("(+1 Shadows standing)");
+        }
+
         await Task.Delay(2000);
         refreshMenu = true;
     }
@@ -1989,6 +2235,209 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("You squeeze her shoulder gently and leave.");
             terminal.WriteLine("Perhaps another time.");
         }
+    }
+
+    #endregion
+
+    #region The Faith Faction Recruitment
+
+    /// <summary>
+    /// Show The Faith faction recruitment UI
+    /// Meet High Priestess Mirael and potentially join The Faith
+    /// </summary>
+    private async Task ShowFaithRecruitment()
+    {
+        var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                              THE FAITH                                       ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("You approach the inner sanctum of the Temple, where only the most");
+        terminal.WriteLine("devoted are permitted. An elderly priestess in white robes greets you.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"I am High Priestess Mirael,\" she says, her voice gentle but firm.");
+        terminal.WriteLine("\"I have watched your journey with interest, traveler.\"");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Check if already in a faction
+        if (factionSystem.PlayerFaction != null)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("She studies you with knowing eyes.");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"\"You already serve {UsurperRemake.Systems.FactionSystem.Factions[factionSystem.PlayerFaction.Value].Name}.\"");
+            terminal.WriteLine("\"The Faith does not accept divided loyalties.\"");
+            terminal.WriteLine("\"Should you ever renounce your current allegiance, seek me again.\"");
+            terminal.WriteLine("");
+            await terminal.GetInputAsync("Press Enter to continue...");
+            refreshMenu = true;
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.WriteLine("She gestures to the sacred flames burning eternally on the altar.");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"The Faith believes the Old Gods were once pure and good.\"");
+        terminal.WriteLine("\"They guided humanity with love, wisdom, and truth.\"");
+        terminal.WriteLine("\"But mortal worship corrupted them - our fears, our hatreds,\"");
+        terminal.WriteLine("\"our lies... they absorbed them all until they broke.\"");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("\"We believe the gods can be HEALED, not destroyed.\"");
+        terminal.WriteLine("\"Through devotion, sacrifice, and unwavering faith,\"");
+        terminal.WriteLine("\"we will restore them to their former glory.\"");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Show faction benefits
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("═══ Benefits of The Faith ═══");
+        terminal.SetColor("white");
+        terminal.WriteLine("• 25% discount on healing services at all healers");
+        terminal.WriteLine("• Access to special healing prayers and blessings");
+        terminal.WriteLine("• Friendly treatment from clerics and temple NPCs");
+        terminal.WriteLine("• Standing with The Faith grows through devotion");
+        terminal.WriteLine("");
+
+        // Check requirements
+        var (canJoin, reason) = factionSystem.CanJoinFaction(UsurperRemake.Systems.Faction.TheFaith, currentPlayer);
+
+        if (!canJoin)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("═══ Requirements Not Met ═══");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(reason);
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine("The Faith requires:");
+            terminal.WriteLine("• Level 10 or higher");
+            terminal.WriteLine("• Faith Standing 100+ (make gold offerings, pray daily)");
+            terminal.WriteLine($"  Your Faith Standing: {factionSystem.FactionStanding[UsurperRemake.Systems.Faction.TheFaith]}");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("\"Return when your faith burns brighter,\" Mirael says kindly.");
+            terminal.WriteLine("\"Make offerings at our altars. Pray daily. Show your devotion.\"");
+            await terminal.GetInputAsync("Press Enter to continue...");
+            refreshMenu = true;
+            return;
+        }
+
+        // Can join - offer the choice
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("═══ Requirements Met ═══");
+        terminal.SetColor("white");
+        terminal.WriteLine("High Priestess Mirael extends her hand toward you.");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"Your devotion has been noted. Your offerings accepted.\"");
+        terminal.WriteLine("\"Will you take the sacred oath and join The Faith?\"");
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("WARNING: Joining The Faith will:");
+        terminal.WriteLine("• Lock you out of The Crown and The Shadows");
+        terminal.WriteLine("• Decrease standing with rival factions by 100");
+        terminal.WriteLine("");
+
+        var choice = await terminal.GetInputAsync("Join The Faith? (Y/N) ");
+
+        if (choice.ToUpper() == "Y")
+        {
+            await PerformFaithOath(factionSystem);
+        }
+        else
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Mirael nods with understanding.");
+            terminal.WriteLine("\"The path of faith is not for everyone. But know this:\"");
+            terminal.WriteLine("\"Our doors remain open, should you ever seek the light.\"");
+        }
+
+        await terminal.GetInputAsync("Press Enter to continue...");
+        refreshMenu = true;
+    }
+
+    /// <summary>
+    /// Perform the oath ceremony to join The Faith
+    /// </summary>
+    private async Task PerformFaithOath(UsurperRemake.Systems.FactionSystem factionSystem)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                         THE SACRED OATH                                      ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("You kneel before the sacred flames.");
+        terminal.WriteLine("High Priestess Mirael stands before you, her hands raised.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"Repeat after me:\"");
+        terminal.WriteLine("");
+        await Task.Delay(1000);
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("\"I pledge my soul to the restoration of the gods.\"");
+        await Task.Delay(1200);
+        terminal.WriteLine("\"I will heal what is broken, mend what is torn.\"");
+        await Task.Delay(1200);
+        terminal.WriteLine("\"Through faith, I will be the light in darkness.\"");
+        await Task.Delay(1200);
+        terminal.WriteLine("\"Until the gods are pure, I shall not rest.\"");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("The sacred flames flare brightly, bathing you in warm light.");
+        terminal.WriteLine("You feel a profound sense of peace wash over you.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Actually join the faction
+        factionSystem.JoinFaction(UsurperRemake.Systems.Faction.TheFaith, currentPlayer);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║              YOU HAVE JOINED THE FAITH                                       ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"Welcome, child of the light,\" Mirael says warmly.");
+        terminal.WriteLine("\"You are now one of us. May your faith never waver.\"");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("As a member of The Faith, you will receive:");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("• 25% discount on all healing services");
+        terminal.WriteLine("• Recognition from Temple NPCs");
+        terminal.WriteLine("• Access to Faith-only blessings and prayers");
+        terminal.WriteLine("");
+
+        // Generate news
+        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has joined The Faith and sworn the Sacred Oath!");
+
+        // Log to debug
+        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("FACTION", $"{currentPlayer.Name2} joined The Faith");
     }
 
     #endregion

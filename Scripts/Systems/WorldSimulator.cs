@@ -116,6 +116,9 @@ public class WorldSimulator
 
                 // NPCs have a chance to do additional activities each tick
                 ProcessNPCActivities(npc, worldState);
+
+                // Process NPC relationships (marriages, friendships, enemies)
+                EnhancedNPCBehaviors.ProcessNPCRelationships(npc, npcs);
             }
             catch (Exception ex)
             {

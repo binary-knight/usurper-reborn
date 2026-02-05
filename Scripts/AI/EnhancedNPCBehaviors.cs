@@ -1,4 +1,5 @@
 using UsurperRemake.Utils;
+using UsurperRemake.Systems;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -407,7 +408,423 @@ public static class EnhancedNPCBehaviors
     private static void SendItemNotificationMail(NPC npc, int itemId) { /* Mail implementation */ }
     private static void OptimizeNPCEquipment(NPC npc) { /* Equipment optimization */ }
     private static int CalculateItemCost(string itemType, int level) => level * 50 + random.Next(25, 100);
-    private static void AttemptNPCMarriage(NPC npc, List<NPC> candidates) { /* Marriage logic */ }
+
+    /// <summary>
+    /// Attempt NPC-to-NPC marriage - finds compatible partner and marries them
+    /// </summary>
+    private static void AttemptNPCMarriage(NPC npc, List<NPC> candidates)
+    {
+        if (npc.Married || npc.IsMarried) return;
+        if (npc.IsDead || !npc.IsAlive) return;
+
+        var profile = npc.Brain?.Personality;
+        if (profile == null) return;
+
+        // Asexual NPCs don't seek marriage (but could still be approached)
+        if (profile.Orientation == SexualOrientation.Asexual) return;
+
+        // Get NPC's gender for attraction checks
+        var npcGender = profile.Gender;
+
+        // Find eligible partners
+        var eligiblePartners = candidates.Where(c =>
+            c.ID != npc.ID &&
+            !c.IsDead && c.IsAlive &&
+            !c.Married && !c.IsMarried &&
+            c.Level >= 5 &&
+            c.Brain?.Personality != null &&
+            Math.Abs(c.Level - npc.Level) <= 10 && // Similar level range
+            IsCompatibleForMarriage(npc, c)
+        ).ToList();
+
+        if (eligiblePartners.Count == 0) return;
+
+        // Score potential partners
+        var scoredPartners = eligiblePartners
+            .Select(p => new { Partner = p, Score = CalculateMarriageCompatibility(npc, p) })
+            .Where(x => x.Score > 0.3f) // Minimum compatibility threshold
+            .OrderByDescending(x => x.Score)
+            .ToList();
+
+        if (scoredPartners.Count == 0) return;
+
+        // Pick from top candidates with some randomness
+        var topCandidates = scoredPartners.Take(3).ToList();
+        var chosen = topCandidates[random.Next(topCandidates.Count)];
+
+        // Marriage success chance based on compatibility
+        float marriageChance = chosen.Score * 0.5f; // Max 50% even with perfect compatibility
+        if (random.NextDouble() > marriageChance) return;
+
+        // Execute the marriage!
+        ExecuteNPCMarriage(npc, chosen.Partner);
+    }
+
+    /// <summary>
+    /// Check if two NPCs are compatible for marriage (mutual attraction)
+    /// </summary>
+    private static bool IsCompatibleForMarriage(NPC npc1, NPC npc2)
+    {
+        var profile1 = npc1.Brain?.Personality;
+        var profile2 = npc2.Brain?.Personality;
+
+        if (profile1 == null || profile2 == null) return false;
+
+        // Both must be attracted to each other
+        bool npc1AttractedTo2 = profile1.IsAttractedTo(profile2.Gender);
+        bool npc2AttractedTo1 = profile2.IsAttractedTo(profile1.Gender);
+
+        return npc1AttractedTo2 && npc2AttractedTo1;
+    }
+
+    /// <summary>
+    /// Calculate marriage compatibility score between two NPCs
+    /// </summary>
+    private static float CalculateMarriageCompatibility(NPC npc1, NPC npc2)
+    {
+        var profile1 = npc1.Brain?.Personality;
+        var profile2 = npc2.Brain?.Personality;
+
+        if (profile1 == null || profile2 == null) return 0f;
+
+        float score = 0.5f; // Base compatibility
+
+        // Same class bonus
+        if (npc1.Class == npc2.Class) score += 0.1f;
+
+        // Similar alignment
+        bool bothGood = npc1.Chivalry > npc1.Darkness && npc2.Chivalry > npc2.Darkness;
+        bool bothEvil = npc1.Darkness > npc1.Chivalry && npc2.Darkness > npc2.Chivalry;
+        if (bothGood || bothEvil) score += 0.15f;
+
+        // Personality compatibility - opposites can attract but similar is safer
+        float flirtDiff = Math.Abs(profile1.Flirtatiousness - profile2.Flirtatiousness);
+        float commitDiff = Math.Abs(profile1.Commitment - profile2.Commitment);
+
+        // Similar commitment levels are important for marriage stability
+        if (commitDiff < 0.3f) score += 0.15f;
+        else if (commitDiff > 0.6f) score -= 0.2f;
+
+        // High flirtatiousness in both = potential drama, but more likely to marry
+        if (profile1.Flirtatiousness > 0.6f && profile2.Flirtatiousness > 0.6f)
+            score += 0.1f;
+
+        // Relationship preference compatibility
+        if (profile1.RelationshipPref == RelationshipPreference.Monogamous &&
+            profile2.RelationshipPref == RelationshipPreference.Monogamous)
+            score += 0.1f;
+
+        // Same faction bonus
+        if (npc1.NPCFaction.HasValue && npc1.NPCFaction == npc2.NPCFaction)
+            score += 0.1f;
+
+        // Opposite factions penalty (especially Faith vs Shadows)
+        if (npc1.NPCFaction.HasValue && npc2.NPCFaction.HasValue)
+        {
+            var f1 = npc1.NPCFaction.Value;
+            var f2 = npc2.NPCFaction.Value;
+            if ((f1 == UsurperRemake.Systems.Faction.TheFaith && f2 == UsurperRemake.Systems.Faction.TheShadows) ||
+                (f1 == UsurperRemake.Systems.Faction.TheShadows && f2 == UsurperRemake.Systems.Faction.TheFaith))
+            {
+                score -= 0.3f; // Romeo and Juliet situation - rare but possible
+            }
+        }
+
+        return Math.Clamp(score, 0f, 1f);
+    }
+
+    /// <summary>
+    /// Execute the marriage between two NPCs
+    /// </summary>
+    private static void ExecuteNPCMarriage(NPC npc1, NPC npc2)
+    {
+        // Set marriage flags
+        npc1.Married = true;
+        npc1.IsMarried = true;
+        npc1.SpouseName = npc2.Name2;
+        npc1.MarriedTimes++;
+
+        npc2.Married = true;
+        npc2.IsMarried = true;
+        npc2.SpouseName = npc1.Name2;
+        npc2.MarriedTimes++;
+
+        // Store spouse IDs for tracking (using existing memory system)
+        npc1.Brain?.Memory?.AddMemory($"I married {npc2.Name2}!", "marriage", DateTime.Now);
+        npc2.Brain?.Memory?.AddMemory($"I married {npc1.Name2}!", "marriage", DateTime.Now);
+
+        // Track the marriage in the NPC marriage registry
+        NPCMarriageRegistry.Instance.RegisterMarriage(npc1.ID, npc2.ID, npc1.Name2, npc2.Name2);
+
+        // Generate news
+        NewsSystem.Instance?.WriteNews(
+            GameConfig.NewsCategory.Marriage,
+            $"Wedding Bells! {npc1.Name2} and {npc2.Name2} have gotten married!"
+        );
+
+        GD.Print($"[NPC Marriage] {npc1.Name2} married {npc2.Name2}!");
+    }
+
+    /// <summary>
+    /// Process an affair attempt by the player on a married NPC
+    /// Returns true if the affair progresses
+    /// </summary>
+    public static AffairResult ProcessAffairAttempt(NPC marriedNpc, Character player, float seductionSuccess)
+    {
+        var profile = marriedNpc.Brain?.Personality;
+        if (profile == null) return new AffairResult { Success = false, Message = "They seem unresponsive." };
+
+        var affair = NPCMarriageRegistry.Instance.GetOrCreateAffair(marriedNpc.ID, player.ID);
+
+        // Calculate affair susceptibility
+        float susceptibility = CalculateAffairSusceptibility(marriedNpc, profile, affair);
+
+        // Apply seduction success
+        float progressChance = susceptibility * seductionSuccess;
+
+        if (random.NextDouble() < progressChance)
+        {
+            // Affair progresses!
+            affair.AffairProgress = Math.Min(200, affair.AffairProgress + random.Next(5, 15));
+            affair.LastInteraction = DateTime.Now;
+            affair.SecretMeetings++;
+
+            // Check for affair milestones
+            if (affair.AffairProgress >= 100 && !affair.IsActive)
+            {
+                affair.IsActive = true;
+                return new AffairResult
+                {
+                    Success = true,
+                    Milestone = AffairMilestone.BecameLovers,
+                    Message = $"{marriedNpc.Name2} looks at you with desire. \"I know this is wrong, but I can't resist you anymore...\""
+                };
+            }
+            else if (affair.AffairProgress >= 75 && affair.SecretMeetings >= 3)
+            {
+                return new AffairResult
+                {
+                    Success = true,
+                    Milestone = AffairMilestone.SecretRendezvous,
+                    Message = $"{marriedNpc.Name2} whispers, \"Meet me tonight... alone. My spouse doesn't need to know.\""
+                };
+            }
+            else if (affair.AffairProgress >= 50)
+            {
+                return new AffairResult
+                {
+                    Success = true,
+                    Milestone = AffairMilestone.EmotionalConnection,
+                    Message = $"{marriedNpc.Name2}'s eyes linger on you. \"I shouldn't feel this way about you...\""
+                };
+            }
+            else
+            {
+                return new AffairResult
+                {
+                    Success = true,
+                    Milestone = AffairMilestone.Flirting,
+                    Message = $"{marriedNpc.Name2} blushes despite themselves. \"You're quite charming, aren't you?\""
+                };
+            }
+        }
+        else
+        {
+            // Failed attempt - might raise suspicion
+            if (random.NextDouble() < 0.2f) // 20% chance spouse notices
+            {
+                affair.SpouseSuspicion = Math.Min(100, affair.SpouseSuspicion + random.Next(10, 25));
+                return new AffairResult
+                {
+                    Success = false,
+                    SpouseNoticed = true,
+                    Message = $"{marriedNpc.Name2} glances nervously toward where their spouse might be. \"We shouldn't...\""
+                };
+            }
+
+            return new AffairResult
+            {
+                Success = false,
+                Message = $"{marriedNpc.Name2} maintains their composure. \"I'm married, you know.\""
+            };
+        }
+    }
+
+    /// <summary>
+    /// Calculate how susceptible a married NPC is to an affair
+    /// </summary>
+    private static float CalculateAffairSusceptibility(NPC npc, PersonalityProfile profile, AffairState affair)
+    {
+        float susceptibility = 0.1f; // Base very low - affairs are hard
+
+        // High flirtatiousness increases susceptibility
+        susceptibility += profile.Flirtatiousness * 0.2f;
+
+        // Low commitment increases susceptibility
+        susceptibility += (1f - profile.Commitment) * 0.25f;
+
+        // Existing affair progress helps
+        susceptibility += affair.AffairProgress * 0.003f; // Up to +0.3 at max progress
+
+        // Polyamorous/open relationship preference
+        if (profile.RelationshipPref == RelationshipPreference.OpenRelationship ||
+            profile.RelationshipPref == RelationshipPreference.Polyamorous)
+        {
+            susceptibility += 0.2f;
+        }
+
+        // Casual preference
+        if (profile.RelationshipPref == RelationshipPreference.CasualOnly)
+        {
+            susceptibility += 0.15f;
+        }
+
+        // Very high commitment = nearly impossible to seduce
+        if (profile.Commitment > 0.85f)
+        {
+            susceptibility *= 0.2f; // Reduce to 20%
+        }
+
+        return Math.Clamp(susceptibility, 0.05f, 0.6f); // Max 60% even with perfect conditions
+    }
+
+    /// <summary>
+    /// Check if a player's affair with a married NPC should cause the NPC to leave their spouse
+    /// </summary>
+    public static DivorceResult CheckAffairDivorce(NPC marriedNpc, Character player)
+    {
+        var affair = NPCMarriageRegistry.Instance.GetAffair(marriedNpc.ID, player.ID);
+        if (affair == null || !affair.IsActive)
+            return new DivorceResult { WillDivorce = false };
+
+        var profile = marriedNpc.Brain?.Personality;
+        if (profile == null)
+            return new DivorceResult { WillDivorce = false };
+
+        // Need significant affair progress and emotional investment
+        if (affair.AffairProgress < 150)
+            return new DivorceResult { WillDivorce = false };
+
+        // Calculate divorce chance
+        float divorceChance = 0f;
+
+        // Low commitment = more likely to leave spouse
+        divorceChance += (1f - profile.Commitment) * 0.3f;
+
+        // High affair progress
+        divorceChance += (affair.AffairProgress - 100) * 0.002f;
+
+        // Player's charisma bonus
+        float charismaBonus = (player.Charisma - 50) / 200f;
+        divorceChance += Math.Max(0, charismaBonus);
+
+        // Multiple secret meetings show real connection
+        divorceChance += Math.Min(0.2f, affair.SecretMeetings * 0.02f);
+
+        // High spouse suspicion might force the issue
+        if (affair.SpouseSuspicion >= 80)
+        {
+            divorceChance += 0.2f; // "The secret is out anyway"
+        }
+
+        if (random.NextDouble() < divorceChance)
+        {
+            // They'll leave their spouse for the player!
+            return new DivorceResult
+            {
+                WillDivorce = true,
+                Reason = affair.SpouseSuspicion >= 80
+                    ? $"{marriedNpc.Name2} says, \"{marriedNpc.SpouseName} found out about us... I've made my choice. I choose you.\""
+                    : $"{marriedNpc.Name2} takes your hand. \"I can't live this lie anymore. I'm leaving {marriedNpc.SpouseName} for you.\""
+            };
+        }
+
+        return new DivorceResult { WillDivorce = false };
+    }
+
+    /// <summary>
+    /// Execute an NPC leaving their spouse for the player (or becoming player's lover)
+    /// </summary>
+    public static void ProcessAffairDivorce(NPC npc, Character player, bool becomeSpouse)
+    {
+        // Check if NPC is dead
+        if (npc.IsDead || !npc.IsAlive)
+        {
+            GD.Print($"[Affair] Cannot process divorce for dead NPC {npc.Name2}");
+            return;
+        }
+
+        string oldSpouseName = npc.SpouseName;
+        string oldSpouseId = NPCMarriageRegistry.Instance.GetSpouseId(npc.ID);
+
+        // Find the old spouse NPC
+        var oldSpouse = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == oldSpouseId);
+
+        // Check if old spouse is dead - still process divorce but skip hostility
+        bool oldSpouseIsDead = oldSpouse?.IsDead == true || oldSpouse?.IsAlive == false;
+
+        // Divorce the NPC from their current spouse
+        npc.Married = false;
+        npc.IsMarried = false;
+        npc.SpouseName = "";
+
+        if (oldSpouse != null && !oldSpouseIsDead)
+        {
+            oldSpouse.Married = false;
+            oldSpouse.IsMarried = false;
+            oldSpouse.SpouseName = "";
+
+            // Jilted spouse becomes hostile to player
+            oldSpouse.Brain?.Memory?.AddMemory($"{player.Name} stole my spouse {npc.Name2}!", "betrayal", DateTime.Now);
+
+            // Relationship with player tanks - set to hostile
+            RelationshipSystem.UpdateRelationship(player, oldSpouse, -8, 1, false, true); // Force to hostile
+        }
+
+        // Clear the marriage registry
+        NPCMarriageRegistry.Instance.EndMarriage(npc.ID);
+        NPCMarriageRegistry.Instance.ClearAffair(npc.ID, player.ID);
+
+        // Now handle the new relationship with the player
+        if (becomeSpouse)
+        {
+            // Marry the player to the NPC
+            npc.Married = true;
+            npc.IsMarried = true;
+            npc.SpouseName = player.Name;
+            npc.MarriedTimes++;
+
+            player.Married = true;
+            player.IsMarried = true;
+            player.SpouseName = npc.Name2;
+            player.MarriedTimes++;
+
+            // Update RomanceTracker
+            RomanceTracker.Instance?.AddSpouse(npc.ID);
+
+            // Generate wedding news (dramatic remarriage after affair)
+            NewsSystem.Instance?.WriteNews(
+                GameConfig.NewsCategory.Marriage,
+                $"Scandal and Romance! {npc.Name2} left {oldSpouseName} and immediately married {player.Name}!"
+            );
+
+            GD.Print($"[Affair] {npc.Name2} left {oldSpouseName} and married {player.Name}!");
+        }
+        else
+        {
+            // Become lovers instead
+            RomanceTracker.Instance?.AddLover(npc.ID, 75, false);
+
+            // Generate drama news
+            NewsSystem.Instance?.WriteNews(
+                GameConfig.NewsCategory.Marriage,
+                $"Scandal! {npc.Name2} has left {oldSpouseName} for the adventurer {player.Name}!"
+            );
+
+            GD.Print($"[Affair] {npc.Name2} left {oldSpouseName} for {player.Name} (lovers)!");
+        }
+    }
+
     private static void ProcessFriendshipDevelopment(NPC npc, List<NPC> others) { /* Friendship logic */ }
     private static void ProcessEnemyRelationships(NPC npc) { /* Enemy tracking */ }
     
@@ -442,6 +859,192 @@ public static class EnhancedNPCBehaviors
         public int Winner { get; set; } // 1 or 2
         public int Rounds { get; set; }
     }
-    
+
     #endregion
+}
+
+// Affair and marriage data classes - outside the static class for accessibility
+
+public class AffairResult
+{
+    public bool Success { get; set; }
+    public AffairMilestone Milestone { get; set; } = AffairMilestone.None;
+    public string Message { get; set; } = "";
+    public bool SpouseNoticed { get; set; }
+}
+
+public class DivorceResult
+{
+    public bool WillDivorce { get; set; }
+    public string Reason { get; set; } = "";
+}
+
+public enum AffairMilestone
+{
+    None,
+    Flirting,           // Just started flirting
+    EmotionalConnection, // Deep conversations, growing feelings
+    SecretRendezvous,    // Secret meetings
+    BecameLovers,        // Full affair
+    LeftSpouse           // Divorced for the player
+}
+
+public class AffairState
+{
+    public string MarriedNpcId { get; set; } = "";
+    public string SeducerId { get; set; } = ""; // Player ID
+    public int AffairProgress { get; set; } = 0; // 0-200 scale
+    public int SecretMeetings { get; set; } = 0;
+    public int SpouseSuspicion { get; set; } = 0; // 0-100
+    public bool IsActive { get; set; } = false; // Full affair status
+    public DateTime LastInteraction { get; set; } = DateTime.Now;
+}
+
+/// <summary>
+/// Singleton registry for tracking NPC-NPC marriages and player affairs
+/// </summary>
+public class NPCMarriageRegistry
+{
+    private static NPCMarriageRegistry? _instance;
+    public static NPCMarriageRegistry Instance => _instance ??= new NPCMarriageRegistry();
+
+    // NPC ID -> Spouse NPC ID
+    private Dictionary<string, string> marriages = new();
+
+    // Married NPC ID -> AffairState (player seducing them)
+    private Dictionary<string, AffairState> affairs = new();
+
+    public void RegisterMarriage(string npc1Id, string npc2Id, string npc1Name, string npc2Name)
+    {
+        marriages[npc1Id] = npc2Id;
+        marriages[npc2Id] = npc1Id;
+
+        GD.Print($"[MarriageRegistry] Registered marriage: {npc1Name} <-> {npc2Name}");
+    }
+
+    public void EndMarriage(string npcId)
+    {
+        if (marriages.TryGetValue(npcId, out var spouseId))
+        {
+            marriages.Remove(npcId);
+            marriages.Remove(spouseId);
+            GD.Print($"[MarriageRegistry] Ended marriage for {npcId}");
+        }
+    }
+
+    public string? GetSpouseId(string npcId)
+    {
+        return marriages.TryGetValue(npcId, out var spouseId) ? spouseId : null;
+    }
+
+    public bool IsMarriedToNPC(string npcId)
+    {
+        return marriages.ContainsKey(npcId);
+    }
+
+    public AffairState GetOrCreateAffair(string marriedNpcId, string seducerId)
+    {
+        var key = $"{marriedNpcId}:{seducerId}";
+        if (!affairs.TryGetValue(key, out var affair))
+        {
+            affair = new AffairState
+            {
+                MarriedNpcId = marriedNpcId,
+                SeducerId = seducerId
+            };
+            affairs[key] = affair;
+        }
+        return affair;
+    }
+
+    public AffairState? GetAffair(string marriedNpcId, string seducerId)
+    {
+        var key = $"{marriedNpcId}:{seducerId}";
+        return affairs.TryGetValue(key, out var affair) ? affair : null;
+    }
+
+    public void ClearAffair(string marriedNpcId, string seducerId)
+    {
+        var key = $"{marriedNpcId}:{seducerId}";
+        affairs.Remove(key);
+    }
+
+    /// <summary>
+    /// Get all current NPC-NPC marriages for saving
+    /// </summary>
+    public List<NPCMarriageData> GetAllMarriages()
+    {
+        var result = new List<NPCMarriageData>();
+        var processed = new HashSet<string>();
+
+        foreach (var kvp in marriages)
+        {
+            if (!processed.Contains(kvp.Key) && !processed.Contains(kvp.Value))
+            {
+                result.Add(new NPCMarriageData
+                {
+                    Npc1Id = kvp.Key,
+                    Npc2Id = kvp.Value
+                });
+                processed.Add(kvp.Key);
+                processed.Add(kvp.Value);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Get all affairs for saving
+    /// </summary>
+    public List<AffairState> GetAllAffairs()
+    {
+        return affairs.Values.ToList();
+    }
+
+    /// <summary>
+    /// Restore marriages from save data
+    /// </summary>
+    public void RestoreMarriages(List<NPCMarriageData>? data)
+    {
+        marriages.Clear();
+        if (data == null) return;
+
+        foreach (var marriage in data)
+        {
+            marriages[marriage.Npc1Id] = marriage.Npc2Id;
+            marriages[marriage.Npc2Id] = marriage.Npc1Id;
+        }
+    }
+
+    /// <summary>
+    /// Restore affairs from save data
+    /// </summary>
+    public void RestoreAffairs(List<AffairState>? data)
+    {
+        affairs.Clear();
+        if (data == null) return;
+
+        foreach (var affair in data)
+        {
+            var key = $"{affair.MarriedNpcId}:{affair.SeducerId}";
+            affairs[key] = affair;
+        }
+    }
+
+    /// <summary>
+    /// Reset for new game
+    /// </summary>
+    public void Reset()
+    {
+        marriages.Clear();
+        affairs.Clear();
+        GD.Print("[MarriageRegistry] Reset for new game");
+    }
+}
+
+public class NPCMarriageData
+{
+    public string Npc1Id { get; set; } = "";
+    public string Npc2Id { get; set; } = "";
 } 

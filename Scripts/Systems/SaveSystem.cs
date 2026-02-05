@@ -633,6 +633,13 @@ namespace UsurperRemake.Systems
                 Leprosy = player.Leprosy,
                 LoversBane = player.LoversBane,
 
+                // Divine Wrath System
+                DivineWrathLevel = player.DivineWrathLevel,
+                AngeredGodName = player.AngeredGodName ?? "",
+                BetrayedForGodName = player.BetrayedForGodName ?? "",
+                DivineWrathPending = player.DivineWrathPending,
+                DivineWrathTurnsRemaining = player.DivineWrathTurnsRemaining,
+
                 // Combat statistics (kill/death counts)
                 MKills = (int)player.MKills,
                 MDefeats = (int)player.MDefeats,
@@ -897,6 +904,15 @@ namespace UsurperRemake.Systems
 
                     // Death status - permanent death tracking
                     IsDead = npc.IsDead,
+
+                    // Marriage status
+                    IsMarried = npc.IsMarried,
+                    Married = npc.Married,
+                    SpouseName = npc.SpouseName ?? "",
+                    MarriedTimes = npc.MarriedTimes,
+
+                    // Faction affiliation
+                    NPCFaction = npc.NPCFaction.HasValue ? (int)npc.NPCFaction.Value : -1,
 
                     // Alignment
                     Chivalry = npc.Chivalry,
@@ -1532,6 +1548,97 @@ namespace UsurperRemake.Systems
                 GD.PrintErr($"[SaveSystem] Failed to save relationships: {ex.Message}");
             }
 
+            // ===== NEW NARRATIVE SYSTEMS =====
+
+            // Stranger/Noctura Encounter System
+            try
+            {
+                data.StrangerEncounters = StrangerEncounterSystem.Instance.Serialize();
+                if (data.StrangerEncounters.EncountersHad > 0)
+                {
+                    GD.Print($"[SaveSystem] Saved {data.StrangerEncounters.EncountersHad} stranger encounters");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to save stranger encounters: {ex.Message}");
+            }
+
+            // Faction System
+            try
+            {
+                data.Factions = FactionSystem.Instance.Serialize();
+                if (data.Factions.PlayerFaction >= 0)
+                {
+                    GD.Print($"[SaveSystem] Saved faction data: faction {data.Factions.PlayerFaction}, rank {data.Factions.FactionRank}");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to save faction system: {ex.Message}");
+            }
+
+            // Town NPC Story System
+            try
+            {
+                data.TownNPCStories = TownNPCStorySystem.Instance.Serialize();
+                var activeStories = data.TownNPCStories.NPCStates.Count(s => s.CurrentStage > 0);
+                if (activeStories > 0)
+                {
+                    GD.Print($"[SaveSystem] Saved {activeStories} active town NPC stories");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to save town NPC stories: {ex.Message}");
+            }
+
+            // Dream System
+            try
+            {
+                data.Dreams = DreamSystem.Instance.Serialize();
+                if (data.Dreams.ExperiencedDreams.Count > 0)
+                {
+                    GD.Print($"[SaveSystem] Saved {data.Dreams.ExperiencedDreams.Count} experienced dreams");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to save dream system: {ex.Message}");
+            }
+
+            // NPC Marriage Registry
+            try
+            {
+                var marriages = NPCMarriageRegistry.Instance.GetAllMarriages();
+                data.NPCMarriages = marriages.Select(m => new NPCMarriageSaveData
+                {
+                    Npc1Id = m.Npc1Id,
+                    Npc2Id = m.Npc2Id
+                }).ToList();
+
+                var affairs = NPCMarriageRegistry.Instance.GetAllAffairs();
+                data.Affairs = affairs.Select(a => new AffairSaveData
+                {
+                    MarriedNpcId = a.MarriedNpcId,
+                    SeducerId = a.SeducerId,
+                    AffairProgress = a.AffairProgress,
+                    SecretMeetings = a.SecretMeetings,
+                    SpouseSuspicion = a.SpouseSuspicion,
+                    IsActive = a.IsActive,
+                    LastInteraction = a.LastInteraction
+                }).ToList();
+
+                if (data.NPCMarriages.Count > 0 || data.Affairs.Count > 0)
+                {
+                    GD.Print($"[SaveSystem] Saved {data.NPCMarriages.Count} NPC marriages, {data.Affairs.Count} affairs");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to save NPC marriages/affairs: {ex.Message}");
+            }
+
             return data;
         }
 
@@ -1815,6 +1922,105 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 GD.PrintErr($"[SaveSystem] Failed to restore relationships: {ex.Message}");
+            }
+
+            // ===== NEW NARRATIVE SYSTEMS =====
+
+            // Stranger/Noctura Encounter System
+            try
+            {
+                if (data.StrangerEncounters != null)
+                {
+                    StrangerEncounterSystem.Instance.Deserialize(data.StrangerEncounters);
+                    GD.Print($"[SaveSystem] Restored {data.StrangerEncounters.EncountersHad} stranger encounters");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to restore stranger encounters: {ex.Message}");
+            }
+
+            // Faction System
+            try
+            {
+                if (data.Factions != null)
+                {
+                    FactionSystem.Instance.Deserialize(data.Factions);
+                    if (data.Factions.PlayerFaction >= 0)
+                    {
+                        GD.Print($"[SaveSystem] Restored faction: {data.Factions.PlayerFaction}, rank {data.Factions.FactionRank}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to restore faction system: {ex.Message}");
+            }
+
+            // Town NPC Story System
+            try
+            {
+                if (data.TownNPCStories != null)
+                {
+                    TownNPCStorySystem.Instance.Deserialize(data.TownNPCStories);
+                    var activeStories = data.TownNPCStories.NPCStates.Count(s => s.CurrentStage > 0);
+                    GD.Print($"[SaveSystem] Restored {activeStories} active town NPC stories");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to restore town NPC stories: {ex.Message}");
+            }
+
+            // Dream System
+            try
+            {
+                if (data.Dreams != null)
+                {
+                    DreamSystem.Instance.Deserialize(data.Dreams);
+                    GD.Print($"[SaveSystem] Restored {data.Dreams.ExperiencedDreams.Count} experienced dreams");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to restore dream system: {ex.Message}");
+            }
+
+            // NPC Marriage Registry
+            try
+            {
+                // Restore marriages
+                if (data.NPCMarriages != null && data.NPCMarriages.Count > 0)
+                {
+                    var marriageData = data.NPCMarriages.Select(m => new NPCMarriageData
+                    {
+                        Npc1Id = m.Npc1Id,
+                        Npc2Id = m.Npc2Id
+                    }).ToList();
+                    NPCMarriageRegistry.Instance.RestoreMarriages(marriageData);
+                    GD.Print($"[SaveSystem] Restored {data.NPCMarriages.Count} NPC marriages");
+                }
+
+                // Restore affairs
+                if (data.Affairs != null && data.Affairs.Count > 0)
+                {
+                    var affairData = data.Affairs.Select(a => new AffairState
+                    {
+                        MarriedNpcId = a.MarriedNpcId,
+                        SeducerId = a.SeducerId,
+                        AffairProgress = a.AffairProgress,
+                        SecretMeetings = a.SecretMeetings,
+                        SpouseSuspicion = a.SpouseSuspicion,
+                        IsActive = a.IsActive,
+                        LastInteraction = a.LastInteraction
+                    }).ToList();
+                    NPCMarriageRegistry.Instance.RestoreAffairs(affairData);
+                    GD.Print($"[SaveSystem] Restored {data.Affairs.Count} affairs");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to restore NPC marriages/affairs: {ex.Message}");
             }
         }
     }

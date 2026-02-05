@@ -22,8 +22,20 @@ UsurperReborn --door32 <path>    # Explicitly load DOOR32.SYS
 UsurperReborn --doorsys <path>   # Explicitly load DOOR.SYS
 UsurperReborn --node <directory> # Search directory for drop files
 UsurperReborn --local            # Local testing mode (no BBS)
+UsurperReborn --stdio            # Force Standard I/O mode (for Synchronet)
+UsurperReborn --fossil <port>    # Force FOSSIL/serial mode on COM port
+UsurperReborn --com <port>       # Same as --fossil
+UsurperReborn --verbose, -v      # Enable detailed debug output
 UsurperReborn --help             # Show help
 ```
+
+### I/O Mode Flags
+
+| Flag | Description |
+|------|-------------|
+| `--stdio` | Forces Standard I/O mode using ANSI escape codes. Recommended for Synchronet. |
+| `--fossil <port>` | Forces FOSSIL/serial mode on the specified COM port (e.g., `COM1`). |
+| `--verbose` or `-v` | Enables detailed debug output for troubleshooting connection issues. |
 
 ## Synchronet BBS Setup
 
@@ -226,13 +238,48 @@ UsurperReborn --local
 
 ## Troubleshooting
 
+### Using Verbose Mode for Debugging
+
+When experiencing connection issues, add the `--verbose` or `-v` flag to get detailed debug output:
+
+```bash
+UsurperReborn --door32 door32.sys --verbose
+```
+
+Verbose mode provides:
+- **Raw drop file dump**: Shows the exact contents of your drop file line-by-line
+- **Parsed session info**: Displays how the drop file was interpreted (CommType, SocketHandle, ComPort, etc.)
+- **Connection debugging**: Shows socket/serial initialization attempts
+- **Error details**: Includes full exception information and stack traces
+- **Pause points**: Stops at key points so you can read the output before it scrolls away
+
+**Example verbose output:**
+```
+[VERBOSE] Verbose mode enabled - detailed debug output will be shown
+[VERBOSE] === RAW DROP FILE CONTENTS: door32.sys ===
+[VERBOSE] Line 1: 2
+[VERBOSE] Line 2: 1234
+[VERBOSE] Line 3: 38400
+...
+[VERBOSE] Session info from drop file:
+[VERBOSE]   CommType: Telnet
+[VERBOSE]   SocketHandle: 1234 (0x000004D2)
+[VERBOSE]   ComPort:
+[VERBOSE]   UserName: John Smith
+[VERBOSE]   UserAlias: CyberKnight
+[VERBOSE] Press Enter to continue...
+```
+
 ### "Could not parse drop file"
+- Use `--verbose` to see the raw drop file contents
 - Verify the drop file exists at the specified path
 - Check file permissions
 - Ensure the file format matches DOOR32.SYS or DOOR.SYS specifications
 
 ### "Failed to initialize socket"
+- Use `--verbose` to see the socket handle value from the drop file
 - The socket handle from DOOR32.SYS may be invalid
+- Try using `--stdio` flag for Standard I/O mode instead
 - Try using DOOR.SYS instead (falls back to console I/O)
 - Verify your BBS is configured to pass socket handles
 
@@ -240,11 +287,19 @@ UsurperReborn --local
 - Ensure terminal emulation is set to ANSI
 - Check that the BBS is not intercepting I/O
 - Verify "Native Executable" is set to Yes
+- Try adding `--stdio` flag to use ANSI escape codes
 
 ### Connection drops immediately
+- Use `--verbose` to identify where initialization fails
 - Check the command line path is correct
 - Verify all DLL dependencies are present
 - Look for error messages in the BBS log
+
+### Output shows locally but not remotely
+1. Try `--stdio` flag for Standard I/O mode
+2. Use `--verbose` to see detailed connection info
+3. Check your DOOR32.SYS has correct CommType (2=telnet) and socket handle
+4. Verify Synchronet's I/O Method matches your command line flags
 
 ## Log Output
 

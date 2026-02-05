@@ -422,6 +422,18 @@ namespace UsurperRemake.Systems
             ExperiencedMoments = new HashSet<AwakeningMoment>(data.ExperiencedMoments);
             Insights = data.Insights?.ToList() ?? new List<OceanInsight>();
         }
+
+        /// <summary>
+        /// Reset all state for a new game
+        /// </summary>
+        public void Reset()
+        {
+            AwakeningLevel = 0;
+            CollectedFragments = new HashSet<WaveFragment>();
+            ExperiencedMoments = new HashSet<AwakeningMoment>();
+            Insights = new List<OceanInsight>();
+            GD.Print("[Ocean] System reset for new game");
+        }
     }
 
     #region Enums and Data Classes

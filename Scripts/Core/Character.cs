@@ -155,6 +155,61 @@ public class Character
     // Hint system - tracks which contextual hints have been shown to this player
     public HashSet<string> HintsShown { get; set; } = new HashSet<string>();
 
+    // Divine Wrath System - tracks when player angers their god by worshipping another
+    public int DivineWrathLevel { get; set; } = 0;           // 0 = none, 1-3 = severity (higher = worse punishment)
+    public string AngeredGodName { get; set; } = "";         // The god that was angered
+    public string BetrayedForGodName { get; set; } = "";     // The god the player sacrificed to instead
+    public bool DivineWrathPending { get; set; } = false;    // Has punishment triggered yet?
+    public int DivineWrathTurnsRemaining { get; set; } = 0;  // Turns until wrath fades (if unpunished)
+
+    /// <summary>
+    /// Record divine wrath when the player betrays their god
+    /// </summary>
+    public void RecordDivineWrath(string playerGod, string betrayedForGod, int severity)
+    {
+        AngeredGodName = playerGod;
+        BetrayedForGodName = betrayedForGod;
+        DivineWrathLevel = Math.Min(3, DivineWrathLevel + severity);  // Stack up to level 3
+        DivineWrathPending = true;
+        DivineWrathTurnsRemaining = 50 + (severity * 20);  // Wrath lasts longer for more severe betrayals
+    }
+
+    /// <summary>
+    /// Clear divine wrath after punishment has been dealt
+    /// </summary>
+    public void ClearDivineWrath()
+    {
+        DivineWrathLevel = 0;
+        AngeredGodName = "";
+        BetrayedForGodName = "";
+        DivineWrathPending = false;
+        DivineWrathTurnsRemaining = 0;
+    }
+
+    /// <summary>
+    /// Reduce wrath over time if no punishment occurred
+    /// </summary>
+    public void TickDivineWrath()
+    {
+        if (DivineWrathPending && DivineWrathTurnsRemaining > 0)
+        {
+            DivineWrathTurnsRemaining--;
+            if (DivineWrathTurnsRemaining <= 0)
+            {
+                // Wrath fades naturally over time (the god forgives... eventually)
+                DivineWrathLevel = Math.Max(0, DivineWrathLevel - 1);
+                if (DivineWrathLevel == 0)
+                {
+                    ClearDivineWrath();
+                }
+                else
+                {
+                    DivineWrathTurnsRemaining = 30;  // Reset timer for next level decay
+                }
+            }
+        }
+    }
+
     // Battle temporary flags
     public bool Casted { get; set; }                // used in battles
     public long Punch { get; set; }                 // player punch, temporary

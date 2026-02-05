@@ -688,6 +688,7 @@ namespace UsurperRemake.Systems
             return new GriefSystemData
             {
                 ActiveGrief = new List<GriefState>(activeGrief.Values),
+                ActiveNpcGrief = new List<GriefState>(activeNpcGrief.Values),
                 Memories = new List<CompanionMemory>(memories)
             };
         }
@@ -705,7 +706,30 @@ namespace UsurperRemake.Systems
                 }
             }
 
+            activeNpcGrief.Clear();
+            if (data.ActiveNpcGrief != null)
+            {
+                foreach (var grief in data.ActiveNpcGrief)
+                {
+                    if (!string.IsNullOrEmpty(grief.NpcId))
+                    {
+                        activeNpcGrief[grief.NpcId] = grief;
+                    }
+                }
+            }
+
             memories = data.Memories ?? new List<CompanionMemory>();
+        }
+
+        /// <summary>
+        /// Reset all state for a new game
+        /// </summary>
+        public void Reset()
+        {
+            activeGrief.Clear();
+            activeNpcGrief.Clear();
+            memories.Clear();
+            GD.Print("[Grief] System reset for new game");
         }
 
         #endregion
@@ -771,6 +795,7 @@ namespace UsurperRemake.Systems
     public class GriefSystemData
     {
         public List<GriefState> ActiveGrief { get; set; } = new();
+        public List<GriefState> ActiveNpcGrief { get; set; } = new();
         public List<CompanionMemory> Memories { get; set; } = new();
     }
 

@@ -392,6 +392,40 @@ terminal.SetColor("darkgray");
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
         terminal.WriteLine("You feel completely rejuvenated!", "bright_green");
+
+        // Check for dreams during rest at home
+        var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
+        if (dream != null)
+        {
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine("As sleep takes you, dreams unfold...");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"=== {dream.Title} ===");
+            terminal.WriteLine("");
+
+            terminal.SetColor("magenta");
+            foreach (var line in dream.Content)
+            {
+                terminal.WriteLine($"  {line}");
+                await Task.Delay(1200);
+            }
+
+            if (!string.IsNullOrEmpty(dream.PhilosophicalHint))
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("dark_cyan");
+                terminal.WriteLine($"  ({dream.PhilosophicalHint})");
+            }
+
+            terminal.WriteLine("");
+            DreamSystem.Instance.ExperienceDream(dream.Id);
+        }
+
         await terminal.WaitForKey();
     }
 

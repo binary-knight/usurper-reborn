@@ -75,6 +75,9 @@ namespace UsurperRemake.Locations
                 case "A":
                     await VisitAlchemistHeaven();
                     return false;
+                case "J": // The Shadows faction recruitment
+                    await ShowShadowsRecruitment();
+                    return false;
                 case "Q":
                 case "R":
                     await NavigateToLocation(GameLocation.MainStreet);
@@ -186,6 +189,35 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("lchemist's Heaven");
 
             terminal.WriteLine("");
+
+            // The Shadows faction option
+            var factionSystem = FactionSystem.Instance;
+            if (factionSystem.PlayerFaction != Faction.TheShadows)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_magenta");
+                terminal.Write("J");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("bright_magenta");
+                terminal.Write("oin The Shadows ");
+                if (factionSystem.PlayerFaction == null)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("(a figure watches from the darkness...)");
+                }
+                else
+                {
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine("(you serve another...)");
+                }
+            }
+            else
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(" You are a member of The Shadows.");
+            }
 
             // Navigation
             terminal.SetColor("darkgray");
@@ -337,6 +369,11 @@ namespace UsurperRemake.Locations
                 if (effects.HPDrain > 0) terminal.WriteLine($"  -{effects.HPDrain} HP/round drain");
 
                 currentPlayer.Darkness += 5; // Dark act
+
+                // Increase Shadows standing for shady dealings
+                FactionSystem.Instance.ModifyReputation(Faction.TheShadows, 5);
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("  The Shadows have noted your... activities. (+5 Shadows standing)");
             }
             else
             {
@@ -567,6 +604,228 @@ namespace UsurperRemake.Locations
                 DrugType.DemonBlood => new DrugEffects { DamageBonus = 25, DarknessBonus = 10 },
                 _ => new DrugEffects()
             };
+        }
+
+        #endregion
+
+        #region The Shadows Faction Recruitment
+
+        /// <summary>
+        /// Show The Shadows faction recruitment UI
+        /// Meet "The Faceless One" and potentially join The Shadows
+        /// </summary>
+        private async Task ShowShadowsRecruitment()
+        {
+            var factionSystem = FactionSystem.Instance;
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                              THE SHADOWS                                     ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("You feel eyes on you. The shadows in the corner of the alley seem");
+            terminal.WriteLine("to deepen, to solidify into something almost human...");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("A figure emerges. You cannot see their face - it's wrapped in darkness");
+            terminal.WriteLine("that seems to move and shift like smoke. Only their voice is clear.");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("\"You've been noticed,\" the voice whispers, neither male nor female.");
+            terminal.WriteLine("\"Not everyone who walks these alleys catches our attention.\"");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            // Check if already in a faction
+            if (factionSystem.PlayerFaction != null)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("The faceless figure tilts its head, studying you.");
+                terminal.WriteLine("");
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"\"You carry the mark of {FactionSystem.Factions[factionSystem.PlayerFaction.Value].Name}.\"");
+                terminal.WriteLine("\"The Shadows do not share. We do not compete.\"");
+                terminal.WriteLine("\"When you are ready to walk free of chains... find us.\"");
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("The figure dissolves back into the darkness.");
+                await terminal.GetInputAsync("Press Enter to continue...");
+                return;
+            }
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("The figure beckons you deeper into the shadows.");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("\"The Crown demands obedience. The Faith demands worship.\"");
+            terminal.WriteLine("\"We demand nothing. We offer... opportunity.\"");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("\"Information is currency. Secrets are power.\"");
+            terminal.WriteLine("\"The Shadows know what the Crown hides. What The Faith fears.\"");
+            terminal.WriteLine("\"We move unseen. We profit while others fight.\"");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            // Show faction benefits
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══ Benefits of The Shadows ═══");
+            terminal.SetColor("white");
+            terminal.WriteLine("• 20% better prices when selling items (fence bonus)");
+            terminal.WriteLine("• Access to exclusive black market goods");
+            terminal.WriteLine("• Friendly treatment from thieves and assassin NPCs");
+            terminal.WriteLine("• Information network reveals hidden opportunities");
+            terminal.WriteLine("");
+
+            // Check requirements
+            var (canJoin, reason) = factionSystem.CanJoinFaction(Faction.TheShadows, currentPlayer);
+
+            if (!canJoin)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("═══ Requirements Not Met ═══");
+                terminal.SetColor("yellow");
+                terminal.WriteLine(reason);
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("The Shadows require:");
+                terminal.WriteLine("• Level 10 or higher");
+                terminal.WriteLine("• Darkness 200+ (or complete a favor for The Shadows)");
+                terminal.WriteLine($"  Your Darkness: {currentPlayer.Darkness}");
+                terminal.WriteLine("");
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("\"You walk too much in the light,\" the voice observes.");
+                terminal.WriteLine("\"Embrace the darkness. Do what must be done.\"");
+                terminal.WriteLine("\"Or... prove yourself with a favor. We remember those who help us.\"");
+                await terminal.GetInputAsync("Press Enter to continue...");
+                return;
+            }
+
+            // Can join - offer the choice
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("═══ Requirements Met ═══");
+            terminal.SetColor("gray");
+            terminal.WriteLine("The faceless figure nods - somehow you can tell, even without seeing.");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("\"You understand how the world works. Good.\"");
+            terminal.WriteLine("\"Will you step into the shadows with us?\"");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("WARNING: Joining The Shadows will:");
+            terminal.WriteLine("• Lock you out of The Crown and The Faith");
+            terminal.WriteLine("• Decrease standing with rival factions by 100");
+            terminal.WriteLine("");
+
+            var choice = await terminal.GetInputAsync("Join The Shadows? (Y/N) ");
+
+            if (choice.ToUpper() == "Y")
+            {
+                await PerformShadowsInitiation(factionSystem);
+            }
+            else
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("The figure shrugs - or seems to.");
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("\"The offer remains. The shadows are patient.\"");
+                terminal.WriteLine("\"We will be watching.\"");
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("Between one blink and the next, the figure is gone.");
+            }
+
+            await terminal.GetInputAsync("Press Enter to continue...");
+        }
+
+        /// <summary>
+        /// Perform the initiation ceremony to join The Shadows
+        /// </summary>
+        private async Task PerformShadowsInitiation(FactionSystem factionSystem)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                         THE INITIATION                                       ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("The figure leads you deeper into the darkness.");
+            terminal.WriteLine("The alley twists and turns in ways that should be impossible.");
+            terminal.WriteLine("You lose all sense of direction.");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("Finally, you stand in a chamber of absolute darkness.");
+            terminal.WriteLine("You cannot see the walls. You cannot see the floor.");
+            terminal.WriteLine("You can only see the figure, outlined in shadow.");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("\"There is no oath,\" the voice says. \"No vow. No ritual.\"");
+            terminal.WriteLine("");
+            await Task.Delay(1000);
+
+            terminal.WriteLine("\"There is only understanding.\"");
+            terminal.WriteLine("");
+            await Task.Delay(1000);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("Something cold touches your hand. A coin, heavier than gold.");
+            terminal.WriteLine("You cannot see its face, but you can feel the symbol carved into it.");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("\"Keep this. Show it when you need to.\"");
+            terminal.WriteLine("\"Those who see it will know you walk with us.\"");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            // Actually join the faction
+            factionSystem.JoinFaction(Faction.TheShadows, currentPlayer);
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║              YOU HAVE JOINED THE SHADOWS                                     ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("\"Welcome to the darkness. Use it well.\"");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("As a member of The Shadows, you will receive:");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("• 20% better sell prices at black markets");
+            terminal.WriteLine("• Access to exclusive Shadows-only goods");
+            terminal.WriteLine("• Recognition from thieves and assassins");
+            terminal.WriteLine("• The information network works for you now");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("When you blink, you find yourself back in the Dark Alley.");
+            terminal.WriteLine("The figure is gone. But you can feel the shadow coin in your pocket.");
+
+            // Generate news (anonymously - it's the Shadows after all)
+            NewsSystem.Instance.Newsy(false, $"A new shadow moves through Dorashire...");
+
+            // Log to debug
+            DebugLogger.Instance.LogInfo("FACTION", $"{currentPlayer.Name2} joined The Shadows");
         }
 
         #endregion

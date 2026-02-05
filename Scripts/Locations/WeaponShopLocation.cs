@@ -600,6 +600,9 @@ public class WeaponShopLocation : BaseLocation
         // Apply city control discount if player's team controls the city
         adjustedPrice = CityControlSystem.Instance.ApplyDiscount(adjustedPrice, currentPlayer);
 
+        // Apply faction discount (The Crown gets 10% off at shops)
+        adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
+
         if (currentPlayer.Gold < adjustedPrice)
         {
             terminal.WriteLine("");
@@ -813,6 +816,17 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine("═══ Sell Weapons/Shields ═══");
         terminal.WriteLine("");
 
+        // Get Shadows faction fence bonus modifier (1.0 normal, 1.2 with Shadows)
+        var fenceModifier = FactionSystem.Instance.GetFencePriceModifier();
+        bool hasFenceBonus = fenceModifier > 1.0f;
+
+        if (hasFenceBonus)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("  [Shadows Bonus: +20% sell prices]");
+            terminal.WriteLine("");
+        }
+
         // Track all sellable items - equipped and inventory
         var sellableItems = new List<(bool isEquipped, EquipmentSlot? slot, int? invIndex, string name, long value, bool isCursed)>();
         int num = 1;
@@ -825,12 +839,13 @@ public class WeaponShopLocation : BaseLocation
         if (mainHand != null)
         {
             sellableItems.Add((true, EquipmentSlot.MainHand, null, mainHand.Name, mainHand.Value, mainHand.IsCursed));
+            long displayPrice = (long)((mainHand.Value / 2) * fenceModifier);
             terminal.SetColor("bright_cyan");
             terminal.Write($"{num}. ");
             terminal.SetColor("white");
             terminal.Write($"Main Hand: {mainHand.Name}");
             terminal.SetColor("yellow");
-            terminal.WriteLine($" - Sell for {FormatNumber(mainHand.Value / 2)} gold");
+            terminal.WriteLine($" - Sell for {FormatNumber(displayPrice)} gold");
             num++;
         }
 
@@ -838,12 +853,13 @@ public class WeaponShopLocation : BaseLocation
         if (offHand != null)
         {
             sellableItems.Add((true, EquipmentSlot.OffHand, null, offHand.Name, offHand.Value, offHand.IsCursed));
+            long displayPrice = (long)((offHand.Value / 2) * fenceModifier);
             terminal.SetColor("bright_cyan");
             terminal.Write($"{num}. ");
             terminal.SetColor("white");
             terminal.Write($"Off Hand: {offHand.Name}");
             terminal.SetColor("yellow");
-            terminal.WriteLine($" - Sell for {FormatNumber(offHand.Value / 2)} gold");
+            terminal.WriteLine($" - Sell for {FormatNumber(displayPrice)} gold");
             num++;
         }
 
@@ -862,6 +878,7 @@ public class WeaponShopLocation : BaseLocation
             foreach (var (item, invIndex) in inventoryWeapons)
             {
                 sellableItems.Add((false, null, invIndex, item.Name, item.Value, item.IsCursed));
+                long displayPrice = (long)((item.Value / 2) * fenceModifier);
                 terminal.SetColor("bright_cyan");
                 terminal.Write($"{num}. ");
                 terminal.SetColor("white");
@@ -871,7 +888,7 @@ public class WeaponShopLocation : BaseLocation
                 else
                     terminal.Write($" (Shield)");
                 terminal.SetColor("yellow");
-                terminal.WriteLine($" - Sell for {FormatNumber(item.Value / 2)} gold");
+                terminal.WriteLine($" - Sell for {FormatNumber(displayPrice)} gold");
                 num++;
             }
         }
@@ -894,7 +911,7 @@ public class WeaponShopLocation : BaseLocation
         }
 
         var selected = sellableItems[sellChoice - 1];
-        long price = selected.value / 2;
+        long price = (long)((selected.value / 2) * fenceModifier);
 
         if (selected.isCursed)
         {
@@ -994,6 +1011,8 @@ public class WeaponShopLocation : BaseLocation
             // Re-check affordability (gold may have changed)
             var weapon = affordableWeapons[weaponIndex];
             long adjustedPrice = CityControlSystem.Instance.ApplyDiscount(weapon.Value, currentPlayer);
+            // Apply faction discount (The Crown gets 10% off at shops)
+            adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
 
             if (adjustedPrice > currentPlayer.Gold)
             {

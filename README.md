@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.17 - FOSSIL Support
+## ALPHA v0.18 - NPC Relationships
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -358,6 +358,20 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - **Quest Telemetry** - Track quest acceptance and completion rates
 - **Session Analytics** - Playtime, final level, deaths, and monsters killed on quit
 - **Dungeon Feature Interactions** - Enhanced room features with skill-based outcomes
+
+### Completed in v0.18 - NPC Relationships
+
+**Five New Narrative Systems:**
+- **Dream System** - Prophetic dreams during rest at the Inn that become more vivid as you approach the truth. 20+ unique dreams tied to player level and awakening progress.
+- **Stranger Encounter System** - Mysterious encounters with Noctura in 10 different disguises throughout the game, dropping cryptic hints about your true nature.
+- **Town NPC Story System** - Memorable NPCs with personal story arcs (Marcus the Wounded Soldier, Elena the Grieving Widow, Brother Aldric, and more) that unfold over time.
+- **Cycle Dialogue System** - NG+ aware dialogue where NPCs become increasingly aware of the cyclical nature of existence across playthroughs.
+- **Faction System** - Three joinable factions (The Crown, The Shadows, The Faith) with unique benefits, reputation cascades, and bitter rivalries.
+
+**NPC Relationship Overhaul:**
+- **NPC-to-NPC Marriage** - NPCs autonomously find compatible partners and marry based on attraction, class, alignment, and faction compatibility.
+- **Player Affair System** - Pursue married NPCs, progress through affair milestones, and potentially convince them to leave their spouse for you.
+- **Scandal News** - Marriage and affair drama generates realm-wide news announcements.
 
 ### Completed in v0.8
 - **NPC Teammate Combat AI** - NPCs now cast offensive spells, use class abilities, and heal more intelligently

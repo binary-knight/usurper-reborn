@@ -85,6 +85,12 @@ public partial class NPC : Character
     public List<string> Enemies { get; set; } = new();
     public List<string> GangMembers { get; set; } = new();
     public string GangId { get; set; } = "";
+
+    /// <summary>
+    /// NPC's faction affiliation (The Crown, The Shadows, The Faith)
+    /// Null means unaffiliated with any major faction
+    /// </summary>
+    public Faction? NPCFaction { get; set; } = null;
     public new bool ControlsTurf { get; set; }
     
     // Missing properties for API compatibility
@@ -641,6 +647,17 @@ public partial class NPC : Character
         if (IsSpecialNPC)
         {
             return GetSpecialGreeting(player);
+        }
+
+        // Check for faction-based greeting if both NPC and player have faction affiliations
+        if (NPCFaction != null)
+        {
+            var playerFaction = FactionSystem.Instance?.PlayerFaction;
+            if (playerFaction != null)
+            {
+                // Use faction-aware greeting
+                return FactionSystem.Instance.GetFactionGreeting(NPCFaction.Value, player);
+            }
         }
 
         // Use personality and relationship to generate greeting

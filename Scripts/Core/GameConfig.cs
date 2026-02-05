@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.17.0-alpha";
-    public const string VersionName = "FOSSIL Support";
+    public const string Version = "0.18.0-alpha";
+    public const string VersionName = "NPC Relationships";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

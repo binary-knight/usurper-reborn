@@ -334,10 +334,16 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.WriteLine($"You are blessed by {bishopName}.");
             terminal.WriteLine($"You gain {chivalryGain} chivalry points!");
-            
+
+            // Church donations are light actions - increase Faith standing
+            int faithGain = Math.Max(1, (int)(amount / 100));
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, faithGain);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"Your piety has been noted. (+{faithGain} Faith standing)");
+
             // Create news entry
             await CreateNewsEntry("Good-Doer", $"{currentPlayer.DisplayName} donated money to the Church.", "");
-            
+
             await Task.Delay(3000);
         }
         
@@ -416,10 +422,16 @@ namespace UsurperRemake.Locations
             terminal.WriteLine($"You gain {chivalryGain} chivalry points!");
             terminal.WriteLine($"Your darkness decreases by {Math.Max(1L, darknessReduction)} points!");
             terminal.WriteLine("You are blessed for 7 days!");
-            
+
+            // Blessings are light actions - increase Faith standing
+            int faithGain = Math.Max(1, (int)(amount / 75));
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, faithGain);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"The Faith recognizes your devotion. (+{faithGain} Faith standing)");
+
             // Create news entry
             await CreateNewsEntry("Blessed", $"{currentPlayer.DisplayName} purchased a blessing.", "");
-            
+
             await Task.Delay(4000);
         }
         

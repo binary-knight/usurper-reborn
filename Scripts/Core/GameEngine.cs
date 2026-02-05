@@ -1121,6 +1121,15 @@ public partial class GameEngine : Node
         WorldInitializerSystem.Instance.ResetWorld();
         UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
         UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();
+        UsurperRemake.Systems.FactionSystem.Instance.Reset();
+
+        // Reset narrative systems for new game
+        UsurperRemake.Systems.StrangerEncounterSystem.Instance.Reset();
+        UsurperRemake.Systems.TownNPCStorySystem.Instance.Reset();
+        UsurperRemake.Systems.DreamSystem.Instance.Reset();
+        UsurperRemake.Systems.OceanPhilosophySystem.Instance.Reset();
+        UsurperRemake.Systems.GriefSystem.Instance.Reset();
+        NPCMarriageRegistry.Instance.Reset();
 
         // Create new player using character creation system
         var newCharacter = await CreateNewPlayer(playerName);
@@ -1324,6 +1333,13 @@ public partial class GameEngine : Node
             Measles = playerData.Measles,
             Leprosy = playerData.Leprosy,
             LoversBane = playerData.LoversBane,
+
+            // Divine Wrath System
+            DivineWrathLevel = playerData.DivineWrathLevel,
+            AngeredGodName = playerData.AngeredGodName ?? "",
+            BetrayedForGodName = playerData.BetrayedForGodName ?? "",
+            DivineWrathPending = playerData.DivineWrathPending,
+            DivineWrathTurnsRemaining = playerData.DivineWrathTurnsRemaining,
 
             // Combat statistics (kill/death counts)
             MKills = playerData.MKills,
@@ -1845,6 +1861,15 @@ public partial class GameEngine : Node
                 // Death status - permanent death tracking
                 IsDead = data.IsDead,
 
+                // Marriage status
+                IsMarried = data.IsMarried,
+                Married = data.Married,
+                SpouseName = data.SpouseName ?? "",
+                MarriedTimes = data.MarriedTimes,
+
+                // Faction affiliation
+                NPCFaction = data.NPCFaction >= 0 ? (UsurperRemake.Systems.Faction)data.NPCFaction : null,
+
                 // Alignment
                 Chivalry = data.Chivalry,
                 Darkness = data.Darkness,
@@ -2020,6 +2045,16 @@ public partial class GameEngine : Node
                 npc.BaseMaxMana = npc.MaxMana;
             }
 
+            // Migrate: Assign faction to NPCs that don't have one (legacy save compatibility)
+            if (!npc.NPCFaction.HasValue)
+            {
+                npc.NPCFaction = DetermineFactionForNPC(npc);
+                if (npc.NPCFaction.HasValue)
+                {
+                    GD.Print($"[GameEngine] Migrated {npc.Name} to faction {npc.NPCFaction.Value}");
+                }
+            }
+
             // Restore dynamic equipment FIRST (before EquippedItems, so IDs are registered)
             if (data.DynamicEquipment != null && data.DynamicEquipment.Count > 0)
             {
@@ -2145,6 +2180,48 @@ public partial class GameEngine : Node
             exp += (long)(Math.Pow(i, 1.8) * 50);
         }
         return exp;
+    }
+
+    /// <summary>
+    /// Determine faction for an NPC based on their class and alignment (for legacy save migration)
+    /// Uses same logic as NPCSpawnSystem.DetermineFactionForNPC but works with NPC object
+    /// </summary>
+    private static UsurperRemake.Systems.Faction? DetermineFactionForNPC(NPC npc)
+    {
+        var random = new Random();
+
+        // Clerics are strongly associated with The Faith
+        if (npc.Class == CharacterClass.Cleric)
+        {
+            // Only evil clerics wouldn't be Faith
+            if (npc.Darkness <= npc.Chivalry)
+                return UsurperRemake.Systems.Faction.TheFaith;
+        }
+
+        // Assassins are associated with The Shadows
+        if (npc.Class == CharacterClass.Assassin)
+        {
+            if (random.Next(100) < 80) // 80% chance
+                return UsurperRemake.Systems.Faction.TheShadows;
+        }
+
+        // Warriors and Paladins may be Crown members
+        if (npc.Class == CharacterClass.Warrior || npc.Class == CharacterClass.Paladin)
+        {
+            // Good-aligned warriors often serve the Crown
+            if (npc.Chivalry > npc.Darkness && random.Next(100) < 60)
+                return UsurperRemake.Systems.Faction.TheCrown;
+        }
+
+        // Evil-aligned characters may be Shadows
+        if (npc.Darkness > npc.Chivalry + 200)
+        {
+            if (random.Next(100) < 50) // 50% chance
+                return UsurperRemake.Systems.Faction.TheShadows;
+        }
+
+        // Most NPCs remain unaffiliated
+        return null;
     }
 
     /// <summary>

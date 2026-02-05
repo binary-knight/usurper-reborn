@@ -42,13 +42,15 @@ public class HealerLocation : BaseLocation
     }
 
     /// <summary>
-    /// Get adjusted price with alignment and world event modifiers
+    /// Get adjusted price with alignment, world event, and faction modifiers
     /// </summary>
     private long GetAdjustedPrice(long basePrice, Character player)
     {
         var alignmentModifier = AlignmentSystem.Instance.GetPriceModifier(player, isShadyShop: false);
         var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
-        return (long)(basePrice * alignmentModifier * worldEventModifier);
+        // Apply faction discount (The Faith gets 25% off at healers)
+        var factionModifier = UsurperRemake.Systems.FactionSystem.Instance.GetHealingPriceModifier();
+        return (long)(basePrice * alignmentModifier * worldEventModifier * factionModifier);
     }
 
     public HealerLocation() : base(

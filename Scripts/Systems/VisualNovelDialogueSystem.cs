@@ -1220,22 +1220,57 @@ namespace UsurperRemake.Systems
             var profile = npc.Brain?.Personality;
             var state = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
             bool isAttracted = profile?.IsAttractedTo(player!.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male) ?? true;
-            float flirtReceptiveness = profile?.GetFlirtReceptiveness(relationLevel, isAttracted) ?? 0.5f;
+
+            // Check NPC's relationship status
+            bool npcIsMarried = npc.Married || npc.IsMarried;
+            // Check if NPC has a spouse/partner that isn't the player (makes flirting harder)
+            // If NPC is already player's Lover/FWB, they're receptive - don't penalize
+            bool npcHasLover = !string.IsNullOrEmpty(npc.SpouseName) && npc.SpouseName != player!.Name2;
+
+            // Get base flirt receptiveness with NPC's relationship status
+            float flirtReceptiveness = profile?.GetFlirtReceptiveness(relationLevel, isAttracted, npcIsMarried, npcHasLover) ?? 0.3f;
+
+            // Check player's relationship status - NPCs notice if you're taken!
+            bool playerIsMarried = player!.Married || player.IsMarried || RomanceTracker.Instance.IsMarried;
+            bool playerHasLover = RomanceTracker.Instance.CurrentLovers?.Count > 0;
+
+            // Player relationship status penalties
+            float playerStatusPenalty = 0f;
+            string playerStatusWarning = "";
+            if (playerIsMarried)
+            {
+                playerStatusPenalty = 0.25f; // -25% for married players
+                playerStatusWarning = "They glance at your wedding ring...";
+            }
+            else if (playerHasLover)
+            {
+                playerStatusPenalty = 0.10f; // -10% for players in relationships
+                playerStatusWarning = "They seem aware you're already involved with someone...";
+            }
+            flirtReceptiveness -= playerStatusPenalty;
 
             // Apply charisma modifier - high charisma makes flirting more effective
-            float charismaModifier = GetCharismaModifier();
+            // Charisma matters more now (scaled up)
+            float charismaModifier = GetCharismaModifier() * 1.5f;
             flirtReceptiveness += charismaModifier;
 
             // Adjust receptiveness based on how the conversation's been going
             if (state.FlirtSuccessCount > 0)
-                flirtReceptiveness += 0.1f; // They're warming up
+                flirtReceptiveness += 0.08f; // They're warming up (reduced from 0.1)
             if (flirtCountThisSession > 1 && !state.LastFlirtWasPositive)
-                flirtReceptiveness -= 0.2f; // Pushing too hard
+                flirtReceptiveness -= 0.25f; // Pushing too hard (increased penalty)
 
-            // Clamp to reasonable bounds
-            flirtReceptiveness = Math.Clamp(flirtReceptiveness, 0.05f, 0.95f);
+            // Clamp to reasonable bounds - max is lower now
+            flirtReceptiveness = Math.Clamp(flirtReceptiveness, 0.02f, 0.80f);
 
             terminal!.SetColor("bright_magenta");
+
+            // Show player status warning if applicable
+            if (!string.IsNullOrEmpty(playerStatusWarning))
+            {
+                terminal.SetColor("dark_gray");
+                terminal.WriteLine($"  ({playerStatusWarning})");
+            }
 
             // Show charisma flavor text for exceptional or very low charisma
             string charismaFlavor = GetCharismaFlavorText(true);
@@ -1244,6 +1279,169 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  ({charismaFlavor})");
                 terminal.SetColor("bright_magenta");
+            }
+
+            // Check for "impossible" scenarios - NPC outright refuses
+            if (npcIsMarried && profile != null && profile.Commitment > 0.7f)
+            {
+                terminal.WriteLine($"  You try to catch {npc.Name2}'s eye...");
+                terminal.WriteLine("");
+                await Task.Delay(500);
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {npc.Name2} stops you immediately:");
+                terminal.SetColor("red");
+                var marriedResponses = new[]
+                {
+                    $"  \"I'm married. Happily. This conversation is over.\"",
+                    $"  *coldly* \"I have a spouse I love dearly. Don't try this again.\"",
+                    $"  \"I don't know what you think you're doing, but I'm not interested. I'm married.\""
+                };
+                terminal.WriteLine(marriedResponses[random.Next(marriedResponses.Length)]);
+                RelationshipSystem.UpdateRelationship(player!, npc, -2);
+                flirtCountThisSession++;
+                terminal.WriteLine("");
+                await terminal!.PressAnyKey();
+                return;
+            }
+
+            // NPC has a lover and is very jealous/committed
+            if (npcHasLover && profile != null && (profile.Jealousy > 0.7f || profile.Commitment > 0.65f))
+            {
+                terminal.WriteLine($"  You try to catch {npc.Name2}'s eye...");
+                terminal.WriteLine("");
+                await Task.Delay(500);
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {npc.Name2} shakes their head:");
+                terminal.SetColor("dark_red");
+                var takenResponses = new[]
+                {
+                    $"  \"I'm with someone. I'm not looking elsewhere.\"",
+                    $"  \"Flattering, but my heart belongs to another.\"",
+                    $"  *firmly* \"I have someone special in my life. This isn't happening.\""
+                };
+                terminal.WriteLine(takenResponses[random.Next(takenResponses.Length)]);
+                flirtCountThisSession++;
+                terminal.WriteLine("");
+                await terminal!.PressAnyKey();
+                return;
+            }
+
+            // AFFAIR HANDLING: Married NPC with lower commitment - affair is possible!
+            if (npcIsMarried && profile != null && profile.Commitment <= 0.7f)
+            {
+                // Process affair attempt through the affair system
+                var affairResult = EnhancedNPCBehaviors.ProcessAffairAttempt(npc, player!, flirtReceptiveness);
+
+                terminal.WriteLine($"  You catch {npc.Name2}'s eye, knowing they're married...");
+                terminal.WriteLine("");
+                await Task.Delay(500);
+
+                if (affairResult.Success)
+                {
+                    state.LastFlirtWasPositive = true;
+                    state.FlirtSuccessCount++;
+                    flirtCountThisSession++;
+
+                    // Show milestone-specific dialogue
+                    switch (affairResult.Milestone)
+                    {
+                        case AffairMilestone.BecameLovers:
+                            terminal.SetColor("bright_red");
+                            terminal.WriteLine($"  ♥ Something forbidden has begun... ♥");
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"  {affairResult.Message}");
+                            terminal.WriteLine("");
+                            terminal.SetColor("gray");
+                            terminal.WriteLine($"  (You are now having an affair with {npc.Name2}!)");
+                            break;
+
+                        case AffairMilestone.SecretRendezvous:
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"  The tension is palpable...");
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"  {affairResult.Message}");
+                            break;
+
+                        case AffairMilestone.EmotionalConnection:
+                            terminal.SetColor("magenta");
+                            terminal.WriteLine($"  There's a spark of something dangerous here...");
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"  {affairResult.Message}");
+                            break;
+
+                        default: // Flirting
+                            terminal.SetColor("bright_magenta");
+                            terminal.WriteLine($"  {affairResult.Message}");
+                            break;
+                    }
+
+                    // Improve relationship slightly
+                    RelationshipSystem.UpdateRelationship(player!, npc, 1);
+
+                    // Check if NPC will leave their spouse for the player
+                    var divorceCheck = EnhancedNPCBehaviors.CheckAffairDivorce(npc, player!);
+                    if (divorceCheck.WillDivorce)
+                    {
+                        terminal.WriteLine("");
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine($"  ═══ A Decision Is Made ═══");
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"  {divorceCheck.Reason}");
+                        terminal.WriteLine("");
+
+                        // Offer player a choice - become spouse or just lovers
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"  [M] \"Marry me.\" - Make them your spouse");
+                        terminal.WriteLine($"  [L] \"Stay with me.\" - Become lovers");
+                        terminal.WriteLine($"  [N] \"I can't do this.\" - Reject them");
+                        terminal.WriteLine("");
+                        terminal.Write("  Your choice: ");
+                        string? affairChoice = await terminal.GetInput("");
+
+                        if (affairChoice?.ToUpper() == "M" || affairChoice?.ToUpper() == "L")
+                        {
+                            bool marry = affairChoice.ToUpper() == "M";
+                            EnhancedNPCBehaviors.ProcessAffairDivorce(npc, player!, marry);
+
+                            if (marry)
+                            {
+                                terminal.SetColor("bright_red");
+                                terminal.WriteLine($"  ♥ {npc.Name2} will become your spouse! ♥");
+                                // The actual marriage would be handled by the regular marriage system
+                            }
+                            else
+                            {
+                                terminal.SetColor("red");
+                                terminal.WriteLine($"  ♥ {npc.Name2} is now your lover. ♥");
+                                RomanceTracker.Instance.AddLover(npc.ID, 50, false);
+                            }
+                        }
+                        else
+                        {
+                            terminal.SetColor("gray");
+                            terminal.WriteLine($"  {npc.Name2} looks heartbroken as you walk away...");
+                            RelationshipSystem.UpdateRelationship(player!, npc, -3);
+                        }
+                    }
+                }
+                else
+                {
+                    state.LastFlirtWasPositive = false;
+                    flirtCountThisSession++;
+
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"  {affairResult.Message}");
+
+                    if (affairResult.SpouseNoticed)
+                    {
+                        terminal.SetColor("dark_red");
+                        terminal.WriteLine($"  (Their spouse may have noticed something...)");
+                    }
+                }
+
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+                return;
             }
 
             // Vary the player's action based on the flirt
@@ -1270,7 +1468,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_magenta");
 
                 // Varied positive responses
-                if (flirtReceptiveness > 0.7f && state.FlirtSuccessCount >= 2)
+                if (flirtReceptiveness > 0.5f && state.FlirtSuccessCount >= 2)
                 {
                     var responses = new[]
                     {
@@ -1301,9 +1499,9 @@ namespace UsurperRemake.Systems
                     RelationshipSystem.UpdateRelationship(player!, npc, 1, 1, false, true);
                 }
             }
-            else if (roll < flirtReceptiveness + 0.3f)
+            else if (roll < flirtReceptiveness + 0.25f)
             {
-                // Neutral response
+                // Neutral response (narrower range now)
                 state.LastFlirtWasPositive = false;
 
                 terminal.SetColor("yellow");
@@ -1320,7 +1518,7 @@ namespace UsurperRemake.Systems
             }
             else
             {
-                // Negative response
+                // Negative response (more likely now)
                 state.LastFlirtWasPositive = false;
 
                 terminal.SetColor("yellow");
@@ -1331,10 +1529,31 @@ namespace UsurperRemake.Systems
                 {
                     terminal.WriteLine($"  \"Flattering, but you're not really my type.\"");
                 }
+                else if (playerIsMarried)
+                {
+                    var responses = new[]
+                    {
+                        $"  \"Aren't you married? I don't appreciate this.\"",
+                        $"  *eyes your ring* \"I think your spouse might have something to say about that.\"",
+                        $"  \"I don't get involved with married people. Period.\""
+                    };
+                    terminal.WriteLine(responses[random.Next(responses.Length)]);
+                    RelationshipSystem.UpdateRelationship(player!, npc, -2);
+                }
                 else if (flirtCountThisSession > 1)
                 {
                     terminal.WriteLine($"  \"You're being a bit... persistent, aren't you?\"");
                     RelationshipSystem.UpdateRelationship(player!, npc, -1);
+                }
+                else if (relationLevel > 60)
+                {
+                    var responses = new[]
+                    {
+                        $"  \"We barely know each other. Maybe slow down?\"",
+                        $"  *steps back* \"I don't know you well enough for this.\"",
+                        $"  \"Perhaps we should get to know each other better first.\""
+                    };
+                    terminal.WriteLine(responses[random.Next(responses.Length)]);
                 }
                 else
                 {

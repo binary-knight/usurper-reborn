@@ -1196,7 +1196,7 @@ public class InnLocation : BaseLocation
     {
         terminal.WriteLine("You find a quiet corner and rest for a while...", "green");
         await Task.Delay(2000);
-        
+
         var healing = Math.Min(10, currentPlayer.MaxHP - currentPlayer.HP);
         if (healing > 0)
         {
@@ -1207,8 +1207,44 @@ public class InnLocation : BaseLocation
         {
             terminal.WriteLine("You are already at full health.", "white");
         }
-        
-        await Task.Delay(2000);
+
+        // Check for dreams during rest
+        var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
+        if (dream != null)
+        {
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine("As you doze, a dream takes shape...");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"=== {dream.Title} ===");
+            terminal.WriteLine("");
+
+            terminal.SetColor("magenta");
+            foreach (var line in dream.Content)
+            {
+                terminal.WriteLine($"  {line}");
+                await Task.Delay(1200);
+            }
+
+            if (!string.IsNullOrEmpty(dream.PhilosophicalHint))
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("dark_cyan");
+                terminal.WriteLine($"  ({dream.PhilosophicalHint})");
+            }
+
+            terminal.WriteLine("");
+            DreamSystem.Instance.ExperienceDream(dream.Id);
+            await terminal.PressAnyKey();
+        }
+        else
+        {
+            await Task.Delay(2000);
+        }
     }
     
     /// <summary>

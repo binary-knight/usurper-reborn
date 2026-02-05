@@ -110,7 +110,113 @@ namespace UsurperRemake.Systems
             // Set random starting location
             npc.CurrentLocation = GetRandomStartLocation();
 
+            // Assign faction based on class, personality, alignment, and story role
+            npc.NPCFaction = DetermineFactionForNPC(template);
+
             return npc;
+        }
+
+        /// <summary>
+        /// Determine the faction affiliation for an NPC based on their template
+        /// Not all NPCs belong to factions - many are just ordinary adventurers
+        /// </summary>
+        private Faction? DetermineFactionForNPC(NPCTemplate template)
+        {
+            // Story NPCs have specific faction ties
+            if (!string.IsNullOrEmpty(template.StoryRole))
+            {
+                switch (template.StoryRole)
+                {
+                    case "HighPriest":      // Archpriest Aldwyn
+                    case "OceanOracle":     // The Wavespeaker
+                        return Faction.TheFaith;
+                    case "ShadowAgent":     // Whisperwind
+                    case "Mordecai":        // Mordecai Voidborne
+                        return Faction.TheShadows;
+                    case "Lysandra":        // Lysandra Dawnwhisper
+                    case "FallenPaladin":   // Sir Darius the Lost
+                    case "MaelkethChampion": // Skarn - warriors often align with Crown
+                        return Faction.TheCrown;
+                    case "TheStranger":     // Noctura in disguise - purposefully unaffiliated
+                    case "Sylvana":         // Neutral romance option
+                    case "SealScholar":     // Sera the Seeker - independent scholar
+                        return null;        // Unaffiliated
+                }
+            }
+
+            string personality = template.Personality.ToLower();
+            string alignment = template.Alignment.ToLower();
+
+            // Clerics are strongly associated with The Faith
+            if (template.Class == CharacterClass.Cleric)
+            {
+                // Only evil clerics wouldn't be Faith
+                if (alignment != "evil")
+                    return Faction.TheFaith;
+            }
+
+            // Assassins are associated with The Shadows
+            if (template.Class == CharacterClass.Assassin)
+            {
+                // Most assassins are Shadows members
+                if (random.Next(100) < 80) // 80% chance
+                    return Faction.TheShadows;
+            }
+
+            // Good-aligned Paladins are either Crown or Faith
+            if (template.Class == CharacterClass.Paladin && alignment == "good")
+            {
+                // Paladins split between Crown (martial) and Faith (religious)
+                return random.Next(2) == 0 ? Faction.TheCrown : Faction.TheFaith;
+            }
+
+            // Personality-based faction assignment
+            switch (personality)
+            {
+                // Faith personalities
+                case "pious":
+                case "devout":
+                case "compassionate":
+                case "gentle":
+                case "kind":
+                    return Faction.TheFaith;
+
+                // Crown personalities
+                case "honorable":
+                case "noble":
+                case "righteous":
+                case "loyal":
+                case "resolute":
+                case "zealous":
+                    if (alignment == "good")
+                        return Faction.TheCrown;
+                    break;
+
+                // Shadows personalities
+                case "cunning":
+                case "scheming":
+                case "sneaky":
+                case "secretive":
+                case "greedy":
+                case "cold":
+                case "professional":
+                    return Faction.TheShadows;
+            }
+
+            // Evil-aligned characters lean toward Shadows
+            if (alignment == "evil" && random.Next(100) < 40)
+                return Faction.TheShadows;
+
+            // Good-aligned warriors/barbarians may be Crown
+            if (alignment == "good" &&
+                (template.Class == CharacterClass.Warrior || template.Class == CharacterClass.Barbarian))
+            {
+                if (random.Next(100) < 30) // 30% chance
+                    return Faction.TheCrown;
+            }
+
+            // Most NPCs remain unaffiliated
+            return null;
         }
 
         /// <summary>

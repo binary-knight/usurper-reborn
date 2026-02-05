@@ -223,6 +223,9 @@ public abstract class BaseLocation
             }
         }
 
+        // Check for narrative encounters (Stranger, Town NPCs)
+        await CheckNarrativeEncounters();
+
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {
             // Autosave BEFORE displaying location (save stable state)
@@ -275,6 +278,231 @@ public abstract class BaseLocation
             GameLocation.Master => false,         // Level master's sanctum
             _ => true                             // Other locations have encounters
         };
+    }
+
+    /// <summary>
+    /// Check for narrative encounters (Stranger and Town NPC stories)
+    /// </summary>
+    protected virtual async Task CheckNarrativeEncounters()
+    {
+        if (currentPlayer == null || terminal == null) return;
+
+        var locationName = LocationId.ToString();
+
+        // Track player actions for Stranger encounter system
+        StrangerEncounterSystem.Instance.OnPlayerAction(locationName, currentPlayer);
+
+        // Check for Stranger (Noctura) encounter
+        if (StrangerEncounterSystem.Instance.ShouldTriggerEncounter(locationName, currentPlayer))
+        {
+            var encounter = StrangerEncounterSystem.Instance.GetEncounter(locationName, currentPlayer);
+            if (encounter != null)
+            {
+                await DisplayStrangerEncounter(encounter);
+            }
+        }
+
+        // Check for memorable NPC encounters (Town NPC stories)
+        var npcEncounter = TownNPCStorySystem.Instance.GetAvailableNPCEncounter(locationName, currentPlayer);
+        if (npcEncounter != null)
+        {
+            var npcKey = TownNPCStorySystem.MemorableNPCs.FirstOrDefault(kvp => kvp.Value == npcEncounter).Key;
+            var stage = TownNPCStorySystem.Instance.GetNextStage(npcKey, currentPlayer);
+            if (stage != null)
+            {
+                await DisplayTownNPCEncounter(npcEncounter, stage, npcKey);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Display a Stranger (Noctura) encounter
+    /// </summary>
+    private async Task DisplayStrangerEncounter(StrangerEncounter encounter)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("dark_magenta");
+        terminal.WriteLine("");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                          A MYSTERIOUS ENCOUNTER                              ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"  {encounter.DisguiseData.Name}");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {encounter.DisguiseData.Description}");
+        terminal.WriteLine("");
+
+        await Task.Delay(2000);
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"  \"{encounter.Dialogue}\"");
+        terminal.WriteLine("");
+
+        await Task.Delay(2000);
+
+        // Get response options
+        var options = StrangerEncounterSystem.Instance.GetResponseOptions(encounter, currentPlayer);
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("  How do you respond?");
+        terminal.WriteLine("");
+
+        foreach (var (key, text, _) in options)
+        {
+            terminal.SetColor("yellow");
+            terminal.Write($"    [{key}] ");
+            terminal.SetColor("white");
+            terminal.WriteLine(text);
+        }
+
+        terminal.WriteLine("");
+        var choice = await terminal.GetInput("Your response: ");
+
+        var selectedOption = options.FirstOrDefault(o => o.key.Equals(choice, StringComparison.OrdinalIgnoreCase));
+        if (selectedOption.response != null)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("magenta");
+            terminal.WriteLine($"  {selectedOption.response}");
+            terminal.WriteLine("");
+        }
+
+        // Record the encounter
+        StrangerEncounterSystem.Instance.RecordEncounter(encounter);
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Display a memorable Town NPC encounter
+    /// </summary>
+    private async Task DisplayTownNPCEncounter(MemorableNPCData npc, NPCStoryStage stage, string npcKey)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine($"║                    {npc.Name.ToUpper()} - {npc.Title.ToUpper(),-42}    ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {npc.Description}");
+        terminal.WriteLine("");
+
+        await Task.Delay(1500);
+
+        // Display dialogue
+        terminal.SetColor("white");
+        foreach (var line in stage.Dialogue)
+        {
+            terminal.WriteLine($"  {line}");
+            await Task.Delay(1500);
+        }
+        terminal.WriteLine("");
+
+        string? choiceMade = null;
+
+        // Handle choice if present
+        if (stage.Choice != null)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {stage.Choice.Prompt}");
+            terminal.WriteLine("");
+
+            foreach (var option in stage.Choice.Options)
+            {
+                terminal.SetColor("cyan");
+                terminal.Write($"    [{option.Key}] ");
+                terminal.SetColor("white");
+                terminal.WriteLine(option.Text);
+            }
+            terminal.WriteLine("");
+
+            var input = await terminal.GetInput("Your choice: ");
+            var selected = stage.Choice.Options.FirstOrDefault(o =>
+                o.Key.Equals(input, StringComparison.OrdinalIgnoreCase));
+
+            if (selected != null)
+            {
+                choiceMade = selected.Key;
+
+                // Apply choice effects
+                if (selected.GoldCost > 0 && currentPlayer.Gold >= selected.GoldCost)
+                {
+                    currentPlayer.Gold -= selected.GoldCost;
+                    terminal.WriteLine($"  (You paid {selected.GoldCost} gold)", "yellow");
+                }
+                if (selected.Chivalry > 0)
+                {
+                    currentPlayer.Chivalry += selected.Chivalry;
+                    terminal.WriteLine($"  (+{selected.Chivalry} Chivalry)", "bright_green");
+                }
+                if (selected.Darkness > 0)
+                {
+                    currentPlayer.Darkness += selected.Darkness;
+                    terminal.WriteLine($"  (+{selected.Darkness} Darkness)", "dark_red");
+                }
+            }
+        }
+
+        // Apply rewards if present
+        if (stage.Reward != null)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+
+            if (stage.Reward.ChivalryBonus > 0)
+            {
+                currentPlayer.Chivalry += stage.Reward.ChivalryBonus;
+                terminal.WriteLine($"  +{stage.Reward.ChivalryBonus} Chivalry!");
+            }
+            if (stage.Reward.Wisdom > 0)
+            {
+                currentPlayer.Wisdom += stage.Reward.Wisdom;
+                terminal.WriteLine($"  +{stage.Reward.Wisdom} Wisdom!");
+            }
+            if (stage.Reward.Dexterity > 0)
+            {
+                currentPlayer.Dexterity += stage.Reward.Dexterity;
+                terminal.WriteLine($"  +{stage.Reward.Dexterity} Dexterity!");
+            }
+            if (stage.Reward.WaveFragment.HasValue)
+            {
+                OceanPhilosophySystem.Instance.CollectFragment(stage.Reward.WaveFragment.Value);
+                terminal.WriteLine("  (A fragment of truth settles into your consciousness...)");
+            }
+            if (stage.Reward.AwakeningMoment.HasValue)
+            {
+                OceanPhilosophySystem.Instance.ExperienceMoment(stage.Reward.AwakeningMoment.Value);
+                terminal.WriteLine("  (Something shifts in your understanding...)");
+            }
+        }
+
+        // Apply awakening gain
+        if (stage.AwakeningGain > 0)
+        {
+            OceanPhilosophySystem.Instance.GainInsight(stage.AwakeningGain * 10);
+            terminal.SetColor("magenta");
+            terminal.WriteLine("  (A deeper understanding settles within you...)");
+        }
+
+        // Apply gold loss if any
+        if (stage.GoldLost > 0)
+        {
+            var actualLoss = Math.Min(stage.GoldLost, currentPlayer.Gold);
+            currentPlayer.Gold -= actualLoss;
+            terminal.SetColor("red");
+            terminal.WriteLine($"  (-{actualLoss} gold)");
+        }
+
+        // Complete the stage
+        TownNPCStorySystem.Instance.CompleteStage(npcKey, stage.StageId, choiceMade);
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -1256,10 +1484,194 @@ public abstract class BaseLocation
     protected virtual async Task NavigateToLocation(GameLocation destination)
     {
         terminal.WriteLine($"Heading to {GetLocationName(destination)}...", "yellow");
-        await Task.Delay(1000);
-        
+        await Task.Delay(500);
+
+        // Check for faction ambush while traveling
+        var ambushed = await CheckFactionAmbush();
+        if (ambushed)
+        {
+            // After surviving ambush, continue to destination
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("After the encounter, you continue on your way...");
+            await Task.Delay(1000);
+        }
+
         // Throw exception to signal location change
         throw new LocationExitException(destination);
+    }
+
+    /// <summary>
+    /// Check for and handle faction ambushes while traveling
+    /// Returns true if an ambush occurred (regardless of outcome)
+    /// </summary>
+    protected virtual async Task<bool> CheckFactionAmbush()
+    {
+        var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
+        var npcSpawn = UsurperRemake.Systems.NPCSpawnSystem.Instance;
+        var random = new Random();
+
+        // Get NPCs that could ambush (alive, with factions, hostile to player)
+        var potentialAmbushers = npcSpawn?.ActiveNPCs?
+            .Where(npc => !npc.IsDead &&
+                          npc.NPCFaction.HasValue &&
+                          factionSystem.IsNPCHostileToPlayer(npc.NPCFaction) &&
+                          npc.Level <= currentPlayer.Level + 5) // Don't ambush with NPCs way higher level
+            .ToList();
+
+        if (potentialAmbushers == null || potentialAmbushers.Count == 0)
+            return false;
+
+        // Check each potential ambusher
+        foreach (var npc in potentialAmbushers)
+        {
+            int ambushChance = factionSystem.GetAmbushChance(npc.NPCFaction);
+            if (random.Next(100) < ambushChance)
+            {
+                // Ambush triggered!
+                await HandleFactionAmbush(npc, factionSystem);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Handle a faction ambush encounter
+    /// </summary>
+    private async Task HandleFactionAmbush(NPC ambusher, UsurperRemake.Systems.FactionSystem factionSystem)
+    {
+        terminal.ClearScreen();
+
+        // Get faction color
+        string factionColor = ambusher.NPCFaction switch
+        {
+            UsurperRemake.Systems.Faction.TheFaith => "bright_cyan",
+            UsurperRemake.Systems.Faction.TheShadows => "bright_magenta",
+            UsurperRemake.Systems.Faction.TheCrown => "bright_yellow",
+            _ => "white"
+        };
+
+        // Show ambush header
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                              AMBUSH!                                         ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        // Show faction context
+        if (ambusher.NPCFaction.HasValue)
+        {
+            var factionData = UsurperRemake.Systems.FactionSystem.Factions[ambusher.NPCFaction.Value];
+            terminal.SetColor(factionColor);
+            terminal.WriteLine($"A member of {factionData.Name} has found you!");
+            terminal.WriteLine("");
+        }
+
+        // Show ambush dialogue
+        string dialogue = factionSystem.GetAmbushDialogue(
+            ambusher.NPCFaction ?? UsurperRemake.Systems.Faction.TheCrown,
+            ambusher.Name);
+
+        terminal.SetColor("white");
+        terminal.WriteLine(dialogue);
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        // Show ambusher stats
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {ambusher.Name} - Level {ambusher.Level} {ambusher.Class}");
+        terminal.WriteLine($"  HP: {ambusher.HP}/{ambusher.MaxHP}  STR: {ambusher.Strength}  DEF: {ambusher.Defence}");
+        terminal.WriteLine("");
+
+        // Give player choice
+        terminal.SetColor("yellow");
+        terminal.WriteLine("What do you do?");
+        terminal.SetColor("white");
+        terminal.WriteLine(" [F]ight - Engage the ambusher");
+        terminal.WriteLine(" [R]un  - Attempt to flee (may fail)");
+        terminal.WriteLine("");
+
+        var choice = await terminal.GetInputAsync("Your choice: ");
+
+        if (choice.ToUpper() == "R")
+        {
+            // Attempt to flee - 50% base chance, modified by agility
+            int fleeChance = 50 + (int)((currentPlayer.Agility - ambusher.Agility) / 2);
+            fleeChance = Math.Clamp(fleeChance, 20, 80);
+
+            if (new Random().Next(100) < fleeChance)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("green");
+                terminal.WriteLine("You manage to escape into the crowd!");
+                await Task.Delay(1500);
+                return;
+            }
+            else
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("red");
+                terminal.WriteLine("You couldn't escape! They block your path!");
+                await Task.Delay(1500);
+            }
+        }
+
+        // Combat!
+        terminal.WriteLine("");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("COMBAT BEGINS!");
+        await Task.Delay(1000);
+
+        // Use the combat engine to fight the NPC
+        var combatEngine = new CombatEngine(terminal);
+        var result = await combatEngine.PlayerVsPlayer(currentPlayer, ambusher);
+
+        // Handle combat result
+        if (result.Outcome == CombatOutcome.Victory)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"You defeated {ambusher.Name}!");
+
+            // Killing faction NPCs affects standing
+            if (ambusher.NPCFaction.HasValue)
+            {
+                factionSystem.ModifyReputation(ambusher.NPCFaction.Value, -50);
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  Your standing with {UsurperRemake.Systems.FactionSystem.Factions[ambusher.NPCFaction.Value].Name} has decreased significantly!");
+
+                // Gain standing with rival factions
+                foreach (var faction in UsurperRemake.Systems.FactionSystem.Factions.Keys
+                    .Where(f => f != ambusher.NPCFaction.Value))
+                {
+                    // Only gain with true rivals
+                    if ((ambusher.NPCFaction == UsurperRemake.Systems.Faction.TheFaith &&
+                         faction == UsurperRemake.Systems.Faction.TheShadows) ||
+                        (ambusher.NPCFaction == UsurperRemake.Systems.Faction.TheShadows &&
+                         faction == UsurperRemake.Systems.Faction.TheFaith))
+                    {
+                        factionSystem.ModifyReputation(faction, 10);
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"  {UsurperRemake.Systems.FactionSystem.Factions[faction].Name} approves! (+10 standing)");
+                    }
+                }
+            }
+
+            // Log the event
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("FACTION",
+                $"{currentPlayer.Name2} killed {ambusher.Name} ({ambusher.NPCFaction}) in faction ambush");
+        }
+        else if (result.Outcome == CombatOutcome.PlayerEscaped)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("You managed to disengage from combat!");
+        }
+        // If player lost, the death handling is done by the combat engine
+
+        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -1821,6 +2233,30 @@ public abstract class BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine($"  Gender Identity:    {profile.Gender}");
         terminal.WriteLine($"  Sexual Orientation: {profile.Orientation}");
+        terminal.WriteLine("");
+
+        // Faction affiliation
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  === FACTION ===");
+        terminal.SetColor("white");
+        terminal.Write("  Faction:            ");
+        if (npc.NPCFaction.HasValue)
+        {
+            var factionColor = npc.NPCFaction.Value switch
+            {
+                UsurperRemake.Systems.Faction.TheCrown => "bright_yellow",
+                UsurperRemake.Systems.Faction.TheFaith => "bright_cyan",
+                UsurperRemake.Systems.Faction.TheShadows => "bright_magenta",
+                _ => "white"
+            };
+            terminal.SetColor(factionColor);
+            terminal.WriteLine(npc.NPCFaction.Value.ToString());
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("None (Independent)");
+        }
         terminal.WriteLine("");
 
         // Relationship preferences
@@ -2436,48 +2872,102 @@ public abstract class BaseLocation
         }
         terminal.WriteLine("");
 
-        // Game Progress
+        // Faction
         terminal.SetColor("yellow");
-        terminal.WriteLine("═══ GAME PROGRESS ═══");
-        terminal.SetColor("white");
-        terminal.Write("Turn Count: ");
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"{currentPlayer.TurnCount}");
+        terminal.WriteLine("═══ FACTION ═══");
+        var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
+        if (factionSystem.PlayerFaction != null)
+        {
+            var faction = factionSystem.PlayerFaction.Value;
+            var factionData = UsurperRemake.Systems.FactionSystem.Factions[faction];
 
-        terminal.SetColor("white");
-        terminal.Write("Dungeon Fights: ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{currentPlayer.Fights}");
-        terminal.SetColor("white");
-        terminal.Write("  |  Player Fights: ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{currentPlayer.PFights}");
-        terminal.SetColor("white");
-        terminal.Write("  |  Team Fights: ");
-        terminal.SetColor("cyan");
-        terminal.WriteLine($"{currentPlayer.TFights}");
+            terminal.SetColor("white");
+            terminal.Write("Allegiance: ");
+            terminal.SetColor(GetFactionColor(faction));
+            terminal.WriteLine(factionData.Name);
 
-        terminal.SetColor("white");
-        terminal.Write("Good Deeds: ");
-        terminal.SetColor("green");
-        terminal.Write($"{currentPlayer.ChivNr}");
-        terminal.SetColor("white");
-        terminal.Write("  |  Dark Deeds: ");
-        terminal.SetColor("red");
-        terminal.WriteLine($"{currentPlayer.DarkNr}");
+            terminal.SetColor("white");
+            terminal.Write("Rank: ");
+            terminal.SetColor("bright_cyan");
+            terminal.Write($"{factionSystem.FactionRank}");
+            terminal.SetColor("gray");
+            terminal.Write(" (");
+            terminal.SetColor("cyan");
+            terminal.Write(factionSystem.GetCurrentRankTitle());
+            terminal.SetColor("gray");
+            terminal.WriteLine(")");
 
+            // Show active bonuses
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("Active Bonuses:");
+            terminal.SetColor("green");
+            switch (faction)
+            {
+                case UsurperRemake.Systems.Faction.TheCrown:
+                    terminal.WriteLine("  • 10% discount at all shops");
+                    break;
+                case UsurperRemake.Systems.Faction.TheFaith:
+                    terminal.WriteLine("  • 25% discount on healing services");
+                    break;
+                case UsurperRemake.Systems.Faction.TheShadows:
+                    terminal.WriteLine("  • 20% better prices when selling items");
+                    break;
+            }
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("You have not pledged allegiance to any faction.");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("  Visit the Castle, Temple, or Dark Alley to learn more.");
+        }
+
+        // Show standing with all factions
+        terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.Write("Thieveries: ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{currentPlayer.Thiefs}");
-        terminal.SetColor("white");
-        terminal.Write("  |  Assassinations: ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{currentPlayer.Assa}");
-        terminal.SetColor("white");
-        terminal.Write("  |  Brawls: ");
-        terminal.SetColor("cyan");
-        terminal.WriteLine($"{currentPlayer.Brawls}");
+        terminal.WriteLine("Faction Standing:");
+        foreach (var faction in new[] { UsurperRemake.Systems.Faction.TheCrown,
+                                         UsurperRemake.Systems.Faction.TheFaith,
+                                         UsurperRemake.Systems.Faction.TheShadows })
+        {
+            var standing = factionSystem.FactionStanding[faction];
+            var factionData = UsurperRemake.Systems.FactionSystem.Factions[faction];
+
+            terminal.SetColor("gray");
+            terminal.Write("  ");
+            terminal.SetColor(GetFactionColor(faction));
+            terminal.Write($"{factionData.Name,-15}");
+            terminal.SetColor("white");
+            terminal.Write(": ");
+
+            // Color based on standing
+            if (standing >= 100)
+                terminal.SetColor("bright_green");
+            else if (standing >= 50)
+                terminal.SetColor("green");
+            else if (standing >= 0)
+                terminal.SetColor("gray");
+            else if (standing >= -50)
+                terminal.SetColor("yellow");
+            else
+                terminal.SetColor("red");
+
+            terminal.Write($"{standing,4}");
+
+            // Standing descriptor
+            terminal.SetColor("darkgray");
+            string standingDesc = standing switch
+            {
+                >= 200 => " (Revered)",
+                >= 100 => " (Honored)",
+                >= 50 => " (Friendly)",
+                >= 0 => " (Neutral)",
+                >= -50 => " (Unfriendly)",
+                >= -100 => " (Hostile)",
+                _ => " (Hated)"
+            };
+            terminal.WriteLine(standingDesc);
+        }
         terminal.WriteLine("");
 
         // Pagination - Page 3 break
@@ -2529,6 +3019,114 @@ public abstract class BaseLocation
             terminal.WriteLine($"{playerWinRate:F1}%");
         }
         terminal.WriteLine("");
+
+        // Dungeon Progress
+        terminal.SetColor("yellow");
+        terminal.WriteLine("═══ DUNGEON PROGRESS ═══");
+        terminal.SetColor("white");
+        terminal.Write("Deepest Floor Reached: ");
+        int deepestFloor = currentPlayer.Statistics?.DeepestDungeonLevel ?? 1;
+        if (currentPlayer is Player playerForDungeon && playerForDungeon.DungeonLevel > deepestFloor)
+            deepestFloor = playerForDungeon.DungeonLevel;
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"{deepestFloor} / 100");
+
+        // Show Old Gods defeated
+        var storySystem = UsurperRemake.Systems.StoryProgressionSystem.Instance;
+        if (storySystem != null)
+        {
+            int godsDefeated = storySystem.OldGodStates.Count(g => g.Value.Status == UsurperRemake.Systems.GodStatus.Defeated);
+            int godsAllied = storySystem.OldGodStates.Count(g => g.Value.Status == UsurperRemake.Systems.GodStatus.Allied);
+
+            terminal.SetColor("white");
+            terminal.Write("Old Gods: ");
+            if (godsDefeated > 0)
+            {
+                terminal.SetColor("bright_red");
+                terminal.Write($"{godsDefeated} defeated");
+            }
+            if (godsAllied > 0)
+            {
+                if (godsDefeated > 0) terminal.Write(", ");
+                terminal.SetColor("bright_green");
+                terminal.Write($"{godsAllied} allied");
+            }
+            if (godsDefeated == 0 && godsAllied == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.Write("None encountered");
+            }
+            terminal.WriteLine("");
+
+            // Show seals collected
+            int sealsCollected = storySystem.CollectedSeals.Count;
+            terminal.SetColor("white");
+            terminal.Write("Ancient Seals: ");
+            terminal.SetColor(sealsCollected > 0 ? "bright_yellow" : "gray");
+            terminal.WriteLine($"{sealsCollected}/6 collected");
+        }
+        terminal.WriteLine("");
+
+        // God Worship & Divine Wrath
+        terminal.SetColor("yellow");
+        terminal.WriteLine("═══ DIVINE STATUS ═══");
+        terminal.SetColor("white");
+        terminal.Write("Worshipped God: ");
+        string worshippedGod = UsurperRemake.GodSystemSingleton.Instance?.GetPlayerGod(currentPlayer.Name2) ?? "";
+        if (!string.IsNullOrEmpty(worshippedGod))
+        {
+            // Get god alignment indicator from the GodSystem (Darkness > Goodness = Evil)
+            var godInfo = UsurperRemake.GodSystemSingleton.Instance?.GetGod(worshippedGod);
+            bool isEvilGod = godInfo != null && godInfo.Darkness > godInfo.Goodness;
+            terminal.SetColor(isEvilGod ? "red" : "bright_cyan");
+            terminal.WriteLine(worshippedGod);
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("None (Agnostic)");
+        }
+
+        // Show Divine Wrath status if active
+        if (currentPlayer.DivineWrathPending)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("");
+            terminal.WriteLine("*** DIVINE WRATH ACTIVE ***");
+            terminal.SetColor("red");
+            terminal.WriteLine($"  Angered: {currentPlayer.AngeredGodName}");
+            terminal.WriteLine($"  By worshipping: {currentPlayer.BetrayedForGodName}");
+            terminal.SetColor("yellow");
+            string severity = currentPlayer.DivineWrathLevel switch
+            {
+                1 => "Minor (same alignment betrayal)",
+                2 => "Moderate (opposite alignment betrayal)",
+                3 => "Severe (major opposite betrayal)",
+                _ => "Unknown"
+            };
+            terminal.WriteLine($"  Severity: {severity}");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  (Punishment may strike during dungeon exploration)");
+        }
+        terminal.WriteLine("");
+
+        // Artifacts (if any collected)
+        var artifactSystem = UsurperRemake.Systems.ArtifactSystem.Instance;
+        if (artifactSystem != null)
+        {
+            var artifactAbilities = artifactSystem.GetActiveArtifactAbilities();
+            if (artifactAbilities.Count > 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("═══ ARTIFACTS ═══");
+                foreach (var ability in artifactAbilities)
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"  {ability}");
+                }
+                terminal.WriteLine("");
+            }
+        }
 
         // Diseases & Afflictions
         if (currentPlayer.Blind || currentPlayer.Plague || currentPlayer.Smallpox ||
@@ -2587,6 +3185,20 @@ public abstract class BaseLocation
 
         terminal.WriteLine("");
         await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Get the display color for a faction
+    /// </summary>
+    private static string GetFactionColor(UsurperRemake.Systems.Faction faction)
+    {
+        return faction switch
+        {
+            UsurperRemake.Systems.Faction.TheCrown => "bright_yellow",
+            UsurperRemake.Systems.Faction.TheFaith => "bright_cyan",
+            UsurperRemake.Systems.Faction.TheShadows => "bright_magenta",
+            _ => "white"
+        };
     }
 
     /// <summary>

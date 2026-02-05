@@ -2263,6 +2263,13 @@ public class DungeonLocation : BaseLocation
                     await Task.Delay(500);
                 }
 
+                // Check for dungeon visions (narrative environmental beats)
+                var vision = DreamSystem.Instance.GetDungeonVision(currentDungeonLevel, player);
+                if (vision != null)
+                {
+                    await DisplayDungeonVision(vision);
+                }
+
                 // Check for companion personal quest encounters
                 await CheckCompanionQuestEncounters(player, targetRoom);
             }
@@ -2285,6 +2292,43 @@ public class DungeonLocation : BaseLocation
         {
             consecutiveMonsterRooms = 0;
         }
+    }
+
+    /// <summary>
+    /// Display a dungeon vision (environmental narrative beat)
+    /// </summary>
+    private async Task DisplayDungeonVision(DungeonVision vision)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("dark_magenta");
+        terminal.WriteLine($"=== {vision.Description} ===");
+        terminal.WriteLine("");
+
+        terminal.SetColor("magenta");
+        foreach (var line in vision.Content)
+        {
+            terminal.WriteLine($"  {line}");
+            await Task.Delay(1200);
+        }
+        terminal.WriteLine("");
+
+        // Apply awakening gain if any
+        if (vision.AwakeningGain > 0)
+        {
+            OceanPhilosophySystem.Instance.GainInsight(vision.AwakeningGain * 10);
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  (Something stirs in your memory...)");
+        }
+
+        // Grant wave fragment if any
+        if (vision.WaveFragment.HasValue)
+        {
+            OceanPhilosophySystem.Instance.CollectFragment(vision.WaveFragment.Value);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("  (A fragment of truth settles into your consciousness...)");
+        }
+
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -2505,9 +2549,29 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1500);
 
+        // Check for divine punishment before combat
+        var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(player);
+
+        // Apply temporary combat penalties from divine wrath
+        int originalTempAttackBonus = player.TempAttackBonus;
+        int originalTempDefenseBonus = player.TempDefenseBonus;
+        if (punishmentApplied)
+        {
+            // Convert percentage modifier to stat penalty (rough approximation)
+            player.TempAttackBonus -= Math.Abs(damageModifier) * 2;
+            player.TempDefenseBonus -= Math.Abs(defenseModifier) * 2;
+        }
+
         // Combat
         var combatEngine = new CombatEngine(terminal);
         var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true);
+
+        // Restore original temp bonuses after combat
+        if (punishmentApplied)
+        {
+            player.TempAttackBonus = originalTempAttackBonus;
+            player.TempDefenseBonus = originalTempDefenseBonus;
+        }
 
         // Check if player should return to temple after resurrection
         if (combatResult.ShouldReturnToTemple)
@@ -3727,14 +3791,34 @@ public class DungeonLocation : BaseLocation
         }
 
         // Show difficulty assessment
-        ShowDifficultyAssessment(monsters, GetCurrentPlayer());
+        var currentPlayer = GetCurrentPlayer();
+        ShowDifficultyAssessment(monsters, currentPlayer);
 
         terminal.WriteLine("");
         await Task.Delay(2000);
 
+        // Check for divine punishment before combat
+        var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(currentPlayer);
+
+        // Apply temporary combat penalties from divine wrath
+        int originalTempAttackBonus = currentPlayer.TempAttackBonus;
+        int originalTempDefenseBonus = currentPlayer.TempDefenseBonus;
+        if (punishmentApplied)
+        {
+            currentPlayer.TempAttackBonus -= Math.Abs(damageModifier) * 2;
+            currentPlayer.TempDefenseBonus -= Math.Abs(defenseModifier) * 2;
+        }
+
         // Use new PlayerVsMonsters method - ALL monsters fight at once!
         // Monk will appear after ALL monsters are defeated
-        var combatResult = await combatEngine.PlayerVsMonsters(GetCurrentPlayer(), monsters, teammates, offerMonkEncounter: true);
+        var combatResult = await combatEngine.PlayerVsMonsters(currentPlayer, monsters, teammates, offerMonkEncounter: true);
+
+        // Restore original temp bonuses after combat
+        if (punishmentApplied)
+        {
+            currentPlayer.TempAttackBonus = originalTempAttackBonus;
+            currentPlayer.TempDefenseBonus = originalTempDefenseBonus;
+        }
 
         // Check if player should return to temple after resurrection
         if (combatResult.ShouldReturnToTemple)
@@ -10159,6 +10243,205 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine("");
         terminal.WriteLine("[Bucket List: Tell Someone the Truth - COMPLETE]");
+    }
+
+    #endregion
+
+    #region Divine Punishment System
+
+    /// <summary>
+    /// Check if divine punishment should trigger and apply effects before combat
+    /// Returns true if punishment was applied, along with combat modifiers
+    /// </summary>
+    private async Task<(bool applied, int damageModifier, int defenseModifier)> CheckDivinePunishment(Character player)
+    {
+        if (!player.DivineWrathPending || player.DivineWrathLevel <= 0)
+        {
+            return (false, 0, 0);
+        }
+
+        // Chance to trigger based on wrath level: 20%/40%/60% per combat
+        int triggerChance = player.DivineWrathLevel * 20;
+        if (dungeonRandom.Next(100) >= triggerChance)
+        {
+            // No punishment this time, but tick the wrath timer
+            player.TickDivineWrath();
+            return (false, 0, 0);
+        }
+
+        // Divine punishment triggers!
+        terminal.WriteLine("");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("╔════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                    *** DIVINE WRATH ***                        ║");
+        terminal.WriteLine("╚════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+        await Task.Delay(1000);
+
+        // Choose punishment based on wrath level
+        int damageModifier = 0;
+        int defenseModifier = 0;
+
+        switch (player.DivineWrathLevel)
+        {
+            case 1: // Minor punishment - stat debuff
+                await ApplyMinorDivinePunishment(player);
+                damageModifier = -10; // 10% less damage dealt
+                defenseModifier = -10; // 10% less defense
+                break;
+
+            case 2: // Moderate punishment - HP damage + debuff
+                await ApplyModerateDivinePunishment(player);
+                damageModifier = -20;
+                defenseModifier = -20;
+                break;
+
+            case 3: // Severe punishment - Major damage + severe debuffs
+                await ApplySevereDivinePunishment(player);
+                damageModifier = -30;
+                defenseModifier = -30;
+                break;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"(Combat penalties: {damageModifier}% damage, {defenseModifier}% defense)");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        // Clear the wrath after punishment (or reduce level for severe cases)
+        if (player.DivineWrathLevel >= 3)
+        {
+            player.DivineWrathLevel = 1; // Severe punishment reduces but doesn't fully clear
+            player.DivineWrathTurnsRemaining = 30;
+        }
+        else
+        {
+            player.ClearDivineWrath();
+        }
+
+        return (true, damageModifier, defenseModifier);
+    }
+
+    private async Task ApplyMinorDivinePunishment(Character player)
+    {
+        string godName = player.AngeredGodName;
+        string betrayedFor = player.BetrayedForGodName;
+
+        terminal.SetColor("red");
+        terminal.WriteLine($"A cold presence fills the air...");
+        await Task.Delay(1000);
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"\"{player.Name2}... You dare worship at another's altar?\"");
+        await Task.Delay(1500);
+
+        terminal.SetColor("red");
+        var punishments = new[]
+        {
+            $"The voice of {godName} echoes in your mind, sapping your strength!",
+            $"{godName}'s displeasure manifests as a chilling weakness in your limbs!",
+            $"You feel {godName}'s watchful gaze - judging, disappointed, angry!"
+        };
+        terminal.WriteLine(punishments[dungeonRandom.Next(punishments.Length)]);
+        await Task.Delay(1500);
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Your attacks will be weakened in the coming battle.");
+    }
+
+    private async Task ApplyModerateDivinePunishment(Character player)
+    {
+        string godName = player.AngeredGodName;
+        string betrayedFor = player.BetrayedForGodName;
+
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"The dungeon trembles! Divine fury descends!");
+        await Task.Delay(1000);
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"\"FAITHLESS ONE! You gave to {betrayedFor} what was MINE!\"");
+        await Task.Delay(1500);
+
+        // Deal HP damage
+        long damage = Math.Max(1, player.HP / 4); // 25% current HP
+        player.HP = Math.Max(1, player.HP - damage);
+
+        terminal.SetColor("red");
+        terminal.WriteLine($"Divine lightning strikes you for {damage} damage!");
+        terminal.WriteLine($"HP: {player.HP}/{player.MaxHP}");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"\"Let this pain remind you of your broken vows!\"");
+        await Task.Delay(1000);
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Your strength and defense are significantly reduced!");
+    }
+
+    private async Task ApplySevereDivinePunishment(Character player)
+    {
+        string godName = player.AngeredGodName;
+        string betrayedFor = player.BetrayedForGodName;
+
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("██████████████████████████████████████████████████████████████████");
+        terminal.WriteLine("              THE HEAVENS THEMSELVES CRY OUT IN RAGE!");
+        terminal.WriteLine("██████████████████████████████████████████████████████████████████");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"\"WRETCHED TRAITOR! {betrayedFor.ToUpper()} CANNOT PROTECT YOU FROM MY WRATH!\"");
+        await Task.Delay(1500);
+
+        // Severe HP damage
+        long damage = Math.Max(1, player.HP / 2); // 50% current HP
+        player.HP = Math.Max(1, player.HP - damage);
+
+        terminal.SetColor("red");
+        terminal.WriteLine($"Divine fire consumes you for {damage} damage!");
+        terminal.WriteLine($"HP: {player.HP}/{player.MaxHP}");
+        await Task.Delay(1000);
+
+        // Mana drain
+        if (player.Mana > 0)
+        {
+            long manaDrain = player.Mana / 2;
+            player.Mana = Math.Max(0, player.Mana - manaDrain);
+            terminal.WriteLine($"Your magical essence is torn away! -{manaDrain} Mana!");
+        }
+        await Task.Delay(1000);
+
+        // Random disease or curse
+        if (dungeonRandom.Next(100) < 50)
+        {
+            var diseases = new[] { "Blind", "Plague", "Measles" };
+            string disease = diseases[dungeonRandom.Next(diseases.Length)];
+            switch (disease)
+            {
+                case "Blind":
+                    player.Blind = true;
+                    terminal.WriteLine("Divine light sears your eyes - you are BLINDED!");
+                    break;
+                case "Plague":
+                    player.Plague = true;
+                    terminal.WriteLine("Pestilence courses through your veins - you have the PLAGUE!");
+                    break;
+                case "Measles":
+                    player.Measles = true;
+                    terminal.WriteLine("Your skin erupts in painful sores - MEASLES!");
+                    break;
+            }
+            await Task.Delay(1000);
+        }
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"\"Remember this agony, {player.Name2}. My patience is NOT infinite.\"");
+        await Task.Delay(1500);
+
+        terminal.SetColor("red");
+        terminal.WriteLine("You are severely weakened. Survival is not guaranteed...");
     }
 
     #endregion

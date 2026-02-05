@@ -72,6 +72,49 @@ namespace UsurperRemake.Systems
 
         // Relationship System - all character relationships
         public List<RelationshipSaveData> Relationships { get; set; } = new();
+
+        // ===== NEW NARRATIVE SYSTEMS =====
+
+        // Stranger/Noctura Encounter System
+        public StrangerEncounterData? StrangerEncounters { get; set; }
+
+        // Faction System
+        public FactionSaveData? Factions { get; set; }
+
+        // Town NPC Story System (memorable NPCs with arcs)
+        public TownNPCStorySaveData? TownNPCStories { get; set; }
+
+        // Dream System
+        public DreamSaveData? Dreams { get; set; }
+
+        // NPC Marriage System - tracks NPC-to-NPC marriages
+        public List<NPCMarriageSaveData> NPCMarriages { get; set; } = new();
+
+        // Affairs System - tracks player affairs with married NPCs
+        public List<AffairSaveData> Affairs { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Save data for an NPC-to-NPC marriage
+    /// </summary>
+    public class NPCMarriageSaveData
+    {
+        public string Npc1Id { get; set; } = "";
+        public string Npc2Id { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Save data for a player's affair with a married NPC
+    /// </summary>
+    public class AffairSaveData
+    {
+        public string MarriedNpcId { get; set; } = "";
+        public string SeducerId { get; set; } = "";
+        public int AffairProgress { get; set; }
+        public int SecretMeetings { get; set; }
+        public int SpouseSuspicion { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime LastInteraction { get; set; }
     }
 
 
@@ -238,6 +281,13 @@ namespace UsurperRemake.Systems
         public bool Measles { get; set; }
         public bool Leprosy { get; set; }
         public bool LoversBane { get; set; }  // STD from Love Street
+
+        // Divine Wrath System - punishment for betraying your god
+        public int DivineWrathLevel { get; set; }           // 0 = none, 1-3 = severity
+        public string AngeredGodName { get; set; } = "";    // The god that was angered
+        public string BetrayedForGodName { get; set; } = ""; // The god player sacrificed to instead
+        public bool DivineWrathPending { get; set; }        // Has punishment triggered yet?
+        public int DivineWrathTurnsRemaining { get; set; }  // Turns until wrath fades
 
         // Character settings
         public bool AutoHeal { get; set; }  // Auto-heal in battle
@@ -423,6 +473,15 @@ namespace UsurperRemake.Systems
 
         // Death status - permanent death tracking
         public bool IsDead { get; set; }
+
+        // Marriage status
+        public bool IsMarried { get; set; }
+        public bool Married { get; set; }
+        public string SpouseName { get; set; } = "";
+        public int MarriedTimes { get; set; }
+
+        // Faction affiliation (nullable - -1 means no faction)
+        public int NPCFaction { get; set; } = -1;
 
         // Alignment
         public long Chivalry { get; set; }
@@ -1158,4 +1217,5 @@ namespace UsurperRemake.Systems
         public bool Deleted { get; set; }
         public DateTime LastUpdated { get; set; }
     }
+
 } 

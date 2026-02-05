@@ -105,6 +105,7 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("    [N] NPC Controls (spawn, modify, teleport)");
         terminal.WriteLine("    [W] World Simulation Controls");
         terminal.WriteLine("    [T] Time Controls (advance days)");
+        terminal.WriteLine("    [S] Narrative Systems Debug (Dreams, Factions, Stranger, NPCs)");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -188,6 +189,7 @@ public class DevMenuLocation : BaseLocation
             case "N": await NPCControls(); return false;
             case "W": await WorldControls(); return false;
             case "T": await TimeControls(); return false;
+            case "S": await NarrativeDebug(); return false;
             case "G": await GodMode(); return false;
             case "H": await FullHeal(); return false;
             case "M": await MaxGold(); return false;
@@ -2121,6 +2123,853 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("  Character reset to level 1!", "yellow");
 
         await Task.Delay(2000);
+    }
+
+    #endregion
+
+    #region Narrative Systems Debug
+
+    private async Task NarrativeDebug()
+    {
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                    NARRATIVE SYSTEMS DEBUG                                   ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  VIEW STATE:");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("    [1] View All Narrative System States");
+            terminal.WriteLine("    [2] View Faction Standing Details");
+            terminal.WriteLine("    [3] View Dream History");
+            terminal.WriteLine("    [4] View Town NPC Story Progress");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  STRANGER/NOCTURA SYSTEM:");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("    [5] Force Stranger Encounter (next dungeon visit)");
+            terminal.WriteLine("    [6] Reset Stranger Encounters");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  FACTION SYSTEM:");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("    [7] Join a Faction (bypass requirements)");
+            terminal.WriteLine("    [8] Leave Current Faction");
+            terminal.WriteLine("    [9] Adjust Faction Standing");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  DREAM SYSTEM:");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("    [A] Queue Specific Dream");
+            terminal.WriteLine("    [B] Force Dream on Next Rest");
+            terminal.WriteLine("    [C] Clear Dream Queue");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  TOWN NPC STORIES:");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("    [D] Advance NPC Story Stage");
+            terminal.WriteLine("    [E] Reset NPC Story");
+            terminal.WriteLine("    [F] Trigger Random NPC Event");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  CYCLE DIALOGUE:");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("    [G] Set Story Cycle (1-4)");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("    [Q] Return to Dev Menu");
+            terminal.WriteLine("");
+
+            var choice = await terminal.GetInput("  Choice: ");
+            var upperChoice = choice.ToUpper().Trim();
+
+            switch (upperChoice)
+            {
+                case "1": await ViewAllNarrativeStates(); break;
+                case "2": await ViewFactionDetails(); break;
+                case "3": await ViewDreamHistory(); break;
+                case "4": await ViewTownNPCStories(); break;
+                case "5": await ForceStrangerEncounter(); break;
+                case "6": await ResetStrangerEncounters(); break;
+                case "7": await ForceJoinFaction(); break;
+                case "8": await LeaveFaction(); break;
+                case "9": await AdjustFactionStanding(); break;
+                case "A": await QueueSpecificDream(); break;
+                case "B": await ForceDreamOnNextRest(); break;
+                case "C": await ClearDreamQueue(); break;
+                case "D": await AdvanceNPCStoryStage(); break;
+                case "E": await ResetNPCStory(); break;
+                case "F": await TriggerRandomNPCEvent(); break;
+                case "G": await SetStoryCycle(); break;
+                case "Q": return;
+                default:
+                    terminal.WriteLine("  Invalid option.", "red");
+                    await Task.Delay(500);
+                    break;
+            }
+        }
+    }
+
+    private async Task ViewAllNarrativeStates()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ NARRATIVE SYSTEMS STATE ═══════════════════════");
+        terminal.WriteLine("");
+
+        // Stranger Encounter System
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  ▶ STRANGER/NOCTURA SYSTEM:");
+        terminal.SetColor("white");
+        try
+        {
+            var strangerData = StrangerEncounterSystem.Instance.Serialize();
+            terminal.WriteLine($"    Encounters Had: {strangerData.EncountersHad}");
+            terminal.WriteLine($"    Player Suspects: {strangerData.PlayerSuspectsStranger}");
+            terminal.WriteLine($"    Player Knows Truth: {strangerData.PlayerKnowsTruth}");
+            terminal.WriteLine($"    Actions Since Last: {strangerData.ActionsSinceLastEncounter}");
+            terminal.WriteLine($"    Disguises Seen: {strangerData.EncounteredDisguises?.Count ?? 0}");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"    Error: {ex.Message}", "red");
+        }
+        terminal.WriteLine("");
+
+        // Faction System
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  ▶ FACTION SYSTEM:");
+        terminal.SetColor("white");
+        try
+        {
+            var factionData = FactionSystem.Instance.Serialize();
+            var currentFactionName = factionData.PlayerFaction >= 0 ? ((Faction)factionData.PlayerFaction).ToString() : "None";
+            terminal.WriteLine($"    Current Faction: {currentFactionName}");
+            terminal.WriteLine($"    Rank: {factionData.FactionRank}");
+            terminal.WriteLine($"    Reputation: {factionData.FactionReputation}");
+            terminal.WriteLine($"    Completed Quests: {factionData.CompletedFactionQuests?.Count ?? 0}");
+            terminal.WriteLine($"    Has Betrayed: {factionData.HasBetrayedFaction}");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"    Error: {ex.Message}", "red");
+        }
+        terminal.WriteLine("");
+
+        // Dream System
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  ▶ DREAM SYSTEM:");
+        terminal.SetColor("white");
+        try
+        {
+            var experiencedDreams = DreamSystem.Instance.ExperiencedDreams;
+            var dreamData = DreamSystem.Instance.Serialize();
+            terminal.WriteLine($"    Dreams Experienced: {experiencedDreams.Count}");
+            terminal.WriteLine($"    Total Dreams Available: {DreamSystem.Dreams.Count}");
+            terminal.WriteLine($"    Rests Since Last Dream: {dreamData.RestsSinceLastDream}");
+            if (experiencedDreams.Count > 0)
+            {
+                terminal.WriteLine($"    Recent: {string.Join(", ", experiencedDreams.TakeLast(3))}");
+            }
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"    Error: {ex.Message}", "red");
+        }
+        terminal.WriteLine("");
+
+        // Town NPC Story System
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  ▶ TOWN NPC STORY SYSTEM:");
+        terminal.SetColor("white");
+        try
+        {
+            var npcStates = TownNPCStorySystem.Instance.NPCStates;
+            var withProgress = npcStates.Count(s => s.Value.CurrentStage > 0);
+            terminal.WriteLine($"    NPCs with Progress: {withProgress} / {npcStates.Count}");
+            foreach (var kvp in npcStates.Where(s => s.Value.CurrentStage > 0).Take(5))
+            {
+                var npcData = TownNPCStorySystem.MemorableNPCs.GetValueOrDefault(kvp.Key);
+                var name = npcData?.Name ?? kvp.Key;
+                terminal.WriteLine($"      - {name}: Stage {kvp.Value.CurrentStage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"    Error: {ex.Message}", "red");
+        }
+        terminal.WriteLine("");
+
+        // Cycle Dialogue System
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  ▶ CYCLE/STORY PROGRESSION:");
+        terminal.SetColor("white");
+        try
+        {
+            var storySystem = StoryProgressionSystem.Instance;
+            var cycleTitle = CycleDialogueSystem.Instance.GetCycleTitle();
+            terminal.WriteLine($"    Current Cycle: {storySystem.CurrentCycle}");
+            terminal.WriteLine($"    Cycle Title: {(string.IsNullOrEmpty(cycleTitle) ? "First Journey" : cycleTitle)}");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"    Error: {ex.Message}", "red");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        await terminal.PressAnyKey("Press any key to continue...");
+    }
+
+    private async Task ViewFactionDetails()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ FACTION DETAILS ═══════════════════════");
+        terminal.WriteLine("");
+
+        try
+        {
+            var factionSystem = FactionSystem.Instance;
+            var factionData = factionSystem.Serialize();
+
+            terminal.SetColor("yellow");
+            var currentFactionName = factionData.PlayerFaction >= 0 ? ((Faction)factionData.PlayerFaction).ToString() : "None";
+            terminal.WriteLine($"  Current Faction: {currentFactionName}");
+            terminal.WriteLine($"  Rank: {factionData.FactionRank}");
+            terminal.WriteLine($"  Reputation: {factionData.FactionReputation}");
+            terminal.WriteLine("");
+
+            // Show all factions and requirements
+            terminal.SetColor("white");
+            terminal.WriteLine("  Available Factions:");
+            terminal.WriteLine("");
+
+            foreach (Faction faction in Enum.GetValues(typeof(Faction)))
+            {
+                var (canJoin, reason) = factionSystem.CanJoinFaction(faction, currentPlayer);
+                var statusColor = canJoin ? "green" : "red";
+                var statusText = canJoin ? "✓ Eligible" : $"✗ {reason}";
+
+                terminal.SetColor("cyan");
+                terminal.Write($"    {faction}: ");
+                terminal.SetColor(statusColor);
+                terminal.WriteLine(statusText);
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine("  Standing with each faction:");
+            foreach (var kvp in factionData.FactionStanding)
+            {
+                var faction = (Faction)kvp.Key;
+                terminal.WriteLine($"    {faction}: {kvp.Value}");
+            }
+            terminal.WriteLine($"  Completed Quests: {factionData.CompletedFactionQuests?.Count ?? 0}");
+
+            if (factionData.CompletedFactionQuests?.Count > 0)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine("  Completed Quest IDs:");
+                foreach (var quest in factionData.CompletedFactionQuests.Take(10))
+                {
+                    terminal.WriteLine($"    - {quest}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error loading faction data: {ex.Message}", "red");
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey("Press any key to continue...");
+    }
+
+    private async Task ViewDreamHistory()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ DREAM HISTORY ═══════════════════════");
+        terminal.WriteLine("");
+
+        try
+        {
+            var dreamData = DreamSystem.Instance.Serialize();
+            var experiencedDreams = DreamSystem.Instance.ExperiencedDreams;
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Total Dreams Experienced: {experiencedDreams.Count}");
+            terminal.WriteLine($"  Rests Since Last Dream: {dreamData.RestsSinceLastDream}");
+            terminal.WriteLine($"  Total Dreams Available: {DreamSystem.Dreams.Count}");
+            terminal.WriteLine("");
+
+            if (experiencedDreams.Count > 0)
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("  Dreams Experienced:");
+                foreach (var dreamId in experiencedDreams.Take(20))
+                {
+                    var dream = DreamSystem.Dreams.FirstOrDefault(d => d.Id == dreamId);
+                    var title = dream?.Title ?? dreamId;
+                    terminal.WriteLine($"    - {title} ({dreamId})");
+                }
+                if (experiencedDreams.Count > 20)
+                {
+                    terminal.WriteLine($"    ... and {experiencedDreams.Count - 20} more");
+                }
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  No dreams experienced yet.");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Remaining Dreams: {DreamSystem.Dreams.Count - experiencedDreams.Count}");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error loading dream data: {ex.Message}", "red");
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey("Press any key to continue...");
+    }
+
+    private async Task ViewTownNPCStories()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ TOWN NPC STORIES ═══════════════════════");
+        terminal.WriteLine("");
+
+        try
+        {
+            var npcStates = TownNPCStorySystem.Instance.NPCStates;
+            var npcRelationships = TownNPCStorySystem.Instance.NPCRelationship;
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Total Memorable NPCs: {TownNPCStorySystem.MemorableNPCs.Count}");
+            terminal.WriteLine($"  NPCs with Progress: {npcStates.Count(s => s.Value.CurrentStage > 0)}");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  NPC Story Progress:");
+            foreach (var kvp in npcStates)
+            {
+                var npcId = kvp.Key;
+                var state = kvp.Value;
+                var npcData = TownNPCStorySystem.MemorableNPCs.GetValueOrDefault(npcId);
+
+                if (npcData == null) continue;
+
+                var maxStages = npcData.StoryStages?.Length ?? 0;
+                var relationship = npcRelationships.GetValueOrDefault(npcId, 0);
+
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"    {npcData.Name} ({npcData.Title}):");
+                terminal.SetColor("white");
+                terminal.WriteLine($"      Location: {npcData.Location}");
+                terminal.WriteLine($"      Stage: {state.CurrentStage} / {maxStages}");
+                terminal.WriteLine($"      Completed Stages: {string.Join(", ", state.CompletedStages)}");
+                terminal.WriteLine($"      Relationship: {relationship}");
+                if (state.ChoicesMade.Count > 0)
+                {
+                    terminal.WriteLine($"      Choices Made: {string.Join(", ", state.ChoicesMade.Select(c => $"Stage{c.Key}:{c.Value}"))}");
+                }
+                terminal.WriteLine("");
+            }
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error loading NPC story data: {ex.Message}", "red");
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey("Press any key to continue...");
+    }
+
+    private async Task ForceStrangerEncounter()
+    {
+        terminal.WriteLine("");
+        terminal.WriteLine("  Forcing stranger encounter on next dungeon visit...", "yellow");
+
+        try
+        {
+            // Force encounter by setting actions counter high (min 20 required)
+            var currentData = StrangerEncounterSystem.Instance.Serialize();
+            currentData.ActionsSinceLastEncounter = 100;
+            StrangerEncounterSystem.Instance.Deserialize(currentData);
+            terminal.WriteLine("  ✓ Stranger encounter probability maximized!", "green");
+            terminal.WriteLine("  (Next dungeon visit will likely trigger an encounter)", "gray");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error: {ex.Message}", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task ResetStrangerEncounters()
+    {
+        terminal.WriteLine("");
+        terminal.WriteLine("  Resetting all stranger encounter data...", "yellow");
+
+        try
+        {
+            StrangerEncounterSystem.Instance.Deserialize(new StrangerEncounterData());
+            terminal.WriteLine("  ✓ Stranger encounter data reset!", "green");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error: {ex.Message}", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task ForceJoinFaction()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ FORCE JOIN FACTION ═══════════════════════");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  Available Factions:");
+        var factions = Enum.GetValues(typeof(Faction)).Cast<Faction>().ToList();
+
+        for (int i = 0; i < factions.Count; i++)
+        {
+            terminal.WriteLine($"    [{i + 1}] {factions[i]}");
+        }
+        terminal.WriteLine("    [Q] Cancel");
+        terminal.WriteLine("");
+
+        var choice = await terminal.GetInput("  Choose faction: ");
+
+        if (choice.ToUpper() == "Q") return;
+
+        if (int.TryParse(choice, out int index) && index >= 1 && index <= factions.Count)
+        {
+            var faction = factions[index - 1];
+            try
+            {
+                // Force join by directly manipulating save state
+                var data = FactionSystem.Instance.Serialize();
+                data.PlayerFaction = (int)faction;
+                data.FactionRank = 1;
+                data.FactionReputation = 100;
+                FactionSystem.Instance.Deserialize(data);
+                terminal.WriteLine($"  ✓ Force joined {faction}!", "green");
+            }
+            catch (Exception ex)
+            {
+                terminal.WriteLine($"  Error: {ex.Message}", "red");
+            }
+        }
+        else
+        {
+            terminal.WriteLine("  Invalid choice.", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task LeaveFaction()
+    {
+        terminal.WriteLine("");
+
+        try
+        {
+            var factionData = FactionSystem.Instance.Serialize();
+            if (factionData.PlayerFaction < 0)
+            {
+                terminal.WriteLine("  You are not in any faction.", "yellow");
+            }
+            else
+            {
+                var oldFaction = (Faction)factionData.PlayerFaction;
+                FactionSystem.Instance.LeaveFaction();
+                terminal.WriteLine($"  ✓ Left {oldFaction}!", "green");
+            }
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error: {ex.Message}", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task AdjustFactionStanding()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ ADJUST FACTION STANDING ═══════════════════════");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        var factionData = FactionSystem.Instance.Serialize();
+        terminal.WriteLine("  Current standings:");
+        foreach (var kvp in factionData.FactionStanding)
+        {
+            var faction = (Faction)kvp.Key;
+            terminal.WriteLine($"    {faction}: {kvp.Value}");
+        }
+        terminal.WriteLine("");
+
+        terminal.WriteLine("  Choose faction to modify:");
+        var factions = Enum.GetValues(typeof(Faction)).Cast<Faction>().ToList();
+        for (int i = 0; i < factions.Count; i++)
+        {
+            terminal.WriteLine($"    [{i + 1}] {factions[i]}");
+        }
+        terminal.WriteLine("    [Q] Cancel");
+        terminal.WriteLine("");
+
+        var choice = await terminal.GetInput("  Choose faction: ");
+
+        if (choice.ToUpper() == "Q") return;
+
+        if (int.TryParse(choice, out int index) && index >= 1 && index <= factions.Count)
+        {
+            var faction = factions[index - 1];
+            var input = await terminal.GetInput($"  Enter new standing for {faction} (-1000 to 1000): ");
+
+            if (int.TryParse(input, out int newStanding))
+            {
+                newStanding = Math.Clamp(newStanding, -1000, 1000);
+                try
+                {
+                    FactionSystem.Instance.ModifyReputation(faction, newStanding - (factionData.FactionStanding.GetValueOrDefault((int)faction, 0)));
+                    terminal.WriteLine($"  ✓ {faction} standing set to {newStanding}!", "green");
+                }
+                catch (Exception ex)
+                {
+                    terminal.WriteLine($"  Error: {ex.Message}", "red");
+                }
+            }
+            else
+            {
+                terminal.WriteLine("  Invalid value.", "red");
+            }
+        }
+        else
+        {
+            terminal.WriteLine("  Invalid choice.", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task QueueSpecificDream()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ EXPERIENCE DREAM ═══════════════════════");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  Available Dreams:");
+        terminal.SetColor("cyan");
+
+        // Get all dream IDs from static Dreams list
+        var dreamIds = DreamSystem.Dreams.Select(d => d.Id).ToList();
+        var experienced = DreamSystem.Instance.ExperiencedDreams;
+
+        for (int i = 0; i < Math.Min(dreamIds.Count, 20); i++) // Show first 20
+        {
+            var dreamId = dreamIds[i];
+            var status = experienced.Contains(dreamId) ? " (experienced)" : "";
+            terminal.WriteLine($"    [{i + 1}] {dreamId}{status}");
+        }
+        if (dreamIds.Count > 20)
+        {
+            terminal.WriteLine($"    ... and {dreamIds.Count - 20} more");
+        }
+        terminal.WriteLine("    [Q] Cancel");
+        terminal.WriteLine("");
+
+        var choice = await terminal.GetInput("  Choose dream to mark as experienced: ");
+
+        if (choice.ToUpper() == "Q") return;
+
+        if (int.TryParse(choice, out int index) && index >= 1 && index <= dreamIds.Count)
+        {
+            var dreamId = dreamIds[index - 1];
+            try
+            {
+                DreamSystem.Instance.ExperienceDream(dreamId);
+                terminal.WriteLine($"  ✓ Marked dream as experienced: {dreamId}", "green");
+            }
+            catch (Exception ex)
+            {
+                terminal.WriteLine($"  Error: {ex.Message}", "red");
+            }
+        }
+        else
+        {
+            terminal.WriteLine("  Invalid choice.", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task ForceDreamOnNextRest()
+    {
+        terminal.WriteLine("");
+        terminal.WriteLine("  Forcing dream on next rest...", "yellow");
+
+        try
+        {
+            // Force dream by setting rests counter high (need at least 2 rests normally)
+            var dreamData = DreamSystem.Instance.Serialize();
+            dreamData.RestsSinceLastDream = 10;
+            DreamSystem.Instance.Deserialize(dreamData);
+            terminal.WriteLine("  ✓ Dream probability maximized for next rest!", "green");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error: {ex.Message}", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task ClearDreamQueue()
+    {
+        terminal.WriteLine("");
+        terminal.WriteLine("  Clearing experienced dreams...", "yellow");
+
+        try
+        {
+            // Reset dream history
+            var dreamData = new DreamSaveData
+            {
+                ExperiencedDreams = new List<string>(),
+                RestsSinceLastDream = 0
+            };
+            DreamSystem.Instance.Deserialize(dreamData);
+            terminal.WriteLine("  ✓ Dream history cleared! All dreams available again.", "green");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error: {ex.Message}", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task AdvanceNPCStoryStage()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ ADVANCE NPC STORY ═══════════════════════");
+        terminal.WriteLine("");
+
+        try
+        {
+            var npcStates = TownNPCStorySystem.Instance.NPCStates;
+
+            if (npcStates.Count == 0)
+            {
+                terminal.WriteLine("  No NPC stories initialized.", "yellow");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  NPC Stories:");
+            var npcIds = npcStates.Keys.ToList();
+            for (int i = 0; i < npcIds.Count; i++)
+            {
+                var npcId = npcIds[i];
+                var state = npcStates[npcId];
+                var npcData = TownNPCStorySystem.MemorableNPCs.GetValueOrDefault(npcId);
+                var name = npcData?.Name ?? npcId;
+                terminal.WriteLine($"    [{i + 1}] {name} (Stage {state.CurrentStage})");
+            }
+            terminal.WriteLine("    [Q] Cancel");
+            terminal.WriteLine("");
+
+            var choice = await terminal.GetInput("  Choose NPC to advance: ");
+
+            if (choice.ToUpper() == "Q") return;
+
+            if (int.TryParse(choice, out int index) && index >= 1 && index <= npcIds.Count)
+            {
+                var npcId = npcIds[index - 1];
+                var state = npcStates[npcId];
+                // Advance by completing current stage
+                TownNPCStorySystem.Instance.CompleteStage(npcId, state.CurrentStage);
+                terminal.WriteLine($"  ✓ Advanced {npcId}'s story to stage {state.CurrentStage + 1}!", "green");
+            }
+            else
+            {
+                terminal.WriteLine("  Invalid choice.", "red");
+            }
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error: {ex.Message}", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task ResetNPCStory()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════ RESET NPC STORY ═══════════════════════");
+        terminal.WriteLine("");
+
+        try
+        {
+            var npcStates = TownNPCStorySystem.Instance.NPCStates;
+
+            if (npcStates.Count == 0)
+            {
+                terminal.WriteLine("  No NPC stories to reset.", "yellow");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  NPC Stories:");
+            var npcIds = npcStates.Keys.ToList();
+            for (int i = 0; i < npcIds.Count; i++)
+            {
+                var npcId = npcIds[i];
+                var state = npcStates[npcId];
+                var npcData = TownNPCStorySystem.MemorableNPCs.GetValueOrDefault(npcId);
+                var name = npcData?.Name ?? npcId;
+                terminal.WriteLine($"    [{i + 1}] {name} (Stage {state.CurrentStage})");
+            }
+            terminal.WriteLine("    [A] Reset ALL stories");
+            terminal.WriteLine("    [Q] Cancel");
+            terminal.WriteLine("");
+
+            var choice = await terminal.GetInput("  Choose NPC to reset: ");
+
+            if (choice.ToUpper() == "Q") return;
+
+            if (choice.ToUpper() == "A")
+            {
+                TownNPCStorySystem.Instance.Deserialize(new TownNPCStorySaveData());
+                terminal.WriteLine("  ✓ All NPC stories reset!", "green");
+            }
+            else if (int.TryParse(choice, out int index) && index >= 1 && index <= npcIds.Count)
+            {
+                var npcId = npcIds[index - 1];
+                // Reset by setting state back to initial
+                npcStates[npcId] = new MemorableNPCState
+                {
+                    NPCId = npcId,
+                    CurrentStage = 0,
+                    CompletedStages = new HashSet<int>(),
+                    ChoicesMade = new Dictionary<int, string>()
+                };
+                terminal.WriteLine($"  ✓ Reset {npcId}'s story!", "green");
+            }
+            else
+            {
+                terminal.WriteLine("  Invalid choice.", "red");
+            }
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error: {ex.Message}", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task TriggerRandomNPCEvent()
+    {
+        terminal.WriteLine("");
+        terminal.WriteLine("  Advancing all NPC stories by one stage...", "yellow");
+
+        try
+        {
+            var npcStates = TownNPCStorySystem.Instance.NPCStates;
+            int advanced = 0;
+            foreach (var kvp in npcStates)
+            {
+                var npcId = kvp.Key;
+                var state = kvp.Value;
+                if (state.CurrentStage < 10) // Don't advance completed stories
+                {
+                    TownNPCStorySystem.Instance.CompleteStage(npcId, state.CurrentStage);
+                    advanced++;
+                }
+            }
+            terminal.WriteLine($"  ✓ Advanced {advanced} NPC stories!", "green");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine($"  Error: {ex.Message}", "red");
+        }
+
+        await Task.Delay(1500);
+    }
+
+    private async Task SetStoryCycle()
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+
+        var currentCycle = StoryProgressionSystem.Instance.CurrentCycle;
+        var cycleTitle = CycleDialogueSystem.Instance.GetCycleTitle();
+        terminal.WriteLine($"  Current cycle: {currentCycle} ({(string.IsNullOrEmpty(cycleTitle) ? "First Journey" : cycleTitle)})");
+        terminal.WriteLine("");
+        terminal.WriteLine("  Cycle affects NPC dialogue awareness:");
+        terminal.WriteLine("    1 = First playthrough (no deja vu)");
+        terminal.WriteLine("    2 = Second cycle (subtle hints)");
+        terminal.WriteLine("    3 = Third cycle (NPCs notice)");
+        terminal.WriteLine("    4 = Fourth cycle (growing awareness)");
+        terminal.WriteLine("    5+ = Full cycle awareness");
+        terminal.WriteLine("");
+
+        var input = await terminal.GetInput("  Enter new cycle number (1-10): ");
+
+        if (int.TryParse(input, out int newCycle) && newCycle >= 1 && newCycle <= 10)
+        {
+            try
+            {
+                StoryProgressionSystem.Instance.CurrentCycle = newCycle;
+                var newTitle = CycleDialogueSystem.Instance.GetCycleTitle();
+                terminal.WriteLine($"  ✓ Cycle set to {newCycle}!", "green");
+                if (!string.IsNullOrEmpty(newTitle))
+                {
+                    terminal.WriteLine($"  Title: {newTitle}", "cyan");
+                }
+            }
+            catch (Exception ex)
+            {
+                terminal.WriteLine($"  Error: {ex.Message}", "red");
+            }
+        }
+        else
+        {
+            terminal.WriteLine("  Invalid cycle number.", "red");
+        }
+
+        await Task.Delay(1500);
     }
 
     #endregion

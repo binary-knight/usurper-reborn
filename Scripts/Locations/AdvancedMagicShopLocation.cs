@@ -1,4 +1,5 @@
 using UsurperRemake.Utils;
+using UsurperRemake.Systems;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -534,16 +535,25 @@ public class AdvancedMagicShopLocation : BaseLocation
     private async Task SellItem(Character player, TerminalEmulator terminal)
     {
         terminal.WriteLine($"\n{GameConfig.ItemColor}=== Sell Item ==={GameConfig.TextColor}");
-        
+
+        // Show Shadows faction bonus if applicable
+        var fenceModifier = FactionSystem.Instance.GetFencePriceModifier();
+        if (fenceModifier > 1.0f)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("  [Shadows Bonus: +20% sell prices]");
+            terminal.SetColor("white");
+        }
+
         var sellableItems = GetSellableItems(player);
-        
+
         if (sellableItems.Count == 0)
         {
             terminal.WriteLine($"\n{GameConfig.WarningColor}You have no items to sell!{GameConfig.TextColor}");
             await terminal.WaitForKeyPress();
             return;
         }
-        
+
         terminal.WriteLine("Items you can sell:");
         for (int i = 0; i < sellableItems.Count; i++)
         {
@@ -789,11 +799,16 @@ public class AdvancedMagicShopLocation : BaseLocation
     
     /// <summary>
     /// Calculate sell price - Pascal sell_price function
+    /// Includes Shadows faction fence bonus (20% better prices)
     /// </summary>
     private int CalculateSellPrice(ItemDetails item)
     {
         // Pascal: sell_price := item.value div 2;
-        return (int)(item.Value / 2);
+        int basePrice = (int)(item.Value / 2);
+
+        // Apply Shadows faction fence bonus
+        var fenceModifier = FactionSystem.Instance.GetFencePriceModifier();
+        return (int)(basePrice * fenceModifier);
     }
 
     /// <summary>

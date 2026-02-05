@@ -429,6 +429,35 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
 
+        // The Crown faction option - only show if not already a member
+        var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
+        if (factionSystem.PlayerFaction != UsurperRemake.Systems.Faction.TheCrown)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("J");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("oin Royal Service ");
+            if (factionSystem.PlayerFaction == null)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("(swear loyalty to The Crown...)");
+            }
+            else
+            {
+                terminal.SetColor("dark_red");
+                terminal.WriteLine("(you serve another...)");
+            }
+        }
+        else
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(" You are a loyal servant of The Crown.");
+        }
+
         // Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
@@ -595,6 +624,10 @@ public class CastleLocation : BaseLocation
                     terminal.WriteLine("The throne is already occupied!");
                     await Task.Delay(2000);
                 }
+                return false;
+
+            case "J": // The Crown faction recruitment
+                await ShowCrownRecruitment();
                 return false;
 
             case "R":
@@ -4359,6 +4392,15 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"You donate {amount:N0} gold to the Royal Purse.");
                 terminal.WriteLine($"Your chivalry increases by {chivalryGain} for this noble deed!");
+
+                // Increase Crown standing (+1 per 50 gold donated)
+                int crownStandingGain = (int)(amount / 50);
+                if (crownStandingGain > 0)
+                {
+                    UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheCrown, crownStandingGain);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"The Crown appreciates your loyalty. (+{crownStandingGain} Crown standing)");
+                }
             }
         }
         else
@@ -4659,6 +4701,221 @@ public class CastleLocation : BaseLocation
 
         // GD.Print($"[Castle] {npc.Name} has been restored as monarch");
     }
+
+    #region The Crown Faction Recruitment
+
+    /// <summary>
+    /// Show The Crown faction recruitment UI
+    /// Meet the Royal Chancellor and potentially join The Crown
+    /// </summary>
+    private async Task ShowCrownRecruitment()
+    {
+        var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                              THE CROWN                                       ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("A royal herald leads you through gilded corridors to an ornate");
+        terminal.WriteLine("chamber where the Royal Chancellor awaits at a great oak desk.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"Ah, a prospective servant of the realm,\" the Chancellor says,");
+        terminal.WriteLine("adjusting his monocle to study you carefully.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Check if already in a faction
+        if (factionSystem.PlayerFaction != null)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("The Chancellor's expression hardens.");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"\"Our records show you have sworn allegiance to {UsurperRemake.Systems.FactionSystem.Factions[factionSystem.PlayerFaction.Value].Name}.\"");
+            terminal.WriteLine("\"The Crown does not accept those with divided loyalties.\"");
+            terminal.WriteLine("\"Should you ever renounce your current masters, return here.\"");
+            terminal.WriteLine("");
+            await terminal.GetInputAsync("Press Enter to continue...");
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.WriteLine("The Chancellor gestures to tapestries depicting the kingdom's history.");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"The Crown represents order, stability, and justice.\"");
+        terminal.WriteLine("\"When the Old Gods fell to corruption, it was The Crown\"");
+        terminal.WriteLine("\"that held the kingdom together. Law. Structure. Purpose.\"");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("\"We do not kneel to gods who abandoned us.\"");
+        terminal.WriteLine("\"We do not skulk in shadows like common thieves.\"");
+        terminal.WriteLine("\"We BUILD. We PROTECT. We GOVERN.\"");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Show faction benefits
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("═══ Benefits of The Crown ═══");
+        terminal.SetColor("white");
+        terminal.WriteLine("• 10% discount at all legitimate shops");
+        terminal.WriteLine("• Access to Royal Guard positions and military resources");
+        terminal.WriteLine("• Friendly treatment from guards and noble NPCs");
+        terminal.WriteLine("• Priority audience with the ruling monarch");
+        terminal.WriteLine("");
+
+        // Check requirements
+        var (canJoin, reason) = factionSystem.CanJoinFaction(UsurperRemake.Systems.Faction.TheCrown, currentPlayer);
+
+        if (!canJoin)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("═══ Requirements Not Met ═══");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(reason);
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine("The Crown requires:");
+            terminal.WriteLine("• Level 10 or higher");
+            terminal.WriteLine("• Chivalry 500+ (prove your honor through noble deeds)");
+            terminal.WriteLine("• Darkness below 500 (no criminal record)");
+            terminal.WriteLine($"  Your Chivalry: {currentPlayer.Chivalry}");
+            terminal.WriteLine($"  Your Darkness: {currentPlayer.Darkness}");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("\"Your reputation precedes you,\" the Chancellor says coolly.");
+            if (currentPlayer.Darkness > 500)
+            {
+                terminal.WriteLine("\"The Crown does not associate with criminals.\"");
+            }
+            else
+            {
+                terminal.WriteLine("\"Prove your worth. Perform honorable deeds. Then return.\"");
+            }
+            await terminal.GetInputAsync("Press Enter to continue...");
+            return;
+        }
+
+        // Can join - offer the choice
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("═══ Requirements Met ═══");
+        terminal.SetColor("white");
+        terminal.WriteLine("The Chancellor rises and extends a scroll sealed with the royal crest.");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"Your record speaks well of you. Honorable. Disciplined.\"");
+        terminal.WriteLine("\"Will you swear the Oath of Service and join The Crown?\"");
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("WARNING: Joining The Crown will:");
+        terminal.WriteLine("• Lock you out of The Faith and The Shadows");
+        terminal.WriteLine("• Decrease standing with rival factions by 100");
+        terminal.WriteLine("");
+
+        var choice = await terminal.GetInputAsync("Join The Crown? (Y/N) ");
+
+        if (choice.ToUpper() == "Y")
+        {
+            await PerformCrownOath(factionSystem);
+        }
+        else
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("The Chancellor nods curtly.");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("\"A wise soul takes time to consider such oaths.\"");
+            terminal.WriteLine("\"The Crown's gates remain open to those of noble heart.\"");
+        }
+
+        await terminal.GetInputAsync("Press Enter to continue...");
+    }
+
+    /// <summary>
+    /// Perform the oath ceremony to join The Crown
+    /// </summary>
+    private async Task PerformCrownOath(UsurperRemake.Systems.FactionSystem factionSystem)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                         THE OATH OF SERVICE                                  ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("You are led to the throne room, where officials have gathered.");
+        terminal.WriteLine("The royal banner hangs above - a golden crown on crimson field.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("You kneel before the great seal of the kingdom.");
+        terminal.WriteLine("The Chancellor stands before you, scroll in hand.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"Repeat the Oath of Service:\"");
+        terminal.WriteLine("");
+        await Task.Delay(1000);
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("\"I pledge my sword, my honor, and my life to The Crown.\"");
+        await Task.Delay(1200);
+        terminal.WriteLine("\"I will uphold law and order in all my dealings.\"");
+        await Task.Delay(1200);
+        terminal.WriteLine("\"I will defend the realm against chaos and corruption.\"");
+        await Task.Delay(1200);
+        terminal.WriteLine("\"In service to the kingdom, I shall not falter.\"");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("The Chancellor places the royal seal upon your oath.");
+        terminal.WriteLine("Trumpets sound. The gathered officials applaud.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Actually join the faction
+        factionSystem.JoinFaction(UsurperRemake.Systems.Faction.TheCrown, currentPlayer);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║              YOU HAVE JOINED THE CROWN                                       ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"Rise, servant of the Crown,\" the Chancellor declares.");
+        terminal.WriteLine("\"Your loyalty will be rewarded. Your service, remembered.\"");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("As a member of The Crown, you will receive:");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("• 10% discount at all shops in the kingdom");
+        terminal.WriteLine("• Recognition from guards and royal officials");
+        terminal.WriteLine("• Access to Crown-only opportunities and resources");
+        terminal.WriteLine("");
+
+        // Generate news
+        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has sworn the Oath of Service and joined The Crown!");
+
+        // Log to debug
+        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("FACTION", $"{currentPlayer.Name2} joined The Crown");
+    }
+
+    #endregion
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
