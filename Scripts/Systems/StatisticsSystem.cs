@@ -490,6 +490,99 @@ public class PlayerStatistics
         else
             return $"{TotalPlayTime.Minutes}m {TotalPlayTime.Seconds}s";
     }
+
+    /// <summary>
+    /// Reset all statistics to zero. Used when resetting Steam stats to prevent
+    /// stat-to-achievement auto-triggers on the next sync.
+    /// </summary>
+    public void ResetAllStats()
+    {
+        // Combat stats
+        TotalMonstersKilled = 0;
+        TotalMonstersEncountered = 0;
+        TotalBossesKilled = 0;
+        TotalUniquesKilled = 0;
+        TotalPlayerKills = 0;
+        TotalPlayerDeaths = 0;
+        TotalMonsterDeaths = 0;
+        TotalCombatsWon = 0;
+        TotalCombatsLost = 0;
+        TotalCombatsFled = 0;
+        TotalDamageDealt = 0;
+        TotalDamageTaken = 0;
+        HighestSingleHit = 0;
+        TotalCriticalHits = 0;
+        TotalSpellsCast = 0;
+        TotalAbilitiesUsed = 0;
+
+        // Economic stats
+        TotalGoldEarned = 0;
+        TotalGoldSpent = 0;
+        TotalGoldFromMonsters = 0;
+        TotalGoldFromQuests = 0;
+        TotalGoldFromSelling = 0;
+        TotalGoldFromGambling = 0;
+        TotalGoldLostGambling = 0;
+        TotalGoldStolen = 0;
+        TotalGoldLostToThieves = 0;
+        HighestGoldHeld = 0;
+        TotalItemsBought = 0;
+        TotalItemsSold = 0;
+        MostExpensivePurchase = 0;
+
+        // Experience stats
+        TotalExperienceEarned = 0;
+        ExperienceFromMonsters = 0;
+        ExperienceFromQuests = 0;
+        ExperienceFromTraining = 0;
+        HighestLevelReached = 0;
+        TotalLevelUps = 0;
+
+        // Exploration stats
+        DeepestDungeonLevel = 0;
+        TotalDungeonFloorsCovered = 0;
+        TotalRoomsExplored = 0;
+        TotalTrapsTriggered = 0;
+        TotalTrapsDisarmed = 0;
+        TotalSecretsFound = 0;
+        TotalChestsOpened = 0;
+        LocationVisits.Clear();
+
+        // Social stats
+        TotalNPCInteractions = 0;
+        TotalConversations = 0;
+        TotalGiftsGiven = 0;
+        TotalFriendsGained = 0;
+        TotalEnemiesMade = 0;
+        TotalRomances = 0;
+        TotalTeamBattles = 0;
+
+        // Survival stats
+        TotalHealingPotionsUsed = 0;
+        TotalManaPotionsUsed = 0;
+        TotalHealthRestored = 0;
+        TotalManaRestored = 0;
+        TotalTimesResurrected = 0;
+        TotalDiseasesContracted = 0;
+        TotalDiseasesCured = 0;
+        TotalPoisonings = 0;
+        TotalCursesBroken = 0;
+
+        // Time stats - keep CharacterCreated but reset play time
+        TotalPlayTime = TimeSpan.Zero;
+        TotalDaysPlayed = 0;
+        TotalSessionsPlayed = 0;
+        LongestSession = TimeSpan.Zero;
+        CurrentStreak = 0;
+        LongestStreak = 0;
+
+        // Achievement triggers
+        QuestsCompleted = 0;
+        BountiesCompleted = 0;
+        ChallengesCompleted = 0;
+        TimesRuler = 0;
+        DaysAsRuler = 0;
+    }
 }
 
 /// <summary>

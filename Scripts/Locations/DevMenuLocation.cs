@@ -2163,9 +2163,10 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine("  This includes:");
         terminal.SetColor("cyan");
-        terminal.WriteLine("    - All 14 tracked stats (monsters killed, gold earned, etc.)");
-        terminal.WriteLine("    - All 47 achievements linked to those stats");
+        terminal.WriteLine("    - All 14 tracked Steam stats (monsters killed, gold earned, etc.)");
+        terminal.WriteLine("    - All 47 Steam achievements linked to those stats");
         terminal.WriteLine("    - LOCAL achievements on current character (prevents re-sync)");
+        terminal.WriteLine("    - LOCAL statistics on current character (prevents stat-trigger re-sync)");
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -2190,15 +2191,23 @@ public class DevMenuLocation : BaseLocation
                     terminal.WriteLine($"  Cleared {localCount} local achievements to prevent re-sync.");
                 }
 
+                // Also reset LOCAL statistics to prevent stat-to-achievement auto-triggers
+                if (currentPlayer?.Statistics != null)
+                {
+                    currentPlayer.Statistics.ResetAllStats();
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine("  Reset local statistics to prevent stat-based achievement triggers.");
+                }
+
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("");
                 terminal.WriteLine("  All Steam stats and achievements have been reset!");
-                terminal.WriteLine("  Local achievements also cleared to prevent auto-sync.");
+                terminal.WriteLine("  Local achievements AND statistics cleared to prevent auto-sync.");
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine("  Your stats will start fresh. Play the game to earn achievements properly.");
                 terminal.SetColor("yellow");
-                terminal.WriteLine("  Note: Save your game to persist the local achievement reset.");
+                terminal.WriteLine("  Note: Save your game to persist the reset.");
             }
             else
             {
