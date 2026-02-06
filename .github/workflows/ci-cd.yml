@@ -606,6 +606,38 @@ jobs:
             exit 1
           fi
 
+      - name: Copy Steam native libraries from NuGet package
+        run: |
+          # Find Steamworks.NET package in NuGet cache and copy native libraries
+          STEAMWORKS_PATH=$(find ~/.nuget/packages/steamworks.net -name "runtimes" -type d 2>/dev/null | head -1)
+
+          if [ -n "$STEAMWORKS_PATH" ]; then
+            echo "Found Steamworks.NET at: $STEAMWORKS_PATH"
+
+            # Windows x64
+            if [ -f "$STEAMWORKS_PATH/win-x64/native/steam_api64.dll" ]; then
+              cp "$STEAMWORKS_PATH/win-x64/native/steam_api64.dll" steam-build/depot-windows/
+              echo "✅ Copied steam_api64.dll to Windows depot"
+            else
+              echo "⚠️ steam_api64.dll not found in NuGet package"
+            fi
+
+            # Linux x64
+            if [ -f "$STEAMWORKS_PATH/linux-x64/native/libsteam_api.so" ]; then
+              cp "$STEAMWORKS_PATH/linux-x64/native/libsteam_api.so" steam-build/depot-linux/
+              echo "✅ Copied libsteam_api.so to Linux depot"
+            else
+              echo "⚠️ libsteam_api.so not found in NuGet package"
+            fi
+          else
+            echo "❌ Steamworks.NET package not found in NuGet cache"
+            echo "Native Steam libraries must be added manually to Steam depots"
+          fi
+
+          echo "=== Steam depot native libraries ==="
+          ls -la steam-build/depot-windows/*.dll 2>/dev/null || echo "No DLLs in Windows depot"
+          ls -la steam-build/depot-linux/*.so 2>/dev/null || echo "No .so files in Linux depot"
+
       - name: Add GPL compliance files to Steam builds
         run: |
           # Create source archive

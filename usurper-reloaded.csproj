@@ -36,6 +36,15 @@
         <None Include="steam_appid.txt" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
+    <!-- Steam native libraries - copy to output for Steam builds -->
+    <!-- Download these from Steamworks SDK: sdk/redistributable_bin/ -->
+    <ItemGroup Condition="'$(Configuration)' == 'Steam' Or '$(Configuration)' == 'SteamRelease'">
+        <None Include="SteamNative/win64/steam_api64.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('SteamNative/win64/steam_api64.dll')" />
+        <None Include="SteamNative/win32/steam_api.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('SteamNative/win32/steam_api.dll')" />
+        <None Include="SteamNative/linux64/libsteam_api.so" CopyToOutputDirectory="PreserveNewest" Condition="Exists('SteamNative/linux64/libsteam_api.so')" />
+        <None Include="SteamNative/osx/libsteam_api.dylib" CopyToOutputDirectory="PreserveNewest" Condition="Exists('SteamNative/osx/libsteam_api.dylib')" />
+    </ItemGroup>
+
     <ItemGroup>
         <Compile Remove="Tests/**/*.cs" />
         <Compile Remove="SimpleGame.cs" />

@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.20 - Steam Achievements Fix
+## ALPHA v0.21 - Steam Native Libraries
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -350,6 +350,17 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### Completed in v0.21 - Steam Native Libraries
+
+**Steam Native Library Fix:**
+- **Missing DLL Fix** - Steam builds were failing with "Dll was not found" because native Steam libraries were not bundled
+- **CI/CD Native Library Extraction** - Build pipeline now automatically extracts steam_api64.dll and libsteam_api.so from Steamworks.NET NuGet package
+- **Depot Bundling** - Native libraries are copied to Steam depot folders during CI/CD build
+
+**Local Development Support:**
+- **SteamNative Folder Structure** - Added csproj support for local Steam native libraries in SteamNative/win64/, linux64/, etc.
+- **Conditional Inclusion** - Native libraries only copied when files exist (won't break builds if missing)
+
 ### Completed in v0.20 - Steam Achievements Fix
 
 **Critical Steam Build Fix:**
@@ -521,7 +532,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.20)
+### Known Issues (Alpha v0.21)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -538,4 +549,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.20 - Steam Achievements Fix
+**Status**: ALPHA v0.21 - Steam Native Libraries
