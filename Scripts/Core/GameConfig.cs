@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.22.0-alpha";
-    public const string VersionName = "Steam Native Libraries";
+    public const string Version = "0.22.1-alpha";
+    public const string VersionName = "Achievement Reset Fix";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

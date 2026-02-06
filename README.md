@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.22 - Steam Native Libraries
+## ALPHA v0.22.1 - Achievement Reset Fix
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
