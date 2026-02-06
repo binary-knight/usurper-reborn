@@ -803,6 +803,31 @@ public static class AchievementSystem
     }
 
     /// <summary>
+    /// Sync all previously-unlocked achievements to Steam.
+    /// Call this on game startup after player is loaded and Steam is initialized.
+    /// This ensures achievements earned before Steam integration work properly.
+    /// </summary>
+    public static void SyncUnlockedToSteam(Character player)
+    {
+        if (!SteamIntegration.IsAvailable) return;
+
+        int synced = 0;
+        foreach (var achievementId in player.Achievements.UnlockedAchievements)
+        {
+            // This will only actually unlock on Steam if not already unlocked there
+            if (SteamIntegration.UnlockAchievement(achievementId))
+            {
+                synced++;
+            }
+        }
+
+        if (synced > 0)
+        {
+            DebugLogger.Instance?.LogInfo("ACHIEVEMENTS", $"Synced {synced} previously-unlocked achievements to Steam");
+        }
+    }
+
+    /// <summary>
     /// Check and award achievements based on player state
     /// Call this after significant game events
     /// </summary>

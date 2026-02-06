@@ -8,11 +8,16 @@
         <IsPackable>false</IsPackable>
         <ImplicitUsings>enable</ImplicitUsings>
         <InvariantGlobalization>true</InvariantGlobalization>
+        <!-- Define available configurations -->
+        <Configurations>Debug;Release;Steam;SteamRelease</Configurations>
     </PropertyGroup>
 
-    <!-- Steam build configuration - enables Steam integration -->
+    <!-- Steam build configuration - Release optimizations + Steam integration -->
     <PropertyGroup Condition="'$(Configuration)' == 'Steam' Or '$(Configuration)' == 'SteamRelease'">
         <DefineConstants>$(DefineConstants);STEAM_BUILD</DefineConstants>
+        <Optimize>true</Optimize>
+        <DebugType>none</DebugType>
+        <DebugSymbols>false</DebugSymbols>
     </PropertyGroup>
 
     <ItemGroup>

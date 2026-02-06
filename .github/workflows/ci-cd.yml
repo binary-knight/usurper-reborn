@@ -573,38 +573,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          pattern: "*-build"
+          dotnet-version: '8.0.x'
 
-      - name: Create Steam structure
+      - name: Build Steam Windows executable
         run: |
-          echo "=== Directory structure after download ==="
-          ls -la
-          ls -la windows-x64-build/ || echo "No windows-x64-build dir"
-          ls -la linux-x64-build/ || echo "No linux-x64-build dir"
-
-          mkdir -p steam-build/depot-windows
-          mkdir -p steam-build/depot-linux
-
-          # Copy build artifacts - download-artifact creates directories named after artifacts
-          # Steam uses 64-bit Windows build
-          if [ -d "windows-x64-build" ]; then
-            cp -r windows-x64-build/* steam-build/depot-windows/
-            echo "Windows files copied: $(ls steam-build/depot-windows/ | wc -l) files"
+          echo "Building Windows executable with STEAM_BUILD flag..."
+          dotnet publish usurper-reloaded.csproj -c Steam -r win-x64 -o steam-build/depot-windows \
+            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
+          if [ -f "steam-build/depot-windows/UsurperReborn.exe" ]; then
+            cp launchers/UsurperReborn.bat steam-build/depot-windows/
+            echo "✅ Steam Windows build successful (with STEAM_BUILD flag)"
           else
-            echo "ERROR: windows-x64-build directory not found!"
+            echo "❌ Steam Windows build failed"
             exit 1
           fi
 
-          if [ -d "linux-x64-build" ]; then
-            cp -r linux-x64-build/* steam-build/depot-linux/
-            echo "Linux files copied: $(ls steam-build/depot-linux/ | wc -l) files"
+      - name: Build Steam Linux executable
+        run: |
+          echo "Building Linux executable with STEAM_BUILD flag..."
+          dotnet publish usurper-reloaded.csproj -c Steam -r linux-x64 -o steam-build/depot-linux \
+            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
+          if [ -f "steam-build/depot-linux/UsurperReborn" ]; then
+            chmod +x "steam-build/depot-linux/UsurperReborn"
+            cp launchers/usurper-reborn.sh steam-build/depot-linux/
+            chmod +x steam-build/depot-linux/usurper-reborn.sh
+            echo "✅ Steam Linux build successful (with STEAM_BUILD flag)"
           else
-            echo "ERROR: linux-x64-build directory not found!"
+            echo "❌ Steam Linux build failed"
             exit 1
           fi
+
+      - name: Add GPL compliance files to Steam builds
+        run: |
+          # Create source archive
+          git archive --format=zip --prefix=usurper-reborn-source/ HEAD > usurper-reborn-source.zip
+
+          # Copy to depots
+          for dir in steam-build/depot-windows steam-build/depot-linux; do
+            cp LICENSE "$dir/"
+            cp usurper-reborn-source.zip "$dir/"
+          done
 
           echo "=== Steam depot contents ==="
           ls -la steam-build/depot-windows/

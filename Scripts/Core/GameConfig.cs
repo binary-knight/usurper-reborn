@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.19.0-alpha";
-    public const string VersionName = "Steam Integration";
+    public const string Version = "0.20.0-alpha";
+    public const string VersionName = "Steam Achievements Fix";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

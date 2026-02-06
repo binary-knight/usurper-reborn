@@ -119,6 +119,12 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("    [Z] Reset Character to Level 1");
         terminal.WriteLine("");
 
+        terminal.SetColor("white");
+        terminal.WriteLine("  STEAM (when running via Steam):");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("    [R] Reset Steam Stats & Achievements");
+        terminal.WriteLine("");
+
         terminal.SetColor("gray");
         terminal.WriteLine("    [Q] Return to Main Street");
         terminal.WriteLine("");
@@ -196,6 +202,7 @@ public class DevMenuLocation : BaseLocation
             case "L": await LevelUp(); return false;
             case "X": await MaxLevel(); return false;
             case "Z": await ResetCharacter(); return false;
+            case "R": await ResetSteamStats(); return false;
             case "Q":
                 terminal.WriteLine("Returning to Main Street...", "cyan");
                 await Task.Delay(500);
@@ -2123,6 +2130,79 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("  Character reset to level 1!", "yellow");
 
         await Task.Delay(2000);
+    }
+
+    private async Task ResetSteamStats()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                    STEAM STATS RESET (DEBUG)                                 ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        if (!SteamIntegration.IsAvailable)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  Steam is not available.");
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  Make sure you're running the game through Steam.");
+            terminal.WriteLine("  (The Steam client must be running and this must be a Steam build.)");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  WARNING: This will reset all YOUR Steam stats and achievements!");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine("  This affects ONLY your Steam account (the currently logged-in user).");
+        terminal.WriteLine("  Other players' stats are not affected - Steam's security prevents that.");
+        terminal.WriteLine("");
+        terminal.WriteLine("  This includes:");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("    - All 14 tracked stats (monsters killed, gold earned, etc.)");
+        terminal.WriteLine("    - All 47 achievements linked to those stats");
+        terminal.WriteLine("");
+
+        terminal.SetColor("yellow");
+        var confirm = await terminal.GetInput("  Type 'RESET' to confirm: ");
+
+        if (confirm.Trim().ToUpper() == "RESET")
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  Resetting Steam stats and achievements...");
+
+            bool success = SteamIntegration.ResetAllStats(resetAchievements: true);
+
+            if (success)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("");
+                terminal.WriteLine("  All Steam stats and achievements have been reset!");
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Your stats will start fresh. Play the game to earn achievements properly.");
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("");
+                terminal.WriteLine("  Failed to reset Steam stats. Check debug.log for details.");
+            }
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("");
+            terminal.WriteLine("  Reset cancelled.");
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
     }
 
     #endregion

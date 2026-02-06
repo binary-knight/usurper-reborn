@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.19 - Steam Integration
+## ALPHA v0.20 - Steam Achievements Fix
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -350,6 +350,26 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### Completed in v0.20 - Steam Achievements Fix
+
+**Critical Steam Build Fix:**
+- **CI/CD Steam Configuration** - Fixed Steam builds to use `-c Steam` configuration instead of `-c Release`
+- **STEAM_BUILD Flag** - Steam builds now properly define STEAM_BUILD preprocessor directive
+- **Achievement Unlocking** - Manual achievements (married, first_friend, no_death_10, etc.) now sync to Steam
+- **Stat-to-Achievement Linking** - Stats continue to auto-trigger linked achievements via Steam's server-side processing
+
+**Dev Menu Steam Tools:**
+- **Reset Steam Stats** - New `[R]` option in Dev Menu to reset all Steam stats and achievements for testing
+- **Steam Status Logging** - Enhanced debug logging to show Steam initialization state and achievement sync attempts
+
+**Build System Improvements:**
+- **Explicit Steam Configurations** - Added Steam and SteamRelease to project configurations with Release optimizations
+- **Separate Steam Builds** - CI/CD now builds Steam-specific executables for Steam depot upload
+
+**Achievement System Enhancement:**
+- **SyncUnlockedToSteam** - New method to sync previously-unlocked achievements to Steam on game load
+- **Diagnostic Logging** - Added detailed logging for Steam availability and achievement unlock attempts
+
 ### Completed in v0.19 - Steam Integration
 
 **Steam Platform Support:**
@@ -501,14 +521,14 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.19)
+### Known Issues (Alpha v0.20)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
 - BBS FOSSIL mode not supported (use `--stdio` flag for FOSSIL-based BBSes)
 - Faction recruitment UI is still being refined
 - Some Town NPC stories may not trigger if the NPC hasn't spawned in your game
-- Steam achievements only sync when game is launched through Steam client
+- Steam features only work when game is launched through Steam client
 
 ### How to Report Bugs
 1. Join Discord: https://discord.gg/EZhwgDT6Ta
@@ -518,4 +538,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.19 - Steam Integration
+**Status**: ALPHA v0.20 - Steam Achievements Fix

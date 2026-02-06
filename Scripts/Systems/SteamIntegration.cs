@@ -49,6 +49,7 @@ public static class SteamIntegration
         try
         {
 #if STEAM_BUILD
+            DebugLogger.Instance?.LogInfo("STEAM", "This is a STEAM_BUILD - attempting Steam initialization");
             // Only attempt Steam initialization if compiled with STEAM_BUILD flag
             if (!Steamworks.SteamAPI.Init())
             {
@@ -129,7 +130,11 @@ public static class SteamIntegration
     /// <returns>True if the achievement was unlocked, false if Steam unavailable or already unlocked</returns>
     public static bool UnlockAchievement(string achievementId)
     {
-        if (!_steamAvailable) return false;
+        if (!_steamAvailable)
+        {
+            DebugLogger.Instance?.LogDebug("STEAM", $"UnlockAchievement({achievementId}): Steam not available");
+            return false;
+        }
 
 #if STEAM_BUILD
         try
@@ -160,6 +165,8 @@ public static class SteamIntegration
             return false;
         }
 #else
+        // This branch is only reached in non-Steam builds
+        DebugLogger.Instance?.LogDebug("STEAM", $"UnlockAchievement({achievementId}): Not a STEAM_BUILD - achievement not synced");
         return false;
 #endif
     }
@@ -212,6 +219,40 @@ public static class SteamIntegration
 #endif
 
         return false;
+    }
+
+    /// <summary>
+    /// Reset ALL Steam stats and achievements for current user (TESTING ONLY).
+    /// This is a destructive operation - use with caution!
+    /// </summary>
+    /// <param name="resetAchievements">If true, also resets all achievements</param>
+    /// <returns>True if reset was successful</returns>
+    public static bool ResetAllStats(bool resetAchievements = true)
+    {
+        if (!_steamAvailable) return false;
+
+#if STEAM_BUILD
+        try
+        {
+            if (Steamworks.SteamUserStats.ResetAllStats(resetAchievements))
+            {
+                DebugLogger.Instance?.LogWarning("STEAM", $"ALL STATS RESET! Achievements reset: {resetAchievements}");
+                return true;
+            }
+            else
+            {
+                DebugLogger.Instance?.LogError("STEAM", "Failed to reset Steam stats");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance?.LogError("STEAM", $"Error resetting Steam stats: {ex.Message}");
+            return false;
+        }
+#else
+        return false;
+#endif
     }
 
     /// <summary>

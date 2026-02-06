@@ -28,6 +28,10 @@ namespace UsurperRemake.Systems
         private List<BossFightTeammate> activeTeammates = new();
         private List<Character>? dungeonTeammates; // Passed from DungeonLocation
 
+        // Minion support for boss phases (e.g., Maelketh's spectral soldiers)
+        private List<BossMinion> activeMinions = new();
+        private int roundsSinceLastSummon = 0;
+
         // Combat modifiers based on dialogue choices
         private CombatModifiers activeCombatModifiers = new();
 
@@ -46,6 +50,19 @@ namespace UsurperRemake.Systems
             public bool IsCompanion { get; set; } // True if from CompanionSystem, false if NPC
             public Companion? CompanionRef { get; set; } // Reference if this is a companion
             public Character? CharacterRef { get; set; } // Reference if this is an NPC
+            public bool IsAlive => CurrentHP > 0;
+        }
+
+        /// <summary>
+        /// Represents a minion summoned by the boss during combat
+        /// </summary>
+        private class BossMinion
+        {
+            public string Name { get; set; } = "Minion";
+            public long CurrentHP { get; set; }
+            public long MaxHP { get; set; }
+            public long Attack { get; set; }
+            public long Defense { get; set; }
             public bool IsAlive => CurrentHP > 0;
         }
 
@@ -218,6 +235,8 @@ namespace UsurperRemake.Systems
             bossDefeated = false;
             bossSaved = false;
             dungeonTeammates = teammates; // Store for InitializeTeammates
+            activeMinions.Clear(); // Clear any minions from previous fights
+            roundsSinceLastSummon = 0;
 
             // GD.Print($"[BossSystem] Starting encounter with {boss.Name}");
 
@@ -649,6 +668,22 @@ namespace UsurperRemake.Systems
             var hpBar = RenderHealthBar(hpPercent, 40);
             var hpColor = hpPercent > 0.5 ? "green" : hpPercent > 0.2 ? "yellow" : "red";
             terminal.WriteLine($"  Boss HP: [{hpBar}] {bossCurrentHP:N0}/{boss.HP:N0}", hpColor);
+
+            // Minions HP bars (if any active)
+            var aliveMinions = activeMinions.Where(m => m.IsAlive).ToList();
+            if (aliveMinions.Count > 0)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"  ═══ MINIONS ({aliveMinions.Count}) ═══", "dark_red");
+                foreach (var minion in aliveMinions)
+                {
+                    var mPercent = (double)minion.CurrentHP / minion.MaxHP;
+                    var mBar = RenderHealthBar(mPercent, 20);
+                    var mColor = mPercent > 0.5 ? "red" : mPercent > 0.2 ? "dark_red" : "gray";
+                    terminal.WriteLine($"  {minion.Name}: [{mBar}] {minion.CurrentHP}/{minion.MaxHP}", mColor);
+                }
+            }
+
             terminal.WriteLine("");
 
             // Player HP bar
@@ -714,9 +749,41 @@ namespace UsurperRemake.Systems
                     await Task.Delay(200);
                 }
 
+                // Spawn minions for Maelketh phase 2
+                if (boss.Type == OldGodType.Maelketh && currentPhase == 2)
+                {
+                    SpawnSpectralSoldiers(2, terminal);
+                }
+
                 terminal.WriteLine("");
                 await Task.Delay(1500);
             }
+        }
+
+        /// <summary>
+        /// Spawn spectral soldiers for Maelketh
+        /// </summary>
+        private void SpawnSpectralSoldiers(int count, TerminalEmulator terminal)
+        {
+            var player = GameEngine.Instance?.CurrentPlayer;
+            int playerLevel = player?.Level ?? 25;
+
+            for (int i = 0; i < count; i++)
+            {
+                var soldier = new BossMinion
+                {
+                    Name = $"Spectral Soldier",
+                    MaxHP = 50 + playerLevel * 5,
+                    CurrentHP = 50 + playerLevel * 5,
+                    Attack = 10 + playerLevel * 2,
+                    Defense = 5 + playerLevel
+                };
+                activeMinions.Add(soldier);
+            }
+
+            terminal.WriteLine("");
+            terminal.WriteLine($"  {count} Spectral Soldiers materialize from the shadows!", "bright_red");
+            roundsSinceLastSummon = 0;
         }
 
         /// <summary>
@@ -1068,6 +1135,43 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  ({attackCount} attacks this round)", "gray");
             }
 
+            // Minion attacks
+            var aliveMinionsForAttack = activeMinions.Where(m => m.IsAlive).ToList();
+            if (aliveMinionsForAttack.Count > 0 && player.HP > 0)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"  ═══ MINION ATTACKS ═══", "dark_red");
+
+                foreach (var minion in aliveMinionsForAttack)
+                {
+                    if (player.HP <= 0) break;
+
+                    // Minions have simpler attack logic
+                    long minionDamage = minion.Attack + random.Next((int)minion.Attack / 2);
+
+                    // Apply player defense
+                    long defense = player.Defence + player.ArmPow;
+                    double defReduction = Math.Min(0.6, defense / (double)(defense + 150));
+                    minionDamage = (long)(minionDamage * (1.0 - defReduction));
+                    minionDamage = Math.Max(5, minionDamage);
+
+                    player.HP -= minionDamage;
+                    terminal.WriteLine($"  {minion.Name} strikes you for {minionDamage} damage!", "red");
+                    await Task.Delay(300);
+                }
+            }
+
+            // Maelketh summons more soldiers every 3 rounds in phase 2+
+            roundsSinceLastSummon++;
+            if (boss.Type == OldGodType.Maelketh && currentPhase >= 2 && roundsSinceLastSummon >= 3)
+            {
+                // Summon 1-2 more soldiers
+                int summonCount = 1 + random.Next(2);
+                terminal.WriteLine("");
+                SpawnSpectralSoldiers(summonCount, terminal);
+                await Task.Delay(500);
+            }
+
             await Task.Delay(500);
 
             return player.HP <= 0;
@@ -1373,17 +1477,46 @@ namespace UsurperRemake.Systems
                 // Add some variance
                 long damage = baseDamage + random.Next(Math.Max(1, (int)(baseDamage / 3)));
 
-                // Phase resistance affects teammates
-                damage = (long)(damage * (1.0 - (currentPhase - 1) * 0.05));
-                damage = Math.Max(5, damage);
+                // Check if there are alive minions - 60% chance teammates focus minions instead of boss
+                var aliveMinions = activeMinions.Where(m => m.IsAlive).ToList();
+                bool attackMinion = aliveMinions.Count > 0 && random.Next(100) < 60;
 
-                bossCurrentHP -= damage;
+                if (attackMinion)
+                {
+                    // Attack a random minion
+                    var targetMinion = aliveMinions[random.Next(aliveMinions.Count)];
+                    damage = Math.Max(10, damage); // Minions take more damage from teammates
 
-                // Pick an ability name
-                string abilityName = GetTeammateAbilityName(teammate);
+                    targetMinion.CurrentHP -= damage;
 
-                terminal.WriteLine($"  {teammate.Name} uses {abilityName}!", "cyan");
-                terminal.WriteLine($"    Dealt {damage:N0} damage to {boss.Name}!", "bright_cyan");
+                    string abilityName = GetTeammateAbilityName(teammate);
+                    terminal.WriteLine($"  {teammate.Name} uses {abilityName}!", "cyan");
+
+                    if (targetMinion.CurrentHP <= 0)
+                    {
+                        targetMinion.CurrentHP = 0;
+                        terminal.WriteLine($"    Dealt {damage:N0} damage - {targetMinion.Name} destroyed!", "bright_green");
+                    }
+                    else
+                    {
+                        terminal.WriteLine($"    Dealt {damage:N0} damage to {targetMinion.Name}!", "bright_cyan");
+                    }
+                }
+                else
+                {
+                    // Attack the boss
+                    // Phase resistance affects teammates
+                    damage = (long)(damage * (1.0 - (currentPhase - 1) * 0.05));
+                    damage = Math.Max(5, damage);
+
+                    bossCurrentHP -= damage;
+
+                    // Pick an ability name
+                    string abilityName = GetTeammateAbilityName(teammate);
+
+                    terminal.WriteLine($"  {teammate.Name} uses {abilityName}!", "cyan");
+                    terminal.WriteLine($"    Dealt {damage:N0} damage to {boss.Name}!", "bright_cyan");
+                }
 
                 await Task.Delay(400);
             }
