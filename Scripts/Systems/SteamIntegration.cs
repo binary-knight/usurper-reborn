@@ -10,6 +10,7 @@ public static class SteamIntegration
 {
     private static bool _initialized = false;
     private static bool _steamAvailable = false;
+    private static bool _syncDisabledUntilRestart = false;
 
     // Steam Stat API names - must match Steamworks dashboard configuration
     public static class StatNames
@@ -236,7 +237,9 @@ public static class SteamIntegration
         {
             if (Steamworks.SteamUserStats.ResetAllStats(resetAchievements))
             {
-                DebugLogger.Instance?.LogWarning("STEAM", $"ALL STATS RESET! Achievements reset: {resetAchievements}");
+                // Disable stat syncing until game restart to prevent re-triggering achievements
+                _syncDisabledUntilRestart = true;
+                DebugLogger.Instance?.LogWarning("STEAM", $"ALL STATS RESET! Achievements reset: {resetAchievements}. Stat syncing disabled until restart.");
                 return true;
             }
             else
@@ -362,10 +365,17 @@ public static class SteamIntegration
     /// Call this when saving, on level up, and at session end.
     /// </summary>
     /// <param name="stats">The player statistics to sync</param>
-    /// <returns>True if stats were synced, false if Steam unavailable</returns>
+    /// <returns>True if stats were synced, false if Steam unavailable or sync disabled</returns>
     public static bool SyncPlayerStats(PlayerStatistics? stats)
     {
         if (!_steamAvailable || stats == null) return false;
+
+        // Don't sync after a reset - prevents re-triggering stat-based achievements
+        if (_syncDisabledUntilRestart)
+        {
+            DebugLogger.Instance?.LogInfo("STEAM", "Stat sync skipped - disabled after reset (restart game to re-enable)");
+            return false;
+        }
 
 #if STEAM_BUILD
         try

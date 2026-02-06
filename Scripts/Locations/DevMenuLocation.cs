@@ -2202,12 +2202,12 @@ public class DevMenuLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("");
                 terminal.WriteLine("  All Steam stats and achievements have been reset!");
-                terminal.WriteLine("  Local achievements AND statistics cleared to prevent auto-sync.");
+                terminal.WriteLine("  Local achievements AND statistics cleared.");
+                terminal.WriteLine("  Stat syncing DISABLED until game restart (prevents re-triggering).");
                 terminal.WriteLine("");
-                terminal.SetColor("gray");
-                terminal.WriteLine("  Your stats will start fresh. Play the game to earn achievements properly.");
-                terminal.SetColor("yellow");
-                terminal.WriteLine("  Note: Save your game to persist the reset.");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  IMPORTANT: Quit the game now and restart to complete the reset!");
+                terminal.WriteLine("             Do NOT save - just exit to preserve the reset.");
             }
             else
             {

@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.22.2-alpha";
+    public const string Version = "0.22.3-alpha";
     public const string VersionName = "Achievement Reset Fix";
 
     // From Pascal global_maxXX constants
