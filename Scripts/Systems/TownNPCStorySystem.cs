@@ -549,6 +549,36 @@ namespace UsurperRemake.Systems
         {
             // Parse trigger string
             if (trigger.StartsWith("First visit")) return state.CurrentStage == 0;
+
+            // Choice-based triggers: "Chose to X"
+            if (trigger.StartsWith("Chose to "))
+            {
+                var choiceKey = trigger.Replace("Chose to ", "").ToLower().Trim();
+                // Check if any previous stage had this choice made
+                foreach (var kvp in state.ChoicesMade)
+                {
+                    if (kvp.Value.ToLower() == choiceKey)
+                        return true;
+                }
+                return false; // Choice wasn't made
+            }
+
+            // Time-based triggers: "X+ days after Y"
+            if (trigger.Contains("days after"))
+            {
+                // For now, check if the prerequisite stage was completed
+                // More precise timing could be added later
+                var parts = trigger.Split(' ');
+                foreach (var p in parts)
+                {
+                    if (int.TryParse(p.Replace("+", ""), out int days))
+                    {
+                        // Check if enough time has passed (simplified: check if days played >= threshold)
+                        return DailySystemManager.Instance?.CurrentDay >= days;
+                    }
+                }
+            }
+
             if (trigger.Contains("level")) {
                 var parts = trigger.Split(' ');
                 foreach (var p in parts)
@@ -582,9 +612,31 @@ namespace UsurperRemake.Systems
                 // Check dungeon floor from player or story system
                 return true; // Simplified
             }
+            if (trigger.Contains("Next visit"))
+            {
+                // Next visit triggers are met if we're past the previous stage
+                return true;
+            }
+            if (trigger.Contains("seals"))
+            {
+                // Check seal count
+                var seals = StoryProgressionSystem.Instance?.CollectedSeals?.Count ?? 0;
+                var parts = trigger.Split(' ');
+                foreach (var p in parts)
+                {
+                    if (int.TryParse(p.Replace("+", ""), out int count))
+                        return seals >= count;
+                }
+            }
+            if (trigger.Contains("Random"))
+            {
+                // Random triggers have a chance to occur
+                return new Random().Next(100) < 30; // 30% chance
+            }
 
-            // Default: always available after prerequisites
-            return true;
+            // Default: unknown trigger type, don't proceed
+            GD.Print($"[TownNPC] Unknown trigger type: {trigger}");
+            return false;
         }
 
         /// <summary>
@@ -607,6 +659,23 @@ namespace UsurperRemake.Systems
             {
                 // Handle completion flags
                 StoryProgressionSystem.Instance?.SetStoryFlag(stage.OnComplete, true);
+            }
+
+            // Handle choices that end the NPC's story
+            if (choiceMade != null)
+            {
+                // Pip: Turning her in to guards ends her story
+                if (npcId == "Pip_OrphanThief" && choiceMade == "guards")
+                {
+                    state.CurrentStage = 99; // Mark as completed/gone
+                    GD.Print($"[TownNPC] {npc.Name} was turned in to the guards - story ended");
+                }
+                // Pip: Forgiving her also ends the story (no further stages for that path)
+                else if (npcId == "Pip_OrphanThief" && choiceMade == "forgive")
+                {
+                    state.CurrentStage = 99; // Mark as completed
+                    GD.Print($"[TownNPC] {npc.Name} was forgiven and left - story ended");
+                }
             }
 
             GD.Print($"[TownNPC] Completed stage {stageId} for {npc.Name}");
