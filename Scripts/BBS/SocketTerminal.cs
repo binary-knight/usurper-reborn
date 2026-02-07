@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 
 namespace UsurperRemake.BBS
 {
@@ -18,9 +19,37 @@ namespace UsurperRemake.BBS
         private NetworkStream? _stream;
         private StreamReader? _reader;
         private StreamWriter? _writer;
+        private FileStream? _rawHandleStream; // Fallback for raw handle I/O
         private readonly BBSSessionInfo _sessionInfo;
         private bool _disposed = false;
+        private bool _usingRawHandle = false; // True if using FileStream fallback
         private string _currentColor = "white";
+
+        // Windows API imports for handle validation and duplication
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern int GetFileType(IntPtr hFile);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetHandleInformation(IntPtr hObject, out uint lpdwFlags);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool DuplicateHandle(
+            IntPtr hSourceProcessHandle,
+            IntPtr hSourceHandle,
+            IntPtr hTargetProcessHandle,
+            out IntPtr lpTargetHandle,
+            uint dwDesiredAccess,
+            bool bInheritHandle,
+            uint dwOptions);
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetCurrentProcess();
+
+        private const int FILE_TYPE_UNKNOWN = 0x0000;
+        private const int FILE_TYPE_DISK = 0x0001;
+        private const int FILE_TYPE_CHAR = 0x0002;
+        private const int FILE_TYPE_PIPE = 0x0003;
+        private const uint DUPLICATE_SAME_ACCESS = 0x00000002;
 
         // ANSI escape codes
         private const string ESC = "\x1b";
@@ -267,6 +296,12 @@ namespace UsurperRemake.BBS
                 return false;
             }
 
+            // On Windows, perform additional handle diagnostics
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                DiagnoseWindowsHandle(_sessionInfo.SocketHandle);
+            }
+
             try
             {
                 // Create socket from inherited handle
@@ -275,8 +310,19 @@ namespace UsurperRemake.BBS
 
                 if (_socket == null)
                 {
-                    Console.Error.WriteLine("Failed to create socket from handle");
                     LogVerbose("CreateSocketFromHandle returned null");
+
+                    // Try fallback to raw handle I/O on Windows
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        LogVerbose("Trying raw handle fallback for Windows...");
+                        if (TryInitializeRawHandle(_sessionInfo.SocketHandle))
+                        {
+                            return true;
+                        }
+                    }
+
+                    Console.Error.WriteLine("Failed to create socket from handle");
                     return false;
                 }
 
@@ -301,17 +347,32 @@ namespace UsurperRemake.BBS
                 LogVerbose("Socket initialization complete - attempting test write");
 
                 // Try a test write to verify the socket works
+                bool testSucceeded = false;
                 try
                 {
                     var testBytes = new byte[] { 0 }; // NUL character - invisible
                     _stream.Write(testBytes, 0, 0); // Zero-length write to test
                     LogVerbose("Test write succeeded");
+                    testSucceeded = true;
                 }
                 catch (Exception writeEx)
                 {
                     LogVerbose($"Test write failed: {writeEx.Message}");
                     Console.Error.WriteLine($"Socket test write failed: {writeEx.Message}");
-                    // Continue anyway - some BBSes may have unusual socket behavior
+                }
+
+                // If socket test failed, try the raw handle fallback
+                if (!testSucceeded && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    LogVerbose("Socket test failed, trying raw handle fallback...");
+                    _stream?.Dispose();
+                    _stream = null;
+                    _socket = null;
+
+                    if (TryInitializeRawHandle(_sessionInfo.SocketHandle))
+                    {
+                        return true;
+                    }
                 }
 
                 // Pause in verbose mode so user can read socket diagnostics
@@ -327,6 +388,157 @@ namespace UsurperRemake.BBS
             {
                 Console.Error.WriteLine($"Failed to initialize socket: {ex.Message}");
                 LogVerbose($"Exception type: {ex.GetType().Name}");
+                LogVerbose($"Stack trace: {ex.StackTrace}");
+
+                // Try fallback on failure
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    LogVerbose("Exception during socket init, trying raw handle fallback...");
+                    if (TryInitializeRawHandle(_sessionInfo.SocketHandle))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Diagnose a Windows handle to determine its type
+        /// </summary>
+        private void DiagnoseWindowsHandle(int handle)
+        {
+            try
+            {
+                var ptr = new IntPtr(handle);
+
+                // Check if handle is valid
+                if (GetHandleInformation(ptr, out uint flags))
+                {
+                    LogVerbose($"Handle is valid. Flags: 0x{flags:X}");
+                    if ((flags & 0x01) != 0) LogVerbose("  HANDLE_FLAG_INHERIT is set");
+                    if ((flags & 0x02) != 0) LogVerbose("  HANDLE_FLAG_PROTECT_FROM_CLOSE is set");
+                }
+                else
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    LogVerbose($"GetHandleInformation failed with error {error}");
+                }
+
+                // Get file type
+                int fileType = GetFileType(ptr);
+                string typeDesc = fileType switch
+                {
+                    FILE_TYPE_DISK => "FILE_TYPE_DISK (regular file)",
+                    FILE_TYPE_CHAR => "FILE_TYPE_CHAR (character device like console)",
+                    FILE_TYPE_PIPE => "FILE_TYPE_PIPE (pipe or socket)",
+                    _ => $"FILE_TYPE_UNKNOWN ({fileType})"
+                };
+                LogVerbose($"Handle type: {typeDesc}");
+
+                if (fileType == FILE_TYPE_PIPE)
+                {
+                    LogVerbose("Handle appears to be a pipe or socket - good!");
+                }
+                else if (fileType == FILE_TYPE_CHAR)
+                {
+                    LogVerbose("Handle is a character device - might be console I/O, try --stdio");
+                }
+                else if (fileType == FILE_TYPE_UNKNOWN)
+                {
+                    LogVerbose("Handle type unknown - the handle may be invalid or a different type");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogVerbose($"Handle diagnosis failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Try to initialize I/O using a raw Windows handle via FileStream
+        /// This is a fallback when Socket wrapping doesn't work
+        /// </summary>
+        private bool TryInitializeRawHandle(int handle)
+        {
+            LogVerbose($"TryInitializeRawHandle({handle})");
+
+            try
+            {
+                var ptr = new IntPtr(handle);
+
+                // First, try to duplicate the handle to ensure we have access
+                IntPtr duplicatedHandle = IntPtr.Zero;
+                bool duplicated = false;
+
+                try
+                {
+                    duplicated = DuplicateHandle(
+                        GetCurrentProcess(),
+                        ptr,
+                        GetCurrentProcess(),
+                        out duplicatedHandle,
+                        0,
+                        false,
+                        DUPLICATE_SAME_ACCESS);
+
+                    if (duplicated)
+                    {
+                        LogVerbose($"Handle duplicated successfully: {duplicatedHandle}");
+                        ptr = duplicatedHandle;
+                    }
+                    else
+                    {
+                        int error = Marshal.GetLastWin32Error();
+                        LogVerbose($"DuplicateHandle failed with error {error}, using original handle");
+                    }
+                }
+                catch (Exception dupEx)
+                {
+                    LogVerbose($"DuplicateHandle exception: {dupEx.Message}");
+                }
+
+                // Create a SafeFileHandle from the handle
+                var safeHandle = new SafeFileHandle(ptr, ownsHandle: duplicated);
+                LogVerbose($"SafeFileHandle created. IsInvalid={safeHandle.IsInvalid}");
+
+                if (safeHandle.IsInvalid)
+                {
+                    LogVerbose("SafeFileHandle is invalid");
+                    return false;
+                }
+
+                // Create FileStream for read/write
+                _rawHandleStream = new FileStream(safeHandle, FileAccess.ReadWrite, bufferSize: 1, isAsync: false);
+                LogVerbose($"FileStream created. CanRead={_rawHandleStream.CanRead}, CanWrite={_rawHandleStream.CanWrite}");
+
+                _usingRawHandle = true;
+
+                // Try a test write
+                try
+                {
+                    // Write a visible test message to verify output works
+                    var testMsg = Encoding.ASCII.GetBytes("\r\n[Usurper Raw Handle Mode]\r\n");
+                    _rawHandleStream.Write(testMsg, 0, testMsg.Length);
+                    _rawHandleStream.Flush();
+                    LogVerbose("Raw handle test write succeeded!");
+                }
+                catch (Exception writeEx)
+                {
+                    LogVerbose($"Raw handle test write failed: {writeEx.Message}");
+                    _rawHandleStream?.Dispose();
+                    _rawHandleStream = null;
+                    _usingRawHandle = false;
+                    return false;
+                }
+
+                Console.Error.WriteLine("[SOCKET] Using raw handle I/O mode");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogVerbose($"TryInitializeRawHandle failed: {ex.Message}");
                 LogVerbose($"Stack trace: {ex.StackTrace}");
                 return false;
             }
@@ -407,7 +619,29 @@ namespace UsurperRemake.BBS
 
         public async Task WriteAsync(string text)
         {
-            if (_sessionInfo.CommType == ConnectionType.Local || _stream == null)
+            if (_sessionInfo.CommType == ConnectionType.Local)
+            {
+                Console.Write(text);
+                return;
+            }
+
+            // Use raw handle mode if active
+            if (_usingRawHandle && _rawHandleStream != null)
+            {
+                try
+                {
+                    var bytes = ConvertToCp437(text);
+                    await _rawHandleStream.WriteAsync(bytes, 0, bytes.Length);
+                    await _rawHandleStream.FlushAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Raw handle write error: {ex.Message}");
+                }
+                return;
+            }
+
+            if (_stream == null)
             {
                 Console.Write(text);
                 return;
@@ -522,7 +756,26 @@ namespace UsurperRemake.BBS
         /// </summary>
         private async Task WriteRawAsync(string data)
         {
-            if (_sessionInfo.CommType == ConnectionType.Local || _stream == null)
+            if (_sessionInfo.CommType == ConnectionType.Local)
+            {
+                Console.Write(data);
+                return;
+            }
+
+            // Use raw handle mode if active
+            if (_usingRawHandle && _rawHandleStream != null)
+            {
+                try
+                {
+                    var bytes = Encoding.ASCII.GetBytes(data);
+                    await _rawHandleStream.WriteAsync(bytes, 0, bytes.Length);
+                    await _rawHandleStream.FlushAsync();
+                }
+                catch { }
+                return;
+            }
+
+            if (_stream == null)
             {
                 Console.Write(data);
                 return;
@@ -567,7 +820,26 @@ namespace UsurperRemake.BBS
             if (!string.IsNullOrEmpty(prompt))
                 await WriteAsync(prompt);
 
-            if (_sessionInfo.CommType == ConnectionType.Local || _reader == null)
+            if (_sessionInfo.CommType == ConnectionType.Local)
+            {
+                return Console.ReadLine() ?? "";
+            }
+
+            // Use raw handle mode if active
+            if (_usingRawHandle && _rawHandleStream != null)
+            {
+                try
+                {
+                    var line = await ReadLineFromRawHandleAsync();
+                    return line ?? "";
+                }
+                catch
+                {
+                    return "";
+                }
+            }
+
+            if (_reader == null)
             {
                 return Console.ReadLine() ?? "";
             }
@@ -588,7 +860,30 @@ namespace UsurperRemake.BBS
             if (!string.IsNullOrEmpty(prompt))
                 await WriteAsync(prompt);
 
-            if (_sessionInfo.CommType == ConnectionType.Local || _stream == null)
+            if (_sessionInfo.CommType == ConnectionType.Local)
+            {
+                var key = Console.ReadKey(true);
+                return key.KeyChar.ToString();
+            }
+
+            // Use raw handle mode if active
+            if (_usingRawHandle && _rawHandleStream != null)
+            {
+                try
+                {
+                    var buffer = new byte[1];
+                    var bytesRead = await _rawHandleStream.ReadAsync(buffer, 0, 1);
+                    if (bytesRead == 0)
+                        return "";
+                    return Encoding.ASCII.GetString(buffer, 0, 1);
+                }
+                catch
+                {
+                    return "";
+                }
+            }
+
+            if (_stream == null)
             {
                 var key = Console.ReadKey(true);
                 return key.KeyChar.ToString();
@@ -668,6 +963,60 @@ namespace UsurperRemake.BBS
                 buffer.Append((char)b);
 
                 // Echo the character back (most telnet clients expect echo)
+                await WriteRawAsync(((char)b).ToString());
+            }
+        }
+
+        /// <summary>
+        /// Read a line from the raw handle stream
+        /// </summary>
+        private async Task<string?> ReadLineFromRawHandleAsync()
+        {
+            if (_rawHandleStream == null) return null;
+
+            var buffer = new StringBuilder();
+            var charBuffer = new byte[1];
+
+            while (true)
+            {
+                var bytesRead = await _rawHandleStream.ReadAsync(charBuffer, 0, 1);
+                if (bytesRead == 0)
+                    return buffer.Length > 0 ? buffer.ToString() : null;
+
+                byte b = charBuffer[0];
+
+                // Handle telnet IAC commands (255 = IAC)
+                if (b == 255)
+                {
+                    // Skip next 2 bytes (simplified telnet handling)
+                    await _rawHandleStream.ReadAsync(new byte[2], 0, 2);
+                    continue;
+                }
+
+                // CR or LF ends the line
+                if (b == '\r' || b == '\n')
+                {
+                    return buffer.ToString();
+                }
+
+                // Backspace handling
+                if (b == 8 || b == 127) // BS or DEL
+                {
+                    if (buffer.Length > 0)
+                    {
+                        buffer.Remove(buffer.Length - 1, 1);
+                        await WriteRawAsync("\b \b");
+                    }
+                    continue;
+                }
+
+                // Ignore control characters except printable ASCII
+                if (b < 32)
+                    continue;
+
+                buffer.Append((char)b);
+
+                // Echo the character back
                 await WriteRawAsync(((char)b).ToString());
             }
         }
@@ -795,6 +1144,7 @@ namespace UsurperRemake.BBS
             _writer?.Dispose();
             _reader?.Dispose();
             _stream?.Dispose();
+            _rawHandleStream?.Dispose();
             // Don't dispose the socket - we don't own it (BBS does)
         }
 

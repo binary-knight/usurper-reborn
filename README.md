@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.22.4 - Achievement Reset Fix
+## ALPHA v0.25.1 - BBS Compatibility
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -350,6 +350,52 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### Completed in v0.25.1 - BBS Compatibility
+
+**BBS Socket Handle Improvements:**
+- **Windows Handle Diagnostics** - New `GetFileType()` and `GetHandleInformation()` calls identify handle types
+- **Raw Handle Fallback** - FileStream fallback for BBSes where .NET Socket class fails to wrap inherited handles
+- **Handle Type Detection** - Identifies if handle is socket/pipe, console device, or invalid
+- **Enhanced Verbose Output** - Better diagnostic messages for BBS sysops troubleshooting connections
+
+### Completed in v0.25.0 - Quest System Overhaul
+
+**Quest System Overhaul:**
+- **Level-Appropriate Monsters** - Quests now use MonsterFamilies system with level capping
+- **Equipment Purchase Quests** - New Merchant Guild quests for weapons (35%), armor (30%), accessories (20%), shields (15%)
+- **Dungeon Quest Improvements** - All dungeon objectives capped to accessible floor range
+
+**Dungeon Floor Locking Rework:**
+- Players can always leave to town from special floors to gear up
+- Players can always descend to deeper floors, even from uncleared special floors
+- Ascending blocked until floor cleared - must defeat Old God or claim Seal
+
+**Mini-Boss Champion System:**
+- 10% of random encounters spawn Champion monsters (elite versions)
+- Champions have 1.5x HP/stats with unique names per monster family
+- Champions ALWAYS drop equipment (Uncommon+ rarity)
+
+**Dynamic NPC Dialogue System:**
+- 11 relationship tiers from Married to Hate with unique greetings
+- Archetype vocabularies (guards, merchants, thieves, priests)
+- Memory-aware dialogue (20% chance to reference past interactions)
+- Context-aware comments (30% chance to notice player state)
+- Emotional indicators and personality modifiers
+
+**Critical Bug Fixes:**
+- Backstab/mercy escape capped at 75% (was exploitable to 100%)
+- Critical hit clamped to 5-50% (was uncapped)
+- Dissolution ending now reachable (flag was never set)
+- Ocean's Memory spell now works (effect was never implemented)
+- Bloodlust duration fixed (was 999 turns, now 5)
+- NPC conversation menu stays open after interactions
+
+**Balance Improvements:**
+- Boss HP/stats multiplier increased from 1.5x to 2.0x
+- Sage class buffed, Troll rebalanced, Gnoll buffed, Mutant given bonuses
+- Epic equipment now requires level 45+, Legendary requires 65+
+- Marriage system rebalanced (7+ day minimum, personality-based NPC acceptance)
+
 ### Completed in v0.21 - Steam Native Libraries
 
 **Steam Native Library Fix:**
@@ -532,12 +578,11 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.21)
+### Known Issues (Alpha v0.25)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
 - BBS FOSSIL mode not supported (use `--stdio` flag for FOSSIL-based BBSes)
-- Faction recruitment UI is still being refined
 - Some Town NPC stories may not trigger if the NPC hasn't spawned in your game
 - Steam features only work when game is launched through Steam client
 
@@ -549,4 +594,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.21 - Steam Native Libraries
+**Status**: ALPHA v0.25.1 - BBS Compatibility

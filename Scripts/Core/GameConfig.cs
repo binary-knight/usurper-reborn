@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.25.0-alpha";
-    public const string VersionName = "Quest System Overhaul";
+    public const string Version = "0.25.1-alpha";
+    public const string VersionName = "BBS Compatibility";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
