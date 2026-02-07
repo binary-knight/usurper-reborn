@@ -787,6 +787,7 @@ namespace UsurperRemake.Systems
                     LastVisitedAt = state.LastVisitedAt,
                     EverCleared = state.EverCleared,
                     IsPermanentlyClear = state.IsPermanentlyClear,
+                    BossDefeated = state.BossDefeated,
                     CurrentRoomId = state.CurrentRoomId,
                     Rooms = new List<DungeonRoomStateData>()
                 };
@@ -1385,13 +1386,23 @@ namespace UsurperRemake.Systems
             }
             catch { /* System not initialized */ }
 
-            // Story Progression - save cycle count, seals, and story flags
+            // Story Progression - save cycle count, seals, story flags, and Old God states
             try
             {
                 var story = StoryProgressionSystem.Instance;
                 data.CurrentCycle = story.CurrentCycle;
                 data.CollectedSeals = story.CollectedSeals.Select(s => (int)s).ToList();
                 data.StoryFlags = new Dictionary<string, bool>(story.StoryFlags);
+
+                // Save Old God defeat states (critical for permanent boss defeats)
+                data.OldGodStates = story.OldGodStates.ToDictionary(
+                    kvp => (int)kvp.Key,
+                    kvp => (int)kvp.Value.Status
+                );
+                if (data.OldGodStates.Count > 0)
+                {
+                    GD.Print($"[SaveSystem] Saving {data.OldGodStates.Count} Old God states");
+                }
             }
             catch { /* System not initialized */ }
 
@@ -1691,7 +1702,7 @@ namespace UsurperRemake.Systems
             }
             catch { /* System not available */ }
 
-            // Story Progression - restore seals and story flags
+            // Story Progression - restore seals, story flags, and Old God states
             try
             {
                 var story = StoryProgressionSystem.Instance;
@@ -1714,6 +1725,29 @@ namespace UsurperRemake.Systems
 
                 // Restore cycle count
                 story.CurrentCycle = data.CurrentCycle;
+
+                // Restore Old God defeat states (critical for permanent boss defeats)
+                if (data.OldGodStates != null && data.OldGodStates.Count > 0)
+                {
+                    foreach (var kvp in data.OldGodStates)
+                    {
+                        var godType = (OldGodType)kvp.Key;
+                        var godStatus = (GodStatus)kvp.Value;
+
+                        // Only update if the saved state is "resolved" (defeated, saved, allied, etc.)
+                        // This prevents overwriting the initial state with default values
+                        if (story.OldGodStates.TryGetValue(godType, out var existingState))
+                        {
+                            existingState.Status = godStatus;
+                            GD.Print($"[SaveSystem] Restored {godType} state: {godStatus}");
+                        }
+                    }
+                    GD.Print($"[SaveSystem] Restored {data.OldGodStates.Count} Old God states");
+                }
+
+                // MIGRATION: Sync OldGodStates from story flags for saves created before OldGodStates was saved
+                // This ensures backward compatibility with old saves
+                MigrateOldGodStatesFromStoryFlags(story, data.StoryFlags);
             }
             catch { /* System not available */ }
 
@@ -2039,6 +2073,86 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 GD.PrintErr($"[SaveSystem] Failed to restore NPC marriages/affairs: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// MIGRATION: Sync OldGodStates from story flags for saves created before OldGodStates was saved.
+        /// This ensures backward compatibility - if story flags indicate a god was defeated but
+        /// OldGodStates doesn't reflect that, we sync them up.
+        /// </summary>
+        private void MigrateOldGodStatesFromStoryFlags(StoryProgressionSystem story, Dictionary<string, bool> storyFlags)
+        {
+            if (storyFlags == null) return;
+
+            var godMappings = new Dictionary<string, OldGodType>
+            {
+                { "maelketh", OldGodType.Maelketh },
+                { "veloura", OldGodType.Veloura },
+                { "thorgrim", OldGodType.Thorgrim },
+                { "noctura", OldGodType.Noctura },
+                { "aurelion", OldGodType.Aurelion },
+                { "terravok", OldGodType.Terravok },
+                { "manwe", OldGodType.Manwe }
+            };
+
+            int migrationCount = 0;
+
+            foreach (var mapping in godMappings)
+            {
+                string godName = mapping.Key;
+                OldGodType godType = mapping.Value;
+
+                // Check for various story flags that indicate god status
+                bool wasDestroyed = storyFlags.TryGetValue($"{godName}_destroyed", out bool destroyed) && destroyed;
+                bool wasDefeated = storyFlags.TryGetValue($"{godName}_defeated", out bool defeated) && defeated;
+                bool wasSaved = storyFlags.TryGetValue($"{godName}_saved", out bool saved) && saved;
+                bool wasAllied = storyFlags.TryGetValue($"{godName}_ally", out bool allied) && allied;
+                bool wasAwakened = storyFlags.TryGetValue($"{godName}_awakened", out bool awakened) && awakened;
+
+                if (story.OldGodStates.TryGetValue(godType, out var godState))
+                {
+                    // Only migrate if the current state is NOT already resolved
+                    bool isAlreadyResolved = godState.Status == GodStatus.Defeated ||
+                                              godState.Status == GodStatus.Saved ||
+                                              godState.Status == GodStatus.Allied ||
+                                              godState.Status == GodStatus.Awakened ||
+                                              godState.Status == GodStatus.Consumed;
+
+                    if (!isAlreadyResolved)
+                    {
+                        // Apply migration based on story flags
+                        if (wasDestroyed || wasDefeated)
+                        {
+                            godState.Status = GodStatus.Defeated;
+                            GD.Print($"[SaveSystem] MIGRATION: Set {godType} to Defeated (from story flags)");
+                            migrationCount++;
+                        }
+                        else if (wasSaved)
+                        {
+                            godState.Status = GodStatus.Saved;
+                            GD.Print($"[SaveSystem] MIGRATION: Set {godType} to Saved (from story flags)");
+                            migrationCount++;
+                        }
+                        else if (wasAllied)
+                        {
+                            godState.Status = GodStatus.Allied;
+                            GD.Print($"[SaveSystem] MIGRATION: Set {godType} to Allied (from story flags)");
+                            migrationCount++;
+                        }
+                        else if (wasAwakened)
+                        {
+                            godState.Status = GodStatus.Awakened;
+                            GD.Print($"[SaveSystem] MIGRATION: Set {godType} to Awakened (from story flags)");
+                            migrationCount++;
+                        }
+                    }
+                }
+            }
+
+            if (migrationCount > 0)
+            {
+                GD.Print($"[SaveSystem] Migration complete: Updated {migrationCount} Old God states from story flags");
             }
         }
     }

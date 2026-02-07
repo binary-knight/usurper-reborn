@@ -2124,10 +2124,8 @@ public partial class CombatEngine
     private async Task HandleVictory(CombatResult result)
     {
         // Check if this was a boss fight for dramatic art display
-        bool isBoss = result.Monster.IsBoss || result.Monster.Level >= 20 ||
-                      result.Monster.Name.Contains("Boss") || result.Monster.Name.Contains("Chief") ||
-                      result.Monster.Name.Contains("Lord") || result.Monster.Name.Contains("Dragon") ||
-                      result.Monster.Name.Contains("Demon");
+        // ONLY actual floor bosses count - not mini-bosses, champions, or high-level monsters
+        bool isBoss = result.Monster.IsBoss;
 
         if (isBoss)
         {
@@ -2660,15 +2658,46 @@ public partial class CombatEngine
                 }
                 else
                 {
-                    equipment = Equipment.CreateArmor(
-                        id: 10000 + random.Next(10000),
-                        name: lootItem.Name,
-                        slot: EquipmentSlot.Body,
-                        armorType: ArmorType.Chain,
-                        ac: lootItem.Armor,
-                        value: lootItem.Value,
-                        rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
-                    );
+                    // Determine the correct slot based on item type
+                    EquipmentSlot itemSlot = lootItem.Type switch
+                    {
+                        global::ObjType.Shield => EquipmentSlot.OffHand,
+                        global::ObjType.Body => EquipmentSlot.Body,
+                        global::ObjType.Head => EquipmentSlot.Head,
+                        global::ObjType.Arms => EquipmentSlot.Arms,
+                        global::ObjType.Hands => EquipmentSlot.Hands,
+                        global::ObjType.Legs => EquipmentSlot.Legs,
+                        global::ObjType.Feet => EquipmentSlot.Feet,
+                        global::ObjType.Waist => EquipmentSlot.Waist,
+                        global::ObjType.Neck => EquipmentSlot.Neck,
+                        global::ObjType.Face => EquipmentSlot.Face,
+                        global::ObjType.Fingers => EquipmentSlot.LFinger,
+                        _ => EquipmentSlot.Body
+                    };
+
+                    // Use CreateAccessory for rings and necklaces, CreateArmor for everything else
+                    if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
+                    {
+                        equipment = Equipment.CreateAccessory(
+                            id: 10000 + random.Next(10000),
+                            name: lootItem.Name,
+                            slot: itemSlot,
+                            value: lootItem.Value,
+                            rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
+                        );
+                    }
+                    else
+                    {
+                        equipment = Equipment.CreateArmor(
+                            id: 10000 + random.Next(10000),
+                            name: lootItem.Name,
+                            slot: itemSlot,
+                            armorType: ArmorType.Chain,
+                            ac: lootItem.Armor,
+                            value: lootItem.Value,
+                            rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
+                        );
+                    }
                 }
 
                 // Apply bonus stats to equipment
@@ -6061,8 +6090,8 @@ public partial class CombatEngine
         foreach (var monster in result.DefeatedMonsters)
         {
             // Update quest progress for each monster killed
-            bool isBoss = monster.Level >= 10 || monster.Name.Contains("Boss") ||
-                          monster.Name.Contains("Chief") || monster.Name.Contains("Lord");
+            // ONLY actual floor bosses count for boss-related tracking
+            bool isBoss = monster.IsBoss;
             QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBoss);
 
             // Calculate exp reward based on level difference

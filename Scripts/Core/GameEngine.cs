@@ -1056,7 +1056,10 @@ public partial class GameEngine : Node
     private async Task LoadExistingGame(string playerName)
     {
         terminal.WriteLine("Loading game...", "yellow");
-        
+
+        // Clear dungeon party before loading to prevent state leak between saves
+        ClearDungeonParty();
+
         var saveData = await SaveSystem.Instance.LoadGame(playerName);
         if (saveData == null)
         {
@@ -1064,7 +1067,7 @@ public partial class GameEngine : Node
             await Task.Delay(2000);
             return;
         }
-        
+
         // Restore player from save data
         currentPlayer = RestorePlayerFromSaveData(saveData.Player);
         
@@ -1134,6 +1137,9 @@ public partial class GameEngine : Node
         UsurperRemake.Systems.OceanPhilosophySystem.Instance.Reset();
         UsurperRemake.Systems.GriefSystem.Instance.Reset();
         NPCMarriageRegistry.Instance.Reset();
+
+        // Clear dungeon party from previous saves
+        ClearDungeonParty();
 
         // Create new player using character creation system
         var newCharacter = await CreateNewPlayer(playerName);
@@ -1645,11 +1651,11 @@ public partial class GameEngine : Node
             player.ClearedSpecialFloors = playerData.ClearedSpecialFloors;
         }
 
-        // Restore dungeon floor states (room exploration, respawn timers)
-        if (playerData.DungeonFloorStates != null)
-        {
-            player.DungeonFloorStates = RestoreDungeonFloorStates(playerData.DungeonFloorStates);
-        }
+        // RESET dungeon floor states on every load - dungeons regenerate fresh each session
+        // This prevents stale room states (like boss rooms showing [CLEARED] incorrectly)
+        // Note: ClearedSpecialFloors (seals, Old Gods) is still preserved above for permanent progress
+        player.DungeonFloorStates = new Dictionary<int, UsurperRemake.Systems.DungeonFloorState>();
+        DebugLogger.Instance.LogDebug("LOAD", "Dungeon floor states reset - dungeons will regenerate fresh");
 
         // Restore hint system (which hints have been shown to this player)
         if (playerData.HintsShown != null)
@@ -1701,6 +1707,7 @@ public partial class GameEngine : Node
                 LastVisitedAt = saved.LastVisitedAt,
                 EverCleared = saved.EverCleared,
                 IsPermanentlyClear = saved.IsPermanentlyClear,
+                BossDefeated = saved.BossDefeated,
                 CurrentRoomId = saved.CurrentRoomId,
                 RoomStates = new Dictionary<string, UsurperRemake.Systems.DungeonRoomState>()
             };

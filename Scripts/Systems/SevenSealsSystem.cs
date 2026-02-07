@@ -437,22 +437,6 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("  ═══════════════════════════════════════", "dark_cyan");
             terminal.WriteLine("");
 
-            // Show what's next - seal floors: 0(Temple), 15, 30, 45, 60, 80, 99
-            if (collected >= 1 && collected < 7)
-            {
-                // After collecting seal N, show where seal N+1 is
-                // Index 0=15, 1=30, 2=45, 3=60, 4=80, 5=99 (seal 7 is on floor 99)
-                int[] nextSealFloors = { 15, 30, 45, 60, 80, 99 };
-                int index = collected - 1; // collected is 1-indexed, array is 0-indexed
-                if (index >= 0 && index < nextSealFloors.Length)
-                {
-                    int nextFloor = nextSealFloors[index];
-                    terminal.SetColor("bright_yellow");
-                    terminal.WriteLine($"  NEXT SEAL: Dungeon Floor {nextFloor}");
-                    terminal.WriteLine("");
-                }
-            }
-
             await terminal.GetInputAsync("  Press Enter to continue...");
         }
 

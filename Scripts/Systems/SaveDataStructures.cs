@@ -58,6 +58,10 @@ namespace UsurperRemake.Systems
         public Dictionary<string, bool> StoryFlags { get; set; } = new();
         public int CurrentCycle { get; set; } = 1;
 
+        // Old God defeat states - OldGodType (int) -> GodStatus (int)
+        // Tracks which Old Gods have been defeated, saved, allied, etc.
+        public Dictionary<int, int> OldGodStates { get; set; } = new();
+
         // God worship - player name -> god name
         public Dictionary<string, string> PlayerGods { get; set; } = new();
 
@@ -1095,6 +1099,7 @@ namespace UsurperRemake.Systems
         public DateTime LastVisitedAt { get; set; }          // When player last visited
         public bool EverCleared { get; set; } = false;       // Has this floor ever been fully cleared? (for first-clear bonus)
         public bool IsPermanentlyClear { get; set; } = false; // Boss/seal floors stay cleared forever
+        public bool BossDefeated { get; set; } = false;      // True if the actual boss room boss was defeated
         public string CurrentRoomId { get; set; } = "";      // Where player left off
         public List<DungeonRoomStateData> Rooms { get; set; } = new();
     }

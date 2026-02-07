@@ -1176,6 +1176,10 @@ namespace UsurperRemake.Systems
         {
             foreach (var room in floor.Rooms)
             {
+                // CRITICAL: Never modify boss room properties - they are set explicitly in PlaceSpecialRooms
+                if (room.IsBossRoom)
+                    continue;
+
                 switch (room.Type)
                 {
                     case RoomType.PuzzleRoom:
@@ -1647,6 +1651,7 @@ namespace UsurperRemake.Systems
         public DateTime LastVisitedAt { get; set; } = DateTime.MinValue;
         public bool EverCleared { get; set; } = false;        // For first-clear bonus eligibility
         public bool IsPermanentlyClear { get; set; } = false; // Boss/seal floors
+        public bool BossDefeated { get; set; } = false;       // True if boss room boss was actually defeated
         public string CurrentRoomId { get; set; } = "";
 
         // Room-level state

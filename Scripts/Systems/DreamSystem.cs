@@ -21,6 +21,9 @@ namespace UsurperRemake.Systems
         // Track experienced dreams
         public HashSet<string> ExperiencedDreams { get; private set; } = new();
 
+        // Track seen dungeon visions (per floor to allow revisiting on different floors)
+        public HashSet<string> SeenDungeonVisions { get; private set; } = new();
+
         // Track last dream to avoid repetition
         private string _lastDreamId = "";
         private int _restsSinceLastDream = 0;
@@ -492,21 +495,38 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get a dungeon vision for the current floor
+        /// Get a dungeon vision for the current floor (only shows each vision once per playthrough)
         /// </summary>
         public DungeonVision? GetDungeonVision(int floor, Character player)
         {
             var awakening = OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0;
 
+            // Filter to eligible visions that haven't been seen yet
             var eligible = DungeonVisions
                 .Where(v => v.FloorMin <= floor && v.FloorMax >= floor)
                 .Where(v => v.MinAwakening <= awakening)
-                .Where(v => new Random().NextDouble() < 0.3) // 30% chance when eligible
+                .Where(v => !SeenDungeonVisions.Contains(v.Id))  // Don't repeat seen visions
                 .ToList();
 
             if (!eligible.Any()) return null;
 
-            return eligible[new Random().Next(eligible.Count)];
+            // 30% chance to trigger a vision when entering a new room
+            if (GD.RandRange(0, 100) > 30) return null;
+
+            var vision = eligible[GD.RandRange(0, eligible.Count - 1)];
+
+            // Mark as seen so it won't repeat
+            SeenDungeonVisions.Add(vision.Id);
+
+            return vision;
+        }
+
+        /// <summary>
+        /// Reset seen dungeon visions (e.g., for New Game+)
+        /// </summary>
+        public void ResetDungeonVisions()
+        {
+            SeenDungeonVisions.Clear();
         }
 
         /// <summary>
@@ -548,6 +568,7 @@ namespace UsurperRemake.Systems
             return new DreamSaveData
             {
                 ExperiencedDreams = ExperiencedDreams.ToList(),
+                SeenDungeonVisions = SeenDungeonVisions.ToList(),
                 RestsSinceLastDream = _restsSinceLastDream
             };
         }
@@ -560,6 +581,7 @@ namespace UsurperRemake.Systems
             if (data == null) return;
 
             ExperiencedDreams = new HashSet<string>(data.ExperiencedDreams);
+            SeenDungeonVisions = new HashSet<string>(data.SeenDungeonVisions ?? new List<string>());
             _restsSinceLastDream = data.RestsSinceLastDream;
         }
 
@@ -569,6 +591,7 @@ namespace UsurperRemake.Systems
         public void Reset()
         {
             ExperiencedDreams = new HashSet<string>();
+            SeenDungeonVisions = new HashSet<string>();
             _lastDreamId = "";
             _restsSinceLastDream = 0;
             GD.Print("[Dream] System reset for new game");
@@ -612,6 +635,7 @@ namespace UsurperRemake.Systems
     public class DreamSaveData
     {
         public List<string> ExperiencedDreams { get; set; } = new();
+        public List<string> SeenDungeonVisions { get; set; } = new();
         public int RestsSinceLastDream { get; set; }
     }
 

@@ -321,6 +321,13 @@ namespace UsurperRemake.BBS
                     Console.Error.WriteLine("");
                     Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
                     Console.ReadLine();
+                    Console.Error.WriteLine("[VERBOSE] Continuing after pause...");
+                }
+
+                if (_verboseMode)
+                {
+                    Console.Error.WriteLine($"[VERBOSE] CommType check: {_sessionInfo.CommType}");
+                    Console.Error.WriteLine($"[VERBOSE] _forceStdio={_forceStdio}, _forceFossilPort={_forceFossilPort ?? "null"}");
                 }
 
                 // If --stdio flag was used, force console I/O mode
@@ -387,8 +394,16 @@ namespace UsurperRemake.BBS
                 }
 
                 // Use socket terminal for telnet or local connections
+                if (_verboseMode)
+                {
+                    Console.Error.WriteLine("[VERBOSE] Creating SocketTerminal...");
+                }
                 _socketTerminal = new SocketTerminal(_sessionInfo);
 
+                if (_verboseMode)
+                {
+                    Console.Error.WriteLine("[VERBOSE] Calling SocketTerminal.Initialize()...");
+                }
                 if (!_socketTerminal.Initialize())
                 {
                     Console.Error.WriteLine("Failed to initialize socket terminal");

@@ -57,7 +57,11 @@ public class DungeonLocation : BaseLocation
         currentDungeonLevel = GetMaxAccessibleFloor(player, currentDungeonLevel);
 
         // Generate or restore floor based on persistence state
-        bool isNewFloor = currentFloor == null || currentFloor.Level != currentDungeonLevel;
+        // CRITICAL: Also regenerate if we have a cached floor but no saved state for it
+        // This handles the case where DungeonFloorStates was reset on game load but
+        // currentFloor instance still exists from the previous session
+        bool hasNoSavedState = !player.DungeonFloorStates.ContainsKey(currentDungeonLevel);
+        bool isNewFloor = currentFloor == null || currentFloor.Level != currentDungeonLevel || hasNoSavedState;
         if (isNewFloor)
         {
             // Check if we have saved state for this floor
@@ -2513,13 +2517,26 @@ public class DungeonLocation : BaseLocation
 
             if (godType != null)
             {
-                // Old God was already dealt with - room is empty
-                room.IsCleared = true;
-                currentFloor.BossDefeated = true;
-                terminal.SetColor("gray");
-                terminal.WriteLine("The chamber is empty. The ancient presence has already been dealt with.");
-                await Task.Delay(1500);
-                return;
+                // Check if the Old God was actually resolved (defeated, saved, allied, etc.)
+                var story = StoryProgressionSystem.Instance;
+                bool godResolved = story.OldGodStates.TryGetValue(godType.Value, out var state) &&
+                    (state.Status == GodStatus.Defeated ||
+                     state.Status == GodStatus.Saved ||
+                     state.Status == GodStatus.Allied ||
+                     state.Status == GodStatus.Awakened ||
+                     state.Status == GodStatus.Consumed);
+
+                if (godResolved)
+                {
+                    // Old God was already dealt with - room is empty
+                    room.IsCleared = true;
+                    currentFloor.BossDefeated = true;
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("The chamber is empty. The ancient presence has already been dealt with.");
+                    await Task.Delay(1500);
+                    return;
+                }
+                // If god not resolved, fall through to generate normal boss monsters
             }
         }
         else
@@ -2640,6 +2657,13 @@ public class DungeonLocation : BaseLocation
             if (room.IsBossRoom)
             {
                 currentFloor.BossDefeated = true;
+
+                // Also set the persistent flag in floor state
+                if (player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+                {
+                    floorState.BossDefeated = true;
+                }
+
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("*** BOSS DEFEATED! ***");
                 terminal.WriteLine("");
@@ -3121,13 +3145,12 @@ public class DungeonLocation : BaseLocation
                     }
                     else
                     {
-                        // Non-Old-God floors: Boss room should only be cleared if the floor
-                        // was ever fully cleared (which requires defeating the actual boss room)
-                        // This prevents mini-bosses or other IsBoss monsters from incorrectly
-                        // invalidating the floor boss fight
-                        if (!savedState.EverCleared)
+                        // Non-Old-God floors: Boss room should ONLY be cleared if we have proof
+                        // that the actual boss room boss was defeated (BossDefeated flag).
+                        // This prevents any false clears from mini-bosses or save corruption.
+                        if (!savedState.BossDefeated)
                         {
-                            // Floor was never fully cleared, so boss room shouldn't be cleared either
+                            // Boss was never actually defeated, force room to be uncleared
                             room.IsCleared = false;
                         }
                     }
@@ -3654,28 +3677,28 @@ public class DungeonLocation : BaseLocation
         // Clamp to accessible range based on player level (+/- 10)
         targetLevel = Math.Max(minAccessible, Math.Min(maxAccessible, targetLevel));
 
-        // Check if trying to ASCEND from a boss/seal floor that requires clearing
-        // Players CAN descend (go deeper) but CANNOT ascend (retreat) until floor is cleared
-        if (targetLevel < currentDungeonLevel && RequiresFloorClear() && !IsFloorCleared())
+        // Check if trying to DESCEND past a boss/seal floor that requires clearing
+        // Players CAN ascend (retreat to prepare) but CANNOT descend (skip the boss) until floor is cleared
+        if (targetLevel > currentDungeonLevel && RequiresFloorClear() && !IsFloorCleared())
         {
             terminal.WriteLine("", "red");
             if (IsOldGodFloor(currentDungeonLevel))
             {
-                terminal.WriteLine("A powerful presence blocks your retreat.", "bright_red");
-                terminal.WriteLine("You must defeat the Old God on this floor before ascending.", "yellow");
+                terminal.WriteLine("A powerful presence blocks your descent.", "bright_red");
+                terminal.WriteLine("You must defeat the Old God on this floor before descending deeper.", "yellow");
             }
             else if (SealFloors.Contains(currentDungeonLevel))
             {
                 terminal.WriteLine("This floor holds an ancient Seal.", "bright_magenta");
-                terminal.WriteLine("You must claim the seal before you can ascend.", "yellow");
+                terminal.WriteLine("You must claim the seal before you can descend.", "yellow");
             }
             else
             {
-                terminal.WriteLine("A powerful presence blocks your retreat.", "bright_red");
-                terminal.WriteLine("You must defeat all enemies on this floor before ascending.", "yellow");
+                terminal.WriteLine("A powerful presence blocks your descent.", "bright_red");
+                terminal.WriteLine("You must defeat all enemies on this floor before descending.", "yellow");
             }
             terminal.WriteLine($"({GetRemainingClearInfo()})", "gray");
-            terminal.WriteLine("You may still descend to deeper floors.", "cyan");
+            terminal.WriteLine("You may still ascend to prepare.", "cyan");
             await Task.Delay(2500);
             return;
         }
