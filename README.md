@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.25.3 - Old God Persistence
+## ALPHA v0.25.4 - BBS Console Fix
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -594,4 +594,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.25.3 - Old God Persistence
+**Status**: ALPHA v0.25.4 - BBS Console Fix

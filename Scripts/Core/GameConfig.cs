@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.25.3-alpha";
-    public const string VersionName = "Old God Persistence";
+    public const string Version = "0.25.4-alpha";
+    public const string VersionName = "BBS Console Fix";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

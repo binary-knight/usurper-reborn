@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace UsurperRemake.BBS
@@ -14,8 +15,18 @@ namespace UsurperRemake.BBS
         private static BBSTerminalAdapter? _terminalAdapter;
         private static bool _forceStdio = false;
         private static string? _forceFossilPort = null; // Force FOSSIL mode on this COM port
-        private static bool _verboseMode = false; // Verbose debug output for troubleshooting
+        private static bool _verboseMode = false; // Verbose debug output for troubleshooting (also keeps console visible)
         private static bool _helpWasShown = false; // Flag to indicate --help was processed
+
+        // Windows API for hiding console window
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_HIDE = 0;
+        private const int SW_SHOW = 5;
 
         public static BBSSessionInfo? SessionInfo => _sessionInfo;
         public static BBSTerminalAdapter? TerminalAdapter => _terminalAdapter;
@@ -39,7 +50,7 @@ namespace UsurperRemake.BBS
                 {
                     _forceStdio = true;
                 }
-                // --verbose enables detailed debug output
+                // --verbose enables detailed debug output (also keeps console visible for debugging)
                 else if (arg == "--verbose" || arg == "-v")
                 {
                     _verboseMode = true;
@@ -423,6 +434,27 @@ namespace UsurperRemake.BBS
 
                 // Pass _forceStdio to tell adapter to use ANSI codes instead of Console.ForegroundColor
                 _terminalAdapter = new BBSTerminalAdapter(_socketTerminal, _forceStdio);
+
+                // Auto-hide the console window in BBS socket mode (unless verbose mode is on for debugging)
+                // This prevents the door from showing a visible console window on Windows
+                // All I/O goes through the socket, so the console window is not needed
+                bool shouldHideConsole = _sessionInfo.CommType != ConnectionType.Local && !_verboseMode;
+                if (shouldHideConsole && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    try
+                    {
+                        var consoleWindow = GetConsoleWindow();
+                        if (consoleWindow != IntPtr.Zero)
+                        {
+                            ShowWindow(consoleWindow, SW_HIDE);
+                        }
+                    }
+                    catch
+                    {
+                        // Silently ignore - console hiding is optional
+                    }
+                }
+
                 return _terminalAdapter;
             }
             catch (Exception ex)
@@ -521,7 +553,7 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  --stdio              Use Standard I/O instead of socket (for Synchronet)");
             Console.WriteLine("  --fossil <port>      Force FOSSIL/serial mode on COM port (e.g., COM1)");
             Console.WriteLine("  --com <port>         Same as --fossil");
-            Console.WriteLine("  --verbose, -v        Enable detailed debug output for troubleshooting");
+            Console.WriteLine("  --verbose, -v        Enable detailed debug output (keeps console visible)");
             Console.WriteLine("");
             Console.WriteLine("Examples:");
             Console.WriteLine("  UsurperReborn --door /sbbs/node1/door32.sys");
@@ -544,7 +576,12 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  I/O Method: Standard");
             Console.WriteLine("  Native Executable: Yes");
             Console.WriteLine("");
-            Console.WriteLine("For FOSSIL-based BBS (EleBBS, etc.):");
+            Console.WriteLine("For EleBBS (Socket mode):");
+            Console.WriteLine("  Command: UsurperReborn --door32 %f");
+            Console.WriteLine("  Drop File Type: Door32.sys");
+            Console.WriteLine("  Console window is automatically hidden in socket mode");
+            Console.WriteLine("");
+            Console.WriteLine("For FOSSIL-based BBS:");
             Console.WriteLine("  Command: UsurperReborn --doorsys %f --fossil COM1");
             Console.WriteLine("  Drop File Type: Door.sys");
             Console.WriteLine("  The COM port should match your FOSSIL driver's virtual port");
