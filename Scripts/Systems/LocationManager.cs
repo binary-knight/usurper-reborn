@@ -94,6 +94,9 @@ public class LocationManager
         // Quest Hall - where players claim and complete quests
         locations[GameLocation.QuestHall] = new QuestHallLocation(terminal);
 
+        // BBS SysOp Console - only accessible to SysOps in door mode
+        locations[GameLocation.SysOpConsole] = new SysOpLocation();
+
         // Note: Gym removed - stat training doesn't fit single-player endless format
 
         // GD.Print($"[LocationManager] Initialized {locations.Count} locations");

@@ -659,7 +659,11 @@ namespace UsurperRemake.Systems
         AlliedNoctura = 1 << 14,
         DefeatedMaelketh = 1 << 15,
         DefeatedThorgrim = 1 << 16,
-        TrueEndingAvailable = 1 << 17
+        TrueEndingAvailable = 1 << 17,
+        EncounteredNoctura = 1 << 18,
+        DefeatedNoctura = 1 << 19,
+        Marcus_Healed = 1 << 20,  // Town NPC: Marcus story completion
+        Ezra_Died = 1 << 21       // Town NPC: Ezra story completion
     }
 
     public enum OldGodType

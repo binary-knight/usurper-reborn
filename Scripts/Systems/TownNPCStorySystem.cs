@@ -544,10 +544,14 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Check if a trigger condition is met
+        /// Handles compound triggers like "Random on Main Street (player has 100+ gold)"
         /// </summary>
         private bool IsTriggerMet(string trigger, Character player, MemorableNPCState state)
         {
-            // Parse trigger string
+            // Parse trigger string - handle compound conditions
+            // All conditions in a trigger must be met
+
+            // First visit triggers
             if (trigger.StartsWith("First visit")) return state.CurrentStage == 0;
 
             // Choice-based triggers: "Chose to X"
@@ -563,76 +567,236 @@ namespace UsurperRemake.Systems
                 return false; // Choice wasn't made
             }
 
+            // Next visit triggers - met if we're past the previous stage
+            if (trigger.Contains("Next visit"))
+            {
+                return true;
+            }
+
+            // "After X" triggers - check if a specific choice was made or stage completed
+            // Examples: "After confession", "After paying debt", "After rescue"
+            if (trigger.StartsWith("After "))
+            {
+                var afterWhat = trigger.Replace("After ", "").ToLower().Trim();
+
+                // Map common "after" triggers to the choice keys or previous stages
+                // "After confession" = stage 2 was completed for Marcus
+                // "After paying debt" = "pay" choice was made
+                // "After rescue" = stage 2 was completed (which requires "pay" choice)
+
+                // Check if it matches a choice that was made
+                foreach (var kvp in state.ChoicesMade)
+                {
+                    // "After paying debt" -> check for "pay" choice
+                    if (afterWhat.Contains("paying") && kvp.Value.ToLower() == "pay")
+                        return true;
+                    if (afterWhat.Contains("rescue") && kvp.Value.ToLower() == "pay")
+                        return true;
+                }
+
+                // For generic "After X" where X relates to story progression,
+                // check if previous stage was completed
+                if (state.CurrentStage > 0)
+                    return true;
+
+                return false;
+            }
+
+            // "Refused to help" or similar negative choice triggers
+            if (trigger.Contains("Refused"))
+            {
+                foreach (var kvp in state.ChoicesMade)
+                {
+                    if (kvp.Value.ToLower() == "refuse")
+                        return true;
+                }
+                return false;
+            }
+
+            // "Accepted X" triggers - check if "accept" choice was made
+            if (trigger.StartsWith("Accepted"))
+            {
+                foreach (var kvp in state.ChoicesMade)
+                {
+                    if (kvp.Value.ToLower() == "accept")
+                        return true;
+                }
+                return false;
+            }
+
             // Time-based triggers: "X+ days after Y"
             if (trigger.Contains("days after"))
             {
-                // For now, check if the prerequisite stage was completed
-                // More precise timing could be added later
                 var parts = trigger.Split(' ');
+                int requiredDays = 0;
                 foreach (var p in parts)
                 {
                     if (int.TryParse(p.Replace("+", ""), out int days))
                     {
-                        // Check if enough time has passed (simplified: check if days played >= threshold)
-                        return DailySystemManager.Instance?.CurrentDay >= days;
+                        requiredDays = days;
+                        break;
                     }
                 }
+
+                // Find the most recently completed stage to measure time from
+                int lastCompletedDay = 0;
+                if (state.StageCompletedOnDay.Count > 0)
+                {
+                    lastCompletedDay = state.StageCompletedOnDay.Values.Max();
+                }
+
+                int currentDay = DailySystemManager.Instance?.CurrentDay ?? 0;
+                int daysSinceLastStage = currentDay - lastCompletedDay;
+
+                return daysSinceLastStage >= requiredDays;
             }
 
-            if (trigger.Contains("level")) {
+            // For compound triggers, we need to check ALL conditions
+            bool allConditionsMet = true;
+            bool hasAnyCondition = false;
+
+            // Check gold requirement: "100+ gold" or "player has 100+ gold"
+            if (trigger.Contains("gold"))
+            {
+                hasAnyCondition = true;
+                int requiredGold = 0;
                 var parts = trigger.Split(' ');
                 foreach (var p in parts)
                 {
-                    if (int.TryParse(p.Replace("+", ""), out int level))
-                        return player.Level >= level;
+                    var cleanPart = p.Replace("+", "").Replace("(", "").Replace(")", "");
+                    if (int.TryParse(cleanPart, out int gold))
+                    {
+                        requiredGold = gold;
+                        break;
+                    }
                 }
+                if (player.Gold < requiredGold)
+                    allConditionsMet = false;
             }
+
+            // Check level requirement: "level 50+" or "Player reaches level 50+"
+            if (trigger.Contains("level") && !trigger.Contains("Awakening"))
+            {
+                hasAnyCondition = true;
+                int requiredLevel = 0;
+                var parts = trigger.Split(' ');
+                foreach (var p in parts)
+                {
+                    var cleanPart = p.Replace("+", "").Replace("(", "").Replace(")", "");
+                    if (int.TryParse(cleanPart, out int level))
+                    {
+                        requiredLevel = level;
+                        break;
+                    }
+                }
+                if (player.Level < requiredLevel)
+                    allConditionsMet = false;
+            }
+
+            // Check awakening level
             if (trigger.Contains("Awakening Level"))
             {
+                hasAnyCondition = true;
                 var awakening = OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0;
                 var parts = trigger.Split(' ');
                 foreach (var p in parts)
                 {
                     if (int.TryParse(p.Replace("+", ""), out int level))
-                        return awakening >= level;
+                    {
+                        if (awakening < level)
+                            allConditionsMet = false;
+                        break;
+                    }
                 }
             }
-            if (trigger.Contains("gold")) {
-                var parts = trigger.Split(' ');
-                foreach (var p in parts)
-                {
-                    if (int.TryParse(p.Replace("+", ""), out int gold))
-                        return player.Gold >= gold;
-                }
-            }
-            if (trigger.Contains("defeats Maelketh"))
-                return StoryProgressionSystem.Instance?.HasFlag(StoryFlag.DefeatedMaelketh) ?? false;
-            if (trigger.Contains("floor"))
-            {
-                // Check dungeon floor from player or story system
-                return true; // Simplified
-            }
-            if (trigger.Contains("Next visit"))
-            {
-                // Next visit triggers are met if we're past the previous stage
-                return true;
-            }
+
+            // Check seal count
             if (trigger.Contains("seals"))
             {
-                // Check seal count
+                hasAnyCondition = true;
                 var seals = StoryProgressionSystem.Instance?.CollectedSeals?.Count ?? 0;
                 var parts = trigger.Split(' ');
                 foreach (var p in parts)
                 {
                     if (int.TryParse(p.Replace("+", ""), out int count))
-                        return seals >= count;
+                    {
+                        if (seals < count)
+                            allConditionsMet = false;
+                        break;
+                    }
                 }
             }
+
+            // Check boss defeat - Maelketh
+            if (trigger.Contains("defeats Maelketh"))
+            {
+                hasAnyCondition = true;
+                if (!(StoryProgressionSystem.Instance?.HasFlag(StoryFlag.DefeatedMaelketh) ?? false))
+                    allConditionsMet = false;
+            }
+
+            // Check Noctura encounters
+            if (trigger.Contains("encounters Noctura"))
+            {
+                hasAnyCondition = true;
+                // Check if player has encountered Noctura (reached floor 70 or has the story flag)
+                var hasEncountered = StoryProgressionSystem.Instance?.HasFlag(StoryFlag.EncounteredNoctura) ?? false;
+                if (!hasEncountered)
+                {
+                    // Fallback: check if player has reached floor 70+
+                    var maxFloor = GameEngine.Instance?.CurrentPlayer?.Statistics?.DeepestDungeonLevel ?? 0;
+                    if (maxFloor < 70)
+                        allConditionsMet = false;
+                }
+            }
+
+            // Check Noctura alliance or defeat
+            if (trigger.Contains("allies with or defeats Noctura"))
+            {
+                hasAnyCondition = true;
+                var allied = StoryProgressionSystem.Instance?.HasFlag(StoryFlag.AlliedNoctura) ?? false;
+                var defeated = StoryProgressionSystem.Instance?.HasFlag(StoryFlag.DefeatedNoctura) ?? false;
+                if (!allied && !defeated)
+                    allConditionsMet = false;
+            }
+
+            // Check floor requirement: "floor 60+" or "reaches floor 60+"
+            if (trigger.Contains("floor") && !trigger.Contains("Noctura"))
+            {
+                hasAnyCondition = true;
+                int requiredFloor = 0;
+                var parts = trigger.Split(' ');
+                foreach (var p in parts)
+                {
+                    var cleanPart = p.Replace("+", "").Replace("(", "").Replace(")", "");
+                    if (int.TryParse(cleanPart, out int floor))
+                    {
+                        requiredFloor = floor;
+                        break;
+                    }
+                }
+
+                // Check player's deepest dungeon level
+                var maxFloor = GameEngine.Instance?.CurrentPlayer?.Statistics?.DeepestDungeonLevel ?? 0;
+                if (maxFloor < requiredFloor)
+                    allConditionsMet = false;
+            }
+
+            // Random chance - checked LAST so other conditions are verified first
             if (trigger.Contains("Random"))
             {
-                // Random triggers have a chance to occur
-                return new Random().Next(100) < 30; // 30% chance
+                hasAnyCondition = true;
+                // Only roll if all other conditions are met
+                if (allConditionsMet)
+                {
+                    if (new Random().Next(100) >= 30) // 30% chance
+                        allConditionsMet = false;
+                }
             }
+
+            // If we found and checked at least one condition, return the result
+            if (hasAnyCondition)
+                return allConditionsMet;
 
             // Default: unknown trigger type, don't proceed
             GD.Print($"[TownNPC] Unknown trigger type: {trigger}");
@@ -648,6 +812,9 @@ namespace UsurperRemake.Systems
 
             state.CompletedStages.Add(stageId);
             state.CurrentStage = stageId + 1;
+
+            // Track when this stage was completed for time-based triggers
+            state.StageCompletedOnDay[stageId] = DailySystemManager.Instance?.CurrentDay ?? 0;
 
             if (choiceMade != null)
                 state.ChoicesMade[stageId] = choiceMade;
@@ -693,7 +860,8 @@ namespace UsurperRemake.Systems
                     NPCId = s.NPCId,
                     CurrentStage = s.CurrentStage,
                     CompletedStages = s.CompletedStages.ToList(),
-                    ChoicesMade = s.ChoicesMade
+                    ChoicesMade = s.ChoicesMade,
+                    StageCompletedOnDay = s.StageCompletedOnDay
                 }).ToList(),
                 NPCRelationship = NPCRelationship
             };
@@ -715,7 +883,8 @@ namespace UsurperRemake.Systems
                         NPCId = saved.NPCId,
                         CurrentStage = saved.CurrentStage,
                         CompletedStages = new HashSet<int>(saved.CompletedStages),
-                        ChoicesMade = saved.ChoicesMade
+                        ChoicesMade = saved.ChoicesMade,
+                        StageCompletedOnDay = saved.StageCompletedOnDay ?? new Dictionary<int, int>()
                     };
                 }
             }
@@ -789,6 +958,7 @@ namespace UsurperRemake.Systems
         public int CurrentStage { get; set; }
         public HashSet<int> CompletedStages { get; set; } = new();
         public Dictionary<int, string> ChoicesMade { get; set; } = new();
+        public Dictionary<int, int> StageCompletedOnDay { get; set; } = new(); // Track when each stage was completed
         public bool IsCompleted => CurrentStage >= 99;
     }
 
@@ -804,6 +974,7 @@ namespace UsurperRemake.Systems
         public int CurrentStage { get; set; }
         public List<int> CompletedStages { get; set; } = new();
         public Dictionary<int, string> ChoicesMade { get; set; } = new();
+        public Dictionary<int, int> StageCompletedOnDay { get; set; } = new();
     }
 
     #endregion

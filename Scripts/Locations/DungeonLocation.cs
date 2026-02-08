@@ -2024,6 +2024,22 @@ public class DungeonLocation : BaseLocation
         ShowKnownLore(story);
         terminal.WriteLine("");
 
+        // Ocean Philosophy / Awakening progress
+        ShowOceanProgress();
+        terminal.WriteLine("");
+
+        // Old God status
+        ShowOldGodStatus(story);
+        terminal.WriteLine("");
+
+        // Town NPC stories progress
+        ShowTownStoriesProgress();
+        terminal.WriteLine("");
+
+        // Companion status
+        ShowCompanionStatus();
+        terminal.WriteLine("");
+
         // Next steps
         terminal.SetColor("bright_green");
         terminal.WriteLine("═══ SUGGESTED NEXT STEPS ═══");
@@ -2116,9 +2132,16 @@ public class DungeonLocation : BaseLocation
             .OrderBy(s => s.DungeonFloor)
             .FirstOrDefault();
 
-        if (nextSeal != null && nextSeal.DungeonFloor <= level + 10)
+        if (nextSeal != null)
         {
-            steps.Add($"- Find the {nextSeal.Name} on floor {nextSeal.DungeonFloor}");
+            if (nextSeal.DungeonFloor == 0)
+            {
+                steps.Add($"- Find the {nextSeal.Name} (hidden somewhere in town)");
+            }
+            else if (nextSeal.DungeonFloor <= level + 10)
+            {
+                steps.Add($"- Find the {nextSeal.Name} on dungeon floor {nextSeal.DungeonFloor}");
+            }
         }
 
         // Level suggestions
@@ -2143,6 +2166,218 @@ public class DungeonLocation : BaseLocation
         foreach (var step in steps.Take(4))
         {
             terminal.WriteLine($"  {step}");
+        }
+    }
+
+    private void ShowOceanProgress()
+    {
+        var ocean = OceanPhilosophySystem.Instance;
+
+        terminal.SetColor("bright_blue");
+        terminal.WriteLine($"═══ THE OCEAN'S WHISPER (Awakening: {ocean.AwakeningLevel}/7) ═══");
+
+        // Show awakening level description
+        terminal.SetColor("cyan");
+        string awakeningDesc = ocean.AwakeningLevel switch
+        {
+            0 => "The world seems solid and separate. You know only the physical.",
+            1 => "In quiet moments, the boundaries feel thin...",
+            2 => "What is a wave but the ocean in motion?",
+            3 => "When water meets water, which loses its identity?",
+            4 => "Some souls are older than the bodies they wear.",
+            5 => "Child of the deep waters, you are beginning to remember.",
+            6 => "The boundaries blur. Self and other merge at the edges.",
+            7 => "The wave remembers it is water. Welcome back, Dreamer.",
+            _ => "Unknown state"
+        };
+        terminal.WriteLine($"  {awakeningDesc}");
+
+        // Show wave fragments collected
+        int fragmentCount = ocean.CollectedFragments.Count;
+        int totalFragments = 10; // Total Wave Fragments
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  Wave Fragments collected: {fragmentCount}/{totalFragments}");
+
+        if (fragmentCount > 0)
+        {
+            terminal.SetColor("dark_cyan");
+            foreach (var fragment in ocean.CollectedFragments)
+            {
+                if (OceanPhilosophySystem.FragmentData.TryGetValue(fragment, out var data))
+                {
+                    terminal.WriteLine($"    - {data.Title}");
+                }
+            }
+        }
+    }
+
+    private void ShowOldGodStatus(StoryProgressionSystem story)
+    {
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("═══ THE OLD GODS ═══");
+
+        // Define Old Gods and their floors
+        var gods = new (OldGodType type, string name, int floor)[]
+        {
+            (OldGodType.Maelketh, "Maelketh, God of Chaos", 25),
+            (OldGodType.Veloura, "Veloura, Goddess of Love", 40),
+            (OldGodType.Thorgrim, "Thorgrim, God of Law", 55),
+            (OldGodType.Noctura, "Noctura, Goddess of Shadow", 70),
+            (OldGodType.Aurelion, "Aurelion, God of Light", 85),
+            (OldGodType.Terravok, "Terravok, God of Earth", 95),
+            (OldGodType.Manwe, "Manwe, the Creator", 100)
+        };
+
+        foreach (var (godType, godName, floor) in gods)
+        {
+            if (story.OldGodStates.TryGetValue(godType, out var state))
+            {
+                string statusText = state.Status switch
+                {
+                    GodStatus.Unknown => "Unknown",
+                    GodStatus.Imprisoned => "Imprisoned",
+                    GodStatus.Dormant => "Dormant",
+                    GodStatus.Dying => "Dying",
+                    GodStatus.Corrupted => "Corrupted",
+                    GodStatus.Neutral => "Neutral",
+                    GodStatus.Awakened => "Awakened",
+                    GodStatus.Hostile => "Hostile",
+                    GodStatus.Allied => "Allied",
+                    GodStatus.Saved => "Saved",
+                    GodStatus.Defeated => "Defeated",
+                    GodStatus.Consumed => "Consumed",
+                    _ => "Unknown"
+                };
+
+                string color = state.Status switch
+                {
+                    GodStatus.Allied or GodStatus.Saved => "green",
+                    GodStatus.Defeated or GodStatus.Consumed => "red",
+                    GodStatus.Unknown => "gray",
+                    _ => "yellow"
+                };
+
+                terminal.SetColor(color);
+                terminal.WriteLine($"  Floor {floor}: {godName} - {statusText}");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Floor {floor}: {godName} - Unknown");
+            }
+        }
+    }
+
+    private void ShowTownStoriesProgress()
+    {
+        var storySystem = TownNPCStorySystem.Instance;
+
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("═══ TOWN STORIES ═══");
+
+        // Define memorable NPCs and their story counts
+        var npcInfo = new (string id, string name, int totalStages)[]
+        {
+            ("Pip", "Pip the Urchin", 6),
+            ("Marcus", "Marcus the Guard", 5),
+            ("Elena", "Elena the Barmaid", 5),
+            ("Ezra", "Old Ezra the Sage", 5),
+            ("Greta", "Greta the Healer", 6),
+            ("Bartholomew", "Bartholomew the Scholar", 5)
+        };
+
+        bool anyProgress = false;
+        foreach (var (id, name, totalStages) in npcInfo)
+        {
+            if (storySystem.NPCStates.TryGetValue(id, out var state))
+            {
+                int currentStage = state.CurrentStage;
+                bool isComplete = state.IsCompleted;
+                bool isFailed = currentStage == -1;
+
+                if (currentStage > 0 || isComplete || isFailed)
+                {
+                    anyProgress = true;
+                    if (isComplete)
+                    {
+                        terminal.SetColor("green");
+                        terminal.WriteLine($"  [✓] {name} - Story Complete");
+                    }
+                    else if (isFailed)
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"  [X] {name} - Story Failed");
+                    }
+                    else
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"  [~] {name} - Chapter {currentStage}/{totalStages}");
+                    }
+                }
+            }
+        }
+
+        if (!anyProgress)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  You haven't made progress on any town stories yet.");
+            terminal.WriteLine("  Explore town and talk to memorable NPCs to begin their tales.");
+        }
+    }
+
+    private void ShowCompanionStatus()
+    {
+        var companions = CompanionSystem.Instance;
+
+        terminal.SetColor("bright_white");
+        terminal.WriteLine("═══ COMPANIONS ═══");
+
+        var recruited = companions.GetRecruitedCompanions().ToList();
+        var active = companions.GetActiveCompanions().ToList();
+        var fallen = companions.GetFallenCompanions().ToList();
+
+        if (recruited.Count == 0 && fallen.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  No companions recruited yet.");
+            terminal.WriteLine("  Visit the Inn to meet potential allies.");
+            return;
+        }
+
+        // Show active companions
+        if (active.Count > 0)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  Active Party:");
+            foreach (var companion in active)
+            {
+                int hp = companions.GetCompanionHP(companion.Id);
+                terminal.SetColor("green");
+                terminal.WriteLine($"    {companion.Name} - HP: {hp}/{companion.BaseStats.HP}");
+            }
+        }
+
+        // Show inactive recruited companions
+        var inactive = companions.GetInactiveCompanions().ToList();
+        if (inactive.Count > 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  At the Inn:");
+            foreach (var companion in inactive)
+            {
+                terminal.WriteLine($"    {companion.Name}");
+            }
+        }
+
+        // Show fallen companions
+        if (fallen.Count > 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  Fallen:");
+            foreach (var (companion, death) in fallen)
+            {
+                terminal.WriteLine($"    {companion.Name} - {death.Circumstance}");
+            }
         }
     }
 

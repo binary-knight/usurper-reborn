@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.25.5-alpha";
-    public const string VersionName = "BBS Auto-Detection";
+    public const string Version = "0.25.6-alpha";
+    public const string VersionName = "SysOp Console";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -67,6 +67,46 @@ public static partial class GameConfig
     
     // Missing monster talks constant
     public static bool MonsterTalk = true;           // Whether monsters can speak
+
+    // ============================================================
+    // SysOp-Configurable Settings (BBS door mode administration)
+    // These can be modified at runtime by SysOps via the admin console
+    // ============================================================
+
+    /// <summary>
+    /// Message of the Day - displayed to players on login
+    /// </summary>
+    public static string MessageOfTheDay { get; set; } = "";
+
+    /// <summary>
+    /// Default daily turns for new characters (default: 325 to match TurnsPerDay)
+    /// </summary>
+    public static int DefaultDailyTurns { get; set; } = 325;
+
+    /// <summary>
+    /// XP multiplier for all combat rewards (1.0 = normal)
+    /// </summary>
+    public static float XPMultiplier { get; set; } = 1.0f;
+
+    /// <summary>
+    /// Gold multiplier for all rewards (1.0 = normal)
+    /// </summary>
+    public static float GoldMultiplier { get; set; } = 1.0f;
+
+    /// <summary>
+    /// Monster HP multiplier for difficulty adjustment (1.0 = normal)
+    /// </summary>
+    public static float MonsterHPMultiplier { get; set; } = 1.0f;
+
+    /// <summary>
+    /// Monster damage multiplier for difficulty adjustment (1.0 = normal)
+    /// </summary>
+    public static float MonsterDamageMultiplier { get; set; } = 1.0f;
+
+    /// <summary>
+    /// Maximum dungeon level (default: 100)
+    /// </summary>
+    public static int MaxDungeonLevel { get; set; } = 100;
     
     // Item limits
     public const int MaxItems = 325;             // maxitems
@@ -1203,7 +1243,10 @@ public enum GameLocation
     IceCaves = 300,      // onloc_icecaves
     Heaven = 400,        // onloc_heaven
     HeavenBoss = 401,    // onloc_heaven_boss
-    
+
+    // BBS SysOp locations
+    SysOpConsole = 500,  // SysOp administration console (BBS mode only)
+
     Closed = 30000       // onloc_closed (for fake players)
 }
 

@@ -33,6 +33,18 @@ namespace UsurperRemake.BBS
         public static bool HelpWasShown => _helpWasShown;
 
         /// <summary>
+        /// Check if the current user is a SysOp (security level >= SysOpSecurityLevel)
+        /// SysOps can access the admin console to manage the game
+        /// </summary>
+        public static bool IsSysOp => _sessionInfo != null && _sessionInfo.SecurityLevel >= SysOpSecurityLevel;
+
+        /// <summary>
+        /// SysOp security level threshold (configurable)
+        /// Default is 100, which is standard for most BBS software
+        /// </summary>
+        public static int SysOpSecurityLevel { get; set; } = 100;
+
+        /// <summary>
         /// Check command line args for door mode parameters
         /// Returns true if door mode should be used
         /// </summary>

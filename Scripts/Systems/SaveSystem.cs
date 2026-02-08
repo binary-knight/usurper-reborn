@@ -39,6 +39,11 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// Public accessor for save directory (used by SysOp console)
+        /// </summary>
+        public string GetSaveDirectory() => saveDirectory;
+
         public SaveSystem()
         {
             // Use Godot's user data directory for cross-platform compatibility

@@ -325,7 +325,10 @@ public partial class GameEngine : Node
 
         GD.Print("Reading configuration...");
         ReadStartCfgValues();
-        
+
+        // Load SysOp configuration (for BBS door mode settings persistence)
+        UsurperRemake.Systems.SysOpConfigSystem.Instance.LoadConfig();
+
         GD.Print("Initializing core managers...");
         // Create the LocationManager early so that it becomes the singleton before NPCs are loaded
         if (locationManager == null)
@@ -664,6 +667,20 @@ public partial class GameEngine : Node
             terminal.SetColor("red");
             terminal.WriteLine("Quit");
 
+            // SysOp option - only visible in BBS door mode for SysOps
+            if (UsurperRemake.BBS.DoorMode.IsInDoorMode && UsurperRemake.BBS.DoorMode.IsSysOp)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("%");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("yellow");
+                terminal.WriteLine("SysOp Console");
+            }
+
             terminal.WriteLine("");
             terminal.SetColor("bright_white");
             var choice = await terminal.GetInput("Your choice: ");
@@ -686,10 +703,26 @@ public partial class GameEngine : Node
                     IsIntentionalExit = true;
                     done = true;
                     break;
+                case "%":
+                    if (UsurperRemake.BBS.DoorMode.IsInDoorMode && UsurperRemake.BBS.DoorMode.IsSysOp)
+                    {
+                        await ShowSysOpConsole();
+                    }
+                    break;
             }
         }
     }
-    
+
+    /// <summary>
+    /// SysOp Administration Console - accessible from main menu before any save is loaded.
+    /// This allows SysOps to manage the game without affecting player state.
+    /// </summary>
+    private async Task ShowSysOpConsole()
+    {
+        var sysopConsole = new SysOpConsoleManager(terminal);
+        await sysopConsole.Run();
+    }
+
     /// <summary>
     /// Enter the game with modern save/load UI
     /// </summary>

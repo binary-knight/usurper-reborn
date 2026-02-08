@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.25.5 - BBS Auto-Detection
+## ALPHA v0.25.6 - SysOp Console
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -350,6 +350,25 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### Completed in v0.25.6 - SysOp Console
+
+**SysOp Administration Console:**
+- **Main Menu Access** - SysOps with security level 100+ can press `%` from the Main Menu to access admin console (before any save loads)
+- **Player Management** - View all players, delete player saves, full game reset with double confirmation
+- **Difficulty Settings** - Adjust XP/Gold/Monster HP/Damage multipliers (0.1x to 10.0x)
+- **Message of the Day** - Set announcements for all players on login
+- **Monitoring** - View game statistics, debug log viewer, active NPC list with pagination
+- **Auto-Update System** - Background update check with notification banner, one-click install
+- **Persistent Config** - All settings saved to `sysop_config.json` per-BBS
+
+**Enhanced Dungeon Journal:**
+- Ocean Philosophy awakening level (0-7) with descriptions
+- Wave Fragment collection progress (X/10)
+- Old God encounter status for all 7 gods
+- Town NPC story progress for memorable NPCs
+- Companion recruitment and status tracking
+- Seal locations show "hidden somewhere in town" instead of "floor 0"
+
 ### Completed in v0.25.1 - BBS Compatibility
 
 **BBS Socket Handle Improvements:**
@@ -594,4 +613,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.25.5 - BBS Auto-Detection
+**Status**: ALPHA v0.25.6 - SysOp Console

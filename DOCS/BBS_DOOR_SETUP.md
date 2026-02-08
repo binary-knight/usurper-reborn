@@ -360,6 +360,45 @@ This shows:
 
 ---
 
+## SysOp Administration Console
+
+SysOps with security level 100 or higher can access an in-game administration console to manage the game on their BBS.
+
+### Accessing the Console
+
+From the **Main Menu** (before entering the game), press `%` to open the SysOp Console. This option only appears for users with SysOp privileges (security level 100+) in BBS door mode.
+
+> **Note:** The SysOp Console is accessible from the Main Menu rather than Main Street. This allows SysOps to manage the game, reset data, and apply updates without loading any player saves first.
+
+### Available Functions
+
+| Category | Function | Description |
+|----------|----------|-------------|
+| **Game Management** | View All Players | List all player saves with file info |
+| | Delete Player | Permanently remove a player's save file |
+| | Reset Game | Complete game wipe (deletes ALL data) |
+| **Game Settings** | Difficulty | Adjust XP, gold, monster HP/damage multipliers |
+| | Set MOTD | Set Message of the Day for players |
+| **Monitoring** | View Statistics | Player count, NPC status, story progress |
+| | View Debug Log | Paginated debug log viewer |
+| | View Active NPCs | Paginated list of all NPCs with status |
+| **System Maintenance** | Check for Updates | Download and install game updates |
+
+### Security Level Threshold
+
+The default SysOp security level is 100, which is standard for most BBS software. The game reads the security level from:
+- **DOOR32.SYS**: Line 8
+- **DOOR.SYS**: Line 16
+
+### Configuration Persistence
+
+All game configuration changes made through the SysOp Console are automatically saved to `sysop_config.json` in your BBS's save directory (e.g., `Saves/MyBBS/sysop_config.json`). Settings persist across door restarts and include:
+
+- Message of the Day (MOTD)
+- Difficulty multipliers (XP, Gold, Monster HP, Monster Damage)
+
+---
+
 ## Multi-Node Support
 
 Each node automatically gets its own:
