@@ -15,7 +15,6 @@ namespace UsurperRemake.BBS
     public class BBSTerminalAdapter
     {
         private readonly SocketTerminal? _socketTerminal;
-        private readonly SerialTerminal? _serialTerminal;
         private readonly BBSSessionInfo _sessionInfo;
         private string _currentColor = "white";
         private bool _useAnsiForLocal = false; // True when using --stdio (redirected I/O)
@@ -31,16 +30,6 @@ namespace UsurperRemake.BBS
             _useAnsiForLocal = useAnsiForLocal;
             // WWIV colors are disabled by default - use standard ANSI which works everywhere
             _useWwivColors = useAnsiForLocal && useWwivColors;
-            Instance = this;
-        }
-
-        public BBSTerminalAdapter(SerialTerminal serialTerminal)
-        {
-            _serialTerminal = serialTerminal;
-            _sessionInfo = serialTerminal.SessionInfo;
-            // Serial mode always uses ANSI codes through the serial port
-            _useAnsiForLocal = false;
-            _useWwivColors = false;
             Instance = this;
         }
 
@@ -98,7 +87,7 @@ namespace UsurperRemake.BBS
         }
 
         public BBSSessionInfo SessionInfo => _sessionInfo;
-        public bool IsConnected => _socketTerminal?.IsConnected ?? (_serialTerminal != null);
+        public bool IsConnected => _socketTerminal?.IsConnected ?? false;
 
         #region Output Methods
 
@@ -156,13 +145,8 @@ namespace UsurperRemake.BBS
                 return;
             }
 
-            // Use serial terminal if available, otherwise socket terminal
-            if (_serialTerminal != null)
-            {
-                _serialTerminal.SetColor(color);
-                _serialTerminal.WriteLine(text);
-            }
-            else if (_socketTerminal != null)
+            // Use socket terminal for remote connections
+            if (_socketTerminal != null)
             {
                 _socketTerminal.WriteLineAsync(text, color).GetAwaiter().GetResult();
             }
@@ -221,13 +205,8 @@ namespace UsurperRemake.BBS
                 return;
             }
 
-            // Use serial terminal if available, otherwise socket terminal
-            if (_serialTerminal != null)
-            {
-                _serialTerminal.SetColor(color);
-                _serialTerminal.Write(text);
-            }
-            else if (_socketTerminal != null)
+            // Use socket terminal for remote connections
+            if (_socketTerminal != null)
             {
                 _socketTerminal.WriteAsync(text, color).GetAwaiter().GetResult();
             }
@@ -259,12 +238,8 @@ namespace UsurperRemake.BBS
                 return;
             }
 
-            // Use serial terminal if available, otherwise socket terminal
-            if (_serialTerminal != null)
-            {
-                _serialTerminal.SetColor(_currentColor);
-            }
-            else if (_socketTerminal != null)
+            // Use socket terminal for remote connections
+            if (_socketTerminal != null)
             {
                 _socketTerminal.SetColorAsync(_currentColor).GetAwaiter().GetResult();
             }
@@ -287,12 +262,8 @@ namespace UsurperRemake.BBS
                 return;
             }
 
-            // Use serial terminal if available, otherwise socket terminal
-            if (_serialTerminal != null)
-            {
-                _serialTerminal.ClearScreen();
-            }
-            else if (_socketTerminal != null)
+            // Use socket terminal for remote connections
+            if (_socketTerminal != null)
             {
                 _socketTerminal.ClearScreenAsync().GetAwaiter().GetResult();
             }
@@ -315,12 +286,8 @@ namespace UsurperRemake.BBS
                 return result;
             }
 
-            // Use serial terminal if available, otherwise socket terminal
-            if (_serialTerminal != null)
-            {
-                return await _serialTerminal.ReadLineAsync();
-            }
-            else if (_socketTerminal != null)
+            // Use socket terminal for remote connections
+            if (_socketTerminal != null)
             {
                 return await _socketTerminal.GetInputAsync("");
             }
@@ -349,13 +316,8 @@ namespace UsurperRemake.BBS
                 }
             }
 
-            // Use serial terminal if available, otherwise socket terminal
-            if (_serialTerminal != null)
-            {
-                char c = await _serialTerminal.ReadKeyAsync();
-                return c.ToString();
-            }
-            else if (_socketTerminal != null)
+            // Use socket terminal for remote connections
+            if (_socketTerminal != null)
             {
                 return await _socketTerminal.GetKeyInputAsync("");
             }

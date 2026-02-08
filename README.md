@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.25.4 - BBS Console Fix
+## ALPHA v0.25.5 - BBS Auto-Detection
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -594,4 +594,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.25.4 - BBS Console Fix
+**Status**: ALPHA v0.25.5 - BBS Auto-Detection

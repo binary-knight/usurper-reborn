@@ -14,7 +14,6 @@ namespace UsurperRemake.BBS
         private static SocketTerminal? _socketTerminal;
         private static BBSTerminalAdapter? _terminalAdapter;
         private static bool _forceStdio = false;
-        private static string? _forceFossilPort = null; // Force FOSSIL mode on this COM port
         private static bool _verboseMode = false; // Verbose debug output for troubleshooting (also keeps console visible)
         private static bool _helpWasShown = false; // Flag to indicate --help was processed
 
@@ -39,7 +38,7 @@ namespace UsurperRemake.BBS
         /// </summary>
         public static bool ParseCommandLineArgs(string[] args)
         {
-            // First pass: process flags (--stdio, --verbose, --fossil, etc.)
+            // First pass: process flags (--stdio, --verbose, etc.)
             // These need to be set before we load drop files
             for (int i = 0; i < args.Length; i++)
             {
@@ -55,14 +54,6 @@ namespace UsurperRemake.BBS
                 {
                     _verboseMode = true;
                     Console.Error.WriteLine("[VERBOSE] Verbose mode enabled - detailed debug output will be shown");
-                }
-                // --fossil or --com forces FOSSIL/serial mode
-                else if ((arg == "--fossil" || arg == "--com") && i + 1 < args.Length)
-                {
-                    _forceFossilPort = args[i + 1].ToUpperInvariant();
-                    if (!_forceFossilPort.StartsWith("COM"))
-                        _forceFossilPort = "COM" + _forceFossilPort;
-                    i++; // Skip the port arg
                 }
             }
 
@@ -317,7 +308,6 @@ namespace UsurperRemake.BBS
                 if (_verboseMode)
                 {
                     SocketTerminal.VerboseLogging = true;
-                    SerialTerminal.VerboseLogging = true;
                     Console.Error.WriteLine("[VERBOSE] Session info from drop file:");
                     Console.Error.WriteLine($"[VERBOSE]   CommType: {_sessionInfo.CommType}");
                     Console.Error.WriteLine($"[VERBOSE]   SocketHandle: {_sessionInfo.SocketHandle} (0x{_sessionInfo.SocketHandle:X8})");
@@ -338,70 +328,43 @@ namespace UsurperRemake.BBS
                 if (_verboseMode)
                 {
                     Console.Error.WriteLine($"[VERBOSE] CommType check: {_sessionInfo.CommType}");
-                    Console.Error.WriteLine($"[VERBOSE] _forceStdio={_forceStdio}, _forceFossilPort={_forceFossilPort ?? "null"}");
+                    Console.Error.WriteLine($"[VERBOSE] _forceStdio={_forceStdio}");
                 }
 
-                // If --stdio flag was used, force console I/O mode
+                // Auto-detect BBS software that requires stdio mode
+                // These BBS types pass socket handles but expect doors to use stdin/stdout for terminal I/O
+                if (!_forceStdio && !string.IsNullOrEmpty(_sessionInfo.BBSName))
+                {
+                    string bbsName = _sessionInfo.BBSName;
+                    string? detectedBBS = null;
+
+                    // Check for known BBS software that needs stdio mode
+                    if (bbsName.Contains("Synchronet", StringComparison.OrdinalIgnoreCase))
+                        detectedBBS = "Synchronet";
+                    else if (bbsName.Contains("GameSrv", StringComparison.OrdinalIgnoreCase))
+                        detectedBBS = "GameSrv";
+                    else if (bbsName.Contains("ENiGMA", StringComparison.OrdinalIgnoreCase))
+                        detectedBBS = "ENiGMA";
+                    else if (bbsName.Contains("WWIV", StringComparison.OrdinalIgnoreCase))
+                        detectedBBS = "WWIV";
+
+                    if (detectedBBS != null)
+                    {
+                        _forceStdio = true;
+                        Console.Error.WriteLine($"Detected {detectedBBS} BBS - automatically using Standard I/O mode");
+                        if (_verboseMode)
+                        {
+                            Console.Error.WriteLine($"[VERBOSE] {detectedBBS} requires --stdio mode. Auto-enabled.");
+                        }
+                    }
+                }
+
+                // If --stdio flag was used (or auto-detected), force console I/O mode
                 // This is for Synchronet's "Standard" I/O mode where stdin/stdout are redirected
                 if (_forceStdio)
                 {
                     Console.Error.WriteLine("Using Standard I/O mode (--stdio flag)");
                     _sessionInfo.CommType = ConnectionType.Local;
-                }
-
-                // If --fossil flag was used, force serial/FOSSIL mode
-                if (!string.IsNullOrEmpty(_forceFossilPort))
-                {
-                    Console.Error.WriteLine($"Forcing FOSSIL mode on {_forceFossilPort}");
-                    _sessionInfo.CommType = ConnectionType.Serial;
-                    _sessionInfo.ComPort = _forceFossilPort;
-                }
-
-                // Use serial terminal for FOSSIL/COM port connections
-                if (_sessionInfo.CommType == ConnectionType.Serial)
-                {
-                    Console.Error.WriteLine($"Using Serial/FOSSIL mode on {_sessionInfo.ComPort}");
-                    var serialTerminal = new SerialTerminal(_sessionInfo);
-
-                    if (!serialTerminal.Initialize())
-                    {
-                        Console.Error.WriteLine("");
-                        Console.Error.WriteLine("═══════════════════════════════════════════════════════════════════════");
-                        Console.Error.WriteLine("  SERIAL/FOSSIL MODE FAILED");
-                        Console.Error.WriteLine("═══════════════════════════════════════════════════════════════════════");
-                        Console.Error.WriteLine("");
-                        Console.Error.WriteLine("  .NET applications cannot use traditional FOSSIL drivers.");
-                        Console.Error.WriteLine("  FOSSIL uses DOS INT 14h interrupts which .NET cannot access.");
-                        Console.Error.WriteLine("");
-                        Console.Error.WriteLine("  SOLUTION: Use --stdio flag for Standard I/O mode:");
-                        Console.Error.WriteLine("");
-                        Console.Error.WriteLine($"    UsurperReborn --doorsys \"{_sessionInfo.SourcePath}\" --stdio");
-                        Console.Error.WriteLine("");
-                        Console.Error.WriteLine("  Configure your BBS to redirect stdin/stdout to the door.");
-                        Console.Error.WriteLine("  Most modern BBS software (EleBBS, Mystic, etc.) supports this.");
-                        Console.Error.WriteLine("");
-                        Console.Error.WriteLine("  For EleBBS: Set 'Use STDIO' or 'Pipe I/O' in door configuration.");
-                        Console.Error.WriteLine("═══════════════════════════════════════════════════════════════════════");
-                        Console.Error.WriteLine("");
-
-                        if (_verboseMode)
-                        {
-                            Console.Error.WriteLine("[VERBOSE] Press Enter to continue with local fallback...");
-                            Console.ReadLine();
-                        }
-                        _sessionInfo.CommType = ConnectionType.Local;
-
-                        // Fall back to socket terminal in local mode
-                        _socketTerminal = new SocketTerminal(_sessionInfo);
-                        _socketTerminal.Initialize();
-                        _terminalAdapter = new BBSTerminalAdapter(_socketTerminal, _forceStdio);
-                    }
-                    else
-                    {
-                        _terminalAdapter = new BBSTerminalAdapter(serialTerminal);
-                    }
-
-                    return _terminalAdapter;
                 }
 
                 // Use socket terminal for telnet or local connections
@@ -550,16 +513,13 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  --doorsys <path>     Load DOOR.SYS explicitly");
             Console.WriteLine("  --node, -n <dir>     Search node directory for drop files");
             Console.WriteLine("  --local, -l          Run in local mode (no BBS connection)");
-            Console.WriteLine("  --stdio              Use Standard I/O instead of socket (for Synchronet)");
-            Console.WriteLine("  --fossil <port>      Force FOSSIL/serial mode on COM port (e.g., COM1)");
-            Console.WriteLine("  --com <port>         Same as --fossil");
+            Console.WriteLine("  --stdio              Force Standard I/O mode (usually auto-detected)");
             Console.WriteLine("  --verbose, -v        Enable detailed debug output (keeps console visible)");
             Console.WriteLine("");
             Console.WriteLine("Examples:");
-            Console.WriteLine("  UsurperReborn --door /sbbs/node1/door32.sys");
+            Console.WriteLine("  UsurperReborn --door32 /sbbs/node1/door32.sys");
             Console.WriteLine("  UsurperReborn --node /sbbs/node1");
             Console.WriteLine("  UsurperReborn -d C:\\SBBS\\NODE1\\");
-            Console.WriteLine("  UsurperReborn --doorsys door.sys --fossil COM1");
             Console.WriteLine("");
             Console.WriteLine("Drop File Support:");
             Console.WriteLine("  DOOR32.SYS - Modern format with socket handle (recommended)");
@@ -577,14 +537,9 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  Native Executable: Yes");
             Console.WriteLine("");
             Console.WriteLine("For EleBBS (Socket mode):");
-            Console.WriteLine("  Command: UsurperReborn --door32 %f");
+            Console.WriteLine("  Command: UsurperReborn --door32 *N\\door32.sys");
             Console.WriteLine("  Drop File Type: Door32.sys");
             Console.WriteLine("  Console window is automatically hidden in socket mode");
-            Console.WriteLine("");
-            Console.WriteLine("For FOSSIL-based BBS:");
-            Console.WriteLine("  Command: UsurperReborn --doorsys %f --fossil COM1");
-            Console.WriteLine("  Drop File Type: Door.sys");
-            Console.WriteLine("  The COM port should match your FOSSIL driver's virtual port");
             Console.WriteLine("");
             Console.WriteLine("Troubleshooting:");
             Console.WriteLine("  If output shows locally but not remotely:");

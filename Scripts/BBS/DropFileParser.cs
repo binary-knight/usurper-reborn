@@ -12,7 +12,7 @@ namespace UsurperRemake.BBS
         // Connection info
         public ConnectionType CommType { get; set; } = ConnectionType.Local;
         public int SocketHandle { get; set; } = -1;
-        public string ComPort { get; set; } = ""; // COM port name for FOSSIL/serial (e.g., "COM1")
+        public string ComPort { get; set; } = ""; // COM port name from DOOR.SYS (e.g., "COM1") - not used in .NET
         public int BaudRate { get; set; } = 0;
         public int NodeNumber { get; set; } = 1;
 
