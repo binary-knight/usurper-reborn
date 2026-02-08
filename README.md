@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.25.7 - SysOp Console
+## ALPHA v0.25.8 - SysOp Console
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -350,10 +350,11 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
-### Completed in v0.25.6 - SysOp Console
+### Completed in v0.25.7/v0.25.8 - SysOp Console
 
 **SysOp Administration Console:**
-- **Main Menu Access** - SysOps with security level 100+ can press `%` from the Main Menu to access admin console (before any save loads)
+- **BBS Door Welcome Screen Access** - SysOps can press `%` at the BBS welcome screen (before character selection) to access admin console
+- **Configurable Security Level** - New `--sysop-level <number>` flag allows SysOps to set their BBS's security threshold (saved to config)
 - **Player Management** - View all players, delete player saves, full game reset with double confirmation
 - **Difficulty Settings** - Adjust XP/Gold/Monster HP/Damage multipliers (0.1x to 10.0x)
 - **Message of the Day** - Set announcements for all players on login
@@ -613,4 +614,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.25.7 - SysOp Console
+**Status**: ALPHA v0.25.8 - SysOp Console

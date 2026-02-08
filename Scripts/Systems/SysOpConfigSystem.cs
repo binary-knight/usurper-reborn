@@ -98,6 +98,9 @@ namespace UsurperRemake.Systems
             // MaxDungeonLevel: 1-100 (can't exceed story content)
             GameConfig.MaxDungeonLevel = Math.Clamp(_config.MaxDungeonLevel, 1, 100);
 
+            // SysOp security level: 1-255 (0 would let everyone in)
+            DoorMode.SysOpSecurityLevel = Math.Clamp(_config.SysOpSecurityLevel, 1, 255);
+
             // Log if any values were clamped
             bool wasClamped = false;
             if (_config.DefaultDailyTurns < 1 || _config.DefaultDailyTurns > 9999) wasClamped = true;
@@ -106,6 +109,7 @@ namespace UsurperRemake.Systems
             if (_config.MonsterHPMultiplier < 0.1f || _config.MonsterHPMultiplier > 10.0f) wasClamped = true;
             if (_config.MonsterDamageMultiplier < 0.1f || _config.MonsterDamageMultiplier > 10.0f) wasClamped = true;
             if (_config.MaxDungeonLevel < 1 || _config.MaxDungeonLevel > 100) wasClamped = true;
+            if (_config.SysOpSecurityLevel < 1 || _config.SysOpSecurityLevel > 255) wasClamped = true;
 
             if (wasClamped)
             {
@@ -125,6 +129,7 @@ namespace UsurperRemake.Systems
             _config.MonsterHPMultiplier = GameConfig.MonsterHPMultiplier;
             _config.MonsterDamageMultiplier = GameConfig.MonsterDamageMultiplier;
             _config.MaxDungeonLevel = GameConfig.MaxDungeonLevel;
+            _config.SysOpSecurityLevel = DoorMode.SysOpSecurityLevel;
         }
 
         /// <summary>
@@ -159,6 +164,9 @@ namespace UsurperRemake.Systems
         public float MonsterHPMultiplier { get; set; } = 1.0f;
         public float MonsterDamageMultiplier { get; set; } = 1.0f;
         public int MaxDungeonLevel { get; set; } = 100;
+
+        // SysOp settings
+        public int SysOpSecurityLevel { get; set; } = 100;
 
         // Metadata
         public DateTime LastModified { get; set; } = DateTime.UtcNow;

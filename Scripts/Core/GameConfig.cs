@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.25.7-alpha";
+    public const string Version = "0.25.8-alpha";
     public const string VersionName = "SysOp Console";
 
     // From Pascal global_maxXX constants

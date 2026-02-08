@@ -399,12 +399,23 @@ The default SysOp security level is 100, which is standard for most BBS software
 - **DOOR32.SYS**: Line 8
 - **DOOR.SYS**: Line 16
 
+**Configuring the threshold:**
+
+Different BBS software uses different security levels for SysOps. You can configure the threshold via command line:
+
+```bash
+UsurperReborn --door %f --sysop-level 90
+```
+
+This setting is also saved in `sysop_config.json`, so you only need to specify it once. Future runs will use the saved value.
+
 ### Configuration Persistence
 
 All game configuration changes made through the SysOp Console are automatically saved to `sysop_config.json` in your BBS's save directory (e.g., `Saves/MyBBS/sysop_config.json`). Settings persist across door restarts and include:
 
 - Message of the Day (MOTD)
 - Difficulty multipliers (XP, Gold, Monster HP, Monster Damage)
+- SysOp security level threshold
 
 ---
 

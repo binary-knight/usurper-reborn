@@ -67,6 +67,15 @@ namespace UsurperRemake.BBS
                     _verboseMode = true;
                     Console.Error.WriteLine("[VERBOSE] Verbose mode enabled - detailed debug output will be shown");
                 }
+                // --sysop-level <number> sets the minimum security level for SysOp access
+                else if (arg == "--sysop-level" && i + 1 < args.Length)
+                {
+                    if (int.TryParse(args[i + 1], out int level) && level >= 0)
+                    {
+                        SysOpSecurityLevel = level;
+                        Console.Error.WriteLine($"SysOp security level set to: {level}");
+                    }
+                }
             }
 
             // Second pass: process commands (--door, --door32, etc.)
@@ -527,6 +536,7 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  --local, -l          Run in local mode (no BBS connection)");
             Console.WriteLine("  --stdio              Force Standard I/O mode (usually auto-detected)");
             Console.WriteLine("  --verbose, -v        Enable detailed debug output (keeps console visible)");
+            Console.WriteLine("  --sysop-level <num>  Set SysOp security level threshold (default: 100)");
             Console.WriteLine("");
             Console.WriteLine("Examples:");
             Console.WriteLine("  UsurperReborn --door32 /sbbs/node1/door32.sys");
