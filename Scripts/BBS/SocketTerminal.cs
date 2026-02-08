@@ -344,25 +344,31 @@ namespace UsurperRemake.BBS
                 _reader = new StreamReader(_stream, Encoding.ASCII);
                 _writer = new StreamWriter(_stream, Encoding.ASCII) { AutoFlush = true };
 
-                LogVerbose("Socket initialization complete - attempting test write");
+                LogVerbose("Socket initialization complete - verifying socket");
 
-                // Try a test write to verify the socket works
-                // Use an actual IAC NOP (telnet no-op) which is invisible to terminal
-                // Avoid zero-length writes which fail on some overlapped socket implementations
+                // Verify the socket is usable without sending any data.
+                // IMPORTANT: Do NOT send telnet bytes (IAC NOP etc.) here because the
+                // connection may be SSH (e.g., Mystic BBS over SSH) where raw telnet
+                // bytes corrupt the SSH protocol stream.
                 bool testSucceeded = false;
                 try
                 {
-                    // IAC NOP (0xFF 0xF1) is a telnet no-op - invisible to the terminal
-                    var testBytes = new byte[] { 0xFF, 0xF1 };
-                    _stream.Write(testBytes, 0, testBytes.Length);
-                    _stream.Flush();
-                    LogVerbose("Test write succeeded");
-                    testSucceeded = true;
+                    // Use Socket.Poll to check if the socket is writable
+                    // Poll with SelectWrite returns true if the socket can send data
+                    if (_socket.Poll(1000000, SelectMode.SelectWrite)) // 1 second timeout
+                    {
+                        LogVerbose("Socket poll succeeded - socket is writable");
+                        testSucceeded = true;
+                    }
+                    else
+                    {
+                        LogVerbose("Socket poll failed - socket is not writable");
+                    }
                 }
-                catch (Exception writeEx)
+                catch (Exception pollEx)
                 {
-                    LogVerbose($"Test write failed: {writeEx.Message}");
-                    Console.Error.WriteLine($"Socket test write failed: {writeEx.Message}");
+                    LogVerbose($"Socket poll failed: {pollEx.Message}");
+                    Console.Error.WriteLine($"Socket verification failed: {pollEx.Message}");
                 }
 
                 // If socket test failed, try the raw handle fallback
