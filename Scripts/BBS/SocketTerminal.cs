@@ -386,10 +386,14 @@ namespace UsurperRemake.BBS
                     return false;
                 }
 
-                // Send telnet negotiation: WILL ECHO + WILL SGA (Suppress Go-Ahead)
+                // Send telnet negotiation only for confirmed TCP sockets (not pipes/SSH)
                 // This tells the telnet client: "I will echo your keystrokes" and
                 // "I support character-at-a-time mode" - essential for BBS door games
-                SendTelnetNegotiation();
+                if (_socket != null && (_socket.AddressFamily == AddressFamily.InterNetwork
+                    || _socket.AddressFamily == AddressFamily.InterNetworkV6))
+                {
+                    SendTelnetNegotiation();
+                }
 
                 return true;
             }
@@ -578,8 +582,9 @@ namespace UsurperRemake.BBS
 
                 Console.Error.WriteLine("[SOCKET] Using raw handle I/O mode");
 
-                // Send telnet negotiation for raw handle mode too
-                SendTelnetNegotiation();
+                // NOTE: Do NOT send telnet negotiation for raw handles.
+                // Raw handles may be pipes from SSH-based BBS (e.g., Mystic over SSH),
+                // and telnet IAC bytes would corrupt the SSH protocol stream.
 
                 return true;
             }
