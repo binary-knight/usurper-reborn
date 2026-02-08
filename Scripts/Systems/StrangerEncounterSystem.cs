@@ -295,9 +295,11 @@ namespace UsurperRemake.Systems
         /// </summary>
         private string GetDialogue(Character player, bool suspects, int awakening)
         {
+            // Use EncountersHad + 1 since this is called before RecordEncounter increments the count
+            int encounterNum = EncountersHad + 1;
             var validDialogues = DialoguePool
-                .Where(d => EncountersHad >= d.MinEncounter &&
-                           EncountersHad <= d.MaxEncounter &&
+                .Where(d => encounterNum >= d.MinEncounter &&
+                           encounterNum <= d.MaxEncounter &&
                            player.Wisdom >= d.MinWisdom &&
                            (!d.RequiresPlayerSuspects || suspects) &&
                            (d.RequiresAwakening == 0 || awakening >= d.RequiresAwakening))
@@ -305,8 +307,8 @@ namespace UsurperRemake.Systems
 
             if (!validDialogues.Any())
             {
-                // Fallback
-                return "The figure watches you with eyes that seem to hold secrets.";
+                // Fallback - actual dialogue, not narrator description
+                return "You interest me. We'll meet again.";
             }
 
             var chosen = validDialogues[_random.Next(validDialogues.Count)];

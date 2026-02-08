@@ -613,9 +613,14 @@ public class WorldSimulator
     /// </summary>
     private void NPCTryJoinOrFormTeam(NPC npc)
     {
-        // Look for existing teams at this location to join
+        // Exclude the player's team - NPCs shouldn't autonomously join it
+        var player = GameEngine.Instance?.CurrentPlayer as Player;
+        string? playerTeam = (!string.IsNullOrEmpty(player?.Team)) ? player.Team : null;
+
+        // Look for existing NPC teams at this location to join
         var teamsAtLocation = npcs
-            .Where(n => n.IsAlive && !string.IsNullOrEmpty(n.Team) && n.CurrentLocation == npc.CurrentLocation)
+            .Where(n => n.IsAlive && !string.IsNullOrEmpty(n.Team) && n.CurrentLocation == npc.CurrentLocation &&
+                        !(playerTeam != null && n.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase)))
             .GroupBy(n => n.Team)
             .Where(g => g.Count() < MAX_TEAM_SIZE)
             .ToList();
@@ -684,6 +689,12 @@ public class WorldSimulator
     private void NPCTryRecruitForTeam(NPC npc)
     {
         if (string.IsNullOrEmpty(npc.Team)) return;
+
+        // Don't let NPCs autonomously recruit into the player's team
+        var player = GameEngine.Instance?.CurrentPlayer as Player;
+        if (player != null && !string.IsNullOrEmpty(player.Team) &&
+            npc.Team.Equals(player.Team, StringComparison.OrdinalIgnoreCase))
+            return;
 
         // Check current team size
         var teamSize = npcs.Count(n => n.Team == npc.Team && n.IsAlive);
@@ -2217,8 +2228,17 @@ public class WorldSimulator
     {
         var teamMembers = npcs.Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive).ToList();
 
+        // Get the player's team name so we can protect player team members
+        var player = GameEngine.Instance?.CurrentPlayer as Player;
+        string? playerTeam = (!string.IsNullOrEmpty(player?.Team)) ? player.Team : null;
+
         foreach (var member in teamMembers)
         {
+            // Never remove NPCs from the player's team via world simulation
+            // Player must manually sack them from Team Corner
+            if (playerTeam != null && member.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             // Low loyalty or betrayal-prone personality
             bool likelyToLeave = member.Brain?.Personality?.IsLikelyToBetray() == true ||
                                  member.Loyalty < 30;
@@ -2236,10 +2256,10 @@ public class WorldSimulator
                 NewsSystem.Instance.Newsy(true, $"{member.Name} abandoned '{oldTeam}'!");
                 // GD.Print($"[WorldSim] {member.Name} left team '{oldTeam}'");
 
-                // Notify player if this was their teammate
-                var player = GameEngine.Instance?.CurrentPlayer as Player;
-                if (player != null && !string.IsNullOrEmpty(player.Team) &&
-                    player.Team.Equals(oldTeam, StringComparison.OrdinalIgnoreCase))
+                // Notify player if this was their teammate (shouldn't reach here for player teams
+                // due to the continue above, but kept as safety net)
+                if (player != null && playerTeam != null &&
+                    playerTeam.Equals(oldTeam, StringComparison.OrdinalIgnoreCase))
                 {
                     GameEngine.AddNotification($"{member.DisplayName} has abandoned your team!");
                 }

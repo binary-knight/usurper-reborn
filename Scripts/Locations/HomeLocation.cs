@@ -728,6 +728,7 @@ terminal.SetColor("darkgray");
             ObjType.Neck => EquipmentSlot.Neck,
             ObjType.Face => EquipmentSlot.Face,
             ObjType.Fingers => EquipmentSlot.LFinger,
+            ObjType.Abody => EquipmentSlot.Cloak,
             ObjType.Magic => (int)item.MagicType switch
             {
                 5 => EquipmentSlot.LFinger,  // Ring

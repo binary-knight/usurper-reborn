@@ -497,6 +497,7 @@ namespace UsurperRemake.Systems
                     ObjType.Neck => EquipmentSlot.Neck,
                     ObjType.Face => EquipmentSlot.Face,
                     ObjType.Fingers => EquipmentSlot.LFinger,
+                    ObjType.Abody => EquipmentSlot.Cloak,
                     _ => EquipmentSlot.MainHand // Default
                 };
             }
@@ -748,10 +749,44 @@ namespace UsurperRemake.Systems
                 var unequipped = player.UnequipSlot(slot);
                 if (unequipped != null)
                 {
+                    // Convert equipment to legacy Item and add to backpack
+                    var legacyItem = new global::Item
+                    {
+                        Name = unequipped.Name,
+                        Type = unequipped.Slot switch
+                        {
+                            EquipmentSlot.MainHand or EquipmentSlot.OffHand => ObjType.Weapon,
+                            EquipmentSlot.Body => ObjType.Body,
+                            EquipmentSlot.Head => ObjType.Head,
+                            EquipmentSlot.Arms => ObjType.Arms,
+                            EquipmentSlot.Legs => ObjType.Legs,
+                            EquipmentSlot.Hands => ObjType.Hands,
+                            EquipmentSlot.Feet => ObjType.Feet,
+                            EquipmentSlot.LFinger or EquipmentSlot.RFinger => ObjType.Fingers,
+                            EquipmentSlot.Neck or EquipmentSlot.Neck2 => ObjType.Neck,
+                            EquipmentSlot.Cloak => ObjType.Abody,
+                            EquipmentSlot.Waist => ObjType.Waist,
+                            EquipmentSlot.Face => ObjType.Face,
+                            _ => ObjType.Body
+                        },
+                        Attack = unequipped.WeaponPower,
+                        Armor = unequipped.ArmorClass + unequipped.ShieldBonus,
+                        Defence = unequipped.DefenceBonus,
+                        Strength = unequipped.StrengthBonus,
+                        Dexterity = unequipped.DexterityBonus,
+                        Wisdom = unequipped.WisdomBonus,
+                        HP = unequipped.MaxHPBonus,
+                        Mana = unequipped.MaxManaBonus,
+                        Value = unequipped.Value,
+                        IsCursed = unequipped.IsCursed
+                    };
+                    player.Inventory.Add(legacyItem);
+                    player.RecalculateStats();
+
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"Unequipped {unequipped.Name}.");
                     terminal.SetColor("gray");
-                    terminal.WriteLine("(Item returned to shop inventory)");
+                    terminal.WriteLine("(Item returned to your backpack)");
                     await Task.Delay(1500);
                 }
             }
@@ -861,10 +896,13 @@ namespace UsurperRemake.Systems
                             EquipmentSlot.Head => ObjType.Head,
                             EquipmentSlot.Arms => ObjType.Arms,
                             EquipmentSlot.Legs => ObjType.Legs,
-                            EquipmentSlot.Hands => ObjType.Arms,
-                            EquipmentSlot.Feet => ObjType.Legs,
+                            EquipmentSlot.Hands => ObjType.Hands,
+                            EquipmentSlot.Feet => ObjType.Feet,
                             EquipmentSlot.LFinger or EquipmentSlot.RFinger => ObjType.Fingers,
                             EquipmentSlot.Neck or EquipmentSlot.Neck2 => ObjType.Neck,
+                            EquipmentSlot.Cloak => ObjType.Abody,
+                            EquipmentSlot.Waist => ObjType.Waist,
+                            EquipmentSlot.Face => ObjType.Face,
                             _ => ObjType.Body
                         },
                         Attack = equipment.WeaponPower,

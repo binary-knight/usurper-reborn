@@ -2672,6 +2672,7 @@ public partial class CombatEngine
                         global::ObjType.Neck => EquipmentSlot.Neck,
                         global::ObjType.Face => EquipmentSlot.Face,
                         global::ObjType.Fingers => EquipmentSlot.LFinger,
+                        global::ObjType.Abody => EquipmentSlot.Cloak,
                         _ => EquipmentSlot.Body
                     };
 
@@ -2812,6 +2813,7 @@ public partial class CombatEngine
             global::ObjType.Neck => EquipmentSlot.Neck,
             global::ObjType.Face => EquipmentSlot.Face,
             global::ObjType.Fingers => EquipmentSlot.LFinger,
+            global::ObjType.Abody => EquipmentSlot.Cloak,
             _ => EquipmentSlot.Body
         };
 

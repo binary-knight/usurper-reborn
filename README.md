@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.25.11 - SysOp Console
+## ALPHA v0.25.12 - SysOp Console
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -614,4 +614,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.25.11 - SysOp Console
+**Status**: ALPHA v0.25.12 - SysOp Console

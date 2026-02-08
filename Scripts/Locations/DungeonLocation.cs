@@ -2008,11 +2008,10 @@ public class DungeonLocation : BaseLocation
             else
             {
                 terminal.SetColor("gray");
-                // Floor 0 means it's hidden somewhere in town - let the hint guide them
-                string locationText = seal.DungeonFloor == 0 ? "Hidden in Town" : $"Dungeon Floor {seal.DungeonFloor}";
+                string locationText = seal.DungeonFloor == 0 ? "Hidden somewhere in town" : "Hidden in the dungeon depths";
                 terminal.WriteLine($"  [ ] {seal.Name} - {locationText}");
                 terminal.SetColor("dark_cyan");
-                terminal.WriteLine($"      Hint: {seal.LocationHint}");
+                terminal.WriteLine($"      {seal.LocationHint}");
             }
         }
         terminal.WriteLine("");
@@ -2138,9 +2137,9 @@ public class DungeonLocation : BaseLocation
             {
                 steps.Add($"- Find the {nextSeal.Name} (hidden somewhere in town)");
             }
-            else if (nextSeal.DungeonFloor <= level + 10)
+            else
             {
-                steps.Add($"- Find the {nextSeal.Name} on dungeon floor {nextSeal.DungeonFloor}");
+                steps.Add($"- Seek the {nextSeal.Name} in the dungeon depths");
             }
         }
 
@@ -2230,11 +2229,11 @@ public class DungeonLocation : BaseLocation
 
         foreach (var (godType, godName, floor) in gods)
         {
-            if (story.OldGodStates.TryGetValue(godType, out var state))
+            if (story.OldGodStates.TryGetValue(godType, out var state) &&
+                state.Status != GodStatus.Unknown)
             {
                 string statusText = state.Status switch
                 {
-                    GodStatus.Unknown => "Unknown",
                     GodStatus.Imprisoned => "Imprisoned",
                     GodStatus.Dormant => "Dormant",
                     GodStatus.Dying => "Dying",
@@ -2253,7 +2252,6 @@ public class DungeonLocation : BaseLocation
                 {
                     GodStatus.Allied or GodStatus.Saved => "green",
                     GodStatus.Defeated or GodStatus.Consumed => "red",
-                    GodStatus.Unknown => "gray",
                     _ => "yellow"
                 };
 
@@ -2263,7 +2261,7 @@ public class DungeonLocation : BaseLocation
             else
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  Floor {floor}: {godName} - Unknown");
+                terminal.WriteLine($"  ???: Something stirs in the depths...");
             }
         }
     }

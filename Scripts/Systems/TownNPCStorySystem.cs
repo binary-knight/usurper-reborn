@@ -567,10 +567,10 @@ namespace UsurperRemake.Systems
                 return false; // Choice wasn't made
             }
 
-            // Next visit triggers - met if we're past the previous stage
+            // Next visit triggers - only met if a previous stage has been completed
             if (trigger.Contains("Next visit"))
             {
-                return true;
+                return state.CompletedStages.Count > 0;
             }
 
             // "After X" triggers - check if a specific choice was made or stage completed
@@ -783,14 +783,27 @@ namespace UsurperRemake.Systems
             }
 
             // Random chance - checked LAST so other conditions are verified first
+            // Only rolls once per game day to prevent re-rolling on every location visit
             if (trigger.Contains("Random"))
             {
                 hasAnyCondition = true;
-                // Only roll if all other conditions are met
                 if (allConditionsMet)
                 {
-                    if (new Random().Next(100) >= 30) // 30% chance
-                        allConditionsMet = false;
+                    int currentDay = DailySystemManager.Instance?.CurrentDay ?? 0;
+                    if (state.LastRandomCheckDay == currentDay)
+                    {
+                        // Already rolled today - use cached result
+                        if (!state.RandomCheckPassedToday)
+                            allConditionsMet = false;
+                    }
+                    else
+                    {
+                        // New day - roll once and cache the result
+                        state.LastRandomCheckDay = currentDay;
+                        state.RandomCheckPassedToday = new Random().Next(100) < 30; // 30% chance
+                        if (!state.RandomCheckPassedToday)
+                            allConditionsMet = false;
+                    }
                 }
             }
 
@@ -959,6 +972,8 @@ namespace UsurperRemake.Systems
         public HashSet<int> CompletedStages { get; set; } = new();
         public Dictionary<int, string> ChoicesMade { get; set; } = new();
         public Dictionary<int, int> StageCompletedOnDay { get; set; } = new(); // Track when each stage was completed
+        public int LastRandomCheckDay { get; set; } = -1; // Limit random triggers to once per game day
+        public bool RandomCheckPassedToday { get; set; } = false; // Result of today's random check
         public bool IsCompleted => CurrentStage >= 99;
     }
 

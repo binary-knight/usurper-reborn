@@ -1309,7 +1309,8 @@ namespace UsurperRemake.Systems
                 Effects = new List<DialogueEffect>
                 {
                     new() { Type = EffectType.SetStoryFlag, StringValue = "veloura_spared" },
-                    new() { Type = EffectType.RecordChoice, StringValue = "veloura_fate", StringValue2 = "saved" }
+                    new() { Type = EffectType.RecordChoice, StringValue = "veloura_fate", StringValue2 = "saved" },
+                    new() { Type = EffectType.CollectWaveFragment, StringValue = "TheCorruption" }
                 }
             };
             tree.AllNodes[savePromise.Id] = savePromise;
@@ -1494,7 +1495,8 @@ namespace UsurperRemake.Systems
                 {
                     new() { Type = EffectType.SetStoryFlag, StringValue = "thorgrim_combat_start" },
                     new() { Type = EffectType.SetStoryFlag, StringValue = "thorgrim_broken_logic" },
-                    new() { Type = EffectType.AddChivalry, IntValue = 30 }
+                    new() { Type = EffectType.AddChivalry, IntValue = 30 },
+                    new() { Type = EffectType.CollectWaveFragment, StringValue = "TheSevenDrops" }
                 }
             };
             tree.AllNodes[questionLaws.Id] = questionLaws;
@@ -1695,7 +1697,8 @@ namespace UsurperRemake.Systems
                 {
                     new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_pact_sealed" },
                     new() { Type = EffectType.RecordChoice, StringValue = "noctura_fate", StringValue2 = "allied" },
-                    new() { Type = EffectType.GiveItem, StringValue = "Shadow Cloak" }
+                    new() { Type = EffectType.GiveItem, StringValue = "Shadow Cloak" },
+                    new() { Type = EffectType.CollectWaveFragment, StringValue = "ManwesChoice" }
                 }
             };
             tree.AllNodes[deal.Id] = deal;

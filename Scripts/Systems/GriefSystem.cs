@@ -296,6 +296,9 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("\"Let them go downstream.\"");
                 terminal.WriteLine("\"They are waiting for you at the sea.\"");
                 terminal.WriteLine("");
+
+                // The river metaphor - understanding letting go
+                OceanPhilosophySystem.Instance.CollectFragment(WaveFragment.TheForgetting);
             }
             else if (grief.ResurrectionAttempts >= 5)
             {
@@ -312,6 +315,9 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("\"They changed you. That change is permanent.\"");
                 terminal.WriteLine("\"In that way, they are immortal.\"");
+
+                // The final understanding - love as a choice
+                OceanPhilosophySystem.Instance.CollectFragment(WaveFragment.TheChoice);
                 terminal.WriteLine("\"Stop trying to bring them back.\"");
                 terminal.WriteLine("\"Start carrying them forward.\"");
                 terminal.WriteLine("");

@@ -200,6 +200,12 @@ public class NPCMaintenanceEngine : Node
     
     private bool IsNPCOnlyGang(List<NPC> npcs, string gangName)
     {
+        // Never treat the player's team as NPC-only (player isn't in the NPC list)
+        var player = GameEngine.Instance?.CurrentPlayer as Player;
+        if (player != null && !string.IsNullOrEmpty(player.Team) &&
+            player.Team.Equals(gangName, StringComparison.OrdinalIgnoreCase))
+            return false;
+
         var members = npcs.Where(n => n.Team == gangName);
         return members.Any() && members.All(n => n.AI == CharacterAI.Computer);
     }
@@ -468,8 +474,16 @@ public class NPCMaintenanceEngine : Node
     /// </summary>
     private async Task ProcessGangLoyalty(List<NPC> npcs)
     {
+        // Get the player's team name so we can protect player team members
+        var currentPlayer = GameEngine.Instance?.CurrentPlayer as Player;
+        string? playerTeam = (!string.IsNullOrEmpty(currentPlayer?.Team)) ? currentPlayer.Team : null;
+
         foreach (var npc in npcs.Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive))
         {
+            // Never remove NPCs from the player's team via world simulation
+            if (playerTeam != null && npc.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             var loyalty = CalculateNPCLoyalty(npc);
 
             // Very low loyalty - potential defection
@@ -513,9 +527,13 @@ public class NPCMaintenanceEngine : Node
                 // NPC contributes less to gang activities
                 npc.Memory?.AddMemory("Feeling disloyal to gang", "gang", DateTime.Now);
             }
-            // High loyalty - potential recruitment
+            // High loyalty - potential recruitment (NPC gangs only, not player teams)
             else if (loyalty > 80 && random.Next(100) < 10)
             {
+                // Don't let NPCs autonomously recruit into the player's team
+                if (playerTeam != null && npc.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 // Try to recruit a solo NPC
                 var recruit = npcs.FirstOrDefault(n =>
                     string.IsNullOrEmpty(n.Team) &&
@@ -571,8 +589,13 @@ public class NPCMaintenanceEngine : Node
 
     private string? FindBetterGang(NPC npc, List<NPC> allNpcs)
     {
+        // Exclude the player's team - NPCs shouldn't autonomously defect into it
+        var player = GameEngine.Instance?.CurrentPlayer as Player;
+        string? playerTeam = (!string.IsNullOrEmpty(player?.Team)) ? player.Team : null;
+
         var gangs = allNpcs
-            .Where(n => !string.IsNullOrEmpty(n.Team) && n.Team != npc.Team && n.IsAlive)
+            .Where(n => !string.IsNullOrEmpty(n.Team) && n.Team != npc.Team && n.IsAlive &&
+                        !(playerTeam != null && n.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase)))
             .GroupBy(n => n.Team)
             .Where(g => g.Count() >= 2);
 
