@@ -60,6 +60,18 @@ public partial class TerminalEmulator : Control
         { "bright_cyan", Color.FromHtml("#60FFFF") }
     };
     
+    /// <summary>
+    /// Returns true when running in BBS socket mode (non-local, non-stdio).
+    /// In this case, all I/O must go through BBSTerminalAdapter → SocketTerminal
+    /// instead of Console, because Console output goes to the hidden local window.
+    /// </summary>
+    private bool ShouldUseBBSAdapter()
+    {
+        return display == null
+            && BBSTerminalAdapter.Instance != null
+            && DoorMode.SessionInfo?.CommType != ConnectionType.Local;
+    }
+
     public override void _Ready()
     {
         Instance = this; // Set static instance for compatibility
@@ -118,6 +130,11 @@ public partial class TerminalEmulator : Control
             string processedText = ConvertSimplifiedColorToBBCode(text);
             string formattedText = $"[color={color}]{processedText}[/color]";
             display.Text += formattedText + "\n";
+        }
+        else if (ShouldUseBBSAdapter())
+        {
+            // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
+            BBSTerminalAdapter.Instance!.WriteLine(text, color);
         }
         else
         {
@@ -308,6 +325,11 @@ public partial class TerminalEmulator : Control
 
             display.AppendText($"[color=#{colorCode}]{text}[/color]");
         }
+        else if (ShouldUseBBSAdapter())
+        {
+            // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
+            BBSTerminalAdapter.Instance!.Write(text, effectiveColor);
+        }
         else if (DoorMode.IsInDoorMode)
         {
             // In door mode, use ANSI escape codes since Console.ForegroundColor doesn't work
@@ -481,6 +503,11 @@ public partial class TerminalEmulator : Control
         {
             display.Clear();
         }
+        else if (ShouldUseBBSAdapter())
+        {
+            // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
+            BBSTerminalAdapter.Instance!.ClearScreen();
+        }
         else if (DoorMode.IsInDoorMode)
         {
             // In BBS door mode, use ANSI escape codes instead of Console.Clear()
@@ -513,18 +540,24 @@ public partial class TerminalEmulator : Control
     
     public async Task<string> GetInput(string prompt = "> ")
     {
+        // BBS socket mode - delegate entirely to BBSTerminalAdapter which reads from socket
+        if (ShouldUseBBSAdapter())
+        {
+            return await BBSTerminalAdapter.Instance!.GetInput(prompt);
+        }
+
         Write(prompt, "bright_white");
-        
+
         // If running inside Godot (display created) use the LineEdit, otherwise Console.ReadLine
         if (inputLine != null && display != null)
         {
         inputLine.Clear();
         inputLine.Visible = true;
         inputLine.GrabFocus();
-        
+
         inputAwaiter = new TaskCompletionSource<string>();
         var result = await inputAwaiter.Task;
-        
+
         inputLine.Visible = false;
         WriteLine(result, "cyan");
             return result;
@@ -672,6 +705,10 @@ public partial class TerminalEmulator : Control
     public void SetColor(string color)
     {
         currentColor = color;
+        if (ShouldUseBBSAdapter())
+        {
+            BBSTerminalAdapter.Instance!.SetColor(color);
+        }
     }
     
     public async Task<string> GetKeyInput()
@@ -682,9 +719,14 @@ public partial class TerminalEmulator : Control
             var input = await GetInput("");
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }
+        else if (ShouldUseBBSAdapter())
+        {
+            // BBS socket mode - read key from socket via BBSTerminalAdapter
+            return await BBSTerminalAdapter.Instance!.GetKeyInput();
+        }
         else if (DoorMode.IsInDoorMode)
         {
-            // BBS door mode - use line input since ReadKey doesn't work with redirected I/O
+            // BBS door mode (stdio) - use line input since ReadKey doesn't work with redirected I/O
             var input = await GetInput("");
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }
