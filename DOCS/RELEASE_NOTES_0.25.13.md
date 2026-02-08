@@ -4,13 +4,17 @@
 
 ### EleBBS Socket Connection Fix
 - **EleBBS door mode now works**: EleBBS passes valid socket handles with overlapped (async) I/O, but three issues prevented the game from using them:
-  - **Zero-length test write killed the connection**: The socket validation used `_stream.Write(bytes, 0, 0)` which throws on overlapped socket handles even when the socket is valid. Replaced with an IAC NOP (telnet no-op) which actually tests the connection without side effects.
+  - **Zero-length test write killed the connection**: The socket validation used `_stream.Write(bytes, 0, 0)` which throws on overlapped socket handles even when the socket is valid. Replaced with `Socket.Poll(SelectMode.SelectWrite)` which verifies the socket without sending any bytes - safe for both telnet and SSH.
   - **Raw handle fallback assumed synchronous I/O**: The `FileStream` fallback used `isAsync: false`, but EleBBS opens sockets for overlapped I/O. Now tries sync first, then falls back to async mode.
   - **Socket init returned success when broken**: `Initialize()` returned `true` even when both socket and raw handle failed, causing the game to silently fall through to local `Console.Write` - remote users saw nothing. Now properly returns `false` so the game can fall back to local console mode with appropriate error messaging.
 - **Verbose mode no longer blocks BBS connections**: Removed 8 intermediate "Press Enter to continue" pauses from `--verbose` debug output. These required the sysop to blindly press Enter multiple times, during which the telnet connection could time out (one sysop's connection died after 4 minutes of pauses). Now only pauses once at the very end of initialization so the sysop can read all diagnostics before the game starts.
 
 ### BBS Socket Mode Output Routing Fix
 - **Game output now reaches remote BBS users in socket mode**: The entire game engine used `TerminalEmulator` which always wrote to `Console.Write`/`Console.ReadLine`. In socket mode (EleBBS, Mystic, etc.), `Console` output goes to the hidden local console window, not to the remote user over the socket. `BBSTerminalAdapter` had the correct socket routing through `SocketTerminal`, but was never wired into the game engine. Now `TerminalEmulator` detects BBS socket mode and delegates all output (`WriteLine`, `Write`, `ClearScreen`), input (`GetInput`, `GetKeyInput`), and color (`SetColor`) operations through `BBSTerminalAdapter`, which routes them over the socket to the remote user.
+
+### SSH/Encrypted Transport Auto-Detection
+- **Mystic BBS over SSH now works**: When a BBS handles SSH (or TLS) encryption, it passes the raw TCP socket handle in DOOR32.SYS. Writing directly to this socket bypasses the encryption layer, causing SSH clients to receive unencrypted bytes and report "Bad packet length" errors. The game now auto-detects when stdin/stdout are redirected (which all BBS software does for encrypted transports) and automatically switches to Standard I/O mode. This routes all game output through the BBS's transport layer, which handles encryption transparently. Works for Mystic, and any other BBS software that uses SSH or TLS.
+- **SSH-safe socket initialization**: Socket verification no longer sends any bytes during initialization. Previously used IAC NOP (telnet no-op bytes), which would corrupt SSH streams. Now uses `Socket.Poll(SelectMode.SelectWrite)` for zero-byte verification. Telnet negotiation (WILL ECHO, WILL SGA) is only sent for confirmed TCP sockets, not for pipes or raw handles that might be SSH-wrapped.
 
 ### Telnet Keystroke Echo Fix
 - **Keystrokes now visible in BBS socket mode**: The telnet negotiation handler was refusing all options, including ECHO and SGA (Suppress Go-Ahead). When the client asked "DO ECHO?", the game responded "WON'T ECHO", telling the client the server won't echo keystrokes. But the game actually does echo in its line-reading code, creating a mismatch that left users unable to see what they type. Now the game proactively sends "WILL ECHO" and "WILL SGA" after socket initialization, and correctly accepts these options during negotiation. This tells telnet clients to rely on server-side echo, which the game provides character-by-character during input.
@@ -24,7 +28,7 @@
 
 ### Files Changed
 - `TerminalEmulator.cs` - Added BBS socket mode delegation: all I/O routes through BBSTerminalAdapter when CommType != Local
-- `SocketTerminal.cs` - Fixed test write (IAC NOP instead of zero-length); async raw handle fallback; proper failure return; added telnet WILL ECHO + WILL SGA negotiation; fixed negotiation handler to accept ECHO and SGA options
-- `DoorMode.cs` - Removed 8 blocking verbose pauses; kept single final pause for diagnostics
+- `SocketTerminal.cs` - SSH-safe socket verification (Socket.Poll instead of IAC NOP); async raw handle fallback; proper failure return; telnet WILL ECHO + WILL SGA negotiation (TCP sockets only); fixed negotiation handler to accept ECHO and SGA options
+- `DoorMode.cs` - Auto-detect redirected I/O for SSH/encrypted transports; removed 8 blocking verbose pauses; kept single final pause; added Mystic BBS help section
 - `GriefSystem.cs` - Added CollectFragment calls for 4th and 5th resurrection attempts
 - `DialogueSystem.cs` - Added CollectWaveFragment effects to Veloura, Thorgrim, and Noctura dialogue trees

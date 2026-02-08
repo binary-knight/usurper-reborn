@@ -372,6 +372,25 @@ namespace UsurperRemake.BBS
                     }
                 }
 
+                // Auto-detect redirected I/O (handles Mystic SSH and other BBS software)
+                // When a BBS redirects stdin/stdout, it expects the door to use them.
+                // The socket handle in DOOR32.SYS may be the raw TCP socket (pre-encryption),
+                // and writing directly to it would bypass SSH/TLS encryption, corrupting the stream.
+                // Using stdio mode routes I/O through the BBS's transport layer instead.
+                if (!_forceStdio && (Console.IsInputRedirected || Console.IsOutputRedirected))
+                {
+                    _forceStdio = true;
+                    Console.Error.WriteLine("Detected redirected I/O - automatically using Standard I/O mode");
+                    Console.Error.WriteLine("(BBS is handling the transport layer - stdin/stdout will be used)");
+                    if (_verboseMode)
+                    {
+                        Console.Error.WriteLine($"[VERBOSE] Console.IsInputRedirected={Console.IsInputRedirected}");
+                        Console.Error.WriteLine($"[VERBOSE] Console.IsOutputRedirected={Console.IsOutputRedirected}");
+                        Console.Error.WriteLine("[VERBOSE] This typically means SSH, TLS, or pipe-based transport.");
+                        Console.Error.WriteLine("[VERBOSE] Socket I/O would bypass encryption. Using stdio instead.");
+                    }
+                }
+
                 // If --stdio flag was used (or auto-detected), force console I/O mode
                 // This is for Synchronet's "Standard" I/O mode where stdin/stdout are redirected
                 if (_forceStdio)
@@ -560,6 +579,11 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  Command: UsurperReborn --door32 *N\\door32.sys");
             Console.WriteLine("  Drop File Type: Door32.sys");
             Console.WriteLine("  Console window is automatically hidden in socket mode");
+            Console.WriteLine("");
+            Console.WriteLine("For Mystic BBS (auto-detected):");
+            Console.WriteLine("  Command: UsurperReborn --door32 %f");
+            Console.WriteLine("  Works with both telnet and SSH connections");
+            Console.WriteLine("  SSH connections auto-detected via redirected I/O");
             Console.WriteLine("");
             Console.WriteLine("Troubleshooting:");
             Console.WriteLine("  If output shows locally but not remotely:");
