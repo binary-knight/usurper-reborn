@@ -386,6 +386,11 @@ namespace UsurperRemake.BBS
                     return false;
                 }
 
+                // Send telnet negotiation: WILL ECHO + WILL SGA (Suppress Go-Ahead)
+                // This tells the telnet client: "I will echo your keystrokes" and
+                // "I support character-at-a-time mode" - essential for BBS door games
+                SendTelnetNegotiation();
+
                 return true;
             }
             catch (Exception ex)
@@ -572,6 +577,10 @@ namespace UsurperRemake.BBS
                 }
 
                 Console.Error.WriteLine("[SOCKET] Using raw handle I/O mode");
+
+                // Send telnet negotiation for raw handle mode too
+                SendTelnetNegotiation();
+
                 return true;
             }
             catch (Exception ex)
@@ -1062,6 +1071,45 @@ namespace UsurperRemake.BBS
         /// <summary>
         /// Handle telnet IAC (Interpret As Command) sequences
         /// </summary>
+        // Telnet option constants
+        private const byte TELOPT_ECHO = 1;   // Echo
+        private const byte TELOPT_SGA = 3;    // Suppress Go-Ahead
+
+        /// <summary>
+        /// Send initial telnet negotiation after socket connection.
+        /// Tells the client: "I will echo your keystrokes" and "I support character-at-a-time mode"
+        /// </summary>
+        private void SendTelnetNegotiation()
+        {
+            try
+            {
+                // IAC WILL ECHO (255, 251, 1) - Server will echo keystrokes
+                // IAC WILL SGA  (255, 251, 3) - Suppress Go-Ahead (character-at-a-time mode)
+                var negotiation = new byte[]
+                {
+                    0xFF, 0xFB, TELOPT_ECHO,  // IAC WILL ECHO
+                    0xFF, 0xFB, TELOPT_SGA    // IAC WILL SGA
+                };
+
+                if (_usingRawHandle && _rawHandleStream != null)
+                {
+                    _rawHandleStream.Write(negotiation, 0, negotiation.Length);
+                    _rawHandleStream.Flush();
+                }
+                else if (_stream != null)
+                {
+                    _stream.Write(negotiation, 0, negotiation.Length);
+                    _stream.Flush();
+                }
+
+                LogVerbose("Sent telnet WILL ECHO + WILL SGA negotiation");
+            }
+            catch (Exception ex)
+            {
+                LogVerbose($"Telnet negotiation send failed: {ex.Message}");
+            }
+        }
+
         private async Task HandleTelnetCommandAsync()
         {
             if (_stream == null) return;
@@ -1079,11 +1127,27 @@ namespace UsurperRemake.BBS
 
             switch (cmd)
             {
-                case 251: // WILL - respond with DON'T
-                    await WriteRawAsync($"\xff\xfe{(char)option}"); // IAC DON'T option
+                case 251: // WILL - client offers to do something
+                    if (option == TELOPT_SGA)
+                    {
+                        // Accept SGA from client (character-at-a-time mode)
+                        await WriteRawAsync($"\xff\xfd{(char)option}"); // IAC DO option
+                    }
+                    else
+                    {
+                        await WriteRawAsync($"\xff\xfe{(char)option}"); // IAC DON'T option
+                    }
                     break;
-                case 253: // DO - respond with WON'T
-                    await WriteRawAsync($"\xff\xfc{(char)option}"); // IAC WON'T option
+                case 253: // DO - client asks us to do something
+                    if (option == TELOPT_ECHO || option == TELOPT_SGA)
+                    {
+                        // Accept ECHO and SGA - we handle these
+                        await WriteRawAsync($"\xff\xfb{(char)option}"); // IAC WILL option
+                    }
+                    else
+                    {
+                        await WriteRawAsync($"\xff\xfc{(char)option}"); // IAC WON'T option
+                    }
                     break;
             }
         }
