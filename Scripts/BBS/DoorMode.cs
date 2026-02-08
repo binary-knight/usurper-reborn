@@ -150,8 +150,7 @@ namespace UsurperRemake.BBS
                     Console.Error.WriteLine($"Could not parse drop file: {path}");
                     if (_verboseMode)
                     {
-                        Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
-                        Console.ReadLine();
+                        Console.Error.WriteLine("[VERBOSE] (continuing...)");
                     }
                     return false;
                 }
@@ -167,8 +166,7 @@ namespace UsurperRemake.BBS
                 Console.Error.WriteLine($"Error loading drop file: {ex.Message}");
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
-                    Console.ReadLine();
+                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
                 }
                 return false;
             }
@@ -212,8 +210,7 @@ namespace UsurperRemake.BBS
                 if (!File.Exists(actualPath))
                 {
                     Console.Error.WriteLine($"[VERBOSE] Drop file not found: {actualPath}");
-                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
-                    Console.ReadLine();
+                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
                     return;
                 }
 
@@ -232,8 +229,7 @@ namespace UsurperRemake.BBS
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[VERBOSE] Error reading drop file: {ex.Message}");
-                Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
-                Console.ReadLine();
+                Console.Error.WriteLine("[VERBOSE] (continuing...)");
             }
         }
 
@@ -260,8 +256,7 @@ namespace UsurperRemake.BBS
                 Console.Error.WriteLine($"Error loading DOOR32.SYS: {ex.Message}");
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
-                    Console.ReadLine();
+                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
                 }
                 return false;
             }
@@ -290,8 +285,7 @@ namespace UsurperRemake.BBS
                 Console.Error.WriteLine($"Error loading DOOR.SYS: {ex.Message}");
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
-                    Console.ReadLine();
+                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
                 }
                 return false;
             }
@@ -341,9 +335,7 @@ namespace UsurperRemake.BBS
                     Console.Error.WriteLine($"[VERBOSE]   SourceType: {_sessionInfo.SourceType}");
                     Console.Error.WriteLine($"[VERBOSE]   SourcePath: {_sessionInfo.SourcePath}");
                     Console.Error.WriteLine("");
-                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
-                    Console.ReadLine();
-                    Console.Error.WriteLine("[VERBOSE] Continuing after pause...");
+                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
                 }
 
                 if (_verboseMode)
@@ -409,8 +401,7 @@ namespace UsurperRemake.BBS
                         Console.Error.WriteLine("Falling back to local console mode");
                         if (_verboseMode)
                         {
-                            Console.Error.WriteLine("[VERBOSE] Socket initialization failed. Press Enter to continue...");
-                            Console.ReadLine();
+                            Console.Error.WriteLine("[VERBOSE] Socket initialization failed. (continuing...)");
                         }
                         _sessionInfo.CommType = ConnectionType.Local;
                     }
@@ -418,6 +409,14 @@ namespace UsurperRemake.BBS
 
                 // Pass _forceStdio to tell adapter to use ANSI codes instead of Console.ForegroundColor
                 _terminalAdapter = new BBSTerminalAdapter(_socketTerminal, _forceStdio);
+
+                // Final verbose pause - so sysop can read/copy all diagnostic output
+                if (_verboseMode)
+                {
+                    Console.Error.WriteLine("");
+                    Console.Error.WriteLine("[VERBOSE] === Initialization complete. Press Enter to continue... ===");
+                    Console.ReadLine();
+                }
 
                 // Auto-hide the console window in BBS socket mode (unless verbose mode is on for debugging)
                 // This prevents the door from showing a visible console window on Windows
@@ -448,8 +447,7 @@ namespace UsurperRemake.BBS
                 {
                     Console.Error.WriteLine($"[VERBOSE] Exception type: {ex.GetType().Name}");
                     Console.Error.WriteLine($"[VERBOSE] Stack trace: {ex.StackTrace}");
-                    Console.Error.WriteLine("[VERBOSE] Press Enter to continue...");
-                    Console.ReadLine();
+                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
                 }
                 return null;
             }

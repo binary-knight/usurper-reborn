@@ -347,11 +347,15 @@ namespace UsurperRemake.BBS
                 LogVerbose("Socket initialization complete - attempting test write");
 
                 // Try a test write to verify the socket works
+                // Use an actual IAC NOP (telnet no-op) which is invisible to terminal
+                // Avoid zero-length writes which fail on some overlapped socket implementations
                 bool testSucceeded = false;
                 try
                 {
-                    var testBytes = new byte[] { 0 }; // NUL character - invisible
-                    _stream.Write(testBytes, 0, 0); // Zero-length write to test
+                    // IAC NOP (0xFF 0xF1) is a telnet no-op - invisible to the terminal
+                    var testBytes = new byte[] { 0xFF, 0xF1 };
+                    _stream.Write(testBytes, 0, testBytes.Length);
+                    _stream.Flush();
                     LogVerbose("Test write succeeded");
                     testSucceeded = true;
                 }
@@ -367,19 +371,19 @@ namespace UsurperRemake.BBS
                     LogVerbose("Socket test failed, trying raw handle fallback...");
                     _stream?.Dispose();
                     _stream = null;
+                    _reader = null;
+                    _writer = null;
                     _socket = null;
 
                     if (TryInitializeRawHandle(_sessionInfo.SocketHandle))
                     {
                         return true;
                     }
-                }
 
-                // Pause in verbose mode so user can read socket diagnostics
-                if (VerboseLogging)
-                {
-                    Console.Error.WriteLine("[SOCKET] Socket initialization complete. Press Enter to continue...");
-                    Console.ReadLine();
+                    // Both socket and raw handle failed - initialization truly failed
+                    LogVerbose("Both socket and raw handle initialization failed");
+                    Console.Error.WriteLine("Socket I/O failed. Try using --stdio flag for Standard I/O mode.");
+                    return false;
                 }
 
                 return true;
@@ -510,8 +514,42 @@ namespace UsurperRemake.BBS
                 }
 
                 // Create FileStream for read/write
-                _rawHandleStream = new FileStream(safeHandle, FileAccess.ReadWrite, bufferSize: 1, isAsync: false);
-                LogVerbose($"FileStream created. CanRead={_rawHandleStream.CanRead}, CanWrite={_rawHandleStream.CanWrite}");
+                // Try sync first, then async mode (some BBS software uses overlapped I/O handles)
+                try
+                {
+                    _rawHandleStream = new FileStream(safeHandle, FileAccess.ReadWrite, bufferSize: 1, isAsync: false);
+                    LogVerbose($"FileStream created (sync mode). CanRead={_rawHandleStream.CanRead}, CanWrite={_rawHandleStream.CanWrite}");
+                }
+                catch (Exception syncEx)
+                {
+                    LogVerbose($"Sync FileStream failed: {syncEx.Message}");
+                    LogVerbose("Retrying with async mode (overlapped I/O handle)...");
+
+                    // Re-duplicate handle for async attempt since the sync attempt may have invalidated it
+                    if (duplicated)
+                    {
+                        safeHandle = new SafeFileHandle(IntPtr.Zero, false); // Release old
+                        duplicated = DuplicateHandle(
+                            GetCurrentProcess(),
+                            new IntPtr(handle),
+                            GetCurrentProcess(),
+                            out duplicatedHandle,
+                            0,
+                            false,
+                            DUPLICATE_SAME_ACCESS);
+                        if (duplicated)
+                        {
+                            safeHandle = new SafeFileHandle(duplicatedHandle, ownsHandle: true);
+                        }
+                        else
+                        {
+                            safeHandle = new SafeFileHandle(new IntPtr(handle), ownsHandle: false);
+                        }
+                    }
+
+                    _rawHandleStream = new FileStream(safeHandle, FileAccess.ReadWrite, bufferSize: 4096, isAsync: true);
+                    LogVerbose($"FileStream created (async mode). CanRead={_rawHandleStream.CanRead}, CanWrite={_rawHandleStream.CanWrite}");
+                }
 
                 _usingRawHandle = true;
 
