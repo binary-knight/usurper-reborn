@@ -632,7 +632,8 @@ public class CharacterCreationSystem
                 if (restrictedClasses.Contains(characterClass))
                 {
                     terminal.WriteLine("");
-                    terminal.WriteLine($"Sorry, {GameConfig.RaceNames[(int)race]} cannot be a {characterClass}!", "red");
+                    var article1 = "aeiouAEIOU".Contains(characterClass.ToString()[0]) ? "an" : "a";
+                    terminal.WriteLine($"Sorry, {GameConfig.RaceNames[(int)race]} cannot be {article1} {characterClass}!", "red");
                     if (GameConfig.RaceRestrictionReasons.ContainsKey(race))
                     {
                         terminal.WriteLine(GameConfig.RaceRestrictionReasons[race], "yellow");
@@ -643,7 +644,8 @@ public class CharacterCreationSystem
                 }
 
                 terminal.WriteLine("");
-                if (await ConfirmChoice($"Be a {characterClass}", false))
+                var article2 = "aeiouAEIOU".Contains(characterClass.ToString()[0]) ? "an" : "a";
+                if (await ConfirmChoice($"Be {article2} {characterClass}", false))
                 {
                     return characterClass;
                 }

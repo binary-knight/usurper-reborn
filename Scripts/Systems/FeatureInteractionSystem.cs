@@ -816,7 +816,8 @@ public class FeatureInteractionSystem
 
         var className = player.Class.ToString();
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"Your training as a {className} reveals something others would miss:");
+        var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
+        terminal.WriteLine($"Your training as {article} {className} reveals something others would miss:");
         terminal.WriteLine("");
         await Task.Delay(400);
 
