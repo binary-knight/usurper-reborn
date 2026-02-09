@@ -1,40 +1,52 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
-using System.Web;
+using UsurperRemake.BBS;
 using UsurperRemake.Systems;
 
 /// <summary>
-/// Bug reporting system that collects diagnostic info and opens GitHub Issues.
+/// Bug reporting system that collects diagnostic info and submits reports.
+/// - BBS users: saves locally + posts to Discord webhook
+/// - Local/Steam users: saves locally + posts to Discord + opens browser to GitHub Issues
 /// </summary>
 public static class BugReportSystem
 {
     private const string GitHubIssuesUrl = "https://github.com/binary-knight/usurper-reborn/issues/new";
+    private const string DiscordWebhookUrl = "https://discord.com/api/webhooks/1470239063574315102/YxbnkRF5VGRWSqS4xUZBtyuL9BjtsglHCnV4_L57QE3RySFySOMAtf3Pe3TrFOINkDDu";
+
+    private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 
     /// <summary>
-    /// Generate a bug report and open browser to GitHub Issues with pre-filled content.
+    /// Generate a bug report, save locally, post to Discord, and optionally open browser.
     /// </summary>
     public static async Task ReportBug(TerminalEmulator terminal, Character? player)
     {
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine("===============================================================================");
-        terminal.WriteLine("                              BUG REPORT                                        ");
-        terminal.WriteLine("===============================================================================");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════");
+        terminal.WriteLine("                         BUG REPORT");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════");
         terminal.SetColor("white");
         terminal.WriteLine("");
-        terminal.WriteLine("This will open your browser to create a GitHub Issue with diagnostic info.");
-        terminal.WriteLine("Please describe what happened and what you expected to happen.");
+        terminal.WriteLine("Describe the bug briefly. What happened? What did you expect?");
         terminal.WriteLine("");
 
         // Get bug description from user
         terminal.SetColor("cyan");
-        terminal.WriteLine("What went wrong? (Press Enter for a blank description)");
-        terminal.SetColor("white");
         var description = await terminal.GetInputAsync("> ");
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            terminal.WriteLine("Bug report cancelled.", "yellow");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
 
         terminal.WriteLine("");
         terminal.WriteLine("Collecting diagnostic information...", "gray");
@@ -42,55 +54,177 @@ public static class BugReportSystem
         // Collect diagnostic info
         var diagnostics = CollectDiagnostics(player);
 
-        // Build the issue body
-        var issueBody = BuildIssueBody(description, diagnostics);
+        // Always save locally
+        string localPath = SaveReportLocally(description, diagnostics);
 
-        // Build the URL with pre-filled content
-        var title = string.IsNullOrWhiteSpace(description)
-            ? "Bug Report"
-            : TruncateForTitle(description);
+        // Post to Discord webhook
+        bool discordSent = await PostToDiscord(description, diagnostics);
 
-        var url = BuildGitHubIssueUrl(title, issueBody);
-
-        // Copy to clipboard as backup
-        bool copiedToClipboard = TryCopyToClipboard(issueBody);
-
+        // Show results
         terminal.WriteLine("");
-        if (copiedToClipboard)
+        if (localPath != null)
         {
-            terminal.WriteLine("Report copied to clipboard as backup.", "green");
+            terminal.WriteLine($"Report saved to: bug_reports/", "green");
         }
 
-        // Try to open browser
-        bool browserOpened = TryOpenBrowser(url);
-
-        if (browserOpened)
+        if (discordSent)
         {
             terminal.SetColor("bright_green");
-            terminal.WriteLine("");
-            terminal.WriteLine("Browser opened! Please review and submit the issue.");
-            terminal.WriteLine("You may need to log in to GitHub if not already logged in.");
+            terminal.WriteLine("Report sent to the developer! Thank you for the feedback.");
         }
         else
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("");
-            terminal.WriteLine("Could not open browser automatically.");
-            terminal.WriteLine("");
-            terminal.WriteLine("Please visit:");
-            terminal.SetColor("cyan");
-            terminal.WriteLine("  https://github.com/binary-knight/usurper-reborn/issues/new");
-            terminal.SetColor("yellow");
-            terminal.WriteLine("");
-            if (copiedToClipboard)
+            terminal.WriteLine("Could not send report online (no internet?).");
+            if (localPath != null)
             {
-                terminal.WriteLine("The report is in your clipboard - paste it into the issue body.");
+                terminal.WriteLine("Your report was saved locally - the SysOp can forward it.");
             }
+        }
+
+        // For non-BBS users, also try browser
+        if (!DoorMode.IsInDoorMode)
+        {
+            var issueBody = BuildIssueBody(description, diagnostics);
+            var title = TruncateForTitle(description);
+            var url = BuildGitHubIssueUrl(title, issueBody);
+            TryCopyToClipboard(issueBody);
+            TryOpenBrowser(url);
         }
 
         terminal.SetColor("white");
         terminal.WriteLine("");
         await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Save the bug report to a local file in the bug_reports/ directory.
+    /// </summary>
+    private static string SaveReportLocally(string description, DiagnosticInfo info)
+    {
+        try
+        {
+            var reportsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bug_reports");
+            Directory.CreateDirectory(reportsDir);
+
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+            var playerName = info.PlayerName?.Replace(" ", "_") ?? "unknown";
+            var filename = $"bug_{timestamp}_{playerName}.txt";
+            var filepath = Path.Combine(reportsDir, filename);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("=== USURPER REBORN BUG REPORT ===");
+            sb.AppendLine($"Date: {info.Timestamp}");
+            sb.AppendLine($"Version: {info.GameVersion} ({info.VersionName})");
+            sb.AppendLine($"Platform: {info.Platform}");
+            sb.AppendLine($"Build: {(info.IsSteamBuild ? "Steam" : info.IsBBSDoor ? "BBS Door" : "Standard")}");
+            if (info.IsBBSDoor)
+            {
+                sb.AppendLine($"BBS: {info.BBSName}");
+                sb.AppendLine($"User: {info.PlayerName}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("=== DESCRIPTION ===");
+            sb.AppendLine(description);
+            sb.AppendLine();
+            if (info.PlayerLevel > 0)
+            {
+                sb.AppendLine("=== CHARACTER ===");
+                sb.AppendLine($"Level {info.PlayerLevel} {info.PlayerRace} {info.PlayerClass}");
+                sb.AppendLine($"HP: {info.CurrentHP}/{info.MaxHP}");
+                sb.AppendLine($"Location: {info.CurrentLocation}");
+                if (info.DungeonFloor > 0)
+                    sb.AppendLine($"Dungeon Floor: {info.DungeonFloor}");
+                sb.AppendLine($"Play Time: {info.TotalPlayTime}");
+                sb.AppendLine();
+            }
+            if (!string.IsNullOrEmpty(info.RecentLogEntries))
+            {
+                sb.AppendLine("=== RECENT DEBUG LOG ===");
+                sb.AppendLine(info.RecentLogEntries);
+            }
+
+            File.WriteAllText(filepath, sb.ToString());
+            DebugLogger.Instance?.LogInfo("BUG_REPORT", $"Bug report saved to {filepath}");
+            return filepath;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance?.LogError("BUG_REPORT", $"Failed to save bug report locally: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Post the bug report to a Discord webhook channel.
+    /// </summary>
+    private static async Task<bool> PostToDiscord(string description, DiagnosticInfo info)
+    {
+        try
+        {
+            var sb = new StringBuilder();
+
+            // Discord embed-style formatting
+            sb.AppendLine("**Bug Report** from Usurper Reborn");
+            sb.AppendLine("```");
+            sb.AppendLine($"Version:  {info.GameVersion}");
+            sb.AppendLine($"Platform: {info.Platform}");
+            sb.AppendLine($"Build:    {(info.IsSteamBuild ? "Steam" : info.IsBBSDoor ? "BBS Door" : "Standard")}");
+            if (info.IsBBSDoor)
+            {
+                sb.AppendLine($"BBS:      {info.BBSName}");
+                sb.AppendLine($"User:     {info.PlayerName}");
+            }
+            if (info.PlayerLevel > 0)
+            {
+                sb.AppendLine($"Player:   Lv.{info.PlayerLevel} {info.PlayerRace} {info.PlayerClass}");
+                sb.AppendLine($"Location: {info.CurrentLocation}{(info.DungeonFloor > 0 ? $" (Floor {info.DungeonFloor})" : "")}");
+            }
+            sb.AppendLine("```");
+            sb.AppendLine($"> {description}");
+
+            // Add recent log if available (truncated for Discord's 2000 char limit)
+            if (!string.IsNullOrEmpty(info.RecentLogEntries))
+            {
+                var logPreview = info.RecentLogEntries;
+                // Discord message limit is 2000 chars, leave room for the rest
+                int maxLogLength = 1500 - sb.Length;
+                if (maxLogLength > 100 && logPreview.Length > 0)
+                {
+                    if (logPreview.Length > maxLogLength)
+                        logPreview = logPreview.Substring(logPreview.Length - maxLogLength);
+                    sb.AppendLine("```");
+                    sb.AppendLine(logPreview);
+                    sb.AppendLine("```");
+                }
+            }
+
+            // Truncate to Discord's 2000 char limit
+            var content = sb.ToString();
+            if (content.Length > 1990)
+                content = content.Substring(0, 1987) + "...";
+
+            var payload = JsonSerializer.Serialize(new { content });
+
+            var httpContent = new StringContent(payload, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(DiscordWebhookUrl, httpContent);
+
+            if (response.IsSuccessStatusCode)
+            {
+                DebugLogger.Instance?.LogInfo("BUG_REPORT", "Bug report sent to Discord successfully");
+                return true;
+            }
+            else
+            {
+                DebugLogger.Instance?.LogWarning("BUG_REPORT", $"Discord webhook returned {response.StatusCode}");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance?.LogWarning("BUG_REPORT", $"Failed to send to Discord: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>
@@ -107,7 +241,12 @@ public static class BugReportSystem
             DotNetVersion = Environment.Version.ToString(),
             Is64Bit = Environment.Is64BitProcess,
             Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-            IsSteamBuild = IsSteamBuild()
+            IsSteamBuild = IsSteamBuild(),
+            IsBBSDoor = DoorMode.IsInDoorMode,
+            BBSName = DoorMode.SessionInfo?.BBSName ?? "",
+            PlayerName = DoorMode.IsInDoorMode
+                ? DoorMode.GetPlayerName()
+                : player?.Name ?? "Unknown"
         };
 
         if (player != null)
@@ -129,7 +268,7 @@ public static class BugReportSystem
     }
 
     /// <summary>
-    /// Build the issue body with all diagnostic info.
+    /// Build the issue body with all diagnostic info (for GitHub Issues).
     /// </summary>
     private static string BuildIssueBody(string description, DiagnosticInfo info)
     {
@@ -156,9 +295,14 @@ public static class BugReportSystem
         sb.AppendLine("| Property | Value |");
         sb.AppendLine("|----------|-------|");
         sb.AppendLine($"| Version | {info.GameVersion} ({info.VersionName}) |");
-        sb.AppendLine($"| Build Type | {(info.IsSteamBuild ? "Steam" : "Standard")} |");
+        sb.AppendLine($"| Build Type | {(info.IsSteamBuild ? "Steam" : info.IsBBSDoor ? "BBS Door" : "Standard")} |");
         sb.AppendLine($"| Platform | {info.Platform} |");
         sb.AppendLine($"| OS | {info.OSVersion} |");
+        if (info.IsBBSDoor)
+        {
+            sb.AppendLine($"| BBS | {info.BBSName} |");
+            sb.AppendLine($"| BBS User | {info.PlayerName} |");
+        }
         if (info.PlayerLevel > 0)
         {
             sb.AppendLine($"| Character | Level {info.PlayerLevel} {info.PlayerRace} {info.PlayerClass} |");
@@ -195,15 +339,11 @@ public static class BugReportSystem
     /// </summary>
     private static string BuildGitHubIssueUrl(string title, string body)
     {
-        // URL encode the parameters
         var encodedTitle = Uri.EscapeDataString(title);
         var encodedBody = Uri.EscapeDataString(body);
 
-        // GitHub has a URL length limit, so we may need to truncate
         var url = $"{GitHubIssuesUrl}?title={encodedTitle}&body={encodedBody}&labels=bug,in-game-report";
 
-        // Most browsers support URLs up to ~2000 chars, GitHub accepts longer
-        // but we'll truncate the body if needed
         if (url.Length > 8000)
         {
             var truncatedBody = body.Substring(0, Math.Min(body.Length, 3000)) + "\n\n_[Log truncated due to URL length]_";
@@ -223,7 +363,6 @@ public static class BugReportSystem
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                // Windows: use cmd /c start
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd",
@@ -261,7 +400,6 @@ public static class BugReportSystem
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                // Use clip.exe on Windows
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
@@ -281,7 +419,6 @@ public static class BugReportSystem
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                // Try xclip or xsel
                 try
                 {
                     var process = new Process
@@ -301,10 +438,7 @@ public static class BugReportSystem
                     process.WaitForExit(2000);
                     return true;
                 }
-                catch
-                {
-                    // xclip not available
-                }
+                catch { }
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
@@ -333,9 +467,6 @@ public static class BugReportSystem
         return false;
     }
 
-    /// <summary>
-    /// Get a platform string for diagnostics.
-    /// </summary>
     private static string GetPlatformString()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -347,9 +478,6 @@ public static class BugReportSystem
         return "Unknown";
     }
 
-    /// <summary>
-    /// Check if this is a Steam build.
-    /// </summary>
     private static bool IsSteamBuild()
     {
 #if STEAM_BUILD
@@ -359,16 +487,12 @@ public static class BugReportSystem
 #endif
     }
 
-    /// <summary>
-    /// Get the current dungeon floor if in dungeon.
-    /// </summary>
     private static int GetDungeonFloor(Character? player)
     {
         try
         {
             if (player != null && (GameLocation)player.Location == GameLocation.Dungeons)
             {
-                // Try to get dungeon floor from statistics
                 return player.Statistics?.DeepestDungeonLevel ?? 0;
             }
         }
@@ -376,9 +500,6 @@ public static class BugReportSystem
         return 0;
     }
 
-    /// <summary>
-    /// Get recent entries from the debug log file.
-    /// </summary>
     private static string GetRecentLogEntries(int lineCount)
     {
         try
@@ -393,19 +514,12 @@ public static class BugReportSystem
                 return string.Join("\n", recentLines);
             }
         }
-        catch
-        {
-            // Silently fail if we can't read the log
-        }
+        catch { }
         return "";
     }
 
-    /// <summary>
-    /// Truncate a string to be suitable for a GitHub issue title.
-    /// </summary>
     private static string TruncateForTitle(string text)
     {
-        // Clean up and truncate for title
         var cleaned = text.Replace("\n", " ").Replace("\r", " ").Trim();
         if (cleaned.Length > 80)
         {
@@ -414,9 +528,6 @@ public static class BugReportSystem
         return $"[Bug] {cleaned}";
     }
 
-    /// <summary>
-    /// Diagnostic information container.
-    /// </summary>
     private class DiagnosticInfo
     {
         public string GameVersion { get; set; } = "";
@@ -426,6 +537,9 @@ public static class BugReportSystem
         public string DotNetVersion { get; set; } = "";
         public bool Is64Bit { get; set; }
         public bool IsSteamBuild { get; set; }
+        public bool IsBBSDoor { get; set; }
+        public string BBSName { get; set; } = "";
+        public string PlayerName { get; set; } = "";
         public string Timestamp { get; set; } = "";
         public int PlayerLevel { get; set; }
         public string PlayerClass { get; set; } = "";

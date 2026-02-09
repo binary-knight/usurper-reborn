@@ -1169,12 +1169,14 @@ namespace UsurperRemake.BBS
 
         private string GetAnsiColorCode(string color)
         {
-            color = color.ToLowerInvariant().Replace("_", "");
+            color = color.ToLowerInvariant();
 
+            // Try exact match first (e.g., "bright_red", "dark_green")
             if (AnsiColors.TryGetValue(color, out var code))
                 return code;
 
-            // Also check with underscores
+            // Try without underscores (e.g., "brightred" → "bright_red" won't match,
+            // but "darkred" is in the dictionary directly)
             if (AnsiColors.TryGetValue(color.Replace("_", ""), out code))
                 return code;
 

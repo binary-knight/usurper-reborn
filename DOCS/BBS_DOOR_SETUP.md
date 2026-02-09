@@ -31,14 +31,19 @@ UsurperReborn --door32 <path-to-door32.sys>
 
 | BBS Software | I/O Mode | Auto-Detected? | Status |
 |--------------|----------|----------------|--------|
-| **Synchronet** | Standard I/O | ✅ Yes | ✅ Fully tested |
+| **Synchronet** | Standard I/O | ✅ Yes (by name) | ✅ Fully tested |
 | **EleBBS** | Socket | (default) | ✅ Fully tested |
-| **Mystic BBS** | Socket | (default) | Should work |
-| **WWIV** | Standard I/O | ✅ Yes | Should work |
-| **GameSrv** | Standard I/O | ✅ Yes | Should work |
-| **ENiGMA½** | Standard I/O | ✅ Yes | Should work |
+| **Mystic BBS (telnet)** | Socket | (default) | ✅ Fully tested |
+| **Mystic BBS (SSH)** | Standard I/O | ✅ Yes (redirected I/O) | ✅ Fully tested |
+| **WWIV** | Standard I/O | ✅ Yes (by name) | Should work |
+| **GameSrv** | Standard I/O | ✅ Yes (by name) | Should work |
+| **ENiGMA½** | Standard I/O | ✅ Yes (by name) | Should work |
 
-> **Auto-Detection:** The game reads the BBS name from DOOR32.SYS line 4 and automatically enables the correct I/O mode. No special flags needed!
+> **Auto-Detection:** The game uses two methods to auto-detect the correct I/O mode:
+> 1. **BBS name** (from DOOR32.SYS line 4): Synchronet, GameSrv, ENiGMA, and WWIV are detected by name
+> 2. **Redirected I/O**: If the BBS redirects stdin/stdout (e.g., for SSH or TLS connections), the game automatically uses Standard I/O mode
+>
+> No special flags needed! The same door configuration works for both telnet and SSH users.
 
 > **Windows Note:** The console window is automatically hidden when running in socket mode. Use `--verbose` to keep it visible for debugging.
 
@@ -136,7 +141,7 @@ If the door doesn't connect:
 
 ## Mystic BBS
 
-Mystic creates drop files in each node's temp directory (e.g., `c:\mystic\temp1\` for node 1).
+Mystic creates drop files in each node's temp directory (e.g., `c:\mystic\temp1\` for node 1). The same door configuration works for both telnet and SSH users - the game auto-detects SSH connections and switches to Standard I/O mode automatically.
 
 **Important Mystic variables:**
 - `%3` = Node number (NOT drop file path)
@@ -163,6 +168,10 @@ Data         : CD<c:\mystic\doors\usurper>UsurperReborn --door32 c:\mystic\temp%
 ```
 
 The `CD<path>` helper changes to the door directory before execution.
+
+### SSH Support
+
+No additional configuration needed. When a user connects via SSH, Mystic redirects stdin/stdout through the SSH encryption layer. The game detects this and automatically switches to Standard I/O mode, so all game output is properly encrypted.
 
 **Reference:** [Mystic BBS Wiki - Menu Commands](https://wiki.mysticbbs.com/doku.php?id=menu_commands)
 
@@ -336,8 +345,15 @@ This shows:
 
 #### Output shows on server console but not remotely
 - **Synchronet/WWIV/GameSrv/ENiGMA:** Should auto-detect. If not, add `--stdio`
-- **EleBBS/Mystic:** Socket mode should work. Use `--verbose` to debug.
+- **EleBBS:** Socket mode should work. Use `--verbose` to debug.
+- **Mystic (telnet):** Socket mode should work automatically.
+- **Mystic (SSH):** Auto-detects redirected I/O and switches to Standard I/O mode.
 - Verify BBS I/O Method matches expected mode
+
+#### "Bad packet length" error on SSH
+- This means raw data is being written to the SSH socket, bypassing encryption
+- The game should auto-detect SSH via redirected I/O. If not, add `--stdio`
+- Do NOT use socket mode with SSH connections
 
 ---
 
