@@ -193,6 +193,7 @@ namespace UsurperRemake.Systems
 
         // Equipment and items
         public long Healing { get; set; }  // CRITICAL: Healing potions count
+        public long ManaPotions { get; set; }  // Mana potions (bought at Magic Shop)
         public long WeapPow { get; set; }  // CRITICAL: Weapon power
         public long ArmPow { get; set; }   // CRITICAL: Armor power
         
@@ -561,6 +562,7 @@ namespace UsurperRemake.Systems
             get => IsCursed;
             set => IsCursed = value;
         }
+        public bool IsIdentified { get; set; } = true;  // Defaults to true for backwards compat
         public bool Shop { get; set; }
         public bool Dungeon { get; set; }
         public List<string> Description { get; set; } = new();

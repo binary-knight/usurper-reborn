@@ -708,6 +708,15 @@ public partial class GameEngine : Node
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("bright_cyan");
+            terminal.Write("B");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("BBS List - Play Usurper Reborn Online!");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_cyan");
             terminal.Write("C");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -752,6 +761,9 @@ public partial class GameEngine : Node
                     break;
                 case "H":
                     await UsurperHistorySystem.Instance.ShowHistory(terminal);
+                    break;
+                case "B":
+                    await ShowBBSList();
                     break;
                 case "C":
                     await ShowCredits();
@@ -1379,6 +1391,7 @@ public partial class GameEngine : Node
 
             // Equipment and items (CRITICAL FIXES)
             Healing = playerData.Healing,     // POTIONS
+            ManaPotions = playerData.ManaPotions, // MANA POTIONS
             WeapPow = playerData.WeapPow,     // WEAPON POWER
             ArmPow = playerData.ArmPow,       // ARMOR POWER
 
@@ -1571,6 +1584,7 @@ public partial class GameEngine : Node
                 MinLevel = itemData.MinLevel,
                 IsCursed = itemData.IsCursed,
                 Cursed = itemData.Cursed,
+                IsIdentified = itemData.IsIdentified,
                 Shop = itemData.Shop,
                 Dungeon = itemData.Dungeon,
                 Description = itemData.Description?.ToList() ?? new List<string>()
@@ -2856,6 +2870,62 @@ public partial class GameEngine : Node
     /// <summary>
     /// Display the credits screen
     /// </summary>
+    private async Task ShowBBSList()
+    {
+        terminal.ClearScreen();
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("+=============================================================================+");
+        terminal.SetColor("bright_white");
+        terminal.WriteLine("|                 BBS LIST - Play Usurper Reborn Online!                      |");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("+=============================================================================+");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  The following BBSes are running Usurper Reborn as a door game.");
+        terminal.WriteLine("  Connect via telnet or SSH to play online!");
+        terminal.WriteLine("");
+
+        // Column headers
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  BBS Name                       Software    Address");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("  ---------------------------------------------------------------------------");
+
+        // --- BBS Entries ---
+
+        terminal.SetColor("bright_white");
+        terminal.Write("  Shurato's Heavenly Sphere      ");
+        terminal.SetColor("gray");
+        terminal.Write("EleBBS      ");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("shsbbs.net");
+
+        // --- End BBS Entries ---
+
+        terminal.WriteLine("");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("  ---------------------------------------------------------------------------");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("  Are you a SysOp running Usurper Reborn on your BBS?");
+        terminal.SetColor("gray");
+        terminal.WriteLine("  Get listed here! Open an issue or discussion at:");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("    https://github.com/binary-knight/usurper-reborn");
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine("  Include your BBS name, address, and software. We'd love to add you!");
+        terminal.WriteLine("");
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("                         [Press Enter to return]");
+        await terminal.WaitForKey();
+    }
+
     private async Task ShowCredits()
     {
         terminal.ClearScreen();

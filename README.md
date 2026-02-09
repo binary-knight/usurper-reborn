@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.25.14 - BBS Door Mode
+## ALPHA v0.26.0 - Magic Shop Overhaul
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -346,6 +346,35 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### Completed in v0.26.0 - Magic Shop Overhaul
+
+**Magic Shop - Complete Overhaul:**
+- **Equipment Enchanting** - Enchant equipped weapons and armor with 9 tiers of enchantments (+stat, Divine Blessing, Ocean's Touch, Ward, Predator, Lifedrinker). Max 3 enchantments per item. Persists across save/load.
+- **Enchantment Removal** - Strip enchantments to re-enchant with different stats (50% of original cost)
+- **Modern Accessory Shop** - Buy rings, necklaces, and belts from the Equipment system with paginated category browser, rarity-colored listings, and upgrade/downgrade indicators
+- **Love Spells** - Cast enchantments on NPCs to improve relationships (4 tiers, respects daily cap, mana cost)
+- **Death Spells (Dark Arts)** - Kill NPCs via dark magic with alignment consequences (3 tiers, INT scaling with diminishing returns, protected NPCs immune)
+- **Mana Potions** - New consumable unique to Magic Shop. Combat integration lets players choose between healing and mana potions.
+- **Scrying Service** - Pay gold to reveal NPC details (class, level, alive/dead, relationship, personality traits)
+- **Wave Fragment: The Corruption** - New story content earned through the Magic Shop (requires Awakening 3+, 3+ fragments, death spell usage)
+- **Enhanced Shopkeeper Dialogue** - Class-specific, story-aware, alignment-reactive, awakening-aware conversation with Ravanella
+- **Loyalty Discount System** - 5%/10%/15% discounts based on total gold spent at Magic Shop
+- **8 New Achievements** - Apprentice Enchanter, Master Enchanter, Lovelorn Mage, Shadow Caster, Angel of Death, Magical Patron, The Corruption Remembered, Bejeweled
+- **5 New Statistics** - Enchantments applied, love/death spells cast, magic shop gold spent, accessories purchased
+
+**Unidentified Items System:**
+- Rare+ dungeon loot may drop unidentified (40% Rare, 60% Epic, 80% Legendary, 100% Artifact)
+- Mystery names by power level ("Ornate Unidentified Armor", "Shimmering Unidentified Ring")
+- Hidden stats until identified at Magic Shop (100 + level*50 gold)
+- Inventory display in magenta with "???" for unidentified items
+
+**Bug Fixes & Polish:**
+- Unicode rendering fix for BBS terminal compatibility
+- Healing potion duplicate display and price inconsistency fixes
+- Blocking Thread.Sleep converted to async Task.Delay for BBS compatibility
+- Dead code cleanup (~350 lines removed)
+- Cursed item exploit fix (can no longer drop, unequip, or sell cursed items)
+
 ### Completed in v0.25.14 - BBS Door Mode
 
 **BBS Compatibility:**
@@ -604,7 +633,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.25)
+### Known Issues (Alpha v0.26)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -619,4 +648,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.25.14 - BBS Door Mode
+**Status**: ALPHA v0.26.0 - Magic Shop Overhaul

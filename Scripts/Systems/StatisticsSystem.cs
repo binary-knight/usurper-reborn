@@ -67,6 +67,13 @@ public class PlayerStatistics
     public long TotalRomances { get; set; }
     public long TotalTeamBattles { get; set; }
 
+    // === MAGIC SHOP STATISTICS ===
+    public long TotalEnchantmentsApplied { get; set; }
+    public long TotalLoveSpellsCast { get; set; }
+    public long TotalDeathSpellsCast { get; set; }
+    public long TotalMagicShopGoldSpent { get; set; }
+    public long TotalAccessoriesPurchased { get; set; }
+
     // === SURVIVAL STATISTICS ===
     public long TotalHealingPotionsUsed { get; set; }
     public long TotalManaPotionsUsed { get; set; }
@@ -420,6 +427,50 @@ public class PlayerStatistics
     }
 
     /// <summary>
+    /// Record an enchantment applied at the Magic Shop
+    /// </summary>
+    public void RecordEnchantment(long goldSpent)
+    {
+        TotalEnchantmentsApplied++;
+        TotalMagicShopGoldSpent += goldSpent;
+    }
+
+    /// <summary>
+    /// Record a love spell cast at the Magic Shop
+    /// </summary>
+    public void RecordLoveSpellCast(long goldSpent)
+    {
+        TotalLoveSpellsCast++;
+        TotalMagicShopGoldSpent += goldSpent;
+    }
+
+    /// <summary>
+    /// Record a death spell cast at the Magic Shop
+    /// </summary>
+    public void RecordDeathSpellCast(long goldSpent)
+    {
+        TotalDeathSpellsCast++;
+        TotalMagicShopGoldSpent += goldSpent;
+    }
+
+    /// <summary>
+    /// Record a magic shop purchase (accessories, potions, etc.)
+    /// </summary>
+    public void RecordMagicShopPurchase(long goldSpent)
+    {
+        TotalMagicShopGoldSpent += goldSpent;
+    }
+
+    /// <summary>
+    /// Record an accessory purchased at the Magic Shop
+    /// </summary>
+    public void RecordAccessoryPurchase(long goldSpent)
+    {
+        TotalAccessoriesPurchased++;
+        TotalMagicShopGoldSpent += goldSpent;
+    }
+
+    /// <summary>
     /// Record a chest being opened
     /// </summary>
     public void RecordChestOpened()
@@ -567,6 +618,13 @@ public class PlayerStatistics
         TotalDiseasesCured = 0;
         TotalPoisonings = 0;
         TotalCursesBroken = 0;
+
+        // Magic Shop stats
+        TotalEnchantmentsApplied = 0;
+        TotalLoveSpellsCast = 0;
+        TotalDeathSpellsCast = 0;
+        TotalMagicShopGoldSpent = 0;
+        TotalAccessoriesPurchased = 0;
 
         // Time stats - keep CharacterCreated but reset play time
         TotalPlayTime = TimeSpan.Zero;

@@ -730,6 +730,107 @@ public static class AchievementSystem
             GoldReward = 100000,
             UnlockMessage = "You have done everything there is to do!"
         });
+
+        // ============ MAGIC SHOP ACHIEVEMENTS ============
+
+        Register(new Achievement
+        {
+            Id = "first_enchant",
+            Name = "Apprentice Enchanter",
+            Description = "Enchant an equipped item at the Magic Shop",
+            Category = AchievementCategory.Economy,
+            Tier = AchievementTier.Bronze,
+            PointValue = 10,
+            GoldReward = 500,
+            UnlockMessage = "Your gear glows with arcane power!"
+        });
+
+        Register(new Achievement
+        {
+            Id = "master_enchanter",
+            Name = "Master Enchanter",
+            Description = "Enchant 10 equipped items",
+            Category = AchievementCategory.Economy,
+            Tier = AchievementTier.Silver,
+            PointValue = 25,
+            GoldReward = 2000,
+            UnlockMessage = "Ravanella considers you a fellow artisan."
+        });
+
+        Register(new Achievement
+        {
+            Id = "love_magician",
+            Name = "Lovelorn Mage",
+            Description = "Cast 5 love spells",
+            Category = AchievementCategory.Social,
+            Tier = AchievementTier.Silver,
+            PointValue = 15,
+            GoldReward = 1000,
+            UnlockMessage = "The heart wants what magic commands."
+        });
+
+        Register(new Achievement
+        {
+            Id = "dark_magician",
+            Name = "Shadow Caster",
+            Description = "Cast your first death spell",
+            Category = AchievementCategory.Secret,
+            Tier = AchievementTier.Silver,
+            PointValue = 20,
+            GoldReward = 1500,
+            IsSecret = true,
+            UnlockMessage = "You have stepped into the darkness."
+        });
+
+        Register(new Achievement
+        {
+            Id = "angel_of_death",
+            Name = "Angel of Death",
+            Description = "Kill 5 NPCs via death spells",
+            Category = AchievementCategory.Secret,
+            Tier = AchievementTier.Gold,
+            PointValue = 50,
+            GoldReward = 5000,
+            IsSecret = true,
+            UnlockMessage = "Death follows in your wake."
+        });
+
+        Register(new Achievement
+        {
+            Id = "big_spender_magic",
+            Name = "Magical Patron",
+            Description = "Spend 100,000 gold at the Magic Shop",
+            Category = AchievementCategory.Economy,
+            Tier = AchievementTier.Gold,
+            PointValue = 30,
+            GoldReward = 5000,
+            UnlockMessage = "Ravanella names a shelf after you."
+        });
+
+        Register(new Achievement
+        {
+            Id = "corruption_fragment",
+            Name = "The Corruption Remembered",
+            Description = "Collect the Wave Fragment from Ravanella",
+            Category = AchievementCategory.Secret,
+            Tier = AchievementTier.Gold,
+            PointValue = 40,
+            GoldReward = 3000,
+            IsSecret = true,
+            UnlockMessage = "The corruption is not evil. It is forgetting."
+        });
+
+        Register(new Achievement
+        {
+            Id = "accessory_collector",
+            Name = "Bejeweled",
+            Description = "Wear rings in both finger slots and a necklace",
+            Category = AchievementCategory.Economy,
+            Tier = AchievementTier.Bronze,
+            PointValue = 10,
+            GoldReward = 500,
+            UnlockMessage = "You sparkle with magical accessories!"
+        });
     }
 
     /// <summary>

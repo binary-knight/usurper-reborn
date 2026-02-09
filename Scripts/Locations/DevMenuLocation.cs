@@ -1466,6 +1466,7 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("  [3] Spawn Healing Potions");
         terminal.WriteLine("  [4] Spawn Random Dungeon Loot");
         terminal.WriteLine("  [5] View Current Inventory");
+        terminal.WriteLine("  [6] Spawn Unidentified Item");
         terminal.WriteLine("");
         terminal.WriteLine("  [0] Back");
 
@@ -1549,6 +1550,23 @@ public class DevMenuLocation : BaseLocation
                 }
                 await terminal.PressAnyKey();
                 return;
+            case "6":
+                var unidLevelInput = await terminal.GetInput("Dungeon level for loot (1-100): ");
+                if (int.TryParse(unidLevelInput, out int unidLevel))
+                {
+                    unidLevel = Math.Clamp(unidLevel, 1, 100);
+                    // Generate loot with boosted rarity to ensure unidentified chance
+                    // Use MiniBoss loot for better rarity (Rare+ items become unidentified)
+                    var unidItem = LootGenerator.GenerateMiniBossLoot(unidLevel, currentPlayer.Class);
+                    unidItem.IsIdentified = false;
+                    currentPlayer.Inventory.Add(unidItem);
+                    var mysteryName = LootGenerator.GetUnidentifiedName(unidItem);
+                    terminal.SetColor("magenta");
+                    terminal.WriteLine($"  Spawned: {mysteryName}");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  (Actual: {unidItem.Name}, {unidItem.Type}, Value: {unidItem.Value})");
+                }
+                break;
         }
 
         await Task.Delay(1500);

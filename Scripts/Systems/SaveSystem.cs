@@ -499,6 +499,7 @@ namespace UsurperRemake.Systems
 
                 // Equipment and items (CRITICAL FIXES)
                 Healing = player.Healing,     // POTIONS
+                ManaPotions = player.ManaPotions, // MANA POTIONS
                 WeapPow = player.WeapPow,     // WEAPON POWER
                 ArmPow = player.ArmPow,       // ARMOR POWER
                 
@@ -561,6 +562,7 @@ namespace UsurperRemake.Systems
                     MinLevel = item.MinLevel,
                     IsCursed = item.IsCursed,
                     Cursed = item.Cursed,
+                    IsIdentified = item.IsIdentified,
                     Shop = item.Shop,
                     Dungeon = item.Dungeon,
                     Description = item.Description?.ToList() ?? new List<string>()

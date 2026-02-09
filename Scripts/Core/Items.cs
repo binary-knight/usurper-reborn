@@ -972,6 +972,85 @@ public class Equipment
         _ => "white"
     };
 
+    /// <summary>
+    /// Create a deep copy of this equipment item (for enchanting system)
+    /// </summary>
+    public Equipment Clone()
+    {
+        return new Equipment
+        {
+            // Identity (Id intentionally NOT copied - will be assigned by RegisterDynamic)
+            Name = this.Name,
+            Description = this.Description,
+            // Classification
+            Slot = this.Slot,
+            Handedness = this.Handedness,
+            WeaponType = this.WeaponType,
+            ArmorType = this.ArmorType,
+            Rarity = this.Rarity,
+            // Economics
+            Value = this.Value,
+            // Combat stats
+            WeaponPower = this.WeaponPower,
+            ArmorClass = this.ArmorClass,
+            ShieldBonus = this.ShieldBonus,
+            BlockChance = this.BlockChance,
+            // Primary stat bonuses
+            StrengthBonus = this.StrengthBonus,
+            DexterityBonus = this.DexterityBonus,
+            ConstitutionBonus = this.ConstitutionBonus,
+            IntelligenceBonus = this.IntelligenceBonus,
+            WisdomBonus = this.WisdomBonus,
+            CharismaBonus = this.CharismaBonus,
+            // Secondary stat bonuses
+            MaxHPBonus = this.MaxHPBonus,
+            MaxManaBonus = this.MaxManaBonus,
+            DefenceBonus = this.DefenceBonus,
+            StaminaBonus = this.StaminaBonus,
+            AgilityBonus = this.AgilityBonus,
+            // Special properties
+            CriticalChanceBonus = this.CriticalChanceBonus,
+            CriticalDamageBonus = this.CriticalDamageBonus,
+            MagicResistance = this.MagicResistance,
+            PoisonDamage = this.PoisonDamage,
+            LifeSteal = this.LifeSteal,
+            // Restrictions
+            MinLevel = this.MinLevel,
+            StrengthRequired = this.StrengthRequired,
+            RequiresGood = this.RequiresGood,
+            RequiresEvil = this.RequiresEvil,
+            ClassRestrictions = new List<CharacterClass>(this.ClassRestrictions),
+            // Status
+            IsCursed = this.IsCursed,
+            IsIdentified = this.IsIdentified,
+            IsUnique = false, // Enchanted copies are never unique
+        };
+    }
+
+    /// <summary>
+    /// Get the number of enchantments applied to this item.
+    /// Tracked via [E:N] marker in the Description field.
+    /// </summary>
+    public int GetEnchantmentCount()
+    {
+        if (string.IsNullOrEmpty(Description)) return 0;
+        var match = System.Text.RegularExpressions.Regex.Match(Description, @"\[E:(\d+)\]");
+        return match.Success ? int.Parse(match.Groups[1].Value) : 0;
+    }
+
+    /// <summary>
+    /// Increment the enchantment counter in the Description field.
+    /// </summary>
+    public void IncrementEnchantmentCount()
+    {
+        int current = GetEnchantmentCount();
+        string marker = $"[E:{current + 1}]";
+        if (current > 0)
+            Description = System.Text.RegularExpressions.Regex.Replace(Description, @"\[E:\d+\]", marker);
+        else
+            Description = string.IsNullOrEmpty(Description) ? marker : Description + " " + marker;
+    }
+
     #region Fluent Setters (for builder pattern)
 
     // Primary stat bonuses

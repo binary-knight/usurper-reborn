@@ -897,8 +897,13 @@ public partial class CombatEngine
         }
 
         // Item option
-        if (player.Healing > 0)
-            terminal.WriteLine($"  I - Use Item, Potions: {player.Healing} of {player.MaxPotions}");
+        if (player.Healing > 0 || player.ManaPotions > 0)
+        {
+            string potionInfo = "";
+            if (player.Healing > 0) potionInfo += $"HP:{player.Healing}";
+            if (player.ManaPotions > 0) potionInfo += (potionInfo.Length > 0 ? " " : "") + $"MP:{player.ManaPotions}";
+            terminal.WriteLine($"  I - Use Item, Potions: {potionInfo}");
+        }
         else
             terminal.WriteLine("  I - Use Item, No Potions");
 
@@ -2581,49 +2586,56 @@ public partial class CombatEngine
         }
 
         terminal.WriteLine("");
-        terminal.SetColor(rarityColor);
-        terminal.WriteLine($"  {lootItem.Name}");
-        terminal.SetColor("white");
 
-        // Show stats
-        if (lootItem.Type == global::ObjType.Weapon)
+        if (lootItem.IsIdentified)
         {
-            terminal.WriteLine($"  Attack Power: +{lootItem.Attack}");
+            // Identified - show full details
+            terminal.SetColor(rarityColor);
+            terminal.WriteLine($"  {lootItem.Name}");
+            terminal.SetColor("white");
+
+            if (lootItem.Type == global::ObjType.Weapon)
+                terminal.WriteLine($"  Attack Power: +{lootItem.Attack}");
+            else
+                terminal.WriteLine($"  Armor Power: +{lootItem.Armor}");
+
+            var bonuses = new List<string>();
+            if (lootItem.Strength != 0) bonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
+            if (lootItem.Dexterity != 0) bonuses.Add($"Dex {lootItem.Dexterity:+#;-#;0}");
+            if (lootItem.Wisdom != 0) bonuses.Add($"Wis {lootItem.Wisdom:+#;-#;0}");
+            if (lootItem.HP != 0) bonuses.Add($"HP {lootItem.HP:+#;-#;0}");
+            if (lootItem.Mana != 0) bonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
+            if (lootItem.Defence != 0) bonuses.Add($"Def {lootItem.Defence:+#;-#;0}");
+
+            if (bonuses.Count > 0)
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  Bonuses: {string.Join(", ", bonuses)}");
+            }
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Value: {lootItem.Value:N0} gold");
+
+            if (lootItem.IsCursed)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("");
+                terminal.WriteLine("  WARNING: This item is CURSED!");
+                terminal.WriteLine("  Visit the Magic Shop to remove the curse.");
+            }
+
+            await ShowEquipmentComparison(lootItem, player);
         }
         else
         {
-            terminal.WriteLine($"  Armor Power: +{lootItem.Armor}");
+            // Unidentified - show only type hint, no stats
+            string unidName = LootGenerator.GetUnidentifiedName(lootItem);
+            terminal.SetColor("magenta");
+            terminal.WriteLine($"  {unidName}");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  The item's properties are unknown.");
+            terminal.WriteLine("  Take it to the Magic Shop to have it identified.");
         }
-
-        // Show bonus stats
-        var bonuses = new List<string>();
-        if (lootItem.Strength != 0) bonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
-        if (lootItem.Dexterity != 0) bonuses.Add($"Dex {lootItem.Dexterity:+#;-#;0}");
-        if (lootItem.Wisdom != 0) bonuses.Add($"Wis {lootItem.Wisdom:+#;-#;0}");
-        if (lootItem.HP != 0) bonuses.Add($"HP {lootItem.HP:+#;-#;0}");
-        if (lootItem.Mana != 0) bonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
-        if (lootItem.Defence != 0) bonuses.Add($"Def {lootItem.Defence:+#;-#;0}");
-
-        if (bonuses.Count > 0)
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"  Bonuses: {string.Join(", ", bonuses)}");
-        }
-
-        terminal.SetColor("yellow");
-        terminal.WriteLine($"  Value: {lootItem.Value:N0} gold");
-
-        // Show curse warning
-        if (lootItem.IsCursed)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine("");
-            terminal.WriteLine("  ⚠ WARNING: This item is CURSED! ⚠");
-            terminal.WriteLine("  Visit the Magic Shop to remove the curse.");
-        }
-
-        // Show comparison with currently equipped item
-        await ShowEquipmentComparison(lootItem, player);
 
         terminal.WriteLine("");
 
@@ -3699,18 +3711,14 @@ public partial class CombatEngine
                     }
 
                 case "I":
-                    // Check if player can use potions
-                    if (player.Healing <= 0)
+                    // Check if player can use any potions
+                    bool hasHealPots = player.Healing > 0 && player.HP < player.MaxHP;
+                    bool hasManaPots = player.ManaPotions > 0 && player.Mana < player.MaxMana;
+                    if (!hasHealPots && !hasManaPots)
                     {
-                        terminal.WriteLine("You have no healing potions!", "yellow");
+                        terminal.WriteLine("You have no usable potions!", "yellow");
                         await Task.Delay(GetCombatDelay(800));
-                        continue; // Loop back, don't consume turn
-                    }
-                    if (player.HP >= player.MaxHP)
-                    {
-                        terminal.WriteLine("You are already at full health!", "yellow");
-                        await Task.Delay(GetCombatDelay(800));
-                        continue; // Loop back, don't consume turn
+                        continue;
                     }
                     action.Type = CombatActionType.UseItem;
                     return (action, false);
@@ -6855,15 +6863,43 @@ public partial class CombatEngine
     /// </summary>
     private async Task ExecuteUseItem(Character player, CombatResult result)
     {
-        // Check if player has any potions
+        bool hasHealing = player.Healing > 0 && player.HP < player.MaxHP;
+        bool hasMana = player.ManaPotions > 0 && player.Mana < player.MaxMana;
+
+        // If player has both types, let them choose
+        if (hasHealing && hasMana)
+        {
+            terminal.WriteLine("Which potion?", "cyan");
+            terminal.WriteLine($"  (H) Healing Potion  ({player.Healing}/{player.MaxPotions})", "green");
+            terminal.WriteLine($"  (M) Mana Potion     ({player.ManaPotions}/{player.MaxManaPotions})", "blue");
+            string choice = await terminal.GetInput("> ");
+            if (choice.Equals("M", StringComparison.OrdinalIgnoreCase))
+            {
+                await ExecuteUseManaPotion(player, result);
+                return;
+            }
+            // Default to healing potion
+        }
+        else if (!hasHealing && hasMana)
+        {
+            // Only mana potions available
+            await ExecuteUseManaPotion(player, result);
+            return;
+        }
+        else if (!hasHealing && !hasMana)
+        {
+            terminal.WriteLine("You have no usable potions!", "yellow");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+
+        // Healing potion logic
         if (player.Healing <= 0)
         {
             terminal.WriteLine("You have no healing potions!", "yellow");
             await Task.Delay(GetCombatDelay(1000));
             return;
         }
-
-        // Check if player needs healing
         if (player.HP >= player.MaxHP)
         {
             terminal.WriteLine("You are already at full health!", "yellow");
@@ -6871,32 +6907,45 @@ public partial class CombatEngine
             return;
         }
 
-        // Calculate how much HP needs to be restored
         long hpNeeded = player.MaxHP - player.HP;
-
-        // Each potion heals 100 HP (or configure this as needed)
         const int PotionHealAmount = 100;
-
-        // Calculate how many potions needed to heal to full
         int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / PotionHealAmount);
-        potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing); // Can't use more than we have
-
-        // Calculate actual healing amount
+        potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
         long actualHealing = Math.Min(potionsNeeded * PotionHealAmount, hpNeeded);
-
-        // Apply healing
         player.HP += actualHealing;
-        player.HP = Math.Min(player.HP, player.MaxHP); // Cap at max HP
-
-        // Decrement potion count
+        player.HP = Math.Min(player.HP, player.MaxHP);
         player.Healing -= potionsNeeded;
 
-        // Display results
         terminal.WriteLine($"You drink {potionsNeeded} healing potion{(potionsNeeded > 1 ? "s" : "")} and recover {actualHealing} HP!", "green");
         terminal.WriteLine($"Potions remaining: {player.Healing}/{player.MaxPotions}", "cyan");
-
         result.CombatLog.Add($"Player used {potionsNeeded} healing potion(s) for {actualHealing} HP");
+        await Task.Delay(GetCombatDelay(1500));
+    }
 
+    private async Task ExecuteUseManaPotion(Character player, CombatResult result)
+    {
+        if (player.ManaPotions <= 0)
+        {
+            terminal.WriteLine("You have no mana potions!", "yellow");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+        if (player.Mana >= player.MaxMana)
+        {
+            terminal.WriteLine("Your mana is already full!", "yellow");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+
+        long manaRestore = 30 + player.Level * 2;
+        long manaNeeded = player.MaxMana - player.Mana;
+        long actualRestore = Math.Min(manaRestore, manaNeeded);
+        player.Mana += actualRestore;
+        player.ManaPotions--;
+
+        terminal.WriteLine($"You drink a mana potion and recover {actualRestore} MP!", "blue");
+        terminal.WriteLine($"Mana potions remaining: {player.ManaPotions}/{player.MaxManaPotions}", "cyan");
+        result.CombatLog.Add($"Player used mana potion for {actualRestore} MP");
         await Task.Delay(GetCombatDelay(1500));
     }
     

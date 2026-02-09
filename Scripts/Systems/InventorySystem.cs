@@ -125,33 +125,43 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("gray");
                 terminal.Write($"  [B{index}] ");
 
-                // Color based on item type
-                string itemColor = item.Type switch
+                if (item.IsIdentified)
                 {
-                    ObjType.Weapon => "bright_red",
-                    ObjType.Body or ObjType.Head or ObjType.Arms or ObjType.Legs => "bright_cyan",
-                    ObjType.Shield => "cyan",
-                    ObjType.Fingers or ObjType.Neck => "bright_magenta",
-                    _ => "white"
-                };
-                terminal.SetColor(itemColor);
-                terminal.Write(item.Name);
+                    // Identified - show full name and stats
+                    string itemColor = item.Type switch
+                    {
+                        ObjType.Weapon => "bright_red",
+                        ObjType.Body or ObjType.Head or ObjType.Arms or ObjType.Legs => "bright_cyan",
+                        ObjType.Shield => "cyan",
+                        ObjType.Fingers or ObjType.Neck => "bright_magenta",
+                        _ => "white"
+                    };
+                    terminal.SetColor(itemColor);
+                    terminal.Write(item.Name);
 
-                terminal.SetColor("gray");
-                terminal.Write($" - {item.Value:N0}g");
+                    terminal.SetColor("gray");
+                    terminal.Write($" - {item.Value:N0}g");
 
-                // Show key stats
-                var stats = new List<string>();
-                if (item.Attack > 0) stats.Add($"Att:{item.Attack}");
-                if (item.Defence > 0) stats.Add($"Def:{item.Defence}");
-                if (item.Strength != 0) stats.Add($"Str:{item.Strength:+#;-#;0}");
-                if (item.Dexterity != 0) stats.Add($"Dex:{item.Dexterity:+#;-#;0}");
-                if (item.Wisdom != 0) stats.Add($"Wis:{item.Wisdom:+#;-#;0}");
+                    var stats = new List<string>();
+                    if (item.Attack > 0) stats.Add($"Att:{item.Attack}");
+                    if (item.Defence > 0) stats.Add($"Def:{item.Defence}");
+                    if (item.Strength != 0) stats.Add($"Str:{item.Strength:+#;-#;0}");
+                    if (item.Dexterity != 0) stats.Add($"Dex:{item.Dexterity:+#;-#;0}");
+                    if (item.Wisdom != 0) stats.Add($"Wis:{item.Wisdom:+#;-#;0}");
 
-                if (stats.Count > 0)
+                    if (stats.Count > 0)
+                    {
+                        terminal.SetColor("darkgray");
+                        terminal.Write($" ({string.Join(", ", stats.Take(3))})");
+                    }
+                }
+                else
                 {
+                    // Unidentified - show mystery name, no stats
+                    terminal.SetColor("magenta");
+                    terminal.Write(LootGenerator.GetUnidentifiedName(item));
                     terminal.SetColor("darkgray");
-                    terminal.Write($" ({string.Join(", ", stats.Take(3))})");
+                    terminal.Write(" - ???");
                 }
 
                 terminal.WriteLine("");
@@ -401,29 +411,40 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  {item.Name}");
-            terminal.SetColor("gray");
-            terminal.WriteLine($"  Value: {item.Value:N0} gold");
-            terminal.WriteLine($"  Type: {item.Type}");
-            terminal.WriteLine("");
-
-            // Show stats
-            var stats = new List<string>();
-            if (item.Attack > 0) stats.Add($"Attack: +{item.Attack}");
-            if (item.Defence > 0) stats.Add($"Defence: +{item.Defence}");
-            if (item.Strength != 0) stats.Add($"Strength: {item.Strength:+#;-#;0}");
-            if (item.Dexterity != 0) stats.Add($"Dexterity: {item.Dexterity:+#;-#;0}");
-            if (item.Wisdom != 0) stats.Add($"Wisdom: {item.Wisdom:+#;-#;0}");
-            if (item.MagicProperties?.Mana != 0) stats.Add($"Mana: {item.MagicProperties.Mana:+#;-#;0}");
-
-            if (stats.Count > 0)
+            if (item.IsIdentified)
             {
-                terminal.SetColor("white");
-                foreach (var stat in stats)
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {item.Name}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Value: {item.Value:N0} gold");
+                terminal.WriteLine($"  Type: {item.Type}");
+                terminal.WriteLine("");
+
+                // Show stats
+                var stats = new List<string>();
+                if (item.Attack > 0) stats.Add($"Attack: +{item.Attack}");
+                if (item.Defence > 0) stats.Add($"Defence: +{item.Defence}");
+                if (item.Strength != 0) stats.Add($"Strength: {item.Strength:+#;-#;0}");
+                if (item.Dexterity != 0) stats.Add($"Dexterity: {item.Dexterity:+#;-#;0}");
+                if (item.Wisdom != 0) stats.Add($"Wisdom: {item.Wisdom:+#;-#;0}");
+                if (item.MagicProperties?.Mana != 0) stats.Add($"Mana: {item.MagicProperties.Mana:+#;-#;0}");
+
+                if (stats.Count > 0)
                 {
-                    terminal.WriteLine($"  {stat}");
+                    terminal.SetColor("white");
+                    foreach (var stat in stats)
+                    {
+                        terminal.WriteLine($"  {stat}");
+                    }
+                    terminal.WriteLine("");
                 }
+            }
+            else
+            {
+                terminal.SetColor("magenta");
+                terminal.WriteLine($"  {LootGenerator.GetUnidentifiedName(item)}");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Properties unknown - visit the Magic Shop to identify.");
                 terminal.WriteLine("");
             }
 
@@ -441,10 +462,21 @@ namespace UsurperRemake.Systems
                     await EquipFromBackpack(index - 1);
                     break;
                 case "D":
-                    player.Inventory.Remove(item);
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine($"You drop the {item.Name}.");
-                    await Task.Delay(1000);
+                    if (item.IsCursed)
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"The {item.Name} is CURSED! You cannot drop it.");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("Visit the Healer to have the curse removed.");
+                        await Task.Delay(2000);
+                    }
+                    else
+                    {
+                        player.Inventory.Remove(item);
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"You drop the {item.Name}.");
+                        await Task.Delay(1000);
+                    }
                     break;
             }
         }
@@ -692,6 +724,13 @@ namespace UsurperRemake.Systems
                 if (index >= 1 && index <= player.Inventory.Count)
                 {
                     var item = player.Inventory[index - 1];
+                    if (item.IsCursed)
+                    {
+                        terminal.WriteLine($"The {item.Name} is CURSED! You cannot drop it.", "red");
+                        terminal.WriteLine("Visit the Healer to have the curse removed.", "gray");
+                        await Task.Delay(2000);
+                        return;
+                    }
                     player.Inventory.RemoveAt(index - 1);
                     terminal.WriteLine($"You drop the {item.Name}.", "yellow");
                     await Task.Delay(1000);
@@ -746,6 +785,15 @@ namespace UsurperRemake.Systems
 
             if (choice.ToUpper().Trim() == "U" && currentItem != null)
             {
+                if (currentItem.IsCursed)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"The {currentItem.Name} is CURSED! You cannot unequip it.");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("Visit the Healer to have the curse removed.");
+                    await Task.Delay(2000);
+                    return;
+                }
                 var unequipped = player.UnequipSlot(slot);
                 if (unequipped != null)
                 {

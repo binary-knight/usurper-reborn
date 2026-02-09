@@ -27,7 +27,9 @@ public class Character
     public long Strength { get; set; }              // strength
     public long Defence { get; set; }               // defence
     public long Healing { get; set; }               // healing potions
+    public long ManaPotions { get; set; }            // mana potions (bought at Magic Shop)
     public int MaxPotions => 20 + (Level - 1);      // max potions = 20 + (level - 1)
+    public int MaxManaPotions => 20;                 // max mana potions
     public bool Allowed { get; set; }               // allowed to play
     public long MaxHP { get; set; }                 // max hitpoints
     public long LastOn { get; set; }                // laston, date

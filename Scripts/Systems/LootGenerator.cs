@@ -723,6 +723,9 @@ public static class LootGenerator
                 ApplyCursePenalties(item);
             }
 
+            // Rare+ dungeon drops may be unidentified
+            item.IsIdentified = !ShouldBeUnidentified(rarity);
+
             return item;
         }
 
@@ -768,6 +771,9 @@ public static class LootGenerator
                 item.Value = (long)(item.Value * 0.5f);
                 ApplyCursePenalties(item);
             }
+
+            // Rare+ dungeon drops may be unidentified
+            item.IsIdentified = !ShouldBeUnidentified(rarity);
 
             return item;
         }
@@ -833,6 +839,9 @@ public static class LootGenerator
                 item.Value = (long)(item.Value * 0.5f);
                 ApplyCursePenalties(item);
             }
+
+            // Rare+ dungeon drops may be unidentified
+            item.IsIdentified = !ShouldBeUnidentified(rarity);
 
             return item;
         }
@@ -1101,6 +1110,60 @@ public static class LootGenerator
             }
 
             return items.OrderBy(i => i.Value).ToList();
+        }
+
+        #endregion
+
+        #region Identification System
+
+        /// <summary>
+        /// Determines if a loot drop should be unidentified based on rarity.
+        /// Common/Uncommon items are always identified - players know basic gear.
+        /// Rare+ items have increasing chance to be unidentified.
+        /// </summary>
+        private static bool ShouldBeUnidentified(ItemRarity rarity)
+        {
+            return rarity switch
+            {
+                ItemRarity.Rare => random.NextDouble() < 0.40,       // 40% chance
+                ItemRarity.Epic => random.NextDouble() < 0.60,       // 60% chance
+                ItemRarity.Legendary => random.NextDouble() < 0.80,  // 80% chance
+                ItemRarity.Artifact => true,                          // Always unidentified
+                _ => false                                            // Common/Uncommon always known
+            };
+        }
+
+        /// <summary>
+        /// Get the display name for an unidentified item (hides real name, shows type hint)
+        /// </summary>
+        public static string GetUnidentifiedName(Item item)
+        {
+            if (item.IsIdentified) return item.Name;
+
+            string typeHint = item.Type switch
+            {
+                ObjType.Weapon => "Unidentified Weapon",
+                ObjType.Body => "Unidentified Armor",
+                ObjType.Head => "Unidentified Helm",
+                ObjType.Arms => "Unidentified Bracers",
+                ObjType.Hands => "Unidentified Gauntlets",
+                ObjType.Legs => "Unidentified Greaves",
+                ObjType.Feet => "Unidentified Boots",
+                ObjType.Shield => "Unidentified Shield",
+                ObjType.Fingers => "Unidentified Ring",
+                ObjType.Neck => "Unidentified Amulet",
+                ObjType.Waist => "Unidentified Belt",
+                ObjType.Face => "Unidentified Mask",
+                ObjType.Abody => "Unidentified Cloak",
+                _ => "Unidentified Item"
+            };
+
+            // Add a rarity hint based on power level (the item "feels" powerful)
+            int power = Math.Max(item.Attack, item.Armor);
+            if (power > 200) return $"Glowing {typeHint}";
+            if (power > 100) return $"Shimmering {typeHint}";
+            if (power > 50) return $"Ornate {typeHint}";
+            return typeHint;
         }
 
         #endregion

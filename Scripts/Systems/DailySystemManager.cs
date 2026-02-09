@@ -466,7 +466,7 @@ public class DailySystemManager
                 if (grief.CurrentStage != previousStage && terminal != null)
                 {
                     terminal.WriteLine("");
-                    terminal.WriteLine($"Your grief has evolved... ({previousStage} → {grief.CurrentStage})", "dark_magenta");
+                    terminal.WriteLine($"Your grief has evolved... ({previousStage} --> {grief.CurrentStage})", "dark_magenta");
 
                     // Show stage effect
                     var effects = grief.GetCurrentEffects();

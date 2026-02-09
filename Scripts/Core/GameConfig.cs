@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.25.14-alpha";
-    public const string VersionName = "SysOp Console";
+    public const string Version = "0.26.0-alpha";
+    public const string VersionName = "Magic Shop Overhaul";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
