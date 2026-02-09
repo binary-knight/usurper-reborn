@@ -17,7 +17,7 @@ using UsurperRemake.Systems;
 public static class BugReportSystem
 {
     private const string GitHubIssuesUrl = "https://github.com/binary-knight/usurper-reborn/issues/new";
-    private const string DiscordWebhookUrl = "https://discord.com/api/webhooks/1470239063574315102/YxbnkRF5VGRWSqS4xUZBtyuL9BjtsglHCnV4_L57QE3RySFySOMAtf3Pe3TrFOINkDDu";
+    private const string DiscordWebhookUrl = "https://discord.com/api/webhooks/1470253721979060255/XcJU1bpTaX3HSPdvuCBEaMyJffwASodZSPwi_R5wEmcoF94aKDORoPdiLZEeSRyhgVLR";
 
     private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 
