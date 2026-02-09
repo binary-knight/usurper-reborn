@@ -325,11 +325,22 @@ terminal.SetColor("darkgray");
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
-        // Handle global quick commands first
+        if (string.IsNullOrWhiteSpace(choice))
+            return false;
+
+        var c = choice.Trim().ToUpperInvariant();
+
+        // Handle ! locally first (Resurrect) before global handler claims it for bug report
+        if (c == "!")
+        {
+            await ResurrectAlly();
+            return false;
+        }
+
+        // Handle global quick commands
         var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
         if (handled) return shouldExit;
 
-        var c = choice.Trim().ToUpperInvariant();
         switch (c)
         {
             case "R":

@@ -141,14 +141,21 @@ public class TeamCornerLocation : BaseLocation
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
-        // Handle global quick commands first
-        var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
-        if (handled) return shouldExit;
-
         if (string.IsNullOrWhiteSpace(choice))
             return false;
 
         var upperChoice = choice.ToUpper().Trim();
+
+        // Handle ! locally first (Resurrect) before global handler claims it for bug report
+        if (upperChoice == "!")
+        {
+            await ResurrectTeammate();
+            return false;
+        }
+
+        // Handle global quick commands
+        var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
+        if (handled) return shouldExit;
 
         switch (upperChoice)
         {
