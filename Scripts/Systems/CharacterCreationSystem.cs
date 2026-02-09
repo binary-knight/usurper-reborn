@@ -808,6 +808,13 @@ public class CharacterCreationSystem
         // CRITICAL: Initialize base stats from the rolled values
         // This prevents RecalculateStats() from resetting stats to 0
         character.InitializeBaseStats();
+
+        // Apply stat-derived bonuses (CON->HP, INT/WIS->Mana) so displayed values
+        // are correct from the start. Without this, creation shows raw HP/Mana and the
+        // first RecalculateStats() (e.g. on equipment purchase) causes an apparent jump.
+        character.RecalculateStats();
+        character.HP = character.MaxHP;
+        character.Mana = character.MaxMana;
     }
 
     /// <summary>

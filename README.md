@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.26.0 - Magic Shop Overhaul
+## ALPHA v0.26.1 - Inn Overhaul & Balance
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -346,6 +346,30 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### Completed in v0.26.1 - Inn Overhaul & Balance
+
+**Drinking Contest - Full Minigame Rewrite:**
+- Complete rewrite from passive auto-loss into interactive minigame based on original Pascal DRINKING.PAS
+- Up to 5 NPC opponents drawn from living town NPCs with their own soberness values
+- Drink choice: Ale (mild), Stout (medium), Seth's Bomber (rocket fuel) - affects elimination speed
+- Soberness system based on Constitution + Strength + Stamina, drunk commentary from the original game
+- Player input each round: drink or try to bow out gracefully (Constitution check)
+- Opponents visibly stagger and drop out, soberness evaluation between rounds
+- Winner gets level-scaled XP reward (level * 700), losers get consolation XP
+
+**Seth Able Balance Nerf:**
+- Seth now scales with player level (always 3 levels above, min 15, max 80) - no longer a static punching bag
+- Daily fight limit: 3 challenges per game day, Seth refuses after that
+- Fixed inflated XP exploit: Seth was using monster nr:99 giving ~15,800 XP per fight from level-based formula
+- Rewards now flat and modest: level * 200 XP + level * 5 gold (down from ~15,800 XP + ~12,300 gold)
+- Diminishing returns: rewards halve after 3rd lifetime victory, fame reduced to +1 after first win
+- Seth stays knocked out for the rest of the day when defeated (no re-enter exploit)
+
+**Bug Fixes:**
+- Fixed character creation stat display bug: HP/Mana now correct from creation (RecalculateStats was missing)
+- Fixed ! key conflict: Bug report no longer intercepts resurrect command in Home and Team Corner
+- Added BBS List to main menu showing BBSes running Usurper Reborn with SysOp contact info
+
 ### Completed in v0.26.0 - Magic Shop Overhaul
 
 **Magic Shop - Complete Overhaul:**
@@ -633,7 +657,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.26)
+### Known Issues (Alpha v0.26.1)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -648,4 +672,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.26.0 - Magic Shop Overhaul
+**Status**: ALPHA v0.26.1 - Inn Overhaul & Balance

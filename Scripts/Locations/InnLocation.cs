@@ -14,6 +14,9 @@ public class InnLocation : BaseLocation
 {
     private NPC sethAble;
     private bool sethAbleAvailable = true;
+    private int sethFightsToday = 0;     // Daily fight counter - max 3 per day
+    private int sethDefeatsTotal = 0;    // Total times player has beaten Seth this session
+    private int lastSethFightDay = -1;   // Track which game day the fights counter is for
     
     public InnLocation() : base(
         GameLocation.TheInn,
@@ -619,22 +622,46 @@ public class InnLocation : BaseLocation
     
     /// <summary>
     /// Challenge Seth Able to a fight
+    /// Max 3 fights per game day. Seth scales to player level so he's always a challenge.
     /// </summary>
     private async Task ChallengeSethAble()
     {
         if (!sethAbleAvailable)
         {
-            terminal.WriteLine("Seth Able is not here right now.", "gray");
+            terminal.WriteLine("Seth Able is passed out under a table. Try again later.", "gray");
             await Task.Delay(1500);
             return;
         }
-        
+
+        // Reset daily counter if new day
+        int today = DailySystemManager.Instance?.CurrentDay ?? 0;
+        if (today != lastSethFightDay)
+        {
+            sethFightsToday = 0;
+            lastSethFightDay = today;
+            sethAbleAvailable = true; // Seth recovers each new day
+        }
+
+        // Daily fight limit: 3 per day
+        if (sethFightsToday >= 3)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("Seth Able waves you off dismissively.");
+            terminal.WriteLine("\"Enough already! I've had my fill of brawling today.\"", "yellow");
+            terminal.WriteLine("\"Come back tomorrow if you want another beating!\"", "yellow");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Calculate Seth's level for display - he scales with player
+        int sethLevel = GetSethLevel();
+
         terminal.ClearScreen();
         terminal.SetColor("red");
         terminal.WriteLine("CHALLENGING SETH ABLE");
         terminal.WriteLine("====================");
         terminal.WriteLine("");
-        
+
         // Seth's drunken response
         var responses = new[]
         {
@@ -644,19 +671,24 @@ public class InnLocation : BaseLocation
             "I'll show you what a REAL fighter can do!",
             "*sways* Come on then, if you think you're hard enough!"
         };
-        
+
         terminal.SetColor("yellow");
         terminal.WriteLine($"Seth Able: \"{responses[GD.RandRange(0, responses.Length - 1)]}\"");
         terminal.WriteLine("");
-        
+
         terminal.SetColor("white");
         terminal.WriteLine("WARNING: Seth Able is a dangerous opponent!");
-        terminal.WriteLine($"Seth Able - Level {sethAble.Level} - HP: {sethAble.HP}");
-        terminal.WriteLine($"You - Level {currentPlayer.Level} - HP: {currentPlayer.HP}");
+        terminal.WriteLine($"Seth Able - Level {sethLevel} - HP: {GetSethHP(sethLevel)}");
+        terminal.WriteLine($"You - Level {currentPlayer.Level} - HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
+        if (sethFightsToday > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"(Fights today: {sethFightsToday}/3)");
+        }
         terminal.WriteLine("");
-        
+
         var confirm = await terminal.GetInput("Are you sure you want to fight? (y/N): ");
-        
+
         if (confirm.ToUpper() == "Y")
         {
             await FightSethAble();
@@ -667,46 +699,76 @@ public class InnLocation : BaseLocation
             await Task.Delay(2000);
         }
     }
-    
+
     /// <summary>
-    /// Fight Seth Able using full combat engine
+    /// Get Seth's effective level - scales with player but always 2-5 levels ahead
+    /// Minimum level 15 (his base), scales to always be a challenge
+    /// </summary>
+    private int GetSethLevel()
+    {
+        int playerLevel = (int)currentPlayer.Level;
+        // Seth is always 3 levels above player, minimum 15, max 80
+        return Math.Clamp(playerLevel + 3, 15, 80);
+    }
+
+    /// <summary>
+    /// Get Seth's HP for a given level
+    /// </summary>
+    private static long GetSethHP(int sethLevel)
+    {
+        return 100 + sethLevel * 12;
+    }
+
+    /// <summary>
+    /// Fight Seth Able using full combat engine.
+    /// Seth scales to player level so he's always a genuine challenge.
+    /// Uses nr:1 to prevent inflated XP from level-based formulas.
     /// </summary>
     private async Task FightSethAble()
     {
         terminal.WriteLine("The inn falls silent as you approach Seth Able...", "red");
         await Task.Delay(2000);
-        
-        // Create Seth as a monster for combat (Pascal-compatible)
+
+        int sethLevel = GetSethLevel();
+        long sethHP = GetSethHP(sethLevel);
+        // Stats scale with level: always a tough brawler
+        long sethStr = 20 + sethLevel;
+        long sethDef = 10 + sethLevel / 2;
+        long sethPunch = 20 + sethLevel;
+        long sethArmPow = 8 + sethLevel / 3;
+        long sethWeapPow = 15 + sethLevel / 2;
+
+        // nr:1 keeps monster Level=1 so GetExperienceReward()/GetGoldReward() yield
+        // minimal base rewards. The real reward is the flat bonus below.
         var sethMonster = Monster.CreateMonster(
-            nr: 99,                     // Special monster number for Seth
+            nr: 1,
             name: "Seth Able",
-            hps: 150,                   // High HP for a tough fighter
-            strength: 35,               // Strong fighter
-            defence: 20,                // Good natural defense
+            hps: sethHP,
+            strength: sethStr,
+            defence: sethDef,
             phrase: "You lookin' at me funny?!",
-            grabweap: false,            // Can't take Seth's stuff
+            grabweap: false,
             grabarm: false,
             weapon: "Massive Fists",
             armor: "Thick Skin",
             poisoned: false,
             disease: false,
-            punch: 40,                  // High punch power
-            armpow: 15,                 // Natural armor
-            weappow: 25                 // Weapon power of fists
+            punch: sethPunch,
+            armpow: sethArmPow,
+            weappow: sethWeapPow
         );
-        
-        // Seth is a special unique NPC
+
+        // Override display level (for UI) without affecting reward formulas
+        // Note: CreateMonster sets Level = Math.Max(1, nr), so Level=1 for rewards
         sethMonster.IsUnique = true;
         sethMonster.IsBoss = false;
         sethMonster.CanSpeak = true;
-        
-        // Initialize combat engine
+
         var combatEngine = new CombatEngine(terminal);
-        
-        // Execute combat
         var result = await combatEngine.PlayerVsMonster(currentPlayer, sethMonster);
 
-        // Check if player should return to temple after resurrection
+        sethFightsToday++;
+
         if (result.ShouldReturnToTemple)
         {
             terminal.SetColor("yellow");
@@ -716,45 +778,64 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        // Handle combat outcome
         switch (result.Outcome)
         {
             case CombatOutcome.Victory:
-                // Player wins (rare!)
+                sethDefeatsTotal++;
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("");
-                terminal.WriteLine("INCREDIBLE! You have defeated Seth Able!");
-                terminal.WriteLine("The entire inn erupts in shocked silence...");
-                terminal.WriteLine("Even the bartender drops his glass in amazement!");
-                terminal.WriteLine("");
-                terminal.WriteLine("You are now a legend in this tavern!");
-                
-                // Pascal-compatible rewards for defeating Seth
-                currentPlayer.Experience += 1000;
-                currentPlayer.Gold += 500;
-                currentPlayer.PKills++;
-                currentPlayer.Fame += 10;          // Fame for defeating Seth
-                currentPlayer.Chivalry += 5;       // Chivalrous victory
-                
-                // Seth becomes unavailable for a while (Pascal: NPCs can be "knocked out")
+
+                if (sethDefeatsTotal == 1)
+                {
+                    terminal.WriteLine("INCREDIBLE! You have defeated Seth Able!");
+                    terminal.WriteLine("The entire inn erupts in shocked silence...");
+                    terminal.WriteLine("Even the bartender drops his glass in amazement!");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("You are now a legend in this tavern!");
+                    currentPlayer.PKills++;
+                    currentPlayer.Fame += 10;
+                    currentPlayer.Chivalry += 5;
+                }
+                else
+                {
+                    terminal.WriteLine("You've beaten Seth Able again!");
+                    terminal.WriteLine("The patrons cheer, but they've seen this before...");
+                    // Diminishing fame - 1 point after first win
+                    currentPlayer.Fame += 1;
+                }
+
+                // Flat reward: modest XP and gold, NOT scaling with fake level
+                // This replaces the combat engine's level-based reward (which is tiny at nr=1)
+                long xpReward = currentPlayer.Level * 200;
+                long goldReward = 50 + currentPlayer.Level * 5;
+
+                // Diminishing returns: halve rewards after 3rd lifetime win
+                if (sethDefeatsTotal > 3)
+                {
+                    xpReward /= 2;
+                    goldReward /= 2;
+                }
+
+                currentPlayer.Experience += xpReward;
+                currentPlayer.Gold += goldReward;
+
+                terminal.SetColor("white");
+                terminal.WriteLine($"You earn {xpReward:N0} experience and {goldReward:N0} gold.");
+
+                // Seth is knocked out for the rest of the day
                 sethAbleAvailable = false;
                 sethAble.SetState(NPCState.Unconscious);
-                
-                terminal.WriteLine("You gain legendary status among the patrons!");
                 break;
-                
+
             case CombatOutcome.PlayerDied:
-                // Player died (should be rare vs Seth, he's more of a brawler)
                 terminal.SetColor("red");
                 terminal.WriteLine("");
                 terminal.WriteLine("Seth Able's powerful blow knocks you unconscious!");
                 terminal.WriteLine("You wake up later with a massive headache...");
-                
-                // In Pascal, inn fights rarely kill, more like knockout
-                currentPlayer.HP = 1;  // Leave player at 1 HP instead of dead
+                currentPlayer.HP = 1;
                 currentPlayer.PDefeats++;
                 break;
-                
+
             case CombatOutcome.PlayerEscaped:
                 terminal.SetColor("yellow");
                 terminal.WriteLine("");
@@ -762,9 +843,8 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine("'That's right, walk away!' Seth calls after you.");
                 terminal.WriteLine("The other patrons chuckle at your retreat.");
                 break;
-                
+
             default:
-                // Seth wins (usual outcome)
                 terminal.SetColor("red");
                 terminal.WriteLine("");
                 terminal.WriteLine("Seth Able's massive fist connects with your jaw!");
@@ -772,11 +852,10 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine("The patrons laugh as Seth returns to his drink.");
                 terminal.WriteLine("");
                 terminal.WriteLine("'Maybe next time, kid!' Seth gruffs.");
-                
                 currentPlayer.PDefeats++;
                 break;
         }
-        
+
         await Task.Delay(3000);
     }
     
@@ -1088,52 +1167,470 @@ public class InnLocation : BaseLocation
     }
     
     /// <summary>
-    /// Play drinking game
+    /// Play drinking game - full minigame based on original Pascal DRINKING.PAS
+    /// Up to 5 NPC opponents, drink choice, soberness tracking, drunk comments, player input per round
     /// </summary>
     private async Task PlayDrinkingGame()
     {
         if (currentPlayer.Gold < 20)
         {
             terminal.WriteLine("You need at least 20 gold to enter the drinking contest!", "red");
-            await Task.Delay(2000);
+            await Task.Delay(1500);
             return;
         }
-        
-        terminal.ClearScreen();
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("DRINKING CONTEST");
-        terminal.WriteLine("================");
-        terminal.WriteLine("");
-        
-        currentPlayer.Gold -= 20;
-        
-        var rounds = 0;
-        var maxRounds = currentPlayer.Stamina / 10;
-        
-        while (rounds < maxRounds && GD.Randf() < 0.7f)
+
+        // Gather living NPCs as potential opponents
+        var maxOpponents = 5;
+        var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs?
+            .Where(n => !n.IsDead && n.HP > 0 && n.Name2 != currentPlayer.Name2)
+            .OrderBy(_ => GD.Randf())
+            .Take(maxOpponents)
+            .ToList() ?? new List<NPC>();
+
+        if (allNPCs.Count < 2)
         {
-            rounds++;
-            terminal.WriteLine($"Round {rounds}: You down another drink!", "yellow");
-            await Task.Delay(1000);
+            terminal.WriteLine("There aren't enough patrons in the bar for a contest!", "red");
+            await Task.Delay(1500);
+            return;
         }
-        
+
+        currentPlayer.Gold -= 20;
+
+        // --- Intro ---
+        terminal.ClearScreen();
         terminal.WriteLine("");
-        if (rounds >= 5)
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  +=======================================================+");
+        terminal.SetColor("bright_white");
+        terminal.WriteLine("  |              DRINKING CONTEST AT THE INN               |");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  +=======================================================+");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  You jump up on the bar counter!");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("  \"Come on you lazy boozers! I challenge you to a drinking contest!\"");
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.Write("  There is a sudden silence in the room");
+        await Task.Delay(600);
+        terminal.Write("...");
+        await Task.Delay(600);
+        terminal.WriteLine("...");
+        await Task.Delay(400);
+        terminal.SetColor("white");
+        terminal.WriteLine("  Then a rowdy bunch of characters make their way toward you...");
+        terminal.WriteLine("");
+
+        // Show opponents joining
+        var howdyLines = new[]
         {
-            terminal.SetColor("green");
-            terminal.WriteLine($"You won the contest after {rounds} rounds!");
-            terminal.WriteLine("You win 100 gold and gain reputation!");
-            currentPlayer.Gold += 100;
-            currentPlayer.Charisma += 2;
+            " accepts your challenge! \"I need to show you who's the master!\"",
+            " sits down and says: \"I'm in! I can't see any competition here though...\"",
+            " sits down and stares at you intensely...",
+            " sits down and says: \"I feel sorry for you, {0}!\"",
+            " sits down and mutters something you can't hear.",
+            " sits down and says: \"Are you ready to lose, {0}!? Haha!\"",
+            " sits down and says: \"Make room for me, you cry-babies!\"",
+            " sits down and says: \"I can't lose!\"",
+            " sits down and says: \"You are looking at the current Beer Champion!\"",
+            " sits down without saying a word....",
+        };
+
+        foreach (var npc in allNPCs)
+        {
+            var line = howdyLines[GD.RandRange(0, howdyLines.Length - 1)];
+            line = string.Format(line, currentPlayer.Name2);
+            terminal.SetColor("bright_green");
+            terminal.Write($"  {npc.Name2}");
+            terminal.SetColor("white");
+            terminal.WriteLine(line);
+            await Task.Delay(400);
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+
+        // --- Drink Choice ---
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("  Choose Your Competition Drink:");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_white");
+        terminal.Write("  [A] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Ale            - Easy going, more rounds to survive");
+        terminal.SetColor("bright_white");
+        terminal.Write("  [S] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Stout          - A solid choice for serious drinkers");
+        terminal.SetColor("bright_white");
+        terminal.Write("  [K] ");
+        terminal.SetColor("red");
+        terminal.WriteLine("Seth's Bomber  - Rocket fuel! Only the brave dare...");
+        terminal.WriteLine("");
+
+        string drinkName;
+        int drinkStrength;
+        string drinkReaction;
+        var drinkChoice = (await terminal.GetInput("  Your choice: ")).Trim().ToUpperInvariant();
+
+        switch (drinkChoice)
+        {
+            case "S":
+                drinkName = "Stout";
+                drinkStrength = 3;
+                drinkReaction = "Your choice seems to have made everybody content...";
+                break;
+            case "K":
+                drinkName = "Seth's Bomber";
+                drinkStrength = 6;
+                drinkReaction = "There is a buzz of wonder in the crowded bar...";
+                break;
+            default: // A or anything else
+                drinkName = "Ale";
+                drinkStrength = 2;
+                drinkReaction = "\"That was a wimpy choice!\", someone shouts from the back.";
+                break;
+        }
+
+        terminal.SetColor("bright_white");
+        terminal.WriteLine($"  {drinkName}!");
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {drinkReaction}");
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+
+        // --- Calculate soberness values ---
+        // Based on original: (stamina + strength + charisma + 10) / 10, capped at 100
+        long playerSoberness = Math.Min(100, (currentPlayer.Stamina + currentPlayer.Strength + currentPlayer.Constitution + 10) / 10);
+        if (playerSoberness < 5) playerSoberness = 5; // minimum floor
+
+        var opponents = new List<(string Name, long Soberness, bool Male)>();
+        foreach (var npc in allNPCs)
+        {
+            long sob = Math.Min(100, (npc.Stamina + npc.Strength + npc.Constitution + 10) / 10);
+            if (sob < 3) sob = 3;
+            opponents.Add((npc.Name2, sob, npc.Sex == CharacterSex.Male));
+        }
+
+        // Rank and show favourite
+        var allSob = opponents.Select(o => (o.Name, o.Soberness)).ToList();
+        allSob.Add((currentPlayer.Name2, playerSoberness));
+        allSob.Sort((a, b) => b.Soberness.CompareTo(a.Soberness));
+
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        terminal.SetColor("bright_magenta");
+        terminal.Write("  Favourite in this contest is... ");
+        terminal.SetColor("bright_white");
+        terminal.WriteLine($"{allSob[0].Name}!");
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+
+        // --- Main contest loop ---
+        int round = 0;
+        bool playerAlive = true;
+        int playerRounds = 0;
+
+        while (true)
+        {
+            round++;
+
+            // Count remaining contestants
+            int remaining = opponents.Count(o => o.Soberness > 0) + (playerAlive ? 1 : 0);
+            if (remaining <= 1) break;
+
+            terminal.ClearScreen();
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  === Beer Round #{round} ===   ({remaining} contestants remaining)");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Drinking: {drinkName}");
+            terminal.WriteLine("");
+
+            // --- Player's turn ---
+            if (playerAlive)
+            {
+                // Player chooses: drink or try to bow out
+                terminal.SetColor("bright_white");
+                terminal.WriteLine($"  Your soberness: {GetSobernessBar(playerSoberness)}");
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine("  [D] Down your drink!");
+                terminal.WriteLine("  [Q] Try to bow out gracefully");
+                terminal.WriteLine("");
+
+                var action = (await terminal.GetInput("  What do you do? ")).Trim().ToUpperInvariant();
+
+                if (action == "Q")
+                {
+                    // CON check to bow out without embarrassment
+                    int bowOutChance = 30 + (int)(currentPlayer.Constitution / 2);
+                    if (bowOutChance > 80) bowOutChance = 80;
+                    if (GD.RandRange(1, 100) <= bowOutChance)
+                    {
+                        terminal.SetColor("green");
+                        terminal.WriteLine("  You stand up steadily and bow to the crowd.");
+                        terminal.WriteLine("  \"I know my limits, friends. Good luck to you all!\"");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  The crowd gives a polite, if disappointed, round of applause.");
+                        playerAlive = false;
+                        playerRounds = round;
+                        terminal.WriteLine("");
+                        await terminal.PressAnyKey();
+                        continue;
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("  You try to stand up but your legs wobble...");
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine("  \"Sit back down! You're not going anywhere!\"");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  The crowd pushes another drink into your hand!");
+                        terminal.WriteLine("");
+                        await Task.Delay(800);
+                        // Falls through to drinking
+                    }
+                }
+
+                // Drink!
+                terminal.SetColor("bright_cyan");
+                terminal.Write("  You take your beer...");
+                await Task.Delay(300);
+                terminal.Write("Glugg...");
+                await Task.Delay(200);
+                terminal.Write("Glugg...");
+                await Task.Delay(200);
+                terminal.WriteLine("Glugg...!");
+
+                // Reduce soberness: random(23 + drinkStrength)
+                long reduction = GD.RandRange(1, 22 + drinkStrength);
+                playerSoberness -= reduction;
+
+                if (playerSoberness <= 0)
+                {
+                    playerSoberness = 0;
+                    playerAlive = false;
+                    playerRounds = round;
+                    terminal.WriteLine("");
+                    terminal.SetColor("red");
+                    terminal.WriteLine("  The room is spinning!");
+                    terminal.WriteLine("  You hear evil laughter as you stagger around the room...");
+                    terminal.WriteLine("  ...finally falling heavily to the floor!");
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("  You didn't make it, you drunken rat!");
+                    terminal.WriteLine("");
+                    await terminal.PressAnyKey();
+                }
+                else
+                {
+                    await Task.Delay(300);
+                }
+            }
+
+            // --- Opponents' turns ---
+            for (int i = 0; i < opponents.Count; i++)
+            {
+                var opp = opponents[i];
+                if (opp.Soberness <= 0) continue;
+
+                long oppReduction = GD.RandRange(1, 22 + drinkStrength);
+                var newSob = opp.Soberness - oppReduction;
+
+                if (playerAlive || round == playerRounds) // Only show if player is conscious
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.Write($"  {opp.Name}");
+                    terminal.SetColor("white");
+                    terminal.Write(opp.Male ? " takes his beer..." : " takes her beer...");
+                    await Task.Delay(200);
+                    terminal.Write("Glugg...");
+                    await Task.Delay(150);
+                    terminal.Write("Glugg...");
+                    await Task.Delay(150);
+                    terminal.WriteLine("Glugg...!");
+
+                    if (newSob <= 0)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.Write($"  {opp.Name}");
+                        terminal.SetColor("white");
+                        terminal.WriteLine(" starts to reel round in a daze!");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  Everybody laughs as {opp.Name} staggers and falls to the floor!");
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine("  Another one bites the dust!");
+                        terminal.WriteLine("");
+                        await Task.Delay(500);
+                    }
+                }
+
+                opponents[i] = (opp.Name, Math.Max(0, newSob), opp.Male);
+            }
+
+            // --- Soberness report ---
+            if (playerAlive)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("  --- Round Soberness Evaluation ---");
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.Write("  You - ");
+                terminal.SetColor("white");
+                terminal.WriteLine(GetDrunkComment(playerSoberness));
+
+                foreach (var opp in opponents)
+                {
+                    if (opp.Soberness > 0)
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.Write($"  {opp.Name} - ");
+                        terminal.SetColor("white");
+                        terminal.WriteLine(GetDrunkComment(opp.Soberness));
+                    }
+                }
+
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+            }
+
+            // Check if contest is over
+            remaining = opponents.Count(o => o.Soberness > 0) + (playerAlive ? 1 : 0);
+            if (remaining <= 1) break;
+        }
+
+        // --- Results ---
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  +=======================================================+");
+        terminal.SetColor("bright_white");
+        terminal.WriteLine("  |                  CONTEST RESULTS                       |");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  +=======================================================+");
+        terminal.WriteLine("");
+
+        // Determine winner
+        string winnerName = "";
+        if (playerAlive)
+        {
+            winnerName = currentPlayer.Name2;
         }
         else
         {
-            terminal.SetColor("red");
-            terminal.WriteLine($"You lasted {rounds} rounds before passing out.");
-            terminal.WriteLine("You wake up with a headache but no permanent damage.");
+            var npcWinner = opponents.FirstOrDefault(o => o.Soberness > 0);
+            if (npcWinner.Name != null)
+                winnerName = npcWinner.Name;
         }
-        
-        await Task.Delay(3000);
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"  The contest lasted {round} rounds of {drinkName}.");
+        terminal.WriteLine("");
+
+        if (playerAlive)
+        {
+            // Player won!
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  Congratulations!");
+            terminal.SetColor("white");
+            terminal.WriteLine("  You managed to stay sober longer than the rest!");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  Three cheers for the Beer Champion! ");
+            await Task.Delay(400);
+            terminal.Write("...Horray! ");
+            await Task.Delay(400);
+            terminal.Write("...Horray! ");
+            await Task.Delay(400);
+            terminal.WriteLine("...Horray!");
+            terminal.WriteLine("");
+
+            // XP reward: level * 700 (from original Pascal)
+            long xpReward = currentPlayer.Level * 700;
+            long goldReward = 50 + currentPlayer.Level * 10;
+            currentPlayer.Experience += xpReward;
+            currentPlayer.Gold += goldReward;
+
+            terminal.SetColor("bright_white");
+            terminal.WriteLine($"  You receive {xpReward:N0} experience points!");
+            terminal.WriteLine($"  You win {goldReward:N0} gold from the prize pot!");
+
+            currentPlayer.Statistics?.RecordGoldChange(currentPlayer.Gold);
+        }
+        else
+        {
+            // Player lost
+            terminal.SetColor("red");
+            terminal.WriteLine($"  You passed out in round {playerRounds}!");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  You wake up later with a splitting headache.");
+
+            if (!string.IsNullOrEmpty(winnerName))
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {winnerName} won the contest after {round} rounds!");
+            }
+            else
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  Nobody managed to stay standing! No winner was found.");
+            }
+
+            // Small consolation XP for participating
+            long consolationXP = currentPlayer.Level * 100;
+            currentPlayer.Experience += consolationXP;
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  You earned {consolationXP:N0} experience for participating.");
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Get a soberness bar visual indicator
+    /// </summary>
+    private static string GetSobernessBar(long soberness)
+    {
+        int bars = (int)(soberness / 5);
+        if (bars < 0) bars = 0;
+        if (bars > 20) bars = 20;
+        string filled = new string('#', bars);
+        string empty = new string('-', 20 - bars);
+        string label;
+        if (soberness > 60) label = "Sober";
+        else if (soberness > 40) label = "Tipsy";
+        else if (soberness > 20) label = "Dizzy";
+        else if (soberness > 5) label = "Wasted";
+        else label = "Blind Drunk!";
+        return $"[{filled}{empty}] {soberness}% - {label}";
+    }
+
+    /// <summary>
+    /// Get a drunk comment based on soberness level (from original Pascal Drunk_Comment)
+    /// </summary>
+    private static string GetDrunkComment(long soberness)
+    {
+        if (soberness <= 0) return "*Blind drunk, out of competition*";
+        if (soberness <= 1) return "Burp. WhheramIi?3$...???";
+        if (soberness <= 4) return "Hihiii! I can see that everybody has a twin!";
+        if (soberness <= 8) return "Gosh! That floor IS REALLY moving!";
+        if (soberness <= 12) return "Stand still you rats! Why is the room spinning!?";
+        if (soberness <= 15) return "I'm a little dizzy, that's all!";
+        if (soberness <= 18) return "That beer hasn't got to me yet!";
+        if (soberness <= 24) return "I'm fine, but where is the bathroom please!";
+        if (soberness <= 30) return "And a happy new year to ya all! (burp..)";
+        if (soberness <= 35) return "Gimme another one, Bartender!";
+        if (soberness <= 40) return "Ha! I'm unbeatable!";
+        if (soberness <= 50) return "Sober as a rock...";
+        if (soberness <= 55) return "A clear and steady mind...";
+        if (soberness <= 60) return "Refill please!";
+        return "This is boriiiing... (yawn)";
     }
     
     /// <summary>
