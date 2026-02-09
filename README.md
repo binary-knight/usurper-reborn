@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.25.12 - SysOp Console
+## ALPHA v0.25.14 - BBS Door Mode
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -320,25 +320,21 @@ How long to complete Usurper Reborn:
 
 ### BBS Door Mode
 Run Usurper Reborn as a door game on modern BBS software:
-- **DOOR32.SYS Support** - Modern format with socket handle for telnet connections
-- **DOOR.SYS Support** - Legacy 52-line format with console I/O fallback
-- **Synchronet BBS** - Full compatibility with socket-based and Standard I/O modes
-- **Mystic BBS** - Works with standard door configuration
+- **Auto-Detection** - Game reads DOOR32.SYS and auto-configures for your BBS. No special flags needed.
+- **Fully Tested** - Synchronet (Standard I/O), EleBBS (Socket), Mystic BBS (Socket + SSH)
+- **Should Work** - WWIV, GameSrv, ENiGMA (auto-detected by name)
+- **SSH Support** - Auto-detects encrypted transports and switches to Standard I/O mode
+- **DOOR32.SYS & DOOR.SYS** - Both drop file formats supported
 - **Multi-Node Support** - Each node gets isolated session handling
 - **BBS-Isolated Saves** - Saves stored per-BBS to prevent user conflicts
-- **Character Name Locking** - Character names locked to BBS username for consistency
+- **SysOp Console** - In-game admin console for player management, difficulty settings, MOTD, and auto-updates
+- **In-Game Bug Reports** - Players can press `!` to submit bug reports directly from a BBS session
 - **Cross-Platform** - Works on Windows x64/x86, Linux x64/ARM64, and macOS
-- **Verbose Debug Mode** - `--verbose` flag for troubleshooting connection issues
 
 **Quick Setup for Sysops:**
 ```bash
-# Command line options
-UsurperReborn --door <dropfile>    # Auto-detect DOOR32.SYS or DOOR.SYS
-UsurperReborn --door32 <path>      # Explicit DOOR32.SYS
-UsurperReborn --doorsys <path>     # Explicit DOOR.SYS
-UsurperReborn --stdio              # Force Standard I/O mode (recommended for Synchronet)
-UsurperReborn --verbose            # Enable verbose debug output
-UsurperReborn --local              # Local testing mode
+UsurperReborn --door32 <path>      # Just point it to your DOOR32.SYS - that's it!
+UsurperReborn --verbose            # Enable verbose debug output for troubleshooting
 ```
 
 For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_SETUP.md).
@@ -349,6 +345,16 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.25.14 - BBS Door Mode
+
+**BBS Compatibility:**
+- **EleBBS socket mode working** - Fixed overlapped I/O handle init, SSH-safe socket verification
+- **Mystic BBS SSH support** - Auto-detects redirected I/O for encrypted transports
+- **ANSI color fix** - Bright colors (bright_red, bright_green, etc.) now render correctly over sockets
+- **Output routing fix** - Game output now properly routes through SocketTerminal in socket mode
+- **Telnet negotiation** - Proper WILL ECHO/SGA for keystroke visibility
+- **In-game bug reports** - Press `!` to submit reports via Discord webhook (works on BBS)
 
 ### Completed in v0.25.7/v0.25.8 - SysOp Console
 
@@ -607,11 +613,10 @@ Join our Discord server for discussions, feedback, and updates:
 - Steam features only work when game is launched through Steam client
 
 ### How to Report Bugs
-1. Join Discord: https://discord.gg/EZhwgDT6Ta
-2. Describe what you were doing
-3. Include any error messages
-4. Note your platform (Windows/Linux/Mac)
+1. **In-game**: Press `!` from any location to submit a bug report (works on BBS too!)
+2. **Discord**: https://discord.gg/EZhwgDT6Ta
+3. **GitHub Issues**: https://github.com/binary-knight/usurper-reborn/issues
 
 ---
 
-**Status**: ALPHA v0.25.12 - SysOp Console
+**Status**: ALPHA v0.25.14 - BBS Door Mode
