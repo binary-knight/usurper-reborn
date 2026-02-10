@@ -1,0 +1,14 @@
+{
+  "name": "usurper-web-terminal",
+  "version": "1.0.0",
+  "description": "WebSocket-to-SSH proxy for Usurper Reborn browser play",
+  "main": "ssh-proxy.js",
+  "scripts": {
+    "start": "node ssh-proxy.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "ssh2": "^1.16.0",
+    "better-sqlite3": "^11.0.0"
+  }
+}

@@ -79,9 +79,17 @@ public class CharacterCreationSystem
             // Step 4: Select class (Pascal class selection with validation)
             character.Class = await SelectClass(character.Race);
 
-            // Step 5: Select difficulty mode
-            character.Difficulty = await SelectDifficulty();
-            DifficultySystem.CurrentDifficulty = character.Difficulty;
+            // Step 5: Select difficulty mode (skipped in online mode - server admin sets difficulty)
+            if (DoorMode.IsOnlineMode)
+            {
+                character.Difficulty = DifficultyMode.Normal;
+                DifficultySystem.CurrentDifficulty = DifficultyMode.Normal;
+            }
+            else
+            {
+                character.Difficulty = await SelectDifficulty();
+                DifficultySystem.CurrentDifficulty = character.Difficulty;
+            }
 
             // Step 6: Roll stats with re-roll option (up to 5 re-rolls)
             await RollCharacterStats(character);

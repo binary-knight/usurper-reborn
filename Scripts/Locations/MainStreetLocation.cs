@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -66,6 +67,26 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         
+        // Online status bar (only in online mode)
+        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            int onlineCount = OnlineStateManager.Instance.CachedOnlinePlayerCount;
+            terminal.SetColor("darkgray");
+            terminal.Write(" Players online: ");
+            terminal.SetColor("bright_green");
+            terminal.Write($"{onlineCount}");
+            terminal.SetColor("darkgray");
+            terminal.Write("  |  ");
+            terminal.SetColor("cyan");
+            terminal.Write("/say");
+            terminal.SetColor("darkgray");
+            terminal.Write(" to chat  |  ");
+            terminal.SetColor("cyan");
+            terminal.Write("/who");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(" for player list");
+        }
+
         // Location description with time/weather
         terminal.SetColor("white");
         terminal.WriteLine($"You are standing on the main street of {GetTownName()}.");
@@ -408,6 +429,52 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine("uit Game");
 
+        // Online multiplayer section (only shown in online mode)
+        if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+            terminal.Write(" ═══ ");
+            terminal.SetColor("bright_white");
+            terminal.Write("Online");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(" ═══");
+
+            // Show online player count
+            int onlineCount = OnlineStateManager.Instance?.CachedOnlinePlayerCount ?? 0;
+
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_green");
+            terminal.Write("3");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write($"Who's Online ");
+            terminal.SetColor("bright_green");
+            terminal.Write($"({onlineCount}");
+            terminal.SetColor("white");
+            terminal.WriteLine($" player{(onlineCount != 1 ? "s" : "")})");
+
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("4");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("Chat         ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("5");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("News Feed");
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
@@ -467,6 +534,19 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("  ? - Help");
         terminal.WriteLine("  ! - Report Bug");
         terminal.WriteLine("");
+
+        if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
+        {
+            terminal.WriteLine("Online:");
+            terminal.WriteLine("  3 - Who's Online");
+            terminal.WriteLine("  4 - Chat");
+            terminal.WriteLine("  5 - News Feed");
+            terminal.WriteLine("  /say message - Broadcast chat");
+            terminal.WriteLine("  /tell player message - Private message");
+            terminal.WriteLine("  /who - See online players");
+            terminal.WriteLine("  /news - Recent news");
+            terminal.WriteLine("");
+        }
     }
     
     protected override async Task<bool> ProcessChoice(string choice)
@@ -631,7 +711,38 @@ public class MainStreetLocation : BaseLocation
                 return false;
 
             case "3":
-                await ListCharacters();
+                if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
+                {
+                    await OnlineChatSystem.Instance!.ShowWhosOnline(terminal);
+                }
+                else
+                {
+                    await ListCharacters();
+                }
+                return false;
+
+            case "4":
+                if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
+                {
+                    terminal.SetColor("bright_cyan");
+                    terminal.Write("  Say: ");
+                    terminal.SetColor("white");
+                    var chatMsg = await terminal.GetInput("");
+                    if (!string.IsNullOrWhiteSpace(chatMsg))
+                    {
+                        await OnlineChatSystem.Instance!.Say(chatMsg);
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"  [You] {chatMsg}");
+                        await Task.Delay(1000);
+                    }
+                }
+                return false;
+
+            case "5":
+                if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
+                {
+                    await OnlineChatSystem.Instance!.ShowNews(terminal);
+                }
                 return false;
                 
             case "SETTINGS":
@@ -761,6 +872,26 @@ public class MainStreetLocation : BaseLocation
 
         // Add player
         allCharacters.Add((currentPlayer.DisplayName, currentPlayer.Level, currentPlayer.Class.ToString(), currentPlayer.Experience, "Main Street", true, currentPlayer.IsAlive));
+
+        // Add other online players from the database
+        if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+        {
+            try
+            {
+                var onlinePlayers = await UsurperRemake.Systems.OnlineStateManager.Instance!.GetAllPlayerSummaries();
+                foreach (var op in onlinePlayers)
+                {
+                    // Skip current player (already added above)
+                    if (op.DisplayName.Equals(currentPlayer.DisplayName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string className = ((CharacterClass)op.ClassId).ToString();
+                    string onlineTag = op.IsOnline ? "[ON]" : "";
+                    allCharacters.Add((op.DisplayName, op.Level, className, op.Experience, onlineTag, false, true));
+                }
+            }
+            catch { /* If DB query fails, just show NPCs */ }
+        }
 
         // Add NPCs
         if (npcs != null)

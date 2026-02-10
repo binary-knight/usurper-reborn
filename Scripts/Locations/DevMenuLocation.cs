@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 public class DevMenuLocation : BaseLocation
 {
     private const string PASSCODE = "CHEATER";
+    private const string ONLINE_PASSCODE = "CHEATER-ONLINE";
     private bool _authenticated = false;
 
     public DevMenuLocation() : base(
@@ -129,6 +130,13 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("    [Q] Return to Main Street");
         terminal.WriteLine("");
 
+        if (currentPlayer.DevMenuUsed)
+        {
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("  [!] Steam achievements are PERMANENTLY DISABLED for this save.");
+            terminal.WriteLine("");
+        }
+
         ShowCurrentStats();
     }
 
@@ -216,8 +224,42 @@ public class DevMenuLocation : BaseLocation
 
     private async Task<bool> HandleAuthentication(string input)
     {
-        if (input.ToUpper() == PASSCODE)
+        var requiredPasscode = UsurperRemake.BBS.DoorMode.IsOnlineMode ? ONLINE_PASSCODE : PASSCODE;
+        if (input.ToUpper() == requiredPasscode)
         {
+            // If Steam is available and flag not already set, warn the user
+            if (SteamIntegration.IsAvailable && !currentPlayer.DevMenuUsed)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+                terminal.WriteLine("║                         !! STEAM WARNING !!                                 ║");
+                terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
+                terminal.WriteLine("║  Using the Developer Menu will PERMANENTLY disable Steam achievements       ║");
+                terminal.WriteLine("║  for this save file. This cannot be undone - the only way to re-enable      ║");
+                terminal.WriteLine("║  achievements is to delete this save and start a new character.             ║");
+                terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                string confirm = await terminal.GetInput("Are you sure you want to proceed? (Y/N): ");
+                if (confirm.Trim().ToUpper() != "Y")
+                {
+                    terminal.WriteLine("Dev menu access cancelled. Returning to Main Street...", "cyan");
+                    await Task.Delay(1000);
+                    throw new LocationExitException(GameLocation.MainStreet);
+                }
+
+                currentPlayer.DevMenuUsed = true;
+                terminal.WriteLine("");
+                terminal.WriteLine("Steam achievements have been disabled for this save.", "red");
+                await Task.Delay(1000);
+            }
+            else if (!currentPlayer.DevMenuUsed)
+            {
+                // Non-Steam build: still set the flag silently in case save is later used with Steam
+                currentPlayer.DevMenuUsed = true;
+            }
+
             _authenticated = true;
             terminal.WriteLine("Access granted.", "green");
             await Task.Delay(500);

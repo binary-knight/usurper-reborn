@@ -56,6 +56,10 @@ public abstract class BaseLocation
         // Update player location
         player.Location = (int)LocationId;
 
+        // Update online presence with current location
+        if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+            UsurperRemake.Systems.OnlineStateManager.Instance!.UpdateLocation(Name);
+
         // Track location visit statistics
         player.Statistics?.RecordLocationVisit(Name);
 
@@ -237,6 +241,12 @@ public abstract class BaseLocation
 
             // Display location
             DisplayLocation();
+
+            // Show any pending online chat messages
+            if (OnlineChatSystem.IsActive)
+            {
+                OnlineChatSystem.Instance!.DisplayPendingMessages(terminal);
+            }
 
             // Get user choice
             var choice = await GetUserChoice();
@@ -1103,6 +1113,13 @@ public abstract class BaseLocation
         // Handle slash commands (works from any location)
         if (choice.StartsWith("/"))
         {
+            // Try online chat commands first (preserve original casing for message content)
+            if (OnlineChatSystem.IsActive)
+            {
+                var handled = await OnlineChatSystem.Instance!.TryProcessCommand(choice.Trim(), terminal);
+                if (handled) return (true, false);
+            }
+
             return await ProcessSlashCommand(choice.Substring(1).ToLower().Trim());
         }
 
@@ -1312,6 +1329,38 @@ public abstract class BaseLocation
         terminal.Write("!  ");
         terminal.SetColor("white");
         terminal.WriteLine("- Report bug         ║");
+
+        // Online chat commands (only shown when in online mode)
+        if (OnlineChatSystem.IsActive)
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine("║                                                                              ║");
+            terminal.WriteLine("║  Online commands:                                                            ║");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("║  ");
+            terminal.SetColor("bright_green");
+            terminal.Write("/say <msg>          ");
+            terminal.SetColor("white");
+            terminal.WriteLine("- Chat to all online players                         ║");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("║  ");
+            terminal.SetColor("bright_green");
+            terminal.Write("/tell <name> <msg>  ");
+            terminal.SetColor("white");
+            terminal.WriteLine("- Private message to a player                        ║");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("║  ");
+            terminal.SetColor("bright_green");
+            terminal.Write("/who                ");
+            terminal.SetColor("white");
+            terminal.WriteLine("- See who's online                                   ║");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("║  ");
+            terminal.SetColor("bright_green");
+            terminal.Write("/news               ");
+            terminal.SetColor("white");
+            terminal.WriteLine("- Recent server news                                 ║");
+        }
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");

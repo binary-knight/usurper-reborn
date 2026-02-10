@@ -2249,6 +2249,14 @@ public partial class CombatEngine
         if (isBoss)
         {
             ArchetypeTracker.Instance.RecordBossDefeat(result.Monster.Name, result.Monster.Level);
+
+            // Online news: boss kill
+            if (OnlineStateManager.IsActive)
+            {
+                var bossKillerName = result.Player.Name2 ?? result.Player.Name1;
+                _ = OnlineStateManager.Instance!.AddNews(
+                    $"{bossKillerName} defeated the boss {result.Monster.Name}!", "combat");
+            }
         }
 
         // Track gold collection for quests

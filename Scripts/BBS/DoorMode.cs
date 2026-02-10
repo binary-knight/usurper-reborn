@@ -17,6 +17,11 @@ namespace UsurperRemake.BBS
         private static bool _verboseMode = false; // Verbose debug output for troubleshooting (also keeps console visible)
         private static bool _helpWasShown = false; // Flag to indicate --help was processed
 
+        // Online multiplayer mode
+        private static bool _onlineMode = false;
+        private static string? _onlineUsername = null;
+        private static string _onlineDatabasePath = "/var/usurper/usurper_online.db";
+
         // Windows API for hiding console window
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetConsoleWindow();
@@ -43,6 +48,37 @@ namespace UsurperRemake.BBS
         /// Default is 100, which is standard for most BBS software
         /// </summary>
         public static int SysOpSecurityLevel { get; set; } = 100;
+
+        /// <summary>
+        /// True when running in online multiplayer mode (--online flag).
+        /// Uses SqlSaveBackend instead of FileSaveBackend.
+        /// </summary>
+        public static bool IsOnlineMode => _onlineMode;
+
+        /// <summary>
+        /// The username for the online session (from --user flag, SSH, or in-game auth).
+        /// </summary>
+        public static string? OnlineUsername => _onlineUsername;
+
+        /// <summary>
+        /// Set the online username after in-game authentication.
+        /// Also updates the session info so the game engine uses the correct name.
+        /// </summary>
+        public static void SetOnlineUsername(string username)
+        {
+            _onlineUsername = username;
+            if (_sessionInfo != null)
+            {
+                _sessionInfo.UserName = username;
+                _sessionInfo.UserAlias = username;
+            }
+        }
+
+        /// <summary>
+        /// Path to the SQLite database for online mode.
+        /// Default: /var/usurper/usurper_online.db (configurable via --db flag)
+        /// </summary>
+        public static string OnlineDatabasePath => _onlineDatabasePath;
 
         /// <summary>
         /// Check command line args for door mode parameters
@@ -75,6 +111,24 @@ namespace UsurperRemake.BBS
                         SysOpSecurityLevel = level;
                         Console.Error.WriteLine($"SysOp security level set to: {level}");
                     }
+                }
+                // --online enables online multiplayer mode (SQLite backend)
+                else if (arg == "--online")
+                {
+                    _onlineMode = true;
+                    Console.Error.WriteLine("[ONLINE] Online multiplayer mode enabled");
+                }
+                // --user <username> sets the online player username
+                else if (arg == "--user" && i + 1 < args.Length)
+                {
+                    _onlineUsername = args[i + 1];
+                    i++; // skip next arg (the username value)
+                }
+                // --db <path> sets the SQLite database path (default: /var/usurper/usurper_online.db)
+                else if (arg == "--db" && i + 1 < args.Length)
+                {
+                    _onlineDatabasePath = args[i + 1];
+                    i++; // skip next arg (the path value)
                 }
             }
 
@@ -115,6 +169,25 @@ namespace UsurperRemake.BBS
                 if (arg == "--local" || arg == "-l")
                 {
                     _sessionInfo = DropFileParser.CreateLocalSession();
+                    return true;
+                }
+
+                // --online (handled in first pass for flag, trigger entry here)
+                if (arg == "--online")
+                {
+                    // Online mode uses stdio - create a local session for the online user
+                    _forceStdio = true;
+                    _sessionInfo = DropFileParser.CreateLocalSession();
+
+                    // Override username if --user was provided
+                    if (!string.IsNullOrEmpty(_onlineUsername) && _sessionInfo != null)
+                    {
+                        _sessionInfo.UserName = _onlineUsername;
+                        _sessionInfo.UserAlias = _onlineUsername;
+                    }
+
+                    Console.Error.WriteLine($"[ONLINE] User: {_onlineUsername ?? "(in-game auth)"}");
+                    Console.Error.WriteLine($"[ONLINE] Database: {_onlineDatabasePath}");
                     return true;
                 }
 
@@ -555,10 +628,17 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  --verbose, -v        Enable detailed debug output (keeps console visible)");
             Console.WriteLine("  --sysop-level <num>  Set SysOp security level threshold (default: 100)");
             Console.WriteLine("");
+            Console.WriteLine("Online Multiplayer Options:");
+            Console.WriteLine("  --online             Run in online multiplayer mode (SQLite backend)");
+            Console.WriteLine("  --user <name>        Set player username (for SSH ForceCommand)");
+            Console.WriteLine("  --db <path>          SQLite database path (default: /var/usurper/usurper_online.db)");
+            Console.WriteLine("");
             Console.WriteLine("Examples:");
             Console.WriteLine("  UsurperReborn --door32 /sbbs/node1/door32.sys");
             Console.WriteLine("  UsurperReborn --node /sbbs/node1");
             Console.WriteLine("  UsurperReborn -d C:\\SBBS\\NODE1\\");
+            Console.WriteLine("  UsurperReborn --online --user PlayerName --stdio");
+            Console.WriteLine("  UsurperReborn --online --db /var/usurper/game.db");
             Console.WriteLine("");
             Console.WriteLine("Drop File Support:");
             Console.WriteLine("  DOOR32.SYS - Modern format with socket handle (recommended)");

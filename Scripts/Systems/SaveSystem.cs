@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Godot;
-using UsurperRemake.BBS;
 
 namespace UsurperRemake.Systems
 {
@@ -18,47 +15,44 @@ namespace UsurperRemake.Systems
         private static SaveSystem? instance;
         public static SaveSystem Instance => instance ??= new SaveSystem();
 
-        private readonly string baseSaveDirectory;
-        private readonly JsonSerializerOptions jsonOptions;
+        /// <summary>
+        /// Initialize the singleton with a specific backend before first use.
+        /// Must be called before any code accesses Instance, otherwise the default
+        /// FileSaveBackend is created. Used by online mode to inject SqlSaveBackend.
+        /// </summary>
+        public static void InitializeWithBackend(ISaveBackend backend)
+        {
+            if (instance != null)
+            {
+                DebugLogger.Instance.LogWarning("SAVE", "SaveSystem already initialized - replacing backend");
+            }
+            instance = new SaveSystem(backend);
+        }
+
+        private readonly ISaveBackend backend;
 
         /// <summary>
-        /// Get the active save directory (includes BBS namespace if in door mode)
+        /// The active save backend (FileSaveBackend for local, SqlSaveBackend for online)
         /// </summary>
-        public string saveDirectory
-        {
-            get
-            {
-                var bbsNamespace = DoorMode.GetSaveNamespace();
-                if (!string.IsNullOrEmpty(bbsNamespace))
-                {
-                    var bbsDir = Path.Combine(baseSaveDirectory, bbsNamespace);
-                    Directory.CreateDirectory(bbsDir);
-                    return bbsDir;
-                }
-                return baseSaveDirectory;
-            }
-        }
+        public ISaveBackend Backend => backend;
+
+        /// <summary>
+        /// Get the active save directory (delegates to backend)
+        /// </summary>
+        public string saveDirectory => backend.GetSaveDirectory();
 
         /// <summary>
         /// Public accessor for save directory (used by SysOp console)
         /// </summary>
-        public string GetSaveDirectory() => saveDirectory;
+        public string GetSaveDirectory() => backend.GetSaveDirectory();
 
-        public SaveSystem()
+        public SaveSystem() : this(new FileSaveBackend())
         {
-            // Use Godot's user data directory for cross-platform compatibility
-            baseSaveDirectory = Path.Combine(GetUserDataPath(), "saves");
+        }
 
-            // Ensure base save directory exists
-            Directory.CreateDirectory(baseSaveDirectory);
-
-            // Configure JSON serialization
-            jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                IncludeFields = true
-            };
+        public SaveSystem(ISaveBackend saveBackend)
+        {
+            backend = saveBackend;
         }
         
         /// <summary>
@@ -69,7 +63,7 @@ namespace UsurperRemake.Systems
             try
             {
                 // Create backup of existing save before overwriting
-                CreateBackup(playerName);
+                backend.CreateBackup(playerName);
 
                 // Log save event
                 DebugLogger.Instance.LogSave(playerName, player.Level, player.HP, player.MaxHP, player.Gold);
@@ -90,21 +84,20 @@ namespace UsurperRemake.Systems
                     Telemetry = TelemetrySystem.Instance.Serialize()
                 };
 
-                var fileName = GetSaveFileName(playerName);
-                var filePath = Path.Combine(saveDirectory, fileName);
-                var json = JsonSerializer.Serialize(saveData, jsonOptions);
+                var success = await backend.WriteGameData(playerName, saveData);
 
-                await File.WriteAllTextAsync(filePath, json);
+                if (success)
+                {
+                    DebugLogger.Instance.LogDebug("SAVE", $"Game saved successfully for '{playerName}'");
+                }
 
-                DebugLogger.Instance.LogDebug("SAVE", $"Game saved successfully: {fileName}");
-
-                // Sync stats to Steam if available
-                if (player is Player playerChar && playerChar.Statistics != null)
+                // Sync stats to Steam if available (blocked if dev menu was used)
+                if (player is Player playerChar && playerChar.Statistics != null && !player.DevMenuUsed)
                 {
                     SteamIntegration.SyncPlayerStats(playerChar.Statistics);
                 }
 
-                return true;
+                return success;
             }
             catch (Exception ex)
             {
@@ -118,41 +111,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task<SaveGameData?> LoadGame(string playerName)
         {
-            try
-            {
-                var fileName = GetSaveFileName(playerName);
-                var filePath = Path.Combine(saveDirectory, fileName);
-
-                if (!File.Exists(filePath))
-                {
-                    DebugLogger.Instance.LogDebug("LOAD", $"No save file found for '{playerName}'");
-                    return null;
-                }
-
-                var json = await File.ReadAllTextAsync(filePath);
-                var saveData = JsonSerializer.Deserialize<SaveGameData>(json, jsonOptions);
-
-                if (saveData == null)
-                {
-                    DebugLogger.Instance.LogError("LOAD", "Failed to deserialize save data");
-                    return null;
-                }
-
-                // Validate save version compatibility
-                if (saveData.Version < GameConfig.MinSaveVersion)
-                {
-                    DebugLogger.Instance.LogError("LOAD", $"Save file version {saveData.Version} is too old (minimum: {GameConfig.MinSaveVersion})");
-                    return null;
-                }
-
-                DebugLogger.Instance.LogDebug("LOAD", $"Save file loaded: {fileName} (v{saveData.Version})");
-                return saveData;
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogSystemError("LOAD", $"Failed to load game: {ex.Message}", ex.StackTrace);
-                return null;
-            }
+            return await backend.ReadGameData(playerName);
         }
         
         /// <summary>
@@ -160,35 +119,15 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool SaveExists(string playerName)
         {
-            var fileName = GetSaveFileName(playerName);
-            var filePath = Path.Combine(saveDirectory, fileName);
-            return File.Exists(filePath);
+            return backend.GameDataExists(playerName);
         }
-        
+
         /// <summary>
         /// Delete a save file
         /// </summary>
         public bool DeleteSave(string playerName)
         {
-            try
-            {
-                var fileName = GetSaveFileName(playerName);
-                var filePath = Path.Combine(saveDirectory, fileName);
-                
-                if (File.Exists(filePath))
-                {
-                    File.Delete(filePath);
-                    // GD.Print($"Save file deleted: {fileName}");
-                    return true;
-                }
-                
-                return false;
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"Failed to delete save: {ex.Message}");
-                return false;
-            }
+            return backend.DeleteGameData(playerName);
         }
         
         /// <summary>
@@ -196,46 +135,9 @@ namespace UsurperRemake.Systems
         /// </summary>
         public List<SaveInfo> GetAllSaves()
         {
-            var saves = new List<SaveInfo>();
-            
-            try
-            {
-                var files = Directory.GetFiles(saveDirectory, "*.json");
-                
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        var json = File.ReadAllText(file);
-                        var saveData = JsonSerializer.Deserialize<SaveGameData>(json, jsonOptions);
-                        
-                        if (saveData?.Player != null)
-                        {
-                            saves.Add(new SaveInfo
-                            {
-                                PlayerName = saveData.Player.Name2 ?? saveData.Player.Name1,
-                                SaveTime = saveData.SaveTime,
-                                Level = saveData.Player.Level,
-                                CurrentDay = saveData.CurrentDay,
-                                TurnsRemaining = saveData.Player.TurnsRemaining,
-                                FileName = Path.GetFileName(file)
-                            });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        GD.PrintErr($"Failed to read save file {file}: {ex.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"Failed to enumerate save files: {ex.Message}");
-            }
-            
-            return saves;
+            return backend.GetAllSaves();
         }
-        
+
         /// <summary>
         /// Auto-save the current game state with rotation (keeps 5 most recent autosaves)
         /// </summary>
@@ -244,49 +146,32 @@ namespace UsurperRemake.Systems
             if (player == null) return false;
 
             var playerName = player.Name2 ?? player.Name1;
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
-            var autosaveName = $"{playerName}_autosave_{timestamp}";
 
-            // Save the new autosave
-            var success = await SaveGame(autosaveName, player);
-
-            if (success)
+            // Serialize game state
+            var saveData = new SaveGameData
             {
-                // Rotate autosaves - keep only the 5 most recent
-                RotateAutosaves(playerName);
+                Version = GameConfig.SaveVersion,
+                SaveTime = DateTime.Now,
+                LastDailyReset = DailySystemManager.Instance.LastResetTime,
+                CurrentDay = DailySystemManager.Instance.CurrentDay,
+                DailyCycleMode = DailySystemManager.Instance.CurrentMode,
+                Player = SerializePlayer(player),
+                NPCs = await SerializeNPCs(),
+                WorldState = SerializeWorldState(),
+                Settings = SerializeDailySettings(),
+                StorySystems = SerializeStorySystems(),
+                Telemetry = TelemetrySystem.Instance.Serialize()
+            };
+
+            var success = await backend.WriteAutoSave(playerName, saveData);
+
+            // Sync stats to Steam if available (blocked if dev menu was used)
+            if (success && player is Player playerChar && playerChar.Statistics != null && !player.DevMenuUsed)
+            {
+                SteamIntegration.SyncPlayerStats(playerChar.Statistics);
             }
 
             return success;
-        }
-
-        /// <summary>
-        /// Rotate autosaves to keep only the 5 most recent
-        /// </summary>
-        private void RotateAutosaves(string playerName)
-        {
-            try
-            {
-                // Get all autosaves for this player
-                var autosavePattern = $"{string.Join("_", playerName.Split(Path.GetInvalidFileNameChars()))}_autosave_*.json";
-                var autosaveFiles = Directory.GetFiles(saveDirectory, autosavePattern);
-
-                // Sort by creation time, newest first
-                var sortedFiles = autosaveFiles
-                    .Select(f => new FileInfo(f))
-                    .OrderByDescending(f => f.CreationTime)
-                    .ToList();
-
-                // Delete all but the 5 most recent
-                for (int i = 5; i < sortedFiles.Count; i++)
-                {
-                    sortedFiles[i].Delete();
-                    // GD.Print($"Deleted old autosave: {sortedFiles[i].Name}");
-                }
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"Failed to rotate autosaves: {ex.Message}");
-            }
         }
 
         /// <summary>
@@ -294,55 +179,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public List<SaveInfo> GetPlayerSaves(string playerName)
         {
-            var saves = new List<SaveInfo>();
-            var sanitizedName = string.Join("_", playerName.Split(Path.GetInvalidFileNameChars()));
-
-            try
-            {
-                // Get all saves for this player (manual saves and autosaves)
-                var pattern = $"{sanitizedName}*.json";
-                var files = Directory.GetFiles(saveDirectory, pattern);
-
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        var json = File.ReadAllText(file);
-                        var saveData = JsonSerializer.Deserialize<SaveGameData>(json, jsonOptions);
-
-                        if (saveData?.Player != null)
-                        {
-                            var fileName = Path.GetFileName(file);
-                            var isAutosave = fileName.Contains("_autosave_");
-
-                            saves.Add(new SaveInfo
-                            {
-                                PlayerName = saveData.Player.Name2 ?? saveData.Player.Name1,
-                                SaveTime = saveData.SaveTime,
-                                Level = saveData.Player.Level,
-                                CurrentDay = saveData.CurrentDay,
-                                TurnsRemaining = saveData.Player.TurnsRemaining,
-                                FileName = fileName,
-                                IsAutosave = isAutosave,
-                                SaveType = isAutosave ? "Autosave" : "Manual Save"
-                            });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        GD.PrintErr($"Failed to read save file {file}: {ex.Message}");
-                    }
-                }
-
-                // Sort by save time, newest first
-                saves = saves.OrderByDescending(s => s.SaveTime).ToList();
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"Failed to get player saves: {ex.Message}");
-            }
-
-            return saves;
+            return backend.GetPlayerSaves(playerName);
         }
 
         /// <summary>
@@ -350,8 +187,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public SaveInfo? GetMostRecentSave(string playerName)
         {
-            var saves = GetPlayerSaves(playerName);
-            return saves.FirstOrDefault();
+            return backend.GetMostRecentSave(playerName);
         }
 
         /// <summary>
@@ -359,39 +195,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task<SaveGameData?> LoadSaveByFileName(string fileName)
         {
-            try
-            {
-                var filePath = Path.Combine(saveDirectory, fileName);
-
-                if (!File.Exists(filePath))
-                {
-                    return null;
-                }
-
-                var json = await File.ReadAllTextAsync(filePath);
-                var saveData = JsonSerializer.Deserialize<SaveGameData>(json, jsonOptions);
-
-                if (saveData == null)
-                {
-                    GD.PrintErr("Failed to deserialize save data");
-                    return null;
-                }
-
-                // Validate save version compatibility
-                if (saveData.Version < GameConfig.MinSaveVersion)
-                {
-                    GD.PrintErr($"Save file version {saveData.Version} is too old (minimum: {GameConfig.MinSaveVersion})");
-                    return null;
-                }
-
-                // GD.Print($"Game loaded successfully: {fileName}");
-                return saveData;
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"Failed to load game: {ex.Message}");
-                return null;
-            }
+            return await backend.ReadGameDataByFileName(fileName);
         }
 
         /// <summary>
@@ -399,71 +203,26 @@ namespace UsurperRemake.Systems
         /// </summary>
         public List<string> GetAllPlayerNames()
         {
-            var playerNames = new HashSet<string>();
-
-            try
-            {
-                var files = Directory.GetFiles(saveDirectory, "*.json");
-
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        var json = File.ReadAllText(file);
-                        var saveData = JsonSerializer.Deserialize<SaveGameData>(json, jsonOptions);
-
-                        if (saveData?.Player != null)
-                        {
-                            var playerName = saveData.Player.Name2 ?? saveData.Player.Name1;
-                            if (!string.IsNullOrWhiteSpace(playerName))
-                            {
-                                playerNames.Add(playerName);
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // Skip invalid save files
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"Failed to enumerate player names: {ex.Message}");
-            }
-
-            return playerNames.OrderBy(n => n).ToList();
+            return backend.GetAllPlayerNames();
         }
-        
+
         /// <summary>
         /// Create backup of existing save before overwriting
         /// </summary>
         public void CreateBackup(string playerName)
         {
-            try
-            {
-                var fileName = GetSaveFileName(playerName);
-                var filePath = Path.Combine(saveDirectory, fileName);
-                
-                if (File.Exists(filePath))
-                {
-                    var backupPath = Path.Combine(saveDirectory, $"{Path.GetFileNameWithoutExtension(fileName)}_backup.json");
-                    File.Copy(filePath, backupPath, true);
-                }
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"Failed to create backup: {ex.Message}");
-            }
+            backend.CreateBackup(playerName);
         }
-        
-        private string GetSaveFileName(string playerName)
+
+        /// <summary>
+        /// Public accessor for story systems serialization.
+        /// Used by OnlineStateManager to save shared world state.
+        /// </summary>
+        public StorySystemsData SerializeStorySystemsPublic()
         {
-            // Sanitize player name for file system
-            var sanitized = string.Join("_", playerName.Split(Path.GetInvalidFileNameChars()));
-            return $"{sanitized}.json";
+            return SerializeStorySystems();
         }
-        
+
         private PlayerData SerializePlayer(Character player)
         {
             return new PlayerData
@@ -661,6 +420,7 @@ namespace UsurperRemake.Systems
                 PDefeats = (int)player.PDefeats,
 
                 // Character settings
+                DevMenuUsed = player.DevMenuUsed,
                 AutoHeal = player.AutoHeal,
                 CombatSpeed = player.CombatSpeed,
                 SkipIntimateScenes = player.SkipIntimateScenes,
@@ -1310,31 +1070,6 @@ namespace UsurperRemake.Systems
             return new Dictionary<string, GodStateData>();
         }
         
-        /// <summary>
-        /// Get cross-platform user data directory
-        /// </summary>
-        private string GetUserDataPath()
-        {
-            // For console mode, use platform-specific directories
-            var appName = "UsurperReloaded";
-            
-            if (System.Environment.OSVersion.Platform == PlatformID.Win32NT)
-            {
-                return Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), appName);
-            }
-            else if (System.Environment.OSVersion.Platform == PlatformID.Unix)
-            {
-                var home = System.Environment.GetEnvironmentVariable("HOME");
-                return Path.Combine(home ?? "/tmp", ".local", "share", appName);
-            }
-            else
-            {
-                // Mac or other - use application support
-                var home = System.Environment.GetEnvironmentVariable("HOME");
-                return Path.Combine(home ?? "/tmp", "Library", "Application Support", appName);
-            }
-        }
-
         /// <summary>
         /// Serialize all story systems state
         /// Note: Uses reflection to safely access properties that may or may not exist

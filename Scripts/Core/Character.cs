@@ -94,6 +94,7 @@ public class Character
      * 6. what to say when you don't spare opponents life
      */
     
+    public bool DevMenuUsed { get; set; }            // permanently disables Steam achievements
     public bool AutoHeal { get; set; }              // autoheal in battle?
     public CombatSpeed CombatSpeed { get; set; } = CombatSpeed.Normal;  // combat text speed
     public bool SkipIntimateScenes { get; set; }    // skip detailed intimate scenes (fade to black)

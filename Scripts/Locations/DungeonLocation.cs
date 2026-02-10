@@ -842,6 +842,14 @@ public class DungeonLocation : BaseLocation
                 // Check achievements
                 AchievementSystem.CheckAchievements(player);
                 await AchievementSystem.ShowPendingNotifications(term);
+
+                // Online news: Old God defeated
+                if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+                {
+                    var godDisplayName = player.Name2 ?? player.Name1;
+                    _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                        $"{godDisplayName} has slain the Old God {result.God} on floor {currentDungeonLevel}!", "combat");
+                }
                 break;
 
             case BossOutcome.Saved:
@@ -854,6 +862,14 @@ public class DungeonLocation : BaseLocation
 
                 // Ocean Philosophy moment
                 OceanPhilosophySystem.Instance.CollectFragment(WaveFragment.TheCycle);
+
+                // Online news: Old God saved
+                if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+                {
+                    var saviorName = player.Name2 ?? player.Name1;
+                    _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                        $"{saviorName} has saved the Old God {result.God} from corruption!", "quest");
+                }
                 break;
 
             case BossOutcome.Allied:
@@ -9665,6 +9681,15 @@ public class DungeonLocation : BaseLocation
         // Collect the seal using the SevenSealsSystem
         var sealSystem = SevenSealsSystem.Instance;
         await sealSystem.CollectSeal(player, currentFloor.SealType.Value, terminal);
+
+        // Online news: seal discovered
+        if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+        {
+            var sealFinderName = player.Name2 ?? player.Name1;
+            var sealCount = StoryProgressionSystem.Instance.CollectedSeals.Count;
+            _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                $"{sealFinderName} has discovered an ancient Seal! ({sealCount}/7 collected)", "quest");
+        }
 
         // Mark this seal floor as cleared so player can progress to deeper floors
         // This is required because IsFloorCleared() and GetMaxAccessibleFloor() check ClearedSpecialFloors

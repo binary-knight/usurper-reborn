@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.26.1 - Inn Overhaul & Balance
+## ALPHA v0.27.0 - Online Multiplayer
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -24,6 +24,8 @@ cd usurper-reborn
 dotnet publish usurper-reloaded.csproj -c Release -o publish
 ./publish/UsurperReborn.exe  # or ./publish/UsurperReborn on Linux/Mac
 ```
+
+**Play online**: https://usurper-reborn.net (browser) or `ssh usurper@play.usurper-reborn.net -p 4000` (password: play)
 
 **Report bugs**: https://discord.gg/EZhwgDT6Ta (or GitHub Issues)
 
@@ -221,8 +223,9 @@ chmod +x publish/osx-arm64/UsurperReborn
 - **Pascal Compatibility**: 100% formula accuracy from original source
 - **New Systems**: 20+ major systems added (Companions, Grief, Ocean Philosophy, Seals, Old Gods, etc.)
 - **Platforms**: Windows, Linux, macOS
-- **Architecture**: Single-player with persistent turn-based world simulation
-- **Save System**: JSON-based with autosave rotation and manual saves
+- **Architecture**: Single-player local + online multiplayer via SSH
+- **Save System**: JSON (local) / SQLite (online) with autosave
+- **Online Play**: Browser terminal at usurper-reborn.net or SSH on port 4000
 
 ### Project Structure
 ```
@@ -318,6 +321,17 @@ How long to complete Usurper Reborn:
 
 *Note: Playtime varies based on difficulty mode and exploration style.*
 
+### Online Multiplayer (NEW)
+Play with others in a shared persistent world:
+- **Browser Play** - Play instantly at [usurper-reborn.net](https://usurper-reborn.net) with an embedded terminal
+- **SSH Access** - Connect via `ssh usurper@play.usurper-reborn.net -p 4000` (password: play)
+- **In-Game Client** - Select `[O]nline Play` from the main menu (uses built-in SSH.NET)
+- **Shared World** - All online players share NPCs, economy, politics, and news
+- **In-Game Auth** - Register/login with your own account and password
+- **Live Stats** - See who's online, leaderboards, and world stats on the website
+- **Cross-Player Chat** - `/say`, `/tell`, `/who` commands
+- **Server Deployment** - Host your own server (see [SERVER_DEPLOYMENT.md](DOCS/SERVER_DEPLOYMENT.md))
+
 ### BBS Door Mode
 Run Usurper Reborn as a door game on modern BBS software:
 - **Auto-Detection** - Game reads DOOR32.SYS and auto-configures for your BBS. No special flags needed.
@@ -345,6 +359,22 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.27.0 - Online Multiplayer
+
+**Online Server:**
+- Full online multiplayer via SSH with shared SQLite database
+- In-game authentication (PBKDF2 password hashing, constant-time comparison)
+- Online player tracking with heartbeat system
+- Inter-player chat and messaging
+- Automated server setup script, systemd services, backup scripts
+
+**Website (usurper-reborn.net):**
+- Browser-based play via xterm.js WebSocket terminal
+- Live stats dashboard with online players, aggregate stats, highlights, news feed
+- Stats REST API (`GET /api/stats`) with 30-second cache
+- Comprehensive landing page with game lore, classes, races, companions, Old Gods, endings
+- SSL via Let's Encrypt, nginx reverse proxy
 
 ### Completed in v0.26.1 - Inn Overhaul & Balance
 
@@ -657,7 +687,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.26.1)
+### Known Issues (Alpha v0.27.0)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -672,4 +702,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.26.1 - Inn Overhaul & Balance
+**Status**: ALPHA v0.27.0 - Online Multiplayer

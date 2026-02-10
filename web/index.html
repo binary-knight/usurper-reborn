@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usurper Reborn - Online Text RPG</title>
+    <meta name="description" content="A modern recreation of the classic 1993 BBS door game. Play online in your browser or via SSH. 11 classes, 100 dungeon floors, deep narrative.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231a0a2e'/%3E%3Ctext x='16' y='22' font-family='serif' font-weight='bold' font-size='16' fill='%23ffaa00' text-anchor='middle'%3EUR%3C/text%3E%3Cpolygon points='10,7 16,3 22,7' fill='%23ffaa00'/%3E%3Cpolygon points='12,7 16,4.5 20,7' fill='%231a0a2e'/%3E%3Crect x='11' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3Crect x='15' y='5' width='2' height='4' fill='%23ffaa00'/%3E%3Crect x='19' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+    <style>
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a25;
+            --border: #2a2a3a;
+            --cyan: #00e5ff;
+            --cyan-dim: #0099aa;
+            --green: #00ff88;
+            --green-dim: #009955;
+            --gold: #ffaa00;
+            --red: #ff4444;
+            --purple: #aa66ff;
+            --text: #e0e0e0;
+            --text-dim: #888899;
+            --glow-cyan: 0 0 20px rgba(0, 229, 255, 0.3);
+            --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+            --glow-gold: 0 0 20px rgba(255, 170, 0, 0.3);
+            --glow-purple: 0 0 20px rgba(170, 102, 255, 0.3);
+            --glow-red: 0 0 20px rgba(255, 68, 68, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Scanline overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.03) 2px,
+                rgba(0, 0, 0, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: rgba(10, 10, 15, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 14px;
+            color: var(--cyan);
+            text-decoration: none;
+            text-shadow: var(--glow-cyan);
+        }
+
+        .nav-links a {
+            color: var(--text-dim);
+            text-decoration: none;
+            margin-left: 20px;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--cyan); }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 80px 0 60px;
+        }
+
+        .hero-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 32px;
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan);
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .hero-subtitle {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            color: var(--gold);
+            margin-bottom: 24px;
+            letter-spacing: 2px;
+        }
+
+        .hero-desc {
+            font-size: 18px;
+            color: var(--text-dim);
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--cyan);
+            color: var(--bg-dark);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn-primary:hover {
+            background: #33eeff;
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--cyan-dim);
+            color: var(--cyan);
+        }
+
+        /* Title banner */
+        .title-banner {
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .title-banner .title-main {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 36px;
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan), 0 0 40px rgba(0, 229, 255, 0.15);
+            letter-spacing: 4px;
+            margin-bottom: 8px;
+        }
+        .title-banner .title-sub {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 20px;
+            color: var(--gold);
+            text-shadow: var(--glow-gold), 0 0 30px rgba(255, 215, 0, 0.15);
+            letter-spacing: 6px;
+        }
+
+        /* Section styling */
+        section { padding: 60px 0; }
+        section + section { border-top: 1px solid var(--border); }
+
+        .section-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 14px;
+            color: var(--green);
+            text-align: center;
+            margin-bottom: 16px;
+            text-shadow: var(--glow-green);
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 15px;
+            margin-bottom: 40px;
+            max-width: 650px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Feature grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+            gap: 16px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            transition: all 0.2s;
+        }
+
+        .feature-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--cyan-dim);
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+
+        .feature-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--cyan);
+            margin-bottom: 8px;
+        }
+
+        .feature-card p {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        /* Story pages */
+        .story-page {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 32px;
+            margin-bottom: 16px;
+        }
+
+        .story-page h3 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            color: var(--gold);
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: var(--glow-gold);
+        }
+
+        .story-page p {
+            color: var(--text-dim);
+            font-size: 15px;
+            margin-bottom: 12px;
+            text-align: center;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .story-page p:last-child { margin-bottom: 0; }
+
+        /* God cards */
+        .god-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .god-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .god-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+
+        .god-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--purple);
+            transform: translateY(-2px);
+        }
+
+        .god-card .god-floor {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+
+        .god-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            color: var(--purple);
+            margin-bottom: 2px;
+        }
+
+        .god-card .god-title {
+            font-size: 12px;
+            color: var(--gold);
+            font-style: italic;
+            margin-bottom: 4px;
+        }
+
+        .god-card .god-domain {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--cyan-dim);
+            margin-bottom: 10px;
+        }
+
+        .god-card p {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        /* Class/Race grids */
+        .class-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .class-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+
+        .class-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--cyan-dim);
+        }
+
+        .class-card h4 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--cyan);
+            margin-bottom: 6px;
+        }
+
+        .class-card .class-role {
+            font-size: 11px;
+            color: var(--gold);
+            margin-bottom: 8px;
+        }
+
+        .class-card p {
+            font-size: 12px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        .class-card .stat-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .stat-bar .bar {
+            flex: 1;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .stat-bar .bar-fill {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        .stat-bar .bar-fill.str { background: var(--red); }
+        .stat-bar .bar-fill.def { background: var(--cyan); }
+        .stat-bar .bar-fill.mag { background: var(--purple); }
+        .stat-bar .bar-fill.spd { background: var(--green); }
+
+        /* Companion cards */
+        .companion-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 16px;
+        }
+
+        .companion-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            transition: all 0.2s;
+        }
+
+        .companion-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--green-dim);
+        }
+
+        .companion-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--green);
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .companion-card .companion-title {
+            font-size: 12px;
+            color: var(--gold);
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+
+        .companion-card .companion-desc {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+        }
+
+        .companion-card .companion-backstory {
+            font-size: 13px;
+            color: var(--text-dim);
+            border-left: 2px solid var(--border);
+            padding-left: 12px;
+            margin-bottom: 10px;
+        }
+
+        .companion-card .companion-meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .companion-card .companion-meta span { color: var(--cyan-dim); }
+
+        .companion-card .companion-quote {
+            font-style: italic;
+            color: var(--gold);
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        /* Ending cards */
+        .ending-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .ending-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .ending-card:hover {
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+        }
+
+        .ending-card h3 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+
+        .ending-card p {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .ending-card .ending-hint {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            margin-top: 10px;
+            color: var(--text-dim);
+            font-style: italic;
+        }
+
+        /* History section */
+        .history-timeline {
+            position: relative;
+            padding-left: 24px;
+        }
+
+        .history-timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .history-entry {
+            position: relative;
+            margin-bottom: 32px;
+            padding-left: 24px;
+        }
+
+        .history-entry::before {
+            content: '';
+            position: absolute;
+            left: -29px;
+            top: 8px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .history-entry h3 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            color: var(--gold);
+            margin-bottom: 8px;
+        }
+
+        .history-entry p {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+
+        /* Credits */
+        .credits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .credit-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .credit-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--gold);
+            margin-bottom: 4px;
+        }
+
+        .credit-card .credit-role {
+            font-size: 12px;
+            color: var(--cyan-dim);
+            margin-bottom: 10px;
+        }
+
+        .credit-card p {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        /* Connect section */
+        .connect-methods {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 32px;
+        }
+
+        .connect-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 28px;
+        }
+
+        .connect-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--gold);
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .connect-card p {
+            color: var(--text-dim);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .ssh-command {
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--green);
+            cursor: pointer;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+
+        .ssh-command:hover { border-color: var(--green-dim); }
+
+        .ssh-command .copy-hint {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            font-size: 11px;
+        }
+
+        /* BBS List */
+        .bbs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            margin-top: 24px;
+        }
+
+        .bbs-table th {
+            text-align: left;
+            padding: 10px 12px;
+            color: var(--cyan);
+            border-bottom: 2px solid var(--border);
+            font-size: 12px;
+        }
+
+        .bbs-table td {
+            padding: 10px 12px;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .bbs-note {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        .bbs-note a {
+            color: var(--cyan-dim);
+            text-decoration: none;
+        }
+
+        .bbs-note a:hover { color: var(--cyan); }
+
+        /* Terminal */
+        .terminal-section {
+            display: none;
+            padding: 0 0 40px;
+            border-top: none !important;
+        }
+
+        .terminal-section.active { display: block; }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #1a1a25;
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .terminal-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .terminal-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .terminal-dots span {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background: var(--red); }
+        .dot-yellow { background: var(--gold); }
+        .dot-green { background: var(--green); }
+
+        .terminal-close {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0 4px;
+        }
+
+        .terminal-close:hover { color: var(--red); }
+
+        #terminal-container {
+            border: 1px solid var(--border);
+            border-radius: 0 0 8px 8px;
+            overflow: hidden;
+            height: 500px;
+        }
+
+        .terminal-status {
+            text-align: center;
+            padding: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .terminal-status.connected { color: var(--green); }
+        .terminal-status.error { color: var(--red); }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 32px 0;
+            text-align: center;
+        }
+
+        footer p {
+            color: var(--text-dim);
+            font-size: 13px;
+        }
+
+        footer a {
+            color: var(--cyan-dim);
+            text-decoration: none;
+        }
+
+        footer a:hover { color: var(--cyan); }
+
+        .footer-links {
+            display: flex;
+            gap: 24px;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+
+        /* Live Stats Dashboard */
+        .stats-online-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .online-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: var(--glow-green);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        .online-dot.offline {
+            background: var(--text-dim);
+            box-shadow: none;
+            animation: none;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .online-count {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--green);
+        }
+
+        .online-count.none { color: var(--text-dim); }
+
+        .online-players-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            margin-bottom: 24px;
+        }
+
+        .online-players-table th {
+            text-align: left;
+            padding: 8px 12px;
+            color: var(--cyan);
+            border-bottom: 2px solid var(--border);
+            font-size: 11px;
+        }
+
+        .online-players-table td {
+            padding: 8px 12px;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .online-players-table .player-name { color: var(--green); }
+        .online-players-table .player-class { color: var(--gold); }
+        .online-players-table .player-via { color: var(--text-dim); font-size: 12px; }
+
+        .online-empty {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 14px;
+            padding: 16px;
+            font-style: italic;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px 16px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--cyan-dim);
+        }
+
+        .stat-card .stat-value {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 18px;
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan);
+            margin-bottom: 6px;
+        }
+
+        .stat-card .stat-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .highlights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .highlight-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+
+        .highlight-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--gold);
+        }
+
+        .highlight-card .highlight-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .highlight-card .highlight-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--gold);
+        }
+
+        .highlight-card .highlight-detail {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .news-feed {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .news-feed h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--cyan);
+            margin-bottom: 12px;
+        }
+
+        .news-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+
+        .news-item:last-child { border-bottom: none; }
+
+        .news-item .news-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-right: 8px;
+        }
+
+        .news-item .news-player { color: var(--green); }
+        .news-item .news-text { color: var(--text-dim); }
+
+        .news-empty {
+            color: var(--text-dim);
+            font-style: italic;
+            font-size: 13px;
+        }
+
+        .leaderboard-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .leaderboard-section h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--gold);
+            margin-bottom: 12px;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .leaderboard-table th {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .leaderboard-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .leaderboard-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+        .leaderboard-table .rank-col { width: 50px; color: var(--text-dim); }
+        .leaderboard-table .rank-1 { color: var(--gold); font-weight: bold; }
+        .leaderboard-table .rank-2 { color: #ccc; font-weight: bold; }
+        .leaderboard-table .rank-3 { color: #cd7f32; font-weight: bold; }
+        .leaderboard-table .lb-name { color: var(--green); }
+        .leaderboard-table .lb-name.is-online { color: var(--bright-green, #5f5); }
+        .leaderboard-table .lb-class { color: var(--gold); }
+        .leaderboard-table .lb-xp { color: var(--text-dim); text-align: right; }
+        .leaderboard-table .lb-level { text-align: center; }
+        .leaderboard-table .online-indicator { color: #0f0; font-size: 8px; margin-right: 4px; }
+
+        .leaderboard-empty {
+            color: var(--text-dim);
+            font-style: italic;
+            font-size: 13px;
+            padding: 12px 0;
+        }
+
+        .stats-refresh {
+            text-align: center;
+            margin-top: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .stats-error {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 14px;
+            padding: 40px 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-title { font-size: 20px; }
+            .hero-subtitle { font-size: 10px; }
+            .title-banner .title-main { font-size: 20px; letter-spacing: 2px; }
+            .title-banner .title-sub { font-size: 12px; letter-spacing: 3px; }
+            .connect-methods { grid-template-columns: 1fr; }
+            .companion-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .highlights-grid { grid-template-columns: 1fr; }
+            header .container { flex-direction: column; gap: 12px; }
+            .nav-links { display: flex; flex-wrap: wrap; justify-content: center; }
+            .nav-links a { margin: 4px 8px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="container">
+        <a href="#" class="logo">USURPER REBORN</a>
+        <nav class="nav-links">
+            <a href="#live-stats">Live</a>
+            <a href="#features">Features</a>
+            <a href="#story">Story</a>
+            <a href="#gods">Old Gods</a>
+            <a href="#classes">Classes</a>
+            <a href="#companions">Companions</a>
+            <a href="#history">History</a>
+            <a href="#connect">Play</a>
+            <a href="https://github.com/jknight-developer/usurper-reborn" target="_blank">GitHub</a>
+        </nav>
+    </div>
+</header>
+
+<section class="hero">
+    <div class="container">
+        <div class="title-banner">
+            <div class="title-main">USURPER</div>
+            <div class="title-sub">REBORN</div>
+        </div>
+        <p class="hero-subtitle">A MODERN RECREATION OF THE CLASSIC 1993 BBS DOOR GAME</p>
+        <p class="hero-desc">
+            Adventure in a persistent world with deep combat, political intrigue, romance,
+            and a 100-floor dungeon. Play online with others in your browser.
+        </p>
+        <div class="hero-buttons">
+            <button class="btn btn-primary" id="play-btn" onclick="openTerminal()">Play Now in Browser</button>
+            <a class="btn btn-secondary" href="#connect">SSH Connection Info</a>
+        </div>
+    </div>
+</section>
+
+<!-- Terminal (hidden by default) -->
+<section class="terminal-section" id="terminal-section">
+    <div class="container">
+        <div class="terminal-header">
+            <div class="terminal-dots">
+                <span class="dot-red"></span>
+                <span class="dot-yellow"></span>
+                <span class="dot-green"></span>
+            </div>
+            <span class="terminal-title">usurper-reborn.net</span>
+            <button class="terminal-close" onclick="closeTerminal()" title="Close terminal">&times;</button>
+        </div>
+        <div id="terminal-container"></div>
+        <div class="terminal-status" id="terminal-status">Click "Play Now" to connect...</div>
+    </div>
+</section>
+
+<!-- Live Stats -->
+<section id="live-stats">
+    <div class="container">
+        <h2 class="section-title">// WORLD STATUS</h2>
+        <p class="section-subtitle">Live data from the Usurper Reborn online server</p>
+
+        <div id="stats-content">
+            <div class="stats-error" id="stats-loading">Loading world data...</div>
+        </div>
+    </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+    <div class="container">
+        <h2 class="section-title">// FEATURES</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">&#9876;</div>
+                <h3>11 Unique Classes</h3>
+                <p>Warrior, Paladin, Assassin, Magician, Cleric, Ranger, Bard, Sage, Barbarian, Alchemist, and Jester. Each with unique abilities and playstyles.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#127758;</div>
+                <h3>100-Floor Dungeon</h3>
+                <p>Deterministically generated floors with boss encounters, ancient seals, Old God battles, treasure rooms, and hidden secrets.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128481;</div>
+                <h3>Online Multiplayer</h3>
+                <p>Play alongside others in a shared persistent world. Chat, trade, duel, and compete on leaderboards.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128081;</div>
+                <h3>Political Intrigue</h3>
+                <p>Challenge the throne, recruit guards, manage a treasury, navigate court factions, and rule as King with real consequences.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#10084;</div>
+                <h3>Deep Relationships</h3>
+                <p>60 unique NPCs with memories, personalities, and relationship arcs. Romance, marriage, family, betrayal, and grief systems.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128218;</div>
+                <h3>Rich Narrative</h3>
+                <p>7 Old Gods to confront, 5 possible endings, companion quests, dream sequences, and a philosophical awakening system.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Story -->
+<section id="story">
+    <div class="container">
+        <h2 class="section-title">// THE STORY SO FAR</h2>
+        <p class="section-subtitle">A tale of gods, corruption, and the mortal who dared to challenge eternity.</p>
+
+        <div class="story-page">
+            <h3>~ The Golden Age ~</h3>
+            <p>Long ago, in an age now lost to memory, the world was watched over by the Seven Divine &mdash; gods of immense power who guided mortalkind with wisdom and grace. Under their benevolent gaze, civilizations flourished.</p>
+            <p>The god of war taught honor in battle. The goddess of love blessed every union. The god of light ensured truth prevailed over deception.</p>
+            <p>It was an age of miracles. An age of heroes. An age of hope.</p>
+        </div>
+
+        <div class="story-page">
+            <h3>~ The Sundering ~</h3>
+            <p>Then came the Sundering &mdash; a cataclysm whose cause remains unknown. Some say mortals grew too proud and turned away from the gods. Others whisper of a betrayal among the Divine themselves. Whatever the truth, the result was catastrophic.</p>
+            <p>The Seven were corrupted. Twisted. Imprisoned in realms of their own making.</p>
+            <p>The god of war became rage incarnate, drowning in endless bloodshed. The goddess of love withered into jealousy and obsession. The god of light faded to barely a whisper, truth dying with each passing lie.</p>
+        </div>
+
+        <div class="story-page">
+            <h3>~ The Age of Avarice ~</h3>
+            <p>Centuries have passed. The Old Gods are now mere legends &mdash; cautionary tales told to frighten children. In their absence, mortals have created new gods to worship, pale echoes of the Divine that once were.</p>
+            <p>And in this godless age, a new power has risen: <strong style="color:var(--gold)">AVARICE.</strong></p>
+            <p>The Halls of Avarice &mdash; a sprawling underground complex where adventurers seek fortune, glory, and power. Where the strong prey upon the weak. Where gold is the only god that matters.</p>
+            <p>Some come seeking treasure. Some come seeking fame. Some come to escape their past. And some... some hear whispers in the dark. Ancient voices calling from the depths. Promising power. Demanding sacrifice.</p>
+        </div>
+
+        <div class="story-page">
+            <h3>~ Your Story Begins ~</h3>
+            <p>You arrive at the gates of the realm with little more than the clothes on your back and a hunger for something more.</p>
+            <p>Will you delve into the deadly Dungeons in search of treasure and glory? Will you find love on the cobblestones of this dangerous town? Will you rise to become a champion... or fall to become a cautionary tale?</p>
+            <p>And perhaps, if you grow strong enough, you may discover what truly lurks in the deepest halls. You may learn the fate of the Old Gods. You may even have the chance to save them... or destroy them forever.</p>
+            <p style="color:var(--cyan)">The choice, adventurer, is yours.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Old Gods -->
+<section id="gods">
+    <div class="container">
+        <h2 class="section-title" style="color:var(--purple);text-shadow:var(--glow-purple)">// THE SEVEN OLD GODS</h2>
+        <p class="section-subtitle">Once benevolent deities, now corrupted and imprisoned in the depths. Each must be confronted to learn the truth.</p>
+
+        <div class="god-grid">
+            <div class="god-card" style="border-top:3px solid var(--red)">
+                <div class="god-floor">Floor 25</div>
+                <h3>Maelketh</h3>
+                <div class="god-title">The Broken Blade</div>
+                <div class="god-domain">War &amp; Conquest</div>
+                <p>Once the noble god of honorable combat, Maelketh's mind shattered during the Sundering. Now he knows only endless war.</p>
+            </div>
+
+            <div class="god-card" style="border-top:3px solid #ff66aa">
+                <div class="god-floor">Floor 40</div>
+                <h3>Veloura</h3>
+                <div class="god-title">The Withered Heart</div>
+                <div class="god-domain">Love &amp; Passion</div>
+                <p>The goddess of love fades with each broken heart. She can still be saved... if one proves love endures.</p>
+            </div>
+
+            <div class="god-card" style="border-top:3px solid var(--gold)">
+                <div class="god-floor">Floor 55</div>
+                <h3>Thorgrim</h3>
+                <div class="god-title">The Hollow Judge</div>
+                <div class="god-domain">Law &amp; Order</div>
+                <p>The god of justice became the god of tyranny. His scales weigh only power now.</p>
+            </div>
+
+            <div class="god-card" style="border-top:3px solid var(--purple)">
+                <div class="god-floor">Floor 70</div>
+                <h3>Noctura</h3>
+                <div class="god-title">The Shadow Weaver</div>
+                <div class="god-domain">Shadow &amp; Secrets</div>
+                <p>The mysterious orchestrator. She set these events in motion. Her true motives remain hidden.</p>
+            </div>
+
+            <div class="god-card" style="border-top:3px solid #ffee44">
+                <div class="god-floor">Floor 85</div>
+                <h3>Aurelion</h3>
+                <div class="god-title">The Fading Light</div>
+                <div class="god-domain">Light &amp; Truth</div>
+                <p>The god of truth speaks only in whispers now. His light dims with every lie told in the realm.</p>
+            </div>
+
+            <div class="god-card" style="border-top:3px solid #886644">
+                <div class="god-floor">Floor 95</div>
+                <h3>Terravok</h3>
+                <div class="god-title">The Sleeping Mountain</div>
+                <div class="god-domain">Earth &amp; Endurance</div>
+                <p>The oldest god sleeps beneath the dungeon. He can be awakened... but should he be?</p>
+            </div>
+
+            <div class="god-card" style="border-top:3px solid var(--cyan)">
+                <div class="god-floor">Floor 100</div>
+                <h3>Manwe</h3>
+                <div class="god-title">The Weary Creator</div>
+                <div class="god-domain">Creation &amp; Balance</div>
+                <p>The Supreme Creator. He waits at the end of all paths, weary of eternity. Your choices determine his fate &mdash; and yours.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Classes -->
+<section id="classes">
+    <div class="container">
+        <h2 class="section-title">// CLASSES &amp; RACES</h2>
+        <p class="section-subtitle">Choose from 11 distinct classes and 10 races. Each combination offers unique strengths and playstyles.</p>
+
+        <h3 style="font-family:'JetBrains Mono',monospace;color:var(--cyan);font-size:13px;margin-bottom:16px;text-align:center;">Character Classes</h3>
+        <div class="class-grid">
+            <div class="class-card">
+                <h4>Warrior</h4>
+                <div class="class-role">Melee Fighter</div>
+                <p>Balanced melee combatant with solid HP, strength, and defense. The reliable choice for any adventurer.</p>
+                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
+                <div class="stat-bar"><span>DEF</span><div class="bar"><div class="bar-fill def" style="width:80%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Paladin</h4>
+                <div class="class-role">Holy Knight</div>
+                <p>Heavy armor, high stamina, and righteous fury. Strong defense with moderate offensive capability.</p>
+                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
+                <div class="stat-bar"><span>DEF</span><div class="bar"><div class="bar-fill def" style="width:60%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Ranger</h4>
+                <div class="class-role">Scout &amp; Tracker</div>
+                <p>Swift and versatile. High stamina and dexterity make rangers excellent dungeon explorers.</p>
+                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:80%"></div></div></div>
+                <div class="stat-bar"><span>STA</span><div class="bar"><div class="bar-fill def" style="width:80%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Assassin</h4>
+                <div class="class-role">Shadow Striker</div>
+                <p>Devastating backstab attacks and unmatched dexterity. Fragile but deadly in the right hands.</p>
+                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
+                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Bard</h4>
+                <div class="class-role">Jack of All Trades</div>
+                <p>Well-rounded with high charisma. Capable in combat, social situations, and support roles.</p>
+                <div class="stat-bar"><span>CHA</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
+                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:80%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Jester</h4>
+                <div class="class-role">Trickster</div>
+                <p>Unpredictable and agile. Highest dexterity and agility of any class, with chaos-based abilities.</p>
+                <div class="stat-bar"><span>AGI</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
+                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Alchemist</h4>
+                <div class="class-role">Arcane Crafter</div>
+                <p>Blends science and magic. High wisdom and intelligence with charismatic flair.</p>
+                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
+                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Magician</h4>
+                <div class="class-role">Arcane Caster</div>
+                <p>Pure spellcaster with devastating magical power. Fragile in melee but commands 75 spells.</p>
+                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
+                <div class="stat-bar"><span>CHA</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Cleric</h4>
+                <div class="class-role">Divine Healer</div>
+                <p>Holy magic and healing spells. Moderate combat with strong support abilities and divine mana.</p>
+                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
+                <div class="stat-bar"><span>CHA</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Sage</h4>
+                <div class="class-role">Scholar Mage</div>
+                <p>Highest wisdom and intelligence. Massive mana pool (50 base) for unmatched spellcasting endurance.</p>
+                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
+                <div class="stat-bar"><span>MNA</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
+            </div>
+            <div class="class-card">
+                <h4>Barbarian</h4>
+                <div class="class-role">Berserker</div>
+                <p>Raw power incarnate. Highest HP, strength, stamina, and constitution. Brains optional.</p>
+                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:100%"></div></div></div>
+                <div class="stat-bar"><span>HP</span><div class="bar"><div class="bar-fill str" style="width:100%"></div></div></div>
+            </div>
+        </div>
+
+        <h3 style="font-family:'JetBrains Mono',monospace;color:var(--cyan);font-size:13px;margin:40px 0 16px;text-align:center;">Character Races</h3>
+        <div class="class-grid">
+            <div class="class-card">
+                <h4>Human</h4>
+                <p>Balanced and adaptable. Solid bonuses across all stats with no weaknesses.</p>
+            </div>
+            <div class="class-card">
+                <h4>Hobbit</h4>
+                <p>Small but loyal. Lower strength but naturally resilient and surprisingly tough.</p>
+            </div>
+            <div class="class-card">
+                <h4>Elf</h4>
+                <p>Graceful and agile. Lower HP but enhanced magical affinity and precision.</p>
+            </div>
+            <div class="class-card">
+                <h4>Half-Elf</h4>
+                <p>The best of both worlds. Good stamina with balanced human and elven traits.</p>
+            </div>
+            <div class="class-card">
+                <h4>Dwarf</h4>
+                <p>Stubborn and sturdy. Highest HP, strength, and defense bonuses of all races.</p>
+            </div>
+            <div class="class-card">
+                <h4>Troll</h4>
+                <p>Massive and powerful. Exceptional HP and strength with intimidating presence.</p>
+            </div>
+            <div class="class-card">
+                <h4>Orc</h4>
+                <p>Ill-mannered but effective. Strong defense and natural combat instincts.</p>
+            </div>
+            <div class="class-card">
+                <h4>Gnome</h4>
+                <p>Willful and clever. Modest physical stats but resourceful in unexpected ways.</p>
+            </div>
+            <div class="class-card">
+                <h4>Gnoll</h4>
+                <p>Small and scrappy. Compensates for size with strength and determination.</p>
+            </div>
+            <div class="class-card">
+                <h4>Mutant</h4>
+                <p>Unpredictable and unique. Adaptive bonuses make every mutant different.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Companions -->
+<section id="companions">
+    <div class="container">
+        <h2 class="section-title" style="color:var(--gold);text-shadow:var(--glow-gold)">// COMPANIONS</h2>
+        <p class="section-subtitle">Four souls whose fates intertwine with yours. They can fight, heal, die &mdash; and change your story forever.</p>
+
+        <div class="companion-grid">
+            <div class="companion-card">
+                <h3>Lyris</h3>
+                <div class="companion-title">The Wandering Star</div>
+                <div class="companion-desc">A mysterious traveler with silver-streaked hair and eyes that seem to hold ancient sorrow. She speaks in riddles and appears to know more than she reveals.</div>
+                <div class="companion-backstory">Once a priestess of Aurelion, the god of light. When the Old Gods were corrupted, she was cast out &mdash; neither fully mortal nor divine. She wanders endlessly, seeking a way to heal the gods she once served.</div>
+                <div class="companion-meta">
+                    <span>Hybrid (Magic/Healer)</span>
+                    <span>Recruits: Level 15</span>
+                    <span>Romance: Available</span>
+                </div>
+                <div class="companion-quote">"There is something... familiar about you."</div>
+            </div>
+
+            <div class="companion-card">
+                <h3>Aldric</h3>
+                <div class="companion-title">The Unbroken Shield</div>
+                <div class="companion-desc">A grizzled warrior with scars mapping decades of battle. His eyes hold the weight of those he couldn't save, and the determination to never fail again.</div>
+                <div class="companion-backstory">Once the captain of the King's Guard, Aldric lost his entire unit to a demonic incursion he blames himself for. He now wanders, seeking redemption through protecting those who need it most.</div>
+                <div class="companion-meta">
+                    <span>Tank</span>
+                    <span>Recruits: Level 10</span>
+                    <span>Quest: Ghosts of the Guard</span>
+                </div>
+                <div class="companion-quote">"I've failed people before. I won't fail you."</div>
+            </div>
+
+            <div class="companion-card">
+                <h3>Mira</h3>
+                <div class="companion-title">The Faded Light</div>
+                <div class="companion-desc">A former priestess whose faith shattered when her temple was destroyed. Her healing powers remain, but her spirit is hollow. She helps others because she no longer knows what else to do.</div>
+                <div class="companion-backstory">Mira devoted her life to healing in Veloura's temple. When Veloura was corrupted, the temple turned on itself &mdash; healers became reapers. Mira escaped, but left her faith behind.</div>
+                <div class="companion-meta">
+                    <span>Healer</span>
+                    <span>Recruits: Level 20</span>
+                    <span>Quest: The Meaning of Mercy</span>
+                </div>
+                <div class="companion-quote">"I heal because I don't know what else to do. Is that enough?"</div>
+            </div>
+
+            <div class="companion-card">
+                <h3>Vex</h3>
+                <div class="companion-title">The Laughing Shadow</div>
+                <div class="companion-desc">A charming thief with a quick wit and quicker fingers. Vex treats everything as a joke &mdash; including death. But there's a sadness behind the smile that he never speaks of.</div>
+                <div class="companion-backstory">Born with a wasting disease &mdash; he's been dying his whole life, one day at a time. Rather than despair, he chose to laugh. He steals to survive, jokes to cope, and refuses to take anything seriously.</div>
+                <div class="companion-meta">
+                    <span>Damage</span>
+                    <span>Recruits: Level 25</span>
+                    <span>Quest: One More Sunrise</span>
+                </div>
+                <div class="companion-quote">"Life's too short to take seriously. Trust me, I know."</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Endings -->
+<section id="endings">
+    <div class="container">
+        <h2 class="section-title" style="color:var(--red);text-shadow:var(--glow-red)">// FIVE ENDINGS</h2>
+        <p class="section-subtitle">Your choices shape the fate of gods and mortals alike. Every path leads to a different truth.</p>
+
+        <div class="ending-grid">
+            <div class="ending-card" style="border-top:3px solid var(--red)">
+                <h3 style="color:var(--red)">The Usurper</h3>
+                <p>Seize divine power for yourself. Become the new tyrant. Rule for eternity &mdash; and discover that power is a prison of its own.</p>
+                <div class="ending-hint">Path of Darkness</div>
+            </div>
+            <div class="ending-card" style="border-top:3px solid var(--green)">
+                <h3 style="color:var(--green)">The Savior</h3>
+                <p>Choose mercy over vengeance. Redeem the corrupted gods and restore the Golden Age. Become a legend songs are sung about.</p>
+                <div class="ending-hint">Path of Light</div>
+            </div>
+            <div class="ending-card" style="border-top:3px solid var(--gold)">
+                <h3 style="color:var(--gold)">The Defiant</h3>
+                <p>Reject all divine power. Shatter the artifacts. Free mortals from the gods forever. Walk into the sunrise &mdash; just a person who chose freedom.</p>
+                <div class="ending-hint">Path of Independence</div>
+            </div>
+            <div class="ending-card" style="border-top:3px solid var(--purple)">
+                <h3 style="color:var(--purple)">The True Awakening</h3>
+                <p>Break the cycle itself. Discover the truth about who you really are. Become the Bridge between divine and mortal &mdash; forever upward.</p>
+                <div class="ending-hint">Path of Balance (NG+)</div>
+            </div>
+            <div class="ending-card" style="border-top:3px solid #ffffff">
+                <h3 style="color:#ffffff">Dissolution</h3>
+                <p>The ultimate secret. After seeing every ending, make a choice no fragment has ever made. Find peace at last.</p>
+                <div class="ending-hint">Secret Ending (Cycle 3+)</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- History -->
+<section id="history">
+    <div class="container">
+        <h2 class="section-title">// USURPER HISTORY</h2>
+        <p class="section-subtitle">From 1993 BBS door game to a modern recreation. A journey through time.</p>
+
+        <div class="history-timeline">
+            <div class="history-entry">
+                <h3>The Age of the BBS (1978-1999)</h3>
+                <p>Before the World Wide Web, Bulletin Board Systems were tiny digital worlds you dialed into with a telephone modem. You'd hear the screech of the handshake, watch ANSI art fill your screen, and connect to a community of people you'd never meet in person.</p>
+                <p>By 1992, there were over 25,000 BBSes in the United States alone. Each one was run by a "SysOp" from their basement or bedroom. You could post messages, download files, chat &mdash; and play games.</p>
+            </div>
+
+            <div class="history-entry">
+                <h3>The Door Games</h3>
+                <p>"Door Games" were external programs that BBSes could launch for callers. The constraints were brutal: text only, slow connections (2400-14400 baud), one caller at a time, and limited play time to share the phone line.</p>
+                <p>Yet from these constraints came innovation. Games like Trade Wars 2002, Legend of the Red Dragon, and Usurper created persistent worlds where your actions TODAY affected what other players found TOMORROW. These were the first massively multiplayer online games accessible to ordinary people.</p>
+            </div>
+
+            <div class="history-entry">
+                <h3>The Birth of Usurper (1993)</h3>
+                <p>In 1993, programmer <strong style="color:var(--gold)">Jakob Dangarden</strong> created Usurper. At a time when Legend of the Red Dragon dominated, Usurper dared to be different &mdash; offering multiple races and classes with real mechanical differences, a 100-level dungeon, team warfare, political systems, and complex character progression.</p>
+                <p>The game was set in the realm of Dorashire, where adventurers explored the Dungeons of Durunghins. The ultimate goal? Accumulate power and usurp the throne itself. Usurper quickly gained a devoted following. It was dark, complex, and rewarded mastery.</p>
+            </div>
+
+            <div class="history-entry">
+                <h3>Those Who Preserved the Dream</h3>
+                <p><strong style="color:var(--gold)">Jakob Dangarden</strong> created the original masterpiece in Turbo Pascal. In 2004, he made the historic decision to release Usurper as open source under the GPL license, ensuring the game could live on forever.</p>
+                <p><strong style="color:var(--gold)">Rick Parrish</strong> of R&amp;M Software took on the monumental task of porting the original Pascal source code to modern systems, creating 32-bit and 64-bit versions. His GameSrv BBS server software keeps the entire door game era alive today.</p>
+                <p><strong style="color:var(--gold)">Daniel Zingaro</strong> provided tremendous help with massive bug fixing efforts, tracking down edge cases in decades-old code to make version 0.20e the most stable release ever.</p>
+            </div>
+
+            <div class="history-entry">
+                <h3>Usurper Reborn (2024-Present)</h3>
+                <p>This remake began with a simple question: what if Usurper had continued to evolve? What if the limitations of 1990s hardware were lifted, but the soul of the game remained intact?</p>
+                <p>Created by <strong style="color:var(--gold)">Jason Knight</strong>, Usurper Reborn is built in C# with modern architecture, staying true to the original vision. The core gameplay, class system, dungeon structure, and political intrigue are all preserved &mdash; enhanced with 60 unique NPCs, dynamic world simulation, deep narrative systems, companion quests, and New Game+ cycles.</p>
+                <p>The text-based interface is intentional. It's a love letter to an era when imagination filled in what graphics couldn't show.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Connect -->
+<section id="connect">
+    <div class="container">
+        <h2 class="section-title">// HOW TO CONNECT</h2>
+        <div class="connect-methods">
+            <div class="connect-card">
+                <h3>&#9658; Play in Browser</h3>
+                <p>No download required. Click the button to start playing instantly in a web terminal.</p>
+                <button class="btn btn-primary" onclick="openTerminal()" style="width:100%;justify-content:center;">Play Now</button>
+            </div>
+            <div class="connect-card">
+                <h3>&#9658; SSH (Advanced)</h3>
+                <p>Connect with any SSH client for the best terminal experience. Use password: <code style="color:var(--gold)">play</code></p>
+                <div class="ssh-command" onclick="copyCommand(this)">
+                    ssh usurper@play.usurper-reborn.net -p 4000
+                    <span class="copy-hint">click to copy</span>
+                </div>
+                <p style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);">Password: <code style="color:var(--gold);font-size:14px;">play</code></p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- BBS List -->
+<section id="bbs-list">
+    <div class="container">
+        <h2 class="section-title">// BBS LIST</h2>
+        <p class="section-subtitle">BBSes currently running Usurper Reborn as a door game. Connect via telnet or SSH to play!</p>
+
+        <table class="bbs-table">
+            <thead>
+                <tr>
+                    <th>BBS Name</th>
+                    <th>Software</th>
+                    <th>Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="color:var(--text)">Shurato's Heavenly Sphere</td>
+                    <td>EleBBS</td>
+                    <td style="color:var(--green)">shsbbs.net</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="bbs-note">
+            <p>Are you a SysOp running Usurper Reborn? <a href="https://github.com/jknight-developer/usurper-reborn/issues" target="_blank">Get listed here!</a></p>
+        </div>
+    </div>
+</section>
+
+<!-- Credits -->
+<section id="credits">
+    <div class="container">
+        <h2 class="section-title" style="color:var(--gold);text-shadow:var(--glow-gold)">// CREDITS</h2>
+
+        <div class="credits-grid">
+            <div class="credit-card">
+                <h3>Jakob Dangarden</h3>
+                <div class="credit-role">Original Game Creator (1993)</div>
+                <p>Created the original Usurper: Halls of Avarice in Turbo Pascal. Released as open source under GPL in 2004.</p>
+            </div>
+            <div class="credit-card">
+                <h3>Rick Parrish</h3>
+                <div class="credit-role">Source Code Preservation &amp; Porting</div>
+                <p>Ported the original Pascal source to modern systems. Creator of GameSrv BBS software.</p>
+            </div>
+            <div class="credit-card">
+                <h3>Daniel Zingaro</h3>
+                <div class="credit-role">Bug Fixing &amp; Code Quality</div>
+                <p>Massive bug fixing efforts on the Pascal source code. Made v0.20e the most stable release.</p>
+            </div>
+            <div class="credit-card">
+                <h3>Jason Knight</h3>
+                <div class="credit-role">Creator of Usurper Reborn</div>
+                <p>Built the modern C# / .NET 8.0 recreation with expanded systems and deep narrative.</p>
+            </div>
+        </div>
+
+        <div style="text-align:center;margin-top:32px;color:var(--text-dim);font-size:14px;">
+            <p>Special thanks to the BBS community of the 1980s and 1990s, all the SysOps who kept the boards running, and every player who dialed in to explore Durunghins.</p>
+            <p style="margin-top:12px;"><a href="https://discord.gg/EZhwgDT6Ta" target="_blank" style="color:var(--cyan-dim);text-decoration:none;">Join us on Discord</a></p>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="container">
+        <div class="footer-links">
+            <a href="https://github.com/jknight-developer/usurper-reborn" target="_blank">GitHub</a>
+            <a href="https://github.com/jknight-developer/usurper-reborn/issues" target="_blank">Report Bug</a>
+            <a href="https://discord.gg/EZhwgDT6Ta" target="_blank">Discord</a>
+        </div>
+        <p>Usurper Reborn &mdash; A free, open-source recreation of Usurper (1993) by Jakob Dangarden</p>
+        <p style="margin-top:4px;">Licensed under GPL v2 &bull; Built with C# / .NET 8.0</p>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script>
+    let terminal = null;
+    let ws = null;
+    let fitAddon = null;
+    let onDataDispose = null;
+    let onResizeDispose = null;
+
+    function openTerminal() {
+        const section = document.getElementById('terminal-section');
+        const status = document.getElementById('terminal-status');
+        section.classList.add('active');
+        section.scrollIntoView({ behavior: 'smooth' });
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            if (terminal) terminal.focus();
+            return;
+        }
+
+        if (!terminal) {
+            terminal = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+                theme: {
+                    background: '#0a0a0f',
+                    foreground: '#e0e0e0',
+                    cursor: '#00e5ff',
+                    selectionBackground: '#264f78',
+                    black: '#000000',
+                    red: '#ff4444',
+                    green: '#00ff88',
+                    yellow: '#ffaa00',
+                    blue: '#4488ff',
+                    magenta: '#aa66ff',
+                    cyan: '#00e5ff',
+                    white: '#e0e0e0',
+                    brightBlack: '#666666',
+                    brightRed: '#ff6666',
+                    brightGreen: '#66ffaa',
+                    brightYellow: '#ffcc44',
+                    brightBlue: '#66aaff',
+                    brightMagenta: '#cc88ff',
+                    brightCyan: '#33eeff',
+                    brightWhite: '#ffffff'
+                },
+                scrollback: 1000,
+                convertEol: true
+            });
+
+            fitAddon = new FitAddon.FitAddon();
+            terminal.loadAddon(fitAddon);
+            terminal.open(document.getElementById('terminal-container'));
+            fitAddon.fit();
+
+            window.addEventListener('resize', () => {
+                if (fitAddon) fitAddon.fit();
+            });
+        }
+
+        terminal.clear();
+        status.textContent = 'Connecting...';
+        status.className = 'terminal-status';
+
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}/ws`);
+        ws.binaryType = 'arraybuffer';
+
+        ws.onopen = () => {
+            status.textContent = 'Connected';
+            status.className = 'terminal-status connected';
+            terminal.focus();
+
+            if (fitAddon) {
+                const dims = fitAddon.proposeDimensions();
+                if (dims) {
+                    ws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
+                }
+            }
+        };
+
+        ws.onmessage = (event) => {
+            if (event.data instanceof ArrayBuffer) {
+                terminal.write(new Uint8Array(event.data));
+            } else {
+                terminal.write(event.data);
+            }
+        };
+
+        ws.onclose = () => {
+            status.textContent = 'Disconnected. Click "Play Now" to reconnect.';
+            status.className = 'terminal-status';
+            terminal.write('\r\n\x1b[90m--- Connection closed ---\x1b[0m\r\n');
+        };
+
+        ws.onerror = () => {
+            status.textContent = 'Connection failed. Please try again.';
+            status.className = 'terminal-status error';
+        };
+
+        // Dispose previous handlers to prevent duplicate keystroke sends on reconnect
+        if (onDataDispose) onDataDispose.dispose();
+        if (onResizeDispose) onResizeDispose.dispose();
+
+        onDataDispose = terminal.onData((data) => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(data);
+            }
+        });
+
+        onResizeDispose = terminal.onResize(({ cols, rows }) => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+            }
+        });
+    }
+
+    function closeTerminal() {
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+        document.getElementById('terminal-section').classList.remove('active');
+    }
+
+    function copyCommand(el) {
+        const text = el.textContent.replace('click to copy', '').trim();
+        navigator.clipboard.writeText(text).then(() => {
+            const hint = el.querySelector('.copy-hint');
+            hint.textContent = 'copied!';
+            hint.style.color = 'var(--green)';
+            setTimeout(() => {
+                hint.textContent = 'click to copy';
+                hint.style.color = '';
+            }, 2000);
+        });
+    }
+
+    // --- Live Stats Dashboard ---
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function formatNumber(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+        return String(n);
+    }
+
+    function formatGold(n) {
+        if (n >= 1000000000) return (n / 1000000000).toFixed(1) + 'B';
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+        return String(n);
+    }
+
+    function getTimeAgo(dateStr) {
+        if (!dateStr) return '';
+        const diff = Date.now() - new Date(dateStr + 'Z').getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'just now';
+        if (mins < 60) return mins + 'm ago';
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return hrs + 'h ago';
+        return Math.floor(hrs / 24) + 'd ago';
+    }
+
+    function renderStats(data) {
+        const container = document.getElementById('stats-content');
+        if (!data || data.error) {
+            container.innerHTML = '<div class="stats-error">World data unavailable. The server may be offline.</div>';
+            return;
+        }
+
+        let html = '';
+
+        // Online players section
+        const onlineCount = data.onlineCount || 0;
+        const dotClass = onlineCount > 0 ? '' : ' offline';
+        const countClass = onlineCount > 0 ? '' : ' none';
+        html += '<div class="stats-online-header">';
+        html += '<div class="online-dot' + dotClass + '"></div>';
+        html += '<span class="online-count' + countClass + '">';
+        if (onlineCount === 0) html += 'No adventurers online';
+        else if (onlineCount === 1) html += '1 Adventurer Online';
+        else html += onlineCount + ' Adventurers Online';
+        html += '</span></div>';
+
+        if (data.online && data.online.length > 0) {
+            html += '<table class="online-players-table"><thead><tr>';
+            html += '<th>Player</th><th>Class</th><th>Level</th><th>Location</th><th>Via</th>';
+            html += '</tr></thead><tbody>';
+            for (const p of data.online) {
+                html += '<tr>';
+                html += '<td class="player-name">' + escapeHtml(p.name) + '</td>';
+                html += '<td class="player-class">' + escapeHtml(p.className) + '</td>';
+                html += '<td>' + p.level + '</td>';
+                html += '<td>' + escapeHtml(p.location) + '</td>';
+                html += '<td class="player-via">' + escapeHtml(p.connectionType || 'Unknown') + '</td>';
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+        } else {
+            html += '<div class="online-empty">The realm awaits its next hero...</div>';
+        }
+
+        // Stats grid
+        const s = data.stats || {};
+        html += '<div class="stats-grid">';
+        html += renderStatCard(formatNumber(s.totalPlayers || 0), 'Total Players');
+        html += renderStatCard(formatNumber(s.totalKills || 0), 'Monsters Slain');
+        html += renderStatCard(s.avgLevel || 0, 'Avg Level');
+        html += renderStatCard(s.deepestFloor || 0, 'Deepest Floor');
+        html += renderStatCard(formatGold(s.totalGold || 0), 'Total Gold');
+        html += renderStatCard((s.marriages || 0) + ' / ' + (s.children || 0), 'Marriages / Kids');
+        html += '</div>';
+
+        // Highlights
+        const h = data.highlights || {};
+        html += '<div class="highlights-grid">';
+        if (h.topPlayer) {
+            html += '<div class="highlight-card">';
+            html += '<div class="highlight-label">Top Adventurer</div>';
+            html += '<div class="highlight-value">' + escapeHtml(h.topPlayer.name) + '</div>';
+            html += '<div class="highlight-detail">Level ' + h.topPlayer.level + ' ' + escapeHtml(h.topPlayer.className) + '</div>';
+            html += '</div>';
+        }
+        if (h.king) {
+            html += '<div class="highlight-card">';
+            html += '<div class="highlight-label">Current Ruler</div>';
+            html += '<div class="highlight-value">' + escapeHtml(h.king) + '</div>';
+            html += '<div class="highlight-detail">Sits upon the throne of Durunghins</div>';
+            html += '</div>';
+        }
+        if (h.popularClass) {
+            html += '<div class="highlight-card">';
+            html += '<div class="highlight-label">Most Popular Class</div>';
+            html += '<div class="highlight-value">' + escapeHtml(h.popularClass) + '</div>';
+            html += '<div class="highlight-detail">The favored path of adventurers</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+
+        // Player leaderboard
+        if (data.leaderboard && data.leaderboard.length > 0) {
+            html += '<div class="leaderboard-section"><h3>// HALL OF FAME</h3>';
+            html += '<table class="leaderboard-table"><thead><tr>';
+            html += '<th class="rank-col">Rank</th><th>Player</th><th>Class</th><th class="lb-level">Lv</th><th class="lb-xp">Experience</th>';
+            html += '</tr></thead><tbody>';
+            for (const p of data.leaderboard) {
+                const rankClass = p.rank <= 3 ? ' rank-' + p.rank : '';
+                const onlineClass = p.isOnline ? ' is-online' : '';
+                const onlineDot = p.isOnline ? '<span class="online-indicator">&#9679;</span>' : '';
+                html += '<tr>';
+                html += '<td class="rank-col' + rankClass + '">#' + p.rank + '</td>';
+                html += '<td class="lb-name' + onlineClass + '">' + onlineDot + escapeHtml(p.name) + '</td>';
+                html += '<td class="lb-class">' + escapeHtml(p.className) + '</td>';
+                html += '<td class="lb-level">' + p.level + '</td>';
+                html += '<td class="lb-xp">' + formatNumber(p.experience) + '</td>';
+                html += '</tr>';
+            }
+            html += '</tbody></table></div>';
+        }
+
+        // News feed
+        if (data.news && data.news.length > 0) {
+            html += '<div class="news-feed"><h3>// RECENT NEWS</h3>';
+            for (const n of data.news) {
+                html += '<div class="news-item">';
+                html += '<span class="news-time">' + getTimeAgo(n.time) + '</span>';
+                if (n.playerName) html += '<span class="news-player">' + escapeHtml(n.playerName) + '</span> ';
+                html += '<span class="news-text">' + escapeHtml(n.message) + '</span>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+
+        html += '<div class="stats-refresh">Auto-refreshes every 30 seconds</div>';
+        container.innerHTML = html;
+    }
+
+    function renderStatCard(value, label) {
+        return '<div class="stat-card"><div class="stat-value">' + value + '</div><div class="stat-label">' + label + '</div></div>';
+    }
+
+    function fetchStats() {
+        fetch('/api/stats')
+            .then(res => res.json())
+            .then(data => renderStats(data))
+            .catch(() => {
+                document.getElementById('stats-content').innerHTML =
+                    '<div class="stats-error">Could not reach the game server. Try again later.</div>';
+            });
+    }
+
+    // Initial fetch + auto-refresh
+    fetchStats();
+    setInterval(fetchStats, 30000);
+</script>
+
+</body>
+</html>

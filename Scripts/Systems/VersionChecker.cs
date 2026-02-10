@@ -88,6 +88,14 @@ namespace UsurperRemake.Systems
                 return;
             }
 
+            // Skip update check for online server mode - admin updates manually
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                DebugLogger.Instance.LogInfo("UPDATE", "Skipping version check - online server mode (admin updates manually)");
+                CheckCompleted = true;
+                return;
+            }
+
             DebugLogger.Instance.LogInfo("UPDATE", $"Version check started (current: {CurrentVersion})");
 
             try

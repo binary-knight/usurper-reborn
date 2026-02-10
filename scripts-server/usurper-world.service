@@ -1,0 +1,34 @@
+# Usurper Reborn - World Simulator Systemd Service
+# Optional: runs background world simulation independent of player connections
+#
+# Install:
+#   sudo cp usurper-world.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable usurper-world
+#   sudo systemctl start usurper-world
+#
+# Monitor:
+#   sudo systemctl status usurper-world
+#   tail -f /var/usurper/logs/world-sim.log
+
+[Unit]
+Description=Usurper Reborn World Simulator
+After=network.target
+
+[Service]
+Type=simple
+User=usurper
+Group=usurper
+WorkingDirectory=/opt/usurper
+ExecStart=/opt/usurper/UsurperReborn --online --user "WORLD_SIM" --stdio
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/usurper/logs/world-sim.log
+StandardError=append:/var/usurper/logs/world-sim-error.log
+
+# Resource limits
+LimitNOFILE=1024
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

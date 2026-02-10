@@ -1,0 +1,33 @@
+# Usurper Reborn - Web Terminal Proxy Service
+# Runs the WebSocket-to-SSH bridge for browser-based play
+#
+# Install:
+#   sudo cp usurper-web.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable usurper-web
+#   sudo systemctl start usurper-web
+#
+# Monitor:
+#   sudo systemctl status usurper-web
+#   sudo journalctl -u usurper-web -f
+
+[Unit]
+Description=Usurper Reborn Web Terminal Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=usurper
+WorkingDirectory=/opt/usurper/web
+ExecStart=/usr/bin/node ssh-proxy.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+LimitNOFILE=1024
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target

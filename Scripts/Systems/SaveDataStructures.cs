@@ -294,6 +294,9 @@ namespace UsurperRemake.Systems
         public bool DivineWrathPending { get; set; }        // Has punishment triggered yet?
         public int DivineWrathTurnsRemaining { get; set; }  // Turns until wrath fades
 
+        // Dev menu flag - permanently disables Steam achievements
+        public bool DevMenuUsed { get; set; }
+
         // Character settings
         public bool AutoHeal { get; set; }  // Auto-heal in battle
         public CombatSpeed CombatSpeed { get; set; } = CombatSpeed.Normal;  // Combat text speed

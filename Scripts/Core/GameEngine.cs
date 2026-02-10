@@ -141,8 +141,8 @@ public partial class GameEngine : Node
     {
         var engine = Instance;
 
-        // Check if we're in BBS door mode
-        if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
+        // Check if we're in BBS door mode or online mode (both have pre-set player names)
+        if (UsurperRemake.BBS.DoorMode.IsInDoorMode || UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
             await engine.RunBBSDoorMode();
         }
@@ -723,6 +723,20 @@ public partial class GameEngine : Node
             terminal.SetColor("white");
             terminal.WriteLine("Credits");
 
+            // Online Play - not shown in BBS door mode or online server mode (they're already online)
+            if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("O");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("Online Play - Connect to Shared World");
+            }
+
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -771,6 +785,13 @@ public partial class GameEngine : Node
                 case "Q":
                     IsIntentionalExit = true;
                     done = true;
+                    break;
+                case "O":
+                    if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    {
+                        var onlinePlay = new UsurperRemake.Systems.OnlinePlaySystem(terminal);
+                        await onlinePlay.StartOnlinePlay();
+                    }
                     break;
                 case "%":
                     if (UsurperRemake.BBS.DoorMode.IsInDoorMode && UsurperRemake.BBS.DoorMode.IsSysOp)
@@ -1066,7 +1087,14 @@ public partial class GameEngine : Node
             {
                 terminal.WriteLine("Failed to load save file!", "red");
                 terminal.WriteLine("The save file may be corrupted or invalid.", "yellow");
-                await Task.Delay(3000);
+                await Task.Delay(2000);
+                // In online/door mode, offer to create a new character instead of just exiting
+                if (UsurperRemake.BBS.DoorMode.IsInDoorMode || UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    terminal.WriteLine("Starting new character instead...", "yellow");
+                    await Task.Delay(1000);
+                    await CreateNewGame(fileName);
+                }
                 return;
             }
 
@@ -1270,6 +1298,15 @@ public partial class GameEngine : Node
 
         await Task.Delay(1500);
 
+        // Online news: announce new adventurer
+        if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+        {
+            var displayName = currentPlayer.Name2 ?? currentPlayer.Name1;
+            var className = currentPlayer.Class.ToString();
+            _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                $"A new adventurer arrives! {displayName} the {className} begins their journey.", "quest");
+        }
+
         // Play the opening story sequence
         // This establishes the mystery, the goal, and hooks the player
         var openingSystem = OpeningStorySystem.Instance;
@@ -1461,6 +1498,7 @@ public partial class GameEngine : Node
             PDefeats = playerData.PDefeats,
 
             // Character settings
+            DevMenuUsed = playerData.DevMenuUsed,
             AutoHeal = playerData.AutoHeal,
             CombatSpeed = playerData.CombatSpeed,
             SkipIntimateScenes = playerData.SkipIntimateScenes,
@@ -2687,6 +2725,14 @@ public partial class GameEngine : Node
         terminal.WriteLine("You wake up at the Inn, nursed back to health by the innkeeper.");
         terminal.WriteLine($"Your wounds have partially healed. (HP: {currentPlayer.HP}/{currentPlayer.MaxHP})");
         terminal.WriteLine("");
+
+        // Online news: player death
+        if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+        {
+            var deathName = currentPlayer.Name2 ?? currentPlayer.Name1;
+            _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                $"{deathName} has fallen in battle and was carried back to the Inn.", "combat");
+        }
 
         terminal.SetColor("gray");
         terminal.WriteLine("\"You're lucky to be alive, friend. Rest up and try again.\"");

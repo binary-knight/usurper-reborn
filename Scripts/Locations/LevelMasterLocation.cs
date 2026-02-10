@@ -392,6 +392,15 @@ public class LevelMasterLocation : BaseLocation
             // Log level up
             UsurperRemake.Systems.DebugLogger.Instance.LogLevelUp(currentPlayer.Name, startLevel, currentPlayer.Level);
 
+            // Online news: announce level ups at milestones
+            if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+            {
+                var displayName = currentPlayer.Name2 ?? currentPlayer.Name1;
+                if (currentPlayer.Level % 5 == 0 || currentPlayer.Level <= 3)
+                    _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                        $"{displayName} has reached level {currentPlayer.Level}!", "combat");
+            }
+
             // Display level up celebration with training points earned
             await DisplayLevelUpCelebration(levelsRaised, startLevel, totalTrainingPoints);
 

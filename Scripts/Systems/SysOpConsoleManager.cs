@@ -88,7 +88,7 @@ namespace UsurperRemake.Systems
 
         private void StartBackgroundUpdateCheck()
         {
-            if (_updateCheckTask != null || VersionChecker.Instance.IsSteamBuild)
+            if (_updateCheckTask != null || VersionChecker.Instance.IsSteamBuild || DoorMode.IsOnlineMode)
                 return;
 
             _updateCheckComplete = false;

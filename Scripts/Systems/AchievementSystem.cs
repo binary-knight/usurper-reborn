@@ -894,8 +894,19 @@ public static class AchievementSystem
                 achievement.Category.ToString()
             );
 
-            // Sync with Steam if available
-            SteamIntegration.UnlockAchievement(achievementId);
+            // Sync with Steam if available (blocked if dev menu was used)
+            if (!player.DevMenuUsed)
+            {
+                SteamIntegration.UnlockAchievement(achievementId);
+            }
+
+            // Online news: achievement unlocked
+            if (OnlineStateManager.IsActive)
+            {
+                var displayName = player.Name2 ?? player.Name1;
+                _ = OnlineStateManager.Instance!.AddNews(
+                    $"{displayName} unlocked \"{achievement.Name}\"!", "quest");
+            }
 
             return true;
         }
@@ -911,6 +922,11 @@ public static class AchievementSystem
     public static void SyncUnlockedToSteam(Character player)
     {
         if (!SteamIntegration.IsAvailable) return;
+        if (player.DevMenuUsed)
+        {
+            DebugLogger.Instance?.LogInfo("ACHIEVEMENTS", "Steam sync skipped - dev menu was used on this save");
+            return;
+        }
 
         int synced = 0;
         foreach (var achievementId in player.Achievements.UnlockedAchievements)

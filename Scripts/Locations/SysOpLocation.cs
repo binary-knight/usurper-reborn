@@ -64,8 +64,8 @@ public class SysOpLocation : BaseLocation
 
     private void StartBackgroundUpdateCheck()
     {
-        // Skip if already checking or if Steam build
-        if (_updateCheckTask != null || VersionChecker.Instance.IsSteamBuild)
+        // Skip if already checking, Steam build, or online server mode
+        if (_updateCheckTask != null || VersionChecker.Instance.IsSteamBuild || DoorMode.IsOnlineMode)
             return;
 
         _updateCheckComplete = false;

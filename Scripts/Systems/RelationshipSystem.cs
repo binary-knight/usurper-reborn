@@ -306,7 +306,14 @@ public partial class RelationshipSystem
         character2.MarriedTimes++;
         
         SaveRelationship(relation);
-        
+
+        // Online news: marriage
+        if (OnlineStateManager.IsActive)
+        {
+            _ = OnlineStateManager.Instance!.AddNews(
+                $"{character1.Name} and {character2.Name} have been wed! Congratulations!", "romance");
+        }
+
         // Generate wedding announcement
         var ceremonyMessage = GameConfig.WeddingCeremonyMessages[_random.Next(GameConfig.WeddingCeremonyMessages.Length)];
         
