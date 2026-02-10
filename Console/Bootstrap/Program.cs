@@ -167,6 +167,22 @@ namespace UsurperConsole
                 if (DoorMode.IsOnlineMode && sqlBackend != null)
                 {
                     var onlineUsername = DoorMode.OnlineUsername ?? "anonymous";
+
+                    // Prevent duplicate logins - check if this player already has an active session
+                    if (await sqlBackend.IsPlayerOnline(onlineUsername))
+                    {
+                        DoorMode.Log($"Player '{onlineUsername}' is already logged in - rejecting duplicate session");
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine("");
+                        terminal.WriteLine("  This character is already logged in from another session.");
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine("  Please disconnect the other session first, or wait a few minutes.");
+                        terminal.WriteLine("");
+                        await Task.Delay(3000);
+                        Environment.Exit(0);
+                        return;
+                    }
+
                     OnlineStateManager.Initialize(sqlBackend, onlineUsername);
                     DoorMode.Log($"Online state manager initialized for '{onlineUsername}'");
 

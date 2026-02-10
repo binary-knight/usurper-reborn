@@ -1200,6 +1200,11 @@ public abstract class BaseLocation
                 await ShowPreferencesMenu();
                 return (true, false);
 
+            case "pot":
+            case "potion":
+                await UseQuickPotion();
+                return (true, false);
+
             case "bug":
             case "report":
             case "bugreport":
@@ -1285,6 +1290,17 @@ public abstract class BaseLocation
         terminal.Write("/hp ");
         terminal.SetColor("white");
         terminal.WriteLine("- Show health and mana status                            ║");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("║  ");
+        terminal.SetColor("cyan");
+        terminal.Write("/potion   ");
+        terminal.SetColor("gray");
+        terminal.Write("or ");
+        terminal.SetColor("cyan");
+        terminal.Write("/pot");
+        terminal.SetColor("white");
+        terminal.WriteLine("- Use a healing potion                                   ║");
 
         terminal.SetColor("bright_yellow");
         terminal.Write("║  ");
@@ -1452,6 +1468,54 @@ public abstract class BaseLocation
         terminal.Write("  MP: ");
         terminal.SetColor(mpPercent > 50 ? "bright_cyan" : mpPercent > 25 ? "cyan" : "gray");
         terminal.WriteLine($"{currentPlayer?.CurrentMana}/{currentPlayer?.MaxMana} ({mpPercent}%)");
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Use a healing potion outside of combat via /potion quick command
+    /// </summary>
+    protected async Task UseQuickPotion()
+    {
+        terminal.WriteLine("");
+        if (currentPlayer == null)
+        {
+            terminal.WriteLine("  No active character.", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        if (currentPlayer.HP >= currentPlayer.MaxHP)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  You're already at full health!");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        if (currentPlayer.Healing <= 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  You don't have any healing potions.");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  Visit the Healer to buy some.");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Use one potion
+        long healAmount = 30 + currentPlayer.Level * 5 + new Random().Next(10, 30);
+        healAmount = Math.Min(healAmount, currentPlayer.MaxHP - currentPlayer.HP);
+        currentPlayer.HP += healAmount;
+        currentPlayer.Healing--;
+        currentPlayer.Statistics?.RecordPotionUsed(healAmount);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  You drink a healing potion and recover {healAmount} HP!");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"  HP: {currentPlayer.HP}/{currentPlayer.MaxHP}  |  Potions remaining: {currentPlayer.Healing}/{currentPlayer.MaxPotions}");
         terminal.WriteLine("");
         await terminal.PressAnyKey();
     }
@@ -1964,11 +2028,12 @@ public abstract class BaseLocation
     {
         var npcsHere = GetLiveNPCsAtLocation();
 
-        // Also include any static LocationNPCs (special NPCs like shopkeepers)
-        var allNPCs = new List<NPC>(LocationNPCs);
+        // Also include any static LocationNPCs, but exclude special NPCs that have
+        // their own dedicated interaction paths (e.g., Seth Able has [F] Challenge)
+        var allNPCs = new List<NPC>(LocationNPCs.Where(n => !n.IsSpecialNPC));
         foreach (var npc in npcsHere)
         {
-            if (!allNPCs.Any(n => n.Name2 == npc.Name2))
+            if (!npc.IsSpecialNPC && !allNPCs.Any(n => n.Name2 == npc.Name2))
                 allNPCs.Add(npc);
         }
 

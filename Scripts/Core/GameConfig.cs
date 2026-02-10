@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.27.0-alpha";
+    public const string Version = "0.27.1-alpha";
     public const string VersionName = "Online Multiplayer";
 
     // From Pascal global_maxXX constants
@@ -707,7 +707,7 @@ Hobbit    - Small but agile. Good rangers, rogues, bards. Too small for heavy co
 Elf       - Graceful and magical. Excellent mages and clerics. Dislike brute force.
 Half-Elf  - Versatile like humans. Can be any class.
 Dwarf     - Strong and tough. Great warriors. Distrust arcane magic.
-Troll     - Massive brutes. Warriors, barbarians, rangers only.
+Troll     - Massive brutes with natural regeneration. Warriors, barbarians, rangers only.
 Orc       - Aggressive fighters. Warriors, assassins, rangers. Limited magic.
 Gnome     - Small and clever. Great mages, alchemists. Poor heavy fighters.
 Gnoll     - Pack hunters. Warriors, rangers, assassins. Limited intellect.

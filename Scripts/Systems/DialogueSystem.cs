@@ -547,31 +547,13 @@ namespace UsurperRemake.Systems
         {
             if (string.IsNullOrEmpty(nodeId)) return null;
 
+            // All nodes are registered in tree.AllNodes, so search there directly.
+            // The previous tree-traversal approach only found nodes 1 level deep from root,
+            // missing deeper nodes like veloura_save_path (root → story → save_path).
             foreach (var tree in dialogueTrees.Values)
             {
-                var node = FindNodeInTree(tree.RootNode, nodeId);
-                if (node != null) return node;
-            }
-            return null;
-        }
-
-        private DialogueNode? FindNodeInTree(DialogueNode node, string nodeId)
-        {
-            if (node.Id == nodeId) return node;
-
-            foreach (var choice in node.Choices)
-            {
-                if (!string.IsNullOrEmpty(choice.NextNodeId))
-                {
-                    // Find in registered nodes
-                    foreach (var tree in dialogueTrees.Values)
-                    {
-                        if (tree.AllNodes.TryGetValue(choice.NextNodeId, out var nextNode))
-                        {
-                            if (nextNode.Id == nodeId) return nextNode;
-                        }
-                    }
-                }
+                if (tree.AllNodes.TryGetValue(nodeId, out var node))
+                    return node;
             }
             return null;
         }

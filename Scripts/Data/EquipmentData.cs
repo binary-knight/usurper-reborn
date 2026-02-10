@@ -133,25 +133,25 @@ public static class EquipmentDatabase
     }
 
     /// <summary>
-    /// Get all equipment for a specific slot
+    /// Get all equipment for a specific slot (excludes dynamic/loot items by default)
     /// </summary>
-    public static List<Equipment> GetBySlot(EquipmentSlot slot)
+    public static List<Equipment> GetBySlot(EquipmentSlot slot, bool includesDynamic = false)
     {
         EnsureInitialized();
         return _allEquipment.Values
-            .Where(e => e.Slot == slot)
+            .Where(e => e.Slot == slot && (includesDynamic || e.Id < DynamicEquipmentStart))
             .OrderBy(e => e.Value)
             .ToList();
     }
 
     /// <summary>
-    /// Get all weapons of a specific handedness
+    /// Get all weapons of a specific handedness (excludes dynamic/loot items by default)
     /// </summary>
-    public static List<Equipment> GetWeaponsByHandedness(WeaponHandedness handedness)
+    public static List<Equipment> GetWeaponsByHandedness(WeaponHandedness handedness, bool includeDynamic = false)
     {
         EnsureInitialized();
         return _allEquipment.Values
-            .Where(e => e.Handedness == handedness)
+            .Where(e => e.Handedness == handedness && (includeDynamic || e.Id < DynamicEquipmentStart))
             .OrderBy(e => e.Value)
             .ToList();
     }
@@ -194,25 +194,25 @@ public static class EquipmentDatabase
     }
 
     /// <summary>
-    /// Get all accessories (rings, amulets)
+    /// Get all accessories (rings, amulets) - excludes dynamic/loot items
     /// </summary>
     public static List<Equipment> GetAccessories()
     {
         EnsureInitialized();
         return _allEquipment.Values
-            .Where(e => e.Slot.IsAccessorySlot())
+            .Where(e => e.Slot.IsAccessorySlot() && e.Id < DynamicEquipmentStart)
             .OrderBy(e => e.Value)
             .ToList();
     }
 
     /// <summary>
-    /// Find best equipment by power/AC within budget
+    /// Find best base equipment by power/AC within budget (excludes dynamic/loot items)
     /// </summary>
     public static Equipment GetBestAffordable(EquipmentSlot slot, long maxGold)
     {
         EnsureInitialized();
         return _allEquipment.Values
-            .Where(e => e.Slot == slot && e.Value <= maxGold)
+            .Where(e => e.Slot == slot && e.Value <= maxGold && e.Id < DynamicEquipmentStart)
             .OrderByDescending(e => e.ArmorClass + e.WeaponPower + e.ShieldBonus)
             .FirstOrDefault();
     }
@@ -224,7 +224,7 @@ public static class EquipmentDatabase
     {
         EnsureInitialized();
         return _allEquipment.Values
-            .Where(e => e.Slot == slot)
+            .Where(e => e.Slot == slot && e.Id < DynamicEquipmentStart)
             .OrderBy(e => Math.Abs((e.WeaponPower + e.ArmorClass + e.ShieldBonus) - power))
             .FirstOrDefault();
     }

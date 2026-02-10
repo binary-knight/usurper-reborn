@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.27.0 - Online Multiplayer
+## ALPHA v0.27.1 - Bug Fix & Balance
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -149,7 +149,7 @@ Your journey can end in many ways:
 - **Talk System** - Chat, ask for rumors, learn about dungeons, challenge to duels
 
 ### 30+ Playable Locations
-Main Street, Inn, Bank, Weapon Shop, Armor Shop, Magic Shop, Healer, Temple, Church, Dark Alley, Level Master, Marketplace, Anchor Road, Hall of Recruitment, Dormitory, Castle, Prison, Love Corner, Team Corner, News, Quest Hall, God World, Dungeons, Home, Gym, Prison Walk, and more.
+Main Street, Inn, Bank, Weapon Shop, Armor Shop, Magic Shop, Healer, Temple, Church, Dark Alley, Level Master, Marketplace, Anchor Road, Dormitory, Castle, Prison, Love Corner, Team Corner, News, Quest Hall, God World, Dungeons, Home, Gym, Prison Walk, and more.
 
 ## Building from Source
 
@@ -359,6 +359,26 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.27.1 - Bug Fix & Balance
+
+**Major Bug Fixes:**
+- Seth Able exploit fix (generic NPC talk menu bypass)
+- Armor/Weapon shop duplicate items fix (Studded Belt x200)
+- Old God floor progression gates (5 bypass methods fixed)
+- Veloura (Floor 40) Old God spawn fix and save quest chain
+- Purify spell now works (cure_disease handler was missing)
+- Dungeon ascending restriction fix (couldn't go up past level-10)
+- Online Play color fix (ANSI output for SSH/stdio mode)
+- Duplicate login prevention (same character in two sessions)
+- Unidentified weapon equip exploit blocked
+- Auto-combat now uses healing potions at low HP
+- Troll racial regeneration (1-3 HP/round in combat)
+- Boss room monster HP display fix (HP > MaxHP)
+- Spell failure now shows roll details
+- Linux auto-updater crash fix (CRLF, pgrep, cp bugs)
+- Hall of Recruitment removed (Godot-era crash)
+- Quick `/potion` command from any location
 
 ### Completed in v0.27.0 - Online Multiplayer
 
@@ -687,7 +707,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.27.0)
+### Known Issues (Alpha v0.27.1)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -702,4 +722,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.27.0 - Online Multiplayer
+**Status**: ALPHA v0.27.1 - Bug Fix & Balance

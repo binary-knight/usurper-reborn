@@ -263,6 +263,34 @@ public class DungeonLocation : BaseLocation
                     }, "dark_magenta");
                 break;
 
+            case 40:
+                // Veloura save quest return - triggers when entering floor 40 with the Loom
+                {
+                    var story40 = StoryProgressionSystem.Instance;
+                    if (story40.OldGodStates.TryGetValue(OldGodType.Veloura, out var velouraState) &&
+                        velouraState.Status == GodStatus.Awakened &&
+                        ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
+                    {
+                        term.WriteLine("");
+                        term.SetColor("bright_magenta");
+                        term.WriteLine("You feel a familiar warmth as you step onto this floor...");
+                        await Task.Delay(1500);
+                        term.SetColor("bright_cyan");
+                        term.WriteLine("Veloura senses your return - and what you carry.");
+                        await Task.Delay(1500);
+                        term.WriteLine("");
+
+                        var saveResult = await OldGodBossSystem.Instance.CompleteSaveQuest(player, OldGodType.Veloura, term);
+                        await HandleGodEncounterResult(saveResult, player, term);
+
+                        if (saveResult.Outcome == BossOutcome.Saved && currentFloor != null)
+                        {
+                            currentFloor.BossDefeated = true;
+                        }
+                    }
+                }
+                break;
+
             case 45:
                 await ShowStoryMoment(term, "Prison of Ages",
                     new[] {
@@ -319,10 +347,34 @@ public class DungeonLocation : BaseLocation
                 break;
 
             case 65:
-                // Moral Paradox: Veloura's Cure (requires Soulweaver's Loom)
-                if (MoralParadoxSystem.Instance.IsParadoxAvailable("velouras_cure", player))
+                // Soulweaver's Loom discovery - triggered by Veloura's save quest
+                if (StoryProgressionSystem.Instance.HasStoryFlag("veloura_save_quest") &&
+                    !ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
                 {
                     await ShowStoryMoment(term, "The Soulweaver's Chamber",
+                        new[] {
+                            "Deep within this forgotten chamber, something ancient calls to you...",
+                            "A device of impossible delicacy sits upon a stone pedestal.",
+                            "Threads of light drift from it like spider silk in a breeze.",
+                            "",
+                            "This is the Soulweaver's Loom - the artifact that can undo divine corruption.",
+                            "The very thing you promised to find.",
+                        }, "bright_magenta");
+
+                    // Grant the artifact
+                    await ArtifactSystem.Instance.CollectArtifact(player, ArtifactType.SoulweaversLoom, term);
+
+                    term.WriteLine("");
+                    term.SetColor("bright_yellow");
+                    term.WriteLine("  You remember your promise to Veloura on floor 40.");
+                    term.WriteLine("  Return to her with the Loom to complete the save.", "yellow");
+                }
+
+                // Moral Paradox: Veloura's Cure (deeper choice about the Loom's cost)
+                if (MoralParadoxSystem.Instance.IsParadoxAvailable("velouras_cure", player))
+                {
+                    term.WriteLine("");
+                    await ShowStoryMoment(term, "The Soulweaver's Price",
                         new[] {
                             "The Soulweaver's Loom pulses with power in your hands.",
                             "And before you stands someone you never expected to see again...",
@@ -879,6 +931,31 @@ public class DungeonLocation : BaseLocation
 
                 player.Chivalry += 50;
                 player.Wisdom += 2;
+                break;
+
+            case BossOutcome.Spared:
+                term.WriteLine("");
+                term.WriteLine("The Old God's eyes widen with something long forgotten - hope.", "bright_cyan");
+                term.WriteLine("They fade from this place, but their presence lingers in your heart.", "white");
+                term.WriteLine("");
+                term.SetColor("bright_magenta");
+                term.WriteLine("You have promised to find the Soulweaver's Loom and return.");
+                term.WriteLine("The artifact lies somewhere deeper in the dungeon...", "yellow");
+                term.WriteLine("");
+
+                player.Chivalry += 75;
+                term.WriteLine("+75 Chivalry - Your mercy speaks louder than any blade.", "bright_green");
+                term.SetColor("bright_yellow");
+                term.WriteLine("");
+                term.WriteLine("  [QUEST STARTED] Find the Soulweaver's Loom and return to save this god.");
+
+                // Online news
+                if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+                {
+                    var sparerName = player.Name2 ?? player.Name1;
+                    _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                        $"{sparerName} has shown mercy to the Old God {result.God} and vowed to find a cure!", "quest");
+                }
                 break;
 
             case BossOutcome.Fled:
@@ -1767,12 +1844,21 @@ public class DungeonLocation : BaseLocation
         }
         else if (floor == 65)
         {
-            // Only show paradox hint if it's actually available
             var player65 = GetCurrentPlayer();
-            if (player65 != null && MoralParadoxSystem.Instance.IsParadoxAvailable("velouras_cure", player65))
+            if (player65 != null)
             {
-                hint = "EVENT: Veloura's Cure paradox awaits. You have what you need.";
-                color = "bright_magenta";
+                // Check if the Soulweaver's Loom can be found here (save quest active, Loom not yet collected)
+                if (StoryProgressionSystem.Instance.HasStoryFlag("veloura_save_quest") &&
+                    !ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
+                {
+                    hint = "EVENT: The Soulweaver's Loom awaits discovery in this chamber.";
+                    color = "bright_magenta";
+                }
+                else if (MoralParadoxSystem.Instance.IsParadoxAvailable("velouras_cure", player65))
+                {
+                    hint = "EVENT: The Soulweaver's Price - a moral choice awaits.";
+                    color = "bright_magenta";
+                }
             }
         }
         else if (floor == 75)
@@ -2577,6 +2663,47 @@ public class DungeonLocation : BaseLocation
             }
         }
 
+        // Check for Old God save quest return visit (god is Awakened, player has artifact)
+        // This triggers on room entry so the player doesn't need to "fight" a cleared boss room
+        if (targetRoom.IsBossRoom)
+        {
+            var player2 = GetCurrentPlayer();
+            if (player2 != null)
+            {
+                OldGodType? returnGodType = currentDungeonLevel switch
+                {
+                    25 => OldGodType.Maelketh,
+                    40 => OldGodType.Veloura,
+                    55 => OldGodType.Thorgrim,
+                    70 => OldGodType.Noctura,
+                    85 => OldGodType.Aurelion,
+                    95 => OldGodType.Terravok,
+                    100 => OldGodType.Manwe,
+                    _ => null
+                };
+
+                if (returnGodType != null)
+                {
+                    var returnStory = StoryProgressionSystem.Instance;
+                    if (returnStory.OldGodStates.TryGetValue(returnGodType.Value, out var returnGodState) &&
+                        returnGodState.Status == GodStatus.Awakened &&
+                        OldGodBossSystem.Instance.CanEncounterBoss(player2, returnGodType.Value))
+                    {
+                        var saveResult = await OldGodBossSystem.Instance.CompleteSaveQuest(player2, returnGodType.Value, terminal);
+                        await HandleGodEncounterResult(saveResult, player2, terminal);
+
+                        if (saveResult.Outcome == BossOutcome.Saved)
+                        {
+                            targetRoom.IsCleared = true;
+                            currentFloor.BossDefeated = true;
+                        }
+
+                        await terminal.PressAnyKey();
+                    }
+                }
+            }
+        }
+
         // If room has monsters and player enters, auto-engage (ambush chance)
         if (targetRoom.HasMonsters && !targetRoom.IsCleared)
         {
@@ -2789,7 +2916,16 @@ public class DungeonLocation : BaseLocation
                     await Task.Delay(1500);
                     return;
                 }
-                // If god not resolved, fall through to generate normal boss monsters
+                else
+                {
+                    // God exists but prerequisites not met - hint that something ancient lurks here
+                    terminal.SetColor("dark_magenta");
+                    terminal.WriteLine("You sense an ancient presence sealed away in this chamber...");
+                    terminal.WriteLine("Perhaps you must prove yourself elsewhere before it reveals itself.", "gray");
+                    terminal.WriteLine("");
+                    await Task.Delay(2000);
+                }
+                // Fall through to generate normal boss monsters as placeholder
             }
         }
         else
@@ -2809,6 +2945,7 @@ public class DungeonLocation : BaseLocation
             foreach (var m in monsters)
             {
                 m.HP = (long)(m.HP * 1.5);
+                m.MaxHP = m.HP;  // Keep MaxHP in sync with boosted HP
                 m.Strength = (int)(m.Strength * 1.3);
             }
             // Ensure there's a boss
@@ -2975,6 +3112,30 @@ public class DungeonLocation : BaseLocation
 
         if (godType == null)
             return false;
+
+        // Check if this is a save quest return visit (god is Awakened and player has artifact)
+        var story = StoryProgressionSystem.Instance;
+        if (story.OldGodStates.TryGetValue(godType.Value, out var godState) &&
+            godState.Status == GodStatus.Awakened)
+        {
+            // Player has the artifact - complete the save quest
+            if (OldGodBossSystem.Instance.CanEncounterBoss(player, godType.Value))
+            {
+                var saveResult = await OldGodBossSystem.Instance.CompleteSaveQuest(player, godType.Value, terminal);
+                await HandleGodEncounterResult(saveResult, player, terminal);
+
+                if (saveResult.Outcome == BossOutcome.Saved)
+                {
+                    room.IsCleared = true;
+                    currentFloor.BossDefeated = true;
+                }
+
+                await terminal.PressAnyKey();
+                return true;
+            }
+            // No artifact yet - don't trigger encounter, player needs to find it first
+            return false;
+        }
 
         if (!OldGodBossSystem.Instance.CanEncounterBoss(player, godType.Value))
             return false;
@@ -3505,45 +3666,48 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// Get the maximum floor the player can access based on their cleared special floors
-    /// Players cannot skip past uncleared boss/seal floors
+    /// Get the maximum floor the player can access based on Old God floor gates.
+    /// Old God floors are hard gates - players MUST defeat the god before going deeper.
+    /// Seal floors are NOT hard gates - players can skip seals (affects endings only).
     /// </summary>
     private int GetMaxAccessibleFloor(Character player, int requestedFloor)
     {
         if (player == null)
             return requestedFloor;
 
-        // Migration: Sync collected seals with ClearedSpecialFloors for saves before this fix
-        // This ensures players who already collected seals can progress
-        SyncCollectedSealsWithClearedFloors(player);
-
-        // Find the first uncleared special floor that would block access
-        foreach (int specialFloor in AllSpecialFloors.OrderBy(f => f))
+        // Only Old God floors are hard progression gates
+        foreach (int godFloor in OldGodFloors.OrderBy(f => f))
         {
-            // If player wants to go to or past this special floor
-            if (requestedFloor >= specialFloor)
+            // If player wants to go past this Old God floor
+            if (requestedFloor > godFloor)
             {
-                // Check if floor is cleared using BOTH methods for robustness:
-                // 1. ClearedSpecialFloors set (explicit tracking)
-                // 2. DungeonFloorStates.EverCleared (persistence backup)
-                bool isCleared = player.ClearedSpecialFloors.Contains(specialFloor);
+                // Check if the Old God on this floor has been defeated/resolved
+                var godType = GetOldGodForFloor(godFloor);
+                bool isResolved = false;
 
-                // Also check DungeonFloorStates as a backup
-                if (!isCleared && player.DungeonFloorStates.TryGetValue(specialFloor, out var floorState))
+                if (godType != null)
                 {
-                    if (floorState.EverCleared)
+                    var story = StoryProgressionSystem.Instance;
+                    if (story.OldGodStates.TryGetValue(godType.Value, out var state))
                     {
-                        isCleared = true;
-                        // Sync the ClearedSpecialFloors set to match
-                        player.ClearedSpecialFloors.Add(specialFloor);
+                        isResolved = state.Status == GodStatus.Defeated ||
+                                     state.Status == GodStatus.Saved ||
+                                     state.Status == GodStatus.Allied ||
+                                     state.Status == GodStatus.Awakened ||
+                                     state.Status == GodStatus.Consumed;
                     }
                 }
 
-                // If not cleared by either method, cap access at this floor
-                if (!isCleared)
+                // Also check ClearedSpecialFloors as a backup (for saves before Old God tracking)
+                if (!isResolved)
                 {
-                    // They must start at this floor (or below it if they're lower level)
-                    return Math.Min(requestedFloor, specialFloor);
+                    isResolved = player.ClearedSpecialFloors.Contains(godFloor);
+                }
+
+                // If Old God not defeated, cap access at this floor (player can reach the floor but not pass it)
+                if (!isResolved)
+                {
+                    return Math.Min(requestedFloor, godFloor);
                 }
             }
         }
@@ -3552,12 +3716,13 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// Check if current floor requires clearing before leaving
-    /// Boss floors and seal floors must be fully cleared
+    /// Check if current floor requires clearing before the player can descend deeper.
+    /// Old God floors are hard gates - players MUST defeat the god before progressing.
+    /// Seal floors are soft gates - players can skip seals (affects endings only).
     /// </summary>
     private bool RequiresFloorClear()
     {
-        return SealFloors.Contains(currentDungeonLevel) || SecretBossFloors.Contains(currentDungeonLevel);
+        return OldGodFloors.Contains(currentDungeonLevel);
     }
 
     /// <summary>
@@ -3741,11 +3906,19 @@ public class DungeonLocation : BaseLocation
         var playerLevel = player?.Level ?? 1;
         int maxAccessible = Math.Min(maxDungeonLevel, playerLevel + 10);
 
-        // Players can always descend deeper into the dungeon, even from uncleared special floors
-        // They just can't ascend or leave until they clear the floor
-        // This allows players to continue deeper if they choose to skip a challenge temporarily
+        // Old God floors are hard gates - must defeat the god before descending
+        if (RequiresFloorClear() && !IsFloorCleared())
+        {
+            terminal.WriteLine("", "red");
+            terminal.WriteLine("A powerful presence blocks your descent.", "bright_red");
+            terminal.WriteLine("You must defeat the Old God on this floor before descending deeper.", "yellow");
+            terminal.WriteLine($"({GetRemainingClearInfo()})", "gray");
+            terminal.WriteLine("You may still ascend to prepare.", "cyan");
+            await Task.Delay(2500);
+            return;
+        }
 
-        // Check level restriction (player level +/- 10)
+        // Check level restriction (player level + 10)
         if (currentDungeonLevel >= maxAccessible)
         {
             terminal.WriteLine($"You cannot venture deeper than level {maxAccessible} at your current strength.", "yellow");
@@ -3900,14 +4073,13 @@ public class DungeonLocation : BaseLocation
     {
         var playerLevel = GetCurrentPlayer()?.Level ?? 1;
 
-        // Calculate accessible range: player level +/- 10
-        int minAccessible = Math.Max(1, playerLevel - 10);
+        // Players can always ascend (go up) to any floor, but can only descend to playerLevel + 10
         int maxAccessible = Math.Min(maxDungeonLevel, playerLevel + 10);
 
         terminal.WriteLine("");
         terminal.WriteLine($"Current level: {currentDungeonLevel}", "white");
         terminal.WriteLine($"Your level: {playerLevel}", "cyan");
-        terminal.WriteLine($"Accessible range: {minAccessible} - {maxAccessible} (your level +/- 10)", "yellow");
+        terminal.WriteLine($"Deepest accessible: {maxAccessible} (your level + 10)", "yellow");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput("Enter target level (or +/- for relative): ");
@@ -3927,29 +4099,43 @@ public class DungeonLocation : BaseLocation
             targetLevel = absolute;
         }
 
-        // Clamp to accessible range based on player level (+/- 10)
-        targetLevel = Math.Max(minAccessible, Math.Min(maxAccessible, targetLevel));
+        // Players can always go up (min floor 1), but can't descend past playerLevel + 10
+        targetLevel = Math.Max(1, Math.Min(maxAccessible, targetLevel));
 
-        // Check if trying to DESCEND past a boss/seal floor that requires clearing
-        // Players CAN ascend (retreat to prepare) but CANNOT descend (skip the boss) until floor is cleared
+        // Cap at the first undefeated Old God floor between current position and target
+        int requestedTarget = targetLevel;
+        if (targetLevel > currentDungeonLevel)
+        {
+            var player2 = GetCurrentPlayer();
+            if (player2 != null)
+            {
+                targetLevel = GetMaxAccessibleFloor(player2, targetLevel);
+            }
+        }
+
+        // If GetMaxAccessibleFloor capped the target (Old God gate), explain why
+        if (targetLevel < requestedTarget && targetLevel <= currentDungeonLevel)
+        {
+            // Find which Old God floor is blocking
+            var blockingFloor = OldGodFloors.OrderBy(f => f).FirstOrDefault(f => f >= currentDungeonLevel && f <= requestedTarget);
+            var blockingGod = blockingFloor > 0 ? GetOldGodForFloor(blockingFloor) : null;
+            var godName = blockingGod != null ? blockingGod.Value.ToString() : "an Old God";
+
+            terminal.WriteLine("", "red");
+            terminal.WriteLine("A powerful presence blocks your descent.", "bright_red");
+            terminal.WriteLine($"You must defeat {godName} on floor {blockingFloor} before descending deeper.", "yellow");
+            terminal.WriteLine("You may still ascend to prepare.", "cyan");
+            await Task.Delay(2500);
+            return;
+        }
+
+        // Check if trying to DESCEND past an Old God floor that hasn't been cleared
+        // Players CAN ascend (retreat to prepare) but CANNOT descend (skip the god) until defeated
         if (targetLevel > currentDungeonLevel && RequiresFloorClear() && !IsFloorCleared())
         {
             terminal.WriteLine("", "red");
-            if (IsOldGodFloor(currentDungeonLevel))
-            {
-                terminal.WriteLine("A powerful presence blocks your descent.", "bright_red");
-                terminal.WriteLine("You must defeat the Old God on this floor before descending deeper.", "yellow");
-            }
-            else if (SealFloors.Contains(currentDungeonLevel))
-            {
-                terminal.WriteLine("This floor holds an ancient Seal.", "bright_magenta");
-                terminal.WriteLine("You must claim the seal before you can descend.", "yellow");
-            }
-            else
-            {
-                terminal.WriteLine("A powerful presence blocks your descent.", "bright_red");
-                terminal.WriteLine("You must defeat all enemies on this floor before descending.", "yellow");
-            }
+            terminal.WriteLine("A powerful presence blocks your descent.", "bright_red");
+            terminal.WriteLine("You must defeat the Old God on this floor before descending deeper.", "yellow");
             terminal.WriteLine($"({GetRemainingClearInfo()})", "gray");
             terminal.WriteLine("You may still ascend to prepare.", "cyan");
             await Task.Delay(2500);
@@ -6891,6 +7077,17 @@ public class DungeonLocation : BaseLocation
         var player = GetCurrentPlayer();
         var playerLevel = player?.Level ?? 1;
         int maxAccessible = Math.Min(maxDungeonLevel, playerLevel + 10);
+
+        // Old God floors are hard gates - must defeat the god before descending
+        if (RequiresFloorClear() && !IsFloorCleared())
+        {
+            terminal.WriteLine("", "red");
+            terminal.WriteLine("A powerful presence blocks your descent.", "bright_red");
+            terminal.WriteLine("You must defeat the Old God on this floor before descending deeper.", "yellow");
+            terminal.WriteLine($"({GetRemainingClearInfo()})", "gray");
+            await Task.Delay(2500);
+            return;
+        }
 
         // Check if player can descend (limited to player level + 10)
         if (currentDungeonLevel >= maxAccessible)

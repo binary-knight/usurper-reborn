@@ -35,6 +35,12 @@ namespace UsurperRemake.BBS
         public static BBSSessionInfo? SessionInfo => _sessionInfo;
         public static BBSTerminalAdapter? TerminalAdapter => _terminalAdapter;
         public static bool IsInDoorMode => _sessionInfo != null && _sessionInfo.SourceType != DropFileType.None;
+
+        /// <summary>
+        /// True when the terminal should emit ANSI escape codes instead of using Console.ForegroundColor.
+        /// Covers BBS door mode AND online mode (where stdout goes through SSH pipe to the client).
+        /// </summary>
+        public static bool ShouldUseAnsiOutput => IsInDoorMode || _onlineMode;
         public static bool HelpWasShown => _helpWasShown;
 
         /// <summary>

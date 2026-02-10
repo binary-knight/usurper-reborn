@@ -155,8 +155,8 @@ public partial class TerminalEmulator : Control
             return;
         }
 
-        // In door mode, use ANSI escape codes since Console.ForegroundColor doesn't work
-        if (DoorMode.IsInDoorMode)
+        // In door/online mode, use ANSI escape codes since Console.ForegroundColor doesn't travel through SSH
+        if (DoorMode.ShouldUseAnsiOutput)
         {
             if (!text.Contains("[") || !text.Contains("[/]"))
             {
@@ -303,13 +303,13 @@ public partial class TerminalEmulator : Control
     // Overload for cases with no text parameter
     public void WriteLine()
     {
-        WriteLine("", "white");
+        WriteLine("", currentColor);
     }
-    
-    // Overload for single string parameter  
+
+    // Overload for single string parameter - uses currentColor set by SetColor()
     public void WriteLine(string text)
     {
-        WriteLine(text, "white");
+        WriteLine(text, currentColor);
     }
     
     public void Write(string text, string? color = null)
@@ -330,9 +330,9 @@ public partial class TerminalEmulator : Control
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
             BBSTerminalAdapter.Instance!.Write(text, effectiveColor);
         }
-        else if (DoorMode.IsInDoorMode)
+        else if (DoorMode.ShouldUseAnsiOutput)
         {
-            // In door mode, use ANSI escape codes since Console.ForegroundColor doesn't work
+            // In door/online mode, use ANSI escape codes since Console.ForegroundColor doesn't travel through SSH
             Console.Write($"\x1b[{GetAnsiColorCode(effectiveColor)}m");
             Console.Write(text);
             // Don't reset here - let next Write/WriteLine handle color
@@ -508,9 +508,9 @@ public partial class TerminalEmulator : Control
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
             BBSTerminalAdapter.Instance!.ClearScreen();
         }
-        else if (DoorMode.IsInDoorMode)
+        else if (DoorMode.ShouldUseAnsiOutput)
         {
-            // In BBS door mode, use ANSI escape codes instead of Console.Clear()
+            // In door/online mode, use ANSI escape codes instead of Console.Clear()
             // Console.Clear() throws when stdin/stdout are redirected pipes
             Console.Write("\x1b[2J\x1b[H"); // Clear screen and move cursor to home
         }
@@ -709,6 +709,11 @@ public partial class TerminalEmulator : Control
         {
             BBSTerminalAdapter.Instance!.SetColor(color);
         }
+        else if (DoorMode.ShouldUseAnsiOutput)
+        {
+            // Emit ANSI color code for stdio door/online mode
+            Console.Write($"\x1b[{GetAnsiColorCode(color)}m");
+        }
     }
     
     public async Task<string> GetKeyInput()
@@ -724,9 +729,9 @@ public partial class TerminalEmulator : Control
             // BBS socket mode - read key from socket via BBSTerminalAdapter
             return await BBSTerminalAdapter.Instance!.GetKeyInput();
         }
-        else if (DoorMode.IsInDoorMode)
+        else if (DoorMode.ShouldUseAnsiOutput)
         {
-            // BBS door mode (stdio) - use line input since ReadKey doesn't work with redirected I/O
+            // Door/online mode (stdio) - use line input since ReadKey doesn't work with redirected I/O
             var input = await GetInput("");
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }

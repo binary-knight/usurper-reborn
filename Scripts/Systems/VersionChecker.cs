@@ -239,6 +239,8 @@ namespace UsurperRemake.Systems
                     LatestVersion = cache.LatestVersion ?? "";
                     NewVersionAvailable = cache.NewVersionAvailable;
                     ReleaseUrl = cache.ReleaseUrl ?? GitHubReleasesUrl;
+                    ReleaseNotes = cache.ReleaseNotes ?? "";
+                    releaseAssets = cache.Assets ?? new List<GitHubAsset>();
                     return true;
                 }
 
@@ -263,7 +265,9 @@ namespace UsurperRemake.Systems
                     CurrentVersion = CurrentVersion,  // Store our version to detect upgrades/downgrades
                     LatestVersion = LatestVersion,
                     NewVersionAvailable = NewVersionAvailable,
-                    ReleaseUrl = ReleaseUrl
+                    ReleaseUrl = ReleaseUrl,
+                    ReleaseNotes = ReleaseNotes,
+                    Assets = releaseAssets
                 };
 
                 var json = JsonSerializer.Serialize(cache);
@@ -420,7 +424,7 @@ namespace UsurperRemake.Systems
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                platformPattern = "macOS-x64";
+                platformPattern = RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "macOS-AppleSilicon" : "macOS-Intel";
             }
             else
             {
@@ -610,44 +614,51 @@ rd /S /Q ""{tempDir}"" 2>nul
             var exeName = "UsurperReborn";
             var exePath = Path.Combine(appDir, exeName);
 
-            var script = $@"#!/bin/bash
-echo ""Usurper Reborn Auto-Updater""
-echo ""===========================""
-echo """"
-echo ""Waiting for game to close...""
-sleep 3
+            // Build script with explicit \n to avoid CRLF issues when compiled on Windows.
+            // C# verbatim strings embed the source file's line endings (CRLF on Windows),
+            // which causes "bad interpreter" errors when bash tries to run the script on Linux.
+            var lines = new[]
+            {
+                "#!/bin/bash",
+                "echo \"Usurper Reborn Auto-Updater\"",
+                "echo \"===========================\"",
+                "echo \"\"",
+                "echo \"Waiting for game to close...\"",
+                "sleep 3",
+                "",
+                "# Wait for any running instances to close",
+                $"while pgrep -f \"{exeName}\" > /dev/null 2>&1; do",
+                "    sleep 1",
+                "done",
+                "",
+                "echo \"\"",
+                "echo \"Installing update...\"",
+                $"cp -rf \"{extractDir}/\". \"{appDir}/\"",
+                "if [ $? -ne 0 ]; then",
+                "    echo \"\"",
+                "    echo \"ERROR: Failed to copy update files.\"",
+                "    echo \"Please download the update manually from:\"",
+                $"    echo \"{ReleaseUrl}\"",
+                "    read -p \"Press Enter to continue...\"",
+                $"    rm -rf \"{tempDir}\"",
+                "    exit 1",
+                "fi",
+                "",
+                "# Make the executable runnable",
+                $"chmod +x \"{exePath}\"",
+                "",
+                "echo \"\"",
+                "echo \"Update complete! Starting game...\"",
+                $"\"{exePath}\" &",
+                "",
+                "echo \"\"",
+                "echo \"Cleaning up...\"",
+                $"rm -rf \"{tempDir}\"",
+                ""
+            };
+            var script = string.Join("\n", lines);
 
-# Wait for any running instances to close
-while pgrep -x ""{exeName}"" > /dev/null; do
-    sleep 1
-done
-
-echo """"
-echo ""Installing update...""
-cp -rf ""{extractDir}/""* ""{appDir}/""
-if [ $? -ne 0 ]; then
-    echo """"
-    echo ""ERROR: Failed to copy update files.""
-    echo ""Please download the update manually from:""
-    echo ""{ReleaseUrl}""
-    read -p ""Press Enter to continue...""
-    rm -rf ""{tempDir}""
-    exit 1
-fi
-
-# Make the executable runnable
-chmod +x ""{exePath}""
-
-echo """"
-echo ""Update complete! Starting game...""
-""{exePath}"" &
-
-echo """"
-echo ""Cleaning up...""
-rm -rf ""{tempDir}""
-";
-
-            File.WriteAllText(updaterPath, script);
+            File.WriteAllText(updaterPath, script, new System.Text.UTF8Encoding(false));
 
             // Make the script executable
             try
@@ -809,6 +820,8 @@ rm -rf ""{tempDir}""
             public string? LatestVersion { get; set; }
             public bool NewVersionAvailable { get; set; }
             public string? ReleaseUrl { get; set; }
+            public string? ReleaseNotes { get; set; }
+            public List<GitHubAsset>? Assets { get; set; }
         }
     }
 }

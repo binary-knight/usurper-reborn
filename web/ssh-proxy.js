@@ -163,6 +163,7 @@ function getStats() {
           AND json_extract(p.player_data, '$.player.level') IS NOT NULL
         ORDER BY json_extract(p.player_data, '$.player.level') DESC,
                  json_extract(p.player_data, '$.player.experience') DESC
+        LIMIT 25
       `).all().map((row, idx) => ({
         rank: idx + 1,
         name: row.display_name,

@@ -432,7 +432,7 @@ public class CharacterCreationSystem
                 DisplayRaceOption(2, "Elf", CharacterRace.Elf);
                 DisplayRaceOption(3, "Half-elf", CharacterRace.HalfElf);
                 DisplayRaceOption(4, "Dwarf", CharacterRace.Dwarf);
-                DisplayRaceOption(5, "Troll", CharacterRace.Troll);
+                DisplayRaceOption(5, "Troll", CharacterRace.Troll, "*regeneration");
                 DisplayRaceOption(6, "Orc", CharacterRace.Orc);
                 DisplayRaceOption(7, "Gnome", CharacterRace.Gnome);
                 DisplayRaceOption(8, "Gnoll", CharacterRace.Gnoll, "*poisonous bite");

@@ -327,8 +327,13 @@ namespace UsurperRemake.Systems
                     Description = item.Description?.ToList() ?? new List<string>()
                 }).ToList() ?? new List<InventoryItemData>(),
 
-                // Dynamic equipment (items equipped from inventory/dungeon loot)
-                DynamicEquipment = EquipmentDatabase.GetDynamicEquipment().Select(equip => new DynamicEquipmentData
+                // Dynamic equipment (only items the player actually has equipped, not all dynamic items in the DB)
+                DynamicEquipment = (player.EquippedItems ?? new Dictionary<EquipmentSlot, int>())
+                    .Values
+                    .Where(id => id >= 100000) // Only dynamic equipment IDs
+                    .Select(id => EquipmentDatabase.GetById(id))
+                    .Where(equip => equip != null)
+                    .Select(equip => new DynamicEquipmentData
                 {
                     Id = equip.Id,
                     Name = equip.Name,
@@ -737,8 +742,9 @@ namespace UsurperRemake.Systems
                     ) ?? new Dictionary<int, int>(),
 
                     // Save dynamic equipment that this NPC has equipped
+                    // DynamicEquipmentStart = 100000; base equipment (Waist=10000, Face=11000, etc.) must NOT be saved as dynamic
                     DynamicEquipment = npc.EquippedItems?
-                        .Where(kvp => kvp.Value >= 10000) // Dynamic equipment IDs start at 10000
+                        .Where(kvp => kvp.Value >= 100000) // Dynamic equipment IDs start at 100000
                         .Select(kvp => EquipmentDatabase.GetById(kvp.Value))
                         .Where(equip => equip != null)
                         .Select(equip => new DynamicEquipmentData
@@ -1134,6 +1140,7 @@ namespace UsurperRemake.Systems
                 var story = StoryProgressionSystem.Instance;
                 data.CurrentCycle = story.CurrentCycle;
                 data.CollectedSeals = story.CollectedSeals.Select(s => (int)s).ToList();
+                data.CollectedArtifacts = story.CollectedArtifacts.Select(a => (int)a).ToList();
                 data.StoryFlags = new Dictionary<string, bool>(story.StoryFlags);
 
                 // Save Old God defeat states (critical for permanent boss defeats)
@@ -1456,6 +1463,19 @@ namespace UsurperRemake.Systems
                     if (!story.CollectedSeals.Contains(seal))
                     {
                         story.CollectSeal(seal);
+                    }
+                }
+
+                // Restore collected artifacts
+                if (data.CollectedArtifacts != null)
+                {
+                    foreach (var artifactInt in data.CollectedArtifacts)
+                    {
+                        var artifact = (ArtifactType)artifactInt;
+                        if (!story.CollectedArtifacts.Contains(artifact))
+                        {
+                            story.CollectArtifact(artifact);
+                        }
                     }
                 }
 

@@ -149,7 +149,10 @@ namespace UsurperRemake.Systems
                 }
             };
 
-            // PARADOX 2: Veloura's Cure (from plan)
+            // PARADOX 2: Veloura's Cure - the cost of using the Soulweaver's Loom
+            // This paradox triggers AFTER the player finds the Loom on floor 65 (from the save quest).
+            // The Loom is already in hand - this is about what price must be paid to power it.
+            // The actual save completion happens when the player returns to floor 40.
             paradoxes["velouras_cure"] = new MoralParadox
             {
                 Id = "velouras_cure",
@@ -159,12 +162,8 @@ namespace UsurperRemake.Systems
                 RequiredArtifact = ArtifactType.SoulweaversLoom,
                 Setup = new[]
                 {
-                    "You hold the Soulweaver's Loom - the only artifact capable of",
-                    "curing Veloura, the dying goddess of love.",
-                    "",
-                    "But the Loom requires a soul to function.",
-                    "Not just any soul - a soul willingly given.",
-                    "A soul that loves deeply and truly.",
+                    "The Soulweaver's Loom hums with potential, but it needs",
+                    "a soul to truly activate - a soul willingly given.",
                     "",
                     "Lyris steps forward. 'I have a confession.'",
                     "'I am... a fragment of Veloura herself.'",
@@ -175,14 +174,14 @@ namespace UsurperRemake.Systems
                     "'Let me do this. Let my death have meaning.'",
                     "",
                     "A goddess can be saved.",
-                    "But the cost is the woman you love."
+                    "But the cost may be the woman you love."
                 },
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
                     {
                         Id = "sacrifice_lyris",
-                        Label = "Accept Lyris's sacrifice - save Veloura",
+                        Label = "Accept Lyris's sacrifice - empower the Loom",
                         MoralType = MoralType.Utilitarian,
                         Outcome = new[]
                         {
@@ -190,20 +189,15 @@ namespace UsurperRemake.Systems
                             "Her form shimmers as the Loom activates.",
                             "You feel her hand in yours, then... nothing.",
                             "",
-                            "Veloura awakens with a gasp.",
-                            "The goddess of love lives again.",
+                            "The Loom blazes with light. Its threads glow gold.",
+                            "You can feel Veloura's curse within it, ready to be unwoven.",
                             "",
-                            "But when she looks at you, she weeps.",
-                            "'You loved her,' Veloura whispers. 'Truly loved her.'",
-                            "'That is why it worked. That is why it hurts.'",
-                            "",
-                            "'I am so sorry.'"
+                            "Return to Veloura on floor 40 to complete the cure."
                         },
                         ChivalryChange = 0,
                         DarknessChange = 0,
                         WisdomChange = 5,
                         CompanionDeath = "Lyris",
-                        GodSaved = OldGodType.Veloura,
                         StoryFlag = "lyris_sacrificed_for_veloura"
                     },
                     new ParadoxOption
@@ -219,16 +213,15 @@ namespace UsurperRemake.Systems
                             "'Is already dying. Has been dying for millennia.'",
                             "'I will not trade a certain love for a distant goddess.'",
                             "",
-                            "Veloura continues to fade.",
+                            "The Loom dims but does not go dark.",
+                            "Perhaps... perhaps love itself can power it.",
                             "But Lyris remains at your side.",
                             "",
-                            "Was this selfish? Perhaps.",
-                            "But love, too, is a kind of divinity."
+                            "Return to Veloura on floor 40 to attempt the cure."
                         },
                         ChivalryChange = 100,
                         DarknessChange = 50,
                         WisdomChange = 2,
-                        GodNotSaved = OldGodType.Veloura,
                         StoryFlag = "refused_lyris_sacrifice"
                     },
                     new ParadoxOption
@@ -246,11 +239,11 @@ namespace UsurperRemake.Systems
                             "'Pieces are missing. Pieces you do not remember.'",
                             "'You are not whole enough to pay this price.'",
                             "",
-                            "The Loom goes dark.",
+                            "The Loom dims, then steadies. Your attempt moved something.",
                             "Lyris looks at you with newfound wonder.",
                             "'What ARE you?'",
                             "",
-                            "The question lingers unanswered."
+                            "Return to Veloura on floor 40 to attempt the cure."
                         },
                         ChivalryChange = 200,
                         DarknessChange = 0,

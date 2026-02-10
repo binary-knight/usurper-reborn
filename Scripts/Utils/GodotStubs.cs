@@ -267,7 +267,7 @@ namespace UsurperRemake.Utils
 
         private void SafeClearScreen()
         {
-            if (DoorMode.IsInDoorMode)
+            if (DoorMode.ShouldUseAnsiOutput)
             {
                 Console.Write("\x1b[2J\x1b[H");
             }

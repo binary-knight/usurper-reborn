@@ -21,6 +21,7 @@ namespace UsurperRemake.Systems
 
         private readonly IOnlineSaveBackend backend;
         private readonly string username;
+
         private readonly JsonSerializerOptions jsonOptions;
 
         private System.Threading.Timer? heartbeatTimer;

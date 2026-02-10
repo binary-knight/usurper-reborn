@@ -423,11 +423,13 @@ public static class SpellSystem
             if (rollResult.IsCriticalFailure)
             {
                 result.Message = $"{caster.Name2} fumbles the spell! The magic fizzles harmlessly.";
+                result.Message += $"\n  {result.RollInfo}";
                 result.SpecialEffect = "fizzle";
             }
             else
             {
                 result.Message = $"{caster.Name2} utters '{spellInfo.MagicWords}'... but the spell fails!";
+                result.Message += $"\n  {result.RollInfo}";
                 result.SpecialEffect = "fail";
             }
 

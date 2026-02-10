@@ -44,43 +44,78 @@ namespace UsurperRemake.UI
             };
 
             // Insert version line dynamically
-            var versionLine = $"███                            Alpha v{GameConfig.Version.Replace("-alpha", "")}                             ███";
+            var versionText = $"Alpha v{GameConfig.Version.Replace("-alpha", "")}";
             var linesList = new System.Collections.Generic.List<string>(lines);
-            linesList.Insert(linesList.Count - 3, versionLine);
+            linesList.Insert(linesList.Count - 3, $"███{versionText}███"); // placeholder, will be padded below
             lines = linesList.ToArray();
 
-            // Animated reveal with colors
+            // Normalize all lines to consistent width (match solid border lines)
+            int targetWidth = lines[0].Length;
+            for (int j = 0; j < lines.Length; j++)
+            {
+                if (lines[j].Length >= 6 && lines[j].StartsWith("███") && lines[j].EndsWith("███")
+                    && lines[j].Length != targetWidth)
+                {
+                    // Framed line with wrong width - pad content between borders
+                    string innerContent = lines[j].Substring(3, lines[j].Length - 6);
+                    int contentWidth = targetWidth - 6;
+                    // Center the content if it's a short text line (like version)
+                    if (innerContent.Trim().Length > 0 && innerContent.Trim().Length < contentWidth / 2)
+                    {
+                        int totalPad = contentWidth - innerContent.Trim().Length;
+                        int leftPad = totalPad / 2;
+                        innerContent = new string(' ', leftPad) + innerContent.Trim() + new string(' ', contentWidth - leftPad - innerContent.Trim().Length);
+                    }
+                    else
+                    {
+                        innerContent = innerContent.PadRight(contentWidth);
+                    }
+                    lines[j] = "███" + innerContent + "███";
+                }
+            }
+
+            // Animated reveal with segment-level coloring
+            // Borders are subtle darkgray, letter art pops in bright colors
             for (int i = 0; i < lines.Length; i++)
             {
                 var line = lines[i];
+                bool isSolidBorder = !line.Contains(' ');
 
-                // Color scheme based on line content
-                if (line.Contains("USURPER") || line.Contains("REBORN"))
+                if (isSolidBorder)
                 {
-                    terminal.SetColor("bright_red");
-                }
-                else if (line.Contains("BBS Door Game") || line.Contains("Jakob Dangarden"))
-                {
-                    terminal.SetColor("bright_yellow");
-                }
-                else if (line.Contains("Reimagined for 2026"))
-                {
-                    terminal.SetColor("bright_cyan");
-                }
-                else if (line.Contains("Alpha v"))
-                {
-                    terminal.SetColor("bright_green");
-                }
-                else if (line.Contains("█"))
-                {
-                    terminal.SetColor("red");
+                    // Solid border line - subtle frame
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine(line);
                 }
                 else
                 {
-                    terminal.SetColor("darkred");
-                }
+                    // Framed line - color border and content separately
+                    string leftBorder = line.Substring(0, 3);
+                    string content = line.Substring(3, line.Length - 6);
+                    string rightBorder = line.Substring(line.Length - 3);
 
-                terminal.WriteLine(line);
+                    // Determine content color by section
+                    string contentColor;
+                    if (i >= 4 && i <= 8)
+                        contentColor = "bright_yellow";     // USURPER block letters
+                    else if (i >= 10 && i <= 14)
+                        contentColor = "bright_cyan";       // REBORN block letters
+                    else if (line.Contains("BBS Door Game"))
+                        contentColor = "white";
+                    else if (line.Contains("Jakob Dangarden"))
+                        contentColor = "gray";
+                    else if (line.Contains("Alpha v"))
+                        contentColor = "bright_green";
+                    else
+                        contentColor = "darkgray";          // Empty frame spacers
+
+                    terminal.SetColor("darkgray");
+                    terminal.Write(leftBorder);
+                    terminal.SetColor(contentColor);
+                    terminal.Write(content);
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine(rightBorder);
+                }
 
                 // Small delay for dramatic effect on title lines
                 if (i >= 4 && i <= 14)

@@ -133,6 +133,18 @@ namespace UsurperRemake.Systems
 
             if (success)
             {
+                // Check if this player is already logged in elsewhere
+                if (await backend.IsPlayerOnline(username.Trim()))
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("  This character is already logged in from another session.");
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  Please disconnect the other session first, or wait a few minutes.");
+                    terminal.WriteLine("");
+                    await Task.Delay(2000);
+                    return null;
+                }
+
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"  Welcome back, {displayName}!");
                 terminal.WriteLine("");

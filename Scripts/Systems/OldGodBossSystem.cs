@@ -150,11 +150,20 @@ namespace UsurperRemake.Systems
             // Check if already dealt with (defeated, saved, allied, etc.)
             if (story.OldGodStates.TryGetValue(type, out var state))
             {
-                // Gods that have been resolved cannot be encountered again
+                // Awakened gods can be re-encountered if player has the required artifact
+                // (they were spared via dialogue and player found the artifact to complete the save)
+                if (state.Status == GodStatus.Awakened)
+                {
+                    var requiredArtifact = GetArtifactForSave(type);
+                    if (requiredArtifact != null && ArtifactSystem.Instance.HasArtifact(requiredArtifact.Value))
+                        return true; // Allow re-encounter to complete the save
+                    return false; // No artifact yet, can't re-encounter
+                }
+
+                // Gods that have been fully resolved cannot be encountered again
                 if (state.Status == GodStatus.Defeated ||
                     state.Status == GodStatus.Saved ||
                     state.Status == GodStatus.Allied ||
-                    state.Status == GodStatus.Awakened ||
                     state.Status == GodStatus.Consumed)
                     return false;
             }
@@ -171,6 +180,94 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Get the artifact required to save a specific god via the save quest chain.
+        /// Returns null for gods that don't have a save-quest artifact.
+        /// </summary>
+        private ArtifactType? GetArtifactForSave(OldGodType type)
+        {
+            return type switch
+            {
+                OldGodType.Veloura => ArtifactType.SoulweaversLoom,
+                OldGodType.Aurelion => ArtifactType.SunforgedBlade,
+                _ => null
+            };
+        }
+
+        /// <summary>
+        /// Complete the save quest for an Awakened god. Called when the player returns
+        /// to the god's floor with the required artifact after sparing them via dialogue.
+        /// </summary>
+        public async Task<BossEncounterResult> CompleteSaveQuest(
+            Character player, OldGodType type, TerminalEmulator terminal)
+        {
+            if (!bossData.TryGetValue(type, out var boss))
+                return new BossEncounterResult { Success = false, Outcome = BossOutcome.Fled, God = type };
+
+            var story = StoryProgressionSystem.Instance;
+            string godName = boss.Name;
+
+            // The god remembers the player's promise
+            terminal.WriteLine("");
+            await Task.Delay(1000);
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"{godName} materializes before you once more...");
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"\"You... you actually returned. And you brought it.\"");
+            await Task.Delay(1500);
+            terminal.WriteLine($"\"The Soulweaver's Loom. I can feel its power reaching out to me.\"");
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+
+            terminal.SetColor("bright_white");
+            terminal.WriteLine("The Loom begins to glow, threads of light weaving through the air...");
+            await Task.Delay(2000);
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("The corruption that has twisted this ancient being starts to unravel.");
+            await Task.Delay(1500);
+            terminal.WriteLine("Layer by layer, the curse falls away like old skin.");
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"\"{godName} gasps as memories of who they truly were flood back.\"");
+            await Task.Delay(1500);
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"\"Thank you... I remember now. I remember what love truly means.\"");
+            await Task.Delay(2000);
+            terminal.WriteLine("");
+
+            terminal.SetColor("bright_white");
+            terminal.WriteLine("Press Enter to continue...");
+            await terminal.WaitForKey("");
+
+            // Update god state to fully Saved
+            story.UpdateGodState(type, GodStatus.Saved);
+            story.SetStoryFlag($"{type.ToString().ToLower()}_saved", true);
+
+            // Award experience and Chivalry
+            long xpReward = boss.Level * 1000;
+            player.Experience += xpReward;
+            player.Chivalry += 100;
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"+{xpReward} XP for fulfilling your promise.");
+            terminal.WriteLine("+100 Chivalry - You kept your word to a god.");
+            terminal.WriteLine("");
+
+            // Grant Ocean Philosophy fragment
+            OceanPhilosophySystem.Instance.CollectFragment(WaveFragment.TheCorruption);
+
+            return new BossEncounterResult
+            {
+                Success = true,
+                Outcome = BossOutcome.Saved,
+                God = type
+            };
+        }
+
+        /// <summary>
         /// Check if prerequisites are met for encountering a god
         /// </summary>
         private bool CheckPrerequisites(OldGodType type)
@@ -184,9 +281,16 @@ namespace UsurperRemake.Systems
                     return true;
 
                 case OldGodType.Veloura:
-                    // Must have defeated or encountered Maelketh
-                    return story.HasStoryFlag("maelketh_defeated") ||
-                           story.HasStoryFlag("maelketh_encountered");
+                    // Must have resolved Maelketh (defeated, saved, or allied)
+                    if (story.OldGodStates.TryGetValue(OldGodType.Maelketh, out var maelkethState))
+                    {
+                        return maelkethState.Status == GodStatus.Defeated ||
+                               maelkethState.Status == GodStatus.Saved ||
+                               maelkethState.Status == GodStatus.Allied ||
+                               maelkethState.Status == GodStatus.Awakened ||
+                               maelkethState.Status == GodStatus.Consumed;
+                    }
+                    return false;
 
                 case OldGodType.Thorgrim:
                     // Must have defeated at least one god
@@ -262,7 +366,11 @@ namespace UsurperRemake.Systems
 
             if (story.HasStoryFlag($"{type.ToString().ToLower()}_spared"))
             {
-                // Spared the god (save quest started)
+                // Spared the god - mark as Awakened (quest in progress, not fully saved yet)
+                // Player must find the required artifact and return to complete the save
+                story.UpdateGodState(type, GodStatus.Awakened);
+                story.SetStoryFlag($"{type.ToString().ToLower()}_save_quest", true);
+
                 return new BossEncounterResult
                 {
                     Success = true,

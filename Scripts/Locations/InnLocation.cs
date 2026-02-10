@@ -30,8 +30,7 @@ public class InnLocation : BaseLocation
         PossibleExits = new List<GameLocation>
         {
             GameLocation.MainStreet,    // loc1 - back to main street
-            GameLocation.TeamCorner,    // loc2 - team corner
-            GameLocation.Recruit        // loc3 - hall of recruitment
+            GameLocation.TeamCorner     // loc2 - team corner
         };
         
         // Inn-specific actions
@@ -420,16 +419,8 @@ public class InnLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.Write("Team Corner              ");
+        terminal.WriteLine("Team Corner");
 
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("magenta");
-        terminal.Write("H");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        terminal.SetColor("white");
-        terminal.WriteLine("Hall of Recruitment");
 
         // Show companion option if available
         if (recruitableCompanions.Any())
@@ -538,10 +529,7 @@ public class InnLocation : BaseLocation
             case "C":
                 await NavigateToLocation(GameLocation.TeamCorner);
                 return true;
-                
-            case "H":
-                await NavigateToLocation(GameLocation.Recruit);
-                return true;
+
 
             case "A":
                 await ApproachCompanions();
@@ -1000,6 +988,14 @@ public class InnLocation : BaseLocation
     /// </summary>
     private async Task ChallengeNPC(NPC npc)
     {
+        // Seth Able has a dedicated challenge system with daily limits and flat rewards.
+        // Redirect to it regardless of how the player reached this point.
+        if (npc.IsSpecialNPC && npc.SpecialScript == "drunk_fighter")
+        {
+            await ChallengeSethAble();
+            return;
+        }
+
         terminal.ClearScreen();
         terminal.SetColor("red");
         terminal.WriteLine($"Challenging {npc.Name2} to a Duel!");

@@ -276,6 +276,16 @@ public partial class CombatEngine
             // Process plague/disease damage from world events and character conditions
             await ProcessPlagueDamage(player, result);
 
+            // Troll racial passive regeneration
+            if (player.Race == CharacterRace.Troll && player.HP < player.MaxHP && player.IsAlive)
+            {
+                int regenAmount = Math.Min(1 + (int)(player.Level / 20), 3);
+                long actualRegen = Math.Min(regenAmount, player.MaxHP - player.HP);
+                player.HP += actualRegen;
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"[Troll Regeneration] You regenerate {actualRegen} HP!");
+            }
+
             // Check if player died from status effects or plague
             if (!player.IsAlive)
             {
@@ -296,12 +306,24 @@ public partial class CombatEngine
                     terminal.WriteLine("[AUTO-COMBAT] Press Enter to stop...");
                     terminal.WriteLine("");
 
-                    // Create auto-attack action
-                    playerAction = new CombatAction
+                    // Smart auto-combat: use potion if HP below 50% (preemptive to survive burst)
+                    if (player.HP < player.MaxHP * 0.5 && player.Healing > 0)
                     {
-                        Type = CombatActionType.Attack,
-                        TargetIndex = null // Random target
-                    };
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine("[AUTO-COMBAT] HP low - using healing potion...");
+                        playerAction = new CombatAction
+                        {
+                            Type = CombatActionType.QuickHeal
+                        };
+                    }
+                    else
+                    {
+                        playerAction = new CombatAction
+                        {
+                            Type = CombatActionType.Attack,
+                            TargetIndex = null // Random target
+                        };
+                    }
 
                     await Task.Delay(GetCombatDelay(500)); // Brief pause
                 }
@@ -2651,7 +2673,10 @@ public partial class CombatEngine
         terminal.SetColor("white");
         terminal.WriteLine($"You found this on the {monster.Name}'s corpse.");
         terminal.WriteLine("");
-        terminal.WriteLine("(E)quip immediately");
+        if (lootItem.IsIdentified)
+        {
+            terminal.WriteLine("(E)quip immediately");
+        }
         terminal.WriteLine("(T)ake to inventory");
         terminal.WriteLine("(L)eave it");
         terminal.WriteLine("");
@@ -2662,6 +2687,17 @@ public partial class CombatEngine
         switch (choice.ToUpper())
         {
             case "E":
+                // Block equipping unidentified items
+                if (!lootItem.IsIdentified)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("You can't equip an unidentified item. Taking it to your inventory instead.");
+                    player.Inventory.Add(lootItem);
+                    string unidDisplayName = LootGenerator.GetUnidentifiedName(lootItem);
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"Added {unidDisplayName} to your inventory.");
+                    break;
+                }
                 // Convert Item to Equipment and equip properly
                 Equipment equipment;
                 if (lootItem.Type == global::ObjType.Weapon)
@@ -2778,7 +2814,8 @@ public partial class CombatEngine
                 // Add to inventory
                 player.Inventory.Add(lootItem);
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"Added {lootItem.Name} to your inventory.");
+                string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
+                terminal.WriteLine($"Added {invName} to your inventory.");
                 break;
 
             default:
@@ -3879,6 +3916,14 @@ public partial class CombatEngine
 
             case CombatActionType.CastSpell:
                 await ExecuteSpellMultiMonster(player, monsters, action, result);
+                break;
+
+            case CombatActionType.Heal:
+                await ExecuteHeal(player, result, false);
+                break;
+
+            case CombatActionType.QuickHeal:
+                await ExecuteHeal(player, result, true);
                 break;
 
             case CombatActionType.UseItem:
@@ -5168,15 +5213,15 @@ public partial class CombatEngine
             return await TeammateHealWithSpell(teammate, mostInjured, result);
         }
 
-        // Use potion if no spells or low mana and target is critical (below 35%)
-        if (hasPotion && injuredPercent < 0.35)
+        // Use potion if no spells or low mana and target is below 50% HP
+        if (hasPotion && injuredPercent < 0.50)
         {
             return await TeammateHealWithPotion(teammate, mostInjured, result);
         }
 
-        // Self-preservation: if the teammate themselves is below 25% HP, use a potion
+        // Self-preservation: if the teammate themselves is below 50% HP, use a potion
         double selfPercent = (double)teammate.HP / teammate.MaxHP;
-        if (hasPotion && selfPercent < 0.25)
+        if (hasPotion && selfPercent < 0.50)
         {
             return await TeammateHealWithPotion(teammate, teammate, result);
         }
@@ -6056,14 +6101,16 @@ public partial class CombatEngine
             if (wasSpouse)
             {
                 terminal.SetColor("magenta");
-                terminal.WriteLine($"Your beloved spouse {npc.DisplayName} is gone forever...");
+                terminal.WriteLine($"Your beloved spouse {npc.DisplayName} has fallen...");
+                terminal.WriteLine($"Perhaps they can still be saved...");
                 // Mark the spouse as dead in romance tracker
                 romanceTracker.HandleSpouseDeath(npcId);
             }
             else if (wasLover)
             {
                 terminal.SetColor("magenta");
-                terminal.WriteLine($"Your lover {npc.DisplayName} will never return...");
+                terminal.WriteLine($"Your lover {npc.DisplayName} has fallen...");
+                terminal.WriteLine($"Perhaps they can still be saved...");
             }
             else
             {
@@ -8004,6 +8051,43 @@ public partial class CombatEngine
                 if (target != null)
                 {
                     target.WeakenRounds = 3;
+                }
+                break;
+
+            case "cure_disease":
+                // Purify spell - cleanse disease and minor poisons
+                bool curedAnything = false;
+
+                // Clear status effect diseases
+                if (caster.ActiveStatuses.ContainsKey(StatusEffect.Diseased))
+                {
+                    caster.RemoveStatus(StatusEffect.Diseased);
+                    curedAnything = true;
+                }
+                if (caster.ActiveStatuses.ContainsKey(StatusEffect.Poisoned))
+                {
+                    caster.RemoveStatus(StatusEffect.Poisoned);
+                    curedAnything = true;
+                }
+
+                // Clear boolean disease flags
+                if (caster.Blind) { caster.Blind = false; curedAnything = true; }
+                if (caster.Plague) { caster.Plague = false; curedAnything = true; }
+                if (caster.Smallpox) { caster.Smallpox = false; curedAnything = true; }
+                if (caster.Measles) { caster.Measles = false; curedAnything = true; }
+                if (caster.Leprosy) { caster.Leprosy = false; curedAnything = true; }
+                if (caster.LoversBane) { caster.LoversBane = false; curedAnything = true; }
+
+                // Clear poison counter
+                if (caster.Poison > 0) { caster.Poison = 0; curedAnything = true; }
+
+                if (curedAnything)
+                {
+                    terminal.WriteLine($"{caster.DisplayName} is purified! Disease and afflictions are purged!", "bright_green");
+                }
+                else
+                {
+                    terminal.WriteLine($"{caster.DisplayName} is already healthy - the purifying light finds nothing to cleanse.", "cyan");
                 }
                 break;
 

@@ -58,6 +58,9 @@ namespace UsurperRemake.Systems
         public Dictionary<string, bool> StoryFlags { get; set; } = new();
         public int CurrentCycle { get; set; } = 1;
 
+        // Collected artifacts (ArtifactType as int)
+        public List<int> CollectedArtifacts { get; set; } = new();
+
         // Old God defeat states - OldGodType (int) -> GodStatus (int)
         // Tracks which Old Gods have been defeated, saved, allied, etc.
         public Dictionary<int, int> OldGodStates { get; set; } = new();

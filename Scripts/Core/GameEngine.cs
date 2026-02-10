@@ -667,24 +667,30 @@ public partial class GameEngine : Node
             terminal.ClearScreen();
 
             // Title header
-            terminal.SetColor("bright_red");
+            terminal.SetColor("cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.SetColor("cyan");
+            terminal.Write("║");
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine("║                USURPER REBORN - Halls of Avarice                            ║");
-            terminal.SetColor("bright_red");
+            terminal.Write("                USURPER REBORN");
+            terminal.SetColor("white");
+            terminal.Write(" - Halls of Avarice                            ");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("║");
+            terminal.SetColor("cyan");
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
-            terminal.SetColor("gray");
+            terminal.SetColor("darkgray");
             terminal.WriteLine($"  v{GameConfig.Version}");
             terminal.WriteLine("");
 
-            // Menu options with classic BBS style
+            // Menu options with clean color hierarchy
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("bright_cyan");
             terminal.Write("E");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
-            terminal.SetColor("cyan");
+            terminal.SetColor("bright_green");
             terminal.WriteLine("Enter the Game");
 
             terminal.SetColor("darkgray");
@@ -702,7 +708,7 @@ public partial class GameEngine : Node
             terminal.Write("H");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("white");
             terminal.WriteLine("Usurper History");
 
             terminal.SetColor("darkgray");
@@ -711,7 +717,7 @@ public partial class GameEngine : Node
             terminal.Write("B");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("white");
             terminal.WriteLine("BBS List - Play Usurper Reborn Online!");
 
             terminal.SetColor("darkgray");
@@ -720,7 +726,7 @@ public partial class GameEngine : Node
             terminal.Write("C");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
-            terminal.SetColor("white");
+            terminal.SetColor("gray");
             terminal.WriteLine("Credits");
 
             // Online Play - not shown in BBS door mode or online server mode (they're already online)
@@ -740,11 +746,11 @@ public partial class GameEngine : Node
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("red");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
-            terminal.SetColor("red");
+            terminal.SetColor("gray");
             terminal.WriteLine("Quit");
 
             // SysOp option - only visible in BBS door mode for SysOps

@@ -100,6 +100,26 @@
 
         .nav-links a:hover { color: var(--cyan); }
 
+        /* Steam Announcement Banner */
+        .announcement-banner {
+            background: linear-gradient(90deg, #1a0a2e, #2a1040, #1a0a2e);
+            border-bottom: 1px solid var(--gold);
+            padding: 12px 0;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+        }
+
+        .announcement-banner .banner-text {
+            color: var(--gold);
+            text-shadow: var(--glow-gold);
+        }
+
+        .announcement-banner .banner-date {
+            color: #fff;
+            font-weight: bold;
+        }
+
         /* Hero */
         .hero {
             text-align: center;
@@ -174,6 +194,20 @@
             color: var(--cyan);
         }
 
+        .btn-sponsor {
+            background: transparent;
+            color: #ea4aaa;
+            border: 1px solid #ea4aaa;
+        }
+
+        .btn-sponsor:hover {
+            background: rgba(234, 74, 170, 0.1);
+            border-color: #ff6ec7;
+            color: #ff6ec7;
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(234, 74, 170, 0.3);
+        }
+
         /* Title banner */
         .title-banner {
             margin-bottom: 24px;
@@ -238,10 +272,6 @@
             border-color: var(--cyan-dim);
         }
 
-        .feature-icon {
-            font-size: 24px;
-            margin-bottom: 12px;
-        }
 
         .feature-card h3 {
             font-family: 'JetBrains Mono', monospace;
@@ -609,6 +639,20 @@
             margin-top: 32px;
         }
 
+        .btn-steam {
+            background: #1b2838;
+            color: #c7d5e0;
+            border: 1px solid #2a475e;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn-steam:hover {
+            background: #2a475e;
+            color: #fff;
+            border-color: #66c0f4;
+        }
+
         .connect-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -633,13 +677,15 @@
             background: #000;
             border: 1px solid var(--border);
             border-radius: 4px;
-            padding: 12px 16px;
+            padding: 12px 110px 12px 16px;
             font-family: 'JetBrains Mono', monospace;
             font-size: 13px;
             color: var(--green);
             cursor: pointer;
             position: relative;
             transition: border-color 0.2s;
+            overflow: hidden;
+            white-space: nowrap;
         }
 
         .ssh-command:hover { border-color: var(--green-dim); }
@@ -1075,10 +1121,15 @@
             <a href="#companions">Companions</a>
             <a href="#history">History</a>
             <a href="#connect">Play</a>
-            <a href="https://github.com/jknight-developer/usurper-reborn" target="_blank">GitHub</a>
+            <a href="https://github.com/binary-knight/usurper-reborn" target="_blank">GitHub</a>
+            <a href="https://github.com/sponsors/binary-knight" target="_blank" style="color:#ea4aaa;">&#9829; Sponsor</a>
         </nav>
     </div>
 </header>
+
+<div class="announcement-banner">
+    <span class="banner-text">Usurper Reborn is coming to Steam on <span class="banner-date">March 2, 2026</span> &#8212; Wishlist coming soon!</span>
+</div>
 
 <section class="hero">
     <div class="container">
@@ -1093,7 +1144,8 @@
         </p>
         <div class="hero-buttons">
             <button class="btn btn-primary" id="play-btn" onclick="openTerminal()">Play Now in Browser</button>
-            <a class="btn btn-secondary" href="#connect">SSH Connection Info</a>
+            <a class="btn btn-secondary" href="https://github.com/binary-knight/usurper-reborn/releases/latest" target="_blank">Download Latest Release</a>
+            <a class="btn btn-sponsor" href="https://github.com/sponsors/binary-knight" target="_blank">&#9829; Sponsor this Project</a>
         </div>
     </div>
 </section>
@@ -1133,32 +1185,26 @@
         <h2 class="section-title">// FEATURES</h2>
         <div class="feature-grid">
             <div class="feature-card">
-                <div class="feature-icon">&#9876;</div>
                 <h3>11 Unique Classes</h3>
                 <p>Warrior, Paladin, Assassin, Magician, Cleric, Ranger, Bard, Sage, Barbarian, Alchemist, and Jester. Each with unique abilities and playstyles.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#127758;</div>
                 <h3>100-Floor Dungeon</h3>
                 <p>Deterministically generated floors with boss encounters, ancient seals, Old God battles, treasure rooms, and hidden secrets.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#128481;</div>
                 <h3>Online Multiplayer</h3>
                 <p>Play alongside others in a shared persistent world. Chat, trade, duel, and compete on leaderboards.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#128081;</div>
                 <h3>Political Intrigue</h3>
                 <p>Challenge the throne, recruit guards, manage a treasury, navigate court factions, and rule as King with real consequences.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#10084;</div>
                 <h3>Deep Relationships</h3>
                 <p>60 unique NPCs with memories, personalities, and relationship arcs. Romance, marriage, family, betrayal, and grief systems.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#128218;</div>
                 <h3>Rich Narrative</h3>
                 <p>7 Old Gods to confront, 5 possible endings, companion quests, dream sequences, and a philosophical awakening system.</p>
             </div>
@@ -1562,6 +1608,16 @@
                 </div>
                 <p style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);">Password: <code style="color:var(--gold);font-size:14px;">play</code></p>
             </div>
+            <div class="connect-card">
+                <h3>&#9658; Download</h3>
+                <p>Download the standalone version for Windows, Linux, or macOS. Play offline or connect to the online server.</p>
+                <a class="btn btn-secondary" href="https://github.com/binary-knight/usurper-reborn/releases/latest" target="_blank" style="width:100%;justify-content:center;">Latest Release on GitHub</a>
+            </div>
+            <div class="connect-card">
+                <h3>&#9658; Steam</h3>
+                <p>Usurper Reborn is coming to Steam on <span style="color:var(--gold);font-weight:bold;">March 2, 2026</span>. Wishlist it now!</p>
+                <button class="btn btn-steam" disabled style="opacity:0.7;cursor:default;">Coming March 2nd</button>
+            </div>
         </div>
     </div>
 </section>
@@ -1590,7 +1646,7 @@
         </table>
 
         <div class="bbs-note">
-            <p>Are you a SysOp running Usurper Reborn? <a href="https://github.com/jknight-developer/usurper-reborn/issues" target="_blank">Get listed here!</a></p>
+            <p>Are you a SysOp running Usurper Reborn? <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank">Get listed here!</a></p>
         </div>
     </div>
 </section>
@@ -1633,8 +1689,8 @@
 <footer>
     <div class="container">
         <div class="footer-links">
-            <a href="https://github.com/jknight-developer/usurper-reborn" target="_blank">GitHub</a>
-            <a href="https://github.com/jknight-developer/usurper-reborn/issues" target="_blank">Report Bug</a>
+            <a href="https://github.com/binary-knight/usurper-reborn" target="_blank">GitHub</a>
+            <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank">Report Bug</a>
             <a href="https://discord.gg/EZhwgDT6Ta" target="_blank">Discord</a>
         </div>
         <p>Usurper Reborn &mdash; A free, open-source recreation of Usurper (1993) by Jakob Dangarden</p>
@@ -1894,7 +1950,7 @@
             html += '<table class="leaderboard-table"><thead><tr>';
             html += '<th class="rank-col">Rank</th><th>Player</th><th>Class</th><th class="lb-level">Lv</th><th class="lb-xp">Experience</th>';
             html += '</tr></thead><tbody>';
-            for (const p of data.leaderboard) {
+            for (const p of data.leaderboard.slice(0, 25)) {
                 const rankClass = p.rank <= 3 ? ' rank-' + p.rank : '';
                 const onlineClass = p.isOnline ? ' is-online' : '';
                 const onlineDot = p.isOnline ? '<span class="online-indicator">&#9679;</span>' : '';

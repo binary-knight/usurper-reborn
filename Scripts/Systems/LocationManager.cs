@@ -78,7 +78,7 @@ public class LocationManager
         locations[GameLocation.DarkAlley] = new UsurperRemake.Locations.DarkAlleyLocation();
         locations[GameLocation.AnchorRoad] = new AnchorRoadLocation();
         locations[GameLocation.TeamCorner] = new TeamCornerLocation();
-        locations[GameLocation.Recruit] = new UsurperRemake.Locations.HallOfRecruitmentLocation();
+        // Hall of Recruitment removed - redundant with Team Corner
         locations[GameLocation.Dormitory] = new UsurperRemake.Locations.DormitoryLocation();
         locations[GameLocation.Temple] = new TempleLocation(terminal, this, UsurperRemake.GodSystemSingleton.Instance);
         locations[GameLocation.Home] = new UsurperRemake.Locations.HomeLocation();
@@ -133,16 +133,10 @@ public class LocationManager
         navigationTable[GameLocation.TheInn] = new List<GameLocation>
         {
             GameLocation.MainStreet,   // loc1
-            GameLocation.TeamCorner,   // loc2
-            GameLocation.Recruit       // loc3
+            GameLocation.TeamCorner    // loc2
         };
-        
+
         navigationTable[GameLocation.TeamCorner] = new List<GameLocation>
-        {
-            GameLocation.TheInn       // loc1
-        };
-        
-        navigationTable[GameLocation.Recruit] = new List<GameLocation>
         {
             GameLocation.TheInn       // loc1
         };

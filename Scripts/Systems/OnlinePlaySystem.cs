@@ -25,6 +25,7 @@ namespace UsurperRemake.Systems
         private SshClient? sshClient;
         private ShellStream? shellStream;
         private CancellationTokenSource? cancellationSource;
+        private bool vtProcessingEnabled = false;
 
         public OnlinePlaySystem(TerminalEmulator terminal)
         {
@@ -217,14 +218,20 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Pipe input/output between the local console and the remote SSH shell.
-        /// Uses Console directly (bypassing TerminalEmulator) since the remote game
-        /// sends ANSI escape codes that Windows 10+ console handles natively.
+        /// The remote game sends ANSI escape codes for colors. We try to enable
+        /// native VT processing on Windows, with a fallback ANSI parser that
+        /// translates escape codes to Console.ForegroundColor calls.
         /// Runs until the connection is closed or the player disconnects (Ctrl+]).
         /// </summary>
         private async Task PipeIO(CancellationToken ct)
         {
-            // Enable ANSI/VT processing on Windows console
-            EnableVirtualTerminalProcessing();
+            // Always use our fallback ANSI parser which translates escape codes to
+            // Console.ForegroundColor calls. Windows VT processing claims to work
+            // (escape chars get consumed) but often fails to actually render colors.
+            // Our parser uses Console.ForegroundColor which reliably works everywhere.
+            vtProcessingEnabled = false;
+
+            Console.OutputEncoding = Encoding.UTF8;
 
             terminal.SetColor("gray");
             terminal.WriteLine("  Press Ctrl+] to disconnect.");
@@ -244,7 +251,14 @@ namespace UsurperRemake.Systems
                             if (bytesRead > 0)
                             {
                                 var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                                Console.Write(text);
+                                if (vtProcessingEnabled)
+                                {
+                                    Console.Write(text);
+                                }
+                                else
+                                {
+                                    WriteAnsiToConsole(text);
+                                }
                             }
                         }
                         else
@@ -324,33 +338,301 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Enable ANSI/VT100 escape sequence processing on Windows 10+ console.
-        /// This allows the remote game's ANSI color codes to render correctly.
+        /// Try to enable ANSI/VT100 escape sequence processing on Windows 10+ console.
+        /// Returns true if VT processing was confirmed enabled, false if fallback is needed.
         /// </summary>
-        private static void EnableVirtualTerminalProcessing()
+        private static bool TryEnableVirtualTerminalProcessing()
         {
             if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
                 System.Runtime.InteropServices.OSPlatform.Windows))
-                return;
+                return true; // Linux/macOS terminals support ANSI natively
 
             try
             {
                 var handle = GetStdHandle(-11); // STD_OUTPUT_HANDLE
-                GetConsoleMode(handle, out uint mode);
+                if (handle == IntPtr.Zero || handle == new IntPtr(-1))
+                    return false;
+
+                if (!GetConsoleMode(handle, out uint mode))
+                    return false;
+
                 mode |= 0x0004; // ENABLE_VIRTUAL_TERMINAL_PROCESSING
-                SetConsoleMode(handle, mode);
+                if (!SetConsoleMode(handle, mode))
+                    return false;
+
+                // Verify it actually stuck
+                if (!GetConsoleMode(handle, out uint verifyMode))
+                    return false;
+
+                return (verifyMode & 0x0004) != 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GetStdHandle(int nStdHandle);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+
+        // =====================================================================
+        // Fallback ANSI Parser - translates ANSI escape codes to Console colors
+        // when native VT processing is not available
+        // =====================================================================
+
+        private bool ansiBold = false;
+        private string ansiBuffer = "";
+
+        /// <summary>
+        /// Parse ANSI escape codes and translate them to Console.ForegroundColor/
+        /// Console.BackgroundColor calls. Handles SGR (colors), clear screen,
+        /// and cursor positioning.
+        /// </summary>
+        private void WriteAnsiToConsole(string text)
+        {
+            ansiBuffer += text;
+            int i = 0;
+
+            while (i < ansiBuffer.Length)
+            {
+                if (ansiBuffer[i] == '\x1b')
+                {
+                    // Check if we have enough data for a complete escape sequence
+                    if (i + 1 >= ansiBuffer.Length)
+                    {
+                        // Incomplete sequence - save for next call
+                        ansiBuffer = ansiBuffer.Substring(i);
+                        return;
+                    }
+
+                    if (ansiBuffer[i + 1] == '[')
+                    {
+                        // CSI sequence: \x1b[...X
+                        int seqStart = i + 2;
+                        int seqEnd = seqStart;
+                        while (seqEnd < ansiBuffer.Length && ansiBuffer[seqEnd] >= 0x20 && ansiBuffer[seqEnd] <= 0x3F)
+                            seqEnd++; // parameter bytes
+
+                        if (seqEnd >= ansiBuffer.Length)
+                        {
+                            // Incomplete sequence
+                            ansiBuffer = ansiBuffer.Substring(i);
+                            return;
+                        }
+
+                        char command = ansiBuffer[seqEnd];
+                        string parameters = ansiBuffer.Substring(seqStart, seqEnd - seqStart);
+                        i = seqEnd + 1;
+
+                        ProcessCsiSequence(command, parameters);
+                    }
+                    else
+                    {
+                        // Unknown escape - skip \x1b and the next char
+                        i += 2;
+                    }
+                }
+                else
+                {
+                    // Regular character - find the next escape or end
+                    int next = ansiBuffer.IndexOf('\x1b', i);
+                    if (next == -1)
+                    {
+                        Console.Write(ansiBuffer.Substring(i));
+                        i = ansiBuffer.Length;
+                    }
+                    else
+                    {
+                        Console.Write(ansiBuffer.Substring(i, next - i));
+                        i = next;
+                    }
+                }
+            }
+
+            ansiBuffer = "";
+        }
+
+        /// <summary>
+        /// Process a CSI (Control Sequence Introducer) escape sequence.
+        /// </summary>
+        private void ProcessCsiSequence(char command, string parameters)
+        {
+            switch (command)
+            {
+                case 'm': // SGR - Select Graphic Rendition (colors)
+                    ProcessSgr(parameters);
+                    break;
+
+                case 'J': // Erase in Display
+                    if (parameters == "2" || parameters == "")
+                    {
+                        try { Console.Clear(); } catch { }
+                    }
+                    break;
+
+                case 'H': // Cursor Position
+                case 'f': // Horizontal Vertical Position
+                    ProcessCursorPosition(parameters);
+                    break;
+
+                case 'K': // Erase in Line
+                    try
+                    {
+                        int clearLen = Console.BufferWidth - Console.CursorLeft;
+                        if (clearLen > 0)
+                            Console.Write(new string(' ', clearLen));
+                        Console.CursorLeft = Math.Max(0, Console.CursorLeft - clearLen);
+                    }
+                    catch { }
+                    break;
+
+                case 'A': // Cursor Up
+                    try { Console.CursorTop = Math.Max(0, Console.CursorTop - ParseInt(parameters, 1)); } catch { }
+                    break;
+
+                case 'B': // Cursor Down
+                    try { Console.CursorTop = Math.Min(Console.BufferHeight - 1, Console.CursorTop + ParseInt(parameters, 1)); } catch { }
+                    break;
+
+                case 'C': // Cursor Forward
+                    try { Console.CursorLeft = Math.Min(Console.BufferWidth - 1, Console.CursorLeft + ParseInt(parameters, 1)); } catch { }
+                    break;
+
+                case 'D': // Cursor Back
+                    try { Console.CursorLeft = Math.Max(0, Console.CursorLeft - ParseInt(parameters, 1)); } catch { }
+                    break;
+
+                // Other sequences silently ignored
+            }
+        }
+
+        private void ProcessCursorPosition(string parameters)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(parameters))
+                {
+                    Console.SetCursorPosition(0, 0);
+                    return;
+                }
+                var parts = parameters.Split(';');
+                int row = parts.Length > 0 && int.TryParse(parts[0], out int r) ? Math.Max(1, r) : 1;
+                int col = parts.Length > 1 && int.TryParse(parts[1], out int c) ? Math.Max(1, c) : 1;
+                Console.SetCursorPosition(
+                    Math.Min(col - 1, Console.BufferWidth - 1),
+                    Math.Min(row - 1, Console.BufferHeight - 1));
             }
             catch { }
         }
 
-        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-        private static extern IntPtr GetStdHandle(int nStdHandle);
+        /// <summary>
+        /// Process SGR (Select Graphic Rendition) parameters for color changes.
+        /// </summary>
+        private void ProcessSgr(string parameters)
+        {
+            if (string.IsNullOrEmpty(parameters))
+            {
+                // \x1b[m is equivalent to \x1b[0m (reset)
+                Console.ResetColor();
+                ansiBold = false;
+                return;
+            }
 
-        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-        private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+            var codes = parameters.Split(';');
+            foreach (var codeStr in codes)
+            {
+                if (!int.TryParse(codeStr, out int code))
+                    continue;
 
-        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-        private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+                switch (code)
+                {
+                    case 0: // Reset
+                        Console.ResetColor();
+                        ansiBold = false;
+                        break;
+                    case 1: // Bold/Bright
+                        ansiBold = true;
+                        // If we already have a foreground color set, brighten it
+                        Console.ForegroundColor = BrightenColor(Console.ForegroundColor);
+                        break;
+                    case 22: // Normal intensity
+                        ansiBold = false;
+                        break;
+
+                    // Standard foreground colors (30-37)
+                    case 30: Console.ForegroundColor = ansiBold ? ConsoleColor.DarkGray : ConsoleColor.Black; break;
+                    case 31: Console.ForegroundColor = ansiBold ? ConsoleColor.Red : ConsoleColor.DarkRed; break;
+                    case 32: Console.ForegroundColor = ansiBold ? ConsoleColor.Green : ConsoleColor.DarkGreen; break;
+                    case 33: Console.ForegroundColor = ansiBold ? ConsoleColor.Yellow : ConsoleColor.DarkYellow; break;
+                    case 34: Console.ForegroundColor = ansiBold ? ConsoleColor.Blue : ConsoleColor.DarkBlue; break;
+                    case 35: Console.ForegroundColor = ansiBold ? ConsoleColor.Magenta : ConsoleColor.DarkMagenta; break;
+                    case 36: Console.ForegroundColor = ansiBold ? ConsoleColor.Cyan : ConsoleColor.DarkCyan; break;
+                    case 37: Console.ForegroundColor = ansiBold ? ConsoleColor.White : ConsoleColor.Gray; break;
+                    case 39: Console.ForegroundColor = ConsoleColor.Gray; break; // Default foreground
+
+                    // Standard background colors (40-47)
+                    case 40: Console.BackgroundColor = ConsoleColor.Black; break;
+                    case 41: Console.BackgroundColor = ConsoleColor.DarkRed; break;
+                    case 42: Console.BackgroundColor = ConsoleColor.DarkGreen; break;
+                    case 43: Console.BackgroundColor = ConsoleColor.DarkYellow; break;
+                    case 44: Console.BackgroundColor = ConsoleColor.DarkBlue; break;
+                    case 45: Console.BackgroundColor = ConsoleColor.DarkMagenta; break;
+                    case 46: Console.BackgroundColor = ConsoleColor.DarkCyan; break;
+                    case 47: Console.BackgroundColor = ConsoleColor.Gray; break;
+                    case 49: Console.BackgroundColor = ConsoleColor.Black; break; // Default background
+
+                    // Bright foreground colors (90-97)
+                    case 90: Console.ForegroundColor = ConsoleColor.DarkGray; break;
+                    case 91: Console.ForegroundColor = ConsoleColor.Red; break;
+                    case 92: Console.ForegroundColor = ConsoleColor.Green; break;
+                    case 93: Console.ForegroundColor = ConsoleColor.Yellow; break;
+                    case 94: Console.ForegroundColor = ConsoleColor.Blue; break;
+                    case 95: Console.ForegroundColor = ConsoleColor.Magenta; break;
+                    case 96: Console.ForegroundColor = ConsoleColor.Cyan; break;
+                    case 97: Console.ForegroundColor = ConsoleColor.White; break;
+
+                    // Bright background colors (100-107)
+                    case 100: Console.BackgroundColor = ConsoleColor.DarkGray; break;
+                    case 101: Console.BackgroundColor = ConsoleColor.Red; break;
+                    case 102: Console.BackgroundColor = ConsoleColor.Green; break;
+                    case 103: Console.BackgroundColor = ConsoleColor.Yellow; break;
+                    case 104: Console.BackgroundColor = ConsoleColor.Blue; break;
+                    case 105: Console.BackgroundColor = ConsoleColor.Magenta; break;
+                    case 106: Console.BackgroundColor = ConsoleColor.Cyan; break;
+                    case 107: Console.BackgroundColor = ConsoleColor.White; break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Convert a dim ConsoleColor to its bright counterpart.
+        /// </summary>
+        private static ConsoleColor BrightenColor(ConsoleColor color)
+        {
+            return color switch
+            {
+                ConsoleColor.Black => ConsoleColor.DarkGray,
+                ConsoleColor.DarkRed => ConsoleColor.Red,
+                ConsoleColor.DarkGreen => ConsoleColor.Green,
+                ConsoleColor.DarkYellow => ConsoleColor.Yellow,
+                ConsoleColor.DarkBlue => ConsoleColor.Blue,
+                ConsoleColor.DarkMagenta => ConsoleColor.Magenta,
+                ConsoleColor.DarkCyan => ConsoleColor.Cyan,
+                ConsoleColor.Gray => ConsoleColor.White,
+                _ => color // Already bright
+            };
+        }
+
+        private static int ParseInt(string s, int defaultValue)
+        {
+            return int.TryParse(s, out int result) ? result : defaultValue;
+        }
 
         /// <summary>
         /// Disconnect from the SSH server and clean up resources.

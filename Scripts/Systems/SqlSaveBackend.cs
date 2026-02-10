@@ -577,6 +577,32 @@ namespace UsurperRemake.Systems
 
         // --- Online Player Tracking ---
 
+        /// <summary>
+        /// Check if a player is currently online (has a recent heartbeat).
+        /// Used to prevent duplicate logins on the same character.
+        /// </summary>
+        public async Task<bool> IsPlayerOnline(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT COUNT(*) FROM online_players
+                    WHERE LOWER(username) = LOWER(@username)
+                      AND last_heartbeat >= datetime('now', '-120 seconds');
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                var result = await cmd.ExecuteScalarAsync();
+                return Convert.ToInt64(result) > 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to check if player is online: {ex.Message}");
+                return false; // Fail open - don't block login on DB errors
+            }
+        }
+
         public async Task RegisterOnline(string username, string displayName, string location, string connectionType = "Unknown")
         {
             try

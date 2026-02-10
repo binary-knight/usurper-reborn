@@ -449,7 +449,16 @@ namespace UsurperRemake.Systems
             }
 
             terminal.SetColor("white");
-            terminal.WriteLine("  [E] Equip Item");
+            if (item.IsIdentified)
+            {
+                terminal.WriteLine("  [E] Equip Item");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  [E] Equip Item (must identify first)");
+                terminal.SetColor("white");
+            }
             terminal.WriteLine("  [D] Drop Item");
             terminal.WriteLine("  [Q] Back");
             terminal.WriteLine("");
@@ -459,6 +468,15 @@ namespace UsurperRemake.Systems
             switch (choice.ToUpper())
             {
                 case "E":
+                    if (!item.IsIdentified)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine("You can't equip an unidentified item.");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("Take it to the Magic Shop to have it identified first.");
+                        await Task.Delay(2000);
+                        break;
+                    }
                     await EquipFromBackpack(index - 1);
                     break;
                 case "D":
@@ -472,9 +490,10 @@ namespace UsurperRemake.Systems
                     }
                     else
                     {
+                        string dropName = item.IsIdentified ? item.Name : LootGenerator.GetUnidentifiedName(item);
                         player.Inventory.Remove(item);
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"You drop the {item.Name}.");
+                        terminal.WriteLine($"You drop the {dropName}.");
                         await Task.Delay(1000);
                     }
                     break;
