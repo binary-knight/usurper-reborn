@@ -1,155 +1,68 @@
 # Usurper Reborn
 
-## ALPHA v0.28.0 - PvP Arena & Living World
+## A Persistent Online Text RPG with a Living World
 
-**FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
+**ALPHA v0.28.0** | **FREE AND OPEN SOURCE** | **GPL v2**
 
-A faithful recreation of the classic 1993 BBS door game "Usurper" by Jakob Dangarden, transformed with revolutionary AI systems, deep narrative systems, and philosophical storytelling while maintaining 100% Pascal source compatibility.
+60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
-### Quick Start for Alpha Testers
+**Play now**: https://usurper-reborn.net (browser) or `ssh usurper@play.usurper-reborn.net -p 4000` (password: play)
 
-**Download the latest build for your platform:**
-- Go to [Actions](https://github.com/binary-knight/usurper-reborn/actions) → Latest successful run → Download artifact
-- Or check [Releases](https://github.com/binary-knight/usurper-reborn/releases) for packaged builds
+**Download**: [Latest Release](https://github.com/binary-knight/usurper-reborn/releases) | **Report bugs**: [Discord](https://discord.gg/EZhwgDT6Ta) or [GitHub Issues](https://github.com/binary-knight/usurper-reborn/issues)
 
-**Run the game:**
-- **Windows**: Run `UsurperReborn.bat` or `UsurperReborn.exe`
-- **Linux**: Run `./usurper-reborn.sh` or `./UsurperReborn`
-- **macOS**: Run `usurper-reborn-mac.command` or the app bundle
+---
 
-**Build from source:**
-```bash
-git clone https://github.com/binary-knight/usurper-reborn.git
-cd usurper-reborn
-dotnet publish usurper-reloaded.csproj -c Release -o publish
-./publish/UsurperReborn.exe  # or ./publish/UsurperReborn on Linux/Mac
-```
+## The Living World
 
-**Play online**: https://usurper-reborn.net (browser) or `ssh usurper@play.usurper-reborn.net -p 4000` (password: play)
+The core of Usurper Reborn is a 24/7 agent-based simulation. NPCs aren't quest dispensers standing in place — they're goal-driven agents with personalities, memories, and opinions about each other and about you.
 
-**Report bugs**: https://discord.gg/EZhwgDT6Ta (or GitHub Issues)
+**Autonomous NPCs** — Each NPC has 15 personality traits, a memory system (100 memories, 7-day decay), and a goal-based AI brain. They choose careers, form gangs, visit shops, train at the guild, and develop relationships with each other independently of player action.
 
-## About
+**Full Lifecycles** — Married NPCs can become pregnant, have children, and raise them. Children grow up over real time and eventually join the realm as new adult NPCs. Adults age according to their race's lifespan (Human ~30 days, Elf ~80 days, Orc ~22 days) and die permanently when their time comes. The population turns over. No one is permanent.
 
-Usurper Reborn brings the brutal medieval world of the original BBS classic to modern platforms. Every formula, every stat, every quirk from the original Pascal source has been meticulously preserved—and then we added layers upon layers of new content.
+**Emergent Events** — Marriages, divorces, affairs, births, coming-of-age ceremonies, natural deaths, gang wars, and political upheavals all happen organically and appear in the live news feed on the website and in-game.
 
-What began as a faithful port has evolved into something more: a game that explores themes of **memory, identity, loss, and transcendence** through the lens of a Buddhist-inspired philosophy: *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
+**Persistent Multiplayer** — Connect via browser or SSH to a shared world backed by SQLite. Your actions affect other players. PvP arena, cross-player chat, leaderboards, and a news feed that captures everything happening in the realm.
 
-**Original Creator**: Jakob Dangarden (1993)
-**Source Preservation**: Rick Parrish, Daniel Zingaro
-**Modern Recreation**: Built with C# and .NET 8.0
-**License**: GNU General Public License v2 (GPL v2)
-**Privacy**: See [PRIVACY.md](PRIVACY.md) - Telemetry is opt-in only
+---
 
-## The Story
+## The Game
 
-You wake in a dormitory with no memory of who you are. A letter in your own handwriting warns you:
+Beyond the simulation, there's a deep RPG with 100+ hours of content.
 
-> *"The gods are broken. Corrupted. There are SEVEN SEALS hidden in the dungeons below. Collect them. Break the cycle. End the suffering. Trust no one. Especially not the Stranger. And remember this: You are not what you think you are. You never were."*
+### Character Building
+- **11 Classes** — Warrior, Paladin, Assassin, Magician, Cleric, Ranger, Bard, Sage, Barbarian, Alchemist, Jester — each with unique abilities and combat stamina mechanics
+- **10 Races** — Human, Elf, Dwarf, Hobbit, Half-Elf, Orc, Gnome, Troll, Gnoll, Mutant — with race-specific lifespans, stats, and lore
+- **75 Spells** across 3 caster classes, 44 class abilities, meaningful stat scaling
 
-The letter crumbles to dust. But the words burn in your mind.
+### 100-Floor Dungeon
+- Deterministically generated floors with boss encounters, treasure rooms, traps, and hidden secrets
+- 7 corrupted Old Gods sealed in the depths, each with multi-phase combat and meaningful dialogue choices
+- 7 Ancient Seals to collect, unlocking the truth about who you are
+- 5 endings based on your choices: Conqueror, Savior, Defiant, True, and a secret Dissolution ending
 
-**Your Journey:**
-- Explore the town of Dorashire and its many locations
-- Descend into dungeons that grow darker and more dangerous
-- Encounter the Old Gods—some imprisoned, some corrupted, all remembering
-- Collect the Seven Seals to unlock the truth
-- Discover what you really are... and what the "cycle" truly means
+### Story & Narrative
+You wake with no memory. A letter in your own handwriting warns you: *"The gods are broken. Collect the Seven Seals. Break the cycle. You are not what you think you are."*
 
-## Features
+- **Ocean Philosophy** — A Buddhist-inspired awakening system with 7 levels: *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
+- **4 Companions** who can die permanently — Lyris, Aldric, Mira, Vex — each with personal quests and real grief consequences
+- **NG+ Cycle System** — Each playthrough, you remember more. NPCs notice.
+- **6 Town NPCs with story arcs**, dream sequences, stranger encounters, and faction politics
 
-### Core Gameplay (Pascal Compatible)
-- **Classic BBS Dungeon Crawler** - 50+ dungeon levels with original Pascal combat formulas
-- **10 Races, 11 Classes** - All original options preserved (Human, Elf, Dwarf, Hobbit, Half-Elf, Orc, Gnome, Troll, Gnoll, Mutant + Warrior, Magician, Assassin, Paladin, Ranger, Cleric, Barbarian, Bard, Jester, Alchemist, Sage)
-- **Turn-Based Combat** - Attack, Defend, Power Attack, Precise Strike, Rage, Smite
-- **37 Combat Spells** - Complete magic system across Cleric, Magician, and Sage classes
-- **Persistent World** - NPCs act, trade, fight, and die even when you're not playing
+### Relationships & Politics
+- Romance, marriage, children, divorce, affairs, polyamory
+- Challenge the throne, recruit guards, manage treasury, navigate court factions
+- 3 joinable factions: The Crown, The Shadows, The Faith
+- PvP arena with daily limits, gold theft, and leaderboards
 
-### Combat Stamina System (NEW)
-Resource management for special abilities:
-- **Stamina Bar** - Combat resource separate from HP/Mana
-- **Per-Round Regeneration** - Stamina recovers each combat round
-- **Ability Costs** - All 44 class abilities require stamina (prevents spam)
-- **Stat-Based Scaling** - Stamina stat affects max pool and regen rate
+### 30+ Locations
+Main Street, Inn, Bank, Weapon Shop, Armor Shop, Magic Shop, Healer, Temple, Church, Dark Alley, Level Master, Marketplace, Castle, Prison, Dungeons, Home, Arena, and more.
 
-### Meaningful Character Stats (NEW)
-Every stat now has real mechanical effects like a modern RPG:
-- **Strength** - Bonus melee damage (+STR/4)
-- **Dexterity** - Hit chance bonus, critical hit chance (5%+), ranged damage
-- **Constitution** - Bonus HP, poison/disease resistance (up to 75%)
-- **Intelligence** - Bonus mana, spell damage multiplier, spell critical chance, XP bonus
-- **Wisdom** - Mana cost reduction (up to 50%), magic resistance, healing power
-- **Charisma** - Shop discounts, team size limit, NPC reactions
-- **Stamina** - Combat stamina pool and regeneration rate
-- **Agility** - Dodge chance (up to 35%), extra attack chance, initiative bonus
+---
 
-### The Ocean Philosophy System (NEW)
-A subtle narrative layer that tracks your awakening to deeper truths:
-- **7 Awakening Levels** - From ignorance to full enlightenment
-- **Wave Fragments** - Cryptic lore pieces scattered throughout dungeons
-- **Ocean Insights** - Revelations triggered by key story events
-- **Memory Flashes** - Dreams that hint at your forgotten past
+## Origins
 
-### The Amnesia System (NEW)
-Your forgotten past holds the key to everything:
-- **Memory Fragments** - Recovered through dreams, dungeon exploration, and god encounters
-- **The Truth** - You are more than you appear... but what?
-- **NG+ Integration** - Each cycle, you remember a little more
-
-### Companion System (NEW)
-Recruit allies who travel, fight, and **can die permanently**:
-- **4 Unique Companions** - Lyris (tragic love interest), Aldric (loyal shield), Mira (broken healer), Vex (doomed trickster)
-- **Relationship Building** - Trust, loyalty, and romance levels
-- **Personal Quests** - Each companion has their own story
-- **Permanent Death** - When they die, they stay dead. This makes grief real.
-
-### Grief System (NEW)
-Death has consequences. When companions fall:
-- **5 Grief Stages** - Denial, Anger, Bargaining, Depression, Acceptance
-- **Mechanical Effects** - Stats change based on grief stage
-- **World Reactions** - NPCs respond to your mourning
-- **Bargaining Failures** - No resurrection. No tricks. Death is final.
-
-### The Seven Seals (NEW)
-Hidden throughout the dungeon depths:
-- **7 Ancient Seals** - Each reveals part of the truth
-- **Old God Connections** - Finding seals awakens imprisoned deities
-- **Multiple Endings** - Your choices and seals determine your fate
-
-### The Old Gods (NEW)
-Six forgotten deities, each with their own tragedy:
-- **Veloura** - Goddess of sorrow, trapped in eternal grief
-- **Thorgrim** - God of war, broken by endless battle
-- **Maelketh** - God of shadows, consumed by darkness
-- **Noctura** - The Stranger, mysterious and dangerous
-- **Aurelion** - God of light, blinded by his own radiance
-- **Terravok** - God of earth, sleeping in stone
-- **Manwe** - The Creator, and the key to everything
-
-### Enhanced Dungeon System (NEW)
-- **15-25 Rooms Per Floor** - Expanded from original 6-16
-- **Secret Rooms** - Hidden chambers with rare treasures
-- **Puzzle Rooms** - Logic, riddles, and environmental challenges
-- **Lore Libraries** - Discover Wave/Ocean philosophy fragments
-- **Meditation Chambers** - Rest and gain Ocean insights
-- **Secret Bosses** - The First Wave, The Forgotten Eighth, Echo of Self, The Ocean Speaks
-
-### Multiple Endings (NEW)
-Your journey can end in many ways:
-- **Conqueror Ending** - Embrace darkness and rule
-- **Savior Ending** - Choose light and sacrifice
-- **Defiant Ending** - Reject all gods
-- **True Ending** - Achieve balance and remember what you are
-- **Secret Ending** - For those who truly understand... dissolution
-
-### 50+ Living NPCs
-- **Classic Usurper NPCs** - Warriors, Mages, Thieves, Paladins, and more
-- **AI-Driven Behavior** - Personality, goals, memories, emotions
-- **World Simulation** - NPCs wander, trade, fight, form relationships
-- **Talk System** - Chat, ask for rumors, learn about dungeons, challenge to duels
-
-### 30+ Playable Locations
-Main Street, Inn, Bank, Weapon Shop, Armor Shop, Magic Shop, Healer, Temple, Church, Dark Alley, Level Master, Marketplace, Anchor Road, Dormitory, Castle, Prison, Love Corner, Team Corner, News, Quest Hall, God World, Dungeons, Home, Gym, Prison Walk, and more.
+Originally inspired by *Usurper* (1993) by Jakob Dangarden, a classic BBS door game. The original Pascal source was preserved by Rick Parrish and Daniel Zingaro. Usurper Reborn maintains compatibility with the original formulas while building an entirely new simulation layer on top.
 
 ## Building from Source
 
@@ -218,14 +131,13 @@ chmod +x publish/osx-arm64/UsurperReborn
 
 ## Technical Details
 
-- **Runtime**: .NET 8.0 (LTS)
-- **Lines of Code**: 100,000+ across 150+ C# files
-- **Pascal Compatibility**: 100% formula accuracy from original source
-- **New Systems**: 20+ major systems added (Companions, Grief, Ocean Philosophy, Seals, Old Gods, etc.)
-- **Platforms**: Windows, Linux, macOS
-- **Architecture**: Single-player local + online multiplayer via SSH
+- **Runtime**: .NET 8.0 (LTS) | **Language**: C# 12
+- **Codebase**: 100,000+ lines across 150+ files, 68+ game systems
+- **NPC Simulation**: Goal-based AI with 15 personality traits, memory system, lifecycle aging
+- **Platforms**: Windows (x64/x86), Linux (x64/ARM64), macOS (Intel/Apple Silicon)
+- **Multiplayer**: SQLite shared backend, SSH gateway, WebSocket browser terminal
 - **Save System**: JSON (local) / SQLite (online) with autosave
-- **Online Play**: Browser terminal at usurper-reborn.net or SSH on port 4000
+- **Website**: Live stats API, SSE event feed, xterm.js terminal
 
 ### Project Structure
 ```
@@ -257,8 +169,7 @@ usurper-reborn/
 └── .github/            # CI/CD workflows
 ```
 
-### Quest & Bounty System (NEW)
-Dynamic quest content for single-player progression:
+### Quest & Bounty SystemDynamic quest content for single-player progression:
 - **Quest Hall** - Central hub for viewing quests and bounties
 - **Starter Quests** - 11 pre-made quests spanning levels 1-100
 - **Open Contract Bounties** - Kill any NPC with a bounty and get paid immediately (no claiming required)
@@ -266,8 +177,7 @@ Dynamic quest content for single-player progression:
 - **Auto-Refresh** - Completed bounties automatically replaced with new targets
 - **Difficulty Scaling** - Easy, Medium, Hard, Extreme quest tiers
 
-### Achievement System (NEW)
-Track your progress with 50+ achievements:
+### Achievement SystemTrack your progress with 50+ achievements:
 - **Combat** - Monster kills, boss defeats, combat milestones
 - **Progression** - Level milestones, stat achievements
 - **Economy** - Gold earned, items purchased
@@ -275,22 +185,19 @@ Track your progress with 50+ achievements:
 - **Social** - NPC interactions, relationships formed
 - **Challenge** - Special accomplishments
 
-### Statistics Tracking (NEW)
-Comprehensive gameplay statistics:
+### Statistics TrackingComprehensive gameplay statistics:
 - Total monsters killed, gold earned, time played
 - Deepest dungeon floor reached
 - Quests completed, achievements unlocked
 - Combat statistics and records
 
-### Difficulty Modes (NEW)
-Choose your challenge level:
+### Difficulty ModesChoose your challenge level:
 - **Easy** - 150% XP, 50% monster damage, 150% gold
 - **Normal** - Standard balanced experience
 - **Hard** - 75% XP, 150% monster damage, 75% gold
 - **Nightmare** - 50% XP, 200% monster damage, 50% gold
 
-### Family System (NEW)
-Marriage and children with real consequences:
+### Family SystemMarriage and children with real consequences:
 - **Marriage** - Court NPCs through the relationship system, marry at the Church
 - **Polyamory Support** - Multiple marriages allowed for those who prefer it
 - **Children** - Have children who inherit traits from both parents
@@ -303,8 +210,7 @@ Marriage and children with real consequences:
 - **Coming of Age** - At 18, children become adult NPCs who join the world
 - **Custody & Divorce** - Family drama with real mechanical effects
 
-### Game Preferences (NEW)
-Quick settings accessible from anywhere via `[~]Prefs`:
+### Game PreferencesQuick settings accessible from anywhere via `[~]Prefs`:
 - **Combat Speed** - Normal, Fast, or Instant text display
 - **Auto-heal** - Toggle automatic healing potion use in combat
 - **Skip Intimate Scenes** - "Fade to black" option for romantic content
@@ -321,16 +227,11 @@ How long to complete Usurper Reborn:
 
 *Note: Playtime varies based on difficulty mode and exploration style.*
 
-### Online Multiplayer (NEW)
-Play with others in a shared persistent world:
-- **Browser Play** - Play instantly at [usurper-reborn.net](https://usurper-reborn.net) with an embedded terminal
-- **SSH Access** - Connect via `ssh usurper@play.usurper-reborn.net -p 4000` (password: play)
-- **In-Game Client** - Select `[O]nline Play` from the main menu (uses built-in SSH.NET)
-- **Shared World** - All online players share NPCs, economy, politics, and news
-- **In-Game Auth** - Register/login with your own account and password
-- **Live Stats** - See who's online, leaderboards, and world stats on the website
-- **Cross-Player Chat** - `/say`, `/tell`, `/who` commands
-- **Server Deployment** - Host your own server (see [SERVER_DEPLOYMENT.md](DOCS/SERVER_DEPLOYMENT.md))
+### How to Connect
+- **Browser** — Play instantly at [usurper-reborn.net](https://usurper-reborn.net) with an embedded web terminal
+- **SSH** — `ssh usurper@play.usurper-reborn.net -p 4000` (password: play)
+- **In-Game Client** — Select `[O]nline Play` from the main menu (uses built-in SSH.NET)
+- **Self-hosted** — Host your own server (see [SERVER_DEPLOYMENT.md](DOCS/SERVER_DEPLOYMENT.md))
 
 ### BBS Door Mode
 Run Usurper Reborn as a door game on modern BBS software:
@@ -732,17 +633,15 @@ Join our Discord server for discussions, feedback, and updates:
 
 ## Acknowledgments
 
-- **Jakob Dangarden**: For creating the original 1993 masterpiece
-- **Rick Parrish**: For preserving the Pascal source code
-- **Daniel Zingaro**: For tremendous help with the Pascal source
-- **The BBS Community**: For keeping the spirit of door games alive
-- **All Contributors**: Everyone who has tested, improved, and believed
+- **Jakob Dangarden** — Created the original *Usurper* (1993), the seed this grew from
+- **Rick Parrish** — Preserved the Pascal source code
+- **Daniel Zingaro** — Tremendous help with the Pascal source
+- **The BBS Community** — For keeping the spirit alive
+- **All Contributors** — Everyone who has tested, reported bugs, and believed
 
 ---
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
-
-*In the realm of Usurper, death is not the end—it's just another beginning. The cycle continues until you remember. Will you find the Seven Seals? Will you discover what you truly are? Will you finally... wake up?*
 
 ## Alpha Testing Notes
 
@@ -770,4 +669,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.28.0 - PvP Arena & Living World
+**Status**: ALPHA v0.28.0 — The world is running. [Watch it live.](https://usurper-reborn.net)
