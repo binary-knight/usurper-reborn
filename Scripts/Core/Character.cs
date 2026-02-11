@@ -119,6 +119,12 @@ public class Character
     // Learned combat abilities (non-caster classes)
     public HashSet<string> LearnedAbilities { get; set; } = new();
 
+    /// <summary>
+    /// Combat quickbar slots 1-9. Stores spell IDs ("spell:5") or ability IDs ("power_strike").
+    /// Only equipped skills are usable in combat. Null = empty slot.
+    /// </summary>
+    public List<string?> Quickbar { get; set; } = new(new string?[9]);
+
     // Close combat skills (from Pascal: array[1..global_maxcombat] of int)
     public List<int> Skill { get; set; }            // close combat skills
     

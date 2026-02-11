@@ -32,9 +32,36 @@ public class WorldSimulator
     // Track dead NPCs for respawn
     private Dictionary<string, int> deadNPCRespawnTimers = new();
 
+    // Gossip system - pool of recent events NPCs can spread as rumors
+    private class GossipItem
+    {
+        public string Text { get; set; } = "";
+        public int TimesShared { get; set; }
+        public int MaxShares { get; set; } // 2-3 shares before it's old news
+    }
+    private static readonly List<GossipItem> _gossipPool = new();
+    private const int MaxGossipPoolSize = 20;
+
+    // Emotional cascade rate limiting - tick counter per NPC
+    private static readonly Dictionary<string, int> _lastCascadeTick = new();
+    private static int _currentTick = 0;
+
     public WorldSimulator()
     {
         _instance = this;
+    }
+
+    /// <summary>
+    /// Add a gossip item to the pool. Sociable NPCs will spread it via news later.
+    /// </summary>
+    public static void AddGossip(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        // Avoid duplicate gossip
+        if (_gossipPool.Any(g => g.Text == text)) return;
+        _gossipPool.Add(new GossipItem { Text = text, TimesShared = 0, MaxShares = 2 + new Random().Next(2) });
+        while (_gossipPool.Count > MaxGossipPoolSize)
+            _gossipPool.RemoveAt(0);
     }
 
     // Team name generators for NPC-formed teams - Ocean/Manwe themed for lore
@@ -160,6 +187,16 @@ public class WorldSimulator
                 UsurperRemake.Systems.DebugLogger.Instance.LogDebug("NPC", $"{npc.Name} added to respawn queue ({NPC_RESPAWN_TICKS} ticks)");
             }
         }
+
+        // Process emotional cascades - strong emotions spread to nearby NPCs
+        _currentTick++;
+        foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && n.EmotionalState != null))
+        {
+            ProcessEmotionalCascades(npc);
+        }
+
+        // Process gossip spreading
+        ProcessGossip();
 
         // Process world events
         ProcessWorldEvents();
@@ -869,6 +906,11 @@ public class WorldSimulator
 
         if (activities.Count == 0) return;
 
+        // Apply personality-driven, time-of-day, and memory-based weight modifiers
+        ApplyPersonalityWeights(activities, npc);
+        ApplyTimeOfDayWeights(activities);
+        ApplyMemoryWeights(activities, npc);
+
         // Weighted random selection
         double totalWeight = activities.Sum(a => a.weight);
         double roll = random.NextDouble() * totalWeight;
@@ -945,6 +987,166 @@ public class WorldSimulator
                 NPCGoHome(npc);
                 npc.CurrentActivity = "heading home for the day";
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Multiply an activity weight in the list. No-op if activity not present.
+    /// </summary>
+    private static void MultiplyWeight(List<(string action, double weight)> activities, string action, double multiplier)
+    {
+        for (int i = 0; i < activities.Count; i++)
+        {
+            if (activities[i].action == action)
+            {
+                activities[i] = (action, activities[i].weight * multiplier);
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Apply personality-driven weight modifiers so NPCs behave according to their traits.
+    /// Aggressive NPCs dungeon more, scholarly NPCs train more, sociable NPCs socialize more, etc.
+    /// </summary>
+    private static void ApplyPersonalityWeights(List<(string action, double weight)> activities, NPC npc)
+    {
+        var p = npc.Brain?.Personality;
+        if (p == null) return;
+
+        if (p.Aggression > 0.6f)
+        {
+            MultiplyWeight(activities, "dungeon", 1.5);
+            MultiplyWeight(activities, "team_dungeon", 1.4);
+            MultiplyWeight(activities, "train", 1.3);
+            MultiplyWeight(activities, "shop", 0.7);
+        }
+        if (p.Sociability > 0.6f)
+        {
+            MultiplyWeight(activities, "love_street", 1.5);
+            MultiplyWeight(activities, "move", 1.4); // wander and meet people
+            MultiplyWeight(activities, "temple", 0.8);
+        }
+        if (p.Greed > 0.6f)
+        {
+            MultiplyWeight(activities, "shop", 1.5);
+            MultiplyWeight(activities, "bank", 1.5);
+            MultiplyWeight(activities, "marketplace", 1.4);
+            MultiplyWeight(activities, "dungeon", 1.2);
+        }
+        if (p.Intelligence > 0.6f)
+        {
+            MultiplyWeight(activities, "train", 1.4);
+            MultiplyWeight(activities, "shop", 1.2);
+            MultiplyWeight(activities, "dungeon", 0.8);
+        }
+        if (p.Mysticism > 0.6f)
+        {
+            MultiplyWeight(activities, "temple", 1.5);
+            MultiplyWeight(activities, "train", 1.2);
+            MultiplyWeight(activities, "shop", 0.8);
+        }
+        if (p.Caution > 0.6f)
+        {
+            MultiplyWeight(activities, "heal", 1.5);
+            MultiplyWeight(activities, "bank", 1.3);
+            MultiplyWeight(activities, "dungeon", 0.6);
+            MultiplyWeight(activities, "team_dungeon", 0.7);
+        }
+        if (p.Courage > 0.7f)
+        {
+            MultiplyWeight(activities, "dungeon", 1.4);
+            MultiplyWeight(activities, "team_dungeon", 1.3);
+            MultiplyWeight(activities, "castle", 1.3);
+        }
+        if (p.Patience < 0.3f)
+        {
+            MultiplyWeight(activities, "move", 1.3); // restless, always moving
+            MultiplyWeight(activities, "dungeon", 1.3);
+            MultiplyWeight(activities, "temple", 0.5);
+        }
+    }
+
+    /// <summary>
+    /// Apply time-of-day weight modifiers. NPCs train in the morning, shop in the afternoon,
+    /// socialize in the evening, and go home at night.
+    /// </summary>
+    private static void ApplyTimeOfDayWeights(List<(string action, double weight)> activities)
+    {
+        int hour = DateTime.Now.Hour;
+
+        if (hour >= 6 && hour < 12) // Morning
+        {
+            MultiplyWeight(activities, "train", 1.3);
+            MultiplyWeight(activities, "shop", 1.2);
+            MultiplyWeight(activities, "temple", 1.3);
+        }
+        else if (hour >= 12 && hour < 18) // Afternoon
+        {
+            MultiplyWeight(activities, "dungeon", 1.3);
+            MultiplyWeight(activities, "team_dungeon", 1.3);
+            MultiplyWeight(activities, "shop", 1.2);
+            MultiplyWeight(activities, "marketplace", 1.2);
+        }
+        else if (hour >= 18 && hour < 23) // Evening
+        {
+            MultiplyWeight(activities, "move", 1.5); // socializing
+            MultiplyWeight(activities, "love_street", 1.4);
+            MultiplyWeight(activities, "go_home", 1.3);
+        }
+        else // Night (23-5)
+        {
+            MultiplyWeight(activities, "go_home", 2.0);
+            MultiplyWeight(activities, "dungeon", 0.5);
+            MultiplyWeight(activities, "team_dungeon", 0.5);
+            MultiplyWeight(activities, "shop", 0.3);
+            MultiplyWeight(activities, "marketplace", 0.3);
+            MultiplyWeight(activities, "heal", 0.5);
+        }
+    }
+
+    /// <summary>
+    /// Apply memory-driven weight modifiers. NPCs who were recently attacked seek healing,
+    /// those who were betrayed stay home, those who traded return to shops.
+    /// </summary>
+    private static void ApplyMemoryWeights(List<(string action, double weight)> activities, NPC npc)
+    {
+        var memories = npc.Brain?.Memory?.GetRecentEvents(48); // last 48 hours
+        if (memories == null || memories.Count == 0) return;
+
+        // Check the 5 most recent memories for behavioral influence
+        foreach (var mem in memories.Take(5))
+        {
+            switch (mem.Type)
+            {
+                case MemoryType.Attacked:
+                case MemoryType.Defeated:
+                    MultiplyWeight(activities, "heal", 1.3);
+                    MultiplyWeight(activities, "dungeon", 0.7);
+                    MultiplyWeight(activities, "train", 1.2);
+                    break;
+                case MemoryType.Betrayed:
+                    MultiplyWeight(activities, "go_home", 1.3);
+                    MultiplyWeight(activities, "move", 0.7);
+                    MultiplyWeight(activities, "dungeon", 0.8);
+                    break;
+                case MemoryType.Helped:
+                case MemoryType.Saved:
+                case MemoryType.Defended:
+                    MultiplyWeight(activities, "dungeon", 1.1);
+                    MultiplyWeight(activities, "team_dungeon", 1.1);
+                    break;
+                case MemoryType.Traded:
+                case MemoryType.BoughtItem:
+                case MemoryType.SoldItem:
+                    MultiplyWeight(activities, "shop", 1.2);
+                    MultiplyWeight(activities, "marketplace", 1.2);
+                    break;
+                case MemoryType.SawDeath:
+                    MultiplyWeight(activities, "temple", 1.3);
+                    MultiplyWeight(activities, "dungeon", 0.7);
+                    break;
+            }
         }
     }
 
@@ -2198,6 +2400,114 @@ public class WorldSimulator
         }
     }
     
+    /// <summary>
+    /// When an NPC has a strong dominant emotion, it affects nearby NPCs at the same location.
+    /// Anger spreads fear, fear spreads panic, joy is infectious, sadness resonates with the empathetic.
+    /// Rate-limited to once per 5 ticks per NPC to prevent runaway cascades.
+    /// </summary>
+    private void ProcessEmotionalCascades(NPC npc)
+    {
+        // Rate limit: only cascade every 5 ticks per NPC
+        string npcId = npc.Id ?? npc.Name;
+        if (_lastCascadeTick.TryGetValue(npcId, out int lastTick) && (_currentTick - lastTick) < 5)
+            return;
+
+        var dominant = npc.EmotionalState.GetDominantEmotion();
+        if (dominant == null) return;
+
+        float intensity = npc.EmotionalState.GetEmotionIntensity(dominant.Value);
+        if (intensity < 0.7f) return; // Only strong emotions cascade
+
+        // Find other NPCs at the same location
+        var nearbyNPCs = npcs.Where(n =>
+            n != npc && n.IsAlive && !n.IsDead &&
+            n.EmotionalState != null &&
+            n.CurrentLocation == npc.CurrentLocation).ToList();
+
+        if (nearbyNPCs.Count == 0) return;
+
+        _lastCascadeTick[npcId] = _currentTick;
+        string npcName = npc.Name2 ?? npc.Name;
+
+        foreach (var nearby in nearbyNPCs)
+        {
+            switch (dominant.Value)
+            {
+                case EmotionType.Anger:
+                    // Aggressive NPCs catch anger, others become fearful
+                    if (nearby.Brain?.Personality?.Aggression > 0.5f)
+                        nearby.EmotionalState.AddEmotion(EmotionType.Anger, 0.1f, 60);
+                    else
+                        nearby.EmotionalState.AddEmotion(EmotionType.Fear, 0.2f, 90);
+                    break;
+
+                case EmotionType.Fear:
+                    // Panic spreads
+                    nearby.EmotionalState.AddEmotion(EmotionType.Fear, 0.15f, 60);
+                    break;
+
+                case EmotionType.Joy:
+                    // Infectious happiness
+                    nearby.EmotionalState.AddEmotion(EmotionType.Joy, 0.1f, 120);
+                    break;
+
+                case EmotionType.Sadness:
+                    // Empathetic NPCs share sadness
+                    if (nearby.Brain?.Personality != null &&
+                        (nearby.Brain.Personality.Mysticism > 0.5f || nearby.Brain.Personality.Sociability > 0.6f))
+                    {
+                        nearby.EmotionalState.AddEmotion(EmotionType.Sadness, 0.1f, 90);
+                    }
+                    break;
+            }
+        }
+
+        // Generate gossip for particularly dramatic cascades
+        if (nearbyNPCs.Count >= 3)
+        {
+            string emotionWord = dominant.Value switch
+            {
+                EmotionType.Anger => "rage",
+                EmotionType.Fear => "panic",
+                EmotionType.Joy => "celebration",
+                EmotionType.Sadness => "grief",
+                _ => null
+            };
+            if (emotionWord != null)
+                AddGossip($"A wave of {emotionWord} swept through the {npc.CurrentLocation} — started by {npcName}");
+        }
+    }
+
+    /// <summary>
+    /// Sociable NPCs spread gossip from the pool to the news feed.
+    /// </summary>
+    private void ProcessGossip()
+    {
+        if (_gossipPool.Count == 0) return;
+        if (random.NextDouble() > 0.10) return; // 10% chance per tick
+
+        // Find a sociable NPC at a social location
+        var socialLocations = new[] { "Inn", "Love Street", "Main Street", "Market", "Temple" };
+        var gossiper = npcs
+            .Where(n => n.IsAlive && !n.IsDead &&
+                        n.Brain?.Personality?.Sociability > 0.4f &&
+                        socialLocations.Contains(n.CurrentLocation))
+            .OrderBy(_ => random.Next())
+            .FirstOrDefault();
+
+        if (gossiper == null) return;
+
+        // Pick a random gossip to share
+        var gossip = _gossipPool[random.Next(_gossipPool.Count)];
+        string gossiperName = gossiper.Name2 ?? gossiper.Name;
+
+        NewsSystem.Instance?.Newsy($"{gossiperName} is telling anyone who'll listen: \"{gossip.Text}\"");
+
+        gossip.TimesShared++;
+        if (gossip.TimesShared >= gossip.MaxShares)
+            _gossipPool.Remove(gossip);
+    }
+
     private void ProcessWorldEvents()
     {
         // Random world events that can affect NPCs
@@ -2845,24 +3155,130 @@ public class WorldSimulator
     private void ProcessRivalries()
     {
         // Check for escalating conflicts between enemies
-        var enemies = npcs.Where(npc => npc.Enemies.Count > 0).ToList();
-        
+        var enemies = npcs.Where(npc => npc.IsAlive && !npc.IsDead && npc.Enemies.Count > 0).ToList();
+
         foreach (var npc in enemies)
         {
             foreach (var enemyId in npc.Enemies.ToList()) // ToList to avoid modification during iteration
             {
                 var enemy = npcs.FirstOrDefault(n => n.Id == enemyId);
-                if (enemy?.IsAlive == true && GD.Randf() < 0.05f) // 5% chance
+                if (enemy?.IsAlive == true && !enemy.IsDead && GD.Randf() < 0.05f) // 5% chance
                 {
-                    // Escalate the rivalry
+                    // Escalate the rivalry - only if at same location
                     if (npc.CurrentLocation == enemy.CurrentLocation)
                     {
-                        // GD.Print($"[WorldSim] Rivalry escalates between {npc.Name} and {enemy.Name}");
-                        ExecuteAttack(npc, enemyId, new WorldState(npcs));
+                        // Pick conflict type based on instigator's personality
+                        var personality = npc.Brain?.Personality;
+                        var world = new WorldState(npcs);
+
+                        if (personality != null && personality.Greed > 0.5f && personality.Intelligence > 0.5f)
+                        {
+                            ExecuteTheft(npc, enemy);
+                        }
+                        else if (personality != null && personality.Courage > 0.6f && personality.Aggression < 0.6f)
+                        {
+                            ExecuteChallenge(npc, enemy);
+                        }
+                        else
+                        {
+                            // Default: brawl (existing combat)
+                            ExecuteAttack(npc, enemyId, world);
+                            AddGossip($"{npc.Name2 ?? npc.Name} got into a brawl with {enemy.Name2 ?? enemy.Name} at the {npc.CurrentLocation}");
+                        }
                     }
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Cunning/greedy NPC steals gold from a rival.
+    /// </summary>
+    private void ExecuteTheft(NPC thief, NPC victim)
+    {
+        if (victim.Gold <= 0) return;
+
+        // Steal 5-15% of victim's gold
+        long stolenAmount = Math.Max(1, (long)(victim.Gold * (0.05 + random.NextDouble() * 0.10)));
+        victim.Gold -= stolenAmount;
+        thief.Gold += stolenAmount;
+
+        // Record memories
+        thief.Brain?.Memory?.RecordEvent(new MemoryEvent
+        {
+            Type = MemoryType.GainedGold,
+            InvolvedCharacter = victim.Id,
+            Description = $"Stole {stolenAmount} gold from {victim.Name2 ?? victim.Name}",
+            Importance = 0.7f,
+            Location = thief.CurrentLocation
+        });
+        victim.Brain?.Memory?.RecordEvent(new MemoryEvent
+        {
+            Type = MemoryType.LostGold,
+            InvolvedCharacter = thief.Id,
+            Description = $"{thief.Name2 ?? thief.Name} stole {stolenAmount} gold from me",
+            Importance = 0.8f,
+            Location = victim.CurrentLocation
+        });
+
+        // Victim becomes angry
+        victim.EmotionalState?.AddEmotion(EmotionType.Anger, 0.6f, 180);
+
+        // Generate news
+        string thiefName = thief.Name2 ?? thief.Name;
+        string victimName = victim.Name2 ?? victim.Name;
+        NewsSystem.Instance?.Newsy($"{thiefName} was caught pickpocketing {victimName} at the {thief.CurrentLocation}! {stolenAmount} gold went missing.");
+        AddGossip($"{thiefName} stole from {victimName}");
+
+        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"{thiefName} stole {stolenAmount}g from {victimName}");
+    }
+
+    /// <summary>
+    /// Noble/proud NPC publicly challenges a rival. Winner gains confidence, loser loses face.
+    /// </summary>
+    private void ExecuteChallenge(NPC challenger, NPC target)
+    {
+        string challengerName = challenger.Name2 ?? challenger.Name;
+        string targetName = target.Name2 ?? target.Name;
+
+        // Compare overall combat power with some randomness
+        long challengerPower = challenger.GetAttackPower() + challenger.Level + random.Next(1, 20);
+        long targetPower = target.GetAttackPower() + target.Level + random.Next(1, 20);
+
+        bool challengerWins = challengerPower > targetPower;
+        var winner = challengerWins ? challenger : target;
+        var loser = challengerWins ? target : challenger;
+        string winnerName = winner.Name2 ?? winner.Name;
+        string loserName = loser.Name2 ?? loser.Name;
+
+        // Winner gains confidence, loser gains sadness
+        winner.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.5f, 300);
+        winner.EmotionalState?.AddEmotion(EmotionType.Pride, 0.4f, 240);
+        loser.EmotionalState?.AddEmotion(EmotionType.Sadness, 0.4f, 180);
+
+        // Record memories
+        winner.Brain?.Memory?.RecordEvent(new MemoryEvent
+        {
+            Type = MemoryType.PersonalAchievement,
+            InvolvedCharacter = loser.Id,
+            Description = $"Won a public challenge against {loserName}",
+            Importance = 0.7f,
+            Location = challenger.CurrentLocation
+        });
+        loser.Brain?.Memory?.RecordEvent(new MemoryEvent
+        {
+            Type = MemoryType.PersonalFailure,
+            InvolvedCharacter = winner.Id,
+            Description = $"Lost a public challenge to {winnerName}",
+            Importance = 0.6f,
+            Location = challenger.CurrentLocation
+        });
+
+        // Generate news
+        NewsSystem.Instance?.Newsy($"{challengerName} publicly challenged {targetName} at the {challenger.CurrentLocation}! {winnerName} emerged victorious.");
+        AddGossip($"{winnerName} bested {loserName} in a public challenge");
+
+        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"Challenge: {challengerName} vs {targetName} - {winnerName} won");
     }
     
     public string GetSimulationStatus()

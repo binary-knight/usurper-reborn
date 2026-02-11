@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
+using UsurperRemake.Systems;
 
 /// <summary>
 /// Class Ability System - Manages combat abilities for all classes
@@ -1205,7 +1206,7 @@ public static class ClassAbilitySystem
     }
 
     /// <summary>
-    /// Display the ability learning menu at the Level Master
+    /// Display the ability equip/unequip quickbar menu at the Level Master
     /// </summary>
     public static async Task ShowAbilityLearningMenu(Character player, TerminalEmulator terminal)
     {
@@ -1216,39 +1217,174 @@ public static class ClassAbilitySystem
             return;
         }
 
+        // Ensure LearnedAbilities is up to date
+        GetAvailableAbilities(player);
+
+        // Ensure quickbar is initialized
+        if (player.Quickbar == null || player.Quickbar.Count < 9)
+        {
+            player.Quickbar = new List<string?>(new string?[9]);
+        }
+
         while (true)
         {
             terminal.ClearScreen();
             terminal.WriteLine("═══ COMBAT ABILITIES ═══", "bright_yellow");
-            terminal.WriteLine($"Class: {player.Class} | Level: {player.Level} | Stamina: {player.Stamina}", "cyan");
+            terminal.WriteLine($"Class: {player.Class} | Level: {player.Level} | Stamina: {player.MaxCombatStamina}", "cyan");
             terminal.WriteLine("");
-            terminal.WriteLine("Lvl  Name                     Stamina  Description", "cyan");
-            terminal.WriteLine("───────────────────────────────────────────────────────────────", "cyan");
 
-            var classAbilities = GetClassAbilities(player.Class);
-
-            // Update LearnedAbilities based on current level
-            GetAvailableAbilities(player);
-
-            int index = 1;
-
-            foreach (var ability in classAbilities)
+            // Show current quickbar
+            terminal.WriteLine("  Your Quickbar:", "bright_white");
+            for (int i = 0; i < 9; i++)
             {
-                string levelMark = player.Level >= ability.LevelRequired ? "+" : " ";
-                string color = player.Level >= ability.LevelRequired ? "green" : "dark_gray";
+                var slotId = player.Quickbar[i];
+                if (!string.IsNullOrEmpty(slotId))
+                {
+                    var ability = GetAbility(slotId);
+                    if (ability != null)
+                    {
+                        terminal.SetColor("bright_yellow");
+                        terminal.Write($"  [{i + 1}] ");
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"{ability.Name,-24} ({ability.StaminaCost} ST)");
+                    }
+                    else
+                    {
+                        // Invalid ability in slot - clear it
+                        player.Quickbar[i] = null;
+                        terminal.SetColor("darkgray");
+                        terminal.WriteLine($"  [{i + 1}] --- empty ---");
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine($"  [{i + 1}] --- empty ---");
+                }
+            }
 
-                terminal.WriteLine($"{levelMark} {ability.LevelRequired,2}  {ability.Name,-24} {ability.StaminaCost,3}     {ability.Description}", color);
-                index++;
+            // Show available (unequipped) abilities
+            var available = GetAvailableAbilities(player);
+            var equippedIds = player.Quickbar.Where(s => s != null).ToHashSet();
+            var unequipped = available.Where(a => !equippedIds.Contains(a.Id)).ToList();
+
+            terminal.WriteLine("");
+            if (unequipped.Count > 0)
+            {
+                terminal.WriteLine("  Available Abilities:", "bright_white");
+                for (int i = 0; i < unequipped.Count; i++)
+                {
+                    char letter = (char)('a' + i);
+                    terminal.SetColor("green");
+                    terminal.WriteLine($"  [{letter}] {unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST) Lv{unequipped[i].LevelRequired}");
+                }
+            }
+
+            // Show locked abilities (not yet available)
+            var allClass = GetClassAbilities(player.Class);
+            var locked = allClass.Where(a => player.Level < a.LevelRequired).ToList();
+            if (locked.Count > 0)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine("  Locked (level too low):", "darkgray");
+                foreach (var ability in locked)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine($"      {ability.Name,-24} ({ability.StaminaCost} ST) Requires Lv{ability.LevelRequired}");
+                }
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine("All abilities are automatically available when you reach the required level.", "yellow");
-            terminal.WriteLine("Use them in combat with the (A)bility command.", "yellow");
-            terminal.WriteLine("");
-            terminal.WriteLine("Press Enter to return...", "gray");
+            terminal.WriteLine("[1-9] Equip/change slot  [C] Clear a slot  [A] Auto-fill  [X] Exit", "yellow");
+            var input = await terminal.GetInput("> ");
+            if (string.IsNullOrWhiteSpace(input)) continue;
 
-            await terminal.WaitForKey();
-            break;
+            string cmd = input.Trim().ToUpper();
+
+            if (cmd == "X") break;
+
+            if (cmd == "A")
+            {
+                // Auto-fill: populate quickbar with available abilities in level order
+                GameEngine.AutoPopulateQuickbar(player);
+                terminal.WriteLine("Quickbar auto-filled!", "bright_green");
+                await SaveSystem.Instance.AutoSave(player);
+                await Task.Delay(800);
+                continue;
+            }
+
+            if (cmd == "C")
+            {
+                terminal.Write("Clear which slot? (1-9): ", "yellow");
+                var clearInput = await terminal.GetInput("");
+                if (int.TryParse(clearInput.Trim(), out int clearSlot) && clearSlot >= 1 && clearSlot <= 9)
+                {
+                    var clearedId = player.Quickbar[clearSlot - 1];
+                    if (clearedId != null)
+                    {
+                        var clearedAbility = GetAbility(clearedId);
+                        player.Quickbar[clearSlot - 1] = null;
+                        terminal.WriteLine($"Removed {clearedAbility?.Name ?? clearedId} from slot {clearSlot}.", "cyan");
+                        await SaveSystem.Instance.AutoSave(player);
+                        await Task.Delay(800);
+                    }
+                }
+                continue;
+            }
+
+            // Check for slot number (1-9)
+            if (int.TryParse(cmd, out int slotNum) && slotNum >= 1 && slotNum <= 9)
+            {
+                if (unequipped.Count == 0)
+                {
+                    terminal.WriteLine("All abilities are already on your quickbar!", "yellow");
+                    await Task.Delay(800);
+                    continue;
+                }
+
+                var currentInSlot = player.Quickbar[slotNum - 1];
+                if (currentInSlot != null)
+                {
+                    var currentAbility = GetAbility(currentInSlot);
+                    terminal.WriteLine($"Slot {slotNum} has: {currentAbility?.Name ?? currentInSlot}. Pick a replacement:", "cyan");
+                }
+                else
+                {
+                    terminal.WriteLine($"Pick an ability for slot {slotNum}:", "cyan");
+                }
+
+                for (int i = 0; i < unequipped.Count; i++)
+                {
+                    char letter = (char)('a' + i);
+                    terminal.SetColor("green");
+                    terminal.WriteLine($"  [{letter}] {unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST)");
+                }
+                terminal.SetColor("gray");
+                terminal.WriteLine("  [0] Cancel");
+
+                var pick = await terminal.GetInput("> ");
+                if (string.IsNullOrWhiteSpace(pick) || pick.Trim() == "0") continue;
+
+                char pickChar = pick.Trim().ToLower()[0];
+                int pickIndex = pickChar - 'a';
+                if (pickIndex >= 0 && pickIndex < unequipped.Count)
+                {
+                    var chosen = unequipped[pickIndex];
+
+                    // If this ability is already in another slot, clear that slot
+                    for (int i = 0; i < 9; i++)
+                    {
+                        if (player.Quickbar[i] == chosen.Id)
+                            player.Quickbar[i] = null;
+                    }
+
+                    player.Quickbar[slotNum - 1] = chosen.Id;
+                    terminal.WriteLine($"Equipped {chosen.Name} to slot {slotNum}!", "bright_green");
+                    await SaveSystem.Instance.AutoSave(player);
+                    await Task.Delay(800);
+                }
+                continue;
+            }
         }
     }
 }

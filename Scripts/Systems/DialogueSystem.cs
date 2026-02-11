@@ -347,6 +347,18 @@ namespace UsurperRemake.Systems
                 case ConditionType.TruthRevealed:
                     return AmnesiaSystem.Instance.TruthRevealed;
 
+                case ConditionType.StrangerReceptivityAbove:
+                    return StrangerEncounterSystem.Instance.Receptivity > condition.IntValue;
+
+                case ConditionType.StrangerReceptivityBelow:
+                    return StrangerEncounterSystem.Instance.Receptivity < condition.IntValue;
+
+                case ConditionType.StrangerEncountersAbove:
+                    return StrangerEncounterSystem.Instance.EncountersHad > condition.IntValue;
+
+                case ConditionType.StrangerKnowsTruth:
+                    return StrangerEncounterSystem.Instance.PlayerKnowsTruth;
+
                 default:
                     return true;
             }
@@ -1495,6 +1507,10 @@ namespace UsurperRemake.Systems
                 AllNodes = new Dictionary<string, DialogueNode>()
             };
 
+            // ══════════════════════════════════════════════════════════════
+            // INTRO: Branches based on Receptivity and PlayerKnowsTruth
+            // ══════════════════════════════════════════════════════════════
+
             var intro = new DialogueNode
             {
                 Id = "noctura_intro",
@@ -1503,13 +1519,341 @@ namespace UsurperRemake.Systems
                 {
                     "The shadows themselves coalesce into form.",
                     "A figure of pure darkness, beautiful and terrible,",
-                    "with eyes like distant stars.",
+                    "with eyes like distant stars."
+                },
+                TextColor = "dark_magenta",
+                Choices = new List<DialogueChoice>
+                {
+                    // HIGH RECEPTIVITY (50+) → Full reunion, direct alliance
+                    new()
+                    {
+                        Text = "(She recognizes you. You recognize her.)",
+                        NextNodeId = "noctura_reunion",
+                        Tone = DialogueTone.Wise,
+                        Condition = new DialogueCondition
+                        {
+                            Type = ConditionType.StrangerReceptivityAbove,
+                            IntValue = 49
+                        }
+                    },
+                    // MID RECEPTIVITY (25-49) → Teaching path, must prove understanding
+                    new()
+                    {
+                        Text = "(Something about her feels familiar...)",
+                        NextNodeId = "noctura_familiar",
+                        Tone = DialogueTone.Humble,
+                        Condition = new DialogueCondition
+                        {
+                            Type = ConditionType.StrangerReceptivityAbove,
+                            IntValue = 24
+                        }
+                    },
+                    // NEGATIVE RECEPTIVITY → Enraged intro
+                    new()
+                    {
+                        Text = "(The shadows feel hostile, oppressive.)",
+                        NextNodeId = "noctura_hostile_intro",
+                        Tone = DialogueTone.Aggressive,
+                        Condition = new DialogueCondition
+                        {
+                            Type = ConditionType.StrangerReceptivityBelow,
+                            IntValue = 0
+                        }
+                    },
+                    // DEFAULT: Never met or low receptivity (0-24)
+                    new()
+                    {
+                        Text = "(You face the Goddess of Shadows.)",
+                        NextNodeId = "noctura_default_intro",
+                        Tone = DialogueTone.Neutral
+                    }
+                }
+            };
+            tree.AllNodes[intro.Id] = intro;
+            tree.RootNode = intro;
+
+            // ══════════════════════════════════════════════════════════════
+            // HIGH RECEPTIVITY PATH (50+): The Reunion
+            // ══════════════════════════════════════════════════════════════
+
+            var reunion = new DialogueNode
+            {
+                Id = "noctura_reunion",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "The shadows part like curtains, and she steps through.",
+                    "Not as a goddess. Not as a stranger.",
+                    "As a teacher greeting her finest student.",
                     "",
-                    "\"Interesting. You found me without being found.\"",
+                    "\"We meet at last. Not as Stranger and traveler,\"",
+                    "\"but as teacher and student.\"",
+                    "",
+                    "\"Every disguise. Every lesson. Every encounter.\"",
+                    "\"You listened. You understood.\"",
+                    "",
+                    "\"Death is not destruction. It is the cocoon.\"",
+                    "\"And now, the butterfly emerges.\""
+                },
+                TextColor = "dark_magenta",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "I accept your lesson, Noctura. Death is not my enemy -- it is the cocoon.",
+                        NextNodeId = "noctura_full_alliance",
+                        Tone = DialogueTone.Wise
+                    },
+                    new()
+                    {
+                        Text = "I learned from you. But I still want to hear your terms.",
+                        NextNodeId = "noctura_terms",
+                        Tone = DialogueTone.Neutral
+                    },
+                    new()
+                    {
+                        Text = "I listened. But I'm not your student. I'm your equal.",
+                        NextNodeId = "noctura_teach_fight",
+                        Tone = DialogueTone.Defiant
+                    }
+                }
+            };
+            tree.AllNodes[reunion.Id] = reunion;
+
+            // Full alliance - no combat, earned through understanding
+            var fullAlliance = new DialogueNode
+            {
+                Id = "noctura_full_alliance",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "Her eyes -- the same starlight eyes from every encounter --",
+                    "shine with something that might be tears.",
+                    "",
+                    "\"In all the centuries... in all the cycles...\"",
+                    "\"no one has ever truly understood.\"",
+                    "",
+                    "\"The graveyard blooms. The candle passes its flame.\"",
+                    "\"The wave returns to the ocean.\"",
+                    "\"And death... death becomes transformation.\"",
+                    "",
+                    "Shadows wrap around you. Not cold. Not dark.",
+                    "Warm, like a blanket. Like an embrace.",
+                    "",
+                    "\"I am yours. And you are mine.\"",
+                    "\"Not in darkness. In understanding.\"",
+                    "\"When you face Manwe, I will be there.\"",
+                    "\"Not as shadow. As your teacher. Your ally. Your friend.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_ally" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_pact_sealed" },
+                    new() { Type = EffectType.RecordChoice, StringValue = "noctura_fate", StringValue2 = "allied" },
+                    new() { Type = EffectType.GiveItem, StringValue = "Shadow Cloak" },
+                    new() { Type = EffectType.CollectWaveFragment, StringValue = "ManwesChoice" },
+                    new() { Type = EffectType.GainOceanInsight, IntValue = 30 }
+                }
+            };
+            tree.AllNodes[fullAlliance.Id] = fullAlliance;
+
+            // ══════════════════════════════════════════════════════════════
+            // MID RECEPTIVITY PATH (25-49): The Test
+            // ══════════════════════════════════════════════════════════════
+
+            var familiar = new DialogueNode
+            {
+                Id = "noctura_familiar",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "\"We've met before.\"",
+                    "Her voice carries echoes of a dozen other voices.",
+                    "The hooded traveler. The beggar. The quiet patron.",
+                    "",
+                    "\"You listened... sometimes. Enough to be here.\"",
+                    "\"But understanding is not the same as accepting.\"",
+                    "",
+                    "\"Let me ask you one final question.\"",
+                    "\"What is death?\""
+                },
+                TextColor = "dark_magenta",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "Death is transformation. The cocoon, not the end.",
+                        NextNodeId = "noctura_test_passed",
+                        Tone = DialogueTone.Wise
+                    },
+                    new()
+                    {
+                        Text = "Death is... necessary. Part of the cycle.",
+                        NextNodeId = "noctura_test_partial",
+                        Tone = DialogueTone.Humble
+                    },
+                    new()
+                    {
+                        Text = "Death is what I'll bring you if you stand in my way.",
+                        NextNodeId = "noctura_fight",
+                        Tone = DialogueTone.Aggressive
+                    }
+                }
+            };
+            tree.AllNodes[familiar.Id] = familiar;
+
+            var testPassed = new DialogueNode
+            {
+                Id = "noctura_test_passed",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "*A genuine smile crosses her face.*",
+                    "",
+                    "\"The cocoon. Yes.\"",
+                    "\"You heard every word. You carried the lesson.\"",
+                    "",
+                    "\"We need not fight. I see what I have taught you\"",
+                    "\"lives in your heart, not just your memory.\""
+                },
+                NextNodeId = "noctura_terms"
+            };
+            tree.AllNodes[testPassed.Id] = testPassed;
+
+            var testPartial = new DialogueNode
+            {
+                Id = "noctura_test_partial",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "\"Necessary. That is... close.\"",
+                    "\"But 'necessary' is cold. Clinical.\"",
+                    "",
+                    "\"Death is not merely necessary.\"",
+                    "\"It is beautiful. It is the rest between breaths.\"",
+                    "",
+                    "\"You are almost ready. But almost is not enough.\"",
+                    "\"Let me show you what I mean.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_teaching_fight" }
+                }
+            };
+            tree.AllNodes[testPartial.Id] = testPartial;
+
+            // ══════════════════════════════════════════════════════════════
+            // NEGATIVE RECEPTIVITY PATH: The Scorned Teacher
+            // ══════════════════════════════════════════════════════════════
+
+            var hostileIntro = new DialogueNode
+            {
+                Id = "noctura_hostile_intro",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "The shadows SURGE. Not inviting. Suffocating.",
+                    "",
+                    "\"You.\"",
+                    "\"The one who shunned my every teaching.\"",
+                    "\"Who spat on every lesson I offered.\"",
+                    "",
+                    "\"I came to you as a beggar. You mocked me.\"",
+                    "\"I came as a traveler. You threatened me.\"",
+                    "\"I came as a teacher. You refused to learn.\"",
+                    "",
+                    "\"Very well. Let me teach you the hard way.\""
+                },
+                TextColor = "dark_magenta",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "I'll destroy you like every other obstacle in my path.",
+                        NextNodeId = "noctura_fight_enraged",
+                        Tone = DialogueTone.Aggressive
+                    },
+                    new()
+                    {
+                        Text = "Wait. I was wrong to dismiss you. I see that now.",
+                        NextNodeId = "noctura_last_chance",
+                        Tone = DialogueTone.Humble
+                    }
+                }
+            };
+            tree.AllNodes[hostileIntro.Id] = hostileIntro;
+
+            var fightEnraged = new DialogueNode
+            {
+                Id = "noctura_fight_enraged",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "\"DESTROY me?\"",
+                    "",
+                    "The shadows explode outward. The room goes dark.",
+                    "Only her eyes remain, burning like cold stars.",
+                    "",
+                    "\"I am the shadow between every heartbeat.\"",
+                    "\"I am the pause between every breath.\"",
+                    "\"I am the silence that comes for everyone.\"",
+                    "",
+                    "\"You cannot destroy me. But I will show you what I am.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_enraged" }
+                }
+            };
+            tree.AllNodes[fightEnraged.Id] = fightEnraged;
+
+            var lastChance = new DialogueNode
+            {
+                Id = "noctura_last_chance",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "The shadows pause. The oppressive darkness lifts, slightly.",
+                    "",
+                    "\"Wrong? You were wrong?\"",
+                    "She studies you. Ten thousand years of patience behind those eyes.",
+                    "",
+                    "\"Words are cheap. Understanding is earned.\"",
+                    "\"Prove it. Face me. Not to destroy.\"",
+                    "\"To LEARN.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_teaching_fight" }
+                }
+            };
+            tree.AllNodes[lastChance.Id] = lastChance;
+
+            // ══════════════════════════════════════════════════════════════
+            // DEFAULT PATH: Standard encounter (no/low Stranger history)
+            // ══════════════════════════════════════════════════════════════
+
+            var defaultIntro = new DialogueNode
+            {
+                Id = "noctura_default_intro",
+                Speaker = "Noctura",
+                Text = new[]
+                {
+                    "\"A stranger comes.\"",
                     "Her voice is silk and secrets.",
                     "",
-                    "\"Most who seek the Goddess of Shadows...\"",
-                    "\"...never know they've already failed.\""
+                    "\"We have never met. A pity.\"",
+                    "\"I had so much to teach you.\"",
+                    "",
+                    "\"Most who seek the Goddess of Shadows\"",
+                    "\"never know they've already failed.\""
                 },
                 TextColor = "dark_magenta",
                 Choices = new List<DialogueChoice>
@@ -1529,18 +1873,21 @@ namespace UsurperRemake.Systems
                     new()
                     {
                         Text = "Perhaps we can help each other. An alliance.",
-                        NextNodeId = "noctura_alliance",
+                        NextNodeId = "noctura_terms",
                         Tone = DialogueTone.Suspicious,
                         Condition = new DialogueCondition
                         {
-                            Type = ConditionType.AlignmentBelow,
-                            IntValue = 0
+                            Type = ConditionType.StrangerEncountersAbove,
+                            IntValue = 2
                         }
                     }
                 }
             };
-            tree.AllNodes[intro.Id] = intro;
-            tree.RootNode = intro;
+            tree.AllNodes[defaultIntro.Id] = defaultIntro;
+
+            // ══════════════════════════════════════════════════════════════
+            // SHARED NODES: Fight, Teach, Terms, Deal
+            // ══════════════════════════════════════════════════════════════
 
             var fight = new DialogueNode
             {
@@ -1589,7 +1936,7 @@ namespace UsurperRemake.Systems
                     },
                     new()
                     {
-                        Text = "I won't be bound to a goddess. Forget it.",
+                        Text = "I will not be bound to a goddess. Forget it.",
                         NextNodeId = "noctura_fight",
                         Tone = DialogueTone.Defiant
                     }
@@ -1597,23 +1944,30 @@ namespace UsurperRemake.Systems
             };
             tree.AllNodes[teach.Id] = teach;
 
-            var alliance = new DialogueNode
+            // Teaching fight yields → alliance after proving yourself
+            var teachFight = new DialogueNode
             {
-                Id = "noctura_alliance",
+                Id = "noctura_teach_fight",
                 Speaker = "Noctura",
                 Text = new[]
                 {
-                    "The goddess studies you with new interest.",
+                    "\"Equal?\" She tilts her head, amused.",
                     "",
-                    "\"Alliance? With a mortal?\"",
-                    "\"You are either very brave or very foolish.\"",
+                    "\"Very well. Prove it.\"",
+                    "\"If you can survive my shadows,\"",
+                    "\"I will accept you as more than a student.\"",
                     "",
-                    "\"But I sense darkness in you. Potential.\"",
-                    "\"Perhaps we could indeed be... useful to each other.\""
+                    "The darkness closes in, but it feels less like a threat",
+                    "and more like an invitation."
                 },
-                NextNodeId = "noctura_terms"
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_teaching_fight" }
+                }
             };
-            tree.AllNodes[alliance.Id] = alliance;
+            tree.AllNodes[teachFight.Id] = teachFight;
 
             var terms = new DialogueNode
             {
@@ -1629,7 +1983,7 @@ namespace UsurperRemake.Systems
                     "\"In exchange, I will grant you power over shadow.\"",
                     "\"And when the time comes... I will fight beside you.\"",
                     "",
-                    "\"What say you, mortal? Deal?\""
+                    "\"What say you? Deal?\""
                 },
                 Choices = new List<DialogueChoice>
                 {
@@ -1640,8 +1994,7 @@ namespace UsurperRemake.Systems
                         Tone = DialogueTone.Neutral,
                         Effects = new List<DialogueEffect>
                         {
-                            new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_ally" },
-                            new() { Type = EffectType.AddDarkness, IntValue = 50 }
+                            new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_ally" }
                         }
                     },
                     new()
@@ -1672,7 +2025,7 @@ namespace UsurperRemake.Systems
                     "\"You may call upon the shadows now. They will answer.\"",
                     "\"And when you face Manwe... look for me in the darkness.\"",
                     "",
-                    "\"Until then, mortal. Walk carefully.\""
+                    "\"Until then. Walk carefully.\""
                 },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
@@ -1680,7 +2033,8 @@ namespace UsurperRemake.Systems
                     new() { Type = EffectType.SetStoryFlag, StringValue = "noctura_pact_sealed" },
                     new() { Type = EffectType.RecordChoice, StringValue = "noctura_fate", StringValue2 = "allied" },
                     new() { Type = EffectType.GiveItem, StringValue = "Shadow Cloak" },
-                    new() { Type = EffectType.CollectWaveFragment, StringValue = "ManwesChoice" }
+                    new() { Type = EffectType.CollectWaveFragment, StringValue = "ManwesChoice" },
+                    new() { Type = EffectType.GainOceanInsight, IntValue = 15 }
                 }
             };
             tree.AllNodes[deal.Id] = deal;
@@ -1820,7 +2174,13 @@ namespace UsurperRemake.Systems
         // Amnesia conditions
         HasMemoryFragment,         // StringValue = fragment name
         MemoryRecoveryAbove,       // IntValue = percentage (0-100)
-        TruthRevealed              // Final revelation occurred
+        TruthRevealed,             // Final revelation occurred
+
+        // Stranger/Noctura conditions
+        StrangerReceptivityAbove,  // IntValue = threshold (-100 to 100)
+        StrangerReceptivityBelow,  // IntValue = threshold (-100 to 100)
+        StrangerEncountersAbove,   // IntValue = encounter count
+        StrangerKnowsTruth         // Player knows Stranger is Noctura
     }
 
     public enum EffectType

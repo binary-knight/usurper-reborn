@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using UsurperRemake.Data;
 using Godot;
 
 namespace UsurperRemake.Systems
@@ -461,6 +462,9 @@ namespace UsurperRemake.Systems
                 // Learned combat abilities
                 LearnedAbilities = player.LearnedAbilities?.ToList() ?? new List<string>(),
 
+                // Combat quickbar
+                Quickbar = player.Quickbar?.ToList() ?? new List<string?>(),
+
                 // Training system
                 Trains = player.Trains,
                 TrainingPoints = player.TrainingPoints,
@@ -701,6 +705,9 @@ namespace UsurperRemake.Systems
                     BirthDate = npc.BirthDate,
                     IsAgedDeath = npc.IsAgedDeath,
                     PregnancyDueDate = npc.PregnancyDueDate,
+
+                    // Dialogue tracking
+                    RecentDialogueIds = NPCDialogueDatabase.GetRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? ""),
 
                     // Marriage status
                     IsMarried = npc.IsMarried,

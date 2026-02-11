@@ -2059,6 +2059,15 @@
         if (/Guard|guard|Royal/.test(msg)) return '#ffcc44';            // military = amber
         if (/training|trained/.test(msg)) return '#88ccff';             // training = light cyan
         if (/returned from the realm of the dead/i.test(msg)) return '#88ff88'; // respawn = green
+        // Living World AI events (v0.29.0)
+        if (/telling anyone who'll listen/i.test(msg)) return '#cc9933';       // gossip = tavern amber
+        if (/pickpocket|stole.*gold/i.test(msg)) return '#ff8844';             // theft = orange
+        if (/publicly challenged|emerged victorious/i.test(msg)) return '#ddbb44'; // challenge = bronze
+        if (/amassed a fortune|wealthiest/i.test(msg)) return '#ffcc00';       // wealth goal = bright gold
+        if (/settled the score|got revenge/i.test(msg)) return '#ff6644';      // revenge = fiery orange
+        if (/formed a powerful.*alliance/i.test(msg)) return '#44ccff';        // alliance = sky blue
+        if (/wave of rage|wave of panic|wave of celebration|wave of grief/i.test(msg)) return '#bb88ff'; // emotional cascade = lavender
+        if (/brawl|got into a/i.test(msg)) return '#ff5555';                   // brawl = red-orange
         return '#ccccdd';                                               // default = light gray
     }
 

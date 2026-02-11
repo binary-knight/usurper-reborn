@@ -609,11 +609,105 @@ namespace UsurperRemake.Systems
                     Gold = npc.Gold,
                     Items = npc.Item?.ToArray() ?? new int[0],
                     EquippedItems = npc.EquippedItems?.ToDictionary(
-                        kvp => (int)kvp.Key, kvp => kvp.Value) ?? new Dictionary<int, int>()
+                        kvp => (int)kvp.Key, kvp => kvp.Value) ?? new Dictionary<int, int>(),
+
+                    // AI state - for dashboard analytics
+                    PersonalityProfile = SerializePersonalityStatic(npc.Brain?.Personality),
+                    Memories = SerializeMemoriesStatic(npc.Brain?.Memory),
+                    CurrentGoals = SerializeGoalsStatic(npc.Brain?.Goals),
+                    EmotionalState = SerializeEmotionalStateStatic(npc.EmotionalState),
+                    Relationships = npc.Brain?.Memory?.CharacterImpressions?.ToDictionary(
+                        kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, float>(),
+
+                    // Lifecycle
+                    Age = npc.Age,
+                    BirthDate = npc.BirthDate,
+                    IsAgedDeath = npc.IsAgedDeath,
+                    PregnancyDueDate = npc.PregnancyDueDate,
                 });
             }
 
             return npcData;
+        }
+
+        // --- Static serialization helpers for dashboard analytics ---
+
+        private static PersonalityData? SerializePersonalityStatic(PersonalityProfile? profile)
+        {
+            if (profile == null) return null;
+            return new PersonalityData
+            {
+                Aggression = profile.Aggression,
+                Loyalty = profile.Loyalty,
+                Intelligence = profile.Intelligence,
+                Greed = profile.Greed,
+                Compassion = profile.Sociability,
+                Courage = profile.Courage,
+                Honesty = profile.Trustworthiness,
+                Ambition = profile.Ambition,
+                Vengefulness = profile.Vengefulness,
+                Impulsiveness = profile.Impulsiveness,
+                Caution = profile.Caution,
+                Mysticism = profile.Mysticism,
+                Patience = profile.Patience,
+                Gender = profile.Gender,
+                Orientation = profile.Orientation,
+                IntimateStyle = profile.IntimateStyle,
+                RelationshipPref = profile.RelationshipPref,
+                Romanticism = profile.Romanticism,
+                Sensuality = profile.Sensuality,
+                Jealousy = profile.Jealousy,
+                Commitment = profile.Commitment,
+                Adventurousness = profile.Adventurousness,
+                Flirtatiousness = profile.Flirtatiousness,
+                Passion = profile.Passion,
+                Tenderness = profile.Tenderness
+            };
+        }
+
+        private static List<MemoryData> SerializeMemoriesStatic(MemorySystem? memory)
+        {
+            if (memory == null) return new List<MemoryData>();
+            // Limit to last 10 memories to control JSON blob size
+            return memory.AllMemories
+                .OrderByDescending(m => m.Timestamp)
+                .Take(10)
+                .Select(m => new MemoryData
+                {
+                    Type = m.Type.ToString(),
+                    Description = m.Description,
+                    InvolvedCharacter = m.InvolvedCharacter ?? "",
+                    Importance = m.Importance,
+                    EmotionalImpact = m.EmotionalImpact,
+                    Timestamp = m.Timestamp
+                }).ToList();
+        }
+
+        private static List<GoalData> SerializeGoalsStatic(GoalSystem? goals)
+        {
+            if (goals == null) return new List<GoalData>();
+            return goals.AllGoals.Select(g => new GoalData
+            {
+                Name = g.Name,
+                Type = g.Type.ToString(),
+                Priority = g.Priority,
+                Progress = g.Progress,
+                IsActive = g.IsActive,
+                TargetValue = g.TargetValue,
+                CurrentValue = g.CurrentValue
+            }).ToList();
+        }
+
+        private static EmotionalStateData? SerializeEmotionalStateStatic(EmotionalState? state)
+        {
+            if (state == null) return null;
+            return new EmotionalStateData
+            {
+                Happiness = state.GetEmotionIntensity(EmotionType.Joy),
+                Anger = state.GetEmotionIntensity(EmotionType.Anger),
+                Fear = state.GetEmotionIntensity(EmotionType.Fear),
+                Trust = state.GetEmotionIntensity(EmotionType.Gratitude)
+            };
         }
 
         private List<WorldEventData> SerializeCurrentWorldEvents()

@@ -551,6 +551,15 @@ public partial class CombatEngine
                 continue; // Show menu again
             }
 
+            // Handle quickbar slots [1]-[9] for spells and abilities
+            if (upperChoice.Length == 1 && upperChoice[0] >= '1' && upperChoice[0] <= '9')
+            {
+                var qbResult = await HandleQuickbarActionSingleMonster(player, upperChoice, monster);
+                if (qbResult != null)
+                    return qbResult;
+                continue; // Invalid/cancelled, show menu again
+            }
+
             // Parse and validate action
             var action = ParseCombatAction(upperChoice, player);
 
@@ -615,25 +624,21 @@ public partial class CombatEngine
         terminal.WriteLine("  A - Attack");
         terminal.WriteLine("  D - Defend, reduces damage by 50 percent");
 
-        // Spell/Ability options
-        bool isSpellcaster = ClassAbilitySystem.IsSpellcaster(player.Class);
-        if (isSpellcaster)
+        // Quickbar slots
+        var quickbarActions = GetQuickbarActions(player);
+        if (quickbarActions.Count > 0)
         {
-            if (player.CanCastSpells() && player.Mana > 0)
-                terminal.WriteLine($"  C - Cast Spell, Mana: {player.Mana} of {player.MaxMana}");
-            else if (!player.CanCastSpells())
-                terminal.WriteLine("  C - Cast Spell, SILENCED");
-            else
-                terminal.WriteLine("  C - Cast Spell, No Mana");
+            terminal.WriteLine("");
+            terminal.WriteLine("Quickbar:");
+            foreach (var (qKey, slotId, displayName, available) in quickbarActions)
+            {
+                if (available)
+                    terminal.WriteLine($"  {qKey} - {displayName}");
+                else
+                    terminal.WriteLine($"  {qKey} - {displayName} (unavailable)");
+            }
         }
-        else
-        {
-            var availableAbilities = ClassAbilitySystem.GetAvailableAbilities(player);
-            if (availableAbilities.Count > 0)
-                terminal.WriteLine($"  B - Abilities, {availableAbilities.Count} available");
-            else
-                terminal.WriteLine("  B - Abilities, Level up to unlock");
-        }
+        terminal.WriteLine("");
 
         // Healing
         if (player.Healing > 0)
@@ -739,45 +744,26 @@ public partial class CombatEngine
         terminal.SetColor("cyan");
         terminal.WriteLine("Defend (reduce damage 50%)         ║");
 
-        // === SPELL/ABILITY OPTIONS ===
-        bool isSpellcaster = ClassAbilitySystem.IsSpellcaster(player.Class);
-        if (isSpellcaster)
+        // === QUICKBAR SLOTS [1]-[9] ===
+        var quickbarActions = GetQuickbarActions(player);
+        if (quickbarActions.Count > 0)
         {
-            bool canCastSpells = player.CanCastSpells() && player.Mana > 0;
-            if (canCastSpells)
+            terminal.SetColor("bright_white");
+            terminal.WriteLine("╠═══════════════════════════════════════╣");
+            foreach (var (qKey, slotId, displayName, available) in quickbarActions)
             {
-                terminal.SetColor("bright_blue");
-                terminal.Write("║ [C] ");
-                terminal.SetColor("blue");
-                string manaStr = $"Cast Spell (Mana: {player.Mana}/{player.MaxMana})";
-                terminal.WriteLine($"{manaStr,-33} ║");
-            }
-            else if (!player.CanCastSpells())
-            {
-                terminal.SetColor("darkgray");
-                terminal.WriteLine("║ [C] Cast Spell (SILENCED)              ║");
-            }
-            else
-            {
-                terminal.SetColor("darkgray");
-                terminal.WriteLine("║ [C] Cast Spell (No Mana)               ║");
-            }
-        }
-        else
-        {
-            // Martial class abilities
-            var availableAbilities = ClassAbilitySystem.GetAvailableAbilities(player);
-            if (availableAbilities.Count > 0)
-            {
-                terminal.SetColor("bright_blue");
-                terminal.Write("║ [B] ");
-                terminal.SetColor("blue");
-                terminal.WriteLine($"Abilities ({availableAbilities.Count} available)           ║");
-            }
-            else
-            {
-                terminal.SetColor("darkgray");
-                terminal.WriteLine("║ [B] Abilities (Level up to unlock)    ║");
+                if (available)
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"║ [{qKey}] ");
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"{displayName,-33}║");
+                }
+                else
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine($"║ [{qKey}] {displayName,-33}║");
+                }
             }
         }
 
@@ -906,18 +892,6 @@ public partial class CombatEngine
         terminal.WriteLine("  A - Attack");
         terminal.WriteLine("  D - Defend, reduces damage by 50 percent");
 
-        // Spell option (spellcasters only)
-        bool isSpellcaster = ClassAbilitySystem.IsSpellcaster(player.Class);
-        if (isSpellcaster)
-        {
-            if (player.CanCastSpells() && player.Mana > 0)
-                terminal.WriteLine($"  S - Cast Spell, Mana: {player.Mana} of {player.MaxMana}");
-            else if (!player.CanCastSpells())
-                terminal.WriteLine("  S - Cast Spell, SILENCED");
-            else
-                terminal.WriteLine("  S - Cast Spell, No Mana");
-        }
-
         // Item option
         if (player.Healing > 0 || player.ManaPotions > 0)
         {
@@ -938,11 +912,18 @@ public partial class CombatEngine
                 terminal.WriteLine("  H - Heal Ally, No means to heal");
         }
 
-        // Class-specific abilities
-        foreach (var (key, name, available) in classInfo)
+        // Quickbar slots
+        if (classInfo.Count > 0)
         {
-            if (available)
-                terminal.WriteLine($"  {key} - {name}");
+            terminal.WriteLine("");
+            terminal.WriteLine("Quickbar:");
+            foreach (var (key, name, available) in classInfo)
+            {
+                if (available)
+                    terminal.WriteLine($"  {key} - {name}");
+                else
+                    terminal.WriteLine($"  {key} - {name} (unavailable)");
+            }
         }
 
         // Retreat and auto
@@ -981,30 +962,6 @@ public partial class CombatEngine
         terminal.SetColor("cyan");
         terminal.WriteLine("Defend (reduce damage 50%)         ║");
 
-        // Spell option - ONLY show for spellcaster classes (Magician, Cleric, Sage)
-        bool isSpellcaster = ClassAbilitySystem.IsSpellcaster(player.Class);
-        if (isSpellcaster)
-        {
-            bool canCastSpells = player.CanCastSpells() && player.Mana > 0;
-            if (canCastSpells)
-            {
-                terminal.SetColor("bright_blue");
-                terminal.Write("║ [S] ");
-                terminal.SetColor("blue");
-                terminal.WriteLine($"Cast Spell (Mana: {player.Mana}/{player.MaxMana})         ║");
-            }
-            else if (!player.CanCastSpells())
-            {
-                terminal.SetColor("darkgray");
-                terminal.WriteLine("║ [S] Cast Spell (SILENCED)              ║");
-            }
-            else
-            {
-                terminal.SetColor("darkgray");
-                terminal.WriteLine("║ [S] Cast Spell (No Mana)               ║");
-            }
-        }
-
         // Item option (show potion count)
         if (player.Healing > 0)
         {
@@ -1036,15 +993,25 @@ public partial class CombatEngine
             }
         }
 
-        // Class-specific abilities
-        foreach (var (key, name, available) in classInfo)
+        // Quickbar slots [1]-[9]
+        if (classInfo.Count > 0)
         {
-            if (available)
+            terminal.SetColor("bright_white");
+            terminal.WriteLine("╠═══════════════════════════════════════╣");
+            foreach (var (key, name, available) in classInfo)
             {
-                terminal.SetColor("bright_yellow");
-                terminal.Write($"║ [{key}] ");
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"{name,-33}║");
+                if (available)
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"║ [{key}] ");
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"{name,-33}║");
+                }
+                else
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine($"║ [{key}] {name,-33}║");
+                }
             }
         }
 
@@ -1093,8 +1060,6 @@ public partial class CombatEngine
             "M" => new CombatAction { Type = CombatActionType.BegForMercy },
             "P" => new CombatAction { Type = CombatActionType.PowerAttack },
             "E" => new CombatAction { Type = CombatActionType.PreciseStrike },
-            "C" => new CombatAction { Type = CombatActionType.CastSpell },
-            "B" when !ClassAbilitySystem.IsSpellcaster(player.Class) => new CombatAction { Type = CombatActionType.UseAbility },  // Abilities for non-casters
             "R" => new CombatAction { Type = CombatActionType.Retreat },
             "G" when player.Class == CharacterClass.Barbarian && !player.IsRaging => new CombatAction { Type = CombatActionType.Rage },
             "I" => new CombatAction { Type = CombatActionType.Disarm },
@@ -3703,58 +3668,6 @@ public partial class CombatEngine
                     action.Type = CombatActionType.Defend;
                     return (action, false);
 
-                case "S":
-                    action.Type = CombatActionType.CastSpell;
-                    // Show spell list and get spell choice
-                    var spellIndex = await ShowSpellListAndChoose(player);
-                    if (spellIndex >= 0)
-                    {
-                        action.SpellIndex = spellIndex;
-
-                        // Check spell type - buff/heal spells can target self or allies
-                        var spellInfo = SpellSystem.GetSpellInfo(player.Class, spellIndex);
-                        if (spellInfo?.SpellType == "Buff" || spellInfo?.SpellType == "Heal")
-                        {
-                            // For heal spells, allow targeting self or injured allies
-                            if (spellInfo.SpellType == "Heal" && currentTeammates?.Any(t => t.IsAlive && t.HP < t.MaxHP) == true)
-                            {
-                                // Prompt for heal target
-                                var allyTarget = await SelectHealTarget(player);
-                                action.AllyTargetIndex = allyTarget; // null = self, otherwise = ally index
-                            }
-                            else
-                            {
-                                // Self-targeting buff or no injured allies
-                                action.TargetIndex = null;
-                            }
-                        }
-                        else if (spellInfo?.IsMultiTarget == true)
-                        {
-                            // AoE attack spell - ask if player wants to hit all or just one
-                            terminal.WriteLine("");
-                            terminal.Write("Target all monsters? (Y/N): ");
-                            var targetAllResponse = await terminal.GetInput("");
-                            action.TargetAllMonsters = targetAllResponse.Trim().ToUpper() == "Y";
-
-                            if (!action.TargetAllMonsters)
-                            {
-                                action.TargetIndex = await GetTargetSelection(monsters, allowRandom: false);
-                            }
-                        }
-                        else
-                        {
-                            // Single target attack/debuff spell - select target
-                            action.TargetIndex = await GetTargetSelection(monsters, allowRandom: false);
-                        }
-                        return (action, false);
-                    }
-                    else
-                    {
-                        // Cancelled spell selection - loop back to ask for action again
-                        terminal.WriteLine("");
-                        continue;
-                    }
-
                 case "I":
                     // Check if player can use any potions
                     bool hasHealPots = player.Healing > 0 && player.HP < player.MaxHP;
@@ -3816,7 +3729,7 @@ public partial class CombatEngine
                     await Task.Delay(GetCombatDelay(500));
                     continue; // Show menu again
 
-                // Class-specific abilities (numbered 1-9)
+                // Quickbar slots (1-9) - spells and abilities
                 case "1":
                 case "2":
                 case "3":
@@ -3826,12 +3739,15 @@ public partial class CombatEngine
                 case "7":
                 case "8":
                 case "9":
-                    var classAction = await HandleClassSpecificAction(player, input.Trim(), monsters);
-                    if (classAction.HasValue)
+                    var qbAction = await HandleQuickbarAction(player, input.Trim(), monsters);
+                    if (qbAction.HasValue)
                     {
-                        action.Type = classAction.Value.type;
-                        action.TargetIndex = classAction.Value.target;
-                        action.AbilityId = classAction.Value.abilityId;
+                        action.Type = qbAction.Value.type;
+                        action.TargetIndex = qbAction.Value.target;
+                        action.AbilityId = qbAction.Value.abilityId;
+                        action.SpellIndex = qbAction.Value.spellIndex;
+                        action.AllyTargetIndex = qbAction.Value.allyTarget;
+                        action.TargetAllMonsters = qbAction.Value.targetAll;
                         return (action, false);
                     }
                     continue; // Invalid or cancelled, show menu again
@@ -6462,6 +6378,13 @@ public partial class CombatEngine
         // Track statistics - death (not from player)
         result.Player.Statistics.RecordDeath(false);
 
+        // Queue Stranger encounter after first death
+        if (result.Player.Statistics.TotalMonsterDeaths == 1)
+        {
+            StrangerEncounterSystem.Instance.QueueScriptedEncounter(ScriptedEncounterType.AfterFirstDeath);
+        }
+        StrangerEncounterSystem.Instance.RecordGameEvent(StrangerContextEvent.PlayerDied);
+
         // Track telemetry for player death
         TelemetrySystem.Instance.TrackDeath(
             result.Player.Level,
@@ -8681,99 +8604,215 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Get class-specific combat actions available to the player
-    /// Only shows abilities the player has LEARNED (from training at the Level Master)
-    /// Returns list of (hotkey, ability id, display name, is available, stamina cost)
+    /// Get quickbar actions for combat display and input handling.
+    /// Reads from player.Quickbar which contains both spell IDs ("spell:5") and ability IDs ("power_strike").
+    /// Returns list of (hotkey, slotId, display name, is available)
     /// </summary>
-    private List<(string key, string abilityId, string name, bool available, int staminaCost)> GetLearnedAbilityActions(Character player, Dictionary<string, int> cooldowns)
+    private List<(string key, string slotId, string displayName, bool available)> GetQuickbarActions(Character player)
     {
-        var actions = new List<(string, string, string, bool, int)>();
+        var actions = new List<(string, string, string, bool)>();
+        if (player.Quickbar == null) return actions;
 
-        // Get only abilities the player has learned
-        if (player.LearnedAbilities == null || player.LearnedAbilities.Count == 0)
+        for (int i = 0; i < Math.Min(9, player.Quickbar.Count); i++)
         {
-            return actions;
-        }
+            var slotId = player.Quickbar[i];
+            if (string.IsNullOrEmpty(slotId)) continue;
 
-        int keyNum = 1;
-        foreach (var abilityId in player.LearnedAbilities)
-        {
-            var ability = ClassAbilitySystem.GetAbility(abilityId);
-            if (ability == null) continue;
-
-            // Check if player can use this ability (stamina, cooldown, etc.)
-            bool canUse = ClassAbilitySystem.CanUseAbility(player, abilityId, cooldowns);
-
-            // Format the display name with stamina cost
-            string displayName = $"{ability.Name} ({ability.StaminaCost} ST)";
-
-            // Add cooldown indicator if on cooldown
-            if (cooldowns.TryGetValue(abilityId, out int cd) && cd > 0)
+            var spellLevel = SpellSystem.ParseQuickbarSpellLevel(slotId);
+            if (spellLevel.HasValue)
             {
-                displayName = $"{ability.Name} (CD:{cd})";
+                // Spell slot
+                var spell = SpellSystem.GetSpellInfo(player.Class, spellLevel.Value);
+                if (spell == null) continue;
+                int manaCost = SpellSystem.CalculateManaCost(spell, player);
+                bool canCast = player.CanCastSpells() && player.Mana >= manaCost;
+                string displayName;
+                if (!player.CanCastSpells())
+                    displayName = $"{spell.Name} (SILENCED)";
+                else
+                    displayName = $"{spell.Name} ({manaCost} MP)";
+                actions.Add(((i + 1).ToString(), slotId, displayName, canCast));
             }
-
-            actions.Add((keyNum.ToString(), abilityId, displayName, canUse, ability.StaminaCost));
-            keyNum++;
-
-            // Max 9 abilities shown (keys 1-9)
-            if (keyNum > 9) break;
+            else
+            {
+                // Ability slot
+                var ability = ClassAbilitySystem.GetAbility(slotId);
+                if (ability == null) continue;
+                bool canUse = ClassAbilitySystem.CanUseAbility(player, slotId, abilityCooldowns);
+                string displayName;
+                if (abilityCooldowns.TryGetValue(slotId, out int cd) && cd > 0)
+                    displayName = $"{ability.Name} (CD:{cd})";
+                else
+                    displayName = $"{ability.Name} ({ability.StaminaCost} ST)";
+                actions.Add(((i + 1).ToString(), slotId, displayName, canUse));
+            }
         }
-
         return actions;
     }
 
     /// <summary>
-    /// Legacy wrapper for backwards compatibility - returns in old format
+    /// Get quickbar actions in the old (key, name, available) format for menu display compatibility.
     /// </summary>
     private List<(string key, string name, bool available)> GetClassSpecificActions(Character player)
     {
-        var learnedActions = GetLearnedAbilityActions(player, abilityCooldowns);
-
-        // Convert to old format for compatibility
-        return learnedActions.Select(a => (a.key, a.name, a.available)).ToList();
+        return GetQuickbarActions(player).Select(a => (a.key, a.displayName, a.available)).ToList();
     }
 
     /// <summary>
-    /// Handle class-specific action input using learned abilities
-    /// Returns the action type, target index, and ability ID if valid, null if invalid
+    /// Handle quickbar action input (1-9) for multi-monster combat.
+    /// Reads from player.Quickbar and handles both spells and abilities.
+    /// Returns the action type, target index, ability ID, and spell index if valid, null if invalid.
     /// </summary>
-    private async Task<(CombatActionType type, int? target, string abilityId)?> HandleClassSpecificAction(Character player, string key, List<Monster> monsters)
+    private async Task<(CombatActionType type, int? target, string abilityId, int spellIndex, int? allyTarget, bool targetAll)?> HandleQuickbarAction(Character player, string key, List<Monster> monsters)
     {
-        // Get the learned abilities with their key mappings
-        var learnedActions = GetLearnedAbilityActions(player, abilityCooldowns);
+        var quickbarActions = GetQuickbarActions(player);
+        var matched = quickbarActions.FirstOrDefault(a => a.key == key);
 
-        // Find the ability that matches the pressed key
-        var matchedAction = learnedActions.FirstOrDefault(a => a.key == key);
-
-        if (string.IsNullOrEmpty(matchedAction.abilityId))
+        if (string.IsNullOrEmpty(matched.slotId))
         {
-            terminal.WriteLine("You haven't learned that ability!", "yellow");
+            terminal.WriteLine("That quickbar slot is empty!", "yellow");
             await Task.Delay(GetCombatDelay(1000));
             return null;
         }
 
-        // Check if the ability can be used
-        if (!matchedAction.available)
+        // Check availability
+        if (!matched.available)
         {
-            var ability = ClassAbilitySystem.GetAbility(matchedAction.abilityId);
-            if (ability != null)
+            var spellLevel = SpellSystem.ParseQuickbarSpellLevel(matched.slotId);
+            if (spellLevel.HasValue)
             {
-                if (player.CurrentCombatStamina < ability.StaminaCost)
+                var spell = SpellSystem.GetSpellInfo(player.Class, spellLevel.Value);
+                if (spell != null)
                 {
-                    terminal.WriteLine($"Not enough stamina! Need {ability.StaminaCost}, have {player.CurrentCombatStamina}.", "red");
+                    int manaCost = SpellSystem.CalculateManaCost(spell, player);
+                    if (!player.CanCastSpells())
+                        terminal.WriteLine($"{spell.Name} cannot be cast - you are SILENCED!", "red");
+                    else
+                        terminal.WriteLine($"Not enough mana! Need {manaCost}, have {player.Mana}.", "red");
                 }
-                else if (abilityCooldowns.TryGetValue(matchedAction.abilityId, out int cd) && cd > 0)
+            }
+            else
+            {
+                var ability = ClassAbilitySystem.GetAbility(matched.slotId);
+                if (ability != null)
                 {
-                    terminal.WriteLine($"{ability.Name} is on cooldown for {cd} more rounds!", "red");
+                    if (player.CurrentCombatStamina < ability.StaminaCost)
+                        terminal.WriteLine($"Not enough stamina! Need {ability.StaminaCost}, have {player.CurrentCombatStamina}.", "red");
+                    else if (abilityCooldowns.TryGetValue(matched.slotId, out int cd) && cd > 0)
+                        terminal.WriteLine($"{ability.Name} is on cooldown for {cd} more rounds!", "red");
                 }
             }
             await Task.Delay(GetCombatDelay(1000));
             return null;
         }
 
-        // Return the ability ID so it can be executed
-        return (CombatActionType.ClassAbility, null, matchedAction.abilityId);
+        // Handle spell quickbar slot
+        var spLevel = SpellSystem.ParseQuickbarSpellLevel(matched.slotId);
+        if (spLevel.HasValue)
+        {
+            var spellInfo = SpellSystem.GetSpellInfo(player.Class, spLevel.Value);
+            if (spellInfo == null) return null;
+
+            // Check spell type for targeting
+            if (spellInfo.SpellType == "Buff" || spellInfo.SpellType == "Heal")
+            {
+                int? allyTarget = null;
+                if (spellInfo.SpellType == "Heal" && currentTeammates?.Any(t => t.IsAlive && t.HP < t.MaxHP) == true)
+                {
+                    allyTarget = await SelectHealTarget(player);
+                }
+                return (CombatActionType.CastSpell, null, "", spLevel.Value, allyTarget, false);
+            }
+            else if (spellInfo.IsMultiTarget)
+            {
+                terminal.WriteLine("");
+                terminal.Write("Target all monsters? (Y/N): ");
+                var targetAllResponse = await terminal.GetInput("");
+                bool targetAll = targetAllResponse.Trim().ToUpper() == "Y";
+                int? targetIdx = null;
+                if (!targetAll)
+                {
+                    targetIdx = await GetTargetSelection(monsters, allowRandom: false);
+                }
+                return (CombatActionType.CastSpell, targetIdx, "", spLevel.Value, null, targetAll);
+            }
+            else
+            {
+                // Single target attack/debuff spell
+                var targetIdx = await GetTargetSelection(monsters, allowRandom: false);
+                return (CombatActionType.CastSpell, targetIdx, "", spLevel.Value, null, false);
+            }
+        }
+
+        // Handle ability quickbar slot
+        return (CombatActionType.ClassAbility, null, matched.slotId, 0, null, false);
+    }
+
+    /// <summary>
+    /// Handle quickbar slot input (1-9) for single-monster combat.
+    /// Resolves the quickbar slot to either a spell cast or ability use action.
+    /// Returns a CombatAction if valid, null if empty/cancelled/unavailable.
+    /// </summary>
+    private async Task<CombatAction?> HandleQuickbarActionSingleMonster(Character player, string key, Monster? monster)
+    {
+        var quickbarActions = GetQuickbarActions(player);
+        var matched = quickbarActions.FirstOrDefault(a => a.key == key);
+
+        if (string.IsNullOrEmpty(matched.slotId))
+        {
+            terminal.WriteLine("That quickbar slot is empty!", "yellow");
+            await Task.Delay(GetCombatDelay(1000));
+            return null;
+        }
+
+        // Check availability
+        if (!matched.available)
+        {
+            var spellLevel = SpellSystem.ParseQuickbarSpellLevel(matched.slotId);
+            if (spellLevel.HasValue)
+            {
+                var spell = SpellSystem.GetSpellInfo(player.Class, spellLevel.Value);
+                if (spell != null)
+                {
+                    int manaCost = SpellSystem.CalculateManaCost(spell, player);
+                    if (!player.CanCastSpells())
+                        terminal.WriteLine($"{spell.Name} cannot be cast - you are SILENCED!", "red");
+                    else
+                        terminal.WriteLine($"Not enough mana! Need {manaCost}, have {player.Mana}.", "red");
+                }
+            }
+            else
+            {
+                var ability = ClassAbilitySystem.GetAbility(matched.slotId);
+                if (ability != null)
+                {
+                    if (player.CurrentCombatStamina < ability.StaminaCost)
+                        terminal.WriteLine($"Not enough stamina! Need {ability.StaminaCost}, have {player.CurrentCombatStamina}.", "red");
+                    else if (abilityCooldowns.TryGetValue(matched.slotId, out int cd) && cd > 0)
+                        terminal.WriteLine($"{ability.Name} is on cooldown for {cd} more rounds!", "red");
+                }
+            }
+            await Task.Delay(GetCombatDelay(1000));
+            return null;
+        }
+
+        // Handle spell quickbar slot
+        var spLevel = SpellSystem.ParseQuickbarSpellLevel(matched.slotId);
+        if (spLevel.HasValue)
+        {
+            return new CombatAction
+            {
+                Type = CombatActionType.CastSpell,
+                SpellIndex = spLevel.Value
+            };
+        }
+
+        // Handle ability quickbar slot
+        return new CombatAction
+        {
+            Type = CombatActionType.ClassAbility,
+            AbilityId = matched.slotId
+        };
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.Data;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -104,7 +105,82 @@ public partial class GameEngine : Node
     {
         dungeonPartyNPCIds.Clear();
     }
-    
+
+    /// <summary>
+    /// Auto-populate quickbar for characters migrating from pre-quickbar saves.
+    /// Fills slots 1-9 with known spells (casters) or learned abilities (martial).
+    /// </summary>
+    public static void AutoPopulateQuickbar(Character player)
+    {
+        player.Quickbar = new List<string?>(new string?[9]);
+        int slot = 0;
+
+        bool isSpellcaster = ClassAbilitySystem.IsSpellcaster(player.Class);
+        if (isSpellcaster)
+        {
+            // Fill with known spells ordered by level
+            var knownSpells = SpellSystem.GetAvailableSpells(player);
+            foreach (var spell in knownSpells.OrderBy(s => s.Level))
+            {
+                if (slot >= 9) break;
+                player.Quickbar[slot] = $"spell:{spell.Level}";
+                slot++;
+            }
+        }
+        else
+        {
+            // Fill with learned abilities ordered by level requirement
+            var abilities = ClassAbilitySystem.GetAvailableAbilities(player);
+            foreach (var ability in abilities.OrderBy(a => a.LevelRequired))
+            {
+                if (slot >= 9) break;
+                player.Quickbar[slot] = ability.Id;
+                slot++;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Add newly available spells/abilities to empty quickbar slots.
+    /// Called after level-up so new skills are immediately usable in combat.
+    /// Does NOT overwrite existing slot assignments.
+    /// </summary>
+    public static void QuickbarAddNewSkills(Character player)
+    {
+        if (player.Quickbar == null || player.Quickbar.Count < 9)
+            player.Quickbar = new List<string?>(new string?[9]);
+
+        // Collect what's already on the quickbar
+        var equipped = new HashSet<string>(player.Quickbar.Where(s => s != null)!);
+
+        bool isSpellcaster = ClassAbilitySystem.IsSpellcaster(player.Class);
+        if (isSpellcaster)
+        {
+            var knownSpells = SpellSystem.GetAvailableSpells(player);
+            foreach (var spell in knownSpells.OrderBy(s => s.Level))
+            {
+                string id = $"spell:{spell.Level}";
+                if (equipped.Contains(id)) continue;
+                int emptySlot = player.Quickbar.IndexOf(null);
+                if (emptySlot < 0) break; // No empty slots
+                player.Quickbar[emptySlot] = id;
+                equipped.Add(id);
+            }
+        }
+        else
+        {
+            var abilities = ClassAbilitySystem.GetAvailableAbilities(player);
+            foreach (var ability in abilities.OrderBy(a => a.LevelRequired))
+            {
+                if (equipped.Contains(ability.Id)) continue;
+                int emptySlot = player.Quickbar.IndexOf(null);
+                if (emptySlot < 0) break; // No empty slots
+                player.Quickbar[emptySlot] = ability.Id;
+                equipped.Add(ability.Id);
+            }
+        }
+    }
+
     // Terminal access for systems
     public TerminalEmulator Terminal => terminal;
     
@@ -917,6 +993,8 @@ public partial class GameEngine : Node
                     terminal.Write("] ");
                     terminal.SetColor("white");
                     terminal.Write($"{mostRecentSave.PlayerName}");
+                    terminal.SetColor("cyan");
+                    terminal.Write($" ({mostRecentSave.ClassName})");
                     terminal.SetColor("gray");
                     terminal.Write($" - Level {mostRecentSave.Level}");
                     terminal.SetColor("darkgray");
@@ -1443,6 +1521,7 @@ public partial class GameEngine : Node
         UsurperRemake.Systems.OceanPhilosophySystem.Instance.Reset();
         UsurperRemake.Systems.GriefSystem.Instance.Reset();
         NPCMarriageRegistry.Instance.Reset();
+        NPCDialogueDatabase.ClearAllTracking();
 
         // Clear dungeon party from previous saves
         ClearDungeonParty();
@@ -1455,6 +1534,9 @@ public partial class GameEngine : Node
         }
 
         currentPlayer = (Character)newCharacter;
+
+        // Auto-populate quickbar with starting spells/abilities
+        AutoPopulateQuickbar(currentPlayer);
 
         // Ask about telemetry opt-in for new players
         await PromptTelemetryOptIn();
@@ -1842,6 +1924,17 @@ public partial class GameEngine : Node
         if (playerData.LearnedAbilities?.Count > 0)
         {
             player.LearnedAbilities = new HashSet<string>(playerData.LearnedAbilities);
+        }
+
+        // Restore combat quickbar (with migration for existing saves)
+        if (playerData.Quickbar != null && playerData.Quickbar.Any(s => s != null))
+        {
+            player.Quickbar = playerData.Quickbar.ToList();
+            while (player.Quickbar.Count < 9) player.Quickbar.Add(null);
+        }
+        else
+        {
+            AutoPopulateQuickbar(player);
         }
 
         // Restore training system
@@ -2392,6 +2485,13 @@ public partial class GameEngine : Node
                 npc.BaseWisdom = npc.Wisdom;
                 npc.BaseCharisma = npc.Charisma;
                 npc.BaseMaxMana = npc.MaxMana;
+            }
+
+            // Restore recently-used dialogue IDs to prevent repetition across sessions
+            if (data.RecentDialogueIds != null && data.RecentDialogueIds.Count > 0)
+            {
+                npc.RecentDialogueIds = new List<string>(data.RecentDialogueIds);
+                NPCDialogueDatabase.RestoreRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? "", data.RecentDialogueIds);
             }
 
             // Migrate: Assign faction to NPCs that don't have one (legacy save compatibility)

@@ -336,6 +336,9 @@ namespace UsurperRemake.Systems
         // Learned combat abilities (non-caster classes)
         public List<string> LearnedAbilities { get; set; } = new();
 
+        // Combat quickbar slots 1-9 (spell IDs like "spell:5" or ability IDs like "power_strike")
+        public List<string?> Quickbar { get; set; } = new();
+
         // Training system
         public int Trains { get; set; }  // Training sessions available
         public int TrainingPoints { get; set; }
@@ -501,6 +504,9 @@ namespace UsurperRemake.Systems
         public DateTime BirthDate { get; set; } = DateTime.MinValue;
         public bool IsAgedDeath { get; set; }
         public DateTime? PregnancyDueDate { get; set; }
+
+        // Dialogue tracking - prevents repetition across sessions
+        public List<string>? RecentDialogueIds { get; set; }
 
         // Marriage status
         public bool IsMarried { get; set; }
@@ -672,6 +678,7 @@ namespace UsurperRemake.Systems
     public class SaveInfo
     {
         public string PlayerName { get; set; } = "";
+        public string ClassName { get; set; } = "";
         public DateTime SaveTime { get; set; }
         public int Level { get; set; }
         public int CurrentDay { get; set; }

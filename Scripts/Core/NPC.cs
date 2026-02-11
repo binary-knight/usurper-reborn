@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.Data;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -92,6 +93,12 @@ public partial class NPC : Character
     /// Used for location presence flavor text. Examples: "nursing a drink", "examining a blade"
     /// </summary>
     public string CurrentActivity { get; set; } = "";
+
+    /// <summary>
+    /// Tracks recently used dialogue line IDs to prevent repetition.
+    /// Managed by NPCDialogueDatabase, persisted across saves.
+    /// </summary>
+    public List<string> RecentDialogueIds { get; set; } = new();
 
     // Pascal compatibility flags
     public bool CanInteract => IsAwake && IsAvailable && !IsInConversation;
@@ -1046,6 +1053,13 @@ public partial class NPC : Character
     /// </summary>
     public string GetMoodPrefix(Character player)
     {
+        // Try pre-generated dialogue database first
+        if (player is Player p)
+        {
+            var dbLine = NPCDialogueDatabase.GetBestLine("mood_prefix", this, p);
+            if (dbLine != null) return dbLine;
+        }
+
         var impression = Memory?.GetCharacterImpression(player?.Name2 ?? "") ?? 0f;
         var dominant = EmotionalState?.GetDominantEmotion();
         var mood = EmotionalState?.GetCurrentMood() ?? 0.5f;

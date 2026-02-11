@@ -139,6 +139,46 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task CheckFloorStoryEvents(Character player, TerminalEmulator term)
     {
+        // Check for PreFloor70 Stranger encounter on floors 60-69
+        if (currentDungeonLevel >= 60 && currentDungeonLevel <= 69)
+        {
+            var strangerSystem = UsurperRemake.Systems.StrangerEncounterSystem.Instance;
+            // Only queue if Noctura encounter is pending (floor 70 not yet cleared)
+            var story70 = StoryProgressionSystem.Instance;
+            bool nocturaNotYetFaced = !story70.HasStoryFlag("noctura_combat_start") &&
+                                       !story70.HasStoryFlag("noctura_ally");
+            if (nocturaNotYetFaced &&
+                !strangerSystem.CompletedScriptedEncounters.Contains(UsurperRemake.Systems.ScriptedEncounterType.PreFloor70) &&
+                strangerSystem.EncountersHad >= 3)
+            {
+                strangerSystem.QueueScriptedEncounter(UsurperRemake.Systems.ScriptedEncounterType.PreFloor70);
+            }
+
+            // Check if a scripted encounter is ready right now (dungeon location)
+            var scriptedEncounter = strangerSystem.GetPendingScriptedEncounter("Dungeon", player);
+            if (scriptedEncounter != null)
+            {
+                await DisplayScriptedStrangerEncounterInDungeon(scriptedEncounter, player, term);
+            }
+        }
+
+        // Also queue TheMidgameLesson and TheRevelation based on player level
+        {
+            var strangerSystem = UsurperRemake.Systems.StrangerEncounterSystem.Instance;
+            if (player.Level >= 40 && strangerSystem.EncountersHad >= 3 &&
+                !strangerSystem.CompletedScriptedEncounters.Contains(UsurperRemake.Systems.ScriptedEncounterType.TheMidgameLesson))
+            {
+                strangerSystem.QueueScriptedEncounter(UsurperRemake.Systems.ScriptedEncounterType.TheMidgameLesson);
+            }
+
+            int resolvedGods = StoryProgressionSystem.Instance?.OldGodStates?.Count(g => g.Value.Status != GodStatus.Unknown) ?? 0;
+            if (player.Level >= 55 && strangerSystem.EncountersHad >= 5 && resolvedGods >= 2 &&
+                !strangerSystem.CompletedScriptedEncounters.Contains(UsurperRemake.Systems.ScriptedEncounterType.TheRevelation))
+            {
+                strangerSystem.QueueScriptedEncounter(UsurperRemake.Systems.ScriptedEncounterType.TheRevelation);
+            }
+        }
+
         // Check if there's a Seal on this floor that the player hasn't collected
         var sealSystem = SevenSealsSystem.Instance;
         var sealType = sealSystem.GetSealForFloor(currentDungeonLevel);
@@ -852,6 +892,126 @@ public class DungeonLocation : BaseLocation
         term.WriteLine("");
         term.SetColor("gray");
         await term.GetInputAsync("  Press Enter to continue...");
+    }
+
+    /// <summary>
+    /// Display a scripted Stranger encounter in the dungeon (PreFloor70 or others).
+    /// Similar to BaseLocation's version but adapted for dungeon context.
+    /// </summary>
+    private async Task DisplayScriptedStrangerEncounterInDungeon(
+        UsurperRemake.Systems.ScriptedStrangerEncounter encounter, Character player, TerminalEmulator term)
+    {
+        term.ClearScreen();
+        term.SetColor("dark_magenta");
+        term.WriteLine("");
+        term.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+
+        string titlePadded = encounter.Title.PadLeft((78 + encounter.Title.Length) / 2).PadRight(78);
+        term.Write("║");
+        term.SetColor("bright_magenta");
+        term.Write(titlePadded);
+        term.SetColor("dark_magenta");
+        term.WriteLine("║");
+        term.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        term.WriteLine("");
+
+        // Intro narration
+        foreach (var line in encounter.IntroNarration)
+        {
+            term.SetColor("gray");
+            term.WriteLine($"  {line}");
+            await Task.Delay(1200);
+        }
+        term.WriteLine("");
+        await Task.Delay(500);
+
+        // Disguise
+        var disguiseData = UsurperRemake.Systems.StrangerEncounterSystem.Disguises.GetValueOrDefault(encounter.Disguise);
+        if (disguiseData != null)
+        {
+            term.SetColor("white");
+            term.WriteLine($"  {disguiseData.Name}");
+            term.SetColor("darkgray");
+            term.WriteLine($"  {disguiseData.Description}");
+            term.WriteLine("");
+            await Task.Delay(800);
+        }
+
+        // Dialogue
+        foreach (var line in encounter.Dialogue)
+        {
+            if (string.IsNullOrEmpty(line))
+            {
+                term.WriteLine("");
+                await Task.Delay(400);
+                continue;
+            }
+            term.SetColor("bright_magenta");
+            term.WriteLine($"  {line}");
+            await Task.Delay(1000);
+        }
+        term.WriteLine("");
+        await Task.Delay(500);
+
+        // Response choices
+        var responseType = UsurperRemake.Systems.StrangerResponseType.Silent;
+        int receptivityChange = 0;
+
+        if (encounter.Responses.Count > 0)
+        {
+            term.SetColor("cyan");
+            term.WriteLine("  How do you respond?");
+            term.WriteLine("");
+
+            foreach (var opt in encounter.Responses)
+            {
+                term.SetColor("yellow");
+                term.Write($"    [{opt.Key}] ");
+                term.SetColor("white");
+                term.WriteLine(opt.Text);
+            }
+
+            term.WriteLine("");
+            var choice = await term.GetInput("Your response: ");
+
+            var selectedOpt = encounter.Responses
+                .FirstOrDefault(o => o.Key.Equals(choice?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (selectedOpt != null)
+            {
+                responseType = selectedOpt.ResponseType;
+                receptivityChange = selectedOpt.ReceptivityChange;
+
+                term.WriteLine("");
+                foreach (var replyLine in selectedOpt.StrangerReply)
+                {
+                    term.SetColor("magenta");
+                    term.WriteLine($"  {replyLine}");
+                    await Task.Delay(1000);
+                }
+                term.WriteLine("");
+                await Task.Delay(500);
+            }
+        }
+
+        // Closing narration
+        if (encounter.ClosingNarration.Length > 0)
+        {
+            term.WriteLine("");
+            foreach (var line in encounter.ClosingNarration)
+            {
+                term.SetColor("gray");
+                term.WriteLine($"  {line}");
+                await Task.Delay(1200);
+            }
+            term.WriteLine("");
+        }
+
+        // Record completion
+        UsurperRemake.Systems.StrangerEncounterSystem.Instance.CompleteScriptedEncounter(
+            encounter.Type, responseType, receptivityChange);
+
+        await term.PressAnyKey();
     }
 
     /// <summary>

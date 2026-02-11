@@ -862,6 +862,10 @@ namespace UsurperRemake.Systems
             }
 
             OnCompanionDeath?.Invoke(id, type);
+
+            // Queue Stranger encounter for companion death
+            StrangerEncounterSystem.Instance.QueueScriptedEncounter(ScriptedEncounterType.AfterCompanionDeath);
+            StrangerEncounterSystem.Instance.RecordGameEvent(StrangerContextEvent.CompanionDied);
         }
 
         private string GetLastWords(Companion companion, DeathType type)

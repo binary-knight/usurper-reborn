@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.28.2-alpha";
-    public const string VersionName = "NPCs Feel Alive";
+    public const string Version = "0.29.0-alpha";
+    public const string VersionName = "The Living World";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

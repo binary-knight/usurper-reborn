@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UsurperRemake.Data;
 
 /// <summary>
 /// Dynamic NPC Dialogue Generator
@@ -11,6 +12,9 @@ using System.Linq;
 /// - Memory of past interactions
 /// - Current emotional state
 /// - Context (player HP, wealth, level, etc.)
+///
+/// Now queries the pre-generated NPCDialogueDatabase first for higher-quality lines,
+/// falling back to the original template system if no suitable match is found.
 /// </summary>
 public static class NPCDialogueGenerator
 {
@@ -425,6 +429,11 @@ public static class NPCDialogueGenerator
     {
         if (npc == null || player == null) return "Hello there.";
 
+        // Try pre-generated dialogue database first
+        var dbLine = NPCDialogueDatabase.GetBestLine("greeting", npc, player);
+        if (dbLine != null) return dbLine;
+
+        // Fall back to template system
         // Get relationship level
         int relationshipLevel = GetRelationshipLevel(npc, player);
 
@@ -483,6 +492,11 @@ public static class NPCDialogueGenerator
     {
         if (npc == null || player == null) return "Farewell.";
 
+        // Try pre-generated dialogue database first
+        var dbLine = NPCDialogueDatabase.GetBestLine("farewell", npc, player);
+        if (dbLine != null) return dbLine;
+
+        // Fall back to template system
         int relationshipLevel = GetRelationshipLevel(npc, player);
         string farewell = GetBaseFarewell(relationshipLevel);
 
@@ -508,6 +522,10 @@ public static class NPCDialogueGenerator
     public static string GenerateSmallTalk(NPC npc, Player player)
     {
         if (npc == null) return "Interesting times we live in.";
+
+        // Try pre-generated dialogue database first
+        var dbLine = NPCDialogueDatabase.GetBestLine("smalltalk", npc, player);
+        if (dbLine != null) return dbLine;
 
         // Get archetype-appropriate topics
         var vocab = GetArchetypeVocabulary(npc.Archetype);
@@ -537,6 +555,10 @@ public static class NPCDialogueGenerator
     public static string GenerateReaction(NPC npc, Player player, string eventType)
     {
         if (npc?.Personality == null) return "Interesting.";
+
+        // Try pre-generated dialogue database first
+        var dbLine = NPCDialogueDatabase.GetBestLine("reaction", npc, player, eventType);
+        if (dbLine != null) return dbLine;
 
         return eventType.ToLower() switch
         {

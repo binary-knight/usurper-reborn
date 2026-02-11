@@ -312,13 +312,38 @@ public abstract class BaseLocation
         // Track player actions for Stranger encounter system
         StrangerEncounterSystem.Instance.OnPlayerAction(locationName, currentPlayer);
 
-        // Check for Stranger (Noctura) encounter
-        if (StrangerEncounterSystem.Instance.ShouldTriggerEncounter(locationName, currentPlayer))
+        // Queue level-gated scripted encounters if conditions are met
+        var strangerSys = StrangerEncounterSystem.Instance;
+        if (currentPlayer.Level >= 40 && strangerSys.EncountersHad >= 3 &&
+            !strangerSys.CompletedScriptedEncounters.Contains(ScriptedEncounterType.TheMidgameLesson))
         {
-            var encounter = StrangerEncounterSystem.Instance.GetEncounter(locationName, currentPlayer);
+            strangerSys.QueueScriptedEncounter(ScriptedEncounterType.TheMidgameLesson);
+        }
+
+        int resolvedGods = StoryProgressionSystem.Instance?.OldGodStates?
+            .Count(g => g.Value.Status != GodStatus.Unknown) ?? 0;
+        if (currentPlayer.Level >= 55 && strangerSys.EncountersHad >= 5 && resolvedGods >= 2 &&
+            !strangerSys.CompletedScriptedEncounters.Contains(ScriptedEncounterType.TheRevelation))
+        {
+            strangerSys.QueueScriptedEncounter(ScriptedEncounterType.TheRevelation);
+        }
+
+        // Check for SCRIPTED Stranger encounters first (guaranteed, event-triggered)
+        var scriptedEncounter = StrangerEncounterSystem.Instance.GetPendingScriptedEncounter(locationName, currentPlayer);
+        if (scriptedEncounter != null)
+        {
+            await DisplayScriptedStrangerEncounter(scriptedEncounter);
+            return; // One encounter per visit
+        }
+
+        // Check for random contextual Stranger encounters
+        if (StrangerEncounterSystem.Instance.ShouldTriggerRandomEncounter(locationName, currentPlayer))
+        {
+            var encounter = StrangerEncounterSystem.Instance.GetContextualEncounter(locationName, currentPlayer);
             if (encounter != null)
             {
                 await DisplayStrangerEncounter(encounter);
+                return; // One encounter per visit
             }
         }
 
@@ -336,7 +361,7 @@ public abstract class BaseLocation
     }
 
     /// <summary>
-    /// Display a Stranger (Noctura) encounter
+    /// Display a contextual random Stranger (Noctura) encounter with response tracking
     /// </summary>
     private async Task DisplayStrangerEncounter(StrangerEncounter encounter)
     {
@@ -344,7 +369,7 @@ public abstract class BaseLocation
         terminal.SetColor("dark_magenta");
         terminal.WriteLine("");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          A MYSTERIOUS ENCOUNTER                              ║");
+        terminal.WriteLine("║                          A MYSTERIOUS ENCOUNTER                            ║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -354,43 +379,209 @@ public abstract class BaseLocation
         terminal.WriteLine($"  {encounter.DisguiseData.Description}");
         terminal.WriteLine("");
 
-        await Task.Delay(2000);
+        await Task.Delay(1500);
 
+        // Display dialogue lines with pacing
+        var dialogueLines = encounter.Dialogue.Split('\n');
+        foreach (var line in dialogueLines)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"  {line}");
+            await Task.Delay(800);
+        }
+        terminal.WriteLine("");
+
+        await Task.Delay(500);
+
+        // Display response options from the encounter's ResponseOptions
+        var responseType = StrangerResponseType.Silent;
+        int receptivityChange = 0;
+
+        if (encounter.ResponseOptions != null && encounter.ResponseOptions.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  How do you respond?");
+            terminal.WriteLine("");
+
+            foreach (var opt in encounter.ResponseOptions)
+            {
+                terminal.SetColor("yellow");
+                terminal.Write($"    [{opt.Key}] ");
+                terminal.SetColor("white");
+                terminal.WriteLine(opt.Text);
+            }
+
+            terminal.WriteLine("");
+            var choice = await terminal.GetInput("Your response: ");
+
+            var selectedOpt = encounter.ResponseOptions
+                .FirstOrDefault(o => o.Key.Equals(choice?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (selectedOpt != null)
+            {
+                responseType = selectedOpt.ResponseType;
+                receptivityChange = selectedOpt.ReceptivityChange;
+
+                terminal.WriteLine("");
+                foreach (var replyLine in selectedOpt.StrangerReply)
+                {
+                    terminal.SetColor("magenta");
+                    terminal.WriteLine($"  {replyLine}");
+                    await Task.Delay(800);
+                }
+                terminal.WriteLine("");
+            }
+        }
+        else
+        {
+            // Fallback for encounters without structured response options
+            var options = StrangerEncounterSystem.Instance.GetResponseOptions(encounter, currentPlayer);
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  How do you respond?");
+            terminal.WriteLine("");
+
+            foreach (var (key, text, _) in options)
+            {
+                terminal.SetColor("yellow");
+                terminal.Write($"    [{key}] ");
+                terminal.SetColor("white");
+                terminal.WriteLine(text);
+            }
+
+            terminal.WriteLine("");
+            var choice = await terminal.GetInput("Your response: ");
+
+            var selectedOption = options.FirstOrDefault(o => o.key.Equals(choice, StringComparison.OrdinalIgnoreCase));
+            if (selectedOption.response != null)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("magenta");
+                terminal.WriteLine($"  {selectedOption.response}");
+                terminal.WriteLine("");
+            }
+        }
+
+        // Record the encounter with response tracking
+        StrangerEncounterSystem.Instance.RecordEncounterWithResponse(encounter, responseType, receptivityChange);
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Display a scripted Stranger encounter (guaranteed story beats with full narration)
+    /// </summary>
+    private async Task DisplayScriptedStrangerEncounter(ScriptedStrangerEncounter encounter)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("dark_magenta");
+        terminal.WriteLine("");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+
+        string titlePadded = encounter.Title.PadLeft((78 + encounter.Title.Length) / 2).PadRight(78);
+        terminal.Write("║");
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"  \"{encounter.Dialogue}\"");
+        terminal.Write(titlePadded);
+        terminal.SetColor("dark_magenta");
+        terminal.WriteLine("║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
-        await Task.Delay(2000);
-
-        // Get response options
-        var options = StrangerEncounterSystem.Instance.GetResponseOptions(encounter, currentPlayer);
-
-        terminal.SetColor("cyan");
-        terminal.WriteLine("  How do you respond?");
-        terminal.WriteLine("");
-
-        foreach (var (key, text, _) in options)
+        // Intro narration (atmospheric, gray)
+        foreach (var line in encounter.IntroNarration)
         {
-            terminal.SetColor("yellow");
-            terminal.Write($"    [{key}] ");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {line}");
+            await Task.Delay(1200);
+        }
+        terminal.WriteLine("");
+        await Task.Delay(500);
+
+        // Disguise name
+        var disguiseData = StrangerEncounterSystem.Disguises.GetValueOrDefault(encounter.Disguise);
+        if (disguiseData != null)
+        {
             terminal.SetColor("white");
-            terminal.WriteLine(text);
+            terminal.WriteLine($"  {disguiseData.Name}");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine($"  {disguiseData.Description}");
+            terminal.WriteLine("");
+            await Task.Delay(800);
         }
 
+        // Main dialogue (bright magenta, spoken lines)
+        foreach (var line in encounter.Dialogue)
+        {
+            if (string.IsNullOrEmpty(line))
+            {
+                terminal.WriteLine("");
+                await Task.Delay(400);
+                continue;
+            }
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"  {line}");
+            await Task.Delay(1000);
+        }
         terminal.WriteLine("");
-        var choice = await terminal.GetInput("Your response: ");
+        await Task.Delay(500);
 
-        var selectedOption = options.FirstOrDefault(o => o.key.Equals(choice, StringComparison.OrdinalIgnoreCase));
-        if (selectedOption.response != null)
+        // Response choices
+        var responseType = StrangerResponseType.Silent;
+        int receptivityChange = 0;
+
+        if (encounter.Responses.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  How do you respond?");
+            terminal.WriteLine("");
+
+            foreach (var opt in encounter.Responses)
+            {
+                terminal.SetColor("yellow");
+                terminal.Write($"    [{opt.Key}] ");
+                terminal.SetColor("white");
+                terminal.WriteLine(opt.Text);
+            }
+
+            terminal.WriteLine("");
+            var choice = await terminal.GetInput("Your response: ");
+
+            var selectedOpt = encounter.Responses
+                .FirstOrDefault(o => o.Key.Equals(choice?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (selectedOpt != null)
+            {
+                responseType = selectedOpt.ResponseType;
+                receptivityChange = selectedOpt.ReceptivityChange;
+
+                terminal.WriteLine("");
+                foreach (var replyLine in selectedOpt.StrangerReply)
+                {
+                    terminal.SetColor("magenta");
+                    terminal.WriteLine($"  {replyLine}");
+                    await Task.Delay(1000);
+                }
+                terminal.WriteLine("");
+                await Task.Delay(500);
+            }
+        }
+
+        // Closing narration
+        if (encounter.ClosingNarration.Length > 0)
         {
             terminal.WriteLine("");
-            terminal.SetColor("magenta");
-            terminal.WriteLine($"  {selectedOption.response}");
+            foreach (var line in encounter.ClosingNarration)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {line}");
+                await Task.Delay(1200);
+            }
             terminal.WriteLine("");
         }
 
-        // Record the encounter
-        StrangerEncounterSystem.Instance.RecordEncounter(encounter);
+        // Record completion
+        StrangerEncounterSystem.Instance.CompleteScriptedEncounter(
+            encounter.Type, responseType, receptivityChange);
 
         await terminal.PressAnyKey();
     }
@@ -2169,7 +2360,7 @@ public abstract class BaseLocation
         terminal.WriteLine("");
 
         // List NPCs with numbers
-        for (int i = 0; i < Math.Min(allNPCs.Count, 10); i++)
+        for (int i = 0; i < allNPCs.Count; i++)
         {
             var npc = allNPCs[i];
 
@@ -2201,12 +2392,6 @@ public abstract class BaseLocation
             terminal.WriteLine("]");
         }
 
-        if (allNPCs.Count > 10)
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine($"  ... and {allNPCs.Count - 10} others");
-        }
-
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine("  [0] Never mind");
@@ -2214,7 +2399,7 @@ public abstract class BaseLocation
 
         string choice = await terminal.GetInput("Talk to who? ");
 
-        if (int.TryParse(choice, out int targetIndex) && targetIndex >= 1 && targetIndex <= Math.Min(allNPCs.Count, 10))
+        if (int.TryParse(choice, out int targetIndex) && targetIndex >= 1 && targetIndex <= allNPCs.Count)
         {
             var npc = allNPCs[targetIndex - 1];
             await InteractWithNPC(npc);

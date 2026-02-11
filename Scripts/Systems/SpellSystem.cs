@@ -335,6 +335,22 @@ public static class SpellSystem
     }
 
     /// <summary>
+    /// Convert a spell level to a quickbar slot ID (e.g. 3 -> "spell:3")
+    /// </summary>
+    public static string GetQuickbarId(int spellLevel) => $"spell:{spellLevel}";
+
+    /// <summary>
+    /// Parse a quickbar ID back to a spell level. Returns null if not a spell ID.
+    /// </summary>
+    public static int? ParseQuickbarSpellLevel(string? quickbarId)
+    {
+        if (quickbarId != null && quickbarId.StartsWith("spell:") &&
+            int.TryParse(quickbarId.AsSpan(6), out int level))
+            return level;
+        return null;
+    }
+
+    /// <summary>
     /// Get ALL spells for a class (for learning menu - shows all spells regardless of learned status)
     /// </summary>
     public static List<SpellInfo> GetAllSpellsForClass(CharacterClass characterClass)

@@ -351,6 +351,7 @@ namespace UsurperRemake.Systems
                             saves.Add(new SaveInfo
                             {
                                 PlayerName = saveData.Player.Name2 ?? saveData.Player.Name1,
+                                ClassName = saveData.Player.Class.ToString(),
                                 SaveTime = saveData.SaveTime,
                                 Level = saveData.Player.Level,
                                 CurrentDay = saveData.CurrentDay,

@@ -403,6 +403,9 @@ public class LevelMasterLocation : BaseLocation
                         $"{displayName} has reached level {currentPlayer.Level}!", "combat");
             }
 
+            // Auto-add newly unlocked spells/abilities to empty quickbar slots
+            GameEngine.QuickbarAddNewSkills(currentPlayer);
+
             // Display level up celebration with training points earned
             await DisplayLevelUpCelebration(levelsRaised, startLevel, totalTrainingPoints);
 

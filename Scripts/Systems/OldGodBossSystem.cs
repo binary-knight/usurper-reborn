@@ -546,20 +546,69 @@ namespace UsurperRemake.Systems
 
         private void ApplyNocturaModifiers(StoryProgressionSystem story, TerminalEmulator terminal)
         {
-            // Aggressive approach
-            if (story.HasStoryFlag("noctura_combat_start") && !story.HasStoryFlag("noctura_ally"))
-            {
-                activeCombatModifiers.ApproachType = "aggressive";
-                activeCombatModifiers.DamageMultiplier = 1.10;
-                // She uses shadows against you
-                activeCombatModifiers.CriticalChance = 0.03; // Harder to land crits
-                terminal.WriteLine("  The shadows hide her movements. (+10% damage, but harder to crit)", "dark_magenta");
-            }
+            int receptivity = StrangerEncounterSystem.Instance.Receptivity;
+
             // If allied (shouldn't reach combat, but just in case)
-            else if (story.HasStoryFlag("noctura_ally"))
+            if (story.HasStoryFlag("noctura_ally"))
             {
                 activeCombatModifiers.ApproachType = "allied";
                 // No combat should occur
+                return;
+            }
+
+            // Teaching fight: mid receptivity or last chance path
+            if (story.HasStoryFlag("noctura_teaching_fight"))
+            {
+                activeCombatModifiers.ApproachType = "teaching";
+                activeCombatModifiers.BossDamageMultiplier = 0.50; // 50% boss power
+                activeCombatModifiers.BossDefenseMultiplier = 0.70;
+                activeCombatModifiers.DamageMultiplier = 1.15;
+                terminal.WriteLine("  Noctura holds back. This is a lesson, not a death sentence.", "dark_magenta");
+                terminal.WriteLine("  (-50% boss damage, -30% boss defense, +15% your damage)", "cyan");
+                return;
+            }
+
+            // Enraged: negative receptivity, player rejected every teaching
+            if (story.HasStoryFlag("noctura_enraged") || receptivity < 0)
+            {
+                activeCombatModifiers.ApproachType = "enraged";
+                activeCombatModifiers.BossDamageMultiplier = 1.25;
+                activeCombatModifiers.CriticalChance = 0.03; // Harder to land crits
+                terminal.WriteLine("  Noctura is ENRAGED. The shadows boil with fury.", "dark_magenta");
+                terminal.WriteLine("  (+25% boss damage, harder to crit)", "red");
+                return;
+            }
+
+            // Reluctant fight: receptivity 25+ but took the fight path anyway
+            if (receptivity >= 25)
+            {
+                activeCombatModifiers.ApproachType = "reluctant";
+                activeCombatModifiers.BossDamageMultiplier = 0.70;
+                activeCombatModifiers.BossDefenseMultiplier = 0.85;
+                activeCombatModifiers.DamageMultiplier = 1.10;
+                terminal.WriteLine("  Noctura fights reluctantly. She hoped you'd understand.", "dark_magenta");
+                terminal.WriteLine("  (-30% boss damage, -15% boss defense, +10% your damage)", "cyan");
+                return;
+            }
+
+            // Standard fight: low receptivity (0-24), never engaged with teachings
+            activeCombatModifiers.ApproachType = "aggressive";
+            activeCombatModifiers.DamageMultiplier = 1.10;
+            activeCombatModifiers.CriticalChance = 0.03; // Harder to land crits
+            terminal.WriteLine("  The shadows hide her movements. (+10% damage, but harder to crit)", "dark_magenta");
+        }
+
+        /// <summary>
+        /// Queue a Stranger scripted encounter after the first Old God resolution.
+        /// </summary>
+        private void QueueStrangerOldGodEncounter(StrangerContextEvent eventType)
+        {
+            StrangerEncounterSystem.Instance.RecordGameEvent(eventType);
+
+            // Only queue AfterFirstOldGod on the very first Old God encounter
+            if (!StrangerEncounterSystem.Instance.CompletedScriptedEncounters.Contains(ScriptedEncounterType.AfterFirstOldGod))
+            {
+                StrangerEncounterSystem.Instance.QueueScriptedEncounter(ScriptedEncounterType.AfterFirstOldGod);
             }
         }
 
@@ -1328,6 +1377,9 @@ namespace UsurperRemake.Systems
 
             OnBossSaved?.Invoke(boss.Type);
 
+            // Queue Stranger encounter after first Old God
+            QueueStrangerOldGodEncounter(StrangerContextEvent.OldGodSaved);
+
             await terminal.GetInputAsync("  Press Enter to continue...");
 
             return new BossEncounterResult
@@ -1385,6 +1437,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  (+{goldReward:N0} Gold)", "yellow");
 
             OnBossDefeated?.Invoke(boss.Type);
+
+            // Queue Stranger encounter after first Old God
+            QueueStrangerOldGodEncounter(StrangerContextEvent.OldGodDefeated);
 
             await terminal.GetInputAsync("  Press Enter to continue...");
 
