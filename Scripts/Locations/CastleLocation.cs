@@ -146,6 +146,8 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
         }
 
+        ShowNPCsInLocation();
+
         ShowCastleExteriorMenu();
     }
 

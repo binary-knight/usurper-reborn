@@ -140,6 +140,8 @@ public class LevelMasterLocation : BaseLocation
         }
         terminal.WriteLine("");
 
+        ShowNPCsInLocation();
+
         // Show XP status
         DisplayExperienceStatus();
 

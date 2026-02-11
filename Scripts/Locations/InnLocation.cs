@@ -40,7 +40,7 @@ public class InnLocation : BaseLocation
             "Challenge Seth Able",          // Fight Seth Able
             "Talk to patrons",              // Social interaction  
             "Play drinking game",           // Drinking competition
-            "Listen to rumors",             // Information gathering
+            "Listen to gossip",             // Information gathering (real simulation events)
             "Check bulletin board",         // News and messages
             "Rest at table",                // Minor healing
             "Order food (10 gold)"          // Stamina boost
@@ -359,7 +359,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.Write("Listen to rumors          ");
+        terminal.Write("Listen to gossip          ");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
@@ -1635,27 +1635,74 @@ public class InnLocation : BaseLocation
     private async Task ListenToRumors()
     {
         terminal.ClearScreen();
-        terminal.SetColor("magenta");
-        terminal.WriteLine("Tavern Rumors");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("Tavern Gossip");
         terminal.WriteLine("=============");
         terminal.WriteLine("");
-        
-        var rumors = new[]
-        {
-            "They say the King is planning to increase the royal guard...",
-            "Word is that someone found a magical sword in the dungeons last week.",
-            "The priests at the temple are worried about strange omens.",
-            "A new monster has been spotted in the lower dungeon levels.",
-            "The weapon shop is expecting a shipment of rare items soon."
-        };
-        
-        terminal.SetColor("white");
-        for (int i = 0; i < 3; i++)
-        {
-            terminal.WriteLine($"- {rumors[GD.RandRange(0, rumors.Length - 1)]}");
-        }
-        
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("You lean back and listen to the patrons talking...");
         terminal.WriteLine("");
+
+        var gossip = NewsSystem.Instance?.GetRecentGossip(4) ?? new List<string>();
+
+        if (gossip.Count > 0)
+        {
+            var gossipPrefixes = new[]
+            {
+                "\"Did you hear?",
+                "\"Word around town is that",
+                "\"I heard from a friend that",
+                "\"Someone was saying",
+                "\"You won't believe this, but",
+                "\"The talk of the town is that",
+                "\"Between you and me,",
+            };
+
+            foreach (var item in gossip)
+            {
+                terminal.SetColor("white");
+                // Strip timestamp prefix [HH:mm] if present
+                var text = item.TrimStart();
+                if (text.Length > 7 && text[0] == '[' && text[6] == ']')
+                    text = text.Substring(7).TrimStart();
+
+                // Strip leading emoji/symbol characters for cleaner dialogue
+                while (text.Length > 0 && !char.IsLetterOrDigit(text[0]) && text[0] != '"')
+                    text = text.Substring(1).TrimStart();
+
+                if (string.IsNullOrWhiteSpace(text)) continue;
+
+                var prefix = gossipPrefixes[GD.RandRange(0, gossipPrefixes.Length - 1)];
+                terminal.Write($"  {prefix} ");
+                terminal.SetColor("bright_white");
+                // Lowercase first char for natural dialogue flow
+                if (text.Length > 0 && char.IsUpper(text[0]))
+                    text = char.ToLower(text[0]) + text.Substring(1);
+                terminal.WriteLine($"{text}\"");
+                terminal.WriteLine("");
+            }
+        }
+        else
+        {
+            // Fallback to static rumors when no simulation events exist yet
+            var staticRumors = new[]
+            {
+                "\"They say the King is planning to increase the royal guard...\"",
+                "\"Word is that someone found a magical sword in the dungeons last week.\"",
+                "\"The priests at the temple are worried about strange omens.\"",
+                "\"A new monster has been spotted in the lower dungeon levels.\"",
+                "\"The weapon shop is expecting a shipment of rare items soon.\"",
+            };
+
+            terminal.SetColor("white");
+            for (int i = 0; i < 3; i++)
+            {
+                terminal.WriteLine($"  {staticRumors[GD.RandRange(0, staticRumors.Length - 1)]}");
+                terminal.WriteLine("");
+            }
+        }
+
         await terminal.PressAnyKey();
     }
     

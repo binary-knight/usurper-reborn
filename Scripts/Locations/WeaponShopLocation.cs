@@ -63,6 +63,8 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
+        ShowNPCsInLocation();
+
         if (currentCategory.HasValue)
         {
             ShowCategoryItems(currentCategory.Value);
@@ -79,13 +81,8 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine($"Weaponstore, run by {shopkeeperName} the troll");
         terminal.WriteLine("");
 
-        terminal.SetColor("white");
-        terminal.WriteLine("A fat troll stumbles out from a back room and greets you.");
-        terminal.Write("You realize this must be ");
-        terminal.SetColor("cyan");
-        terminal.Write(shopkeeperName);
-        terminal.SetColor("white");
-        terminal.WriteLine(", the owner.");
+        ShowShopkeeperMood(shopkeeperName,
+            "A fat troll stumbles out from a back room and greets you.");
         terminal.WriteLine("");
 
         terminal.Write("You have ");

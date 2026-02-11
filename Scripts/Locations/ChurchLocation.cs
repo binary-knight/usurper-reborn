@@ -187,7 +187,9 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine($"{bishopName} welcomes you to this sacred place.");
             }
             terminal.WriteLine("");
-            
+
+            ShowNPCsInLocation();
+
             // Menu options
             terminal.SetColor("bright_green");
             terminal.WriteLine("Church Services Available:");

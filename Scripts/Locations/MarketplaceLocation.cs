@@ -40,6 +40,8 @@ public class MarketplaceLocation : BaseLocation
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
+        ShowNPCsInLocation();
+
         terminal.SetColor("cyan");
         terminal.WriteLine("Market Actions:");
         terminal.WriteLine("");

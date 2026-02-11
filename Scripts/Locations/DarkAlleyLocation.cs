@@ -130,6 +130,8 @@ namespace UsurperRemake.Locations
             }
             terminal.WriteLine("");
 
+            ShowNPCsInLocation();
+
             terminal.SetColor("cyan");
             terminal.WriteLine("Shady establishments:");
             terminal.WriteLine("");

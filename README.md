@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.28.0** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.28.2** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,42 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.28.2 - NPC Visibility Fix
+
+**Bug Fixes:**
+- NPCs now visible in all major locations (Weapon Shop, Armor Shop, Healer, Magic Shop, Dark Alley, Church, Marketplace, Level Master, Castle). Previously the world sim moved NPCs to these locations but players never saw them.
+- Removed overly strict "has met" filter that hid most NPCs from location presence display.
+- Fixed location string mismatches (Castle, Love Street, Home, Temple) that prevented NPC lookups from matching.
+
+### Completed in v0.28.1 - NPCs Feel Alive
+
+**Location Presence:**
+- When entering any location, you now see which NPCs are currently there and what they're doing (e.g., "examining a blade on the rack", "deep in prayer at the altar").
+- Activity descriptions come from the live world simulation. Only NPCs you've met are shown.
+- Fallback flavor text per location type when no recent simulation activity exists.
+
+**Gossip System:**
+- Inn's "Listen to rumors" replaced with "Listen to gossip" drawing from real simulation events — marriages, divorces, births, deaths, affairs, scandals.
+- Overheard snippets wrapped in conversational flavor. Falls back to classic static rumors when the simulation hasn't generated enough events.
+
+**Mood-Aware Shopkeeper Dialogue:**
+- Shopkeepers greet you based on their emotional state and how they feel about you. Grieving, angry, joyful, fearful — each has unique dialogue.
+- Mood subtly affects transaction prices (±5-15%), rewarding good relationships.
+- Integrated into Tully (Weapon Shop), Reese (Armor Shop), and Jadu (Healer).
+
+**NPC-Initiated Interactions:**
+- NPCs with strong feelings about you occasionally approach unprompted (5% chance per turn).
+- Friendly NPCs may gift gold, share tips, offer compliments, or cast minor healing. Hostile NPCs may threaten or intimidate.
+- Cooldown system (10 turns) prevents spam. Story NPCs prioritized.
+
+**Website:**
+- GitHub Sponsors section on the landing page with auto-updating avatars and tier info.
+- Marketing copy refresh for README and website landing page.
+- New ARCHITECTURE.md document for developers.
+
+**Housekeeping:**
+- Removed 115 legacy Pascal reference files from `PascalReference/` directory.
 
 ### Completed in v0.28.0 - PvP Arena & Living World
 
@@ -654,7 +690,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.28.0)
+### Known Issues (Alpha v0.28.2)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -669,4 +705,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.28.0 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.28.2 — The world is running. [Watch it live.](https://usurper-reborn.net)

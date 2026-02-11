@@ -76,6 +76,8 @@ public class ArmorShopLocation : BaseLocation
         terminal.WriteLine($"Run by {shopkeeperName} the elf");
         terminal.WriteLine("");
 
+        ShowNPCsInLocation();
+
         if (currentSlotCategory.HasValue)
         {
             // Show items for the selected slot
@@ -90,12 +92,8 @@ public class ArmorShopLocation : BaseLocation
 
     private void ShowMainMenu()
     {
-        terminal.SetColor("white");
-        terminal.WriteLine("As you enter the store you notice a strange but appealing smell.");
-        terminal.SetColor("bright_green");
-        terminal.Write(shopkeeperName);
-        terminal.SetColor("white");
-        terminal.WriteLine(" appears with a smile: \"What armor piece interests you today?\"");
+        ShowShopkeeperMood(shopkeeperName,
+            $"{shopkeeperName} appears with a smile: \"What armor piece interests you today?\"");
         terminal.WriteLine("");
 
         terminal.SetColor("white");

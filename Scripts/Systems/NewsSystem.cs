@@ -262,6 +262,42 @@ public partial class NewsSystem
         return GetTodaysNews();
     }
 
+    // Keywords that indicate gossip-worthy NPC events (marriages, deaths, affairs, births, etc.)
+    private static readonly string[] GossipKeywords = new[]
+    {
+        "married", "divorced", "expecting a child", "proud parents", "born",
+        "passed away", "soul moves on", "come of age", "joined the realm",
+        "affair", "Scandal", "polyamorous", "attacked you in the Arena",
+        "Level", "birthday", "celebrates their"
+    };
+
+    /// <summary>
+    /// Get recent gossip-worthy news items (marriages, deaths, affairs, births, level-ups, etc.)
+    /// Returns items from the in-memory cache, filtered to interesting NPC events.
+    /// </summary>
+    public List<string> GetRecentGossip(int maxEntries = 4)
+    {
+        var allNews = GetTodaysNews();
+
+        var gossip = allNews
+            .Where(line => GossipKeywords.Any(kw => line.Contains(kw, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        // If not enough from today's cache, try the full file
+        if (gossip.Count < maxEntries)
+        {
+            var fileNews = ReadNews();
+            var fileGossip = fileNews
+                .Where(line => GossipKeywords.Any(kw => line.Contains(kw, StringComparison.OrdinalIgnoreCase)))
+                .Where(line => !gossip.Contains(line))
+                .ToList();
+            gossip.AddRange(fileGossip);
+        }
+
+        // Return the most recent entries
+        return gossip.TakeLast(maxEntries).ToList();
+    }
+
     /// <summary>
     /// Daily maintenance - clear old news, keep file manageable
     /// </summary>

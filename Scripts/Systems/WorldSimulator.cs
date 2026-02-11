@@ -889,45 +889,61 @@ public class WorldSimulator
         {
             case "dungeon":
                 NPCExploreDungeon(npc);
+                npc.CurrentActivity = "exploring the dungeon depths";
                 break;
             case "shop":
                 NPCGoShopping(npc);
+                npc.CurrentActivity = npc.CurrentLocation == "Weapon Shop"
+                    ? "examining a blade on the rack"
+                    : "browsing the armor on display";
                 break;
             case "train":
                 NPCTrainAtGym(npc);
+                npc.CurrentActivity = "training with the practice dummies";
                 break;
             case "levelup":
                 NPCVisitMaster(npc);
+                npc.CurrentActivity = "consulting with the Level Master";
                 break;
             case "heal":
                 NPCVisitHealer(npc);
+                npc.CurrentActivity = "browsing the healing potions";
                 break;
             case "move":
                 MoveNPCToRandomLocation(npc);
+                npc.CurrentActivity = "passing through";
                 break;
             case "team_recruit":
                 NPCTeamRecruitment(npc);
+                npc.CurrentActivity = "looking for recruits";
                 break;
             case "team_dungeon":
                 NPCTeamDungeonRun(npc);
+                npc.CurrentActivity = "rallying the team for a dungeon run";
                 break;
             case "love_street":
                 NPCVisitLoveStreet(npc);
+                npc.CurrentActivity = "enjoying the evening company";
                 break;
             case "temple":
                 NPCVisitTemple(npc);
+                npc.CurrentActivity = "praying quietly";
                 break;
             case "bank":
                 NPCVisitBank(npc);
+                npc.CurrentActivity = "counting coins at the counter";
                 break;
             case "marketplace":
                 NPCVisitMarketplace(npc);
+                npc.CurrentActivity = "haggling with a merchant";
                 break;
             case "castle":
                 NPCVisitCastle(npc);
+                npc.CurrentActivity = "attending to court business";
                 break;
             case "go_home":
                 NPCGoHome(npc);
+                npc.CurrentActivity = "heading home for the day";
                 break;
         }
     }

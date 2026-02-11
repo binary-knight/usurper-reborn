@@ -79,10 +79,11 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
-        terminal.SetColor("gray");
-        terminal.WriteLine($"{Manager} The Fat is sitting at his desk, reading a book.");
-        terminal.WriteLine("He is wearing a monks robe and a golden ring.");
+        ShowShopkeeperMood(Manager,
+            $"{Manager} The Fat is sitting at his desk, reading a book.");
         terminal.WriteLine("");
+
+        ShowNPCsInLocation();
 
         ShowMenu();
         ShowPlayerHealthStatus();

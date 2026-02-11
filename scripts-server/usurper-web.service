@@ -19,6 +19,7 @@ After=network.target
 Type=simple
 User=usurper
 WorkingDirectory=/opt/usurper/web
+EnvironmentFile=-/opt/usurper/web/.env
 ExecStart=/usr/bin/node ssh-proxy.js
 Restart=on-failure
 RestartSec=5

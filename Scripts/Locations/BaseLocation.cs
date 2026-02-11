@@ -22,9 +22,13 @@ public abstract class BaseLocation
     
     // Pascal compatibility
     public bool RefreshRequired { get; set; } = true;
-    
+
     protected TerminalEmulator terminal;
     protected Character currentPlayer;
+
+    // NPC approach tracking - prevents spam from same NPC
+    private static readonly Dictionary<string, int> _lastApproachedTurn = new();
+    private const int MinTurnsBetweenApproaches = 10;
     
     public BaseLocation(GameLocation locationId, string name, string description)
     {
@@ -261,6 +265,12 @@ public abstract class BaseLocation
 
                 // Apply poison damage each turn
                 await ApplyPoisonDamage();
+
+                // 5% chance per turn: an NPC with strong opinions approaches the player
+                if (!exitLocation && currentPlayer.IsAlive && _npcRandom.Next(100) < 5)
+                {
+                    await TryNPCApproach();
+                }
 
                 // Run world simulation every 5 turns
                 if (currentPlayer.TurnCount % 5 == 0)
@@ -630,12 +640,16 @@ public abstract class BaseLocation
             GameLocation.MainStreet => "Main Street",
             GameLocation.TheInn => "Inn",
             GameLocation.Church => "Temple",
+            GameLocation.Temple => "Temple",
             GameLocation.WeaponShop => "Weapon Shop",
             GameLocation.ArmorShop => "Armor Shop",
             GameLocation.MagicShop => "Magic Shop",
             GameLocation.Marketplace => "Market",
             GameLocation.Steroids => "Level Master",
             GameLocation.DarkAlley => "Dark Alley",
+            GameLocation.Castle => "Castle",
+            GameLocation.LoveStreet => "Love Street",
+            GameLocation.Home => "Home",
             GameLocation.Orbs => "Inn",
             GameLocation.BobsBeer => "Inn",
             GameLocation.Bank => "Bank",
@@ -770,7 +784,9 @@ public abstract class BaseLocation
     }
 
     /// <summary>
-    /// Show NPCs in this location - dynamically fetched from NPCSpawnSystem
+    /// Show NPCs in this location with contextual activity flavor text.
+    /// Shows up to 3 NPCs with activity descriptions that reflect what they're doing.
+    /// Only shows NPCs the player has met (has memory of) unless they're static location NPCs.
     /// </summary>
     protected virtual void ShowNPCsInLocation()
     {
@@ -785,42 +801,138 @@ public abstract class BaseLocation
                 allNPCs.Add(npc);
         }
 
-        if (allNPCs.Count > 0)
+        // Filter to alive NPCs at this location
+        var visibleNPCs = allNPCs.Where(npc => npc.IsAlive && !npc.IsDead).ToList();
+
+        if (visibleNPCs.Count > 0)
         {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("People here:");
+            terminal.SetColor("gray");
+            terminal.WriteLine("You notice:");
 
-            foreach (var npc in allNPCs.Take(8)) // Limit display to 8 NPCs
+            foreach (var npc in visibleNPCs.Take(3))
             {
-                if (npc.IsAlive)
-                {
-                    // Color based on alignment
-                    if (npc.Darkness > npc.Chivalry + 200)
-                        terminal.SetColor("red");
-                    else if (npc.Chivalry > npc.Darkness + 200)
-                        terminal.SetColor("bright_green");
-                    else
-                        terminal.SetColor("cyan");
+                // Color based on alignment
+                if (npc.Darkness > npc.Chivalry + 200)
+                    terminal.SetColor("red");
+                else if (npc.Chivalry > npc.Darkness + 200)
+                    terminal.SetColor("bright_green");
+                else
+                    terminal.SetColor("cyan");
 
-                    var alignment = GetAlignmentDisplay(npc);
-                    var classStr = npc.Class.ToString();
-                    var shout = GetNPCShout(npc);
+                // Use CurrentActivity if set, otherwise location-contextual fallback
+                var activity = !string.IsNullOrEmpty(npc.CurrentActivity)
+                    ? npc.CurrentActivity
+                    : GetLocationContextActivity(npc);
 
-                    // Show NPC with their current action/shout
-                    terminal.WriteLine($"  {npc.Name2} the Lv{npc.Level} {classStr} {alignment} - {shout}");
-                }
+                terminal.WriteLine($"  {npc.Name2} is {activity}.");
             }
 
-            if (allNPCs.Count > 8)
+            // Show count of other NPCs not displayed
+            var otherCount = allNPCs.Count(n => n.IsAlive) - visibleNPCs.Take(3).Count();
+            if (otherCount > 0)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  ... and {allNPCs.Count - 8} others");
+                terminal.WriteLine($"  ... and {otherCount} other{(otherCount == 1 ? "" : "s")} going about their business.");
             }
 
             terminal.WriteLine("");
         }
     }
-    
+
+    /// <summary>
+    /// Get a location-contextual activity string for an NPC whose CurrentActivity isn't set.
+    /// Returns flavor text appropriate to where the NPC currently is.
+    /// </summary>
+    protected virtual string GetLocationContextActivity(NPC npc)
+    {
+        var location = LocationId;
+        return location switch
+        {
+            GameLocation.TheInn or GameLocation.BobsBeer => _npcRandom.Next(3) switch
+            {
+                0 => "nursing a drink at the bar",
+                1 => "chatting with the other patrons",
+                _ => "sitting alone at a corner table"
+            },
+            GameLocation.Church => _npcRandom.Next(3) switch
+            {
+                0 => "praying quietly",
+                1 => "lighting a candle at the altar",
+                _ => "speaking with one of the priests"
+            },
+            GameLocation.WeaponShop => _npcRandom.Next(3) switch
+            {
+                0 => "examining a blade on the wall",
+                1 => "testing the weight of a mace",
+                _ => "haggling over prices"
+            },
+            GameLocation.ArmorShop => _npcRandom.Next(3) switch
+            {
+                0 => "trying on a pair of gauntlets",
+                1 => "inspecting a shield",
+                _ => "admiring a suit of chainmail"
+            },
+            GameLocation.MagicShop => _npcRandom.Next(3) switch
+            {
+                0 => "studying a scroll with interest",
+                1 => "peering into a crystal ball",
+                _ => "sniffing a suspicious potion"
+            },
+            GameLocation.Marketplace => _npcRandom.Next(3) switch
+            {
+                0 => "haggling with a merchant",
+                1 => "browsing the market stalls",
+                _ => "comparing prices"
+            },
+            GameLocation.Healer => _npcRandom.Next(2) switch
+            {
+                0 => "browsing the healing potions",
+                _ => "waiting to see the healer"
+            },
+            GameLocation.MainStreet => _npcRandom.Next(4) switch
+            {
+                0 => "strolling down the street",
+                1 => "leaning against a wall, watching passers-by",
+                2 => "talking with a friend",
+                _ => "going about their business"
+            },
+            GameLocation.DarkAlley => _npcRandom.Next(3) switch
+            {
+                0 => "lurking in the shadows",
+                1 => "whispering to a hooded figure",
+                _ => "keeping a watchful eye on the alley"
+            },
+            GameLocation.Castle => _npcRandom.Next(3) switch
+            {
+                0 => "attending to court business",
+                1 => "standing guard near the throne room",
+                _ => "speaking with a courtier"
+            },
+            _ => GetNPCShout(npc) // Fallback to the old system
+        };
+    }
+
+    /// <summary>
+    /// Show a mood-aware shopkeeper greeting line. Looks up the NPC by name and displays
+    /// their mood prefix based on emotional state and impression of the player.
+    /// Falls back to a generic greeting if the NPC isn't found.
+    /// </summary>
+    protected void ShowShopkeeperMood(string shopkeeperName, string fallbackGreeting)
+    {
+        var npc = NPCSpawnSystem.Instance?.GetNPCByName(shopkeeperName);
+        if (npc != null && currentPlayer != null)
+        {
+            var moodText = npc.GetMoodPrefix(currentPlayer);
+            terminal.SetColor("gray");
+            terminal.WriteLine(moodText);
+        }
+        else
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine(fallbackGreeting);
+        }
+    }
+
     /// <summary>
     /// Show location-specific actions
     /// </summary>
@@ -3744,4 +3856,184 @@ public abstract class BaseLocation
     {
         // simply break – actual navigation handled by LocationManager
     }
-} 
+
+    /// <summary>
+    /// An NPC with strong feelings about the player may approach them.
+    /// Positive impression → friendly interaction (gift, info, compliment).
+    /// Negative impression → confrontation (threat, warning).
+    /// Tracked per-NPC to prevent spam (minimum 10 turns between approaches from same NPC).
+    /// </summary>
+    protected virtual async Task TryNPCApproach()
+    {
+        if (currentPlayer == null || terminal == null) return;
+
+        var npcsHere = GetLiveNPCsAtLocation();
+        if (npcsHere.Count == 0) return;
+
+        var playerName = currentPlayer.Name2 ?? "";
+        var turnCount = currentPlayer.TurnCount;
+
+        // Find NPCs with strong impressions (|impression| > 0.5)
+        // Prioritize story NPCs and companions
+        var candidates = npcsHere
+            .Where(npc => npc.IsAlive && !npc.IsDead && npc.Memory != null)
+            .Select(npc => new
+            {
+                NPC = npc,
+                Impression = npc.Memory.GetCharacterImpression(playerName),
+                IsStory = npc.IsStoryNPC
+            })
+            .Where(c => Math.Abs(c.Impression) > 0.5f)
+            .OrderByDescending(c => c.IsStory)           // Story NPCs first
+            .ThenByDescending(c => Math.Abs(c.Impression)) // Strongest feelings first
+            .ToList();
+
+        if (candidates.Count == 0) return;
+
+        // Check cooldown for each candidate
+        foreach (var candidate in candidates)
+        {
+            var npcKey = candidate.NPC.Name2;
+            if (_lastApproachedTurn.TryGetValue(npcKey, out var lastTurn))
+            {
+                if (turnCount - lastTurn < MinTurnsBetweenApproaches)
+                    continue; // Too soon
+            }
+
+            // This NPC approaches!
+            _lastApproachedTurn[npcKey] = turnCount;
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("─────────────────────────────────────────");
+
+            if (candidate.Impression > 0.5f)
+            {
+                await ShowFriendlyApproach(candidate.NPC);
+            }
+            else
+            {
+                await ShowHostileApproach(candidate.NPC);
+            }
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("─────────────────────────────────────────");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return; // Only one approach per turn
+        }
+    }
+
+    private async Task ShowFriendlyApproach(NPC npc)
+    {
+        var random = _npcRandom;
+        var approachType = random.Next(4);
+
+        switch (approachType)
+        {
+            case 0: // Gift
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"{npc.Name2} approaches you.");
+                terminal.SetColor("white");
+                terminal.WriteLine($"\"I never thanked you properly. Take this - it's not much, but...\"");
+
+                // Small gold gift based on NPC level
+                var giftGold = (int)(npc.Level * (5 + random.Next(10)));
+                currentPlayer.Gold += giftGold;
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  (Received {giftGold} gold)");
+                break;
+
+            case 1: // Information
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"{npc.Name2} catches your eye and walks over.");
+                terminal.SetColor("white");
+                var tips = new[]
+                {
+                    "\"I heard there are powerful weapons hidden on the deeper dungeon floors. Be careful down there.\"",
+                    "\"A word of advice - the healer offers better prices if you buy in bulk.\"",
+                    "\"I've been training at the gym lately. You should try it - the results are worth it.\"",
+                    "\"The temple priests have been acting strange lately. Something is troubling them.\"",
+                    "\"Keep an eye on the marketplace. Rare goods come through every now and then.\"",
+                };
+                terminal.WriteLine(tips[random.Next(tips.Length)]);
+                break;
+
+            case 2: // Compliment
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"{npc.Name2} smiles as you pass by.");
+                terminal.SetColor("white");
+                var compliments = new[]
+                {
+                    $"\"Good to see you, friend. This town's a better place with you in it.\"",
+                    $"\"I've heard stories about your adventures. Impressive stuff.\"",
+                    $"\"You know, people around here look up to you. Keep it up.\"",
+                    $"\"I was just telling someone about you the other day. All good things, of course.\"",
+                };
+                terminal.WriteLine(compliments[random.Next(compliments.Length)]);
+                break;
+
+            default: // Healing potion gift
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"{npc.Name2} presses something into your hand.");
+                terminal.SetColor("white");
+                terminal.WriteLine($"\"You look like you could use this. Stay safe out there.\"");
+
+                var healAmount = Math.Min(currentPlayer.MaxHP / 5, currentPlayer.MaxHP - currentPlayer.HP);
+                if (healAmount > 0)
+                {
+                    currentPlayer.HP += healAmount;
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  (Restored {healAmount} HP)");
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("  (You're already in good health.)");
+                }
+                break;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task ShowHostileApproach(NPC npc)
+    {
+        var random = _npcRandom;
+        var approachType = random.Next(3);
+
+        switch (approachType)
+        {
+            case 0: // Threat
+                terminal.SetColor("red");
+                terminal.WriteLine($"{npc.Name2} blocks your path.");
+                terminal.SetColor("white");
+                var threats = new[]
+                {
+                    $"\"I know what you did. Stay away from me and mine, or next time we won't be talking.\"",
+                    $"\"You've got a lot of nerve showing your face around here.\"",
+                    $"\"Watch your back. Not everyone around here is as forgiving as I am.\"",
+                };
+                terminal.WriteLine(threats[random.Next(threats.Length)]);
+                break;
+
+            case 1: // Warning
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"{npc.Name2} catches your arm as you pass.");
+                terminal.SetColor("white");
+                terminal.WriteLine("\"People are talking about you. And not in a good way. You might want to lay low.\"");
+                break;
+
+            default: // Cold shoulder with intimidation
+                terminal.SetColor("red");
+                terminal.WriteLine($"{npc.Name2} stares you down from across the room.");
+                terminal.SetColor("white");
+                terminal.WriteLine("Their hand rests pointedly on the pommel of their weapon.");
+                terminal.SetColor("gray");
+                terminal.WriteLine("The message is clear: you're not welcome here.");
+                break;
+        }
+
+        await Task.CompletedTask;
+    }
+}

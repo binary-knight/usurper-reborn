@@ -3,6 +3,7 @@
 // Serves /api/stats endpoint with live game statistics
 
 const http = require('http');
+const https = require('https');
 const { Server } = require('ws');
 const { Client } = require('ssh2');
 
@@ -21,6 +22,8 @@ const SSH_PASS = 'play';
 const DB_PATH = '/var/usurper/usurper_online.db';
 const CACHE_TTL = 30000; // 30 seconds
 const FEED_POLL_MS = 5000; // SSE feed polls DB every 5 seconds
+const GITHUB_PAT = process.env.GITHUB_PAT || '';
+const SPONSORS_CACHE_TTL = 3600000; // 1 hour
 
 const CLASS_NAMES = {
   0: 'Alchemist', 1: 'Assassin', 2: 'Barbarian', 3: 'Bard',
@@ -46,6 +49,97 @@ if (Database) {
   } catch (err) {
     console.error(`[usurper-web] Database not available: ${err.message}`);
   }
+}
+
+// --- Sponsors Cache ---
+let sponsorsCache = null;
+let sponsorsCacheTime = 0;
+
+async function getSponsors() {
+  const now = Date.now();
+  if (sponsorsCache && (now - sponsorsCacheTime) < SPONSORS_CACHE_TTL) {
+    return sponsorsCache;
+  }
+
+  if (!GITHUB_PAT) {
+    return { sponsors: [], note: 'GitHub PAT not configured' };
+  }
+
+  const query = JSON.stringify({ query: `{
+    viewer {
+      sponsorshipsAsMaintainer(first: 100, includePrivate: false, orderBy: {field: CREATED_AT, direction: ASC}) {
+        totalCount
+        nodes {
+          sponsorEntity {
+            ... on User { login name avatarUrl url }
+            ... on Organization { login name avatarUrl url }
+          }
+          tier { name monthlyPriceInDollars isOneTime }
+          createdAt
+        }
+      }
+    }
+  }` });
+
+  return new Promise((resolve) => {
+    const req = https.request('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Authorization': `bearer ${GITHUB_PAT}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'usurper-reborn-web',
+        'Content-Length': Buffer.byteLength(query)
+      }
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          const viewer = data.data && data.data.viewer;
+          const nodes = (viewer &&
+            viewer.sponsorshipsAsMaintainer &&
+            viewer.sponsorshipsAsMaintainer.nodes) || [];
+
+          sponsorsCache = {
+            sponsors: nodes
+              .filter(n => n.sponsorEntity)
+              .map(n => ({
+                login: n.sponsorEntity.login,
+                name: n.sponsorEntity.name,
+                avatarUrl: n.sponsorEntity.avatarUrl,
+                url: n.sponsorEntity.url,
+                tier: (n.tier && n.tier.name) || null,
+                since: n.createdAt
+              })),
+            totalCount: (viewer &&
+              viewer.sponsorshipsAsMaintainer &&
+              viewer.sponsorshipsAsMaintainer.totalCount) || 0,
+            cachedAt: new Date().toISOString()
+          };
+          sponsorsCacheTime = now;
+          console.log(`[usurper-web] Sponsors refreshed: ${sponsorsCache.sponsors.length} public sponsors`);
+          resolve(sponsorsCache);
+        } catch (err) {
+          console.error(`[usurper-web] Sponsors parse error: ${err.message}`);
+          resolve(sponsorsCache || { sponsors: [] });
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      console.error(`[usurper-web] Sponsors fetch error: ${err.message}`);
+      resolve(sponsorsCache || { sponsors: [] });
+    });
+
+    req.write(query);
+    req.end();
+  });
+}
+
+// Pre-fetch sponsors on startup
+if (GITHUB_PAT) {
+  getSponsors().catch(() => {});
 }
 
 // --- Stats Cache ---
@@ -356,6 +450,18 @@ function handleHttpRequest(req, res) {
     req.on('close', () => {
       sseClients.delete(res);
       console.log(`[usurper-web] SSE client disconnected (${sseClients.size} total)`);
+    });
+    return;
+  } else if (req.method === 'GET' && req.url === '/api/sponsors') {
+    getSponsors().then(data => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.writeHead(200);
+      res.end(JSON.stringify(data));
+    }).catch(err => {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: 'Failed to fetch sponsors' }));
     });
     return;
   } else if (req.method === 'GET' && req.url === '/api/stats') {

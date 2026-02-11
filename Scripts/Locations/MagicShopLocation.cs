@@ -421,7 +421,9 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         DisplayMessage($"Run by {_ownerName} the gnome", "gray");
         DisplayMessage("");
-        
+
+        ShowNPCsInLocation();
+
         // Shop description
         DisplayMessage("You enter the dark and dusty boutique, filled with all sorts", "gray");
         DisplayMessage("of strange objects. As you examine the place you notice a", "gray");

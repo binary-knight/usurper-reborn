@@ -1191,6 +1191,73 @@
             header .container { flex-direction: column; gap: 12px; }
             .nav-links { display: flex; flex-wrap: wrap; justify-content: center; }
             .nav-links a { margin: 4px 8px; }
+            .sponsors-grid { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
+        }
+
+        /* Sponsors section */
+        .sponsors-section { background: var(--bg-dark); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        .sponsors-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 24px;
+        }
+        .sponsor-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            transition: all 0.2s;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        .sponsor-card:hover {
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+        }
+        .sponsor-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 2px solid #ea4aaa;
+            box-shadow: 0 0 12px rgba(234, 74, 170, 0.3);
+        }
+        .sponsor-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #ea4aaa;
+            text-align: center;
+        }
+        .sponsor-tier {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+        .sponsor-cta {
+            text-align: center;
+            margin-top: 32px;
+        }
+        .sponsor-cta a {
+            color: #ea4aaa;
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            border: 1px solid rgba(234, 74, 170, 0.3);
+            padding: 8px 24px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .sponsor-cta a:hover {
+            background: rgba(234, 74, 170, 0.1);
+            border-color: #ea4aaa;
+            box-shadow: 0 0 20px rgba(234, 74, 170, 0.2);
+        }
+        .sponsors-empty {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 14px;
+            padding: 16px;
         }
     </style>
 </head>
@@ -1296,6 +1363,20 @@
                 <h3>Deep Systems</h3>
                 <p>11 classes, 10 races, political intrigue, romance and marriage, court factions, PvP arena, companion quests, and a throne to usurp. Originally inspired by the 1993 BBS door game.</p>
             </div>
+        </div>
+    </div>
+</section>
+
+<!-- Sponsors -->
+<section class="sponsors-section" id="sponsors">
+    <div class="container" style="padding-top:48px;padding-bottom:48px;">
+        <h2 class="section-title" style="color:#ea4aaa;text-shadow:0 0 10px rgba(234,74,170,0.5)">// SPONSORS</h2>
+        <p class="section-subtitle">Thank you to everyone who supports this project.</p>
+        <div class="sponsors-grid" id="sponsors-grid">
+            <div class="sponsors-empty" id="sponsors-loading">Loading sponsors...</div>
+        </div>
+        <div class="sponsor-cta">
+            <a href="https://github.com/sponsors/binary-knight" target="_blank">&#9829; Become a Sponsor</a>
         </div>
     </div>
 </section>
@@ -2244,6 +2325,31 @@
     // Initial fetch + periodic refresh for stats/leaderboards (feeds stay live via SSE)
     fetchStats();
     setInterval(fetchStats, 30000);
+
+    // Sponsors
+    function fetchSponsors() {
+        fetch('/api/sponsors')
+            .then(res => res.json())
+            .then(data => {
+                const grid = document.getElementById('sponsors-grid');
+                if (!data.sponsors || data.sponsors.length === 0) {
+                    grid.innerHTML = '<div class="sponsors-empty">Be the first to sponsor this project!</div>';
+                    return;
+                }
+                grid.innerHTML = data.sponsors.map(s => `
+                    <a class="sponsor-card" href="${s.url}" target="_blank" rel="noopener" title="${s.name || s.login}">
+                        <img class="sponsor-avatar" src="${s.avatarUrl}" alt="${s.login}" loading="lazy">
+                        <span class="sponsor-name">${s.name || s.login}</span>
+                        ${s.tier ? `<span class="sponsor-tier">${s.tier}</span>` : ''}
+                    </a>
+                `).join('');
+            })
+            .catch(() => {
+                document.getElementById('sponsors-grid').innerHTML =
+                    '<div class="sponsors-empty">Be the first to sponsor this project!</div>';
+            });
+    }
+    fetchSponsors();
 </script>
 
 </body>

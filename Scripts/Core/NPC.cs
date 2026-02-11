@@ -86,7 +86,13 @@ public partial class NPC : Character
     /// If pregnant, when the child is due (real-time DateTime). Null = not pregnant.
     /// </summary>
     public DateTime? PregnancyDueDate { get; set; } = null;
-    
+
+    /// <summary>
+    /// What this NPC is currently doing (set by WorldSimulator each tick).
+    /// Used for location presence flavor text. Examples: "nursing a drink", "examining a blade"
+    /// </summary>
+    public string CurrentActivity { get; set; } = "";
+
     // Pascal compatibility flags
     public bool CanInteract => IsAwake && IsAvailable && !IsInConversation;
     public new string Location => CurrentLocation;  // Pascal compatibility
@@ -1022,15 +1028,93 @@ public partial class NPC : Character
     {
         // Implementation for activity changes
     }
-    
+
     // Overload expected by WorldSimulator (Activity type, urgency/intensity)
     public void ChangeActivity(UsurperRemake.Activity activity, int intensity)
     {
         // Stub: no behaviour yet
     }
-    
+
     public void ChangeActivity(UsurperRemake.Activity activity, string description)
     {
         // Stub for compatibility, no actual behaviour now
+    }
+
+    /// <summary>
+    /// Returns a mood-flavored prefix for this NPC's dialogue based on emotional state
+    /// and their impression of the player. Used by shops and interaction screens.
+    /// </summary>
+    public string GetMoodPrefix(Character player)
+    {
+        var impression = Memory?.GetCharacterImpression(player?.Name2 ?? "") ?? 0f;
+        var dominant = EmotionalState?.GetDominantEmotion();
+        var mood = EmotionalState?.GetCurrentMood() ?? 0.5f;
+
+        // Check for grieving (spouse died recently)
+        if (Married == false && Memory != null &&
+            Memory.HasMemoryOfEvent(MemoryType.SawDeath, null, 168)) // within 7 days
+        {
+            return $"{Name2} seems distracted, eyes red-rimmed. \"Sorry, I... what did you need?\"";
+        }
+
+        // Strong negative impression of the player
+        if (impression < -0.5f)
+        {
+            if (dominant == EmotionType.Anger)
+                return $"{Name2}'s jaw tightens when seeing you. \"You've got nerve showing your face here.\"";
+            return $"{Name2} eyes you coldly. \"What do you want?\"";
+        }
+
+        // Strong positive impression
+        if (impression > 0.5f)
+        {
+            if (dominant == EmotionType.Joy)
+                return $"{Name2} beams at you. \"My favorite customer! What can I do for you?\"";
+            return $"{Name2} greets you warmly. \"Ah, good to see you again!\"";
+        }
+
+        // Emotional states (neutral impression)
+        if (dominant != null)
+        {
+            switch (dominant.Value)
+            {
+                case EmotionType.Anger:
+                    return $"{Name2} looks irritable today. \"Yeah? What is it?\"";
+                case EmotionType.Sadness:
+                    return $"{Name2} sighs heavily. \"Welcome, I suppose...\"";
+                case EmotionType.Fear:
+                    return $"{Name2} glances around nervously. \"Oh! You startled me. What do you need?\"";
+                case EmotionType.Joy:
+                    return $"{Name2} hums a cheerful tune. \"Welcome, welcome!\"";
+                case EmotionType.Hope:
+                    return $"{Name2} looks up with bright eyes. \"Good timing! What can I help with?\"";
+            }
+        }
+
+        // Neutral fallback
+        return $"{Name2} nods in greeting.";
+    }
+
+    /// <summary>
+    /// Get a price modifier based on mood and impression of the player.
+    /// Happy/positive = small discount, grieving/hostile = markup.
+    /// Returns multiplier (e.g. 0.95 for 5% discount, 1.10 for 10% markup).
+    /// </summary>
+    public float GetMoodPriceModifier(Character player)
+    {
+        var impression = Memory?.GetCharacterImpression(player?.Name2 ?? "") ?? 0f;
+        var mood = EmotionalState?.GetCurrentMood() ?? 0.5f;
+
+        float modifier = 1.0f;
+
+        // Impression-based: -5% for liked, +5% for disliked
+        if (impression > 0.5f) modifier -= 0.05f;
+        else if (impression < -0.5f) modifier += 0.05f;
+
+        // Mood-based: happy = -5%, grieving/angry = +10%
+        if (mood > 0.7f) modifier -= 0.05f;
+        else if (mood < 0.3f) modifier += 0.10f;
+
+        return Math.Clamp(modifier, 0.85f, 1.15f);
     }
 } 
