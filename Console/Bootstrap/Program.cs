@@ -119,6 +119,13 @@ namespace UsurperConsole
         {
             try
             {
+                // World sim mode: bypass all terminal/auth/player logic
+                if (DoorMode.IsWorldSimMode)
+                {
+                    await RunWorldSimMode();
+                    return;
+                }
+
                 DoorMode.Log("Initializing BBS door mode...");
 
                 SqlSaveBackend? sqlBackend = null;
@@ -239,6 +246,48 @@ namespace UsurperConsole
                 DoorMode.Log("Shutting down door mode...");
                 DoorMode.Shutdown();
             }
+        }
+
+        /// <summary>
+        /// Run the headless 24/7 world simulator service.
+        /// No terminal, no auth, no player tracking.
+        /// </summary>
+        private static async Task RunWorldSimMode()
+        {
+            Console.Error.WriteLine("[WORLDSIM] Initializing persistent world simulator...");
+
+            // Initialize SQLite backend
+            var sqlBackend = new SqlSaveBackend(DoorMode.OnlineDatabasePath);
+            Console.Error.WriteLine($"[WORLDSIM] Database: {DoorMode.OnlineDatabasePath}");
+
+            // Set up cancellation for graceful shutdown
+            using var cts = new CancellationTokenSource();
+
+            // Handle SIGTERM (systemd stop) and SIGINT (Ctrl+C)
+            Console.CancelKeyPress += (sender, e) =>
+            {
+                e.Cancel = true; // Prevent immediate exit
+                Console.Error.WriteLine("[WORLDSIM] Shutdown signal received (Ctrl+C)...");
+                cts.Cancel();
+            };
+            AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+            {
+                if (!cts.IsCancellationRequested)
+                {
+                    Console.Error.WriteLine("[WORLDSIM] Process exit signal received...");
+                    cts.Cancel();
+                }
+            };
+
+            // Create and run the world sim service
+            var service = new WorldSimService(
+                sqlBackend,
+                simIntervalSeconds: DoorMode.SimIntervalSeconds,
+                npcXpMultiplier: DoorMode.NpcXpMultiplier,
+                saveIntervalMinutes: DoorMode.SaveIntervalMinutes
+            );
+
+            await service.RunAsync(cts.Token);
         }
 
         private static void SetupConsoleCloseHandlers()

@@ -554,7 +554,7 @@ namespace UsurperRemake.Systems
         // Serialization Helpers
         // =====================================================================
 
-        private List<NPCData> SerializeCurrentNPCs()
+        public static List<NPCData> SerializeCurrentNPCs()
         {
             var npcData = new List<NPCData>();
             var worldNPCs = NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>();

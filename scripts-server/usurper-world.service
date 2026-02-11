@@ -1,5 +1,6 @@
 # Usurper Reborn - World Simulator Systemd Service
-# Optional: runs background world simulation independent of player connections
+# Runs 24/7 headless NPC simulation independent of player connections.
+# NPCs dungeon, level up, shop, train, form teams, socialize, and more.
 #
 # Install:
 #   sudo cp usurper-world.service /etc/systemd/system/
@@ -10,6 +11,12 @@
 # Monitor:
 #   sudo systemctl status usurper-world
 #   tail -f /var/usurper/logs/world-sim.log
+#
+# Configuration flags:
+#   --sim-interval <sec>  Tick interval in seconds (default: 60)
+#   --npc-xp <mult>       NPC XP gain multiplier (default: 0.25 = 25% of normal)
+#   --save-interval <min> State persistence interval (default: 5 minutes)
+#   --db <path>           SQLite database path
 
 [Unit]
 Description=Usurper Reborn World Simulator
@@ -20,11 +27,14 @@ Type=simple
 User=usurper
 Group=usurper
 WorkingDirectory=/opt/usurper
-ExecStart=/opt/usurper/UsurperReborn --online --user "WORLD_SIM" --stdio
+ExecStart=/opt/usurper/UsurperReborn --worldsim --sim-interval 30 --npc-xp 3.0 --save-interval 5
 Restart=on-failure
 RestartSec=10
 StandardOutput=append:/var/usurper/logs/world-sim.log
 StandardError=append:/var/usurper/logs/world-sim-error.log
+
+# Graceful shutdown: allow time for final state save
+TimeoutStopSec=30
 
 # Resource limits
 LimitNOFILE=1024

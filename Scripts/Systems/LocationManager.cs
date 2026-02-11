@@ -97,6 +97,9 @@ public class LocationManager
         // BBS SysOp Console - only accessible to SysOps in door mode
         locations[GameLocation.SysOpConsole] = new SysOpLocation();
 
+        // PvP Arena (online mode only)
+        locations[GameLocation.Arena] = new ArenaLocation();
+
         // Note: Gym removed - stat training doesn't fit single-player endless format
 
         // GD.Print($"[LocationManager] Initialized {locations.Count} locations");
@@ -127,7 +130,8 @@ public class LocationManager
             GameLocation.ReportRoom,   // loc12
             GameLocation.Healer,       // loc13
             GameLocation.AnchorRoad,   // loc14
-            GameLocation.Home          // loc15 – your personal dwelling
+            GameLocation.Home,         // loc15 – your personal dwelling
+            GameLocation.Arena         // loc16 – PvP arena (online only)
         };
         
         navigationTable[GameLocation.TheInn] = new List<GameLocation>
@@ -197,7 +201,12 @@ public class LocationManager
         {
             GameLocation.AnchorRoad
         };
-        
+
+        navigationTable[GameLocation.Arena] = new List<GameLocation>
+        {
+            GameLocation.MainStreet
+        };
+
         // Add more navigation entries as needed
         // This follows the exact Pascal pattern from ONLINE.PAS
     }

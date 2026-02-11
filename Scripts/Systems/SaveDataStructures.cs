@@ -496,6 +496,12 @@ namespace UsurperRemake.Systems
         // Death status - permanent death tracking
         public bool IsDead { get; set; }
 
+        // Lifecycle - aging and natural death
+        public int Age { get; set; }
+        public DateTime BirthDate { get; set; } = DateTime.MinValue;
+        public bool IsAgedDeath { get; set; }
+        public DateTime? PregnancyDueDate { get; set; }
+
         // Marriage status
         public bool IsMarried { get; set; }
         public bool Married { get; set; }

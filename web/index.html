@@ -980,44 +980,125 @@
             margin-top: 2px;
         }
 
-        .news-feed {
+        /* Side-by-side feeds container */
+        .feeds-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+        @media (max-width: 800px) {
+            .feeds-row { grid-template-columns: 1fr; }
+        }
+
+        /* Feed panels */
+        .feed-panel {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 20px;
-            max-height: 300px;
-            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
 
-        .news-feed h3 {
+        .feed-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .feed-header h3 {
             font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
-            color: var(--cyan);
-            margin-bottom: 12px;
+            margin: 0;
         }
 
-        .news-item {
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
+        .feed-panel.npc .feed-header h3 { color: var(--gold); }
+        .feed-panel.player .feed-header h3 { color: var(--cyan); }
+
+        .feed-subtitle {
+            font-size: 11px;
+            color: var(--text-dim);
+            font-style: italic;
+            margin-bottom: 14px;
+        }
+
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--red);
+            letter-spacing: 1px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .live-badge.connected { opacity: 1; }
+        .live-badge .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--red);
+            border-radius: 50%;
+            animation: livePulse 2s ease-in-out infinite;
+        }
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,68,68,0.6); }
+            50% { opacity: 0.6; box-shadow: 0 0 8px 3px rgba(255,68,68,0.3); }
+        }
+
+        .feed-scroll {
+            max-height: 380px;
+            overflow-y: auto;
+        }
+        .feed-scroll::-webkit-scrollbar { width: 4px; }
+        .feed-scroll::-webkit-scrollbar-track { background: transparent; }
+        .feed-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .feed-item {
+            padding: 7px 0;
+            border-bottom: 1px solid rgba(42,42,58,0.5);
             font-size: 13px;
+            line-height: 1.4;
         }
+        .feed-item:last-child { border-bottom: none; }
 
-        .news-item:last-child { border-bottom: none; }
-
-        .news-item .news-time {
+        .feed-item .feed-time {
             font-family: 'JetBrains Mono', monospace;
             font-size: 10px;
             color: var(--text-dim);
             margin-right: 8px;
         }
 
-        .news-item .news-player { color: var(--green); }
-        .news-item .news-text { color: var(--text-dim); }
+        .feed-item .feed-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
 
-        .news-empty {
+        .feed-item.is-new {
+            animation: feedSlideIn 0.4s ease-out;
+        }
+        @keyframes feedSlideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .feed-item.is-flash {
+            background: rgba(255,170,0,0.06);
+            transition: background 2s ease-out;
+        }
+
+        .feed-empty {
             color: var(--text-dim);
             font-style: italic;
-            font-size: 13px;
+            font-size: 12px;
+            padding: 20px 0;
+            text-align: center;
         }
 
         .leaderboard-section {
@@ -1075,6 +1156,12 @@
             font-size: 13px;
             padding: 12px 0;
         }
+
+        .leaderboard-section.pvp { margin-top: 16px; }
+        .leaderboard-section.pvp h3 { color: var(--red); }
+        .leaderboard-table .lb-wins { color: var(--green); text-align: center; }
+        .leaderboard-table .lb-losses { color: var(--red); text-align: center; }
+        .leaderboard-table .lb-gold { color: var(--gold); text-align: right; }
 
         .stats-refresh {
             text-align: center;
@@ -1868,6 +1955,33 @@
         return Math.floor(hrs / 24) + 'd ago';
     }
 
+    function getActivityColor(msg) {
+        if (!msg) return '#888899';
+        // Lifecycle events
+        if (/passed away|soul moves on/i.test(msg)) return '#9966cc';   // ⚱ natural death = muted purple
+        if (msg.includes('\u2020')) return '#ff4444';                    // † combat death = red
+        if (/expecting a child/i.test(msg)) return '#ffaacc';           // pregnancy = soft pink
+        if (/proud parents|baby|born/i.test(msg)) return '#ff88dd';     // birth = bright pink
+        if (/come of age|joined the realm/i.test(msg)) return '#44ddaa'; // coming-of-age = teal
+        if (/birthday|celebrates their/i.test(msg)) return '#ffdd44';  // 🎂 birthday = gold
+        if (/COUP|ASSASSINATION|SCANDAL|SABOTAGE/.test(msg)) return '#ff6666'; // politics = bright red
+        if (/Level \d/.test(msg)) return '#ffaa00';                     // level up = gold
+        if (/team|Team/.test(msg)) return '#00e5ff';                    // team activity = cyan
+        if (/dungeon|Dungeon|conquered/.test(msg)) return '#cc66ff';    // dungeon = magenta
+        if (/purchased|deposit|Bank/.test(msg)) return '#00ff88';       // commerce = green
+        if (/divorced/i.test(msg)) return '#cc4444';                        // divorce = dark red
+        if (/affair|Scandal/i.test(msg)) return '#ff4488';                  // affair = hot pink
+        if (/polyamorous/i.test(msg)) return '#dd66ff';                    // polyamory = violet
+        if (/married|Wedding|love|Love Street/.test(msg)) return '#ff66aa'; // romance = pink
+        if (/Temple|blessing|altar/.test(msg)) return '#aaaaff';        // temple = light blue
+        if (/Guard|guard|Royal/.test(msg)) return '#ffcc44';            // military = amber
+        if (/training|trained/.test(msg)) return '#88ccff';             // training = light cyan
+        if (/returned from the realm of the dead/i.test(msg)) return '#88ff88'; // respawn = green
+        return '#ccccdd';                                               // default = light gray
+    }
+
+    var feedsInitialized = false;
+
     function renderStats(data) {
         const container = document.getElementById('stats-content');
         if (!data || data.error) {
@@ -1875,6 +1989,7 @@
             return;
         }
 
+        // Build the "upper" section (online, stats, leaderboards) - refreshed every 30s
         let html = '';
 
         // Online players section
@@ -1965,25 +2080,154 @@
             html += '</tbody></table></div>';
         }
 
-        // News feed
-        if (data.news && data.news.length > 0) {
-            html += '<div class="news-feed"><h3>// RECENT NEWS</h3>';
-            for (const n of data.news) {
-                html += '<div class="news-item">';
-                html += '<span class="news-time">' + getTimeAgo(n.time) + '</span>';
-                if (n.playerName) html += '<span class="news-player">' + escapeHtml(n.playerName) + '</span> ';
-                html += '<span class="news-text">' + escapeHtml(n.message) + '</span>';
-                html += '</div>';
+        // PvP leaderboard
+        if (data.pvpLeaderboard && data.pvpLeaderboard.length > 0) {
+            html += '<div class="leaderboard-section pvp"><h3>// PVP ARENA</h3>';
+            html += '<table class="leaderboard-table"><thead><tr>';
+            html += '<th class="rank-col">Rank</th><th>Player</th><th>Class</th><th class="lb-level">Lv</th><th class="lb-wins">W</th><th class="lb-losses">L</th><th class="lb-gold">Gold Stolen</th>';
+            html += '</tr></thead><tbody>';
+            for (const p of data.pvpLeaderboard) {
+                const rankClass = p.rank <= 3 ? ' rank-' + p.rank : '';
+                html += '<tr>';
+                html += '<td class="rank-col' + rankClass + '">#' + p.rank + '</td>';
+                html += '<td class="lb-name">' + escapeHtml(p.name) + '</td>';
+                html += '<td class="lb-class">' + escapeHtml(p.className) + '</td>';
+                html += '<td class="lb-level">' + p.level + '</td>';
+                html += '<td class="lb-wins">' + p.wins + '</td>';
+                html += '<td class="lb-losses">' + p.losses + '</td>';
+                html += '<td class="lb-gold">' + formatGold(p.goldStolen) + '</td>';
+                html += '</tr>';
             }
-            html += '</div>';
+            html += '</tbody></table></div>';
         }
 
-        html += '<div class="stats-refresh">Auto-refreshes every 30 seconds</div>';
-        container.innerHTML = html;
+        // Update the upper stats area (don't touch feeds)
+        var upperEl = document.getElementById('stats-upper');
+        if (!upperEl) {
+            // First render: create the split structure
+            container.innerHTML = '<div id="stats-upper"></div><div id="stats-feeds"></div>';
+            upperEl = document.getElementById('stats-upper');
+        }
+        upperEl.innerHTML = html;
+
+        // Render feeds only once (they're kept alive by SSE after that)
+        if (!feedsInitialized) {
+            feedsInitialized = true;
+            renderFeeds(data);
+            connectLiveFeed();
+        }
+    }
+
+    function renderFeeds(data) {
+        var feedsEl = document.getElementById('stats-feeds');
+        if (!feedsEl) return;
+
+        var html = '<div class="feeds-row">';
+
+        // NPC world activity feed
+        html += '<div class="feed-panel npc">';
+        html += '<div class="feed-header"><h3>// THE LIVING WORLD</h3>';
+        html += '<span class="live-badge" id="live-badge"><span class="live-dot"></span>LIVE</span></div>';
+        html += '<p class="feed-subtitle">peer into the realm... NPCs live their lives even when you\'re away</p>';
+        html += '<div class="feed-scroll" id="feed-npc">';
+        if (data.npcActivities && data.npcActivities.length > 0) {
+            for (const a of data.npcActivities) {
+                html += makeFeedItem(a.message, a.time);
+            }
+        } else {
+            html += '<div class="feed-empty">Waiting for world activity...</div>';
+        }
+        html += '</div></div>';
+
+        // Recent News feed
+        html += '<div class="feed-panel player">';
+        html += '<div class="feed-header"><h3>// RECENT NEWS</h3>';
+        html += '<span class="live-badge" id="live-badge-news"><span class="live-dot"></span>LIVE</span></div>';
+        html += '<p class="feed-subtitle">player events from across the realm</p>';
+        html += '<div class="feed-scroll" id="feed-news">';
+        if (data.news && data.news.length > 0) {
+            for (const n of data.news) {
+                html += makeFeedItem(n.message, n.time);
+            }
+        } else {
+            html += '<div class="feed-empty">No recent news...</div>';
+        }
+        html += '</div></div>';
+
+        html += '</div>';
+        feedsEl.innerHTML = html;
+    }
+
+    function makeFeedItem(message, time) {
+        var c = getActivityColor(message);
+        return '<div class="feed-item">'
+             + '<span class="feed-time">' + getTimeAgo(time) + '</span>'
+             + '<span class="feed-dot" style="background:' + c + '"></span>'
+             + '<span style="color:' + c + '">' + escapeHtml(message) + '</span>'
+             + '</div>';
     }
 
     function renderStatCard(value, label) {
         return '<div class="stat-card"><div class="stat-value">' + value + '</div><div class="stat-label">' + label + '</div></div>';
+    }
+
+    // --- SSE Live Feed ---
+    var feedSource = null;
+    var MAX_FEED_ITEMS = 30;
+
+    function connectLiveFeed() {
+        if (feedSource) { feedSource.close(); feedSource = null; }
+        try { feedSource = new EventSource('/api/feed'); } catch (e) { return; }
+
+        feedSource.onopen = function() {
+            var b1 = document.getElementById('live-badge');
+            var b2 = document.getElementById('live-badge-news');
+            if (b1) b1.classList.add('connected');
+            if (b2) b2.classList.add('connected');
+        };
+
+        feedSource.onmessage = function(ev) {
+            try {
+                var payload = JSON.parse(ev.data);
+                var targetId = payload.type === 'npc' ? 'feed-npc' : 'feed-news';
+                var feed = document.getElementById(targetId);
+                if (!feed || !payload.items) return;
+
+                // Remove empty placeholder
+                var empty = feed.querySelector('.feed-empty');
+                if (empty) empty.remove();
+
+                // Prepend new items with slide-in animation
+                for (var i = payload.items.length - 1; i >= 0; i--) {
+                    var item = payload.items[i];
+                    var c = getActivityColor(item.message);
+                    var div = document.createElement('div');
+                    div.className = 'feed-item is-new is-flash';
+                    div.innerHTML = '<span class="feed-time">just now</span>'
+                        + '<span class="feed-dot" style="background:' + c + '"></span>'
+                        + '<span style="color:' + c + '">' + escapeHtml(item.message) + '</span>';
+                    feed.insertBefore(div, feed.firstChild);
+
+                    // Clear animation classes after they play
+                    (function(el) {
+                        setTimeout(function() { el.classList.remove('is-flash'); }, 100);
+                        setTimeout(function() { el.classList.remove('is-new'); }, 500);
+                    })(div);
+                }
+
+                // Trim old items
+                while (feed.children.length > MAX_FEED_ITEMS) {
+                    feed.removeChild(feed.lastChild);
+                }
+            } catch (e) {}
+        };
+
+        feedSource.onerror = function() {
+            var b1 = document.getElementById('live-badge');
+            var b2 = document.getElementById('live-badge-news');
+            if (b1) b1.classList.remove('connected');
+            if (b2) b2.classList.remove('connected');
+        };
     }
 
     function fetchStats() {
@@ -1996,7 +2240,7 @@
             });
     }
 
-    // Initial fetch + auto-refresh
+    // Initial fetch + periodic refresh for stats/leaderboards (feeds stay live via SSE)
     fetchStats();
     setInterval(fetchStats, 30000);
 </script>

@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.27.1-alpha";
-    public const string VersionName = "Online Multiplayer";
+    public const string Version = "0.28.0-alpha";
+    public const string VersionName = "PvP Arena & Living World";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -656,6 +656,31 @@ public static partial class GameConfig
         [CharacterRace.Mutant] = new() { HPBonus = 14, StrengthBonus = 3, DefenceBonus = 3, StaminaBonus = 3, MinAge = 18, MaxAge = 32, MinHeight = 150, MaxHeight = 199, MinWeight = 50, MaxWeight = 99, SkinColor = 0, HairColors = new int[0] }  // Random for mutants - adaptive bonus
     };
 
+    // NPC Lifecycle Aging Rate
+    // Controls how fast NPCs and their children age in the persistent world.
+    // At 9.6 hours per game-year:
+    //   - A child (18yr) grows up in ~7 real days
+    //   - A Human (75yr) dies in ~30 real days
+    //   - An Elf (200yr) dies in ~80 real days
+    //   - A Gnoll (50yr) dies in ~20 real days
+    public const double NpcLifecycleHoursPerYear = 9.6;
+
+    // Race Maximum Lifespan (in game-years)
+    // When an NPC reaches this age, they die permanently of old age - no respawn.
+    public static readonly Dictionary<CharacterRace, int> RaceLifespan = new()
+    {
+        [CharacterRace.Human]   = 75,
+        [CharacterRace.Hobbit]  = 90,
+        [CharacterRace.Elf]     = 200,
+        [CharacterRace.HalfElf] = 120,
+        [CharacterRace.Dwarf]   = 150,
+        [CharacterRace.Troll]   = 60,
+        [CharacterRace.Orc]     = 55,
+        [CharacterRace.Gnome]   = 130,
+        [CharacterRace.Gnoll]   = 50,
+        [CharacterRace.Mutant]  = 65,
+    };
+
     // Race and Class Names (Pascal constants)
     public static readonly string[] RaceNames = {
         "Human", "Hobbit", "Elf", "Half-Elf", "Dwarf", "Troll", "Orc", "Gnome", "Gnoll", "Mutant"
@@ -810,6 +835,14 @@ Alchemist - Potion makers and researchers. Requires intellect and patience.
     public const int DefaultBardSongs = 5;                // Daily bard songs reset
     public const int AssassinThiefBonus = 2;              // Extra thief attempts for assassins
     
+    // PvP Arena Configuration
+    public const int MaxPvPAttacksPerDay = 5;           // Maximum PvP attacks per day
+    public const int MinPvPLevel = 5;                   // Minimum level to enter the arena
+    public const double PvPGoldStealPercent = 0.10;     // 10% of loser's gold on hand
+    public const int PvPLevelRangeLimit = 20;           // Can't attack someone more than 20 levels different
+    public const long PvPMinXPReward = 25;              // Minimum XP reward for PvP win
+    public const long PvPMaxXPReward = 5000;            // Maximum XP reward for PvP win
+
     // Daily Limits and Resets (Pascal daily parameter resets)
     public const int DailyDarknessReset = 6;              // Daily darkness deeds reset
     public const int DailyChivalryReset = 6;              // Daily chivalry deeds reset
@@ -1246,6 +1279,9 @@ public enum GameLocation
 
     // BBS SysOp locations
     SysOpConsole = 500,  // SysOp administration console (BBS mode only)
+
+    // PvP Arena (online mode only)
+    Arena = 501,         // PvP combat arena
 
     Closed = 30000       // onloc_closed (for fake players)
 }

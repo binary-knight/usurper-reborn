@@ -15,6 +15,12 @@ public class WorldSimulator
     private bool isRunning = false;
     private Random random = new Random();
 
+    /// <summary>
+    /// Multiplier for NPC XP gains. Default 1.0 for normal mode.
+    /// Set to less than 1.0 for 24/7 world sim mode to slow NPC progression.
+    /// </summary>
+    public static float NpcXpMultiplier { get; set; } = 1.0f;
+
     // Get the active NPC list from NPCSpawnSystem instead of caching
     // This ensures we always use the current list even after save/load
     private List<NPC> npcs => UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>();
@@ -89,6 +95,15 @@ public class WorldSimulator
         isRunning = false;
         // GD.Print("[WorldSim] Simulation stopped");
     }
+
+    /// <summary>
+    /// Mark the simulator as active without starting the internal background loop.
+    /// Used by WorldSimService which drives SimulateStep() externally.
+    /// </summary>
+    public void SetActive(bool active)
+    {
+        isRunning = active;
+    }
     
     public void SimulateStep()
     {
@@ -103,6 +118,15 @@ public class WorldSimulator
 
         // Process child aging (children age and eventually become adult NPCs)
         FamilySystem.Instance?.ProcessDailyAging();
+
+        // Process NPC aging and natural death
+        ProcessNPCAging();
+
+        // Process NPC pregnancies and births (including affairs)
+        ProcessNPCPregnancies();
+
+        // Process NPC divorces
+        ProcessNPCDivorces();
 
         var worldState = new WorldState(npcs);
 
@@ -127,7 +151,8 @@ public class WorldSimulator
         }
 
         // Track dead NPCs for respawn (check both HP <= 0 and IsDead flag)
-        foreach (var npc in npcs.Where(n => !n.IsAlive || n.IsDead))
+        // Skip age-dead NPCs - their soul has moved on, no respawn
+        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath))
         {
             if (!deadNPCRespawnTimers.ContainsKey(npc.Name))
             {
@@ -228,6 +253,13 @@ public class WorldSimulator
             var npc = npcs.FirstOrDefault(n => n.Name == npcName);
             if (npc != null)
             {
+                // Age death is permanent - the soul has moved on, never respawn
+                if (npc.IsAgedDeath)
+                {
+                    deadNPCRespawnTimers.Remove(npcName);
+                    continue;
+                }
+
                 // Respawn the NPC - clear permanent death flag
                 npc.IsDead = false;
 
@@ -376,6 +408,315 @@ public class WorldSimulator
             UsurperRemake.Systems.DebugLogger.Instance.LogWarning("NPC",
                 $"Fixed corrupted base stats for {npc.Name} (Level {level} {npc.Class}): " +
                 $"STR={npc.BaseStrength}, DEF={npc.BaseDefence}, AGI={npc.BaseAgility}");
+        }
+    }
+
+    /// <summary>
+    /// Process NPC aging - update ages from BirthDate and trigger natural death
+    /// when an NPC exceeds their race's maximum lifespan.
+    /// Age-related death is permanent - the soul has moved on.
+    /// </summary>
+    private void ProcessNPCAging()
+    {
+        foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath).ToList())
+        {
+            // Skip story NPCs - they're needed for narrative quests
+            if (npc.IsStoryNPC) continue;
+
+            // Skip NPCs without birth dates (shouldn't happen, but safety)
+            if (npc.BirthDate <= DateTime.MinValue) continue;
+
+            // Calculate current age from birth date (using accelerated lifecycle rate)
+            int previousAge = npc.Age;
+            int currentAge = (int)((DateTime.Now - npc.BirthDate).TotalHours / GameConfig.NpcLifecycleHoursPerYear);
+            npc.Age = currentAge;
+
+            // Birthday announcement when age increments
+            if (currentAge > previousAge && previousAge > 0)
+            {
+                NewsSystem.Instance?.WriteBirthdayNews(npc.Name2, currentAge, npc.Race.ToString());
+            }
+
+            // Check for natural death
+            if (GameConfig.RaceLifespan.TryGetValue(npc.Race, out int maxAge))
+            {
+                if (currentAge >= maxAge)
+                {
+                    // Natural death - permanent, no respawn
+                    npc.IsDead = true;
+                    npc.IsAgedDeath = true;
+                    npc.HP = 0;
+
+                    // Remove from respawn queue if somehow queued
+                    deadNPCRespawnTimers.Remove(npc.Name);
+
+                    // Handle marriage - widow the spouse
+                    if (npc.Married || npc.IsMarried)
+                    {
+                        HandleSpouseBereavement(npc);
+                    }
+
+                    NewsSystem.Instance?.Newsy(
+                        $"⚱ {npc.Name2} has passed away peacefully at the age of {currentAge}. The soul moves on...");
+
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
+                        $"{npc.Name2} died of old age at {currentAge} (max {maxAge} for {npc.Race})");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handle a spouse's bereavement when their partner dies of old age.
+    /// Clears marriage state and adds a memory of the loss.
+    /// </summary>
+    private void HandleSpouseBereavement(NPC deceased)
+    {
+        var spouse = npcs.FirstOrDefault(n =>
+            n.Name2 == deceased.SpouseName && (n.Married || n.IsMarried) && !n.IsDead);
+        if (spouse != null)
+        {
+            spouse.Married = false;
+            spouse.IsMarried = false;
+            spouse.SpouseName = "";
+            spouse.Brain?.Memory?.AddMemory(
+                $"My beloved {deceased.Name2} has passed away...", "bereavement", DateTime.Now);
+
+            // Clear the marriage in the registry
+            NPCMarriageRegistry.Instance.EndMarriage(deceased.ID);
+
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
+                $"{spouse.Name2} is now widowed after {deceased.Name2}'s passing");
+        }
+    }
+
+    /// <summary>
+    /// Process NPC pregnancies - handle births for pregnant NPCs and
+    /// give married female NPCs a chance to become pregnant each tick.
+    /// </summary>
+    // Track which NPC is the father of a current pregnancy (for affairs where father != spouse)
+    private readonly Dictionary<string, string> _pregnancyFathers = new();
+
+    private void ProcessNPCPregnancies()
+    {
+        // Process existing pregnancies - check for births
+        foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && n.PregnancyDueDate.HasValue).ToList())
+        {
+            if (DateTime.Now >= npc.PregnancyDueDate.Value)
+            {
+                // Baby is due! Find the father (could be affair partner, not spouse)
+                string fatherName = npc.SpouseName;
+                if (_pregnancyFathers.TryGetValue(npc.Name2 ?? npc.Name, out var affairFather))
+                {
+                    fatherName = affairFather;
+                    _pregnancyFathers.Remove(npc.Name2 ?? npc.Name);
+                }
+
+                var father = npcs.FirstOrDefault(n =>
+                    n.Name2 == fatherName && n.IsAlive && !n.IsDead);
+                if (father != null)
+                {
+                    FamilySystem.Instance?.CreateNPCChild(npc, father);
+                }
+                npc.PregnancyDueDate = null;
+            }
+        }
+
+        // Calculate dynamic pregnancy rate based on population
+        int aliveCount = npcs.Count(n => n.IsAlive && !n.IsDead);
+        int childCount = FamilySystem.Instance?.AllChildren.Count(c => !c.Deleted) ?? 0;
+        int totalPop = aliveCount + childCount;
+
+        // Dynamic rate: higher when underpopulated, lower when overpopulated
+        int pregnancyDenominator = totalPop < 40 ? 33   // ~3% if underpopulated
+                                 : totalPop > 80 ? 200  // ~0.5% if overpopulated
+                                 : 100;                  // ~1% normal
+
+        // Eligible females (married or not) may become pregnant
+        var eligibleFemales = npcs.Where(n =>
+            n.IsAlive && !n.IsDead &&
+            n.Sex == CharacterSex.Female &&
+            !n.PregnancyDueDate.HasValue &&
+            n.Age >= 18 && n.Age <= 45).ToList();
+
+        foreach (var npc in eligibleFemales)
+        {
+            if (random.Next(pregnancyDenominator) > 0) continue;
+
+            // Try to find a partner for this pregnancy
+            NPC? father = null;
+            bool isAffair = false;
+
+            // If married, spouse is the default partner
+            if (npc.Married || npc.IsMarried)
+            {
+                father = npcs.FirstOrDefault(n =>
+                    n.Name2 == npc.SpouseName && n.IsAlive && !n.IsDead);
+
+                // Flirtatious NPCs may conceive with someone other than their spouse
+                var profile = npc.Brain?.Personality;
+                if (profile != null && profile.Flirtatiousness > 0.6f && random.Next(100) < 15)
+                {
+                    // 15% chance for flirtatious married NPCs to have an affair pregnancy
+                    var affairPartner = FindAffairPartner(npc);
+                    if (affairPartner != null)
+                    {
+                        father = affairPartner;
+                        isAffair = true;
+                    }
+                }
+            }
+            else
+            {
+                // Unmarried NPCs with high flirtatiousness can have casual pregnancies
+                var profile = npc.Brain?.Personality;
+                if (profile != null && profile.Flirtatiousness > 0.5f)
+                {
+                    father = FindAffairPartner(npc);
+                    if (father != null) isAffair = true;
+                }
+            }
+
+            if (father == null) continue;
+
+            // Check couple doesn't have too many children already (max 4)
+            var existingChildren = FamilySystem.Instance?.GetChildrenOfCouple(npc, father);
+            if (existingChildren != null && existingChildren.Count >= 4) continue;
+
+            // Pregnancy! Due in ~9 game months ≈ 7 hours at accelerated rate
+            npc.PregnancyDueDate = DateTime.Now.AddHours(7);
+
+            if (isAffair)
+            {
+                // Track the affair father so the child gets the right parentage
+                _pregnancyFathers[npc.Name2 ?? npc.Name] = father.Name2;
+
+                NewsSystem.Instance?.WriteAffairNews(npc.Name2, father.Name2);
+            }
+            else
+            {
+                NewsSystem.Instance?.Newsy(
+                    $"♥ {npc.Name2} and {father.Name2} are expecting a child!");
+            }
+
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
+                $"{npc.Name2} is pregnant by {father.Name2} (affair={isAffair})! Due: {npc.PregnancyDueDate.Value:HH:mm}");
+        }
+    }
+
+    /// <summary>
+    /// Find a compatible affair partner for an NPC. Must be attracted to each other,
+    /// alive, and of appropriate age.
+    /// </summary>
+    private NPC? FindAffairPartner(NPC npc)
+    {
+        var profile = npc.Brain?.Personality;
+        if (profile == null) return null;
+
+        var candidates = npcs.Where(c =>
+            c.ID != npc.ID &&
+            c.IsAlive && !c.IsDead &&
+            c.Sex != npc.Sex && // Opposite sex for pregnancy
+            c.Name2 != npc.SpouseName && // Not the current spouse
+            c.Age >= 18 &&
+            c.Brain?.Personality != null &&
+            profile.IsAttractedTo(c.Brain.Personality.Gender) &&
+            c.Brain.Personality.IsAttractedTo(profile.Gender)
+        ).ToList();
+
+        if (candidates.Count == 0) return null;
+
+        // Prefer flirtatious partners
+        var flirty = candidates.Where(c =>
+            c.Brain?.Personality?.Flirtatiousness > 0.4f).ToList();
+
+        if (flirty.Count > 0)
+            return flirty[random.Next(flirty.Count)];
+
+        return candidates[random.Next(candidates.Count)];
+    }
+
+    /// <summary>
+    /// Process NPC divorces. Married couples may split based on personality mismatch,
+    /// low commitment, or high flirtatiousness. Divorce frees both NPCs to remarry.
+    /// </summary>
+    private void ProcessNPCDivorces()
+    {
+        // Only process each couple once (by checking the female or alphabetically first partner)
+        var marriedNPCs = npcs.Where(n =>
+            n.IsAlive && !n.IsDead &&
+            (n.Married || n.IsMarried) &&
+            !string.IsNullOrEmpty(n.SpouseName))
+            .ToList();
+
+        // Track already-processed couples to avoid double-divorce
+        var processed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var npc in marriedNPCs)
+        {
+            if (processed.Contains(npc.Name2 ?? npc.Name)) continue;
+
+            var spouse = npcs.FirstOrDefault(n =>
+                n.Name2 == npc.SpouseName && n.IsAlive && !n.IsDead);
+            if (spouse == null) continue;
+
+            processed.Add(npc.Name2 ?? npc.Name);
+            processed.Add(spouse.Name2 ?? spouse.Name);
+
+            // Base divorce chance: 0.3% per tick (~1 per 5 hours of sim time)
+            float divorceChance = 0.003f;
+
+            var profile1 = npc.Brain?.Personality;
+            var profile2 = spouse.Brain?.Personality;
+
+            if (profile1 != null && profile2 != null)
+            {
+                // Low commitment increases divorce chance
+                if (profile1.Commitment < 0.3f) divorceChance += 0.005f;
+                if (profile2.Commitment < 0.3f) divorceChance += 0.005f;
+
+                // High flirtatiousness increases divorce chance
+                if (profile1.Flirtatiousness > 0.7f) divorceChance += 0.003f;
+                if (profile2.Flirtatiousness > 0.7f) divorceChance += 0.003f;
+
+                // Alignment mismatch increases divorce chance
+                bool oneGood = npc.Chivalry > npc.Darkness;
+                bool otherGood = spouse.Chivalry > spouse.Darkness;
+                if (oneGood != otherGood) divorceChance += 0.004f;
+
+                // High commitment in BOTH reduces divorce chance significantly
+                if (profile1.Commitment > 0.7f && profile2.Commitment > 0.7f)
+                    divorceChance *= 0.2f;
+            }
+
+            if (random.NextDouble() >= divorceChance) continue;
+
+            // Divorce!
+            npc.Married = false;
+            npc.IsMarried = false;
+            npc.SpouseName = "";
+
+            spouse.Married = false;
+            spouse.IsMarried = false;
+            spouse.SpouseName = "";
+
+            // Clear pregnancy if pregnant by this spouse
+            if (npc.PregnancyDueDate.HasValue) npc.PregnancyDueDate = null;
+            if (spouse.PregnancyDueDate.HasValue) spouse.PregnancyDueDate = null;
+
+            // End marriage in registry
+            NPCMarriageRegistry.Instance.EndMarriage(npc.ID);
+
+            // Add memories
+            npc.Brain?.Memory?.AddMemory(
+                $"I divorced {spouse.Name2}.", "divorce", DateTime.Now);
+            spouse.Brain?.Memory?.AddMemory(
+                $"I divorced {npc.Name2}.", "divorce", DateTime.Now);
+
+            NewsSystem.Instance?.WriteDivorceNews(npc.Name2, spouse.Name2);
+
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
+                $"{npc.Name2} and {spouse.Name2} have divorced!");
         }
     }
 
@@ -795,8 +1136,8 @@ public class WorldSimulator
                 long expShare = totalExp / survivors.Count;
                 long goldShare = totalGold / survivors.Count;
 
-                // Bonus for team play
-                expShare = (long)(expShare * 1.15); // 15% team XP bonus
+                // Bonus for team play, throttled by NpcXpMultiplier for world sim mode
+                expShare = (long)(expShare * 1.15 * NpcXpMultiplier);
 
                 foreach (var member in survivors)
                 {
@@ -928,8 +1269,8 @@ public class WorldSimulator
 
         if (npcWon)
         {
-            // NPC wins - gain XP and gold
-            long expGain = monster.GetExperienceReward();
+            // NPC wins - gain XP and gold (XP throttled by NpcXpMultiplier for world sim mode)
+            long expGain = (long)(monster.GetExperienceReward() * NpcXpMultiplier);
             long goldGain = monster.GetGoldReward();
 
             npc.GainExperience(expGain);
@@ -1144,8 +1485,7 @@ public class WorldSimulator
             npc.HP = npc.MaxHP;
 
             // This is always newsworthy!
-            NewsSystem.Instance.Newsy(true, $"{npc.Name} has achieved Level {npc.Level}!");
-            // GD.Print($"[WorldSim] {npc.Name} leveled up to {npc.Level}!");
+            NewsSystem.Instance?.WriteNPCLevelUpNews(npc.Name, npc.Level, npc.Class.ToString(), npc.Race.ToString());
         }
     }
 
@@ -1785,7 +2125,7 @@ public class WorldSimulator
         // Small chance to gain experience from training
         if (GD.Randf() < 0.3f)
         {
-            var expGain = GD.RandRange(10, 30);
+            var expGain = (long)(GD.RandRange(10, 30) * NpcXpMultiplier);
             npc.GainExperience(expGain);
             // GD.Print($"[WorldSim] {npc.Name} trained and gained {expGain} experience");
         }

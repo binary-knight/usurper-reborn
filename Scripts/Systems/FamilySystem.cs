@@ -183,9 +183,9 @@ namespace UsurperRemake.Systems
             {
                 int previousAge = child.Age;
 
-                // Calculate age based on days since birth
-                var daysSinceBirth = (DateTime.Now - child.BirthDate).Days;
-                child.Age = daysSinceBirth / DAYS_PER_YEAR;
+                // Calculate age based on hours since birth (accelerated lifecycle rate)
+                var hoursSinceBirth = (DateTime.Now - child.BirthDate).TotalHours;
+                child.Age = (int)(hoursSinceBirth / GameConfig.NpcLifecycleHoursPerYear);
 
                 // Check if child just came of age
                 if (previousAge < ADULT_AGE && child.Age >= ADULT_AGE)
@@ -225,7 +225,8 @@ namespace UsurperRemake.Systems
                 Gold = 100,
                 Experience = 0,
                 CurrentLocation = "Main Street",
-                AI = CharacterAI.Computer
+                AI = CharacterAI.Computer,
+                BirthDate = child.BirthDate // Carry over birth date for lifecycle aging
             };
 
             // Set HP directly since IsAlive is computed from HP
@@ -281,8 +282,7 @@ namespace UsurperRemake.Systems
             child.Deleted = true;
 
             // Generate news
-            NewsSystem.Instance?.Newsy(true,
-                $"{child.Name}, child of {child.Mother} and {child.Father}, has come of age and joined the realm!");
+            NewsSystem.Instance?.WriteComingOfAgeNews(child.Name, child.Mother, child.Father);
 
             // GD.Print($"[Family] Created adult NPC: {npc.Name2} ({npc.Class})");
         }
@@ -407,6 +407,104 @@ namespace UsurperRemake.Systems
                     $"{custodialParent.Name} has been granted custody of {children.Count} child(ren) in the divorce.");
             }
         }
+
+        #region NPC-NPC Children
+
+        // Fantasy name pools for NPC children
+        private static readonly string[] MaleNames = new[]
+        {
+            "Aldric", "Bram", "Caelum", "Dorin", "Eldric", "Fenris", "Gareth", "Hadwin",
+            "Ivar", "Jorund", "Kael", "Leoric", "Magnus", "Noric", "Osric", "Perrin",
+            "Quillan", "Rowan", "Soren", "Theron", "Ulric", "Varen", "Wulfric", "Xander",
+            "Yorick", "Zephyr", "Alaric", "Brandt", "Cedric", "Darian", "Erland", "Finnian",
+            "Gideon", "Halvar", "Iskander", "Jarek", "Korbin", "Lysander", "Malakai", "Nolan"
+        };
+
+        private static readonly string[] FemaleNames = new[]
+        {
+            "Aelara", "Brielle", "Calista", "Darina", "Elara", "Freya", "Gwyneth", "Helena",
+            "Isolde", "Jocelyn", "Kira", "Lyria", "Mirena", "Nessa", "Orina", "Petra",
+            "Rhiannon", "Seraphina", "Thalia", "Ursula", "Vesper", "Wren", "Ysolde", "Zara",
+            "Astrid", "Brianna", "Celeste", "Dahlia", "Elowen", "Fiora", "Guinevere", "Hilda",
+            "Ingrid", "Juliana", "Katarina", "Lucinda", "Morgana", "Nerissa", "Ondine", "Rosalind"
+        };
+
+        /// <summary>
+        /// Create a child from two NPC parents. Uses the existing Child class and aging system.
+        /// When the child reaches ADULT_AGE (18 game-years), ConvertChildToNPC() will
+        /// automatically turn them into a full NPC that joins the realm.
+        /// </summary>
+        public void CreateNPCChild(Character mother, Character father)
+        {
+            var rng = new Random();
+            var sex = rng.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
+
+            var child = new Child
+            {
+                Name = GenerateNPCChildName(sex),
+                Mother = mother.Name2 ?? mother.Name,
+                Father = father.Name2 ?? father.Name,
+                MotherID = mother.ID ?? "",
+                FatherID = father.ID ?? "",
+                Sex = sex,
+                Age = 0,
+                BirthDate = DateTime.Now,
+                Health = 100,
+                Soul = rng.Next(-200, 201),
+                Location = GameConfig.ChildLocationHome,
+                Named = true,
+            };
+
+            RegisterChild(child);
+
+            NewsSystem.Instance?.WriteBirthNews(
+                mother.Name2 ?? mother.Name,
+                father.Name2 ?? father.Name,
+                child.Name, true);
+
+            DebugLogger.Instance.LogInfo("LIFECYCLE",
+                $"NPC child born: {child.Name} ({child.Sex}), parents: {mother.Name2} & {father.Name2}");
+        }
+
+        /// <summary>
+        /// Generate a unique fantasy name for an NPC child, checking against existing NPCs and children.
+        /// </summary>
+        private string GenerateNPCChildName(CharacterSex sex)
+        {
+            var rng = new Random();
+            var names = sex == CharacterSex.Female ? FemaleNames : MaleNames;
+
+            // Collect all existing names to avoid duplicates
+            var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (NPCSpawnSystem.Instance?.ActiveNPCs != null)
+            {
+                foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
+                    existingNames.Add(npc.Name2 ?? npc.Name1);
+            }
+            foreach (var child in _children.Where(c => !c.Deleted))
+                existingNames.Add(child.Name);
+
+            // Try to find a unique name from the pool
+            var available = names.Where(n => !existingNames.Contains(n)).ToArray();
+            if (available.Length > 0)
+                return available[rng.Next(available.Length)];
+
+            // All pool names taken - generate a suffixed name
+            var baseName = names[rng.Next(names.Length)];
+            int suffix = 2;
+            while (existingNames.Contains($"{baseName} {ToRomanNumeral(suffix)}"))
+                suffix++;
+            return $"{baseName} {ToRomanNumeral(suffix)}";
+        }
+
+        private static string ToRomanNumeral(int num) => num switch
+        {
+            2 => "II", 3 => "III", 4 => "IV", 5 => "V",
+            6 => "VI", 7 => "VII", 8 => "VIII", 9 => "IX", 10 => "X",
+            _ => num.ToString()
+        };
+
+        #endregion
 
         /// <summary>
         /// Serialize children for save system

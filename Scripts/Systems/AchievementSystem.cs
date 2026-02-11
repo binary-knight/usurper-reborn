@@ -327,6 +327,17 @@ public static class AchievementSystem
 
         Register(new Achievement
         {
+            Id = "pvp_veteran",
+            Name = "Arena Veteran",
+            Description = "Win 10 player vs player battles in the Arena",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Gold,
+            PointValue = 50,
+            GoldReward = 2000
+        });
+
+        Register(new Achievement
+        {
             Id = "pvp_champion",
             Name = "PvP Champion",
             Description = "Win 50 player vs player battles",
@@ -965,6 +976,7 @@ public static class AchievementSystem
         if (stats.TotalDamageDealt >= 10000) TryUnlock(player, "damage_dealer_10000");
         if (stats.TotalDamageDealt >= 100000) TryUnlock(player, "damage_dealer_100000");
         if (stats.TotalPlayerKills >= 1) TryUnlock(player, "pvp_victor");
+        if (stats.TotalPlayerKills >= 10) TryUnlock(player, "pvp_veteran");
         if (stats.TotalPlayerKills >= 50) TryUnlock(player, "pvp_champion");
 
         // Progression achievements

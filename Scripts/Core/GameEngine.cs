@@ -212,6 +212,8 @@ public partial class GameEngine : Node
         // Check if this BBS user has an existing save
         var existingSave = SaveSystem.Instance.GetMostRecentSave(playerName);
         bool isSysOp = UsurperRemake.BBS.DoorMode.IsSysOp;
+        bool isOnlineAdmin = UsurperRemake.BBS.DoorMode.IsOnlineMode &&
+            string.Equals(UsurperRemake.BBS.DoorMode.OnlineUsername, "rage", StringComparison.OrdinalIgnoreCase);
 
         if (existingSave != null)
         {
@@ -228,6 +230,12 @@ public partial class GameEngine : Node
             {
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("[%] SysOp Administration Console");
+                terminal.SetColor("bright_white");
+            }
+            if (isOnlineAdmin)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("[%] Admin Console");
                 terminal.SetColor("bright_white");
             }
             terminal.WriteLine("[Q] Quit");
@@ -268,7 +276,13 @@ public partial class GameEngine : Node
                     break;
 
                 case "%":
-                    if (isSysOp)
+                    if (isOnlineAdmin)
+                    {
+                        await ShowOnlineAdminConsole();
+                        await RunBBSDoorMode();
+                        return;
+                    }
+                    else if (isSysOp)
                     {
                         await ShowSysOpConsole();
                         await RunBBSDoorMode();
@@ -303,6 +317,12 @@ public partial class GameEngine : Node
                 terminal.WriteLine("[%] SysOp Administration Console");
                 terminal.SetColor("bright_white");
             }
+            if (isOnlineAdmin)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("[%] Admin Console");
+                terminal.SetColor("bright_white");
+            }
             terminal.WriteLine("[Q] Quit");
             terminal.WriteLine("");
 
@@ -311,7 +331,13 @@ public partial class GameEngine : Node
             switch (choice.ToUpper())
             {
                 case "%":
-                    if (isSysOp)
+                    if (isOnlineAdmin)
+                    {
+                        await ShowOnlineAdminConsole();
+                        await RunBBSDoorMode();
+                        return;
+                    }
+                    else if (isSysOp)
                     {
                         await ShowSysOpConsole();
                         await RunBBSDoorMode();
@@ -820,6 +846,24 @@ public partial class GameEngine : Node
     }
 
     /// <summary>
+    /// Online Admin Console - accessible from character selection when authenticated as admin.
+    /// Manages players, settings, and world state via SqlSaveBackend.
+    /// </summary>
+    private async Task ShowOnlineAdminConsole()
+    {
+        var sqlBackend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (sqlBackend == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Admin console requires online mode with SQL backend.");
+            await terminal.GetInputAsync("Press Enter to continue...");
+            return;
+        }
+        var adminConsole = new OnlineAdminConsole(terminal, sqlBackend);
+        await adminConsole.Run();
+    }
+
+    /// <summary>
     /// Enter the game with modern save/load UI
     /// </summary>
     private async Task EnterGame()
@@ -1150,6 +1194,12 @@ public partial class GameEngine : Node
             terminal.WriteLine("Save loaded successfully!", "bright_green");
             await Task.Delay(1000);
 
+            // Show "While you were gone" summary for online players
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend)
+            {
+                await ShowWhileYouWereGone(sqlBackend);
+            }
+
             // Start game at saved location
             await locationManager.EnterLocation(GameLocation.MainStreet, currentPlayer);
         }
@@ -1160,6 +1210,126 @@ public partial class GameEngine : Node
             UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Failed to load save {fileName}:\n{ex}");
             UsurperRemake.Systems.DebugLogger.Instance.Flush();
             await Task.Delay(3000);
+        }
+    }
+
+    /// <summary>
+    /// Show a "While you were gone" summary for online players on login.
+    /// Displays PvP attacks, unread messages, and world news since last logout.
+    /// </summary>
+    private async Task ShowWhileYouWereGone(SqlSaveBackend backend)
+    {
+        try
+        {
+            var username = UsurperRemake.BBS.DoorMode.OnlineUsername;
+            if (string.IsNullOrEmpty(username)) return;
+
+            // Get the player's last logout time
+            var lastLogout = await backend.GetLastLogoutTime(username);
+            if (lastLogout == null) return; // First login ever, skip
+
+            // Query all data sources
+            var pvpAttacks = await backend.GetPvPAttacksAgainst(username, lastLogout.Value);
+            var news = await backend.GetNewsSince(lastLogout.Value, 15);
+            var allMessages = await backend.GetUnreadMessages(username);
+
+            // Filter to direct messages only (not broadcasts)
+            var directMessages = allMessages
+                .Where(m => !string.Equals(m.ToPlayer, "*", StringComparison.OrdinalIgnoreCase))
+                .Take(5)
+                .ToList();
+
+            // If nothing happened, skip silently
+            if (pvpAttacks.Count == 0 && directMessages.Count == 0 && news.Count == 0)
+                return;
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("\u2551                         WHILE YOU WERE GONE                              \u2551");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563");
+
+            // --- PvP Attacks Section ---
+            if (pvpAttacks.Count > 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  -- Arena Attacks --");
+                foreach (var attack in pvpAttacks)
+                {
+                    bool defenderWon = attack.WinnerUsername.Equals(username, StringComparison.OrdinalIgnoreCase)
+                        || attack.WinnerUsername.Equals(attack.DefenderName, StringComparison.OrdinalIgnoreCase);
+
+                    if (defenderWon)
+                    {
+                        terminal.SetColor("bright_green");
+                        string goldMsg = attack.GoldStolen > 0 ? $" You gained {attack.GoldStolen:N0} gold." : "";
+                        terminal.WriteLine($"  * {attack.AttackerName} attacked you but your shadow defeated them!{goldMsg}");
+                    }
+                    else
+                    {
+                        terminal.SetColor("bright_red");
+                        string goldMsg = attack.GoldStolen > 0 ? $" They stole {attack.GoldStolen:N0} of your gold." : "";
+                        terminal.WriteLine($"  * {attack.AttackerName} attacked you and won!{goldMsg}");
+                    }
+                }
+            }
+
+            // --- Messages Section ---
+            if (directMessages.Count > 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  -- Messages --");
+                foreach (var msg in directMessages)
+                {
+                    terminal.SetColor("cyan");
+                    string msgText = msg.Message.Length > 60 ? msg.Message.Substring(0, 57) + "..." : msg.Message;
+                    terminal.WriteLine($"  [{msg.FromPlayer}]: {msgText}");
+                }
+            }
+
+            // --- World News Section ---
+            if (news.Count > 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  -- World News --");
+                int newsShown = 0;
+                foreach (var entry in news)
+                {
+                    if (newsShown >= 10) break;
+
+                    string color = entry.Category?.ToLower() switch
+                    {
+                        "combat" => "red",
+                        "pvp" => "bright_yellow",
+                        "politics" => "bright_cyan",
+                        "romance" => "magenta",
+                        "economy" => "yellow",
+                        "quest" => "green",
+                        _ => "white"
+                    };
+                    terminal.SetColor(color);
+                    string newsText = entry.Message.Length > 72 ? entry.Message.Substring(0, 69) + "..." : entry.Message;
+                    terminal.WriteLine($"  * {newsText}");
+                    newsShown++;
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d");
+            terminal.WriteLine("");
+
+            await terminal.PressAnyKey();
+        }
+        catch (Exception ex)
+        {
+            // Fail silently - this is a cosmetic feature that should never block login
+            DebugLogger.Instance.LogError("WYWEG", $"Failed to show 'While you were gone': {ex.Message}");
         }
     }
 
@@ -2031,6 +2201,14 @@ public partial class GameEngine : Node
 
                 // Death status - permanent death tracking
                 IsDead = data.IsDead,
+
+                // Lifecycle - aging and natural death
+                Age = data.Age > 0 ? data.Age : new Random().Next(18, 50),
+                BirthDate = data.BirthDate > DateTime.MinValue
+                    ? data.BirthDate
+                    : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : new Random().Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
+                IsAgedDeath = data.IsAgedDeath,
+                PregnancyDueDate = data.PregnancyDueDate,
 
                 // Marriage status
                 IsMarried = data.IsMarried,

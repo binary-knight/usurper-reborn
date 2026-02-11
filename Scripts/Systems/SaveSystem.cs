@@ -696,6 +696,12 @@ namespace UsurperRemake.Systems
                     // Death status - permanent death tracking
                     IsDead = npc.IsDead,
 
+                    // Lifecycle - aging and natural death
+                    Age = npc.Age,
+                    BirthDate = npc.BirthDate,
+                    IsAgedDeath = npc.IsAgedDeath,
+                    PregnancyDueDate = npc.PregnancyDueDate,
+
                     // Marriage status
                     IsMarried = npc.IsMarried,
                     Married = npc.Married,

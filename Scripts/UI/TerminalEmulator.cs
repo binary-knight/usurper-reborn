@@ -564,10 +564,76 @@ public partial class TerminalEmulator : Control
         }
         else
         {
-            var result = Console.ReadLine() ?? string.Empty;
-            WriteLine(result, "cyan");
-        return result;
+            // When stdin is redirected (SSH/online mode), Console.ReadLine() doesn't
+            // handle backspace properly - raw \x7f/\x08 bytes leak into the input string.
+            // Use character-by-character reading with manual backspace handling.
+            string result;
+            if (Console.IsInputRedirected)
+            {
+                result = ReadLineWithBackspace();
+            }
+            else
+            {
+                result = Console.ReadLine() ?? string.Empty;
+            }
+            return result;
         }
+    }
+
+    /// <summary>
+    /// Read a line from stdin handling backspace (0x7F, 0x08) and escape sequences manually.
+    /// Used when stdin is redirected (SSH/online mode) where Console.ReadLine() passes raw bytes through.
+    /// </summary>
+    private string ReadLineWithBackspace()
+    {
+        var buffer = new System.Text.StringBuilder();
+        while (true)
+        {
+            int ch = Console.In.Read();
+            if (ch == -1 || ch == '\n' || ch == '\r')
+            {
+                // Consume \n after \r if present
+                if (ch == '\r' && Console.In.Peek() == '\n')
+                    Console.In.Read();
+                Console.Out.Write("\r\n");
+                Console.Out.Flush();
+                break;
+            }
+            else if (ch == 0x7F || ch == 0x08) // DEL or BS
+            {
+                if (buffer.Length > 0)
+                {
+                    buffer.Remove(buffer.Length - 1, 1);
+                    // Send backspace-space-backspace to erase character on terminal
+                    Console.Out.Write("\b \b");
+                    Console.Out.Flush();
+                }
+            }
+            else if (ch == 0x1B) // ESC - skip escape sequences
+            {
+                // Read and discard the rest of the escape sequence
+                if (Console.In.Peek() == '[')
+                {
+                    Console.In.Read(); // consume '['
+                    // Read until we get a letter (end of escape sequence)
+                    while (true)
+                    {
+                        int next = Console.In.Peek();
+                        if (next == -1) break;
+                        Console.In.Read();
+                        if (next >= 'A' && next <= 'Z' || next >= 'a' && next <= 'z' || next == '~')
+                            break;
+                    }
+                }
+            }
+            else if (ch >= 32) // Printable characters only
+            {
+                buffer.Append((char)ch);
+                Console.Out.Write((char)ch);
+                Console.Out.Flush();
+            }
+        }
+        return buffer.ToString();
     }
     
     private void OnInputSubmitted(string text)

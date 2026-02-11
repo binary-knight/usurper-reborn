@@ -20,6 +20,7 @@ const SSH_USER = 'usurper';
 const SSH_PASS = 'play';
 const DB_PATH = '/var/usurper/usurper_online.db';
 const CACHE_TTL = 30000; // 30 seconds
+const FEED_POLL_MS = 5000; // SSE feed polls DB every 5 seconds
 
 const CLASS_NAMES = {
   0: 'Alchemist', 1: 'Assassin', 2: 'Barbarian', 3: 'Bard',
@@ -58,7 +59,7 @@ function getStats() {
   }
 
   if (!db) {
-    return { error: 'Database not available', online: [], stats: {}, highlights: {}, news: [] };
+    return { error: 'Database not available', online: [], stats: {}, highlights: {}, news: [], npcActivities: [] };
   }
 
   try {
@@ -91,7 +92,7 @@ function getStats() {
         COALESCE(MAX(json_extract(player_data, '$.player.statistics.deepestDungeonLevel')), 0) as deepestFloor,
         COALESCE(SUM(json_extract(player_data, '$.player.gold')), 0)
           + COALESCE(SUM(json_extract(player_data, '$.player.bankGold')), 0) as totalGold
-      FROM players WHERE is_banned = 0
+      FROM players WHERE is_banned = 0 AND username NOT LIKE 'emergency_%'
     `).get();
 
     // Top player
@@ -99,14 +100,16 @@ function getStats() {
       SELECT display_name,
              json_extract(player_data, '$.player.level') as level,
              json_extract(player_data, '$.player.class') as class_id
-      FROM players WHERE is_banned = 0
+      FROM players WHERE is_banned = 0 AND username NOT LIKE 'emergency_%'
       ORDER BY json_extract(player_data, '$.player.level') DESC LIMIT 1
     `).get();
 
-    // Most popular class
+    // Most popular class (exclude NULL class from empty/test accounts)
     const popClass = db.prepare(`
       SELECT json_extract(player_data, '$.player.class') as class_id, COUNT(*) as cnt
       FROM players WHERE is_banned = 0
+        AND username NOT LIKE 'emergency_%'
+        AND json_extract(player_data, '$.player.class') IS NOT NULL
       GROUP BY class_id ORDER BY cnt DESC LIMIT 1
     `).get();
 
@@ -161,6 +164,7 @@ function getStats() {
           AND p.player_data != '{}'
           AND LENGTH(p.player_data) > 2
           AND json_extract(p.player_data, '$.player.level') IS NOT NULL
+          AND p.username NOT LIKE 'emergency_%'
         ORDER BY json_extract(p.player_data, '$.player.level') DESC,
                  json_extract(p.player_data, '$.player.experience') DESC
         LIMIT 25
@@ -179,7 +183,7 @@ function getStats() {
     try {
       news = db.prepare(`
         SELECT message, category, player_name, created_at
-        FROM news ORDER BY created_at DESC LIMIT 10
+        FROM news WHERE category != 'npc' ORDER BY created_at DESC LIMIT 10
       `).all().map(row => ({
         message: row.message,
         category: row.category,
@@ -187,6 +191,54 @@ function getStats() {
         time: row.created_at
       }));
     } catch (e) { /* news table may not exist */ }
+
+    // NPC world activity feed (from 24/7 world simulator)
+    let npcActivities = [];
+    try {
+      npcActivities = db.prepare(`
+        SELECT message, created_at
+        FROM news
+        WHERE category = 'npc'
+        ORDER BY created_at DESC
+        LIMIT 20
+      `).all().map(row => ({
+        message: row.message,
+        time: row.created_at
+      }));
+    } catch (e) { /* npc activities may not exist yet */ }
+
+    // PvP leaderboard
+    let pvpLeaderboard = [];
+    try {
+      pvpLeaderboard = db.prepare(`
+        SELECT
+          p.display_name,
+          json_extract(p.player_data, '$.player.level') as level,
+          json_extract(p.player_data, '$.player.class') as class_id,
+          SUM(CASE WHEN LOWER(pvp.winner) = LOWER(pvp.player) THEN 1 ELSE 0 END) as wins,
+          SUM(CASE WHEN LOWER(pvp.winner) != LOWER(pvp.player) THEN 1 ELSE 0 END) as losses,
+          COALESCE(SUM(CASE WHEN LOWER(pvp.winner) = LOWER(pvp.player) THEN pvp.gold_stolen ELSE 0 END), 0) as gold_stolen
+        FROM (
+          SELECT attacker as player, attacker, defender, winner, gold_stolen FROM pvp_log
+          UNION ALL
+          SELECT defender as player, attacker, defender, winner, gold_stolen FROM pvp_log
+        ) pvp
+        JOIN players p ON LOWER(pvp.player) = LOWER(p.username)
+        WHERE p.is_banned = 0
+        GROUP BY pvp.player
+        HAVING wins > 0
+        ORDER BY wins DESC, gold_stolen DESC
+        LIMIT 10
+      `).all().map((row, idx) => ({
+        rank: idx + 1,
+        name: row.display_name,
+        level: row.level || 1,
+        className: CLASS_NAMES[row.class_id] || 'Unknown',
+        wins: row.wins || 0,
+        losses: row.losses || 0,
+        goldStolen: row.gold_stolen || 0
+      }));
+    } catch (e) { /* pvp_log table may not exist yet */ }
 
     statsCache = {
       online: online,
@@ -211,20 +263,102 @@ function getStats() {
         popularClass: popClass ? CLASS_NAMES[popClass.class_id] || 'Unknown' : null
       },
       leaderboard: leaderboard,
+      pvpLeaderboard: pvpLeaderboard,
       news: news,
+      npcActivities: npcActivities,
       cachedAt: new Date().toISOString()
     };
     statsCacheTime = now;
     return statsCache;
   } catch (err) {
     console.error(`[usurper-web] Stats query error: ${err.message}`);
-    return { error: 'Stats query failed', online: [], stats: {}, highlights: {}, news: [] };
+    return { error: 'Stats query failed', online: [], stats: {}, highlights: {}, news: [], npcActivities: [] };
   }
 }
 
+// --- SSE Live Feed ---
+const sseClients = new Set();
+let lastNpcId = 0;
+let lastNewsId = 0;
+
+// Initialize high-water marks from current DB state
+function initFeedIds() {
+  if (!db) return;
+  try {
+    const npcRow = db.prepare(`SELECT MAX(id) as maxId FROM news WHERE category = 'npc'`).get();
+    if (npcRow && npcRow.maxId) lastNpcId = npcRow.maxId;
+    const newsRow = db.prepare(`SELECT MAX(id) as maxId FROM news WHERE category != 'npc'`).get();
+    if (newsRow && newsRow.maxId) lastNewsId = newsRow.maxId;
+    console.log(`[usurper-web] Feed initialized: npcId=${lastNpcId}, newsId=${lastNewsId}`);
+  } catch (e) { /* tables may not exist yet */ }
+}
+initFeedIds();
+
+// Poll for new entries and push to all SSE clients
+function pollFeed() {
+  if (sseClients.size === 0 || !db) return;
+
+  try {
+    // New NPC activities since last check
+    const npcRows = db.prepare(`
+      SELECT id, message, created_at FROM news
+      WHERE category = 'npc' AND id > ? ORDER BY id ASC LIMIT 10
+    `).all(lastNpcId);
+
+    // New player news since last check
+    const newsRows = db.prepare(`
+      SELECT id, message, created_at FROM news
+      WHERE category != 'npc' AND id > ? ORDER BY id ASC LIMIT 10
+    `).all(lastNewsId);
+
+    if (npcRows.length > 0) {
+      lastNpcId = npcRows[npcRows.length - 1].id;
+      const items = npcRows.map(r => ({ message: r.message, time: r.created_at }));
+      broadcast('npc', items);
+    }
+
+    if (newsRows.length > 0) {
+      lastNewsId = newsRows[newsRows.length - 1].id;
+      const items = newsRows.map(r => ({ message: r.message, time: r.created_at }));
+      broadcast('news', items);
+    }
+  } catch (e) {
+    // Silently ignore - table might not exist yet
+  }
+}
+
+function broadcast(type, items) {
+  const data = JSON.stringify({ type, items });
+  const msg = `data: ${data}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(msg); } catch (e) { sseClients.delete(client); }
+  }
+}
+
+// Start feed polling
+const feedTimer = setInterval(pollFeed, FEED_POLL_MS);
+
 // --- HTTP Handler ---
 function handleHttpRequest(req, res) {
-  if (req.method === 'GET' && req.url === '/api/stats') {
+  if (req.method === 'GET' && req.url === '/api/feed') {
+    // SSE endpoint for live feed
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Accel-Buffering', 'no'); // Prevent nginx buffering
+    res.writeHead(200);
+    res.write('retry: 5000\n\n'); // Auto-reconnect after 5s
+
+    sseClients.add(res);
+    console.log(`[usurper-web] SSE client connected (${sseClients.size} total)`);
+
+    req.on('close', () => {
+      sseClients.delete(res);
+      console.log(`[usurper-web] SSE client disconnected (${sseClients.size} total)`);
+    });
+    return;
+  } else if (req.method === 'GET' && req.url === '/api/stats') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'public, max-age=15');
@@ -337,14 +471,13 @@ wss.on('connection', (ws, req) => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+function gracefulShutdown() {
   console.log('[usurper-web] Shutting down...');
+  clearInterval(feedTimer);
+  for (const client of sseClients) { try { client.end(); } catch (e) {} }
+  sseClients.clear();
   if (db) db.close();
   wss.close(() => httpServer.close(() => process.exit(0)));
-});
-
-process.on('SIGINT', () => {
-  console.log('[usurper-web] Shutting down...');
-  if (db) db.close();
-  wss.close(() => httpServer.close(() => process.exit(0)));
-});
+}
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

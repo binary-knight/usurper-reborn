@@ -22,6 +22,12 @@ namespace UsurperRemake.BBS
         private static string? _onlineUsername = null;
         private static string _onlineDatabasePath = "/var/usurper/usurper_online.db";
 
+        // World simulator mode (headless 24/7 NPC simulation)
+        private static bool _worldSimMode = false;
+        private static int _simIntervalSeconds = 60;
+        private static float _npcXpMultiplier = 0.25f;
+        private static int _saveIntervalMinutes = 5;
+
         // Windows API for hiding console window
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetConsoleWindow();
@@ -87,6 +93,21 @@ namespace UsurperRemake.BBS
         public static string OnlineDatabasePath => _onlineDatabasePath;
 
         /// <summary>
+        /// True when running in headless world simulator mode (--worldsim flag).
+        /// Runs NPC simulation 24/7 without terminal, auth, or player tracking.
+        /// </summary>
+        public static bool IsWorldSimMode => _worldSimMode;
+
+        /// <summary>Simulation tick interval in seconds (default: 60).</summary>
+        public static int SimIntervalSeconds => _simIntervalSeconds;
+
+        /// <summary>NPC XP gain multiplier (default: 0.25 = 25% of normal).</summary>
+        public static float NpcXpMultiplier => _npcXpMultiplier;
+
+        /// <summary>How often to persist NPC state to database, in minutes (default: 5).</summary>
+        public static int SaveIntervalMinutes => _saveIntervalMinutes;
+
+        /// <summary>
         /// Check command line args for door mode parameters
         /// Returns true if door mode should be used
         /// </summary>
@@ -136,6 +157,36 @@ namespace UsurperRemake.BBS
                     _onlineDatabasePath = args[i + 1];
                     i++; // skip next arg (the path value)
                 }
+                // --worldsim enables headless world simulator mode (24/7 NPC simulation)
+                else if (arg == "--worldsim")
+                {
+                    _worldSimMode = true;
+                    _onlineMode = true; // implies online mode
+                    _forceStdio = true;
+                    Console.Error.WriteLine("[WORLDSIM] World simulator mode enabled");
+                }
+                // --sim-interval <seconds> sets the simulation tick interval
+                else if (arg == "--sim-interval" && i + 1 < args.Length)
+                {
+                    if (int.TryParse(args[i + 1], out int interval) && interval >= 10)
+                        _simIntervalSeconds = interval;
+                    i++;
+                }
+                // --npc-xp <multiplier> sets the NPC XP gain multiplier (0.01 - 2.0)
+                else if (arg == "--npc-xp" && i + 1 < args.Length)
+                {
+                    if (float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out float mult) && mult >= 0.01f && mult <= 2.0f)
+                        _npcXpMultiplier = mult;
+                    i++;
+                }
+                // --save-interval <minutes> sets how often NPC state is persisted
+                else if (arg == "--save-interval" && i + 1 < args.Length)
+                {
+                    if (int.TryParse(args[i + 1], out int mins) && mins >= 1)
+                        _saveIntervalMinutes = mins;
+                    i++;
+                }
             }
 
             // Second pass: process commands (--door, --door32, etc.)
@@ -175,6 +226,17 @@ namespace UsurperRemake.BBS
                 if (arg == "--local" || arg == "-l")
                 {
                     _sessionInfo = DropFileParser.CreateLocalSession();
+                    return true;
+                }
+
+                // --worldsim (handled in first pass for flag, trigger entry here)
+                if (arg == "--worldsim")
+                {
+                    _sessionInfo = DropFileParser.CreateLocalSession();
+                    _sessionInfo.UserName = "__worldsim__";
+                    _sessionInfo.UserAlias = "__worldsim__";
+                    Console.Error.WriteLine($"[WORLDSIM] Sim interval: {_simIntervalSeconds}s, NPC XP: {_npcXpMultiplier:F2}x, Save interval: {_saveIntervalMinutes}min");
+                    Console.Error.WriteLine($"[WORLDSIM] Database: {_onlineDatabasePath}");
                     return true;
                 }
 
@@ -638,6 +700,12 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  --online             Run in online multiplayer mode (SQLite backend)");
             Console.WriteLine("  --user <name>        Set player username (for SSH ForceCommand)");
             Console.WriteLine("  --db <path>          SQLite database path (default: /var/usurper/usurper_online.db)");
+            Console.WriteLine("");
+            Console.WriteLine("World Simulator Options:");
+            Console.WriteLine("  --worldsim           Run headless 24/7 world simulator (no terminal/auth)");
+            Console.WriteLine("  --sim-interval <sec> Simulation tick interval in seconds (default: 60)");
+            Console.WriteLine("  --npc-xp <mult>      NPC XP gain multiplier, 0.01-2.0 (default: 0.25)");
+            Console.WriteLine("  --save-interval <min> State persistence interval in minutes (default: 5)");
             Console.WriteLine("");
             Console.WriteLine("Examples:");
             Console.WriteLine("  UsurperReborn --door32 /sbbs/node1/door32.sys");

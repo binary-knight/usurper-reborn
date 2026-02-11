@@ -108,9 +108,25 @@ namespace UsurperRemake.Systems
                         created_at TEXT DEFAULT (datetime('now'))
                     );
 
+                    CREATE TABLE IF NOT EXISTS pvp_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        attacker TEXT NOT NULL,
+                        defender TEXT NOT NULL,
+                        attacker_level INTEGER NOT NULL,
+                        defender_level INTEGER NOT NULL,
+                        winner TEXT NOT NULL,
+                        gold_stolen INTEGER DEFAULT 0,
+                        xp_gained INTEGER DEFAULT 0,
+                        attacker_hp_remaining INTEGER DEFAULT 0,
+                        rounds INTEGER DEFAULT 0,
+                        created_at TEXT DEFAULT (datetime('now'))
+                    );
+
                     CREATE INDEX IF NOT EXISTS idx_news_created ON news(created_at DESC);
                     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_player, is_read);
                     CREATE INDEX IF NOT EXISTS idx_online_heartbeat ON online_players(last_heartbeat);
+                    CREATE INDEX IF NOT EXISTS idx_pvp_attacker ON pvp_log(attacker, created_at);
+                    CREATE INDEX IF NOT EXISTS idx_pvp_winner ON pvp_log(winner);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -367,7 +383,7 @@ namespace UsurperRemake.Systems
             {
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT display_name FROM players WHERE is_banned = 0 ORDER BY display_name;";
+                cmd.CommandText = "SELECT display_name FROM players WHERE is_banned = 0 AND username NOT LIKE 'emergency_%' ORDER BY display_name;";
 
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -536,12 +552,31 @@ namespace UsurperRemake.Systems
                 ";
                 cmd.Parameters.AddWithValue("@message", message);
                 cmd.Parameters.AddWithValue("@category", category);
-                cmd.Parameters.AddWithValue("@playerName", playerName);
+                cmd.Parameters.AddWithValue("@playerName", (object?)playerName ?? DBNull.Value);
                 await cmd.ExecuteNonQueryAsync();
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to add news: {ex.Message}");
+            }
+        }
+
+        public async Task PruneOldNews(string category, int hoursToKeep = 24)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    DELETE FROM news WHERE category = @category AND created_at < datetime('now', @cutoff);
+                ";
+                cmd.Parameters.AddWithValue("@category", category);
+                cmd.Parameters.AddWithValue("@cutoff", $"-{hoursToKeep} hours");
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to prune old news: {ex.Message}");
             }
         }
 
@@ -846,7 +881,8 @@ namespace UsurperRemake.Systems
                     WHERE p.is_banned = 0
                         AND p.player_data != '{}'
                         AND LENGTH(p.player_data) > 2
-                        AND json_extract(p.player_data, '$.player.level') IS NOT NULL;
+                        AND json_extract(p.player_data, '$.player.level') IS NOT NULL
+                        AND p.username NOT LIKE 'emergency_%';
                 ";
 
                 using var reader = await cmd.ExecuteReaderAsync();
@@ -913,6 +949,173 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to ban player: {ex.Message}");
+            }
+        }
+
+        // =====================================================================
+        // Admin Methods
+        // =====================================================================
+
+        public async Task UnbanPlayer(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE players SET is_banned = 0, ban_reason = NULL WHERE LOWER(username) = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                await cmd.ExecuteNonQueryAsync();
+                DebugLogger.Instance.LogInfo("SQL", $"Player '{username}' unbanned by admin");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to unban player: {ex.Message}");
+            }
+        }
+
+        public async Task<List<(string username, string displayName, string? banReason)>> GetBannedPlayers()
+        {
+            var banned = new List<(string, string, string?)>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT username, display_name, ban_reason FROM players WHERE is_banned = 1 ORDER BY display_name;";
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    banned.Add((
+                        reader.GetString(0),
+                        reader.GetString(1),
+                        reader.IsDBNull(2) ? null : reader.GetString(2)
+                    ));
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get banned players: {ex.Message}");
+            }
+            return banned;
+        }
+
+        public async Task<List<AdminPlayerInfo>> GetAllPlayersDetailed()
+        {
+            var players = new List<AdminPlayerInfo>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT
+                        p.username, p.display_name, p.is_banned, p.ban_reason,
+                        p.last_login, p.created_at, p.total_playtime_minutes,
+                        json_extract(p.player_data, '$.player.level') as level,
+                        json_extract(p.player_data, '$.player.class') as class_id,
+                        json_extract(p.player_data, '$.player.gold') as gold,
+                        json_extract(p.player_data, '$.player.experience') as xp,
+                        CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online
+                    FROM players p
+                    LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
+                        AND op.last_heartbeat >= datetime('now', '-120 seconds')
+                    ORDER BY p.display_name;
+                ";
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    players.Add(new AdminPlayerInfo
+                    {
+                        Username = reader.GetString(0),
+                        DisplayName = reader.GetString(1),
+                        IsBanned = reader.GetInt32(2) != 0,
+                        BanReason = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        LastLogin = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        CreatedAt = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        TotalPlaytimeMinutes = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
+                        Level = reader.IsDBNull(7) ? 0 : Convert.ToInt32(reader.GetValue(7)),
+                        ClassId = reader.IsDBNull(8) ? 0 : Convert.ToInt32(reader.GetValue(8)),
+                        Gold = reader.IsDBNull(9) ? 0 : Convert.ToInt64(reader.GetValue(9)),
+                        Experience = reader.IsDBNull(10) ? 0 : Convert.ToInt64(reader.GetValue(10)),
+                        IsOnline = reader.GetInt32(11) != 0
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get detailed player list: {ex.Message}");
+            }
+            return players;
+        }
+
+        public async Task ClearAllNews()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM news;";
+                var affected = await cmd.ExecuteNonQueryAsync();
+                DebugLogger.Instance.LogInfo("SQL", $"News table cleared by admin ({affected} entries)");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to clear news: {ex.Message}");
+            }
+        }
+
+        public async Task FullGameReset()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var transaction = connection.BeginTransaction();
+
+                // Clear all player save data (preserve accounts/passwords)
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = "UPDATE players SET player_data = '{}', is_banned = 0, ban_reason = NULL;";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                // Clear world state
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = "DELETE FROM world_state;";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                // Clear news
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = "DELETE FROM news;";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                // Clear messages
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = "DELETE FROM messages;";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                // Clear online players (they'll re-register on next heartbeat)
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = "DELETE FROM online_players;";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                transaction.Commit();
+                DebugLogger.Instance.LogWarning("SQL", "Full game reset performed by admin");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to perform full game reset: {ex.Message}");
+                throw;
             }
         }
 
@@ -1133,5 +1336,397 @@ namespace UsurperRemake.Systems
                 return (false, "Password change failed. Please try again.");
             }
         }
+
+        // =====================================================================
+        // PvP Combat Log
+        // =====================================================================
+
+        /// <summary>
+        /// Record a PvP combat result in the log.
+        /// </summary>
+        public async Task LogPvPCombat(string attacker, string defender,
+            int attackerLevel, int defenderLevel, string winner,
+            long goldStolen, long xpGained, long attackerHpRemaining, int rounds)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO pvp_log (attacker, defender, attacker_level, defender_level,
+                                         winner, gold_stolen, xp_gained, attacker_hp_remaining, rounds)
+                    VALUES (@attacker, @defender, @attackerLevel, @defenderLevel,
+                            @winner, @goldStolen, @xpGained, @hpRemaining, @rounds);
+                ";
+                cmd.Parameters.AddWithValue("@attacker", attacker.ToLower());
+                cmd.Parameters.AddWithValue("@defender", defender.ToLower());
+                cmd.Parameters.AddWithValue("@attackerLevel", attackerLevel);
+                cmd.Parameters.AddWithValue("@defenderLevel", defenderLevel);
+                cmd.Parameters.AddWithValue("@winner", winner.ToLower());
+                cmd.Parameters.AddWithValue("@goldStolen", goldStolen);
+                cmd.Parameters.AddWithValue("@xpGained", xpGained);
+                cmd.Parameters.AddWithValue("@hpRemaining", attackerHpRemaining);
+                cmd.Parameters.AddWithValue("@rounds", rounds);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to log PvP combat: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get the number of PvP attacks a player has made today.
+        /// </summary>
+        public int GetPvPAttacksToday(string attacker)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT COUNT(*) FROM pvp_log
+                    WHERE attacker = LOWER(@attacker)
+                    AND created_at >= date('now');
+                ";
+                cmd.Parameters.AddWithValue("@attacker", attacker);
+                return Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get PvP attacks today: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Check if a player has already attacked a specific defender today.
+        /// </summary>
+        public bool HasAttackedPlayerToday(string attacker, string defender)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT COUNT(*) FROM pvp_log
+                    WHERE attacker = LOWER(@attacker)
+                    AND defender = LOWER(@defender)
+                    AND created_at >= date('now');
+                ";
+                cmd.Parameters.AddWithValue("@attacker", attacker);
+                cmd.Parameters.AddWithValue("@defender", defender);
+                return Convert.ToInt32(cmd.ExecuteScalar() ?? 0) > 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to check PvP attack: {ex.Message}");
+                return true; // Fail safe: prevent attack
+            }
+        }
+
+        /// <summary>
+        /// Get the PvP leaderboard -- top players ranked by win count.
+        /// </summary>
+        public async Task<List<PvPLeaderboardEntry>> GetPvPLeaderboard(int limit = 20)
+        {
+            var entries = new List<PvPLeaderboardEntry>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT
+                        p1.winner,
+                        COUNT(*) as wins,
+                        (SELECT COUNT(*) FROM pvp_log p2
+                         WHERE (p2.attacker = p1.winner AND p2.winner != p1.winner)
+                            OR (p2.defender = p1.winner AND p2.winner != p1.winner)) as losses,
+                        COALESCE(SUM(p1.gold_stolen), 0) as total_gold_stolen,
+                        (SELECT p.display_name FROM players p
+                         WHERE LOWER(p.username) = p1.winner) as display_name,
+                        (SELECT json_extract(p.player_data, '$.player.level')
+                         FROM players p WHERE LOWER(p.username) = p1.winner) as level,
+                        (SELECT json_extract(p.player_data, '$.player.class')
+                         FROM players p WHERE LOWER(p.username) = p1.winner) as class_id
+                    FROM pvp_log p1
+                    GROUP BY p1.winner
+                    ORDER BY wins DESC, total_gold_stolen DESC
+                    LIMIT @limit;
+                ";
+                cmd.Parameters.AddWithValue("@limit", limit);
+
+                using var reader = await Task.Run(() => cmd.ExecuteReader());
+                int rank = 0;
+                while (reader.Read())
+                {
+                    rank++;
+                    entries.Add(new PvPLeaderboardEntry
+                    {
+                        Rank = rank,
+                        Username = reader.GetString(0),
+                        Wins = reader.GetInt32(1),
+                        Losses = reader.GetInt32(2),
+                        TotalGoldStolen = reader.GetInt64(3),
+                        DisplayName = reader.IsDBNull(4) ? reader.GetString(0) : reader.GetString(4),
+                        Level = reader.IsDBNull(5) ? 1 : Convert.ToInt32(reader.GetValue(5)),
+                        ClassId = reader.IsDBNull(6) ? 0 : Convert.ToInt32(reader.GetValue(6))
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get PvP leaderboard: {ex.Message}");
+            }
+            return entries;
+        }
+
+        /// <summary>
+        /// Get recent PvP fights for the arena history display.
+        /// </summary>
+        public async Task<List<PvPLogEntry>> GetRecentPvPFights(int limit = 10)
+        {
+            var entries = new List<PvPLogEntry>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT
+                        (SELECT p.display_name FROM players p
+                         WHERE LOWER(p.username) = pvp.attacker) as attacker_name,
+                        (SELECT p.display_name FROM players p
+                         WHERE LOWER(p.username) = pvp.defender) as defender_name,
+                        pvp.winner,
+                        pvp.gold_stolen,
+                        pvp.attacker_level,
+                        pvp.defender_level,
+                        pvp.created_at
+                    FROM pvp_log pvp
+                    ORDER BY pvp.created_at DESC
+                    LIMIT @limit;
+                ";
+                cmd.Parameters.AddWithValue("@limit", limit);
+
+                using var reader = await Task.Run(() => cmd.ExecuteReader());
+                while (reader.Read())
+                {
+                    entries.Add(new PvPLogEntry
+                    {
+                        AttackerName = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0),
+                        DefenderName = reader.IsDBNull(1) ? "Unknown" : reader.GetString(1),
+                        WinnerUsername = reader.GetString(2),
+                        GoldStolen = reader.GetInt64(3),
+                        AttackerLevel = reader.GetInt32(4),
+                        DefenderLevel = reader.GetInt32(5),
+                        CreatedAt = DateTime.Parse(reader.GetString(6))
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get recent PvP fights: {ex.Message}");
+            }
+            return entries;
+        }
+
+        /// <summary>
+        /// Deduct gold from a player's save data atomically.
+        /// Uses json_set to update without loading the full save blob.
+        /// </summary>
+        public async Task DeductGoldFromPlayer(string username, long goldAmount)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players
+                    SET player_data = json_set(
+                        player_data,
+                        '$.player.gold',
+                        MAX(0, CAST(json_extract(player_data, '$.player.gold') AS INTEGER) - @goldAmount)
+                    )
+                    WHERE LOWER(username) = LOWER(@username)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@goldAmount", goldAmount);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to deduct gold from {username}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Atomically add gold to a player's save data.
+        /// Used for PvP rewards when a defender wins.
+        /// </summary>
+        public async Task AddGoldToPlayer(string username, long goldAmount)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players
+                    SET player_data = json_set(
+                        player_data,
+                        '$.player.gold',
+                        CAST(json_extract(player_data, '$.player.gold') AS INTEGER) + @goldAmount
+                    )
+                    WHERE LOWER(username) = LOWER(@username)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@goldAmount", goldAmount);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to add gold to {username}: {ex.Message}");
+            }
+        }
+
+        // =====================================================================
+        // "While You Were Gone" Queries
+        // =====================================================================
+
+        /// <summary>
+        /// Get the player's last logout timestamp for "While you were gone" summary.
+        /// </summary>
+        public async Task<DateTime?> GetLastLogoutTime(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT last_logout FROM players WHERE LOWER(username) = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+
+                var result = await Task.Run(() => cmd.ExecuteScalar());
+                if (result != null && result != DBNull.Value)
+                {
+                    return DateTime.Parse(result.ToString()!);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get last logout time for {username}: {ex.Message}");
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Get news entries since a given timestamp for "While you were gone" summary.
+        /// </summary>
+        public async Task<List<NewsEntry>> GetNewsSince(DateTime sinceTime, int limit = 15)
+        {
+            var entries = new List<NewsEntry>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT id, message, category, player_name, created_at
+                    FROM news
+                    WHERE created_at > @since
+                    ORDER BY created_at DESC
+                    LIMIT @limit;
+                ";
+                cmd.Parameters.AddWithValue("@since", sinceTime.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.Parameters.AddWithValue("@limit", limit);
+
+                using var reader = await Task.Run(() => cmd.ExecuteReader());
+                while (reader.Read())
+                {
+                    entries.Add(new NewsEntry
+                    {
+                        Id = reader.GetInt32(0),
+                        Message = reader.GetString(1),
+                        Category = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                        PlayerName = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                        CreatedAt = DateTime.Parse(reader.GetString(4))
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get news since {sinceTime}: {ex.Message}");
+            }
+            return entries;
+        }
+
+        /// <summary>
+        /// Get PvP attacks where the player was the defender since a given timestamp.
+        /// </summary>
+        public async Task<List<PvPLogEntry>> GetPvPAttacksAgainst(string username, DateTime sinceTime)
+        {
+            var entries = new List<PvPLogEntry>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT
+                        (SELECT p.display_name FROM players p
+                         WHERE LOWER(p.username) = pvp.attacker) as attacker_name,
+                        (SELECT p.display_name FROM players p
+                         WHERE LOWER(p.username) = pvp.defender) as defender_name,
+                        pvp.winner,
+                        pvp.gold_stolen,
+                        pvp.attacker_level,
+                        pvp.defender_level,
+                        pvp.created_at
+                    FROM pvp_log pvp
+                    WHERE LOWER(pvp.defender) = LOWER(@username)
+                      AND pvp.created_at > @since
+                    ORDER BY pvp.created_at DESC;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@since", sinceTime.ToString("yyyy-MM-dd HH:mm:ss"));
+
+                using var reader = await Task.Run(() => cmd.ExecuteReader());
+                while (reader.Read())
+                {
+                    entries.Add(new PvPLogEntry
+                    {
+                        AttackerName = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0),
+                        DefenderName = reader.IsDBNull(1) ? "Unknown" : reader.GetString(1),
+                        WinnerUsername = reader.GetString(2),
+                        GoldStolen = reader.GetInt64(3),
+                        AttackerLevel = reader.GetInt32(4),
+                        DefenderLevel = reader.GetInt32(5),
+                        CreatedAt = DateTime.Parse(reader.GetString(6))
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get PvP attacks against {username}: {ex.Message}");
+            }
+            return entries;
+        }
+    }
+
+    /// <summary>
+    /// Detailed player info for admin console.
+    /// </summary>
+    public class AdminPlayerInfo
+    {
+        public string Username { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public bool IsBanned { get; set; }
+        public string? BanReason { get; set; }
+        public string? LastLogin { get; set; }
+        public string? CreatedAt { get; set; }
+        public int TotalPlaytimeMinutes { get; set; }
+        public int Level { get; set; }
+        public int ClassId { get; set; }
+        public long Gold { get; set; }
+        public long Experience { get; set; }
+        public bool IsOnline { get; set; }
     }
 }

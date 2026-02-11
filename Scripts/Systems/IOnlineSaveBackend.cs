@@ -114,6 +114,11 @@ namespace UsurperRemake.Systems
         Task BanPlayer(string username, string reason);
 
         /// <summary>
+        /// Unban a previously banned player.
+        /// </summary>
+        Task UnbanPlayer(string username);
+
+        /// <summary>
         /// Update player login/logout timestamps and playtime.
         /// </summary>
         Task UpdatePlayerSession(string username, bool isLogin);
@@ -166,6 +171,35 @@ namespace UsurperRemake.Systems
         public string ToPlayer { get; set; } = "";
         public string MessageType { get; set; } = "";
         public string Message { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+    }
+
+    /// <summary>
+    /// PvP leaderboard entry.
+    /// </summary>
+    public class PvPLeaderboardEntry
+    {
+        public int Rank { get; set; }
+        public string Username { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public int Level { get; set; }
+        public int ClassId { get; set; }
+        public int Wins { get; set; }
+        public int Losses { get; set; }
+        public long TotalGoldStolen { get; set; }
+    }
+
+    /// <summary>
+    /// PvP combat log entry.
+    /// </summary>
+    public class PvPLogEntry
+    {
+        public string AttackerName { get; set; } = "";
+        public string DefenderName { get; set; } = "";
+        public string WinnerUsername { get; set; } = "";
+        public long GoldStolen { get; set; }
+        public int AttackerLevel { get; set; }
+        public int DefenderLevel { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

@@ -1,6 +1,6 @@
 # Usurper Reborn
 
-## ALPHA v0.27.1 - Bug Fix & Balance
+## ALPHA v0.28.0 - PvP Arena & Living World
 
 **FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
 
@@ -360,6 +360,54 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### Completed in v0.28.0 - PvP Arena & Living World
+
+**PvP Combat Arena (Online Multiplayer):**
+- **Arena Location** - New location accessible from Main Street in online mode. Challenge other players to asynchronous PvP combat.
+- **Opponent Selection** - Browse online and offline players within ±20 levels. See name, level, class, and online status. Can't attack the same player twice per day.
+- **Asynchronous Combat** - Defender is loaded from their saved data at full HP and AI-controlled. Uses the existing `CombatEngine.PlayerVsPlayer()` system.
+- **Persistent Damage** - Attacker's HP/mana damage persists after combat (classic Usurper risk/reward). Attacker is autosaved after every fight.
+- **Gold Theft (Bidirectional)** - Winner steals 10% of the loser's gold on hand. Defender's gold atomically updated via SQL. Bank gold is safe.
+- **XP Rewards** - Attacker earns XP scaled by level difference (25-5000 XP range).
+- **Daily Limits** - Maximum 5 PvP attacks per day. Level 5 minimum to enter the Arena.
+- **PvP Death Handling** - Deaths handled in-Arena with proper messaging, XP loss, gold penalty, and resurrection at Inn.
+- **Defender Notifications** - Defenders receive in-game messages about attacks (win or loss, gold stolen).
+- **PvP Leaderboard** - Top players ranked by wins, with gold/white/yellow highlighting for top 3.
+- **Fight History** - View the last 10 PvP fights with winner highlighting.
+- **Personal Stats** - View your PvP kills, deaths, and win rate.
+- **While You Were Gone** - Login summary shows PvP attacks, unread messages, and recent world news since last session.
+- **News Integration** - PvP victories and defeats posted to the shared news feed.
+- **PvP Achievements** - "Arena Initiate" (first win), "Arena Veteran" (10 wins).
+- **Website PvP Leaderboard** - PvP rankings on the website landing page with top-3 styling.
+- **Stats API** - PvP leaderboard added to the `/api/stats` endpoint for the website dashboard.
+
+**NPC Children, Aging & Natural Death:**
+- **NPC Pregnancies** - Married NPC couples can become pregnant (1% chance per world tick for eligible females age 18-45). Dynamic rate adjusts based on population (3% if underpopulated, 0.5% if overpopulated). Max 4 children per couple.
+- **NPC Children** - Children are born after ~7 hours of gestation and grow up using the existing Child aging system. When they reach age 18, they automatically become full NPCs and join the realm.
+- **Accelerated Aging** - NPCs age at 9.6 real hours per game-year (~30 real days for a full Human lifespan). Race-specific lifespans: Human 75, Elf 200, Dwarf 150, Orc 55, Gnoll 50, etc.
+- **Natural Death** - When an NPC exceeds their race's lifespan, they die permanently. No respawn, no resurrection. "The soul moves on." Widowed spouses have their marriage state cleared.
+- **Birthday Announcements** - NPCs receive birthday announcements when their age increments, visible in the news feed.
+- **NPC Level-Up News** - NPC level-ups posted to news feed with race and class info.
+- **NPC Divorce** - Married NPC couples have a 0.3% base chance per world tick to divorce, with personality-driven modifiers (low commitment, high flirtatiousness, alignment mismatch increase chance; both high-commitment reduces by 80%). Divorce cancels pregnancies and frees both NPCs to remarry.
+- **Polyamorous Relationships** - NPCs with Polyamorous or OpenRelationship personality can seek additional partners while already married. Both parties must be poly/open for a polyamorous union to form.
+- **Affairs** - Flirtatious married NPCs (>0.6) have a 15% chance of conceiving with someone other than their spouse. Unmarried flirtatious NPCs can conceive casually. Affair babies track the actual father separately from the spouse.
+- **Story NPC Protection** - Story NPCs are exempt from age-death to prevent breaking narrative quests.
+- **Legacy Save Migration** - Existing NPCs without birth dates are assigned random ages 18-50 with computed birth dates.
+
+**The Living World (Website):**
+- **SSE Live Feed** - Real-time Server-Sent Events replace polling for instant delivery of world events to the website.
+- **Lifecycle Color Coding** - Natural death (purple), pregnancy (soft pink), birth (bright pink), birthday (gold), coming-of-age (teal), respawn (green), divorce (dark red), affair (hot pink), polyamory (violet).
+- **Side-by-Side Layout** - NPC activity and player news feeds displayed in a CSS grid layout on the website.
+
+**Bug Fixes:**
+- **Backspace in SSH/Online Mode** - Fixed garbage characters from backspace key in SSH mode with custom `ReadLineWithBackspace()`.
+- **Duplicate Players in PvP & Leaderboards** - Emergency autosave rows filtered from all player queries.
+- **Website "Most Popular Class" Showing Unknown** - NULL class_id from empty accounts filtered out.
+- **PvP Double Kill/XP/Gold Counting** - Removed duplicate calls from ArenaLocation.
+- **PvP Gold Theft Never Worked** - Fixed missing `Gold = playerData.Gold` in character builder.
+- **PvP Death Shows "Monster Defeats"** - Death handled entirely in ArenaLocation.
+- **Bidirectional Gold Theft** - Added defender-wins gold theft via `AddGoldToPlayer()`.
+
 ### Completed in v0.27.1 - Bug Fix & Balance
 
 **Major Bug Fixes:**
@@ -707,7 +755,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.27.1)
+### Known Issues (Alpha v0.28.0)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -722,4 +770,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.27.1 - Bug Fix & Balance
+**Status**: ALPHA v0.28.0 - PvP Arena & Living World

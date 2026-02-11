@@ -69,6 +69,23 @@ public partial class NPC : Character
     /// Different from IsAlive (HP > 0) which is temporary combat state.
     /// </summary>
     public bool IsDead { get; set; } = false;
+
+    /// <summary>
+    /// When this NPC was "born" in real time. Used with FamilySystem.DAYS_PER_YEAR to calculate current age.
+    /// DateTime.MinValue means not yet set (legacy save migration will compute from Age).
+    /// </summary>
+    public DateTime BirthDate { get; set; } = DateTime.MinValue;
+
+    /// <summary>
+    /// True if this NPC died of old age (permanent, no respawn - the soul has moved on).
+    /// Unlike IsDead which can be reversed by respawn, IsAgedDeath is forever.
+    /// </summary>
+    public bool IsAgedDeath { get; set; } = false;
+
+    /// <summary>
+    /// If pregnant, when the child is due (real-time DateTime). Null = not pregnant.
+    /// </summary>
+    public DateTime? PregnancyDueDate { get; set; } = null;
     
     // Pascal compatibility flags
     public bool CanInteract => IsAwake && IsAvailable && !IsInConversation;
@@ -122,6 +139,10 @@ public partial class NPC : Character
         
         // Set initial equipment and location based on archetype
         SetArchetypeDefaults();
+
+        // Calculate birth date from Age so the aging system works from creation
+        if (Age > 0)
+            BirthDate = DateTime.Now.AddHours(-Age * GameConfig.NpcLifecycleHoursPerYear);
     }
     
     /// <summary>

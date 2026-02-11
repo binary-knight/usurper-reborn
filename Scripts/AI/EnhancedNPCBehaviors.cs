@@ -414,11 +414,18 @@ public static class EnhancedNPCBehaviors
     /// </summary>
     private static void AttemptNPCMarriage(NPC npc, List<NPC> candidates)
     {
-        if (npc.Married || npc.IsMarried) return;
         if (npc.IsDead || !npc.IsAlive) return;
 
         var profile = npc.Brain?.Personality;
         if (profile == null) return;
+
+        // Already married - only polyamorous/open NPCs seek additional partners
+        if (npc.Married || npc.IsMarried)
+        {
+            bool isPolyOrOpen = profile.RelationshipPref == RelationshipPreference.Polyamorous
+                             || profile.RelationshipPref == RelationshipPreference.OpenRelationship;
+            if (!isPolyOrOpen) return;
+        }
 
         // Asexual NPCs don't seek marriage (but could still be approached)
         if (profile.Orientation == SexualOrientation.Asexual) return;
@@ -426,16 +433,26 @@ public static class EnhancedNPCBehaviors
         // Get NPC's gender for attraction checks
         var npcGender = profile.Gender;
 
-        // Find eligible partners
+        // Find eligible partners - polyamorous/open NPCs can also match with married NPCs
         var eligiblePartners = candidates.Where(c =>
-            c.ID != npc.ID &&
-            !c.IsDead && c.IsAlive &&
-            !c.Married && !c.IsMarried &&
-            c.Level >= 5 &&
-            c.Brain?.Personality != null &&
-            Math.Abs(c.Level - npc.Level) <= 10 && // Similar level range
-            IsCompatibleForMarriage(npc, c)
-        ).ToList();
+        {
+            if (c.ID == npc.ID || c.IsDead || !c.IsAlive) return false;
+            if (c.Level < 5 || c.Brain?.Personality == null) return false;
+            if (Math.Abs(c.Level - npc.Level) > 10) return false;
+            if (!IsCompatibleForMarriage(npc, c)) return false;
+            // Can't marry the same person twice
+            if (c.Name2 == npc.SpouseName) return false;
+
+            // If candidate is already married, they must also be poly/open
+            if (c.Married || c.IsMarried)
+            {
+                var cProfile = c.Brain?.Personality;
+                bool cIsPolyOrOpen = cProfile?.RelationshipPref == RelationshipPreference.Polyamorous
+                                  || cProfile?.RelationshipPref == RelationshipPreference.OpenRelationship;
+                return cIsPolyOrOpen;
+            }
+            return true;
+        }).ToList();
 
         if (eligiblePartners.Count == 0) return;
 
@@ -538,6 +555,9 @@ public static class EnhancedNPCBehaviors
     /// </summary>
     private static void ExecuteNPCMarriage(NPC npc1, NPC npc2)
     {
+        // Check if this is a polyamorous union (either party already married)
+        bool isPoly = (npc1.Married || npc1.IsMarried) || (npc2.Married || npc2.IsMarried);
+
         // Set marriage flags
         npc1.Married = true;
         npc1.IsMarried = true;
@@ -556,13 +576,23 @@ public static class EnhancedNPCBehaviors
         // Track the marriage in the NPC marriage registry
         NPCMarriageRegistry.Instance.RegisterMarriage(npc1.ID, npc2.ID, npc1.Name2, npc2.Name2);
 
-        // Generate news
-        NewsSystem.Instance?.WriteNews(
-            GameConfig.NewsCategory.Marriage,
-            $"Wedding Bells! {npc1.Name2} and {npc2.Name2} have gotten married!"
-        );
+        // Generate news - different messages for polyamorous vs traditional unions
+        if (isPoly)
+        {
+            NewsSystem.Instance?.WriteNews(
+                GameConfig.NewsCategory.Marriage,
+                $"♥ {npc1.Name2} and {npc2.Name2} have entered a polyamorous union!"
+            );
+        }
+        else
+        {
+            NewsSystem.Instance?.WriteNews(
+                GameConfig.NewsCategory.Marriage,
+                $"Wedding Bells! {npc1.Name2} and {npc2.Name2} have gotten married!"
+            );
+        }
 
-        GD.Print($"[NPC Marriage] {npc1.Name2} married {npc2.Name2}!");
+        GD.Print($"[NPC Marriage] {npc1.Name2} married {npc2.Name2} (poly={isPoly})");
     }
 
     /// <summary>

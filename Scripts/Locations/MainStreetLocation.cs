@@ -472,7 +472,16 @@ public class MainStreetLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("]");
             terminal.SetColor("white");
-            terminal.WriteLine("News Feed");
+            terminal.Write("News Feed    ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_red");
+            terminal.Write("6");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("Arena (PvP)");
         }
 
         terminal.WriteLine("");
@@ -541,6 +550,7 @@ public class MainStreetLocation : BaseLocation
             terminal.WriteLine("  3 - Who's Online");
             terminal.WriteLine("  4 - Chat");
             terminal.WriteLine("  5 - News Feed");
+            terminal.WriteLine("  6 - Arena (PvP)");
             terminal.WriteLine("  /say message - Broadcast chat");
             terminal.WriteLine("  /tell player message - Private message");
             terminal.WriteLine("  /who - See online players");
@@ -744,7 +754,14 @@ public class MainStreetLocation : BaseLocation
                     await OnlineChatSystem.Instance!.ShowNews(terminal);
                 }
                 return false;
-                
+
+            case "6":
+                if (DoorMode.IsOnlineMode)
+                {
+                    throw new LocationExitException(GameLocation.Arena);
+                }
+                return false;
+
             case "SETTINGS":
             case "CONFIG":
                 await ShowSettingsMenu();

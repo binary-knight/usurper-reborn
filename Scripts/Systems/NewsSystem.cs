@@ -19,6 +19,12 @@ public partial class NewsSystem
     private readonly object _newsLock = new object();
     private string _newsFilePath;
 
+    /// <summary>
+    /// Optional callback for persisting news to a database.
+    /// Set by WorldSimService to route NPC activities to SQLite for the website activity feed.
+    /// </summary>
+    public static Action<string>? DatabaseCallback { get; set; }
+
     public static NewsSystem Instance
     {
         get
@@ -59,6 +65,9 @@ public partial class NewsSystem
 
                 // Write to file
                 AppendToNewsFile(formattedMessage);
+
+                // Persist to database if callback is set (WorldSimService)
+                DatabaseCallback?.Invoke(message);
             }
             catch (Exception ex)
             {
@@ -129,6 +138,39 @@ public partial class NewsSystem
         Newsy($"♥ {motherName} and {fatherName} are proud parents of {childName}!");
     }
 
+    public void WriteNaturalDeathNews(string npcName, int age, string race)
+    {
+        Newsy($"⚱ {npcName}, a {race} of {age} years, has passed away peacefully. The soul moves on...");
+    }
+
+    public void WriteComingOfAgeNews(string childName, string motherName, string fatherName)
+    {
+        Newsy($"{childName}, child of {motherName} and {fatherName}, has come of age and joined the realm!");
+    }
+
+    public void WriteBirthdayNews(string npcName, int age, string race)
+    {
+        Newsy($"🎂 {npcName} the {race} celebrates their {age}{GetOrdinalSuffix(age)} birthday!");
+    }
+
+    private static string GetOrdinalSuffix(int number)
+    {
+        int lastTwo = number % 100;
+        if (lastTwo >= 11 && lastTwo <= 13) return "th";
+        return (number % 10) switch
+        {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th"
+        };
+    }
+
+    public void WriteNPCLevelUpNews(string npcName, int level, string className, string race)
+    {
+        Newsy($"⬆ {npcName} the {race} {className} has achieved Level {level}!");
+    }
+
     public void WriteMarriageNews(string player1Name, string player2Name, string location = "Temple")
     {
         Newsy($"♥ {player1Name} and {player2Name} were married at the {location}!");
@@ -137,6 +179,11 @@ public partial class NewsSystem
     public void WriteDivorceNews(string player1Name, string player2Name)
     {
         Newsy($"✗ {player1Name} and {player2Name} have divorced!");
+    }
+
+    public void WriteAffairNews(string npcName, string loverName)
+    {
+        Newsy($"💋 Scandal! {npcName} and {loverName} are having a secret affair!");
     }
 
     public void WriteRoyalNews(string kingName, string proclamation)
