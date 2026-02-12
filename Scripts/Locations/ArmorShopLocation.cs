@@ -480,11 +480,14 @@ public class ArmorShopLocation : BaseLocation
         // Apply faction discount (The Crown gets 10% off at shops)
         adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
 
-        if (currentPlayer.Gold < adjustedPrice)
+        // Calculate total with tax
+        var (armorKingTax, armorCityTax, armorTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
+
+        if (currentPlayer.Gold < armorTotalWithTax)
         {
             terminal.WriteLine("");
             terminal.SetColor("red");
-            terminal.WriteLine($"You need {FormatNumber(adjustedPrice)} gold but only have {FormatNumber(currentPlayer.Gold)}!");
+            terminal.WriteLine($"You need {FormatNumber(armorTotalWithTax)} gold but only have {FormatNumber(currentPlayer.Gold)}!");
             await Pause();
             return;
         }
@@ -508,13 +511,22 @@ public class ArmorShopLocation : BaseLocation
             return;
         }
 
+        // Show tax breakdown
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, adjustedPrice);
+
         terminal.WriteLine("");
         terminal.SetColor("white");
         terminal.Write($"Buy {item.Name} for ");
         terminal.SetColor("yellow");
-        terminal.Write(FormatNumber(adjustedPrice));
+        terminal.Write(FormatNumber(armorTotalWithTax));
         terminal.SetColor("white");
-        if (Math.Abs(totalModifier - 1.0f) > 0.01f)
+        if (armorKingTax > 0 || armorCityTax > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write($" (incl. tax)");
+            terminal.SetColor("white");
+        }
+        else if (Math.Abs(totalModifier - 1.0f) > 0.01f)
         {
             terminal.SetColor("gray");
             terminal.Write($" (was {FormatNumber(item.Value)})");
@@ -528,9 +540,9 @@ public class ArmorShopLocation : BaseLocation
             return;
         }
 
-        // Process purchase
-        currentPlayer.Gold -= adjustedPrice;
-        currentPlayer.Statistics.RecordPurchase(adjustedPrice);
+        // Process purchase (total includes tax)
+        currentPlayer.Gold -= armorTotalWithTax;
+        currentPlayer.Statistics.RecordPurchase(armorTotalWithTax);
 
         // Process city tax share from this sale
         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
@@ -549,7 +561,7 @@ public class ArmorShopLocation : BaseLocation
 
             // Track shop purchase telemetry
             TelemetrySystem.Instance.TrackShopTransaction(
-                "armor", "buy", item.Name, adjustedPrice,
+                "armor", "buy", item.Name, armorTotalWithTax,
                 currentPlayer.Level, currentPlayer.Gold
             );
 
@@ -561,7 +573,7 @@ public class ArmorShopLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine($"Failed to equip: {message}");
             // Refund
-            currentPlayer.Gold += adjustedPrice;
+            currentPlayer.Gold += armorTotalWithTax;
         }
 
         // Auto-save after purchase
@@ -775,7 +787,10 @@ public class ArmorShopLocation : BaseLocation
                 // Apply faction discount (The Crown gets 10% off at shops)
                 itemPrice = (long)(itemPrice * FactionSystem.Instance.GetShopPriceModifier());
 
-                if (itemPrice > currentPlayer.Gold)
+                // Calculate total with tax
+                var (_, _, abItemTotal) = CityControlSystem.CalculateTaxedPrice(itemPrice);
+
+                if (abItemTotal > currentPlayer.Gold)
                 {
                     armorIndex++;
                     continue;
@@ -804,6 +819,10 @@ public class ArmorShopLocation : BaseLocation
                 terminal.WriteLine($"    Armor Class: {armor.ArmorClass} (+{armor.ArmorClass - currentAC})");
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine($"    Price: {FormatNumber(itemPrice)} gold");
+
+                // Show tax breakdown
+                CityControlSystem.Instance.DisplayTaxBreakdown(terminal, armor.Name, itemPrice);
+
                 terminal.SetColor("gray");
                 terminal.WriteLine($"    Your gold: {FormatNumber(currentPlayer.Gold)}");
 
@@ -822,10 +841,10 @@ public class ArmorShopLocation : BaseLocation
                 switch (choice.ToUpper().Trim())
                 {
                     case "Y":
-                        // Purchase the armor
-                        currentPlayer.Gold -= itemPrice;
-                        currentPlayer.Statistics.RecordPurchase(itemPrice);
-                        totalSpent += itemPrice;
+                        // Purchase the armor (total includes tax)
+                        currentPlayer.Gold -= abItemTotal;
+                        currentPlayer.Statistics.RecordPurchase(abItemTotal);
+                        totalSpent += abItemTotal;
 
                         // Process city tax share from this sale
                         CityControlSystem.Instance.ProcessSaleTax(itemPrice);

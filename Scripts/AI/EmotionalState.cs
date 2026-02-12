@@ -7,7 +7,7 @@ using Godot;
 public partial class EmotionalState
 {
     private Dictionary<EmotionType, Emotion> activeEmotions = new Dictionary<EmotionType, Emotion>();
-    private const int MAX_EMOTIONS = 5;
+    private const int MAX_EMOTIONS = 12;
     
     public void AddEmotion(EmotionType type, float intensity, int durationMinutes)
     {
@@ -188,7 +188,7 @@ public partial class EmotionalState
     
     public float GetEmotionIntensity(EmotionType type)
     {
-        return HasEmotion(type) ? activeEmotions[type].Intensity : 0.0f;
+        return HasEmotion(type) ? activeEmotions[type].GetCurrentIntensity() : 0.0f;
     }
     
     public EmotionType? GetDominantEmotion()

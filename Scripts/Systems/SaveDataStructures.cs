@@ -462,6 +462,7 @@ namespace UsurperRemake.Systems
         public long BaseMaxMana { get; set; }  // Base Mana before equipment bonuses
         public string Location { get; set; } = "";
         public long Gold { get; set; }
+        public long BankGold { get; set; }
         public int[] Items { get; set; } = new int[0];
 
         // Character stats
@@ -822,6 +823,15 @@ namespace UsurperRemake.Systems
         public float Anger { get; set; }
         public float Fear { get; set; }
         public float Trust { get; set; }
+        // Extended emotions (v0.29.1)
+        public float Confidence { get; set; }
+        public float Sadness { get; set; }
+        public float Greed { get; set; }
+        public float Loneliness { get; set; }
+        public float Envy { get; set; }
+        public float Pride { get; set; }
+        public float Hope { get; set; }
+        public float Peace { get; set; }
     }
 
     /// <summary>
@@ -1181,6 +1191,8 @@ namespace UsurperRemake.Systems
         public long Treasury { get; set; }
         public long TaxRate { get; set; }
         public long TotalReign { get; set; }
+        public int KingTaxPercent { get; set; } = 5;
+        public int CityTaxPercent { get; set; } = 2;
         public string DesignatedHeir { get; set; } = "";
 
         public List<CourtMemberSaveData> CourtMembers { get; set; } = new();

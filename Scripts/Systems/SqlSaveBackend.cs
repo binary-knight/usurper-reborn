@@ -467,6 +467,32 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// Get the current version number of a world_state key.
+        /// Used to detect when another process (game server) has modified the data.
+        /// Returns 0 if the key doesn't exist.
+        /// </summary>
+        public long GetWorldStateVersion(string key)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT version FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", key);
+                var result = cmd.ExecuteScalar();
+                return result != null ? Convert.ToInt64(result) : 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get world state version for '{key}': {ex.Message}");
+                return 0;
+            }
+        }
+
+        // GetLatestRoyalCourtJson() removed - world_state 'royal_court' key is now the
+        // authoritative source (maintained by world sim + player sessions), not player saves.
+
         public async Task<bool> TryAtomicUpdate(string key, Func<string, string> transform)
         {
             try
@@ -1335,6 +1361,42 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to change password: {ex.Message}");
                 return (false, "Password change failed. Please try again.");
+            }
+        }
+
+        /// <summary>
+        /// Admin force-reset a player's password (no old password required).
+        /// </summary>
+        public (bool success, string message) AdminResetPassword(string username, string newPassword)
+        {
+            try
+            {
+                if (newPassword.Length < 4)
+                    return (false, "New password must be at least 4 characters.");
+
+                // Verify user exists
+                using var connection = OpenConnection();
+                using var checkCmd = connection.CreateCommand();
+                checkCmd.CommandText = "SELECT COUNT(*) FROM players WHERE LOWER(username) = LOWER(@username);";
+                checkCmd.Parameters.AddWithValue("@username", username);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                    return (false, $"Player '{username}' not found.");
+
+                string newHash = HashPassword(newPassword);
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE players SET password_hash = @hash WHERE LOWER(username) = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@hash", newHash);
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.ExecuteNonQuery();
+
+                DebugLogger.Instance.LogInfo("SQL", $"Admin reset password for: '{username}'");
+                return (true, $"Password reset for '{username}'.");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to reset password: {ex.Message}");
+                return (false, "Password reset failed.");
             }
         }
 

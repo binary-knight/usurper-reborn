@@ -447,9 +447,9 @@ Phase 21 processing per simulation tick:
 5. **Gang Warfare** — automated battles between rival gangs
 
 ### Personality System
-15 personality traits (0.0-1.0): Aggression, Bravery, Loyalty, Greed, Kindness, Humor, Romanticism, Intelligence, Sociability, Ambition, Patience, Honesty, Trustworthiness, Flirtatiousness, Commitment.
+13 core personality traits (0.0-1.0): Aggression, Loyalty, Intelligence, Greed, Compassion, Courage, Honesty, Ambition, Vengefulness, Impulsiveness, Caution, Mysticism, Patience.
 
-14 romance traits: Attraction preferences, gender preferences, relationship style.
+10 romance traits: Romanticism, Flirtatiousness, Commitment, attraction preferences, gender preferences, relationship style.
 
 ---
 
@@ -459,7 +459,7 @@ Phase 21 processing per simulation tick:
 
 ### Simulation Tick (every 30 seconds)
 ```
-1. ProcessNPCRespawns()         — respawn dead NPCs (5 ticks = ~2.5 min)
+1. ProcessNPCRespawns()         — respawn dead NPCs (20 ticks = ~10 min)
 2. FamilySystem.ProcessDailyAging()  — age children, convert to NPCs at 18
 3. ProcessNPCAging()            — age NPCs, check natural death
 4. ProcessNPCPregnancies()      — check births, start new pregnancies
@@ -475,7 +475,7 @@ Phase 21 processing per simulation tick:
 ```
 
 ### Headless Mode (WorldSimService)
-Runs as systemd service. Initializes minimal systems (no terminal, no auth). Routes NPC news to SQLite via `NewsSystem.DatabaseCallback`. Saves world state every 5 minutes. Prunes old NPC activity entries (24-hour retention).
+Runs as systemd service. Initializes minimal systems (no terminal, no auth). Routes NPC news to SQLite via `NewsSystem.DatabaseCallback`. Saves world state every 5 minutes (NPCs, royal court, children, marriages, world events, economy). Prunes old NPC activity entries (24-hour retention). Independent version tracking for NPCs and royal court prevents stale overwrites from player sessions.
 
 ### Respawn System
 ```csharp
@@ -542,7 +542,7 @@ SaveGameData {
 Identity, stats, attributes, equipment (legacy + modern), inventory, status effects, game state, daily limits, home upgrades, dungeon progression, preferences, statistics, achievements.
 
 ### NPCData
-Identity, stats, class/race, lifecycle (Age, BirthDate, IsAgedDeath, PregnancyDueDate), marriage state, faction, AI state (personality 15 traits + 14 romance traits, memories, goals, emotions), inventory, equipment.
+Identity, stats, class/race, lifecycle (Age, BirthDate, IsAgedDeath, PregnancyDueDate), marriage state, faction, AI state (personality 13 core traits + 10 romance traits, memories, goals, emotions), inventory, equipment.
 
 ### StorySystemsData
 Ocean Philosophy (awakening, fragments), Seven Seals, Story Progression (chapters, flags, god states, cycle), Companions (active, fallen, quests), Grief (stages, memories), Family (children), Relationships (bidirectional values), NPC Marriages, Royal Court (members, heirs, plots), Factions, Town NPC Stories, Dreams, Stranger Encounters, God Worship.
@@ -568,7 +568,7 @@ CREATE TABLE players (
 );
 ```
 
-**world_state** — Shared multiplayer world (keys: npcs, king, world_events, quests, marketplace, story_systems, daily_state, marriages)
+**world_state** — Shared multiplayer world (keys: npcs, king, royal_court, world_events, quests, marketplace, story_systems, daily_state, marriages, children, economy)
 ```sql
 CREATE TABLE world_state (
     key TEXT PRIMARY KEY, value TEXT NOT NULL,
@@ -857,6 +857,40 @@ Node.js server (port 3000) with:
 ### Event Color Coding
 Deaths (red), births (bright pink), coming-of-age (teal), birthdays (gold), level-ups (gold-orange), natural death (purple), divorce (dark red), affairs (hot pink), polyamory (violet), marriages (pink), respawns (green).
 
+### NPC Analytics Dashboard ("The Observatory")
+**File**: `web/dashboard.html`
+
+Hidden authenticated dashboard at `/dashboard` for observing the NPC simulation in real-time:
+- **Auth**: PBKDF2 password hashing, 7-day session tokens in SQLite, HttpOnly cookies
+- **World Map**: Location grid with NPC dots colored by faction, sized by level
+- **NPC Detail Panel**: Personality radar (13 traits), emotional state bars, goals, memories, relationships
+- **Demographics**: Class/race/faction doughnut charts, level histogram (Chart.js)
+- **Relationship Network**: D3.js force-directed graph — marriage (red), team (blue), affinity (green/orange)
+- **Live Event Timeline**: SSE-powered scrolling feed via `/api/dash/feed`
+- **Trend Charts**: Events/hour stacked bar, population alive/dead doughnut
+- **Dashboard API**: 8 endpoints under `/api/dash/` served by `ssh-proxy.js`
+
+### Emotional State System
+**File**: `Scripts/AI/EmotionalState.cs`
+
+NPC emotional states displayed on the dashboard are derived from personality traits with antagonistic suppression:
+- 12 emotion types: Happiness, Anger, Fear, Confidence, Sadness, Greed, Hope, Peace, Trust, Loneliness, Envy, Pride
+- Personality-derived baselines (e.g., happiness from sociability, patience, low aggression)
+- Antagonistic suppression: high anger dampens happiness/peace, high fear dampens confidence
+- Transient emotions from world sim events modulate baselines by ±15%
+- Serialized for dashboard via `OnlineStateManager.SerializeEmotionalStateForDashboard()`
+
+### Tax System
+**File**: `Scripts/Systems/CityControlSystem.cs`
+
+Visible tax breakdown on every city purchase:
+- King's tax (yellow) + city control team tax (cyan) displayed before confirmation
+- 27 player purchase points across 6 shop files
+- Tax-free zones: Dark Alley, Love Street, Church, Temple, Castle, Bank, Home, Dungeon
+- NPCs pay full tax (affects their purchasing power)
+- NPCs with high greed pursue city control for tax revenue
+- `ProcessSaleTax()` deposits city tax to player's bank when they lead the controlling team
+
 ---
 
 ## 23. Server Infrastructure
@@ -953,8 +987,8 @@ dotnet publish usurper-reloaded.csproj -c Release -r <rid> \
 
 ### Version
 ```csharp
-Version = "0.28.0-alpha"
-VersionName = "PvP Arena & Living World"
+Version = "0.29.1"
+VersionName = "The Observatory"
 ```
 
 ### Core Constants
@@ -1127,8 +1161,9 @@ Scripts/
     └── UIHelper.cs             # 80-char box drawing utilities
 
 web/
-├── index.html                  # Landing page + dashboard + terminal
-├── ssh-proxy.js                # HTTP + WebSocket + SSE server
+├── index.html                  # Landing page + terminal + stats
+├── dashboard.html              # NPC Analytics Dashboard (Chart.js + D3.js)
+├── ssh-proxy.js                # HTTP + WebSocket + SSE server + dashboard API
 └── package.json                # ws, ssh2, better-sqlite3
 
 scripts-server/
@@ -1172,3 +1207,7 @@ DOCS/
 9. **Heartbeat Presence** — Online players tracked with 120-second heartbeat window for Who's Online.
 
 10. **NPC Death Duality** — `IsDead` (permanent flag) vs `IsAlive` (computed `HP > 0`). Must check both for different scenarios.
+
+11. **World State Authority** — World sim is the authority for shared state (NPCs, children, marriages, world events, economy). Player sessions load from `world_state` on login and push changes back on save. Independent version tracking prevents stale overwrites.
+
+12. **Antagonistic Emotions** — NPC emotional states use personality-derived baselines with antagonistic suppression (anger dampens happiness, fear dampens confidence) rather than independent values.

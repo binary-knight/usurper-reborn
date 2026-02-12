@@ -1775,8 +1775,13 @@ public class CastleLocation : BaseLocation
 
             terminal.SetColor("white");
             terminal.WriteLine($"Royal Treasury: {currentKing.Treasury:N0} gold");
-            terminal.WriteLine($"Current Tax Rate: {currentKing.TaxRate} gold per citizen");
+            terminal.WriteLine($"Daily Citizen Tax: {currentKing.TaxRate} gold per citizen");
             terminal.WriteLine($"Tax Alignment: {currentKing.TaxAlignment}");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"King's Sales Tax: {currentKing.KingTaxPercent}% of all sales");
+            terminal.WriteLine($"City Team Tax:    {currentKing.CityTaxPercent}% of all sales");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"Sales Tax Revenue Today: {currentKing.DailyTaxRevenue:N0} gold");
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
@@ -1857,15 +1862,15 @@ public class CastleLocation : BaseLocation
         }
 
         terminal.SetColor("cyan");
-        terminal.Write("New tax rate (gold per citizen): ");
+        terminal.Write("New daily citizen tax (gold per citizen, 0-1000): ");
         terminal.SetColor("white");
         string rateInput = await terminal.ReadLineAsync();
 
         if (long.TryParse(rateInput, out long rate) && rate >= 0)
         {
-            currentKing.TaxRate = Math.Min(rate, 1000); // Cap at 1000
+            currentKing.TaxRate = Math.Min(rate, 1000);
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"Tax rate set to {currentKing.TaxRate} gold.");
+            terminal.WriteLine($"Citizen tax set to {currentKing.TaxRate} gold per citizen.");
 
             if (rate > 100)
             {
@@ -1874,11 +1879,61 @@ public class CastleLocation : BaseLocation
             }
         }
 
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write($"King's sales tax (0-25%, currently {currentKing.KingTaxPercent}%): ");
+        terminal.SetColor("white");
+        string kingTaxInput = await terminal.ReadLineAsync();
+
+        if (int.TryParse(kingTaxInput, out int kingTax) && kingTax >= 0)
+        {
+            currentKing.KingTaxPercent = Math.Min(kingTax, 25);
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"King's sales tax set to {currentKing.KingTaxPercent}%.");
+
+            if (kingTax > 15)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("Warning: High sales taxes may discourage trade!");
+            }
+        }
+
+        terminal.SetColor("cyan");
+        terminal.Write($"City team tax (0-10%, currently {currentKing.CityTaxPercent}%): ");
+        terminal.SetColor("white");
+        string cityTaxInput = await terminal.ReadLineAsync();
+
+        if (int.TryParse(cityTaxInput, out int cityTax) && cityTax >= 0)
+        {
+            currentKing.CityTaxPercent = Math.Min(cityTax, 10);
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"City team tax set to {currentKing.CityTaxPercent}%.");
+        }
+
+        // Persist tax changes to world_state
+        PersistRoyalCourtToWorldState();
+
         await Task.Delay(2000);
     }
 
     private async Task ShowBudgetDetails()
     {
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("=== Income Breakdown ===");
+        terminal.SetColor("white");
+
+        int npcCount = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.Count ?? 10;
+        long citizenTaxIncome = currentKing.TaxRate * Math.Max(10, npcCount);
+        long salesTaxIncome = currentKing.DailyTaxRevenue;
+
+        terminal.WriteLine($"Citizen Tax:       {citizenTaxIncome:N0} gold ({currentKing.TaxRate} x {Math.Max(10, npcCount)} citizens)");
+        terminal.WriteLine($"Sales Tax Revenue: {salesTaxIncome:N0} gold ({currentKing.KingTaxPercent}% of sales)");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(new string('─', 40));
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"Total Income:      {citizenTaxIncome + salesTaxIncome:N0} gold");
+
         terminal.WriteLine("");
         terminal.SetColor("cyan");
         terminal.WriteLine("=== Expense Breakdown ===");
@@ -1893,8 +1948,8 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine($"Castle Maintenance: {baseCosts:N0} gold");
         terminal.SetColor("darkgray");
         terminal.WriteLine(new string('─', 40));
-        terminal.SetColor("white");
-        terminal.WriteLine($"Total Daily:       {guardCosts + orphanCosts + baseCosts:N0} gold");
+        terminal.SetColor("red");
+        terminal.WriteLine($"Total Expenses:    {guardCosts + orphanCosts + baseCosts:N0} gold");
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
@@ -1923,6 +1978,7 @@ public class CastleLocation : BaseLocation
                 currentPlayer.Gold += amount;
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"Withdrew {amount:N0} gold from the treasury.");
+                PersistRoyalCourtToWorldState();
             }
         }
 
@@ -1950,6 +2006,7 @@ public class CastleLocation : BaseLocation
                 currentKing.Treasury += amount;
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"Deposited {amount:N0} gold to the treasury.");
+                PersistRoyalCourtToWorldState();
             }
         }
 
@@ -3194,6 +3251,9 @@ public class CastleLocation : BaseLocation
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has seized the throne! Long live the new {currentKing.GetTitle()}!");
 
+            // Persist to world_state so world sim and other players see the new king immediately
+            PersistRoyalCourtToWorldState();
+
             await Task.Delay(4000);
             return false; // Stay in castle as new king
         }
@@ -3295,6 +3355,9 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
 
         NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has claimed the empty throne! Long live the {title}!");
+
+        // Persist to world_state so world sim and other players see the new king immediately
+        PersistRoyalCourtToWorldState();
 
         await Task.Delay(4000);
         return false; // Stay in castle as new king
@@ -4569,6 +4632,29 @@ public class CastleLocation : BaseLocation
     // UTILITY
     // ═══════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Persist current royal court state to world_state (online mode only).
+    /// Called after any action that modifies king state: throne challenges,
+    /// tax policy changes, treasury deposits/withdrawals, etc.
+    /// This ensures the world sim and other player sessions see the change immediately.
+    /// </summary>
+    private void PersistRoyalCourtToWorldState()
+    {
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+        var osm = OnlineStateManager.Instance;
+        if (osm == null) return;
+
+        // Fire-and-forget - don't block the UI for a DB write
+        _ = Task.Run(async () =>
+        {
+            try { await osm.SaveRoyalCourtToWorldState(); }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("CASTLE", $"Failed to persist royal court: {ex.Message}");
+            }
+        });
+    }
+
     private void LoadKingData()
     {
         // If player is king but no king data exists, create it
@@ -4668,7 +4754,8 @@ public class CastleLocation : BaseLocation
             EndReason = ""
         });
 
-        // GD.Print($"[Castle] {npc.DisplayName} has been crowned {(npc.Sex == CharacterSex.Male ? "King" : "Queen")}!");
+        // Persist to world_state so world sim picks up the new NPC king
+        PersistRoyalCourtToWorldState();
     }
 
     /// <summary>

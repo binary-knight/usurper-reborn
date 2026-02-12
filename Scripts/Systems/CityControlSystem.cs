@@ -29,9 +29,15 @@ public class CityControlSystem
 
     /// <summary>
     /// Get the team currently controlling the city (CTurf = true)
+    /// Checks both NPCs and the current player.
     /// </summary>
     public string? GetControllingTeam()
     {
+        // Check if the player controls the city
+        var player = GameEngine.Instance?.CurrentPlayer;
+        if (player != null && player.CTurf && !string.IsNullOrEmpty(player.Team))
+            return player.Team;
+
         var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
         if (npcs == null) return null;
 
@@ -40,7 +46,8 @@ public class CityControlSystem
     }
 
     /// <summary>
-    /// Get all members of the city-controlling team
+    /// Get all NPC members of the city-controlling team.
+    /// Note: Use GetCityControlLeader() to get the actual leader (may be the player).
     /// </summary>
     public List<NPC> GetCityControllers()
     {
@@ -50,6 +57,39 @@ public class CityControlSystem
         return NPCSpawnSystem.Instance?.ActiveNPCs?
             .Where(n => n.Team == controllingTeam && n.IsAlive)
             .ToList() ?? new List<NPC>();
+    }
+
+    /// <summary>
+    /// Get the actual team leader - the highest level member including the player.
+    /// Returns (name, bankGold, isPlayer) for the leader.
+    /// </summary>
+    public (string Name, long BankGold, bool IsPlayer) GetCityControlLeader()
+    {
+        var controllingTeam = GetControllingTeam();
+        if (string.IsNullOrEmpty(controllingTeam))
+            return ("None", 0, false);
+
+        var controllers = GetCityControllers();
+        var topNpc = controllers.OrderByDescending(n => n.Level).FirstOrDefault();
+
+        // Check if the player is on the controlling team
+        var player = GameEngine.Instance?.CurrentPlayer;
+        bool playerOnTeam = player != null &&
+            !string.IsNullOrEmpty(player.Team) &&
+            player.Team == controllingTeam &&
+            player.HP > 0;
+
+        if (playerOnTeam)
+        {
+            // Player is the leader if they're the highest level member
+            if (topNpc == null || player!.Level >= topNpc.Level)
+                return (player!.Name2 ?? player.Name1, player.BankGold, true);
+        }
+
+        if (topNpc != null)
+            return (topNpc.Name, topNpc.BankGold, false);
+
+        return ("None", 0, false);
     }
 
     /// <summary>
@@ -99,27 +139,44 @@ public class CityControlSystem
         var king = CastleLocation.GetCurrentKing();
         if (king == null) return;
 
-        // Calculate the city's share based on King's setting
-        int taxPercent = king.CityTaxPercent;
-        if (taxPercent <= 0) return;
-
-        long cityShare = (saleAmount * taxPercent) / 100;
-        if (cityShare <= 0) return;
-
-        // Distribute among city controllers
-        var controllers = GetCityControllers();
-        if (controllers.Count == 0) return;
-
-        // Split evenly among all controllers
-        long sharePerMember = cityShare / controllers.Count;
-        if (sharePerMember <= 0) return;
-
-        foreach (var controller in controllers)
+        // King's sales tax - goes directly to the royal treasury
+        int kingTaxPercent = king.KingTaxPercent;
+        if (kingTaxPercent > 0)
         {
-            controller.GainGold(sharePerMember);
+            // Minimum 1 gold tax to match what the buyer was charged
+            long kingShare = Math.Max(1, (saleAmount * kingTaxPercent) / 100);
+            king.Treasury += kingShare;
+            king.DailyTaxRevenue += kingShare;
         }
 
-        // GD.Print($"[CityControl] Distributed {cityShare} gold tax share to {controllers.Count} city controllers");
+        // City controller's share - deposited to team leader's bank account
+        int cityTaxPercent = king.CityTaxPercent;
+        if (cityTaxPercent <= 0) return;
+
+        // Minimum 1 gold tax to match what the buyer was charged
+        long cityShare = Math.Max(1, (saleAmount * cityTaxPercent) / 100);
+
+        // Find the team leader (highest level member, including the player)
+        var leader = GetCityControlLeader();
+        if (leader.Name == "None") return;
+
+        if (leader.IsPlayer)
+        {
+            // Deposit to the player's bank account
+            var player = GameEngine.Instance?.CurrentPlayer;
+            if (player != null)
+                player.BankGold += cityShare;
+        }
+        else
+        {
+            // Deposit to the NPC leader's bank account
+            var controllers = GetCityControllers();
+            var npcLeader = controllers.OrderByDescending(n => n.Level).FirstOrDefault();
+            if (npcLeader != null)
+                npcLeader.BankGold += cityShare;
+        }
+
+        king.DailyCityTaxRevenue += cityShare;
     }
 
     /// <summary>
@@ -263,18 +320,18 @@ public class CityControlSystem
     public string GetCityStatusMessage()
     {
         var controllingTeam = GetControllingTeam();
-        var controllers = GetCityControllers();
 
         if (string.IsNullOrEmpty(controllingTeam))
         {
             return "The city is not under any team's control.";
         }
 
-        return $"'{controllingTeam}' controls the city ({controllers.Count} members)";
+        var info = GetCityControlInfo();
+        return $"'{controllingTeam}' controls the city ({info.MemberCount} members)";
     }
 
     /// <summary>
-    /// Get detailed city control info
+    /// Get detailed city control info (includes the player if they're on the controlling team)
     /// </summary>
     public (string TeamName, int MemberCount, long TotalPower) GetCityControlInfo()
     {
@@ -283,8 +340,72 @@ public class CityControlSystem
             return ("None", 0, 0);
 
         var controllers = GetCityControllers();
+        int memberCount = controllers.Count;
         long power = controllers.Sum(m => m.Level + m.Strength + m.Defence);
 
-        return (controllingTeam, controllers.Count, power);
+        // Include the player in count and power if they're on the controlling team
+        var player = GameEngine.Instance?.CurrentPlayer;
+        if (player != null &&
+            !string.IsNullOrEmpty(player.Team) &&
+            player.Team == controllingTeam &&
+            player.HP > 0)
+        {
+            memberCount++;
+            power += player.Level + player.Strength + player.Defence;
+        }
+
+        return (controllingTeam, memberCount, power);
+    }
+
+    /// <summary>
+    /// Calculate the total price including tax on top of the base price.
+    /// Tax is added ON TOP — the buyer pays more than the listed price.
+    /// King's tax goes to the royal treasury, city tax goes to the controlling team.
+    /// </summary>
+    public static (long kingTax, long cityTax, long total) CalculateTaxedPrice(long basePrice)
+    {
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null)
+            return (0, 0, basePrice);
+
+        // Minimum 1 gold tax when rate is active, so even cheap items show tax
+        long kingTax = king.KingTaxPercent > 0 ? Math.Max(1, (basePrice * king.KingTaxPercent) / 100) : 0;
+        long cityTax = king.CityTaxPercent > 0 ? Math.Max(1, (basePrice * king.CityTaxPercent) / 100) : 0;
+
+        return (kingTax, cityTax, basePrice + kingTax + cityTax);
+    }
+
+    /// <summary>
+    /// Display a tax breakdown to the player showing item cost, king's tax, city tax, and total.
+    /// Only shows breakdown when taxes are active (at least one > 0%).
+    /// </summary>
+    public void DisplayTaxBreakdown(TerminalEmulator terminal, string itemName, long basePrice)
+    {
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null) return;
+
+        // Minimum 1 gold tax when rate is active, so even cheap items show tax
+        long kingTax = king.KingTaxPercent > 0 ? Math.Max(1, (basePrice * king.KingTaxPercent) / 100) : 0;
+        long cityTax = king.CityTaxPercent > 0 ? Math.Max(1, (basePrice * king.CityTaxPercent) / 100) : 0;
+
+        // No breakdown needed if no taxes
+        if (kingTax <= 0 && cityTax <= 0) return;
+
+        long total = basePrice + kingTax + cityTax;
+
+        terminal.WriteLine("");
+        terminal.WriteLine($"  {itemName}: {basePrice:N0} gold", "white");
+        if (kingTax > 0)
+            terminal.WriteLine($"  King's Tax ({king.KingTaxPercent}%): {kingTax:N0} gold", "yellow");
+        if (cityTax > 0)
+        {
+            var controllingTeam = GetControllingTeam();
+            string cityLabel = !string.IsNullOrEmpty(controllingTeam)
+                ? $"City Tax ({king.CityTaxPercent}% to {controllingTeam})"
+                : $"City Tax ({king.CityTaxPercent}%)";
+            terminal.WriteLine($"  {cityLabel}: {cityTax:N0} gold", "cyan");
+        }
+        terminal.WriteLine($"  ─────────────────────────────", "gray");
+        terminal.WriteLine($"  Total: {total:N0} gold", "bright_white");
     }
 }

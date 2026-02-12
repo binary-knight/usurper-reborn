@@ -223,21 +223,20 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Read a line of text. Uses Console.ReadLine since we're in stdio mode.
+        /// Read a line of text with proper backspace handling for SSH/online mode.
         /// </summary>
         private async Task<string?> ReadLineAsync()
         {
             return await Task.Run(() =>
             {
-                try { return Console.ReadLine(); }
+                try { return TerminalEmulator.ReadLineWithBackspace(); }
                 catch { return null; }
             });
         }
 
         /// <summary>
-        /// Read a password with asterisk masking.
-        /// In stdio mode, we read char by char and echo asterisks.
-        /// Falls back to plain ReadLine if char-by-char isn't available.
+        /// Read a password with asterisk masking and backspace support.
+        /// Works on both redirected stdin (pipes) and PTY (SSH terminals).
         /// </summary>
         private async Task<string?> ReadPasswordAsync()
         {
@@ -245,36 +244,7 @@ namespace UsurperRemake.Systems
             {
                 try
                 {
-                    // In stdio mode (redirected I/O), we can't intercept individual keys.
-                    // Just read the whole line - the SSH terminal handles echo on the client side.
-                    if (Console.IsInputRedirected)
-                    {
-                        var line = Console.ReadLine();
-                        return line;
-                    }
-
-                    // Local console: mask with asterisks
-                    var password = new System.Text.StringBuilder();
-                    while (true)
-                    {
-                        var key = Console.ReadKey(intercept: true);
-                        if (key.Key == ConsoleKey.Enter)
-                        {
-                            Console.WriteLine();
-                            break;
-                        }
-                        else if (key.Key == ConsoleKey.Backspace && password.Length > 0)
-                        {
-                            password.Remove(password.Length - 1, 1);
-                            Console.Write("\b \b");
-                        }
-                        else if (key.KeyChar != '\0' && key.Key != ConsoleKey.Backspace)
-                        {
-                            password.Append(key.KeyChar);
-                            Console.Write("*");
-                        }
-                    }
-                    return password.ToString();
+                    return TerminalEmulator.ReadLineWithBackspace(maskPassword: true);
                 }
                 catch
                 {

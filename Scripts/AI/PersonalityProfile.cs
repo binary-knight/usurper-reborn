@@ -114,6 +114,11 @@ public class PersonalityProfile
                 profile.Impulsiveness = GD.Randf() * 0.4f + 0.5f; // 0.5-0.9
                 profile.Sociability = GD.Randf() * 0.4f + 0.3f; // 0.3-0.7
                 profile.Ambition = GD.Randf() * 0.5f + 0.2f;    // 0.2-0.7
+                profile.Intelligence = GD.Randf() * 0.4f + 0.1f; // 0.1-0.5 (street smart, not book smart)
+                profile.Patience = GD.Randf() * 0.3f + 0.1f;    // 0.1-0.4 (short tempered)
+                profile.Mysticism = GD.Randf() * 0.2f;          // 0.0-0.2 (no interest in magic)
+                profile.Trustworthiness = GD.Randf() * 0.3f + 0.1f; // 0.1-0.4 (unreliable)
+                profile.Caution = GD.Randf() * 0.3f + 0.1f;     // 0.1-0.4 (reckless)
                 profile.PreferredCombatStyle = CombatStyle.Aggressive;
                 profile.Fears.Add("stronger_opponents");
                 profile.Fears.Add("law_enforcement");
@@ -131,6 +136,11 @@ public class PersonalityProfile
                 profile.Impulsiveness = GD.Randf() * 0.3f + 0.1f; // 0.1-0.4
                 profile.Sociability = GD.Randf() * 0.3f + 0.6f; // 0.6-0.9
                 profile.Ambition = GD.Randf() * 0.3f + 0.5f;    // 0.5-0.8
+                profile.Intelligence = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (shrewd business sense)
+                profile.Patience = GD.Randf() * 0.3f + 0.5f;    // 0.5-0.8 (patient negotiators)
+                profile.Mysticism = GD.Randf() * 0.3f;          // 0.0-0.3 (practical minded)
+                profile.Trustworthiness = GD.Randf() * 0.4f + 0.4f; // 0.4-0.8 (reputation matters)
+                profile.Caution = GD.Randf() * 0.3f + 0.5f;     // 0.5-0.8 (careful with money)
                 profile.PreferredCombatStyle = CombatStyle.Defensive;
                 profile.Fears.Add("poverty");
                 profile.Fears.Add("violence");
@@ -150,6 +160,11 @@ public class PersonalityProfile
                 profile.Greed = GD.Randf() * 0.4f + 0.4f;       // 0.4-0.8
                 profile.Aggression = GD.Randf() * 0.4f + 0.3f;  // 0.3-0.7
                 profile.Impulsiveness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
+                profile.Intelligence = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (educated, politically savvy)
+                profile.Patience = GD.Randf() * 0.3f + 0.4f;    // 0.4-0.7 (plays the long game)
+                profile.Mysticism = GD.Randf() * 0.3f + 0.1f;   // 0.1-0.4 (some superstition)
+                profile.Trustworthiness = GD.Randf() * 0.4f + 0.3f; // 0.3-0.7 (varies by individual)
+                profile.Caution = GD.Randf() * 0.3f + 0.4f;     // 0.4-0.7 (calculated)
                 profile.PreferredCombatStyle = CombatStyle.Tactical;
                 profile.Fears.Add("disgrace");
                 profile.Fears.Add("poverty");
@@ -168,6 +183,11 @@ public class PersonalityProfile
                 profile.Impulsiveness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
                 profile.Sociability = GD.Randf() * 0.4f + 0.3f; // 0.3-0.7
                 profile.Greed = GD.Randf() * 0.4f + 0.2f;       // 0.2-0.6
+                profile.Intelligence = GD.Randf() * 0.4f + 0.3f; // 0.3-0.7 (tactical awareness)
+                profile.Patience = GD.Randf() * 0.3f + 0.5f;    // 0.5-0.8 (disciplined, waits for orders)
+                profile.Mysticism = GD.Randf() * 0.2f + 0.1f;   // 0.1-0.3 (superstitious but practical)
+                profile.Trustworthiness = GD.Randf() * 0.2f + 0.6f; // 0.6-0.8 (duty-bound, reliable)
+                profile.Caution = GD.Randf() * 0.3f + 0.4f;     // 0.4-0.7 (trained to assess threats)
                 profile.PreferredCombatStyle = CombatStyle.Balanced;
                 profile.Fears.Add("dereliction");
                 profile.Fears.Add("dishonor");
@@ -186,6 +206,11 @@ public class PersonalityProfile
                 profile.Impulsiveness = GD.Randf() * 0.3f + 0.1f; // 0.1-0.4
                 profile.Sociability = GD.Randf() * 0.3f + 0.6f; // 0.6-0.9
                 profile.Greed = GD.Randf() * 0.3f;              // 0.0-0.3
+                profile.Intelligence = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (theological study)
+                profile.Patience = GD.Randf() * 0.2f + 0.7f;    // 0.7-0.9 (serene, meditative)
+                profile.Mysticism = GD.Randf() * 0.3f + 0.5f;   // 0.5-0.8 (deeply spiritual)
+                profile.Trustworthiness = GD.Randf() * 0.2f + 0.7f; // 0.7-0.9 (pillars of community)
+                profile.Caution = GD.Randf() * 0.3f + 0.5f;     // 0.5-0.8 (thoughtful, deliberate)
                 profile.PreferredCombatStyle = CombatStyle.Defensive;
                 profile.Fears.Add("sin");
                 profile.Fears.Add("corruption");
@@ -204,6 +229,11 @@ public class PersonalityProfile
                 profile.Impulsiveness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
                 profile.Sociability = GD.Randf() * 0.5f + 0.2f; // 0.2-0.7
                 profile.Greed = GD.Randf() * 0.4f + 0.3f;       // 0.3-0.7
+                profile.Intelligence = GD.Randf() * 0.2f + 0.8f; // 0.8-1.0 (brilliant scholars)
+                profile.Patience = GD.Randf() * 0.3f + 0.5f;    // 0.5-0.8 (years of study require patience)
+                profile.Mysticism = GD.Randf() * 0.2f + 0.8f;   // 0.8-1.0 (deeply attuned to the arcane)
+                profile.Trustworthiness = GD.Randf() * 0.5f + 0.2f; // 0.2-0.7 (varies — some are secretive)
+                profile.Caution = GD.Randf() * 0.4f + 0.4f;     // 0.4-0.8 (respects dangerous magic)
                 profile.PreferredCombatStyle = CombatStyle.Tactical;
                 profile.Fears.Add("ignorance");
                 profile.Fears.Add("powerlessness");
@@ -222,6 +252,11 @@ public class PersonalityProfile
                 profile.Impulsiveness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
                 profile.Sociability = GD.Randf() * 0.4f + 0.4f; // 0.4-0.8
                 profile.Greed = GD.Randf() * 0.4f + 0.4f;       // 0.4-0.8
+                profile.Intelligence = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (skilled problem solvers)
+                profile.Patience = GD.Randf() * 0.2f + 0.6f;    // 0.6-0.8 (meticulous work requires patience)
+                profile.Mysticism = GD.Randf() * 0.3f + 0.1f;   // 0.1-0.4 (some enchanting interest)
+                profile.Trustworthiness = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (honest tradespeople)
+                profile.Caution = GD.Randf() * 0.3f + 0.4f;     // 0.4-0.7 (careful with their work)
                 profile.PreferredCombatStyle = CombatStyle.Balanced;
                 profile.Fears.Add("mediocrity");
                 profile.Fears.Add("poverty");
@@ -240,6 +275,11 @@ public class PersonalityProfile
                 profile.Impulsiveness = GD.Randf() * 0.8f + 0.1f; // 0.1-0.9
                 profile.Sociability = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8
                 profile.Ambition = GD.Randf() * 0.6f + 0.2f;    // 0.2-0.8
+                profile.Intelligence = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8 (wide range)
+                profile.Patience = GD.Randf() * 0.6f + 0.2f;    // 0.2-0.8 (wide range)
+                profile.Mysticism = GD.Randf() * 0.4f + 0.1f;   // 0.1-0.5 (some folk superstition)
+                profile.Trustworthiness = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8 (wide range)
+                profile.Caution = GD.Randf() * 0.6f + 0.2f;     // 0.2-0.8 (wide range)
                 profile.PreferredCombatStyle = (CombatStyle)GD.RandRange(0, 3);
                 profile.Fears.Add("death");
                 profile.Fears.Add("poverty");
@@ -675,9 +715,10 @@ public class PersonalityProfile
     
     public bool IsLikelyToJoinGang()
     {
-        // Gang joining likelihood based on personality
-        var gangScore = (Loyalty * 0.3f) + (Sociability * 0.3f) + (Ambition * 0.2f) + (Courage * 0.2f);
-        return gangScore > 0.6f && Aggression > 0.3f;
+        // Gang joining likelihood — most NPCs should be willing to team up
+        // Only truly antisocial loners refuse (low sociability + low loyalty + low ambition)
+        var gangScore = (Loyalty * 0.25f) + (Sociability * 0.25f) + (Ambition * 0.25f) + (Courage * 0.15f) + (Aggression * 0.10f);
+        return gangScore > 0.35f;
     }
     
     public bool IsLikelyToBetray()

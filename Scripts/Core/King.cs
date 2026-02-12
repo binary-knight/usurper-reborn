@@ -24,6 +24,15 @@ public class King
     // City control tax share (percentage of sales that goes to city-controlling team)
     public int CityTaxPercent { get; set; } = 2;              // Default 2% of all sales
 
+    // King's sales tax (percentage of every sale that goes to the royal treasury)
+    public int KingTaxPercent { get; set; } = 5;              // Default 5% of all sales (0-25%)
+
+    // Actual tax revenue collected today (reset each day in ProcessDailyActivities)
+    public long DailyTaxRevenue { get; set; } = 0;
+
+    // City controller tax revenue collected today (for dashboard tracking)
+    public long DailyCityTaxRevenue { get; set; } = 0;
+
     // Royal Guard System (Pascal: guard, guardpay, guardai, guardsex arrays)
     // Max 5 NPC guards + 5 monster guards
     public const int MaxNPCGuards = 5;
@@ -139,10 +148,10 @@ public class King
         int npcCount = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.Count ?? 10;
         long baseIncome = TaxRate * Math.Max(10, npcCount);
 
-        // Bonus income from merchant activity
-        long merchantBonus = CityTaxPercent * 50; // Estimate of daily merchant revenue
+        // Sales tax revenue (actual amount collected today via ProcessSaleTax)
+        long salesTaxIncome = DailyTaxRevenue;
 
-        return baseIncome + merchantBonus;
+        return baseIncome + salesTaxIncome;
     }
     
     /// <summary>
@@ -152,8 +161,12 @@ public class King
     {
         var expenses = CalculateDailyExpenses();
         var income = CalculateDailyIncome();
-        
+
         Treasury += income - expenses;
+
+        // Reset daily tax revenue accumulators for the next day
+        DailyTaxRevenue = 0;
+        DailyCityTaxRevenue = 0;
         
         // Ensure treasury doesn't go negative
         if (Treasury < 0)
@@ -309,8 +322,10 @@ public class King
             AI = ai,
             Sex = sex,
             Treasury = GameConfig.DefaultRoyalTreasury,
-            TaxRate = 0,
+            TaxRate = 20,
             TaxAlignment = GameConfig.TaxAlignment.All,
+            KingTaxPercent = 5,
+            CityTaxPercent = 2,
             CoronationDate = DateTime.Now,
             TotalReign = 0
         };

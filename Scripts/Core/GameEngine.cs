@@ -314,6 +314,12 @@ public partial class GameEngine : Node
                 terminal.WriteLine("[%] Admin Console");
                 terminal.SetColor("bright_white");
             }
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("[C] Change Password");
+                terminal.SetColor("bright_white");
+            }
             terminal.WriteLine("[Q] Quit");
             terminal.WriteLine("");
 
@@ -348,6 +354,19 @@ public partial class GameEngine : Node
                         await Task.Delay(2000);
                         // Recurse to show menu again
                         await RunBBSDoorMode();
+                    }
+                    break;
+
+                case "C":
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    {
+                        await ChangePasswordScreen();
+                        await RunBBSDoorMode();
+                        return;
+                    }
+                    else
+                    {
+                        await LoadSaveByFileName(existingSave.FileName);
                     }
                     break;
 
@@ -399,6 +418,12 @@ public partial class GameEngine : Node
                 terminal.WriteLine("[%] Admin Console");
                 terminal.SetColor("bright_white");
             }
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("[C] Change Password");
+                terminal.SetColor("bright_white");
+            }
             terminal.WriteLine("[Q] Quit");
             terminal.WriteLine("");
 
@@ -406,6 +431,19 @@ public partial class GameEngine : Node
 
             switch (choice.ToUpper())
             {
+                case "C":
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    {
+                        await ChangePasswordScreen();
+                        await RunBBSDoorMode();
+                        return;
+                    }
+                    else
+                    {
+                        await CreateNewGame(playerName);
+                    }
+                    break;
+
                 case "%":
                     if (isOnlineAdmin)
                     {
@@ -940,6 +978,75 @@ public partial class GameEngine : Node
     }
 
     /// <summary>
+    /// Change password screen - accessible from character selection in online mode.
+    /// Requires current password for verification before allowing change.
+    /// </summary>
+    private async Task ChangePasswordScreen()
+    {
+        var sqlBackend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (sqlBackend == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Password change requires online mode.");
+            await terminal.GetInputAsync("Press Enter to continue...");
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══ CHANGE PASSWORD ═══");
+        terminal.WriteLine("");
+
+        var username = UsurperRemake.BBS.DoorMode.OnlineUsername;
+        if (string.IsNullOrEmpty(username))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("No username found.");
+            await terminal.GetInputAsync("Press Enter to continue...");
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"Account: {username}");
+        terminal.WriteLine("");
+
+        terminal.Write("Current password: ");
+        var currentPassword = await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true));
+        if (string.IsNullOrWhiteSpace(currentPassword))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("Cancelled.");
+            await Task.Delay(1000);
+            return;
+        }
+
+        terminal.Write("New password (min 4 chars): ");
+        var newPassword = await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true));
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Password must be at least 4 characters.");
+            await terminal.GetInputAsync("Press Enter to continue...");
+            return;
+        }
+
+        terminal.Write("Confirm new password: ");
+        var confirmPassword = await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true));
+        if (newPassword != confirmPassword)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Passwords do not match.");
+            await terminal.GetInputAsync("Press Enter to continue...");
+            return;
+        }
+
+        var (success, message) = await sqlBackend.ChangePassword(username, currentPassword, newPassword);
+        terminal.SetColor(success ? "bright_green" : "red");
+        terminal.WriteLine(message);
+        await terminal.GetInputAsync("Press Enter to continue...");
+    }
+
+    /// <summary>
     /// Enter the game with modern save/load UI
     /// </summary>
     private async Task EnterGame()
@@ -1260,11 +1367,35 @@ public partial class GameEngine : Node
             // Restore world state
             await RestoreWorldState(saveData.WorldState);
 
-            // Restore NPCs
+            // Restore NPCs - from player's save as baseline
             await RestoreNPCs(saveData.NPCs);
+
+            // In online mode, override NPCs and royal court with world_state (authoritative source).
+            // The world sim maintains shared state 24/7 - player saves may be stale.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+            {
+                // Load current NPCs from world_state (teams, levels, equipment, etc.)
+                var sharedNpcs = await OnlineStateManager.Instance.LoadSharedNPCs();
+                if (sharedNpcs != null && sharedNpcs.Count > 0)
+                {
+                    await RestoreNPCs(sharedNpcs);
+                    DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
+                }
+
+                // Load current royal court from world_state
+                await OnlineStateManager.Instance.LoadRoyalCourtFromWorldState();
+            }
 
             // Restore story systems (companions, children, seals, etc.)
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems);
+
+            // In online mode, override children and marriages with world_state (authoritative source).
+            // RestoreStorySystems loaded stale data from the player's save — the world sim may have
+            // created new children and marriages while the player was offline.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+            {
+                await LoadSharedChildrenAndMarriages();
+            }
 
             // Restore telemetry settings
             TelemetrySystem.Instance.Deserialize(saveData.Telemetry);
@@ -1288,6 +1419,51 @@ public partial class GameEngine : Node
             UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Failed to load save {fileName}:\n{ex}");
             UsurperRemake.Systems.DebugLogger.Instance.Flush();
             await Task.Delay(3000);
+        }
+    }
+
+    /// <summary>
+    /// Load authoritative children and marriage data from world_state.
+    /// Called after RestoreStorySystems to override stale player-save data with
+    /// the world sim's current state. This ensures players see children born
+    /// and marriages formed while they were offline.
+    /// </summary>
+    private async Task LoadSharedChildrenAndMarriages()
+    {
+        try
+        {
+            // Load children from world_state (maintained by WorldSimService)
+            var sharedChildren = await OnlineStateManager.Instance.LoadSharedChildren();
+            if (sharedChildren != null && sharedChildren.Count > 0)
+            {
+                FamilySystem.Instance.DeserializeChildren(sharedChildren);
+                DebugLogger.Instance.LogInfo("ONLINE", $"Children overridden from world_state: {sharedChildren.Count} children");
+            }
+
+            // Load marriages from world_state (maintained by WorldSimService)
+            var (marriages, affairs) = await OnlineStateManager.Instance.LoadSharedMarriages();
+            if (marriages != null)
+            {
+                NPCMarriageRegistry.Instance.RestoreMarriages(marriages);
+                DebugLogger.Instance.LogInfo("ONLINE", $"Marriages overridden from world_state: {marriages.Count} marriages");
+            }
+            if (affairs != null)
+            {
+                NPCMarriageRegistry.Instance.RestoreAffairs(affairs);
+                DebugLogger.Instance.LogInfo("ONLINE", $"Affairs overridden from world_state: {affairs.Count} affairs");
+            }
+
+            // Load world events from world_state so player sees active plagues, festivals, etc.
+            var sharedEvents = await OnlineStateManager.Instance.LoadSharedWorldEvents();
+            if (sharedEvents != null && sharedEvents.Count > 0)
+            {
+                WorldEventSystem.Instance.RestoreFromSaveData(sharedEvents, 0);
+                DebugLogger.Instance.LogInfo("ONLINE", $"World events loaded from world_state: {WorldEventSystem.Instance.GetActiveEvents().Count} active events");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("ONLINE", $"Failed to load shared children/marriages/events: {ex.Message}");
         }
     }
 
@@ -1461,11 +1637,35 @@ public partial class GameEngine : Node
         // Restore world state
         await RestoreWorldState(saveData.WorldState);
         
-        // Restore NPCs
+        // Restore NPCs - from player's save as baseline
         await RestoreNPCs(saveData.NPCs);
+
+        // In online mode, override NPCs and royal court with world_state (authoritative source).
+        // The world sim maintains shared state 24/7 - player saves may be stale.
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            // Load current NPCs from world_state (teams, levels, equipment, etc.)
+            var sharedNpcs = await OnlineStateManager.Instance.LoadSharedNPCs();
+            if (sharedNpcs != null && sharedNpcs.Count > 0)
+            {
+                await RestoreNPCs(sharedNpcs);
+                DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
+            }
+
+            // Load current royal court from world_state
+            await OnlineStateManager.Instance.LoadRoyalCourtFromWorldState();
+        }
 
         // Restore story systems (companions, children, seals, etc.)
         SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems);
+
+        // In online mode, override children and marriages with world_state (authoritative source).
+        // RestoreStorySystems loaded stale data from the player's save — the world sim may have
+        // created new children and marriages while the player was offline.
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            await LoadSharedChildrenAndMarriages();
+        }
 
         // Restore telemetry settings
         TelemetrySystem.Instance.Deserialize(saveData.Telemetry);
@@ -2318,6 +2518,7 @@ public partial class GameEngine : Node
 
                 // Inventory
                 Gold = data.Gold,
+                BankGold = data.BankGold,
                 AI = CharacterAI.Computer
             };
 
@@ -2459,6 +2660,22 @@ public partial class GameEngine : Node
                         npc.Brain.Emotions?.AddEmotion(EmotionType.Fear, data.EmotionalState.Fear, 120);
                     if (data.EmotionalState.Trust > 0)
                         npc.Brain.Emotions?.AddEmotion(EmotionType.Gratitude, data.EmotionalState.Trust, 120);
+                    if (data.EmotionalState.Confidence > 0)
+                        npc.Brain.Emotions?.AddEmotion(EmotionType.Confidence, data.EmotionalState.Confidence, 120);
+                    if (data.EmotionalState.Sadness > 0)
+                        npc.Brain.Emotions?.AddEmotion(EmotionType.Sadness, data.EmotionalState.Sadness, 120);
+                    if (data.EmotionalState.Greed > 0)
+                        npc.Brain.Emotions?.AddEmotion(EmotionType.Greed, data.EmotionalState.Greed, 120);
+                    if (data.EmotionalState.Loneliness > 0)
+                        npc.Brain.Emotions?.AddEmotion(EmotionType.Loneliness, data.EmotionalState.Loneliness, 120);
+                    if (data.EmotionalState.Envy > 0)
+                        npc.Brain.Emotions?.AddEmotion(EmotionType.Envy, data.EmotionalState.Envy, 120);
+                    if (data.EmotionalState.Pride > 0)
+                        npc.Brain.Emotions?.AddEmotion(EmotionType.Pride, data.EmotionalState.Pride, 120);
+                    if (data.EmotionalState.Hope > 0)
+                        npc.Brain.Emotions?.AddEmotion(EmotionType.Hope, data.EmotionalState.Hope, 120);
+                    if (data.EmotionalState.Peace > 0)
+                        npc.Brain.Emotions?.AddEmotion(EmotionType.Peace, data.EmotionalState.Peace, 120);
                 }
             }
 

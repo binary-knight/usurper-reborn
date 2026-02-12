@@ -1,0 +1,3643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usurper Reborn - NPC Analytics</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231a0a2e'/%3E%3Ctext x='16' y='22' font-family='serif' font-weight='bold' font-size='16' fill='%23ffaa00' text-anchor='middle'%3EUR%3C/text%3E%3Cpolygon points='10,7 16,3 22,7' fill='%23ffaa00'/%3E%3Cpolygon points='12,7 16,4.5 20,7' fill='%231a0a2e'/%3E%3Crect x='11' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3Crect x='15' y='5' width='2' height='4' fill='%23ffaa00'/%3E%3Crect x='19' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a25;
+            --bg-input: #1a1a28;
+            --border: #2a2a3a;
+            --cyan: #00e5ff;
+            --cyan-dim: #0099aa;
+            --green: #00ff88;
+            --green-dim: #009955;
+            --gold: #ffaa00;
+            --red: #ff4444;
+            --purple: #aa66ff;
+            --pink: #ff66aa;
+            --text: #e0e0e0;
+            --text-dim: #888899;
+            --glow-cyan: 0 0 20px rgba(0, 229, 255, 0.3);
+            --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+            --glow-gold: 0 0 20px rgba(255, 170, 0, 0.3);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            background: var(--bg-dark);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* --- Login Screen --- */
+        #login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .login-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-box h1 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 13px;
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan);
+            margin-bottom: 4px;
+        }
+        .login-box .subtitle {
+            color: var(--text-dim);
+            font-size: 12px;
+            margin-bottom: 24px;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+        }
+        .login-box input:focus { border-color: var(--cyan); }
+        .login-box .btn-row { display: flex; gap: 10px; margin-top: 8px; }
+        .login-box button {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--cyan-dim);
+            color: #fff;
+            border-color: var(--cyan) !important;
+        }
+        .btn-primary:hover { background: var(--cyan); color: #000; }
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-dim);
+        }
+        .btn-secondary:hover { background: var(--bg-card-hover); color: var(--text); }
+        .login-error {
+            color: var(--red);
+            font-size: 12px;
+            margin-top: 8px;
+            min-height: 18px;
+        }
+
+        /* --- Dashboard Layout --- */
+        #dashboard { display: none; }
+        .dash-header {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(10, 10, 15, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .dash-logo {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan);
+        }
+        .dash-logo span { color: var(--gold); font-size: 9px; margin-left: 8px; }
+        .dash-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+        .dash-user button {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-dim);
+            padding: 4px 12px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .dash-user button:hover { color: var(--red); border-color: var(--red); }
+        .dash-body { padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+
+        /* --- Population Bar --- */
+        .pop-bar {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+        .pop-stat {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            font-size: 13px;
+        }
+        .pop-stat .val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .pop-stat .lbl { color: var(--text-dim); font-size: 11px; }
+        .pop-stat.alive .val { color: var(--green); }
+        .pop-stat.dead .val { color: var(--red); }
+        .pop-stat.married .val { color: var(--pink); }
+        .pop-stat.pregnant .val { color: #ffaacc; }
+        .pop-stat.children .val { color: #88ddff; }
+        .pop-stat.teams .val { color: var(--cyan); }
+        .pop-stat.lvl .val { color: var(--gold); }
+        .pop-stat.gold .val { color: var(--gold); }
+        .pop-stat.king .val { color: var(--gold); font-size: 13px; }
+        .sse-badge {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .sse-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--red);
+            display: inline-block;
+        }
+        .sse-dot.connected { background: var(--green); }
+
+        /* --- Grid --- */
+        .dash-grid {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px;
+        }
+        .card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        /* --- World Map (SVG) --- */
+        .world-map {
+            position: relative;
+            width: 100%;
+            background: #0a0a12;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .world-map svg { width: 100%; height: auto; display: block; }
+        .map-building rect, .map-building polygon, .map-building circle, .map-building ellipse, .map-building path {
+            transition: stroke 0.2s, stroke-width 0.2s;
+        }
+        .map-building:hover rect, .map-building:hover polygon, .map-building:hover path {
+            stroke: var(--cyan) !important; stroke-width: 1.5 !important;
+        }
+        .map-npc-dot {
+            cursor: pointer;
+            transition: cx 1.2s ease-in-out, cy 1.2s ease-in-out;
+        }
+        .map-npc-dot:hover + text, .map-tooltip { opacity: 1 !important; }
+        .map-npc-tooltip {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 7px;
+            fill: #fff;
+            text-anchor: middle;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .map-npc-dot:hover ~ .map-npc-tooltip { opacity: 1; }
+
+        /* --- Detail Panel --- */
+        .detail-panel { min-height: 400px; }
+        .detail-empty {
+            color: var(--text-dim);
+            font-size: 13px;
+            text-align: center;
+            padding: 40px 0;
+        }
+        .detail-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            color: var(--gold);
+            margin-bottom: 2px;
+        }
+        .detail-sub {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+        .detail-section {
+            margin-bottom: 14px;
+        }
+        .detail-section h4 {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--cyan-dim);
+            margin-bottom: 6px;
+        }
+        .radar-container {
+            width: 100%;
+            max-width: 280px;
+            margin: 0 auto 12px;
+        }
+        .emo-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+        .emo-bar-label { width: 70px; color: var(--text-dim); text-align: right; }
+        .emo-bar-track {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .emo-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .emo-bar-val {
+            width: 32px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+        .goal-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+        .goal-name { flex: 1; color: var(--text); }
+        .goal-type { color: var(--text-dim); font-size: 10px; }
+        .goal-prio {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--gold);
+        }
+        .memory-item {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(42,42,58,0.5);
+            font-size: 11px;
+        }
+        .memory-item:last-child { border: none; }
+        .memory-desc { color: var(--text); }
+        .memory-meta { color: var(--text-dim); font-size: 10px; }
+        .rel-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+            font-size: 11px;
+        }
+        .rel-name { width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rel-bar-track {
+            flex: 1;
+            height: 5px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .rel-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .rel-val { width: 30px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+
+        /* --- Demographics --- */
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 700px) { .demo-grid { grid-template-columns: 1fr; } }
+        .chart-wrap { position: relative; height: 220px; }
+
+        /* --- Relationship Network --- */
+        .network-card { min-height: 350px; margin-bottom: 16px; }
+        #network-svg { width: 100%; height: 340px; }
+        #network-svg text { fill: var(--text-dim); font-size: 9px; pointer-events: none; }
+
+        /* --- Timeline --- */
+        .timeline-card { margin-bottom: 16px; }
+        .timeline-feed {
+            max-height: 300px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+        .tl-item {
+            display: flex;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 12px;
+            border-bottom: 1px solid rgba(42,42,58,0.3);
+            animation: slideIn 0.3s ease;
+        }
+        .tl-item:last-child { border: none; }
+        .tl-time { color: var(--text-dim); font-size: 10px; white-space: nowrap; width: 55px; flex-shrink: 0; }
+        .tl-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            margin-top: 6px;
+            flex-shrink: 0;
+        }
+        .tl-msg { flex: 1; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- Economy Panel --- */
+        .economy-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 900px) { .economy-panel { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 600px) { .economy-panel { grid-template-columns: 1fr; } }
+        .econ-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .econ-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+        .econ-card .econ-label {
+            color: var(--text-dim);
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+        .econ-card .econ-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .econ-card .econ-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(42,42,58,0.5);
+        }
+        .econ-card .econ-row:last-child { border-bottom: none; }
+        .econ-bar {
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(42,42,58,0.8);
+            margin-top: 6px;
+            margin-bottom: 4px;
+            overflow: hidden;
+        }
+        .econ-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        /* --- Children Panel --- */
+        .children-card { margin-bottom: 16px; }
+        .children-card h3 { margin-bottom: 8px; }
+        .children-summary {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: rgba(136,221,255,0.05);
+            border-radius: 4px;
+        }
+        .children-summary .cs-item {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            font-size: 13px;
+        }
+        .children-summary .cs-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 16px;
+            color: #88ddff;
+        }
+        .children-summary .cs-lbl { color: var(--text-dim); font-size: 11px; }
+        .children-list {
+            max-height: 280px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+        .child-row {
+            display: grid;
+            grid-template-columns: 1.5fr 0.6fr 0.6fr 1.2fr 1.2fr 1fr;
+            gap: 8px;
+            padding: 5px 8px;
+            font-size: 12px;
+            border-bottom: 1px solid rgba(42,42,58,0.3);
+            align-items: center;
+        }
+        .child-row:hover { background: rgba(136,221,255,0.05); }
+        .child-row.header {
+            color: var(--text-dim);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+        }
+        .child-row .child-name { color: #88ddff; font-weight: 600; }
+        .child-row .child-sex-m { color: #66aaff; }
+        .child-row .child-sex-f { color: #ff88cc; }
+        .child-row .child-soul-good { color: var(--green); }
+        .child-row .child-soul-neutral { color: var(--text-dim); }
+        .child-row .child-soul-bad { color: var(--red); }
+        .child-row .child-royal { color: var(--gold); }
+        @media (max-width: 700px) {
+            .child-row { grid-template-columns: 1fr 0.5fr 0.5fr 1fr; }
+            .child-row > :nth-child(5), .child-row > :nth-child(6) { display: none; }
+        }
+
+        /* --- Trend Charts --- */
+        .trend-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 700px) { .trend-grid { grid-template-columns: 1fr; } }
+        .trend-chart-wrap { position: relative; height: 200px; }
+
+        /* --- Tooltips --- */
+        .tooltip {
+            position: fixed;
+            background: rgba(18,18,26,0.95);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-size: 11px;
+            color: var(--text);
+            pointer-events: none;
+            z-index: 999;
+            display: none;
+            max-width: 200px;
+        }
+
+        /* --- What's Happening Cards --- */
+        .whats-happening {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+        .wh-card {
+            flex: 0 0 260px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 14px;
+            border-left: 3px solid var(--cyan);
+            transition: border-color 0.2s, transform 0.15s;
+        }
+        .wh-card:hover { transform: translateY(-2px); }
+        .wh-card.wh-combat { border-left-color: var(--red); }
+        .wh-card.wh-social { border-left-color: var(--pink); }
+        .wh-card.wh-economy { border-left-color: var(--green); }
+        .wh-card.wh-lifecycle { border-left-color: var(--purple); }
+        .wh-card.wh-political { border-left-color: var(--gold); }
+        .wh-headline {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        .wh-detail { font-size: 11px; color: var(--text-dim); }
+        .wh-time { font-size: 9px; color: var(--text-dim); margin-top: 4px; opacity: 0.6; }
+
+        /* --- Most Notable Highlights --- */
+        .notable-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .notable-chip {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 5px 14px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            white-space: nowrap;
+        }
+        .notable-chip:hover {
+            border-color: var(--cyan);
+            background: var(--bg-card-hover);
+        }
+        .notable-chip .nc-label { color: var(--text-dim); font-size: 10px; }
+        .notable-chip .nc-value {
+            color: var(--gold);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+        }
+
+        /* --- NPC Search + List --- */
+        .npc-list-card { margin-bottom: 16px; }
+        .npc-search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .npc-search-bar input {
+            flex: 1;
+            min-width: 200px;
+            padding: 6px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+        }
+        .npc-search-bar input:focus { border-color: var(--cyan); }
+        .npc-search-bar select {
+            padding: 6px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 11px;
+            outline: none;
+        }
+        .npc-table-wrap {
+            max-height: 320px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+        .npc-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .npc-table th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--cyan-dim);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        .npc-table th:hover { color: var(--cyan); }
+        .npc-table th .sort-arrow { font-size: 8px; margin-left: 3px; }
+        .npc-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid rgba(42,42,58,0.3);
+            white-space: nowrap;
+        }
+        .npc-table tr { cursor: pointer; transition: background 0.15s; }
+        .npc-table tr:hover { background: var(--bg-card-hover); }
+        .npc-table tr.selected { background: rgba(0,229,255,0.08); }
+        .npc-status-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        /* --- Faction Power Dashboard --- */
+        .faction-power-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 900px) { .faction-power-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 500px) { .faction-power-grid { grid-template-columns: 1fr; } }
+        .fp-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px;
+            border-top: 3px solid var(--text-dim);
+        }
+        .fp-card.fp-crown { border-top-color: #ffcc44; }
+        .fp-card.fp-shadows { border-top-color: #aa66ff; }
+        .fp-card.fp-faith { border-top-color: #6688ff; }
+        .fp-card.fp-none { border-top-color: #666677; }
+        .fp-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .fp-stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+        .fp-stat-label { color: var(--text-dim); }
+        .fp-stat-val { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+        .fp-territory {
+            margin-top: 6px;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+        .fp-territory span { color: var(--text); }
+
+        /* --- Heatmap toggle --- */
+        .map-toggle-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .map-toggle-btn {
+            padding: 3px 10px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: var(--text-dim);
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .map-toggle-btn.active {
+            background: var(--cyan-dim);
+            border-color: var(--cyan);
+            color: #fff;
+        }
+        .map-toggle-btn:hover:not(.active) { border-color: var(--cyan); color: var(--text); }
+
+        /* --- Network filter buttons --- */
+        .net-filter-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .net-filter-btn {
+            padding: 2px 8px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: var(--text-dim);
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .net-filter-btn.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,0.1); }
+        .net-filter-btn:hover:not(.active) { border-color: var(--text-dim); color: var(--text); }
+
+        /* --- NPC Comparison Modal --- */
+        .compare-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 500;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .compare-overlay.visible { display: flex; }
+        .compare-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .compare-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .compare-header h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .compare-close {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-dim);
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .compare-close:hover { color: var(--red); border-color: var(--red); }
+        .compare-pickers {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .compare-pickers select {
+            flex: 1;
+            padding: 8px 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 12px;
+            outline: none;
+        }
+        .compare-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .compare-col { min-width: 0; }
+        .compare-col .detail-name { font-size: 14px; }
+
+        /* --- Location Detail Popup --- */
+        .loc-popup {
+            display: none;
+            position: absolute;
+            background: rgba(18,18,26,0.97);
+            border: 1px solid var(--cyan-dim);
+            border-radius: 6px;
+            padding: 12px;
+            min-width: 200px;
+            max-width: 300px;
+            z-index: 200;
+            font-size: 11px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .loc-popup.visible { display: block; }
+        .loc-popup-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--cyan);
+            margin-bottom: 6px;
+        }
+        .loc-popup-npc {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 0;
+            cursor: pointer;
+        }
+        .loc-popup-npc:hover { color: var(--gold); }
+        .loc-popup-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* --- NPC Memory Timeline --- */
+        .mem-timeline {
+            position: relative;
+            padding: 8px 0 8px 16px;
+            border-left: 2px solid var(--border);
+        }
+        .mem-tl-item {
+            position: relative;
+            padding: 4px 0 8px 12px;
+            font-size: 11px;
+        }
+        .mem-tl-item::before {
+            content: '';
+            position: absolute;
+            left: -21px;
+            top: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--cyan-dim);
+            border: 2px solid var(--bg-card);
+        }
+        .mem-tl-desc { color: var(--text); }
+        .mem-tl-meta { font-size: 9px; color: var(--text-dim); }
+
+        /* --- Emotion Sparklines --- */
+        .sparkline-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+        .sparkline-label { width: 70px; color: var(--text-dim); font-size: 10px; text-align: right; }
+        .sparkline-svg { flex: 1; height: 16px; }
+        .sparkline-val { width: 32px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+    </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+    <div class="login-box">
+        <h1>USURPER REBORN</h1>
+        <div class="subtitle">NPC Analytics Dashboard</div>
+        <input type="text" id="auth-user" placeholder="Username" autocomplete="username" maxlength="30">
+        <input type="password" id="auth-pass" placeholder="Password" autocomplete="current-password" maxlength="100">
+        <div class="btn-row">
+            <button class="btn-primary" onclick="doLogin()">Login</button>
+            <button class="btn-secondary" onclick="doRegister()">Register</button>
+        </div>
+        <div class="login-error" id="auth-error"></div>
+    </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+    <div class="dash-header">
+        <div class="dash-logo">USURPER REBORN <span>NPC ANALYTICS</span></div>
+        <div class="dash-user">
+            <span id="dash-username"></span>
+            <button onclick="doLogout()">Logout</button>
+        </div>
+    </div>
+    <div class="dash-body">
+        <!-- Population Bar -->
+        <div class="pop-bar" id="pop-bar">
+            <div class="pop-stat alive"><span class="val" id="pop-alive">--</span><span class="lbl">Alive</span></div>
+            <div class="pop-stat dead"><span class="val" id="pop-dead">--</span><span class="lbl">Dead</span></div>
+            <div class="pop-stat married"><span class="val" id="pop-married">--</span><span class="lbl">Married</span></div>
+            <div class="pop-stat pregnant"><span class="val" id="pop-pregnant">--</span><span class="lbl">Pregnant</span></div>
+            <div class="pop-stat children"><span class="val" id="pop-children">--</span><span class="lbl">Children</span></div>
+            <div class="pop-stat teams"><span class="val" id="pop-teams">--</span><span class="lbl">Teams</span></div>
+            <div class="pop-stat lvl"><span class="val" id="pop-avglvl">--</span><span class="lbl">Avg Level</span></div>
+            <div class="pop-stat gold"><span class="val" id="pop-gold">--</span><span class="lbl">Total Gold</span></div>
+            <div class="pop-stat king"><span class="val" id="pop-king">--</span><span class="lbl">King</span></div>
+            <div class="sse-badge"><span class="sse-dot" id="sse-dot"></span> <span id="sse-label">Connecting...</span></div>
+        </div>
+
+        <!-- Economy Panel -->
+        <div class="economy-panel" id="economy-panel">
+            <!-- Royal Treasury -->
+            <div class="econ-card" style="border-color: var(--gold)">
+                <h3 style="color: var(--gold)">Royal Treasury</h3>
+                <div class="econ-label">Current King</div>
+                <div class="econ-value" id="econ-king" style="color: var(--gold)">--</div>
+                <div class="econ-label">Treasury Balance</div>
+                <div class="econ-value" id="econ-treasury" style="color: var(--green)">--</div>
+                <div class="econ-row">
+                    <span class="econ-label">Daily Income</span>
+                    <span style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:12px" id="econ-income">--</span>
+                </div>
+                <div class="econ-row">
+                    <span class="econ-label">Daily Expenses</span>
+                    <span style="color:var(--red);font-family:'JetBrains Mono',monospace;font-size:12px" id="econ-expenses">--</span>
+                </div>
+                <div class="econ-row">
+                    <span class="econ-label">Net Daily</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700" id="econ-net">--</span>
+                </div>
+            </div>
+
+            <!-- Tax Rates & Revenue -->
+            <div class="econ-card" style="border-color: var(--cyan)">
+                <h3 style="color: var(--cyan)">Tax Revenue</h3>
+                <div class="econ-row">
+                    <span class="econ-label">King's Sales Tax</span>
+                    <span style="color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:12px" id="econ-king-tax-rate">--%</span>
+                </div>
+                <div class="econ-row">
+                    <span class="econ-label">City Team Tax</span>
+                    <span style="color:var(--purple);font-family:'JetBrains Mono',monospace;font-size:12px" id="econ-city-tax-rate">--%</span>
+                </div>
+                <div class="econ-row">
+                    <span class="econ-label">Citizen Tax / Day</span>
+                    <span style="color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px" id="econ-citizen-tax">--</span>
+                </div>
+                <div style="margin-top:8px">
+                    <div class="econ-label">King's Tax Revenue Today</div>
+                    <div class="econ-value" id="econ-king-revenue" style="color: var(--cyan)">--</div>
+                    <div class="econ-bar"><div class="econ-bar-fill" id="econ-king-bar" style="background:var(--cyan);width:0%"></div></div>
+                </div>
+                <div>
+                    <div class="econ-label">City Tax Revenue Today</div>
+                    <div class="econ-value" id="econ-city-revenue" style="color: var(--purple)">--</div>
+                    <div class="econ-bar"><div class="econ-bar-fill" id="econ-city-bar" style="background:var(--purple);width:0%"></div></div>
+                </div>
+            </div>
+
+            <!-- City Controller -->
+            <div class="econ-card" style="border-color: var(--purple)">
+                <h3 style="color: var(--purple)">City Controller</h3>
+                <div class="econ-label">Controlling Team</div>
+                <div class="econ-value" id="econ-team" style="color: var(--purple)">--</div>
+                <div class="econ-label">Team Leader</div>
+                <div class="econ-value" id="econ-leader" style="color: var(--text)">--</div>
+                <div class="econ-row">
+                    <span class="econ-label">Team Members</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:12px" id="econ-members">--</span>
+                </div>
+                <div class="econ-row">
+                    <span class="econ-label">Team Power</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:12px" id="econ-power">--</span>
+                </div>
+                <div class="econ-row">
+                    <span class="econ-label">Leader's Bank</span>
+                    <span style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:12px" id="econ-leader-bank">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- What's Happening -->
+        <div class="whats-happening" id="whats-happening"></div>
+
+        <!-- Most Notable Highlights -->
+        <div class="notable-bar" id="notable-bar"></div>
+
+        <!-- World Map + Detail Panel -->
+        <div class="dash-grid">
+            <div class="card" style="position:relative">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <h3 style="margin-bottom:0">World Map</h3>
+                    <div class="map-toggle-row">
+                        <button class="map-toggle-btn active" onclick="setMapMode('dots')" id="btn-map-dots">NPCs</button>
+                        <button class="map-toggle-btn" onclick="setMapMode('heat')" id="btn-map-heat">Heatmap</button>
+                    </div>
+                </div>
+                <div class="world-map" id="world-map"></div>
+                <div class="loc-popup" id="loc-popup"></div>
+            </div>
+            <div class="card detail-panel" id="detail-panel">
+                <h3>NPC Detail</h3>
+                <div class="detail-empty" id="detail-empty">Click an NPC dot to view details</div>
+                <div id="detail-content" style="display:none"></div>
+            </div>
+        </div>
+
+        <!-- NPC Search + Sortable List -->
+        <div class="card npc-list-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                <h3 style="margin-bottom:0">NPC Directory</h3>
+                <button class="map-toggle-btn" onclick="openComparison()" style="font-size:11px">Compare NPCs</button>
+            </div>
+            <div class="npc-search-bar">
+                <input type="text" id="npc-search" placeholder="Search by name..." oninput="filterNpcList()">
+                <select id="npc-filter-faction" onchange="filterNpcList()">
+                    <option value="">All Factions</option>
+                    <option value="0">Crown</option>
+                    <option value="1">Shadows</option>
+                    <option value="2">Faith</option>
+                    <option value="-1">None</option>
+                </select>
+                <select id="npc-filter-status" onchange="filterNpcList()">
+                    <option value="">All Status</option>
+                    <option value="alive">Alive</option>
+                    <option value="dead">Dead</option>
+                    <option value="married">Married</option>
+                    <option value="pregnant">Pregnant</option>
+                </select>
+            </div>
+            <div class="npc-table-wrap">
+                <table class="npc-table">
+                    <thead><tr>
+                        <th onclick="sortNpcList('name')">Name <span class="sort-arrow" id="sort-name"></span></th>
+                        <th onclick="sortNpcList('level')">Lvl <span class="sort-arrow" id="sort-level"></span></th>
+                        <th onclick="sortNpcList('class')">Class <span class="sort-arrow" id="sort-class"></span></th>
+                        <th onclick="sortNpcList('race')">Race <span class="sort-arrow" id="sort-race"></span></th>
+                        <th onclick="sortNpcList('faction')">Faction <span class="sort-arrow" id="sort-faction"></span></th>
+                        <th onclick="sortNpcList('location')">Location <span class="sort-arrow" id="sort-location"></span></th>
+                        <th onclick="sortNpcList('age')">Age <span class="sort-arrow" id="sort-age"></span></th>
+                        <th onclick="sortNpcList('gold')">Gold <span class="sort-arrow" id="sort-gold"></span></th>
+                        <th>Status</th>
+                    </tr></thead>
+                    <tbody id="npc-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Faction Power Dashboard -->
+        <div class="faction-power-grid" id="faction-power"></div>
+
+        <!-- Demographics -->
+        <div class="demo-grid">
+            <div class="card">
+                <h3>Class Distribution</h3>
+                <div class="chart-wrap"><canvas id="chart-class"></canvas></div>
+            </div>
+            <div class="card">
+                <h3>Race Distribution</h3>
+                <div class="chart-wrap"><canvas id="chart-race"></canvas></div>
+            </div>
+            <div class="card">
+                <h3>Faction Breakdown</h3>
+                <div class="chart-wrap"><canvas id="chart-faction"></canvas></div>
+            </div>
+            <div class="card">
+                <h3>Level Distribution</h3>
+                <div class="chart-wrap"><canvas id="chart-level"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Children of the Realm -->
+        <div class="card children-card" id="children-panel" style="display:none">
+            <h3>Children of the Realm</h3>
+            <div class="children-summary" id="children-summary"></div>
+            <div class="children-list">
+                <div class="child-row header">
+                    <span>Name</span>
+                    <span>Age</span>
+                    <span>Sex</span>
+                    <span>Parents</span>
+                    <span>Soul</span>
+                    <span>Status</span>
+                </div>
+                <div id="children-rows"></div>
+            </div>
+        </div>
+
+        <!-- Relationship Network -->
+        <div class="card network-card">
+            <h3>Relationship Network</h3>
+            <div class="net-filter-row">
+                <button class="net-filter-btn active" data-filter="all" onclick="setNetFilter(this,'all')">All</button>
+                <button class="net-filter-btn" data-filter="marriage" onclick="setNetFilter(this,'marriage')">Marriages</button>
+                <button class="net-filter-btn" data-filter="team" onclick="setNetFilter(this,'team')">Teams</button>
+                <button class="net-filter-btn" data-filter="ally" onclick="setNetFilter(this,'ally')">Allies</button>
+                <button class="net-filter-btn" data-filter="rival" onclick="setNetFilter(this,'rival')">Rivals</button>
+            </div>
+            <svg id="network-svg"></svg>
+        </div>
+
+        <!-- Live Event Timeline -->
+        <div class="card timeline-card">
+            <h3>Live Event Timeline <span class="sse-badge" style="display:inline-flex;vertical-align:middle;margin-left:8px"><span class="sse-dot" id="sse-dot2"></span> LIVE</span></h3>
+            <div class="timeline-feed" id="timeline-feed">
+                <div class="tl-item" style="color:var(--text-dim);justify-content:center">Waiting for events...</div>
+            </div>
+        </div>
+
+        <!-- Trend Charts -->
+        <div class="trend-grid">
+            <div class="card">
+                <h3>Events / Hour (24h)</h3>
+                <div class="trend-chart-wrap"><canvas id="chart-events-hourly"></canvas></div>
+            </div>
+            <div class="card">
+                <h3>Population Overview</h3>
+                <div class="trend-chart-wrap"><canvas id="chart-population"></canvas></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NPC Comparison Modal -->
+<div class="compare-overlay" id="compare-overlay" onclick="if(event.target===this)closeComparison()">
+    <div class="compare-box">
+        <div class="compare-header">
+            <h3>NPC Comparison</h3>
+            <button class="compare-close" onclick="closeComparison()">Close</button>
+        </div>
+        <div class="compare-pickers">
+            <select id="compare-npc-a" onchange="updateComparison()"><option value="">Select NPC...</option></select>
+            <select id="compare-npc-b" onchange="updateComparison()"><option value="">Select NPC...</option></select>
+        </div>
+        <div class="compare-body" id="compare-body"></div>
+    </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ==========================================
+// Auth
+// ==========================================
+const API = '/api/dash';
+let currentUser = null;
+
+function escapeHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function apiPost(path, body) {
+    const res = await fetch(API + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(body)
+    });
+    return res.json();
+}
+
+async function apiGet(path) {
+    const res = await fetch(API + path, { credentials: 'same-origin' });
+    if (res.status === 401) { showLogin(); return null; }
+    return res.json();
+}
+
+function showLogin() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'none';
+    if (feedSource) { feedSource.close(); feedSource = null; }
+}
+
+function showDashboard(username) {
+    currentUser = username;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('dash-username').textContent = username;
+    initDashboard();
+}
+
+async function checkSession() {
+    try {
+        const res = await fetch(API + '/check', { credentials: 'same-origin' });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.username) { showDashboard(data.username); return; }
+        }
+    } catch (e) {}
+    showLogin();
+}
+
+async function doLogin() {
+    const u = document.getElementById('auth-user').value.trim();
+    const p = document.getElementById('auth-pass').value;
+    const err = document.getElementById('auth-error');
+    if (!u || !p) { err.textContent = 'Username and password required'; return; }
+    try {
+        const data = await apiPost('/login', { username: u, password: p });
+        if (data.ok) { err.textContent = ''; showDashboard(data.username); }
+        else { err.textContent = data.error || 'Login failed'; }
+    } catch (e) { err.textContent = 'Connection error'; }
+}
+
+async function doRegister() {
+    const u = document.getElementById('auth-user').value.trim();
+    const p = document.getElementById('auth-pass').value;
+    const err = document.getElementById('auth-error');
+    if (!u || !p) { err.textContent = 'Username and password required'; return; }
+    if (p.length < 6) { err.textContent = 'Password must be at least 6 characters'; return; }
+    try {
+        const data = await apiPost('/register', { username: u, password: p });
+        if (data.ok) { err.textContent = ''; showDashboard(data.username); }
+        else { err.textContent = data.error || 'Registration failed'; }
+    } catch (e) { err.textContent = 'Connection error'; }
+}
+
+async function doLogout() {
+    try { await apiPost('/logout', {}); } catch (e) {}
+    showLogin();
+}
+
+// Enter key triggers login
+document.getElementById('auth-pass').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+});
+document.getElementById('auth-user').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('auth-pass').focus();
+});
+
+// ==========================================
+// Dashboard State
+// ==========================================
+let allNpcs = [];
+let summary = {};
+let selectedNpc = null;
+let feedSource = null;
+let charts = {};
+let networkSim = null;
+
+const CLASS_NAMES = {
+    0:'Alchemist',1:'Assassin',2:'Barbarian',3:'Bard',
+    4:'Cleric',5:'Jester',6:'Magician',7:'Paladin',
+    8:'Ranger',9:'Sage',10:'Warrior'
+};
+const RACE_NAMES = {
+    0:'Human',1:'Elf',2:'Dwarf',3:'Orc',4:'Halfling',
+    5:'Gnoll',6:'Troll',7:'Mutant'
+};
+const FACTION_COLORS = {
+    '0': '#ffcc44', // Crown = gold
+    '1': '#aa66ff', // Shadows = purple
+    '2': '#6688ff', // Faith = blue
+    '-1': '#666677'  // None = gray
+};
+const FACTION_NAMES = { '0':'Crown', '1':'Shadows', '2':'Faith', '-1':'None' };
+
+const CHART_COLORS = [
+    '#00e5ff','#00ff88','#ffaa00','#ff4444','#aa66ff',
+    '#ff66aa','#44ddaa','#88ccff','#ffcc44','#ff8844','#ddbb44'
+];
+
+Chart.defaults.color = '#888899';
+Chart.defaults.borderColor = 'rgba(42,42,58,0.5)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+
+// ==========================================
+// Init
+// ==========================================
+async function initDashboard() {
+    await loadFullData();
+    connectSSE();
+    // Refresh full data every 60s
+    setInterval(loadFullData, 60000);
+}
+
+async function loadFullData() {
+    try {
+        const [npcsRes, summaryRes, eventsRes, hourlyRes] = await Promise.all([
+            apiGet('/npcs'),
+            apiGet('/summary'),
+            apiGet('/events'),
+            apiGet('/events/hourly')
+        ]);
+        if (npcsRes) allNpcs = npcsRes;
+        if (summaryRes) summary = summaryRes;
+        updatePopBar();
+        updateEconomy();
+        updateChildren();
+        updateWorldMap();
+        updateDemoCharts();
+        updateNetwork();
+        if (eventsRes) updateTimeline(eventsRes);
+        if (hourlyRes) updateTrendCharts(hourlyRes);
+        if (selectedNpc) {
+            const fresh = allNpcs.find(n => (n.name || n.Name) === selectedNpc);
+            if (fresh) showNpcDetail(fresh);
+        }
+    } catch (e) {
+        console.error('Failed to load dashboard data:', e);
+    }
+}
+
+// ==========================================
+// SSE
+// ==========================================
+function connectSSE() {
+    if (feedSource) feedSource.close();
+    try { feedSource = new EventSource(API + '/feed', { withCredentials: true }); } catch (e) { return; }
+
+    feedSource.onopen = function() {
+        document.getElementById('sse-dot').classList.add('connected');
+        document.getElementById('sse-dot2').classList.add('connected');
+        document.getElementById('sse-label').textContent = 'Live';
+    };
+
+    feedSource.addEventListener('npc-snapshot', function(ev) {
+        try {
+            const data = JSON.parse(ev.data);
+            if (data.summary) {
+                summary = data.summary;
+                updatePopBar();
+                updateChildren();
+                updateDemoCharts();
+            }
+            if (data.npcs) {
+                // Merge snapshot data into full NPC array for world map
+                data.npcs.forEach(sn => {
+                    const full = allNpcs.find(n => (n.name || n.Name) === sn.name);
+                    if (full) {
+                        full.location = sn.location;
+                        full.isDead = !sn.alive;
+                        full.isMarried = sn.married;
+                        full.isKing = sn.isKing;
+                        full.pregnancyDueDate = sn.pregnant ? 'yes' : null;
+                    }
+                });
+                updateWorldMap();
+            }
+        } catch (e) {}
+    });
+
+    feedSource.addEventListener('news', function(ev) {
+        try {
+            const data = JSON.parse(ev.data);
+            if (data.items) {
+                const feed = document.getElementById('timeline-feed');
+                // Remove placeholder
+                const ph = feed.querySelector('.tl-item[style]');
+                if (ph && ph.textContent.includes('Waiting')) ph.remove();
+                data.items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'tl-item';
+                    const c = getActivityColor(item.message);
+                    div.innerHTML = '<span class="tl-time">' + formatTime(item.time) + '</span>'
+                        + '<span class="tl-dot" style="background:' + c + '"></span>'
+                        + '<span class="tl-msg" style="color:' + c + '">' + escapeHtml(item.message) + '</span>';
+                    feed.insertBefore(div, feed.firstChild);
+                });
+                while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+            }
+        } catch (e) {}
+    });
+
+    feedSource.onerror = function() {
+        document.getElementById('sse-dot').classList.remove('connected');
+        document.getElementById('sse-dot2').classList.remove('connected');
+        document.getElementById('sse-label').textContent = 'Reconnecting...';
+    };
+}
+
+// ==========================================
+// Population Bar
+// ==========================================
+function updatePopBar() {
+    const s = summary;
+    if (!s || !s.total) return;
+    document.getElementById('pop-alive').textContent = s.alive || 0;
+    document.getElementById('pop-dead').textContent = s.dead || 0;
+    document.getElementById('pop-married').textContent = s.married || 0;
+    document.getElementById('pop-pregnant').textContent = s.pregnant || 0;
+    document.getElementById('pop-children').textContent = s.children?.count || 0;
+    document.getElementById('pop-teams').textContent = s.teams || 0;
+    document.getElementById('pop-avglvl').textContent = s.avgLevel || 0;
+    document.getElementById('pop-gold').textContent = formatGold(s.totalGold || 0);
+    document.getElementById('pop-king').textContent = s.king || 'None';
+}
+
+function formatGold(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return String(n);
+}
+
+// ==========================================
+// Economy Panel
+// ==========================================
+function updateEconomy() {
+    const econ = summary?.economy;
+    if (!econ) {
+        document.getElementById('economy-panel').style.display = 'none';
+        return;
+    }
+    document.getElementById('economy-panel').style.display = '';
+
+    // Royal Treasury
+    document.getElementById('econ-king').textContent = econ.kingName || 'None';
+    document.getElementById('econ-treasury').textContent = formatGold(econ.treasury || 0) + ' gold';
+    document.getElementById('econ-income').textContent = '+' + formatGold(econ.dailyIncome || 0);
+    document.getElementById('econ-expenses').textContent = '-' + formatGold(econ.dailyExpenses || 0);
+    const net = (econ.dailyIncome || 0) - (econ.dailyExpenses || 0);
+    const netEl = document.getElementById('econ-net');
+    netEl.textContent = (net >= 0 ? '+' : '') + formatGold(net);
+    netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+
+    // Tax Rates
+    document.getElementById('econ-king-tax-rate').textContent = (econ.kingTaxPercent || 0) + '%';
+    document.getElementById('econ-city-tax-rate').textContent = (econ.cityTaxPercent || 0) + '%';
+    document.getElementById('econ-citizen-tax').textContent = (econ.taxRate || 0) + ' gold/citizen';
+
+    // Tax Revenue
+    const kingRev = econ.dailyTaxRevenue || 0;
+    const cityRev = econ.dailyCityTaxRevenue || 0;
+    const maxRev = Math.max(kingRev, cityRev, 1);
+    document.getElementById('econ-king-revenue').textContent = formatGold(kingRev) + ' gold';
+    document.getElementById('econ-city-revenue').textContent = formatGold(cityRev) + ' gold';
+    document.getElementById('econ-king-bar').style.width = Math.min(100, (kingRev / maxRev) * 100) + '%';
+    document.getElementById('econ-city-bar').style.width = Math.min(100, (cityRev / maxRev) * 100) + '%';
+
+    // City Controller
+    document.getElementById('econ-team').textContent = econ.cityControlTeam || 'None';
+    document.getElementById('econ-leader').textContent = econ.cityControlLeader || 'None';
+    document.getElementById('econ-members').textContent = econ.cityControlMembers || 0;
+    document.getElementById('econ-power').textContent = formatGold(econ.cityControlPower || 0);
+    document.getElementById('econ-leader-bank').textContent = formatGold(econ.cityControlLeaderBank || 0) + ' gold';
+}
+
+// ==========================================
+// Children Panel
+// ==========================================
+function updateChildren() {
+    const panel = document.getElementById('children-panel');
+    const cd = summary?.children;
+    if (!cd || !cd.children || cd.children.length === 0) {
+        panel.style.display = 'none';
+        return;
+    }
+    panel.style.display = '';
+
+    const kids = cd.children;
+    const boys = kids.filter(c => c.sex === 'Male').length;
+    const girls = kids.filter(c => c.sex === 'Female').length;
+    const royalCount = kids.filter(c => c.royal).length;
+    const avgAge = kids.length > 0 ? (kids.reduce((s, c) => s + (c.age || 0), 0) / kids.length).toFixed(1) : 0;
+
+    // Soul distribution
+    const goodSouls = kids.filter(c => (c.soulDesc || '').match(/angel|well-behaved/i)).length;
+    const badSouls = kids.filter(c => (c.soulDesc || '').match(/evil|naughty|bad/i)).length;
+
+    const summaryEl = document.getElementById('children-summary');
+    summaryEl.innerHTML = `
+        <div class="cs-item"><span class="cs-val">${kids.length}</span><span class="cs-lbl">Total</span></div>
+        <div class="cs-item"><span class="cs-val" style="color:#66aaff">${boys}</span><span class="cs-lbl">Boys</span></div>
+        <div class="cs-item"><span class="cs-val" style="color:#ff88cc">${girls}</span><span class="cs-lbl">Girls</span></div>
+        <div class="cs-item"><span class="cs-val">${avgAge}</span><span class="cs-lbl">Avg Age</span></div>
+        ${royalCount > 0 ? `<div class="cs-item"><span class="cs-val" style="color:var(--gold)">${royalCount}</span><span class="cs-lbl">Royal</span></div>` : ''}
+        ${goodSouls > 0 ? `<div class="cs-item"><span class="cs-val" style="color:var(--green)">${goodSouls}</span><span class="cs-lbl">Good</span></div>` : ''}
+        ${badSouls > 0 ? `<div class="cs-item"><span class="cs-val" style="color:var(--red)">${badSouls}</span><span class="cs-lbl">Mischievous</span></div>` : ''}
+    `;
+
+    // Sort children: youngest first
+    const sorted = [...kids].sort((a, b) => (a.age || 0) - (b.age || 0));
+
+    const rowsEl = document.getElementById('children-rows');
+    rowsEl.innerHTML = sorted.map(c => {
+        const sexClass = c.sex === 'Male' ? 'child-sex-m' : 'child-sex-f';
+        const sexIcon = c.sex === 'Male' ? '\u2642' : '\u2640';
+        const soul = c.soulDesc || 'unknown';
+        const soulClass = soul.match(/angel|well-behaved/i) ? 'child-soul-good' :
+                          soul.match(/evil|naughty|bad/i) ? 'child-soul-bad' : 'child-soul-neutral';
+        const parents = [c.mother, c.father].filter(Boolean).join(' & ') || 'Unknown';
+        const status = c.kidnapped ? '<span style="color:var(--red)">Kidnapped</span>' :
+                       c.royal ? '<span class="child-royal">Royal</span>' :
+                       c.location || 'Home';
+        const ageStr = c.age !== undefined ? c.age : '?';
+        return `<div class="child-row">
+            <span class="child-name">${escapeHtml(c.name || 'Unknown')}</span>
+            <span>${ageStr}</span>
+            <span class="${sexClass}">${sexIcon} ${c.sex || '?'}</span>
+            <span style="color:var(--text-dim);font-size:11px">${escapeHtml(parents)}</span>
+            <span class="${soulClass}">${escapeHtml(soul)}</span>
+            <span>${status}</span>
+        </div>`;
+    }).join('');
+}
+
+// ==========================================
+// World Map
+// ==========================================
+// Building positions for the SVG town map (viewBox 960x580)
+const MAP_BUILDINGS = {
+    'Castle':      { x: 400, y: 15,  w: 140, h: 60, label: 'Castle',          type: 'castle' },
+    'Temple':      { x: 140, y: 95,  w: 90,  h: 50, label: 'Temple',          type: 'temple' },
+    'Arena':       { x: 710, y: 95,  w: 90,  h: 50, label: 'Arena',           type: 'arena' },
+    'MainStreet':  { x: 370, y: 140, w: 200, h: 55, label: 'Main Street',     type: 'plaza' },
+    'ArmorShop':   { x: 80,  y: 215, w: 80,  h: 44, label: 'Armor Shop',      type: 'shop' },
+    'WeaponShop':  { x: 780, y: 215, w: 80,  h: 44, label: 'Weapon Shop',     type: 'shop' },
+    'MagicShop':   { x: 210, y: 270, w: 80,  h: 44, label: 'Magic Shop',      type: 'shop' },
+    'AdvancedMagicShop': { x: 660, y: 270, w: 80, h: 44, label: 'Adv. Magic', type: 'shop' },
+    'Marketplace': { x: 390, y: 250, w: 160, h: 50, label: 'Marketplace',     type: 'market' },
+    'Healer':      { x: 560, y: 215, w: 80,  h: 44, label: 'Healer',          type: 'shop' },
+    'Bank':        { x: 90,  y: 355, w: 80,  h: 44, label: 'Bank',            type: 'building' },
+    'Inn':         { x: 340, y: 345, w: 100, h: 50, label: 'The Inn',         type: 'inn' },
+    'LevelMaster': { x: 580, y: 355, w: 85,  h: 44, label: 'Level Master',    type: 'building' },
+    'Gym':         { x: 750, y: 355, w: 75,  h: 42, label: 'Gym',             type: 'building' },
+    'DarkAlley':   { x: 50,  y: 445, w: 80,  h: 44, label: 'Dark Alley',      type: 'alley' },
+    'LoveStreet':  { x: 250, y: 440, w: 85,  h: 44, label: 'Love Street',     type: 'tavern' },
+    'Home':        { x: 500, y: 440, w: 80,  h: 44, label: 'Home',            type: 'house' },
+    'Dungeon':     { x: 380, y: 510, w: 180, h: 45, label: 'Dungeon Entrance', type: 'dungeon' },
+};
+
+// Road connections between buildings (pairs of building keys)
+const MAP_ROADS = [
+    ['Castle', 'MainStreet'], ['Temple', 'MainStreet'], ['Arena', 'MainStreet'],
+    ['MainStreet', 'ArmorShop'], ['MainStreet', 'WeaponShop'], ['MainStreet', 'Marketplace'],
+    ['MainStreet', 'Healer'], ['ArmorShop', 'MagicShop'], ['WeaponShop', 'AdvancedMagicShop'],
+    ['Marketplace', 'Inn'], ['MagicShop', 'Bank'], ['Healer', 'LevelMaster'],
+    ['LevelMaster', 'Gym'], ['Bank', 'DarkAlley'], ['Inn', 'LoveStreet'],
+    ['Inn', 'Home'], ['Inn', 'Dungeon'], ['DarkAlley', 'LoveStreet'],
+    ['Home', 'LevelMaster'], ['Marketplace', 'MagicShop'], ['Marketplace', 'AdvancedMagicShop'],
+];
+
+// Normalize raw location strings from NPC data to canonical keys
+function normalizeLocation(raw) {
+    if (!raw) return 'Unknown';
+    const lower = raw.toLowerCase().replace(/[\s_]+/g, '');
+    const map = {
+        'mainstreet':'MainStreet', 'dungeon':'Dungeon', 'dungeons':'Dungeon', 'thedungeon':'Dungeon',
+        'inn':'Inn', 'theinn':'Inn', 'temple':'Temple', 'thetemple':'Temple',
+        'weaponshop':'WeaponShop', 'weapons':'WeaponShop', 'armorshop':'ArmorShop', 'armor':'ArmorShop',
+        'magicshop':'MagicShop', 'advancedmagicshop':'AdvancedMagicShop', 'advmagic':'AdvancedMagicShop',
+        'healer':'Healer', 'thehealer':'Healer', 'castle':'Castle', 'thecastle':'Castle',
+        'home':'Home', 'darkalley':'DarkAlley', 'marketplace':'Marketplace', 'market':'Marketplace',
+        'levelmaster':'LevelMaster', 'bank':'Bank', 'thebank':'Bank',
+        'lovestreet':'LoveStreet', 'arena':'Arena', 'gym':'Gym', 'thegym':'Gym',
+    };
+    return map[lower] || 'MainStreet'; // Default to Main Street for unknown locations
+}
+
+// Draw a building shape in SVG based on type
+function drawBuilding(key, b, count) {
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    let svg = '<g class="map-building" data-loc="' + key + '">';
+
+    // Building body
+    const bodyFill = '#14141e';
+    const bodyStroke = '#2a2a3a';
+
+    if (b.type === 'castle') {
+        // Castle with towers
+        svg += '<rect x="' + b.x + '" y="' + (b.y + 10) + '" width="' + b.w + '" height="' + (b.h - 10) + '" rx="2" fill="' + bodyFill + '" stroke="' + bodyStroke + '"/>';
+        // Left tower
+        svg += '<rect x="' + (b.x - 5) + '" y="' + b.y + '" width="20" height="' + b.h + '" rx="1" fill="#18182a" stroke="' + bodyStroke + '"/>';
+        // Right tower
+        svg += '<rect x="' + (b.x + b.w - 15) + '" y="' + b.y + '" width="20" height="' + b.h + '" rx="1" fill="#18182a" stroke="' + bodyStroke + '"/>';
+        // Battlements
+        for (let i = 0; i < 5; i++) {
+            svg += '<rect x="' + (b.x + 20 + i * 22) + '" y="' + (b.y + 5) + '" width="8" height="8" fill="#1c1c2e" stroke="' + bodyStroke + '" stroke-width="0.5"/>';
+        }
+    } else if (b.type === 'temple') {
+        svg += '<rect x="' + b.x + '" y="' + (b.y + 12) + '" width="' + b.w + '" height="' + (b.h - 12) + '" rx="2" fill="' + bodyFill + '" stroke="' + bodyStroke + '"/>';
+        // Dome
+        svg += '<ellipse cx="' + cx + '" cy="' + (b.y + 14) + '" rx="25" ry="16" fill="#1a1a30" stroke="' + bodyStroke + '"/>';
+        // Cross
+        svg += '<line x1="' + cx + '" y1="' + (b.y - 2) + '" x2="' + cx + '" y2="' + (b.y + 8) + '" stroke="#aa66ff" stroke-width="1.5"/>';
+        svg += '<line x1="' + (cx - 5) + '" y1="' + (b.y + 2) + '" x2="' + (cx + 5) + '" y2="' + (b.y + 2) + '" stroke="#aa66ff" stroke-width="1.5"/>';
+    } else if (b.type === 'arena') {
+        // Octagonal arena
+        const r = Math.min(b.w, b.h) / 2;
+        let pts = '';
+        for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
+            pts += (cx + Math.cos(a) * r) + ',' + (cy + Math.sin(a) * r) + ' ';
+        }
+        svg += '<polygon points="' + pts + '" fill="' + bodyFill + '" stroke="' + bodyStroke + '"/>';
+    } else if (b.type === 'plaza') {
+        // Open plaza - dashed border
+        svg += '<rect x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="3" fill="rgba(20,20,30,0.4)" stroke="' + bodyStroke + '" stroke-dasharray="4 3"/>';
+    } else if (b.type === 'dungeon') {
+        // Dark cave entrance
+        svg += '<rect x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="3" fill="#0a0a10" stroke="#1a1020"/>';
+        // Archway
+        svg += '<path d="M' + (cx - 25) + ',' + (b.y + b.h) + ' Q' + cx + ',' + (b.y - 5) + ' ' + (cx + 25) + ',' + (b.y + b.h) + '" fill="none" stroke="#2a1a30" stroke-width="2"/>';
+    } else if (b.type === 'alley') {
+        svg += '<rect x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="1" fill="#0c0c12" stroke="#1a1a22"/>';
+    } else if (b.type === 'inn' || b.type === 'tavern') {
+        // Building with peaked roof
+        svg += '<rect x="' + b.x + '" y="' + (b.y + 10) + '" width="' + b.w + '" height="' + (b.h - 10) + '" rx="2" fill="' + bodyFill + '" stroke="' + bodyStroke + '"/>';
+        svg += '<polygon points="' + (b.x - 3) + ',' + (b.y + 12) + ' ' + cx + ',' + b.y + ' ' + (b.x + b.w + 3) + ',' + (b.y + 12) + '" fill="#1a1420" stroke="' + bodyStroke + '"/>';
+        // Chimney
+        svg += '<rect x="' + (b.x + b.w - 15) + '" y="' + (b.y - 5) + '" width="8" height="15" fill="#181820" stroke="' + bodyStroke + '" stroke-width="0.5"/>';
+    } else if (b.type === 'shop') {
+        svg += '<rect x="' + b.x + '" y="' + (b.y + 8) + '" width="' + b.w + '" height="' + (b.h - 8) + '" rx="2" fill="' + bodyFill + '" stroke="' + bodyStroke + '"/>';
+        svg += '<polygon points="' + (b.x - 2) + ',' + (b.y + 10) + ' ' + cx + ',' + b.y + ' ' + (b.x + b.w + 2) + ',' + (b.y + 10) + '" fill="#161622" stroke="' + bodyStroke + '"/>';
+    } else if (b.type === 'market') {
+        svg += '<rect x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="2" fill="rgba(18,18,28,0.5)" stroke="' + bodyStroke + '"/>';
+        // Market stall roofs
+        for (let i = 0; i < 3; i++) {
+            const sx = b.x + 10 + i * 50;
+            svg += '<polygon points="' + sx + ',' + (b.y + 8) + ' ' + (sx + 20) + ',' + (b.y - 2) + ' ' + (sx + 40) + ',' + (b.y + 8) + '" fill="#1a1824" stroke="' + bodyStroke + '" stroke-width="0.5"/>';
+        }
+    } else if (b.type === 'house') {
+        svg += '<rect x="' + b.x + '" y="' + (b.y + 10) + '" width="' + b.w + '" height="' + (b.h - 10) + '" rx="2" fill="' + bodyFill + '" stroke="' + bodyStroke + '"/>';
+        svg += '<polygon points="' + (b.x - 2) + ',' + (b.y + 12) + ' ' + cx + ',' + b.y + ' ' + (b.x + b.w + 2) + ',' + (b.y + 12) + '" fill="#161620" stroke="' + bodyStroke + '"/>';
+    } else {
+        // Generic building
+        svg += '<rect x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="2" fill="' + bodyFill + '" stroke="' + bodyStroke + '"/>';
+    }
+
+    // Label below building
+    svg += '<text x="' + cx + '" y="' + (b.y + b.h + 12) + '" text-anchor="middle" '
+        + 'font-family="\'JetBrains Mono\', monospace" font-size="8" fill="#667">' + b.label + '</text>';
+
+    // NPC count badge
+    if (count > 0) {
+        svg += '<text x="' + (b.x + b.w - 2) + '" y="' + (b.y + 10) + '" text-anchor="end" '
+            + 'font-family="\'JetBrains Mono\', monospace" font-size="8" fill="#0c8" opacity="0.8">' + count + '</text>';
+    }
+
+    svg += '</g>';
+    return svg;
+}
+
+// Distribute NPCs around a building center
+function scatterNpcsAround(npcs, b) {
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    const maxR = Math.min(b.w, b.h) * 0.35;
+    return npcs.map((npc, i) => {
+        const n = npcs.length;
+        if (n === 1) return { npc, x: cx, y: cy };
+        // Spiral layout for nice distribution
+        const angle = (i / n) * Math.PI * 2 + (i * 0.5);
+        const ring = Math.floor(i / 6);
+        const r = Math.min(maxR, 5 + ring * 6 + (i % 3) * 3);
+        return { npc, x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
+    });
+}
+
+let prevNpcPositions = {};
+
+function updateWorldMap() {
+    const mapEl = document.getElementById('world-map');
+
+    // Normalize and group NPCs by location
+    const byLoc = {};
+    allNpcs.forEach(n => {
+        const raw = n.location || n.Location || 'Unknown';
+        const loc = normalizeLocation(raw);
+        if (!byLoc[loc]) byLoc[loc] = [];
+        byLoc[loc].push(n);
+    });
+
+    let svg = '<svg viewBox="0 0 960 580" xmlns="http://www.w3.org/2000/svg">';
+
+    // Background
+    svg += '<rect width="960" height="580" fill="#0a0a12"/>';
+    // Subtle ground texture - scattered dots
+    for (let i = 0; i < 40; i++) {
+        const gx = 50 + (i * 237) % 860, gy = 30 + (i * 173) % 520;
+        svg += '<circle cx="' + gx + '" cy="' + gy + '" r="1" fill="#12121a" opacity="0.5"/>';
+    }
+
+    // Draw roads
+    svg += '<g class="map-roads">';
+    MAP_ROADS.forEach(([a, b]) => {
+        const ba = MAP_BUILDINGS[a], bb = MAP_BUILDINGS[b];
+        if (!ba || !bb) return;
+        const ax = ba.x + ba.w / 2, ay = ba.y + ba.h / 2;
+        const bx = bb.x + bb.w / 2, by = bb.y + bb.h / 2;
+        svg += '<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="#141420" stroke-width="6" stroke-linecap="round"/>';
+        svg += '<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="#1a1a2a" stroke-width="1" stroke-dasharray="3 4" stroke-linecap="round" opacity="0.5"/>';
+    });
+    svg += '</g>';
+
+    // Draw buildings
+    svg += '<g class="map-buildings">';
+    Object.entries(MAP_BUILDINGS).forEach(([key, b]) => {
+        const count = (byLoc[key] || []).length;
+        svg += drawBuilding(key, b, count);
+    });
+    svg += '</g>';
+
+    // Draw NPC dots
+    const newPositions = {};
+    svg += '<g class="map-npcs">';
+    Object.entries(MAP_BUILDINGS).forEach(([key, b]) => {
+        const npcs = byLoc[key] || [];
+        const positions = scatterNpcsAround(npcs, b);
+        positions.forEach(({ npc: n, x, y }) => {
+            const name = n.name || n.Name || '?';
+            const dead = n.isDead || n.IsDead;
+            const king = n.isKing || n.IsKing;
+            const pregnant = !!(n.pregnancyDueDate || n.PregnancyDueDate);
+            const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+            const color = FACTION_COLORS[fid] || FACTION_COLORS['-1'];
+            const lvl = n.level || n.Level || 1;
+            const r = Math.max(2.5, Math.min(5.5, 2.5 + lvl / 15));
+            const opacity = dead ? 0.25 : 1;
+            const prev = prevNpcPositions[name];
+            const startX = prev ? prev.x : x;
+            const startY = prev ? prev.y : y;
+            newPositions[name] = { x, y };
+
+            svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
+                + 'cx="' + startX + '" cy="' + startY + '" r="' + r + '" '
+                + 'fill="' + color + '" opacity="' + opacity + '" '
+                + 'stroke="' + (king ? '#ffaa00' : (pregnant ? '#ff66aa' : 'none')) + '" '
+                + 'stroke-width="' + (king ? 2 : (pregnant ? 1.5 : 0)) + '">'
+                + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title>'
+                + '</circle>';
+        });
+    });
+
+    // Also scatter any NPCs at unmapped locations into Main Street
+    const mappedKeys = new Set(Object.keys(MAP_BUILDINGS));
+    Object.entries(byLoc).forEach(([loc, npcs]) => {
+        if (mappedKeys.has(loc)) return;
+        const b = MAP_BUILDINGS['MainStreet'];
+        const positions = scatterNpcsAround(npcs, b);
+        positions.forEach(({ npc: n, x, y }) => {
+            const name = n.name || n.Name || '?';
+            const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+            const color = FACTION_COLORS[fid] || FACTION_COLORS['-1'];
+            const lvl = n.level || n.Level || 1;
+            const r = Math.max(2.5, Math.min(5.5, 2.5 + lvl / 15));
+            const dead = n.isDead || n.IsDead;
+            newPositions[name] = { x, y };
+            svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
+                + 'cx="' + x + '" cy="' + y + '" r="' + r + '" '
+                + 'fill="' + color + '" opacity="' + (dead ? 0.25 : 1) + '">'
+                + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title></circle>';
+        });
+    });
+    svg += '</g>';
+
+    // Legend
+    svg += '<g transform="translate(850, 530)">';
+    svg += '<text x="0" y="0" font-family="\'JetBrains Mono\', monospace" font-size="7" fill="#556">';
+    const factionLegend = [
+        { color: FACTION_COLORS['0'], label: 'Crown' },
+        { color: FACTION_COLORS['1'], label: 'Shadow' },
+        { color: FACTION_COLORS['2'], label: 'Faith' },
+        { color: FACTION_COLORS['-1'], label: 'None' }
+    ];
+    factionLegend.forEach((f, i) => {
+        svg += '<tspan x="0" dy="' + (i === 0 ? 0 : 11) + '"><tspan fill="' + f.color + '">&#9679;</tspan> ' + f.label + '</tspan>';
+    });
+    svg += '</text></g>';
+
+    svg += '</svg>';
+    mapEl.innerHTML = svg;
+
+    // Animate NPC dots to their new positions (CSS transitions)
+    if (Object.keys(prevNpcPositions).length > 0) {
+        requestAnimationFrame(() => {
+            mapEl.querySelectorAll('.map-npc-dot').forEach(dot => {
+                const name = dot.getAttribute('data-npc');
+                const pos = newPositions[name];
+                if (pos) {
+                    dot.setAttribute('cx', pos.x);
+                    dot.setAttribute('cy', pos.y);
+                }
+            });
+        });
+    }
+    prevNpcPositions = newPositions;
+
+    // Click handlers
+    mapEl.querySelectorAll('.map-npc-dot').forEach(dot => {
+        dot.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const name = this.getAttribute('data-npc');
+            const npc = allNpcs.find(n => (n.name || n.Name) === name);
+            if (npc) {
+                selectedNpc = name;
+                showNpcDetail(npc);
+                // Highlight selected dot
+                mapEl.querySelectorAll('.map-npc-dot').forEach(d => d.removeAttribute('filter'));
+                this.setAttribute('filter', 'url(#glow)');
+            }
+        });
+    });
+}
+
+// ==========================================
+// NPC Detail Panel
+// ==========================================
+let personalityChart = null;
+
+function showNpcDetail(n) {
+    const empty = document.getElementById('detail-empty');
+    const content = document.getElementById('detail-content');
+    empty.style.display = 'none';
+    content.style.display = 'block';
+
+    const name = n.name || n.Name || '?';
+    const cls = CLASS_NAMES[n.class !== undefined ? n.class : n.Class] || 'Unknown';
+    const race = RACE_NAMES[n.race !== undefined ? n.race : n.Race] || 'Unknown';
+    const lvl = n.level || n.Level || 1;
+    const dead = n.isDead || n.IsDead;
+    const married = n.isMarried || n.IsMarried;
+    const spouse = n.spouseName || n.SpouseName || '';
+    const age = n.age || n.Age || 0;
+    const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+    const faction = FACTION_NAMES[fid] || 'None';
+
+    const loc = n.location || n.Location || '';
+    const hp = n.hp || n.HP || 0;
+    const maxHp = n.maxHP || n.MaxHP || 1;
+    const gold = n.gold || n.Gold || 0;
+
+    let html = '<div class="detail-name">' + escapeHtml(name) + (dead ? ' <span style="color:var(--red)">[DEAD]</span>' : '') + '</div>';
+    html += '<div class="detail-sub">Level ' + lvl + ' ' + race + ' ' + cls;
+    if (age > 0) html += ' | Age ' + age;
+    html += ' | ' + faction;
+    if (married && spouse) html += ' | Married to ' + escapeHtml(spouse);
+    html += '</div>';
+
+    // Quick stats row
+    html += '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;margin-bottom:10px">';
+    if (hp > 0) {
+        const hpPct = Math.round((hp / maxHp) * 100);
+        const hpColor = hpPct > 60 ? 'var(--green)' : hpPct > 30 ? 'var(--gold)' : 'var(--red)';
+        html += '<span style="color:' + hpColor + '">HP ' + hp + '/' + maxHp + '</span>';
+    }
+    if (gold > 0) html += '<span style="color:var(--gold)">Gold ' + formatGold(gold) + '</span>';
+    if (loc) html += '<span style="color:var(--text-dim)">@ ' + escapeHtml(loc) + '</span>';
+    html += '</div>';
+
+    // Personality Radar
+    const pp = n.personalityProfile || n.PersonalityProfile;
+    if (pp) {
+        html += '<div class="detail-section"><h4>Personality</h4><div class="radar-container"><canvas id="personality-radar"></canvas></div></div>';
+    }
+
+    // Emotional State
+    const emo = n.emotionalState || n.EmotionalState;
+    if (emo) {
+        html += '<div class="detail-section"><h4>Emotional State</h4>';
+        const emotions = [
+            { key: 'happiness', label: 'Joy', color: '#00ff88' },
+            { key: 'confidence', label: 'Confidence', color: '#ffaa00' },
+            { key: 'anger', label: 'Anger', color: '#ff4444' },
+            { key: 'fear', label: 'Fear', color: '#aa66ff' },
+            { key: 'trust', label: 'Trust', color: '#00e5ff' },
+            { key: 'sadness', label: 'Sadness', color: '#6688cc' },
+            { key: 'greed', label: 'Greed', color: '#ccaa00' },
+            { key: 'pride', label: 'Pride', color: '#ff8844' },
+            { key: 'loneliness', label: 'Loneliness', color: '#8888aa' },
+            { key: 'hope', label: 'Hope', color: '#44ddaa' },
+            { key: 'peace', label: 'Peace', color: '#88ccff' },
+            { key: 'envy', label: 'Envy', color: '#88aa44' }
+        ];
+        emotions.forEach(e => {
+            const val = emo[e.key] !== undefined ? emo[e.key] : (emo[e.key.charAt(0).toUpperCase() + e.key.slice(1)] || 0);
+            const pct = Math.round(val * 100);
+            html += '<div class="emo-bar-row">'
+                + '<span class="emo-bar-label">' + e.label + '</span>'
+                + '<div class="emo-bar-track"><div class="emo-bar-fill" style="width:' + pct + '%;background:' + e.color + '"></div></div>'
+                + '<span class="emo-bar-val">' + pct + '%</span>'
+                + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Goals
+    const goals = n.currentGoals || n.CurrentGoals;
+    if (goals && goals.length > 0) {
+        html += '<div class="detail-section"><h4>Active Goals</h4>';
+        goals.filter(g => g.isActive || g.IsActive).forEach(g => {
+            const gname = g.name || g.Name || '?';
+            const gtype = g.type || g.Type || '';
+            const gprio = (g.priority || g.Priority || 0).toFixed(2);
+            html += '<div class="goal-item">'
+                + '<span class="goal-name">' + escapeHtml(gname) + '</span>'
+                + '<span class="goal-type">' + escapeHtml(gtype) + '</span>'
+                + '<span class="goal-prio">' + gprio + '</span>'
+                + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Memories
+    const mems = n.memories || n.Memories;
+    if (mems && mems.length > 0) {
+        html += '<div class="detail-section"><h4>Recent Memories</h4>';
+        mems.slice(0, 10).forEach(m => {
+            const desc = m.description || m.Description || '';
+            const type = m.type || m.Type || '';
+            const imp = m.importance || m.Importance || 0;
+            html += '<div class="memory-item">'
+                + '<div class="memory-desc">' + escapeHtml(desc) + '</div>'
+                + '<div class="memory-meta">' + escapeHtml(type) + ' | Importance: ' + imp.toFixed(1) + '</div>'
+                + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Relationships
+    const rels = n.relationships || n.Relationships;
+    if (rels && Object.keys(rels).length > 0) {
+        html += '<div class="detail-section"><h4>Relationships</h4>';
+        const sorted = Object.entries(rels).sort((a, b) => b[1] - a[1]);
+        sorted.slice(0, 15).forEach(([rname, val]) => {
+            const pct = Math.max(0, Math.min(100, (val + 100) / 2)); // -100..100 -> 0..100
+            const color = val >= 0 ? '#00ff88' : '#ff4444';
+            html += '<div class="rel-item">'
+                + '<span class="rel-name" title="' + escapeHtml(rname) + '">' + escapeHtml(rname) + '</span>'
+                + '<div class="rel-bar-track"><div class="rel-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>'
+                + '<span class="rel-val">' + val.toFixed(0) + '</span>'
+                + '</div>';
+        });
+        html += '</div>';
+    }
+
+    if (!pp && !emo && (!goals || goals.length === 0) && (!mems || mems.length === 0)) {
+        html += '<div class="detail-empty" style="padding:20px 0">Awaiting AI data...</div>';
+    }
+
+    content.innerHTML = html;
+
+    // Draw personality radar after DOM insert
+    if (pp) {
+        requestAnimationFrame(() => drawPersonalityRadar(pp));
+    }
+}
+
+function drawPersonalityRadar(pp) {
+    const canvas = document.getElementById('personality-radar');
+    if (!canvas) return;
+    if (personalityChart) { personalityChart.destroy(); personalityChart = null; }
+
+    const traits = [
+        { key: 'aggression', label: 'Aggression' },
+        { key: 'loyalty', label: 'Loyalty' },
+        { key: 'intelligence', label: 'Intelligence' },
+        { key: 'greed', label: 'Greed' },
+        { key: 'compassion', label: 'Compassion' },
+        { key: 'courage', label: 'Courage' },
+        { key: 'ambition', label: 'Ambition' },
+        { key: 'patience', label: 'Patience' },
+        { key: 'vengefulness', label: 'Vengefulness' },
+        { key: 'impulsiveness', label: 'Impulsive' },
+        { key: 'mysticism', label: 'Mysticism' },
+        { key: 'honesty', label: 'Trust' },
+        { key: 'caution', label: 'Caution' }
+    ];
+
+    const values = traits.map(t => {
+        const v = pp[t.key] !== undefined ? pp[t.key] : (pp[t.key.charAt(0).toUpperCase() + t.key.slice(1)] || 0);
+        return v;
+    });
+
+    personalityChart = new Chart(canvas, {
+        type: 'radar',
+        data: {
+            labels: traits.map(t => t.label),
+            datasets: [{
+                data: values,
+                backgroundColor: 'rgba(0, 229, 255, 0.15)',
+                borderColor: 'rgba(0, 229, 255, 0.8)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(0, 229, 255, 1)',
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                r: {
+                    min: 0, max: 1,
+                    ticks: { stepSize: 0.25, display: false },
+                    grid: { color: 'rgba(42,42,58,0.6)' },
+                    angleLines: { color: 'rgba(42,42,58,0.4)' },
+                    pointLabels: { font: { size: 10 }, color: '#888899' }
+                }
+            }
+        }
+    });
+}
+
+// ==========================================
+// Demographic Charts
+// ==========================================
+function updateDemoCharts() {
+    const s = summary;
+    if (!s || !s.total) return;
+
+    // Class Doughnut
+    updateDoughnut('chart-class', s.classDist || {});
+    // Race Doughnut
+    updateDoughnut('chart-race', s.raceDist || {});
+    // Faction Bar
+    updateBarChart('chart-faction', s.factionDist || {}, true);
+    // Level Histogram
+    updateBarChart('chart-level', s.levelDist || {}, false);
+}
+
+function updateDoughnut(canvasId, dist) {
+    const labels = Object.keys(dist);
+    const data = Object.values(dist);
+    if (charts[canvasId]) {
+        charts[canvasId].data.labels = labels;
+        charts[canvasId].data.datasets[0].data = data;
+        charts[canvasId].update('none');
+        return;
+    }
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    charts[canvasId] = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: CHART_COLORS.slice(0, labels.length),
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { font: { size: 10 }, padding: 6 }
+                }
+            },
+            cutout: '55%'
+        }
+    });
+}
+
+function updateBarChart(canvasId, dist, horizontal) {
+    const labels = Object.keys(dist);
+    const data = Object.values(dist);
+    if (charts[canvasId]) {
+        charts[canvasId].data.labels = labels;
+        charts[canvasId].data.datasets[0].data = data;
+        charts[canvasId].update('none');
+        return;
+    }
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    charts[canvasId] = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: labels.map((l, i) => {
+                    if (canvasId === 'chart-faction') {
+                        const fkey = Object.entries(FACTION_NAMES).find(([k, v]) => v === l);
+                        return fkey ? (FACTION_COLORS[fkey[0]] || CHART_COLORS[i]) : CHART_COLORS[i];
+                    }
+                    return CHART_COLORS[i % CHART_COLORS.length];
+                }),
+                borderWidth: 0,
+                borderRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: horizontal ? 'y' : 'x',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: !horizontal } },
+                y: { grid: { display: horizontal } }
+            }
+        }
+    });
+}
+
+// ==========================================
+// Relationship Network (D3.js)
+// ==========================================
+function updateNetwork() {
+    if (!allNpcs || allNpcs.length === 0) return;
+    const svg = d3.select('#network-svg');
+    svg.selectAll('*').remove();
+
+    const width = svg.node().getBoundingClientRect().width;
+    const height = 340;
+
+    // Build nodes and links
+    const nodes = [];
+    const nodeMap = {};
+    const links = [];
+
+    allNpcs.forEach((n, i) => {
+        const name = n.name || n.Name || '?';
+        const dead = n.isDead || n.IsDead;
+        const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+        const lvl = n.level || n.Level || 1;
+        const married = n.isMarried || n.IsMarried;
+        const spouse = n.spouseName || n.SpouseName || '';
+        const team = n.team || n.Team || '';
+        nodes.push({ id: name, level: lvl, faction: fid, dead, married, spouse, team, index: i });
+        nodeMap[name] = nodes.length - 1;
+    });
+
+    // Marriage links
+    const marriageAdded = new Set();
+    nodes.forEach(n => {
+        if (n.married && n.spouse && nodeMap[n.spouse] !== undefined) {
+            const key = [n.id, n.spouse].sort().join('|');
+            if (!marriageAdded.has(key)) {
+                marriageAdded.add(key);
+                links.push({ source: n.id, target: n.spouse, type: 'marriage' });
+            }
+        }
+    });
+
+    // Team links
+    const teamMembers = {};
+    nodes.forEach(n => {
+        if (n.team) {
+            if (!teamMembers[n.team]) teamMembers[n.team] = [];
+            teamMembers[n.team].push(n.id);
+        }
+    });
+    Object.values(teamMembers).forEach(members => {
+        for (let i = 0; i < members.length - 1; i++) {
+            links.push({ source: members[i], target: members[i + 1], type: 'team' });
+        }
+    });
+
+    // Relationship links (from impressions)
+    allNpcs.forEach(n => {
+        const name = n.name || n.Name;
+        const rels = n.relationships || n.Relationships;
+        if (rels) {
+            Object.entries(rels).forEach(([target, val]) => {
+                if (nodeMap[target] !== undefined && Math.abs(val) > 30) {
+                    links.push({
+                        source: name,
+                        target: target,
+                        type: val > 0 ? 'ally' : 'rival',
+                        strength: Math.abs(val)
+                    });
+                }
+            });
+        }
+    });
+
+    const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(60))
+        .force('charge', d3.forceManyBody().strength(-40))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(d => 4 + d.level / 5));
+
+    if (networkSim) networkSim.stop();
+    networkSim = simulation;
+
+    const g = svg.append('g');
+
+    // Zoom
+    svg.call(d3.zoom().scaleExtent([0.3, 4]).on('zoom', (event) => {
+        g.attr('transform', event.transform);
+    }));
+
+    const link = g.selectAll('.link')
+        .data(links)
+        .join('line')
+        .attr('class', 'link')
+        .attr('stroke', d => {
+            if (d.type === 'marriage') return '#ff4444';
+            if (d.type === 'team') return '#00e5ff';
+            if (d.type === 'ally') return '#00ff88';
+            return '#ff8844';
+        })
+        .attr('stroke-opacity', d => {
+            if (d.type === 'marriage') return 0.7;
+            if (d.type === 'team') return 0.6;
+            return Math.min(0.5, (d.strength || 30) / 100);
+        })
+        .attr('stroke-width', d => d.type === 'marriage' ? 2 : 1);
+
+    const node = g.selectAll('.node')
+        .data(nodes)
+        .join('circle')
+        .attr('class', 'node')
+        .attr('r', d => 3 + d.level / 6)
+        .attr('fill', d => FACTION_COLORS[d.faction] || '#666677')
+        .attr('opacity', d => d.dead ? 0.2 : 0.9)
+        .attr('stroke', d => d.married ? '#ff66aa' : 'none')
+        .attr('stroke-width', d => d.married ? 1.5 : 0)
+        .style('cursor', 'pointer')
+        .call(d3.drag()
+            .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+            .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+        )
+        .on('click', (event, d) => {
+            const npc = allNpcs.find(n => (n.name || n.Name) === d.id);
+            if (npc) { selectedNpc = d.id; showNpcDetail(npc); }
+        });
+
+    // Labels for larger/important nodes
+    const label = g.selectAll('.label')
+        .data(nodes.filter(d => d.level >= 15 || d.married || d.faction !== '-1'))
+        .join('text')
+        .attr('class', 'label')
+        .text(d => d.id)
+        .attr('dx', 8)
+        .attr('dy', 3);
+
+    // Tooltip
+    const tooltip = document.getElementById('tooltip');
+    node.on('mouseenter', (event, d) => {
+        tooltip.style.display = 'block';
+        tooltip.style.left = (event.clientX + 10) + 'px';
+        tooltip.style.top = (event.clientY - 10) + 'px';
+        const fName = FACTION_NAMES[d.faction] || 'None';
+        tooltip.innerHTML = '<strong>' + escapeHtml(d.id) + '</strong><br>Level ' + d.level
+            + '<br>Faction: ' + fName
+            + (d.dead ? '<br><span style="color:var(--red)">DEAD</span>' : '')
+            + (d.married ? '<br>Married to ' + escapeHtml(d.spouse) : '');
+    }).on('mouseleave', () => { tooltip.style.display = 'none'; });
+
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+        node
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y);
+        label
+            .attr('x', d => d.x)
+            .attr('y', d => d.y);
+    });
+}
+
+// ==========================================
+// Timeline
+// ==========================================
+function updateTimeline(events) {
+    const feed = document.getElementById('timeline-feed');
+    let html = '';
+    events.slice(0, 100).forEach(ev => {
+        const c = getActivityColor(ev.message);
+        html += '<div class="tl-item">'
+            + '<span class="tl-time">' + formatTime(ev.time) + '</span>'
+            + '<span class="tl-dot" style="background:' + c + '"></span>'
+            + '<span class="tl-msg" style="color:' + c + '">' + escapeHtml(ev.message) + '</span>'
+            + '</div>';
+    });
+    if (!html) html = '<div class="tl-item" style="color:var(--text-dim);justify-content:center">No events yet</div>';
+    feed.innerHTML = html;
+}
+
+function formatTime(t) {
+    if (!t) return '';
+    try {
+        const d = new Date(t);
+        const now = new Date();
+        const diff = (now - d) / 60000;
+        if (diff < 1) return 'just now';
+        if (diff < 60) return Math.floor(diff) + 'm ago';
+        if (diff < 1440) return Math.floor(diff / 60) + 'h ago';
+        return Math.floor(diff / 1440) + 'd ago';
+    } catch (e) { return ''; }
+}
+
+function getActivityColor(msg) {
+    if (!msg) return '#888899';
+    if (/passed away|soul moves on/i.test(msg)) return '#9966cc';
+    if (msg.includes('\u2020')) return '#ff4444';
+    if (/expecting a child/i.test(msg)) return '#ffaacc';
+    if (/proud parents|baby|born/i.test(msg)) return '#ff88dd';
+    if (/come of age|joined the realm/i.test(msg)) return '#44ddaa';
+    if (/birthday|celebrates their/i.test(msg)) return '#ffdd44';
+    if (/COUP|ASSASSINATION|SCANDAL|SABOTAGE/.test(msg)) return '#ff6666';
+    if (/Level \d/.test(msg)) return '#ffaa00';
+    if (/team|Team/.test(msg)) return '#00e5ff';
+    if (/dungeon|Dungeon|conquered/.test(msg)) return '#cc66ff';
+    if (/purchased|deposit|Bank/.test(msg)) return '#00ff88';
+    if (/divorced/i.test(msg)) return '#cc4444';
+    if (/affair|Scandal/i.test(msg)) return '#ff4488';
+    if (/polyamorous/i.test(msg)) return '#dd66ff';
+    if (/married|Wedding|love|Love Street/.test(msg)) return '#ff66aa';
+    if (/Temple|blessing|altar/.test(msg)) return '#aaaaff';
+    if (/Guard|guard|Royal/.test(msg)) return '#ffcc44';
+    if (/training|trained/.test(msg)) return '#88ccff';
+    if (/returned from the realm of the dead/i.test(msg)) return '#88ff88';
+    if (/telling anyone who'll listen/i.test(msg)) return '#cc9933';
+    if (/pickpocket|stole.*gold/i.test(msg)) return '#ff8844';
+    if (/publicly challenged|emerged victorious/i.test(msg)) return '#ddbb44';
+    if (/amassed a fortune|wealthiest/i.test(msg)) return '#ffcc00';
+    if (/settled the score|got revenge/i.test(msg)) return '#ff6644';
+    if (/formed a powerful.*alliance/i.test(msg)) return '#44ccff';
+    if (/wave of rage|wave of panic|wave of celebration|wave of grief/i.test(msg)) return '#bb88ff';
+    if (/brawl|got into a/i.test(msg)) return '#ff5555';
+    return '#ccccdd';
+}
+
+// ==========================================
+// Trend Charts
+// ==========================================
+function updateTrendCharts(hourly) {
+    if (!hourly || hourly.length === 0) return;
+
+    // Group by hour, aggregate categories
+    const hours = [...new Set(hourly.map(h => h.hour))].sort();
+    const categories = [...new Set(hourly.map(h => h.category || 'unknown'))];
+    const catColors = {
+        'npc': '#00e5ff', 'player': '#ffaa00', 'system': '#888899',
+        'combat': '#ff4444', 'social': '#ff66aa', 'economy': '#00ff88',
+        'lifecycle': '#aa66ff'
+    };
+
+    // Events/hour stacked bar
+    const datasets = categories.map(cat => ({
+        label: cat,
+        data: hours.map(h => {
+            const entry = hourly.find(e => e.hour === h && (e.category || 'unknown') === cat);
+            return entry ? entry.count : 0;
+        }),
+        backgroundColor: catColors[cat] || '#666677',
+        borderWidth: 0,
+        borderRadius: 2
+    }));
+
+    const shortHours = hours.map(h => {
+        try { return h.split(' ')[1] || h; } catch (e) { return h; }
+    });
+
+    if (charts['chart-events-hourly']) {
+        charts['chart-events-hourly'].data.labels = shortHours;
+        charts['chart-events-hourly'].data.datasets = datasets;
+        charts['chart-events-hourly'].update('none');
+    } else {
+        const canvas = document.getElementById('chart-events-hourly');
+        if (canvas) {
+            charts['chart-events-hourly'] = new Chart(canvas, {
+                type: 'bar',
+                data: { labels: shortHours, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { size: 9 }, padding: 4 } }
+                    },
+                    scales: {
+                        x: { stacked: true, ticks: { font: { size: 9 }, maxRotation: 45 } },
+                        y: { stacked: true, beginAtZero: true }
+                    }
+                }
+            });
+        }
+    }
+
+    // Population pie from summary
+    const s = summary;
+    if (s && s.total) {
+        const popData = {
+            labels: ['Alive', 'Dead'],
+            datasets: [{
+                data: [s.alive || 0, s.dead || 0],
+                backgroundColor: ['#00ff88', '#ff4444'],
+                borderWidth: 0
+            }]
+        };
+        if (charts['chart-population']) {
+            charts['chart-population'].data = popData;
+            charts['chart-population'].update('none');
+        } else {
+            const canvas = document.getElementById('chart-population');
+            if (canvas) {
+                charts['chart-population'] = new Chart(canvas, {
+                    type: 'doughnut',
+                    data: popData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '60%',
+                        plugins: {
+                            legend: { position: 'right' }
+                        }
+                    }
+                });
+            }
+        }
+    }
+}
+
+// ==========================================
+// NPC Status Indicators (#12)
+// ==========================================
+function computeNpcStatus(n) {
+    const dead = n.isDead || n.IsDead;
+    if (dead) return { label: 'Dead', color: '#ff4444', bg: 'rgba(255,68,68,0.15)' };
+
+    const emo = n.emotionalState || n.EmotionalState || {};
+    const pp = n.personalityProfile || n.PersonalityProfile || {};
+    const gold = n.gold || n.Gold || 0;
+    const lvl = n.level || n.Level || 1;
+    const hp = n.hp || n.HP || 0;
+    const maxHp = n.maxHP || n.MaxHP || 1;
+    const hpPct = hp / maxHp;
+    const goals = n.currentGoals || n.CurrentGoals || [];
+
+    const joy = emo.happiness || emo.Happiness || 0;
+    const anger = emo.anger || emo.Anger || 0;
+    const fear = emo.fear || emo.Fear || 0;
+    const peace = emo.peace || emo.Peace || 0;
+    const confidence = emo.confidence || emo.Confidence || 0;
+    const sadness = emo.sadness || emo.Sadness || 0;
+    const loneliness = emo.loneliness || emo.Loneliness || 0;
+    const aggr = pp.aggression || pp.Aggression || 0;
+    const ambition = pp.ambition || pp.Ambition || 0;
+
+    if (anger > 0.7 && aggr > 0.6) return { label: 'Dangerous', color: '#ff4444', bg: 'rgba(255,68,68,0.15)' };
+    if (hpPct < 0.3 && sadness > 0.4) return { label: 'Struggling', color: '#ff8844', bg: 'rgba(255,136,68,0.15)' };
+    if (fear > 0.6) return { label: 'Fearful', color: '#aa66ff', bg: 'rgba(170,102,255,0.15)' };
+    if (loneliness > 0.5) return { label: 'Lonely', color: '#8888aa', bg: 'rgba(136,136,170,0.15)' };
+    if (ambition > 0.7 && confidence > 0.5) return { label: 'Ambitious', color: '#ffaa00', bg: 'rgba(255,170,0,0.15)' };
+    if (gold > 5000 && joy > 0.4) return { label: 'Thriving', color: '#00ff88', bg: 'rgba(0,255,136,0.15)' };
+    if (peace > 0.5 && joy > 0.3) return { label: 'Peaceful', color: '#88ccff', bg: 'rgba(136,204,255,0.15)' };
+    if (anger > 0.5) return { label: 'Aggressive', color: '#ff6644', bg: 'rgba(255,102,68,0.15)' };
+    if (confidence > 0.6) return { label: 'Confident', color: '#ffcc44', bg: 'rgba(255,204,68,0.15)' };
+    if (goals.length >= 3) return { label: 'Busy', color: '#00e5ff', bg: 'rgba(0,229,255,0.15)' };
+    return { label: 'Stable', color: '#888899', bg: 'rgba(136,136,153,0.15)' };
+}
+
+// ==========================================
+// Most Notable Highlights (#10)
+// ==========================================
+function updateNotableHighlights() {
+    const bar = document.getElementById('notable-bar');
+    if (!allNpcs || allNpcs.length === 0) { bar.innerHTML = ''; return; }
+
+    const alive = allNpcs.filter(n => !(n.isDead || n.IsDead));
+    if (alive.length === 0) { bar.innerHTML = ''; return; }
+
+    const highlights = [];
+
+    // Richest
+    const richest = alive.reduce((a, b) => ((a.gold || a.Gold || 0) > (b.gold || b.Gold || 0) ? a : b));
+    const richGold = richest.gold || richest.Gold || 0;
+    if (richGold > 0) highlights.push({ label: 'Richest', value: (richest.name || richest.Name), detail: formatGold(richGold) + ' gold', npc: richest });
+
+    // Highest Level
+    const strongest = alive.reduce((a, b) => ((a.level || a.Level || 0) > (b.level || b.Level || 0) ? a : b));
+    highlights.push({ label: 'Strongest', value: (strongest.name || strongest.Name), detail: 'Level ' + (strongest.level || strongest.Level || 1), npc: strongest });
+
+    // Most Connected (most relationships)
+    let mostConn = null, maxRels = 0;
+    alive.forEach(n => {
+        const rels = n.relationships || n.Relationships || {};
+        const cnt = Object.keys(rels).length;
+        if (cnt > maxRels) { maxRels = cnt; mostConn = n; }
+    });
+    if (mostConn && maxRels > 0) highlights.push({ label: 'Most Connected', value: (mostConn.name || mostConn.Name), detail: maxRels + ' relationships', npc: mostConn });
+
+    // Most Aggressive
+    let mostAggr = null, maxAggr = 0;
+    alive.forEach(n => {
+        const pp = n.personalityProfile || n.PersonalityProfile || {};
+        const a = pp.aggression || pp.Aggression || 0;
+        if (a > maxAggr) { maxAggr = a; mostAggr = n; }
+    });
+    if (mostAggr && maxAggr > 0.3) highlights.push({ label: 'Most Aggressive', value: (mostAggr.name || mostAggr.Name), detail: Math.round(maxAggr * 100) + '% aggression', npc: mostAggr });
+
+    // Youngest
+    let youngest = null, minAge = 999;
+    alive.forEach(n => {
+        const age = n.age || n.Age || 0;
+        if (age > 0 && age < minAge) { minAge = age; youngest = n; }
+    });
+    if (youngest) highlights.push({ label: 'Youngest', value: (youngest.name || youngest.Name), detail: 'Age ' + minAge, npc: youngest });
+
+    // Most Emotional
+    let mostEmo = null, maxEmoTotal = 0;
+    alive.forEach(n => {
+        const emo = n.emotionalState || n.EmotionalState || {};
+        let total = 0;
+        ['happiness','anger','fear','confidence','trust','sadness','greed','pride','loneliness','hope','peace','envy'].forEach(k => {
+            total += (emo[k] || emo[k.charAt(0).toUpperCase() + k.slice(1)] || 0);
+        });
+        if (total > maxEmoTotal) { maxEmoTotal = total; mostEmo = n; }
+    });
+    if (mostEmo && maxEmoTotal > 1) highlights.push({ label: 'Most Emotional', value: (mostEmo.name || mostEmo.Name), detail: 'Intensity: ' + maxEmoTotal.toFixed(1), npc: mostEmo });
+
+    let html = '';
+    highlights.forEach(h => {
+        html += '<div class="notable-chip" onclick="selectNotableNpc(\'' + escapeHtml(h.value) + '\')">'
+            + '<span class="nc-label">' + h.label + '</span> '
+            + '<span class="nc-value">' + escapeHtml(h.value) + '</span>'
+            + ' <span style="color:var(--text-dim);font-size:10px">' + h.detail + '</span>'
+            + '</div>';
+    });
+    bar.innerHTML = html;
+}
+
+function selectNotableNpc(name) {
+    const npc = allNpcs.find(n => (n.name || n.Name) === name);
+    if (npc) { selectedNpc = name; showNpcDetail(npc); }
+}
+
+// ==========================================
+// What's Happening Summary Cards (#2)
+// ==========================================
+let recentEvents = [];
+
+function updateWhatsHappening() {
+    const el = document.getElementById('whats-happening');
+    if (!recentEvents || recentEvents.length === 0) { el.innerHTML = ''; return; }
+
+    // Categorize and pick most interesting events
+    const categories = {
+        combat: { events: [], cls: 'wh-combat', icon: 'Combat' },
+        social: { events: [], cls: 'wh-social', icon: 'Social' },
+        economy: { events: [], cls: 'wh-economy', icon: 'Economy' },
+        lifecycle: { events: [], cls: 'wh-lifecycle', icon: 'Lifecycle' },
+        political: { events: [], cls: 'wh-political', icon: 'Political' }
+    };
+
+    recentEvents.slice(0, 200).forEach(ev => {
+        const msg = ev.message || '';
+        if (/died|killed|defeated|combat|brawl|arena|challenged|revenge/i.test(msg)) categories.combat.events.push(ev);
+        else if (/married|wedding|love|affair|divorced|polyamorous|friend/i.test(msg)) categories.social.events.push(ev);
+        else if (/gold|purchased|deposit|bank|fortune|wealthiest|trade/i.test(msg)) categories.economy.events.push(ev);
+        else if (/born|birthday|passed away|pregnant|come of age|died of old/i.test(msg)) categories.lifecycle.events.push(ev);
+        else if (/king|throne|guard|coup|scandal|assassination|crown|court/i.test(msg)) categories.political.events.push(ev);
+    });
+
+    let html = '';
+    Object.entries(categories).forEach(([key, cat]) => {
+        if (cat.events.length === 0) return;
+        const latest = cat.events[0];
+        const msg = latest.message || '';
+        const headline = msg.length > 80 ? msg.substring(0, 77) + '...' : msg;
+        html += '<div class="wh-card ' + cat.cls + '">'
+            + '<div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">' + cat.icon + '</div>'
+            + '<div class="wh-headline">' + escapeHtml(headline) + '</div>'
+            + '<div class="wh-detail">' + cat.events.length + ' recent event' + (cat.events.length !== 1 ? 's' : '') + '</div>'
+            + '<div class="wh-time">' + formatTime(latest.time) + '</div>'
+            + '</div>';
+    });
+
+    el.innerHTML = html;
+}
+
+// ==========================================
+// NPC Search + Sortable List (#1)
+// ==========================================
+let npcSortField = 'level';
+let npcSortDir = -1; // -1 = desc
+
+function sortNpcList(field) {
+    if (npcSortField === field) {
+        npcSortDir *= -1;
+    } else {
+        npcSortField = field;
+        npcSortDir = field === 'name' ? 1 : -1;
+    }
+    filterNpcList();
+    // Update sort arrows
+    document.querySelectorAll('.npc-table th .sort-arrow').forEach(el => el.textContent = '');
+    const arrowEl = document.getElementById('sort-' + field);
+    if (arrowEl) arrowEl.textContent = npcSortDir > 0 ? '\u25B2' : '\u25BC';
+}
+
+function filterNpcList() {
+    const search = (document.getElementById('npc-search').value || '').toLowerCase();
+    const factionFilter = document.getElementById('npc-filter-faction').value;
+    const statusFilter = document.getElementById('npc-filter-status').value;
+
+    let npcs = allNpcs.filter(n => {
+        const name = (n.name || n.Name || '').toLowerCase();
+        if (search && !name.includes(search)) return false;
+        if (factionFilter !== '') {
+            const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+            if (fid !== factionFilter) return false;
+        }
+        if (statusFilter) {
+            const dead = n.isDead || n.IsDead;
+            const married = n.isMarried || n.IsMarried;
+            const pregnant = !!(n.pregnancyDueDate || n.PregnancyDueDate);
+            if (statusFilter === 'alive' && dead) return false;
+            if (statusFilter === 'dead' && !dead) return false;
+            if (statusFilter === 'married' && !married) return false;
+            if (statusFilter === 'pregnant' && !pregnant) return false;
+        }
+        return true;
+    });
+
+    // Sort
+    npcs.sort((a, b) => {
+        let va, vb;
+        switch (npcSortField) {
+            case 'name': va = (a.name || a.Name || '').toLowerCase(); vb = (b.name || b.Name || '').toLowerCase(); break;
+            case 'level': va = a.level || a.Level || 0; vb = b.level || b.Level || 0; break;
+            case 'class': va = CLASS_NAMES[a.class !== undefined ? a.class : a.Class] || ''; vb = CLASS_NAMES[b.class !== undefined ? b.class : b.Class] || ''; break;
+            case 'race': va = RACE_NAMES[a.race !== undefined ? a.race : a.Race] || ''; vb = RACE_NAMES[b.race !== undefined ? b.race : b.Race] || ''; break;
+            case 'faction': va = String(a.npcFaction !== undefined ? a.npcFaction : (a.NPCFaction !== undefined ? a.NPCFaction : -1)); vb = String(b.npcFaction !== undefined ? b.npcFaction : (b.NPCFaction !== undefined ? b.NPCFaction : -1)); break;
+            case 'location': va = a.location || a.Location || ''; vb = b.location || b.Location || ''; break;
+            case 'age': va = a.age || a.Age || 0; vb = b.age || b.Age || 0; break;
+            case 'gold': va = a.gold || a.Gold || 0; vb = b.gold || b.Gold || 0; break;
+            default: va = 0; vb = 0;
+        }
+        if (typeof va === 'string') return va.localeCompare(vb) * npcSortDir;
+        return (va - vb) * npcSortDir;
+    });
+
+    renderNpcTable(npcs);
+}
+
+function renderNpcTable(npcs) {
+    const tbody = document.getElementById('npc-table-body');
+    let html = '';
+    npcs.forEach(n => {
+        const name = n.name || n.Name || '?';
+        const lvl = n.level || n.Level || 0;
+        const cls = CLASS_NAMES[n.class !== undefined ? n.class : n.Class] || '?';
+        const race = RACE_NAMES[n.race !== undefined ? n.race : n.Race] || '?';
+        const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+        const faction = FACTION_NAMES[fid] || 'None';
+        const fcolor = FACTION_COLORS[fid] || '#666677';
+        const loc = normalizeLocation(n.location || n.Location || '');
+        const age = n.age || n.Age || 0;
+        const gold = n.gold || n.Gold || 0;
+        const status = computeNpcStatus(n);
+        const selClass = (selectedNpc === name) ? ' selected' : '';
+
+        html += '<tr class="' + selClass + '" onclick="selectNpcFromList(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">'
+            + '<td style="color:var(--gold)">' + escapeHtml(name) + '</td>'
+            + '<td>' + lvl + '</td>'
+            + '<td>' + cls + '</td>'
+            + '<td>' + race + '</td>'
+            + '<td style="color:' + fcolor + '">' + faction + '</td>'
+            + '<td style="color:var(--text-dim)">' + loc + '</td>'
+            + '<td>' + (age > 0 ? age : '-') + '</td>'
+            + '<td style="color:var(--gold)">' + formatGold(gold) + '</td>'
+            + '<td><span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + '">' + status.label + '</span></td>'
+            + '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function selectNpcFromList(name) {
+    const npc = allNpcs.find(n => (n.name || n.Name) === name);
+    if (npc) { selectedNpc = name; showNpcDetail(npc); filterNpcList(); }
+}
+
+// ==========================================
+// Faction Power Dashboard (#4)
+// ==========================================
+function updateFactionPower() {
+    const el = document.getElementById('faction-power');
+    if (!allNpcs || allNpcs.length === 0) { el.innerHTML = ''; return; }
+
+    const factions = {
+        '0': { name: 'The Crown', cls: 'fp-crown', members: [], gold: 0, levels: [], locations: {} },
+        '1': { name: 'The Shadows', cls: 'fp-shadows', members: [], gold: 0, levels: [], locations: {} },
+        '2': { name: 'The Faith', cls: 'fp-faith', members: [], gold: 0, levels: [], locations: {} },
+        '-1': { name: 'Unaffiliated', cls: 'fp-none', members: [], gold: 0, levels: [], locations: {} }
+    };
+
+    allNpcs.forEach(n => {
+        if (n.isDead || n.IsDead) return;
+        const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+        const f = factions[fid] || factions['-1'];
+        f.members.push(n);
+        f.gold += (n.gold || n.Gold || 0);
+        f.levels.push(n.level || n.Level || 1);
+        const loc = normalizeLocation(n.location || n.Location || '');
+        f.locations[loc] = (f.locations[loc] || 0) + 1;
+    });
+
+    let html = '';
+    ['0', '1', '2', '-1'].forEach(fid => {
+        const f = factions[fid];
+        const avgLvl = f.levels.length > 0 ? (f.levels.reduce((a, b) => a + b, 0) / f.levels.length).toFixed(1) : '0';
+        const topLocs = Object.entries(f.locations).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+        html += '<div class="fp-card ' + f.cls + '">'
+            + '<div class="fp-name" style="color:' + (FACTION_COLORS[fid] || '#888') + '">' + f.name + '</div>'
+            + '<div class="fp-stat-row"><span class="fp-stat-label">Members</span><span class="fp-stat-val">' + f.members.length + '</span></div>'
+            + '<div class="fp-stat-row"><span class="fp-stat-label">Total Gold</span><span class="fp-stat-val" style="color:var(--gold)">' + formatGold(f.gold) + '</span></div>'
+            + '<div class="fp-stat-row"><span class="fp-stat-label">Avg Level</span><span class="fp-stat-val">' + avgLvl + '</span></div>'
+            + '<div class="fp-stat-row"><span class="fp-stat-label">Max Level</span><span class="fp-stat-val">' + (f.levels.length > 0 ? Math.max(...f.levels) : 0) + '</span></div>';
+        if (topLocs.length > 0) {
+            html += '<div class="fp-territory">Territory: <span>' + topLocs.map(([l, c]) => l + '(' + c + ')').join(', ') + '</span></div>';
+        }
+        html += '</div>';
+    });
+    el.innerHTML = html;
+}
+
+// ==========================================
+// Map Heatmap Mode (#5)
+// ==========================================
+let mapMode = 'dots';
+
+function setMapMode(mode) {
+    mapMode = mode;
+    document.getElementById('btn-map-dots').classList.toggle('active', mode === 'dots');
+    document.getElementById('btn-map-heat').classList.toggle('active', mode === 'heat');
+    updateWorldMap();
+}
+
+// ==========================================
+// Location Details on Map Click (#11)
+// ==========================================
+let locPopupVisible = false;
+
+function showLocationPopup(locKey, screenX, screenY) {
+    const popup = document.getElementById('loc-popup');
+    const b = MAP_BUILDINGS[locKey];
+    if (!b) return;
+
+    const byLoc = {};
+    allNpcs.forEach(n => {
+        const raw = n.location || n.Location || 'Unknown';
+        const loc = normalizeLocation(raw);
+        if (!byLoc[loc]) byLoc[loc] = [];
+        byLoc[loc].push(n);
+    });
+
+    const npcsHere = byLoc[locKey] || [];
+    let html = '<div class="loc-popup-name">' + b.label + ' (' + npcsHere.length + ')</div>';
+    if (npcsHere.length === 0) {
+        html += '<div style="color:var(--text-dim)">No one here</div>';
+    } else {
+        npcsHere.slice(0, 15).forEach(n => {
+            const name = n.name || n.Name || '?';
+            const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+            const color = FACTION_COLORS[fid] || '#666677';
+            const lvl = n.level || n.Level || 1;
+            const status = computeNpcStatus(n);
+            html += '<div class="loc-popup-npc" onclick="selectNotableNpc(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">'
+                + '<span class="loc-popup-dot" style="background:' + color + '"></span>'
+                + '<span>' + escapeHtml(name) + '</span>'
+                + '<span style="color:var(--text-dim);font-size:9px;margin-left:auto">Lv' + lvl + '</span>'
+                + '<span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + ';font-size:8px">' + status.label + '</span>'
+                + '</div>';
+        });
+        if (npcsHere.length > 15) html += '<div style="color:var(--text-dim);font-size:10px;margin-top:4px">+' + (npcsHere.length - 15) + ' more</div>';
+    }
+
+    popup.innerHTML = html;
+    popup.style.left = screenX + 'px';
+    popup.style.top = screenY + 'px';
+    popup.classList.add('visible');
+    locPopupVisible = true;
+}
+
+function hideLocationPopup() {
+    const popup = document.getElementById('loc-popup');
+    popup.classList.remove('visible');
+    locPopupVisible = false;
+}
+
+// ==========================================
+// NPC Comparison (#3)
+// ==========================================
+let compareChartA = null, compareChartB = null;
+
+function openComparison() {
+    const overlay = document.getElementById('compare-overlay');
+    const selA = document.getElementById('compare-npc-a');
+    const selB = document.getElementById('compare-npc-b');
+
+    // Populate dropdowns
+    const alive = allNpcs.filter(n => !(n.isDead || n.IsDead)).sort((a, b) => (a.name || a.Name || '').localeCompare(b.name || b.Name || ''));
+    let opts = '<option value="">Select NPC...</option>';
+    alive.forEach(n => {
+        const name = n.name || n.Name || '?';
+        opts += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + ' (Lv' + (n.level || n.Level || 1) + ')</option>';
+    });
+    selA.innerHTML = opts;
+    selB.innerHTML = opts;
+
+    // Pre-select if we have a selected NPC
+    if (selectedNpc) selA.value = selectedNpc;
+
+    overlay.classList.add('visible');
+    updateComparison();
+}
+
+function closeComparison() {
+    document.getElementById('compare-overlay').classList.remove('visible');
+    if (compareChartA) { compareChartA.destroy(); compareChartA = null; }
+    if (compareChartB) { compareChartB.destroy(); compareChartB = null; }
+}
+
+function updateComparison() {
+    const nameA = document.getElementById('compare-npc-a').value;
+    const nameB = document.getElementById('compare-npc-b').value;
+    const body = document.getElementById('compare-body');
+
+    if (compareChartA) { compareChartA.destroy(); compareChartA = null; }
+    if (compareChartB) { compareChartB.destroy(); compareChartB = null; }
+
+    const npcA = nameA ? allNpcs.find(n => (n.name || n.Name) === nameA) : null;
+    const npcB = nameB ? allNpcs.find(n => (n.name || n.Name) === nameB) : null;
+
+    body.innerHTML = '<div class="compare-col" id="compare-col-a">' + renderCompareNpc(npcA, 'A') + '</div>'
+        + '<div class="compare-col" id="compare-col-b">' + renderCompareNpc(npcB, 'B') + '</div>';
+
+    // Draw radars after DOM insert
+    requestAnimationFrame(() => {
+        if (npcA) drawCompareRadar(npcA, 'compare-radar-A', 'A');
+        if (npcB) drawCompareRadar(npcB, 'compare-radar-B', 'B');
+    });
+}
+
+function renderCompareNpc(n, side) {
+    if (!n) return '<div class="detail-empty" style="padding:30px 0">Select an NPC</div>';
+
+    const name = n.name || n.Name || '?';
+    const cls = CLASS_NAMES[n.class !== undefined ? n.class : n.Class] || '?';
+    const race = RACE_NAMES[n.race !== undefined ? n.race : n.Race] || '?';
+    const lvl = n.level || n.Level || 1;
+    const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+    const faction = FACTION_NAMES[fid] || 'None';
+    const status = computeNpcStatus(n);
+    const age = n.age || n.Age || 0;
+
+    let html = '<div class="detail-name">' + escapeHtml(name) + ' <span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + '">' + status.label + '</span></div>';
+    html += '<div class="detail-sub">Lv' + lvl + ' ' + race + ' ' + cls + (age > 0 ? ' | Age ' + age : '') + ' | ' + faction + '</div>';
+
+    // Personality radar
+    const pp = n.personalityProfile || n.PersonalityProfile;
+    if (pp) {
+        html += '<div class="radar-container"><canvas id="compare-radar-' + side + '"></canvas></div>';
+    }
+
+    // Emotions comparison
+    const emo = n.emotionalState || n.EmotionalState;
+    if (emo) {
+        const emotions = ['happiness','confidence','anger','fear','trust','sadness','greed','pride','hope','peace'];
+        emotions.forEach(key => {
+            const val = emo[key] !== undefined ? emo[key] : (emo[key.charAt(0).toUpperCase() + key.slice(1)] || 0);
+            const pct = Math.round(val * 100);
+            const color = getEmotionColor(key);
+            html += '<div class="emo-bar-row">'
+                + '<span class="emo-bar-label" style="width:60px;font-size:9px">' + key.charAt(0).toUpperCase() + key.slice(1) + '</span>'
+                + '<div class="emo-bar-track"><div class="emo-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>'
+                + '<span class="emo-bar-val">' + pct + '%</span></div>';
+        });
+    }
+
+    return html;
+}
+
+function getEmotionColor(key) {
+    const map = { happiness:'#00ff88', confidence:'#ffaa00', anger:'#ff4444', fear:'#aa66ff', trust:'#00e5ff', sadness:'#6688cc', greed:'#ccaa00', pride:'#ff8844', loneliness:'#8888aa', hope:'#44ddaa', peace:'#88ccff', envy:'#88aa44' };
+    return map[key] || '#888';
+}
+
+function drawCompareRadar(n, canvasId, side) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const pp = n.personalityProfile || n.PersonalityProfile;
+    if (!pp) return;
+
+    const traits = ['aggression','loyalty','intelligence','greed','compassion','courage','ambition','patience','vengefulness','impulsiveness','mysticism','honesty','caution'];
+    const labels = ['Aggression','Loyalty','Intelligence','Greed','Compassion','Courage','Ambition','Patience','Vengefulness','Impulsive','Mysticism','Trust','Caution'];
+    const values = traits.map(t => pp[t] !== undefined ? pp[t] : (pp[t.charAt(0).toUpperCase() + t.slice(1)] || 0));
+
+    const chart = new Chart(canvas, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: side === 'A' ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255, 170, 0, 0.15)',
+                borderColor: side === 'A' ? 'rgba(0, 229, 255, 0.8)' : 'rgba(255, 170, 0, 0.8)',
+                borderWidth: 2,
+                pointBackgroundColor: side === 'A' ? '#00e5ff' : '#ffaa00',
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false } },
+            scales: { r: { min: 0, max: 1, ticks: { display: false }, grid: { color: 'rgba(42,42,58,0.6)' }, angleLines: { color: 'rgba(42,42,58,0.4)' }, pointLabels: { font: { size: 9 }, color: '#888899' } } }
+        }
+    });
+
+    if (side === 'A') compareChartA = chart;
+    else compareChartB = chart;
+}
+
+// ==========================================
+// Network Filter (#6)
+// ==========================================
+let networkFilter = 'all';
+let networkHighlightNode = null;
+
+function setNetFilter(btn, filter) {
+    networkFilter = filter;
+    document.querySelectorAll('.net-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    updateNetwork();
+}
+
+// ==========================================
+// Emotion Sparklines (#8)
+// ==========================================
+let emotionHistory = {}; // { npcName: [{ time, emotions }] }
+
+function recordEmotionSnapshot() {
+    allNpcs.forEach(n => {
+        const name = n.name || n.Name;
+        if (!name) return;
+        const emo = n.emotionalState || n.EmotionalState;
+        if (!emo) return;
+        if (!emotionHistory[name]) emotionHistory[name] = [];
+        emotionHistory[name].push({
+            time: Date.now(),
+            happiness: emo.happiness || emo.Happiness || 0,
+            anger: emo.anger || emo.Anger || 0,
+            fear: emo.fear || emo.Fear || 0,
+            confidence: emo.confidence || emo.Confidence || 0,
+            peace: emo.peace || emo.Peace || 0,
+            sadness: emo.sadness || emo.Sadness || 0
+        });
+        // Keep last 20 snapshots
+        if (emotionHistory[name].length > 20) emotionHistory[name].shift();
+    });
+}
+
+function renderSparkline(data, color) {
+    if (!data || data.length < 2) return '';
+    const w = 80, h = 14;
+    const max = Math.max(...data, 0.1);
+    const points = data.map((v, i) => {
+        const x = (i / (data.length - 1)) * w;
+        const y = h - (v / max) * (h - 2) - 1;
+        return x + ',' + y;
+    }).join(' ');
+    return '<svg class="sparkline-svg" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">'
+        + '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '</svg>';
+}
+
+// ==========================================
+// Dominant Trait Badges on Map (#9)
+// ==========================================
+function getDominantTraitBadge(n) {
+    const pp = n.personalityProfile || n.PersonalityProfile || {};
+    const emo = n.emotionalState || n.EmotionalState || {};
+
+    // Check current emotion first
+    const anger = emo.anger || emo.Anger || 0;
+    const fear = emo.fear || emo.Fear || 0;
+    const joy = emo.happiness || emo.Happiness || 0;
+    const peace = emo.peace || emo.Peace || 0;
+    const confidence = emo.confidence || emo.Confidence || 0;
+
+    if (anger > 0.6) return { letter: '!', color: '#ff4444' };
+    if (fear > 0.6) return { letter: '?', color: '#aa66ff' };
+    if (joy > 0.6) return { letter: '\u263A', color: '#00ff88' };
+    if (confidence > 0.6) return { letter: '\u2605', color: '#ffaa00' };
+    if (peace > 0.6) return { letter: '\u2022', color: '#88ccff' };
+
+    // Fall back to personality
+    const aggr = pp.aggression || pp.Aggression || 0;
+    const ambi = pp.ambition || pp.Ambition || 0;
+    const intel = pp.intelligence || pp.Intelligence || 0;
+    const greed = pp.greed || pp.Greed || 0;
+
+    const traits = [
+        { val: aggr, letter: '\u2694', color: '#ff6644' },
+        { val: ambi, letter: '\u2191', color: '#ffcc44' },
+        { val: intel, letter: '\u25C6', color: '#00e5ff' },
+        { val: greed, letter: '$', color: '#ccaa00' }
+    ];
+    const top = traits.reduce((a, b) => a.val > b.val ? a : b);
+    return top.val > 0.5 ? { letter: top.letter, color: top.color } : null;
+}
+
+// ==========================================
+// Overrides: Enhanced updateWorldMap with heatmap + badges + location click
+// ==========================================
+const _origUpdateWorldMap = updateWorldMap;
+
+updateWorldMap = function() {
+    const mapEl = document.getElementById('world-map');
+
+    // Normalize and group NPCs by location
+    const byLoc = {};
+    allNpcs.forEach(n => {
+        const raw = n.location || n.Location || 'Unknown';
+        const loc = normalizeLocation(raw);
+        if (!byLoc[loc]) byLoc[loc] = [];
+        byLoc[loc].push(n);
+    });
+
+    let svg = '<svg viewBox="0 0 960 580" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+
+    // Background
+    svg += '<rect width="960" height="580" fill="#0a0a12"/>';
+    for (let i = 0; i < 40; i++) {
+        const gx = 50 + (i * 237) % 860, gy = 30 + (i * 173) % 520;
+        svg += '<circle cx="' + gx + '" cy="' + gy + '" r="1" fill="#12121a" opacity="0.5"/>';
+    }
+
+    // Draw roads
+    svg += '<g class="map-roads">';
+    MAP_ROADS.forEach(([a, b]) => {
+        const ba = MAP_BUILDINGS[a], bb = MAP_BUILDINGS[b];
+        if (!ba || !bb) return;
+        const ax = ba.x + ba.w / 2, ay = ba.y + ba.h / 2;
+        const bx = bb.x + bb.w / 2, by = bb.y + bb.h / 2;
+        svg += '<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="#141420" stroke-width="6" stroke-linecap="round"/>';
+        svg += '<line x1="' + ax + '" y1="' + ay + '" x2="' + bx + '" y2="' + by + '" stroke="#1a1a2a" stroke-width="1" stroke-dasharray="3 4" stroke-linecap="round" opacity="0.5"/>';
+    });
+    svg += '</g>';
+
+    if (mapMode === 'heat') {
+        // HEATMAP MODE
+        svg += '<g class="map-buildings">';
+        const maxCount = Math.max(1, ...Object.values(byLoc).map(arr => arr.length));
+        Object.entries(MAP_BUILDINGS).forEach(([key, b]) => {
+            const count = (byLoc[key] || []).length;
+            const intensity = count / maxCount;
+            const hue = 120 - intensity * 120; // green(0) to red(full)
+            const alpha = 0.15 + intensity * 0.6;
+            svg += drawBuilding(key, b, count);
+            // Heat overlay
+            svg += '<rect x="' + (b.x - 4) + '" y="' + (b.y - 4) + '" width="' + (b.w + 8) + '" height="' + (b.h + 8) + '" rx="4" '
+                + 'fill="hsla(' + hue + ', 80%, 50%, ' + alpha + ')" class="map-building" data-loc="' + key + '" style="cursor:pointer"/>';
+            // Count label
+            svg += '<text x="' + (b.x + b.w / 2) + '" y="' + (b.y + b.h / 2 + 4) + '" text-anchor="middle" '
+                + 'font-family="\'JetBrains Mono\', monospace" font-size="14" font-weight="bold" fill="#fff" opacity="0.9">' + count + '</text>';
+        });
+        svg += '</g>';
+    } else {
+        // DOTS MODE (original + badges)
+        svg += '<g class="map-buildings">';
+        Object.entries(MAP_BUILDINGS).forEach(([key, b]) => {
+            const count = (byLoc[key] || []).length;
+            svg += drawBuilding(key, b, count);
+        });
+        svg += '</g>';
+
+        // Draw NPC dots
+        const newPositions = {};
+        svg += '<g class="map-npcs">';
+        Object.entries(MAP_BUILDINGS).forEach(([key, b]) => {
+            const npcs = byLoc[key] || [];
+            const positions = scatterNpcsAround(npcs, b);
+            positions.forEach(({ npc: n, x, y }) => {
+                const name = n.name || n.Name || '?';
+                const dead = n.isDead || n.IsDead;
+                const king = n.isKing || n.IsKing;
+                const pregnant = !!(n.pregnancyDueDate || n.PregnancyDueDate);
+                const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+                const color = FACTION_COLORS[fid] || FACTION_COLORS['-1'];
+                const lvl = n.level || n.Level || 1;
+                const r = Math.max(2.5, Math.min(5.5, 2.5 + lvl / 15));
+                const opacity = dead ? 0.25 : 1;
+                const prev = prevNpcPositions[name];
+                const startX = prev ? prev.x : x;
+                const startY = prev ? prev.y : y;
+                newPositions[name] = { x, y };
+
+                const selected = (selectedNpc === name);
+                svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
+                    + 'cx="' + startX + '" cy="' + startY + '" r="' + r + '" '
+                    + 'fill="' + color + '" opacity="' + opacity + '" '
+                    + 'stroke="' + (selected ? '#fff' : (king ? '#ffaa00' : (pregnant ? '#ff66aa' : 'none'))) + '" '
+                    + 'stroke-width="' + (selected ? 2.5 : (king ? 2 : (pregnant ? 1.5 : 0))) + '"'
+                    + (selected ? ' filter="url(#glow)"' : '') + '>'
+                    + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title></circle>';
+
+                // Dominant trait badge (#9)
+                if (!dead) {
+                    const badge = getDominantTraitBadge(n);
+                    if (badge) {
+                        svg += '<text x="' + startX + '" y="' + (startY - r - 2) + '" text-anchor="middle" '
+                            + 'font-size="6" fill="' + badge.color + '" pointer-events="none" opacity="0.8">' + badge.letter + '</text>';
+                    }
+                }
+            });
+        });
+
+        // Unmapped locations
+        const mappedKeys = new Set(Object.keys(MAP_BUILDINGS));
+        Object.entries(byLoc).forEach(([loc, npcs]) => {
+            if (mappedKeys.has(loc)) return;
+            const b = MAP_BUILDINGS['MainStreet'];
+            const positions = scatterNpcsAround(npcs, b);
+            positions.forEach(({ npc: n, x, y }) => {
+                const name = n.name || n.Name || '?';
+                const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+                const color = FACTION_COLORS[fid] || FACTION_COLORS['-1'];
+                const lvl = n.level || n.Level || 1;
+                const r = Math.max(2.5, Math.min(5.5, 2.5 + lvl / 15));
+                const dead = n.isDead || n.IsDead;
+                newPositions[name] = { x, y };
+                svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
+                    + 'cx="' + x + '" cy="' + y + '" r="' + r + '" '
+                    + 'fill="' + color + '" opacity="' + (dead ? 0.25 : 1) + '">'
+                    + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title></circle>';
+            });
+        });
+        svg += '</g>';
+
+        // Animate
+        if (Object.keys(prevNpcPositions).length > 0) {
+            requestAnimationFrame(() => {
+                mapEl.querySelectorAll('.map-npc-dot').forEach(dot => {
+                    const name = dot.getAttribute('data-npc');
+                    const pos = newPositions[name];
+                    if (pos) { dot.setAttribute('cx', pos.x); dot.setAttribute('cy', pos.y); }
+                });
+            });
+        }
+        prevNpcPositions = newPositions;
+    }
+
+    // Legend
+    svg += '<g transform="translate(850, 530)">';
+    svg += '<text x="0" y="0" font-family="\'JetBrains Mono\', monospace" font-size="7" fill="#556">';
+    [{ color: FACTION_COLORS['0'], label: 'Crown' }, { color: FACTION_COLORS['1'], label: 'Shadow' }, { color: FACTION_COLORS['2'], label: 'Faith' }, { color: FACTION_COLORS['-1'], label: 'None' }].forEach((f, i) => {
+        svg += '<tspan x="0" dy="' + (i === 0 ? 0 : 11) + '"><tspan fill="' + f.color + '">&#9679;</tspan> ' + f.label + '</tspan>';
+    });
+    svg += '</text></g>';
+    svg += '</svg>';
+    mapEl.innerHTML = svg;
+
+    // Click handlers for NPC dots
+    mapEl.querySelectorAll('.map-npc-dot').forEach(dot => {
+        dot.addEventListener('click', function(e) {
+            e.stopPropagation();
+            hideLocationPopup();
+            const name = this.getAttribute('data-npc');
+            const npc = allNpcs.find(n => (n.name || n.Name) === name);
+            if (npc) { selectedNpc = name; showNpcDetail(npc); updateWorldMap(); filterNpcList(); }
+        });
+    });
+
+    // Click handlers for buildings (#11)
+    mapEl.querySelectorAll('.map-building').forEach(el => {
+        el.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const loc = this.getAttribute('data-loc') || this.closest('[data-loc]')?.getAttribute('data-loc');
+            if (!loc) return;
+            const rect = mapEl.getBoundingClientRect();
+            const b = MAP_BUILDINGS[loc];
+            if (!b) return;
+            const scaleX = rect.width / 960;
+            const px = rect.left + (b.x + b.w / 2) * scaleX;
+            const py = (b.y + b.h) * scaleX + 10;
+            showLocationPopup(loc, (b.x + b.w / 2) - 100, b.y + b.h + 14);
+        });
+    });
+
+    // Close popup on background click
+    mapEl.addEventListener('click', function(e) {
+        if (!e.target.closest('.map-building') && !e.target.closest('.map-npc-dot') && !e.target.closest('.loc-popup')) {
+            hideLocationPopup();
+        }
+    });
+};
+
+// ==========================================
+// Enhanced NPC Detail with Timeline (#7) and Sparklines (#8)
+// ==========================================
+const _origShowNpcDetail = showNpcDetail;
+
+showNpcDetail = function(n) {
+    const empty = document.getElementById('detail-empty');
+    const content = document.getElementById('detail-content');
+    empty.style.display = 'none';
+    content.style.display = 'block';
+
+    const name = n.name || n.Name || '?';
+    const cls = CLASS_NAMES[n.class !== undefined ? n.class : n.Class] || 'Unknown';
+    const race = RACE_NAMES[n.race !== undefined ? n.race : n.Race] || 'Unknown';
+    const lvl = n.level || n.Level || 1;
+    const dead = n.isDead || n.IsDead;
+    const married = n.isMarried || n.IsMarried;
+    const spouse = n.spouseName || n.SpouseName || '';
+    const age = n.age || n.Age || 0;
+    const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+    const faction = FACTION_NAMES[fid] || 'None';
+    const loc = n.location || n.Location || '';
+    const hp = n.hp || n.HP || 0;
+    const maxHp = n.maxHP || n.MaxHP || 1;
+    const gold = n.gold || n.Gold || 0;
+    const status = computeNpcStatus(n);
+
+    let html = '<div class="detail-name">' + escapeHtml(name) + (dead ? ' <span style="color:var(--red)">[DEAD]</span>' : '')
+        + ' <span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + '">' + status.label + '</span></div>';
+    html += '<div class="detail-sub">Level ' + lvl + ' ' + race + ' ' + cls;
+    if (age > 0) html += ' | Age ' + age;
+    html += ' | ' + faction;
+    if (married && spouse) html += ' | Married to ' + escapeHtml(spouse);
+    html += '</div>';
+
+    // Quick stats row
+    html += '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;margin-bottom:10px">';
+    if (hp > 0) {
+        const hpPct = Math.round((hp / maxHp) * 100);
+        const hpColor = hpPct > 60 ? 'var(--green)' : hpPct > 30 ? 'var(--gold)' : 'var(--red)';
+        html += '<span style="color:' + hpColor + '">HP ' + hp + '/' + maxHp + '</span>';
+    }
+    if (gold > 0) html += '<span style="color:var(--gold)">Gold ' + formatGold(gold) + '</span>';
+    if (loc) html += '<span style="color:var(--text-dim)">@ ' + escapeHtml(loc) + '</span>';
+    html += '</div>';
+
+    // Personality Radar
+    const pp = n.personalityProfile || n.PersonalityProfile;
+    if (pp) html += '<div class="detail-section"><h4>Personality</h4><div class="radar-container"><canvas id="personality-radar"></canvas></div></div>';
+
+    // Emotional State with Sparklines (#8)
+    const emo = n.emotionalState || n.EmotionalState;
+    if (emo) {
+        html += '<div class="detail-section"><h4>Emotional State</h4>';
+        const hist = emotionHistory[name] || [];
+        const emotions = [
+            { key: 'happiness', label: 'Joy', color: '#00ff88' },
+            { key: 'confidence', label: 'Confidence', color: '#ffaa00' },
+            { key: 'anger', label: 'Anger', color: '#ff4444' },
+            { key: 'fear', label: 'Fear', color: '#aa66ff' },
+            { key: 'sadness', label: 'Sadness', color: '#6688cc' },
+            { key: 'peace', label: 'Peace', color: '#88ccff' }
+        ];
+        emotions.forEach(e => {
+            const val = emo[e.key] !== undefined ? emo[e.key] : (emo[e.key.charAt(0).toUpperCase() + e.key.slice(1)] || 0);
+            const pct = Math.round(val * 100);
+            const sparkData = hist.map(h => h[e.key] || 0);
+            html += '<div class="emo-bar-row">'
+                + '<span class="emo-bar-label">' + e.label + '</span>'
+                + '<div class="emo-bar-track"><div class="emo-bar-fill" style="width:' + pct + '%;background:' + e.color + '"></div></div>';
+            if (sparkData.length >= 2) {
+                html += renderSparkline(sparkData, e.color);
+            }
+            html += '<span class="emo-bar-val">' + pct + '%</span></div>';
+        });
+
+        // Show remaining emotions without sparklines
+        const extras = [
+            { key: 'trust', label: 'Trust', color: '#00e5ff' },
+            { key: 'greed', label: 'Greed', color: '#ccaa00' },
+            { key: 'pride', label: 'Pride', color: '#ff8844' },
+            { key: 'loneliness', label: 'Loneliness', color: '#8888aa' },
+            { key: 'hope', label: 'Hope', color: '#44ddaa' },
+            { key: 'envy', label: 'Envy', color: '#88aa44' }
+        ];
+        extras.forEach(e => {
+            const val = emo[e.key] !== undefined ? emo[e.key] : (emo[e.key.charAt(0).toUpperCase() + e.key.slice(1)] || 0);
+            const pct = Math.round(val * 100);
+            html += '<div class="emo-bar-row">'
+                + '<span class="emo-bar-label">' + e.label + '</span>'
+                + '<div class="emo-bar-track"><div class="emo-bar-fill" style="width:' + pct + '%;background:' + e.color + '"></div></div>'
+                + '<span class="emo-bar-val">' + pct + '%</span></div>';
+        });
+        html += '</div>';
+    }
+
+    // Goals
+    const goals = n.currentGoals || n.CurrentGoals;
+    if (goals && goals.length > 0) {
+        html += '<div class="detail-section"><h4>Active Goals</h4>';
+        goals.filter(g => g.isActive || g.IsActive).forEach(g => {
+            html += '<div class="goal-item">'
+                + '<span class="goal-name">' + escapeHtml(g.name || g.Name || '?') + '</span>'
+                + '<span class="goal-type">' + escapeHtml(g.type || g.Type || '') + '</span>'
+                + '<span class="goal-prio">' + (g.priority || g.Priority || 0).toFixed(2) + '</span></div>';
+        });
+        html += '</div>';
+    }
+
+    // Memories as Timeline (#7)
+    const mems = n.memories || n.Memories;
+    if (mems && mems.length > 0) {
+        html += '<div class="detail-section"><h4>Memory Timeline</h4>';
+        html += '<div class="mem-timeline">';
+        mems.slice(0, 10).forEach(m => {
+            const desc = m.description || m.Description || '';
+            const type = m.type || m.Type || '';
+            const imp = m.importance || m.Importance || 0;
+            const ts = m.timestamp || m.Timestamp || '';
+            const impColor = imp > 0.7 ? '#ff4444' : imp > 0.4 ? '#ffaa00' : '#888899';
+            html += '<div class="mem-tl-item">'
+                + '<div class="mem-tl-desc">' + escapeHtml(desc) + '</div>'
+                + '<div class="mem-tl-meta"><span style="color:' + impColor + '">' + escapeHtml(type) + '</span>'
+                + ' | Importance: ' + imp.toFixed(1)
+                + (ts ? ' | ' + formatTime(ts) : '')
+                + '</div></div>';
+        });
+        html += '</div></div>';
+    }
+
+    // Relationships
+    const rels = n.relationships || n.Relationships;
+    if (rels && Object.keys(rels).length > 0) {
+        html += '<div class="detail-section"><h4>Relationships</h4>';
+        const sorted = Object.entries(rels).sort((a, b) => b[1] - a[1]);
+        sorted.slice(0, 15).forEach(([rname, val]) => {
+            const pct = Math.max(0, Math.min(100, (val + 100) / 2));
+            const color = val >= 0 ? '#00ff88' : '#ff4444';
+            html += '<div class="rel-item">'
+                + '<span class="rel-name" title="' + escapeHtml(rname) + '" style="cursor:pointer" onclick="selectNotableNpc(\'' + escapeHtml(rname).replace(/'/g, "\\'") + '\')">' + escapeHtml(rname) + '</span>'
+                + '<div class="rel-bar-track"><div class="rel-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>'
+                + '<span class="rel-val">' + val.toFixed(0) + '</span></div>';
+        });
+        html += '</div>';
+    }
+
+    if (!pp && !emo && (!goals || goals.length === 0) && (!mems || mems.length === 0)) {
+        html += '<div class="detail-empty" style="padding:20px 0">Awaiting AI data...</div>';
+    }
+
+    content.innerHTML = html;
+    if (pp) requestAnimationFrame(() => drawPersonalityRadar(pp));
+};
+
+// ==========================================
+// Enhanced Network with filter + highlight (#6)
+// ==========================================
+const _origUpdateNetwork = updateNetwork;
+
+updateNetwork = function() {
+    if (!allNpcs || allNpcs.length === 0) return;
+    const svg = d3.select('#network-svg');
+    svg.selectAll('*').remove();
+
+    const width = svg.node().getBoundingClientRect().width;
+    const height = 340;
+
+    const nodes = [];
+    const nodeMap = {};
+    const links = [];
+
+    allNpcs.forEach((n, i) => {
+        const name = n.name || n.Name || '?';
+        const dead = n.isDead || n.IsDead;
+        const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+        const lvl = n.level || n.Level || 1;
+        const married = n.isMarried || n.IsMarried;
+        const spouse = n.spouseName || n.SpouseName || '';
+        const team = n.team || n.Team || '';
+        nodes.push({ id: name, level: lvl, faction: fid, dead, married, spouse, team, index: i });
+        nodeMap[name] = nodes.length - 1;
+    });
+
+    const marriageAdded = new Set();
+    nodes.forEach(n => {
+        if (n.married && n.spouse && nodeMap[n.spouse] !== undefined) {
+            const key = [n.id, n.spouse].sort().join('|');
+            if (!marriageAdded.has(key)) {
+                marriageAdded.add(key);
+                links.push({ source: n.id, target: n.spouse, type: 'marriage' });
+            }
+        }
+    });
+
+    const teamMembers = {};
+    nodes.forEach(n => { if (n.team) { if (!teamMembers[n.team]) teamMembers[n.team] = []; teamMembers[n.team].push(n.id); } });
+    Object.values(teamMembers).forEach(members => { for (let i = 0; i < members.length - 1; i++) links.push({ source: members[i], target: members[i + 1], type: 'team' }); });
+
+    allNpcs.forEach(n => {
+        const name = n.name || n.Name;
+        const rels = n.relationships || n.Relationships;
+        if (rels) {
+            Object.entries(rels).forEach(([target, val]) => {
+                if (nodeMap[target] !== undefined && Math.abs(val) > 30) {
+                    links.push({ source: name, target, type: val > 0 ? 'ally' : 'rival', strength: Math.abs(val) });
+                }
+            });
+        }
+    });
+
+    // Apply filter (#6)
+    const filteredLinks = networkFilter === 'all' ? links : links.filter(l => l.type === networkFilter);
+
+    // Find connected nodes if filtering
+    const connectedNodes = new Set();
+    if (networkFilter !== 'all') {
+        filteredLinks.forEach(l => { connectedNodes.add(typeof l.source === 'object' ? l.source.id : l.source); connectedNodes.add(typeof l.target === 'object' ? l.target.id : l.target); });
+    }
+
+    const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(filteredLinks).id(d => d.id).distance(60))
+        .force('charge', d3.forceManyBody().strength(-40))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(d => 4 + d.level / 5));
+
+    if (networkSim) networkSim.stop();
+    networkSim = simulation;
+
+    const g = svg.append('g');
+    svg.call(d3.zoom().scaleExtent([0.3, 4]).on('zoom', (event) => g.attr('transform', event.transform)));
+
+    const link = g.selectAll('.link').data(filteredLinks).join('line').attr('class', 'link')
+        .attr('stroke', d => ({ marriage: '#ff4444', team: '#00e5ff', ally: '#00ff88', rival: '#ff8844' }[d.type] || '#666'))
+        .attr('stroke-opacity', d => d.type === 'marriage' ? 0.7 : d.type === 'team' ? 0.6 : Math.min(0.5, (d.strength || 30) / 100))
+        .attr('stroke-width', d => d.type === 'marriage' ? 2 : 1);
+
+    const node = g.selectAll('.node').data(nodes).join('circle').attr('class', 'node')
+        .attr('r', d => 3 + d.level / 6)
+        .attr('fill', d => FACTION_COLORS[d.faction] || '#666677')
+        .attr('opacity', d => {
+            if (d.dead) return 0.15;
+            if (networkFilter !== 'all' && !connectedNodes.has(d.id)) return 0.15;
+            return 0.9;
+        })
+        .attr('stroke', d => d.married ? '#ff66aa' : 'none')
+        .attr('stroke-width', d => d.married ? 1.5 : 0)
+        .style('cursor', 'pointer')
+        .call(d3.drag()
+            .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+            .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+        )
+        .on('click', (event, d) => {
+            // Highlight this node's connections (#6)
+            networkHighlightNode = networkHighlightNode === d.id ? null : d.id;
+            if (networkHighlightNode) {
+                const connected = new Set([d.id]);
+                filteredLinks.forEach(l => {
+                    const s = typeof l.source === 'object' ? l.source.id : l.source;
+                    const t = typeof l.target === 'object' ? l.target.id : l.target;
+                    if (s === d.id) connected.add(t);
+                    if (t === d.id) connected.add(s);
+                });
+                node.attr('opacity', dd => connected.has(dd.id) ? 1 : 0.1);
+                link.attr('stroke-opacity', ll => {
+                    const s = typeof ll.source === 'object' ? ll.source.id : ll.source;
+                    const t = typeof ll.target === 'object' ? ll.target.id : ll.target;
+                    return (s === d.id || t === d.id) ? 0.8 : 0.05;
+                });
+            } else {
+                node.attr('opacity', dd => dd.dead ? 0.15 : 0.9);
+                link.attr('stroke-opacity', ll => ll.type === 'marriage' ? 0.7 : Math.min(0.5, (ll.strength || 30) / 100));
+            }
+
+            const npc = allNpcs.find(nn => (nn.name || nn.Name) === d.id);
+            if (npc) { selectedNpc = d.id; showNpcDetail(npc); filterNpcList(); }
+        });
+
+    const label = g.selectAll('.label').data(nodes.filter(d => d.level >= 15 || d.married || d.faction !== '-1')).join('text')
+        .attr('class', 'label').text(d => d.id).attr('dx', 8).attr('dy', 3);
+
+    const tooltip = document.getElementById('tooltip');
+    node.on('mouseenter', (event, d) => {
+        tooltip.style.display = 'block';
+        tooltip.style.left = (event.clientX + 10) + 'px';
+        tooltip.style.top = (event.clientY - 10) + 'px';
+        tooltip.innerHTML = '<strong>' + escapeHtml(d.id) + '</strong><br>Level ' + d.level + '<br>Faction: ' + (FACTION_NAMES[d.faction] || 'None')
+            + (d.dead ? '<br><span style="color:var(--red)">DEAD</span>' : '') + (d.married ? '<br>Married to ' + escapeHtml(d.spouse) : '');
+    }).on('mouseleave', () => { tooltip.style.display = 'none'; });
+
+    simulation.on('tick', () => {
+        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+        node.attr('cx', d => d.x).attr('cy', d => d.y);
+        label.attr('x', d => d.x).attr('y', d => d.y);
+    });
+};
+
+// ==========================================
+// Enhanced loadFullData - wire in new features
+// ==========================================
+const _origLoadFullData = loadFullData;
+
+loadFullData = async function() {
+    try {
+        const [npcsRes, summaryRes, eventsRes, hourlyRes] = await Promise.all([
+            apiGet('/npcs'),
+            apiGet('/summary'),
+            apiGet('/events'),
+            apiGet('/events/hourly')
+        ]);
+        if (npcsRes) allNpcs = npcsRes;
+        if (summaryRes) summary = summaryRes;
+
+        // Record emotion history before updating
+        recordEmotionSnapshot();
+
+        updatePopBar();
+        updateEconomy();
+        updateChildren();
+        updateWorldMap();
+        updateDemoCharts();
+        updateNetwork();
+        updateNotableHighlights();
+        updateFactionPower();
+        filterNpcList();
+
+        if (eventsRes) {
+            recentEvents = eventsRes;
+            updateTimeline(eventsRes);
+            updateWhatsHappening();
+        }
+        if (hourlyRes) updateTrendCharts(hourlyRes);
+        if (selectedNpc) {
+            const fresh = allNpcs.find(n => (n.name || n.Name) === selectedNpc);
+            if (fresh) showNpcDetail(fresh);
+        }
+    } catch (e) {
+        console.error('Failed to load dashboard data:', e);
+    }
+};
+
+// Enhanced SSE handler - also update events for What's Happening
+const _origConnectSSE = connectSSE;
+
+connectSSE = function() {
+    if (feedSource) feedSource.close();
+    try { feedSource = new EventSource(API + '/feed', { withCredentials: true }); } catch (e) { return; }
+
+    feedSource.onopen = function() {
+        document.getElementById('sse-dot').classList.add('connected');
+        document.getElementById('sse-dot2').classList.add('connected');
+        document.getElementById('sse-label').textContent = 'Live';
+    };
+
+    feedSource.addEventListener('npc-snapshot', function(ev) {
+        try {
+            const data = JSON.parse(ev.data);
+            if (data.summary) {
+                summary = data.summary;
+                updatePopBar();
+                updateChildren();
+                updateDemoCharts();
+                updateFactionPower();
+                updateNotableHighlights();
+            }
+            if (data.npcs) {
+                data.npcs.forEach(sn => {
+                    const full = allNpcs.find(n => (n.name || n.Name) === sn.name);
+                    if (full) {
+                        full.location = sn.location;
+                        full.isDead = !sn.alive;
+                        full.isMarried = sn.married;
+                        full.isKing = sn.isKing;
+                        full.pregnancyDueDate = sn.pregnant ? 'yes' : null;
+                    }
+                });
+                recordEmotionSnapshot();
+                updateWorldMap();
+                filterNpcList();
+            }
+        } catch (e) {}
+    });
+
+    feedSource.addEventListener('news', function(ev) {
+        try {
+            const data = JSON.parse(ev.data);
+            if (data.items) {
+                const feed = document.getElementById('timeline-feed');
+                const ph = feed.querySelector('.tl-item[style]');
+                if (ph && ph.textContent.includes('Waiting')) ph.remove();
+                data.items.forEach(item => {
+                    recentEvents.unshift(item);
+                    const div = document.createElement('div');
+                    div.className = 'tl-item';
+                    const c = getActivityColor(item.message);
+                    div.innerHTML = '<span class="tl-time">' + formatTime(item.time) + '</span>'
+                        + '<span class="tl-dot" style="background:' + c + '"></span>'
+                        + '<span class="tl-msg" style="color:' + c + '">' + escapeHtml(item.message) + '</span>';
+                    feed.insertBefore(div, feed.firstChild);
+                });
+                while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+                while (recentEvents.length > 500) recentEvents.pop();
+                updateWhatsHappening();
+            }
+        } catch (e) {}
+    });
+
+    feedSource.onerror = function() {
+        document.getElementById('sse-dot').classList.remove('connected');
+        document.getElementById('sse-dot2').classList.remove('connected');
+        document.getElementById('sse-label').textContent = 'Reconnecting...';
+    };
+};
+
+// ==========================================
+// Init
+// ==========================================
+checkSession();
+</script>
+</body>
+</html>

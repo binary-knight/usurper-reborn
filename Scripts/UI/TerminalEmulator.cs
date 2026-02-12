@@ -564,11 +564,12 @@ public partial class TerminalEmulator : Control
         }
         else
         {
-            // When stdin is redirected (SSH/online mode), Console.ReadLine() doesn't
-            // handle backspace properly - raw \x7f/\x08 bytes leak into the input string.
-            // Use character-by-character reading with manual backspace handling.
+            // In online/door mode, Console.ReadLine() doesn't handle backspace properly.
+            // On redirected stdin: raw 0x7F/0x08 bytes leak through.
+            // On PTY (SSH): .NET console may not process DEL correctly.
+            // Use our robust ReadLineWithBackspace() for all remote connections.
             string result;
-            if (Console.IsInputRedirected)
+            if (DoorMode.ShouldUseAnsiOutput || Console.IsInputRedirected)
             {
                 result = ReadLineWithBackspace();
             }
@@ -581,58 +582,100 @@ public partial class TerminalEmulator : Control
     }
 
     /// <summary>
-    /// Read a line from stdin handling backspace (0x7F, 0x08) and escape sequences manually.
-    /// Used when stdin is redirected (SSH/online mode) where Console.ReadLine() passes raw bytes through.
+    /// Read a line with manual backspace handling. Works on redirected stdin, PTY, and console.
+    /// Handles DEL (0x7F), BS (0x08), ConsoleKey.Backspace, and ANSI escape sequences.
+    /// Used for all online/door mode input where Console.ReadLine() may not handle backspace.
     /// </summary>
-    private string ReadLineWithBackspace()
+    internal static string ReadLineWithBackspace(bool maskPassword = false)
     {
         var buffer = new System.Text.StringBuilder();
-        while (true)
+
+        if (Console.IsInputRedirected)
         {
-            int ch = Console.In.Read();
-            if (ch == -1 || ch == '\n' || ch == '\r')
+            // Redirected stdin (pipe) - read raw bytes, handle 0x7F/0x08 manually
+            while (true)
             {
-                // Consume \n after \r if present
-                if (ch == '\r' && Console.In.Peek() == '\n')
-                    Console.In.Read();
-                Console.Out.Write("\r\n");
-                Console.Out.Flush();
-                break;
-            }
-            else if (ch == 0x7F || ch == 0x08) // DEL or BS
-            {
-                if (buffer.Length > 0)
+                int ch = Console.In.Read();
+                if (ch == -1 || ch == '\n' || ch == '\r')
                 {
-                    buffer.Remove(buffer.Length - 1, 1);
-                    // Send backspace-space-backspace to erase character on terminal
-                    Console.Out.Write("\b \b");
+                    if (ch == '\r' && Console.In.Peek() == '\n')
+                        Console.In.Read();
+                    Console.Out.Write("\r\n");
+                    Console.Out.Flush();
+                    break;
+                }
+                else if (ch == 0x7F || ch == 0x08) // DEL or BS
+                {
+                    if (buffer.Length > 0)
+                    {
+                        buffer.Remove(buffer.Length - 1, 1);
+                        Console.Out.Write("\b \b");
+                        Console.Out.Flush();
+                    }
+                }
+                else if (ch == 0x1B) // ESC - skip escape sequences
+                {
+                    if (Console.In.Peek() == '[')
+                    {
+                        Console.In.Read(); // consume '['
+                        while (true)
+                        {
+                            int next = Console.In.Peek();
+                            if (next == -1) break;
+                            Console.In.Read();
+                            if ((next >= 'A' && next <= 'Z') || (next >= 'a' && next <= 'z') || next == '~')
+                                break;
+                        }
+                    }
+                }
+                else if (ch >= 32) // Printable characters only
+                {
+                    buffer.Append((char)ch);
+                    Console.Out.Write(maskPassword ? '*' : (char)ch);
                     Console.Out.Flush();
                 }
             }
-            else if (ch == 0x1B) // ESC - skip escape sequences
+        }
+        else
+        {
+            // PTY or real console - use ReadKey for reliable keystroke capture
+            // Console.ReadLine() on a PTY may not handle backspace (0x7F) correctly
+            // when .NET's console subsystem interferes with terminal settings.
+            while (true)
             {
-                // Read and discard the rest of the escape sequence
-                if (Console.In.Peek() == '[')
+                try
                 {
-                    Console.In.Read(); // consume '['
-                    // Read until we get a letter (end of escape sequence)
-                    while (true)
+                    var key = Console.ReadKey(intercept: true);
+                    if (key.Key == ConsoleKey.Enter)
                     {
-                        int next = Console.In.Peek();
-                        if (next == -1) break;
-                        Console.In.Read();
-                        if (next >= 'A' && next <= 'Z' || next >= 'a' && next <= 'z' || next == '~')
-                            break;
+                        Console.Out.Write("\r\n");
+                        Console.Out.Flush();
+                        break;
+                    }
+                    else if (key.Key == ConsoleKey.Backspace)
+                    {
+                        if (buffer.Length > 0)
+                        {
+                            buffer.Remove(buffer.Length - 1, 1);
+                            Console.Out.Write("\b \b");
+                            Console.Out.Flush();
+                        }
+                    }
+                    else if (key.KeyChar >= 32) // Printable characters
+                    {
+                        buffer.Append(key.KeyChar);
+                        Console.Out.Write(maskPassword ? '*' : key.KeyChar);
+                        Console.Out.Flush();
                     }
                 }
-            }
-            else if (ch >= 32) // Printable characters only
-            {
-                buffer.Append((char)ch);
-                Console.Out.Write((char)ch);
-                Console.Out.Flush();
+                catch (InvalidOperationException)
+                {
+                    // ReadKey not supported (rare edge case) - fall back to ReadLine
+                    return Console.ReadLine() ?? string.Empty;
+                }
             }
         }
+
         return buffer.ToString();
     }
     

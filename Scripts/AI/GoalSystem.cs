@@ -73,7 +73,9 @@ public partial class GoalSystem
         return goal.Type switch
         {
             GoalType.Economic when goal.Name.Contains("Wealthy") => owner.Gold >= 10000,
+            GoalType.Economic when goal.Name.Contains("Control") => owner.CTurf,
             GoalType.Social when goal.Name.Contains("Power") => owner.King,
+            GoalType.Social when goal.Name.Contains("Ruler") => owner.King,
             GoalType.Personal when goal.Name.Contains("Strength") => owner.Level >= 20,
             GoalType.Social when goal.Name.Contains("Gang") => !string.IsNullOrEmpty(owner.GangId),
             _ => false
@@ -108,6 +110,13 @@ public partial class GoalSystem
         {
             owner.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.5f, 300);
             // Level-up news is already generated elsewhere, just add emotion
+        }
+        else if (goal.Name.Contains("Control the City"))
+        {
+            owner.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.5f, 300);
+            owner.EmotionalState?.AddEmotion(EmotionType.Pride, 0.4f, 240);
+            NewsSystem.Instance?.Newsy($"{npcName}'s team now controls the city and collects tax revenue from every sale!");
+            WorldSimulator.AddGossip($"{npcName}'s gang took over the city");
         }
         else if (goal.Name.Contains("Gang"))
         {
@@ -195,7 +204,20 @@ public partial class GoalSystem
         {
             if (!goals.Any(g => g.Name.Contains("Become Ruler")))
             {
-                AddGoal(new Goal("Become Ruler", GoalType.Social, personality.Ambition));
+                // Tax revenue makes the throne more attractive
+                var king = CastleLocation.GetCurrentKing();
+                float taxBonus = (king != null && king.KingTaxPercent > 10) ? 0.2f : 0f;
+                float rulerPriority = Math.Min(1.0f, personality.Ambition + taxBonus);
+                AddGoal(new Goal("Become Ruler", GoalType.Social, rulerPriority));
+            }
+        }
+
+        // Generate city control goals for greedy NPCs with teams
+        if (personality.Greed > 0.6f && !string.IsNullOrEmpty(owner.GangId) && !owner.CTurf)
+        {
+            if (!goals.Any(g => g.Name.Contains("Control the City")))
+            {
+                AddGoal(new Goal("Control the City", GoalType.Economic, personality.Greed * 0.7f));
             }
         }
     }

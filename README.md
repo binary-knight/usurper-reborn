@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.28.2** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.29.1** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -16,7 +16,7 @@
 
 The core of Usurper Reborn is a 24/7 agent-based simulation. NPCs aren't quest dispensers standing in place — they're goal-driven agents with personalities, memories, and opinions about each other and about you.
 
-**Autonomous NPCs** — Each NPC has 15 personality traits, a memory system (100 memories, 7-day decay), and a goal-based AI brain. They choose careers, form gangs, visit shops, train at the guild, and develop relationships with each other independently of player action.
+**Autonomous NPCs** — Each NPC has 13 personality traits, a memory system (100 memories, 7-day decay), and a goal-based AI brain. They choose careers, form gangs, visit shops, train at the guild, and develop relationships with each other independently of player action.
 
 **Full Lifecycles** — Married NPCs can become pregnant, have children, and raise them. Children grow up over real time and eventually join the realm as new adult NPCs. Adults age according to their race's lifespan (Human ~30 days, Elf ~80 days, Orc ~22 days) and die permanently when their time comes. The population turns over. No one is permanent.
 
@@ -133,7 +133,7 @@ chmod +x publish/osx-arm64/UsurperReborn
 
 - **Runtime**: .NET 8.0 (LTS) | **Language**: C# 12
 - **Codebase**: 100,000+ lines across 150+ files, 68+ game systems
-- **NPC Simulation**: Goal-based AI with 15 personality traits, memory system, lifecycle aging
+- **NPC Simulation**: Goal-based AI with 13 personality traits, memory system, lifecycle aging
 - **Platforms**: Windows (x64/x86), Linux (x64/ARM64), macOS (Intel/Apple Silicon)
 - **Multiplayer**: SQLite shared backend, SSH gateway, WebSocket browser terminal
 - **Save System**: JSON (local) / SQLite (online) with autosave
@@ -260,6 +260,39 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.29.1 - The Observatory
+
+**NPC Analytics Dashboard:**
+- Hidden authenticated web dashboard at `/dashboard` for observing the NPC simulation in real-time
+- World map with NPC dots colored by faction and sized by level
+- NPC detail panels with personality radar charts (13 traits), emotional state bars, goals, memories, and relationships
+- D3.js force-directed relationship network graph (marriages, teams, affinities, rivalries)
+- Demographic charts (class, race, faction, level distribution), live event timeline via SSE
+- PBKDF2 authentication with 7-day session tokens
+
+**Visible Tax System:**
+- Every city purchase now shows a detailed tax breakdown (King's Tax + City Tax) before confirmation
+- 27 player purchase points across 6 shop files; tax-free zones for underground/religious/government locations
+- NPCs pay full tax on purchases and pursue city control for tax revenue
+
+**NPC Death & Combat Overhaul:**
+- NPCs now properly die (IsDead flag set on all death paths) and stay dead for ~10 minutes
+- NPC-vs-NPC combat changed from single-hit to full 30-round duels — NPCs can kill each other
+- NPCs explore deeper dungeons, take more risks, and fight rivals more often
+- New NPC activities: Dark Alley (pickpocket, fence goods), Inn (rest, drink, socialize)
+
+**Data Persistence Fixes:**
+- Children, marriages, and world events now survive world sim restarts (round-trip through world_state)
+- Player sessions load authoritative data from world_state instead of stale save files
+- Royal court changes (treasury, tax policy) no longer overwritten by world sim
+- Player-aware city control: tax revenue correctly deposited to player's bank account
+
+**Bug Fixes:**
+- NPC personality traits: all 13 core traits now initialized per archetype (5 were stuck at 0.0)
+- NPC emotional states: antagonistic suppression prevents contradictory emotions at maximum
+- Backspace in SSH/online mode: rewrote input handling for all SSH terminals
+- Password management: admin reset and in-game password change
 
 ### Completed in v0.28.2 - NPC Visibility Fix
 
@@ -690,7 +723,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.28.2)
+### Known Issues (Alpha v0.29.1)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -705,4 +738,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.28.2 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.29.1 — The world is running. [Watch it live.](https://usurper-reborn.net)

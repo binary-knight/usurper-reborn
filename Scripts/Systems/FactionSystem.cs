@@ -429,13 +429,13 @@ namespace UsurperRemake.Systems
             int standing = FactionStanding[npcFaction.Value];
             int baseChance = 0;
 
-            // Standing-based chance (tuned for single roll per travel)
+            // Standing-based chance (tuned for single roll per travel, with 12-travel cooldown)
             if (standing <= -100)
-                baseChance = 15;  // Hated: 15% base chance
+                baseChance = 8;   // Hated: 8% base chance
             else if (standing <= -50)
-                baseChance = 8;   // Hostile: 8% base chance
+                baseChance = 4;   // Hostile: 4% base chance
             else if (standing <= -25)
-                baseChance = 3;   // Unfriendly: 3% base chance
+                baseChance = 1;   // Unfriendly: 1% base chance
 
             // Faction rivalry bonus
             if (PlayerFaction != null)
@@ -444,16 +444,16 @@ namespace UsurperRemake.Systems
                 if ((PlayerFaction == Faction.TheFaith && npcFaction == Faction.TheShadows) ||
                     (PlayerFaction == Faction.TheShadows && npcFaction == Faction.TheFaith))
                 {
-                    baseChance += 8;
+                    baseChance += 4;
                 }
                 // Shadows vs Crown - anti-government aggression
                 else if (PlayerFaction == Faction.TheCrown && npcFaction == Faction.TheShadows)
                 {
-                    baseChance += 5;
+                    baseChance += 2;
                 }
             }
 
-            return Math.Min(30, baseChance); // Cap at 30%
+            return Math.Min(15, baseChance); // Cap at 15%
         }
 
         /// <summary>

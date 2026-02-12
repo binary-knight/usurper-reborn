@@ -282,7 +282,8 @@ namespace UsurperRemake.BBS
 
             if (_sessionInfo.CommType == ConnectionType.Local)
             {
-                var result = Console.ReadLine() ?? "";
+                // Use robust backspace handling for all modes (PTY, redirected stdin, console)
+                var result = TerminalEmulator.ReadLineWithBackspace();
                 return result;
             }
 

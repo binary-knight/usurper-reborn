@@ -27,10 +27,16 @@ public class WorldSimulator
 
     private const float SIMULATION_INTERVAL = 30.0f; // seconds between simulation steps (reduced for faster respawns)
     private const int MAX_TEAM_SIZE = 5; // Maximum members per team (from Pascal)
-    private const int NPC_RESPAWN_TICKS = 5; // Respawn dead NPCs after 5 simulation ticks (~2.5 min)
+    private const int NPC_RESPAWN_TICKS = 20; // Respawn dead NPCs after 20 simulation ticks (~10 min)
 
     // Track dead NPCs for respawn
     private Dictionary<string, int> deadNPCRespawnTimers = new();
+
+    /// <summary>
+    /// Set by WorldSimService when a player's team controls city turf but the player is offline.
+    /// The world sim can't see the player, so this flag prevents NPC teams from overriding player turf.
+    /// </summary>
+    public string? PlayerTurfTeam { get; set; } = null;
 
     // Gossip system - pool of recent events NPCs can spread as rumors
     private class GossipItem
@@ -186,6 +192,14 @@ public class WorldSimulator
                 deadNPCRespawnTimers[npc.Name] = NPC_RESPAWN_TICKS;
                 UsurperRemake.Systems.DebugLogger.Instance.LogDebug("NPC", $"{npc.Name} added to respawn queue ({NPC_RESPAWN_TICKS} ticks)");
             }
+        }
+
+        // Update emotional states from recent memories (generates emotions from events)
+        foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && n.EmotionalState != null))
+        {
+            var recentMems = npc.Brain?.Memory?.AllMemories?.Where(m => m.IsRecent(2)).ToList()
+                ?? new List<MemoryEvent>();
+            npc.EmotionalState.Update(recentMems);
         }
 
         // Process emotional cascades - strong emotions spread to nearby NPCs
@@ -768,10 +782,10 @@ public class WorldSimulator
         // Weight activities based on NPC state
         var activities = new List<(string action, double weight)>();
 
-        // Dungeon exploration - if HP is good and level appropriate
-        if (npc.HP > npc.MaxHP * 0.7 && npc.Level >= 1)
+        // Dungeon exploration - if HP is decent and level appropriate
+        if (npc.HP > npc.MaxHP * 0.4 && npc.Level >= 1)
         {
-            activities.Add(("dungeon", 0.25));
+            activities.Add(("dungeon", 0.30));
         }
 
         // Shopping - if has gold
@@ -885,14 +899,49 @@ public class WorldSimulator
             activities.Add(("castle", castleWeight));
         }
 
+        // Dark Alley - shady NPCs, thieves, assassins, high darkness characters
+        if (npc.Brain?.Personality != null)
+        {
+            float alleyWeight = 0.03f; // Low base
+            // High darkness alignment = drawn to the shadows
+            if (npc.Darkness > npc.Chivalry)
+                alleyWeight += 0.10f;
+            // Assassins and thieves love the alley
+            if (npc.Class == CharacterClass.Assassin || npc.Class == CharacterClass.Ranger)
+                alleyWeight += 0.08f;
+            // Higher greed = seeking black market deals
+            alleyWeight += npc.Brain.Personality.Greed * 0.06f;
+            // Higher aggression = more comfortable in rough areas
+            alleyWeight += npc.Brain.Personality.Aggression * 0.04f;
+            if (alleyWeight > 0.05f) // Only add if they'd actually go
+                activities.Add(("dark_alley", alleyWeight));
+        }
+
+        // Inn - rest, socialize, drink, gossip
+        {
+            float innWeight = 0.08f; // Moderate base
+            // Wounded NPCs rest at the inn
+            if (npc.HP < npc.MaxHP * 0.7)
+                innWeight += 0.08f;
+            // Sociable NPCs like the inn
+            if (npc.Brain?.Personality != null)
+                innWeight += npc.Brain.Personality.Sociability * 0.06f;
+            // Evening/night - everyone heads to the inn
+            int hour = DateTime.Now.Hour;
+            if (hour >= 18 || hour < 6)
+                innWeight += 0.08f;
+            activities.Add(("inn", innWeight));
+        }
+
         // Team activities
         if (string.IsNullOrEmpty(npc.Team))
         {
             // Not in a team - consider joining or forming one
+            // Always offer the option; personality check happens inside formation methods
+            float teamWeight = 0.25f;
             if (npc.Brain?.Personality?.IsLikelyToJoinGang() == true)
-            {
-                activities.Add(("team_recruit", 0.15)); // Try to form/join a team
-            }
+                teamWeight = 0.35f; // Gang-oriented NPCs try harder
+            activities.Add(("team_recruit", teamWeight));
         }
         else
         {
@@ -901,7 +950,7 @@ public class WorldSimulator
             {
                 activities.Add(("team_dungeon", 0.20)); // Team dungeon run
             }
-            activities.Add(("team_recruit", 0.10)); // Recruit more members
+            activities.Add(("team_recruit", 0.15)); // Recruit more members
         }
 
         if (activities.Count == 0) return;
@@ -932,24 +981,34 @@ public class WorldSimulator
             case "dungeon":
                 NPCExploreDungeon(npc);
                 npc.CurrentActivity = "exploring the dungeon depths";
+                npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.5f, 90);
+                npc.EmotionalState?.AddEmotion(EmotionType.Fear, 0.3f, 60);
                 break;
             case "shop":
                 NPCGoShopping(npc);
                 npc.CurrentActivity = npc.CurrentLocation == "Weapon Shop"
                     ? "examining a blade on the rack"
                     : "browsing the armor on display";
+                npc.EmotionalState?.AddEmotion(EmotionType.Greed, 0.3f, 60);
                 break;
             case "train":
                 NPCTrainAtGym(npc);
                 npc.CurrentActivity = "training with the practice dummies";
+                npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.4f, 90);
+                npc.EmotionalState?.AddEmotion(EmotionType.Pride, 0.3f, 60);
                 break;
             case "levelup":
                 NPCVisitMaster(npc);
                 npc.CurrentActivity = "consulting with the Level Master";
+                npc.EmotionalState?.AddEmotion(EmotionType.Pride, 0.6f, 120);
+                npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.5f, 120);
+                npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.4f, 90);
                 break;
             case "heal":
                 NPCVisitHealer(npc);
                 npc.CurrentActivity = "browsing the healing potions";
+                npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.4f, 60);
+                npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.3f, 90);
                 break;
             case "move":
                 MoveNPCToRandomLocation(npc);
@@ -958,34 +1017,60 @@ public class WorldSimulator
             case "team_recruit":
                 NPCTeamRecruitment(npc);
                 npc.CurrentActivity = "looking for recruits";
+                npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.3f, 60);
                 break;
             case "team_dungeon":
                 NPCTeamDungeonRun(npc);
                 npc.CurrentActivity = "rallying the team for a dungeon run";
+                npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.5f, 90);
+                npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.4f, 90);
                 break;
             case "love_street":
                 NPCVisitLoveStreet(npc);
                 npc.CurrentActivity = "enjoying the evening company";
+                npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.5f, 120);
+                npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.3f, 90);
                 break;
             case "temple":
                 NPCVisitTemple(npc);
                 npc.CurrentActivity = "praying quietly";
+                npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.5f, 120);
+                npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.4f, 90);
                 break;
             case "bank":
                 NPCVisitBank(npc);
                 npc.CurrentActivity = "counting coins at the counter";
+                npc.EmotionalState?.AddEmotion(EmotionType.Greed, 0.3f, 60);
                 break;
             case "marketplace":
                 NPCVisitMarketplace(npc);
                 npc.CurrentActivity = "haggling with a merchant";
+                npc.EmotionalState?.AddEmotion(EmotionType.Greed, 0.4f, 60);
+                npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.2f, 60);
                 break;
             case "castle":
                 NPCVisitCastle(npc);
                 npc.CurrentActivity = "attending to court business";
+                npc.EmotionalState?.AddEmotion(EmotionType.Pride, 0.4f, 90);
+                npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.3f, 60);
                 break;
             case "go_home":
                 NPCGoHome(npc);
                 npc.CurrentActivity = "heading home for the day";
+                npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.4f, 120);
+                npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.3f, 90);
+                break;
+            case "dark_alley":
+                NPCVisitDarkAlley(npc);
+                npc.CurrentActivity = "lurking in the shadows";
+                npc.EmotionalState?.AddEmotion(EmotionType.Greed, 0.4f, 90);
+                npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.3f, 60);
+                break;
+            case "inn":
+                NPCVisitInn(npc);
+                npc.CurrentActivity = "having a drink at the bar";
+                npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.3f, 60);
+                npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.3f, 90);
                 break;
         }
     }
@@ -1019,11 +1104,13 @@ public class WorldSimulator
             MultiplyWeight(activities, "dungeon", 1.5);
             MultiplyWeight(activities, "team_dungeon", 1.4);
             MultiplyWeight(activities, "train", 1.3);
+            MultiplyWeight(activities, "dark_alley", 1.4);
             MultiplyWeight(activities, "shop", 0.7);
         }
         if (p.Sociability > 0.6f)
         {
             MultiplyWeight(activities, "love_street", 1.5);
+            MultiplyWeight(activities, "inn", 1.5);
             MultiplyWeight(activities, "move", 1.4); // wander and meet people
             MultiplyWeight(activities, "temple", 0.8);
         }
@@ -1032,6 +1119,7 @@ public class WorldSimulator
             MultiplyWeight(activities, "shop", 1.5);
             MultiplyWeight(activities, "bank", 1.5);
             MultiplyWeight(activities, "marketplace", 1.4);
+            MultiplyWeight(activities, "dark_alley", 1.3);
             MultiplyWeight(activities, "dungeon", 1.2);
         }
         if (p.Intelligence > 0.6f)
@@ -1065,6 +1153,19 @@ public class WorldSimulator
             MultiplyWeight(activities, "dungeon", 1.3);
             MultiplyWeight(activities, "temple", 0.5);
         }
+        // Sociable and ambitious NPCs are more likely to form/join teams
+        if (p.Sociability > 0.5f)
+        {
+            MultiplyWeight(activities, "team_recruit", 1.4);
+        }
+        if (p.Ambition > 0.6f)
+        {
+            MultiplyWeight(activities, "team_recruit", 1.3);
+        }
+        if (p.Loyalty > 0.6f)
+        {
+            MultiplyWeight(activities, "team_recruit", 1.2);
+        }
     }
 
     /// <summary>
@@ -1092,11 +1193,15 @@ public class WorldSimulator
         {
             MultiplyWeight(activities, "move", 1.5); // socializing
             MultiplyWeight(activities, "love_street", 1.4);
+            MultiplyWeight(activities, "inn", 1.5); // evening drinks
+            MultiplyWeight(activities, "dark_alley", 1.6); // shady business after dark
             MultiplyWeight(activities, "go_home", 1.3);
         }
         else // Night (23-5)
         {
             MultiplyWeight(activities, "go_home", 2.0);
+            MultiplyWeight(activities, "inn", 1.3); // late-night drinkers
+            MultiplyWeight(activities, "dark_alley", 1.8); // dark alley thrives at night
             MultiplyWeight(activities, "dungeon", 0.5);
             MultiplyWeight(activities, "team_dungeon", 0.5);
             MultiplyWeight(activities, "shop", 0.3);
@@ -1184,7 +1289,7 @@ public class WorldSimulator
             .Where(g => g.Count() < MAX_TEAM_SIZE)
             .ToList();
 
-        if (teamsAtLocation.Any() && random.NextDouble() < 0.6)
+        if (teamsAtLocation.Any() && random.NextDouble() < 0.75)
         {
             // Try to join an existing team
             var teamGroup = teamsAtLocation[random.Next(teamsAtLocation.Count)];
@@ -1193,7 +1298,7 @@ public class WorldSimulator
             {
                 // Check compatibility with team leader
                 var compatibility = npc.Brain?.Personality?.GetCompatibility(teamLeader.Brain?.Personality) ?? 0.5f;
-                if (compatibility > 0.4f)
+                if (compatibility > 0.3f)
                 {
                     // Join the team!
                     npc.Team = teamLeader.Team;
@@ -1207,16 +1312,26 @@ public class WorldSimulator
             }
         }
 
-        // Form a new team if we have compatible NPCs nearby
+        // Form a new team if we have compatible NPCs nearby (or anywhere if no locals found)
         var nearbyUnteamed = npcs
-            .Where(n => n.IsAlive &&
+            .Where(n => n.IsAlive && !n.IsDead &&
                    string.IsNullOrEmpty(n.Team) &&
                    n.CurrentLocation == npc.CurrentLocation &&
-                   n.Id != npc.Id &&
-                   n.Brain?.Personality?.IsLikelyToJoinGang() == true)
+                   n.Id != npc.Id)
             .ToList();
 
-        if (nearbyUnteamed.Count >= 1 && random.NextDouble() < 0.3)
+        // Fall back to any unaffiliated NPC in the realm if nobody at this location
+        if (nearbyUnteamed.Count == 0)
+        {
+            nearbyUnteamed = npcs
+                .Where(n => n.IsAlive && !n.IsDead &&
+                       string.IsNullOrEmpty(n.Team) &&
+                       n.Id != npc.Id &&
+                       n.Brain?.Personality?.IsLikelyToJoinGang() == true)
+                .ToList();
+        }
+
+        if (nearbyUnteamed.Count >= 1 && random.NextDouble() < 0.5)
         {
             // Form a new team
             var teamName = GenerateTeamName();
@@ -1227,17 +1342,31 @@ public class WorldSimulator
             npc.CTurf = false;
             npc.TeamRec = 0;
 
-            // Add first recruit
-            var recruit = nearbyUnteamed[random.Next(nearbyUnteamed.Count)];
-            var compatibility = npc.Brain?.Personality?.GetCompatibility(recruit.Brain?.Personality) ?? 0.5f;
-            if (compatibility > 0.35f)
+            // Add first recruit - try a few candidates for compatibility
+            NPC? bestRecruit = null;
+            float bestCompat = 0f;
+            int tries = Math.Min(nearbyUnteamed.Count, 5);
+            for (int t = 0; t < tries; t++)
             {
-                recruit.Team = teamName;
-                recruit.TeamPW = teamPassword;
-                recruit.CTurf = false;
+                var candidate = nearbyUnteamed[random.Next(nearbyUnteamed.Count)];
+                var compat = npc.Brain?.Personality?.GetCompatibility(candidate.Brain?.Personality) ?? 0.5f;
+                if (compat > bestCompat) { bestCompat = compat; bestRecruit = candidate; }
+            }
 
-                NewsSystem.Instance.Newsy(true, $"{npc.Name} formed a new team called '{teamName}' with {recruit.Name}!");
-                // GD.Print($"[WorldSim] {npc.Name} formed team '{teamName}' with {recruit.Name}");
+            if (bestRecruit != null && bestCompat > 0.25f)
+            {
+                bestRecruit.Team = teamName;
+                bestRecruit.TeamPW = teamPassword;
+                bestRecruit.CTurf = false;
+
+                NewsSystem.Instance.Newsy(true, $"{npc.Name} formed a new team called '{teamName}' with {bestRecruit.Name}!");
+                // GD.Print($"[WorldSim] {npc.Name} formed team '{teamName}' with {bestRecruit.Name}");
+            }
+            else
+            {
+                // No compatible recruit found - undo the team assignment
+                npc.Team = "";
+                npc.TeamPW = "";
             }
         }
     }
@@ -1381,9 +1510,11 @@ public class WorldSimulator
                 var killerName = monsters.FirstOrDefault()?.Name ?? "dungeon monsters";
                 foreach (var deadMember in dead)
                 {
+                    deadMember.IsDead = true;
+                    QueueNPCForRespawn(deadMember.Name);
                     NewsSystem.Instance.WriteDeathNews(deadMember.Name, killerName, "the Dungeon");
                 }
-                // GD.Print($"[WorldSim] Team '{npc.Team}' was defeated! {dead.Count} members died");
+                GD.Print($"[WorldSim] Team '{npc.Team}' was defeated! {dead.Count} members died");
             }
 
             // Survivors flee
@@ -1402,7 +1533,7 @@ public class WorldSimulator
         totalExp = 0;
         totalGold = 0;
         int rounds = 0;
-        const int maxRounds = 25;
+        const int maxRounds = 40;
 
         while (team.Any(m => m.IsAlive) && monsters.Any(m => m.IsAlive) && rounds < maxRounds)
         {
@@ -1453,8 +1584,14 @@ public class WorldSimulator
     {
         npc.UpdateLocation("Dungeon");
 
-        // Determine dungeon level based on NPC level (can go slightly above their level)
-        int dungeonLevel = Math.Max(1, npc.Level + random.Next(-2, 3));
+        // Determine dungeon level based on NPC level - sometimes they push too deep
+        int dungeonLevel = Math.Max(1, npc.Level + random.Next(-3, 6));
+        // Ambitious/courageous NPCs push even deeper
+        if (npc.Brain?.Personality != null &&
+            (npc.Brain.Personality.Courage > 0.7f || npc.Brain.Personality.Ambition > 0.7f))
+        {
+            dungeonLevel += random.Next(0, 5);
+        }
         dungeonLevel = Math.Min(dungeonLevel, 100);
 
         // Generate a monster
@@ -1464,7 +1601,7 @@ public class WorldSimulator
         int rounds = 0;
         bool npcWon = false;
 
-        while (npc.IsAlive && monster.IsAlive && rounds < 20)
+        while (npc.IsAlive && monster.IsAlive && rounds < 50)
         {
             rounds++;
 
@@ -1515,9 +1652,11 @@ public class WorldSimulator
         }
         else if (!npc.IsAlive)
         {
-            // NPC died - generate death news
+            // NPC died - mark as dead and queue for respawn
+            npc.IsDead = true;
+            QueueNPCForRespawn(npc.Name);
             NewsSystem.Instance.WriteDeathNews(npc.Name, monster.Name, "the Dungeon");
-            // GD.Print($"[WorldSim] {npc.Name} was slain by {monster.Name} in the dungeon!");
+            GD.Print($"[WorldSim] {npc.Name} was slain by {monster.Name} in the dungeon!");
         }
         else
         {
@@ -1567,7 +1706,15 @@ public class WorldSimulator
 
             if (betterWeapon != null)
             {
-                npc.SpendGold((int)betterWeapon.Value);
+                var (_, _, weaponTotalWithTax) = CityControlSystem.CalculateTaxedPrice(betterWeapon.Value);
+                if (npc.Gold < weaponTotalWithTax) { betterWeapon = null; }
+            }
+
+            if (betterWeapon != null)
+            {
+                var (_, _, weaponTotal) = CityControlSystem.CalculateTaxedPrice(betterWeapon.Value);
+                npc.SpendGold((int)weaponTotal);
+                CityControlSystem.Instance.ProcessSaleTax(betterWeapon.Value);
                 npc.EquippedItems[EquipmentSlot.MainHand] = betterWeapon.Id;
 
                 // If new weapon is two-handed, remove off-hand item
@@ -1611,7 +1758,15 @@ public class WorldSimulator
 
             if (betterArmor != null)
             {
-                npc.SpendGold((int)betterArmor.Value);
+                var (_, _, armorTotalWithTax) = CityControlSystem.CalculateTaxedPrice(betterArmor.Value);
+                if (npc.Gold < armorTotalWithTax) betterArmor = null;
+            }
+
+            if (betterArmor != null)
+            {
+                var (_, _, armorTotal) = CityControlSystem.CalculateTaxedPrice(betterArmor.Value);
+                npc.SpendGold((int)armorTotal);
+                CityControlSystem.Instance.ProcessSaleTax(betterArmor.Value);
                 npc.EquippedItems[targetSlot] = betterArmor.Id;
                 boughtSomething = true;
                 itemBought = betterArmor.Name;
@@ -1632,12 +1787,14 @@ public class WorldSimulator
     /// </summary>
     private void NPCTrainAtGym(NPC npc)
     {
-        // Training can happen anywhere - NPC stays at current location
+        npc.UpdateLocation("Gym");
 
         int trainingCost = npc.Level * 10 + 50;
-        if (npc.Gold >= trainingCost)
+        var (_, _, trainingTotalWithTax) = CityControlSystem.CalculateTaxedPrice(trainingCost);
+        if (npc.Gold >= trainingTotalWithTax)
         {
-            npc.SpendGold(trainingCost);
+            npc.SpendGold((int)trainingTotalWithTax);
+            CityControlSystem.Instance.ProcessSaleTax(trainingCost);
 
             // Random stat increase - update BOTH current and base stats
             int statChoice = random.Next(4);
@@ -1686,6 +1843,7 @@ public class WorldSimulator
     /// </summary>
     private void NPCVisitMaster(NPC npc)
     {
+        npc.UpdateLocation("Level Master");
         long expNeeded = GetExperienceForLevel(npc.Level + 1);
         if (npc.Experience >= expNeeded && npc.Level < 100)
         {
@@ -1715,22 +1873,28 @@ public class WorldSimulator
         npc.UpdateLocation("Healer");
 
         long healCost = (npc.MaxHP - npc.HP) * 2;
-        if (npc.Gold >= healCost && healCost > 0)
+        var (_, _, healTotalWithTax) = CityControlSystem.CalculateTaxedPrice(healCost);
+        if (npc.Gold >= healTotalWithTax && healCost > 0)
         {
-            npc.SpendGold(healCost);
+            npc.SpendGold(healTotalWithTax);
+            CityControlSystem.Instance.ProcessSaleTax(healCost);
             npc.HP = npc.MaxHP;
-            // GD.Print($"[WorldSim] {npc.Name} healed at the Healer for {healCost} gold");
         }
         else if (npc.HP < npc.MaxHP)
         {
-            // Partial heal
+            // Partial heal - spend half of gold, accounting for tax
             long canAfford = npc.Gold / 2;
-            long hpToHeal = canAfford / 2;
+            // Work backwards from what they can afford to base cost
+            var king = CastleLocation.GetCurrentKing();
+            int totalTaxPercent = (king?.KingTaxPercent ?? 0) + (king?.CityTaxPercent ?? 0);
+            long baseCostFromAffordable = totalTaxPercent > 0 ? (canAfford * 100) / (100 + totalTaxPercent) : canAfford;
+            long hpToHeal = baseCostFromAffordable / 2;
             if (hpToHeal > 0)
             {
-                npc.SpendGold(canAfford);
+                var (_, _, partialHealTotal) = CityControlSystem.CalculateTaxedPrice(baseCostFromAffordable);
+                npc.SpendGold(Math.Min(partialHealTotal, npc.Gold));
+                CityControlSystem.Instance.ProcessSaleTax(baseCostFromAffordable);
                 npc.HP = Math.Min(npc.HP + hpToHeal, npc.MaxHP);
-                // GD.Print($"[WorldSim] {npc.Name} partially healed at the Healer");
             }
         }
     }
@@ -2220,6 +2384,97 @@ public class WorldSimulator
         }
     }
 
+    /// <summary>
+    /// NPC visits the Dark Alley for shady dealings
+    /// </summary>
+    private void NPCVisitDarkAlley(NPC npc)
+    {
+        npc.UpdateLocation("Dark Alley");
+
+        // Pickpocket attempt - high greed + high dex NPCs may steal
+        if (npc.Brain?.Personality != null && npc.Brain.Personality.Greed > 0.6f && random.NextDouble() < 0.15)
+        {
+            var victims = npcs
+                .Where(n => n.IsAlive && n.ID != npc.ID && n.CurrentLocation == "Dark Alley" && n.Gold > 100)
+                .ToList();
+
+            if (victims.Any())
+            {
+                var victim = victims[random.Next(victims.Count)];
+                long stolen = Math.Min(victim.Gold / 10, 50 + npc.Level * 5);
+                if (stolen > 0)
+                {
+                    victim.SpendGold(stolen);
+                    npc.Gold += stolen;
+                    npc.Darkness += 2;
+                    NewsSystem.Instance?.Newsy(false, $"{npc.Name} pickpocketed {stolen} gold from {victim.Name} in the Dark Alley!");
+                    RelationshipSystem.UpdateRelationship(victim, npc, -5, 0, false);
+                }
+            }
+        }
+
+        // Fence stolen goods - sell inventory items at shady prices
+        if (npc.MarketInventory.Count > 0 && random.NextDouble() < 0.20)
+        {
+            var item = npc.MarketInventory[random.Next(npc.MarketInventory.Count)];
+            long fencePrice = Math.Max(10, item.Value / 3); // Fence pays 33%
+            npc.Gold += fencePrice;
+            npc.MarketInventory.Remove(item);
+            npc.Darkness += 1;
+        }
+
+        // Meet other shady NPCs
+        var otherNPCs = npcs
+            .Where(n => n.IsAlive && n.ID != npc.ID && n.CurrentLocation == "Dark Alley")
+            .ToList();
+
+        if (otherNPCs.Any() && random.NextDouble() < 0.20)
+        {
+            var other = otherNPCs[random.Next(otherNPCs.Count)];
+            // Shady companionship - small friendship boost
+            RelationshipSystem.UpdateRelationship(npc, other, 1, 0, false);
+        }
+    }
+
+    /// <summary>
+    /// NPC visits the Inn for rest, drinks, and socializing
+    /// </summary>
+    private void NPCVisitInn(NPC npc)
+    {
+        npc.UpdateLocation("Inn");
+
+        // Heal slightly from resting at the inn
+        if (npc.HP < npc.MaxHP)
+        {
+            int healing = (int)Math.Max(5, npc.MaxHP / 20);
+            npc.HP = Math.Min(npc.HP + healing, npc.MaxHP);
+        }
+
+        // Pay for drinks
+        if (npc.Gold > 20)
+        {
+            long drinkCost = 5 + random.Next(15);
+            npc.SpendGold(drinkCost);
+        }
+
+        // Socialize - meet other NPCs at the inn
+        var otherNPCs = npcs
+            .Where(n => n.IsAlive && n.ID != npc.ID && n.CurrentLocation == "Inn")
+            .ToList();
+
+        if (otherNPCs.Any() && random.NextDouble() < 0.25)
+        {
+            var other = otherNPCs[random.Next(otherNPCs.Count)];
+            RelationshipSystem.UpdateRelationship(npc, other, 2, 0, false);
+
+            // Gossip at the inn (small chance)
+            if (random.NextDouble() < 0.10)
+            {
+                NewsSystem.Instance?.Newsy(false, $"{npc.Name} and {other.Name} shared drinks and gossip at the Inn.");
+            }
+        }
+    }
+
     private void ExecuteTrade(NPC npc, string targetId, WorldState world)
     {
         if (string.IsNullOrEmpty(targetId)) return;
@@ -2280,52 +2535,87 @@ public class WorldSimulator
     private void ExecuteAttack(NPC npc, string targetId, WorldState world)
     {
         if (string.IsNullOrEmpty(targetId)) return;
-        
+
         var target = world.GetNPCById(targetId);
         if (target == null || target.CurrentLocation != npc.CurrentLocation || !target.IsAlive) return;
-        
-        // Simple combat simulation
-        var attackerPower = npc.GetAttackPower() + GD.RandRange(1, 10);
-        var defenderAC = target.GetArmorClass();
-        
-        if (attackerPower > defenderAC)
+
+        // Multi-round combat simulation (like a real fight, not a single punch)
+        int rounds = 0;
+        const int maxRounds = 30;
+        long totalDamageToTarget = 0;
+        long totalDamageToAttacker = 0;
+
+        while (npc.IsAlive && target.IsAlive && rounds < maxRounds)
         {
-            var damage = Math.Max(1, attackerPower - defenderAC);
-            target.TakeDamage(damage);
-            
-            // Record the attack
-            npc.Brain?.RecordInteraction(target, InteractionType.Attacked);
-            target.Brain?.RecordInteraction(npc, InteractionType.Attacked);
-            
-            // Update relationships
-            npc.AddRelationship(target.Id, 0);
-            target.AddRelationship(npc.Id, 0);
-            
-            if (!target.IsAlive)
-            {
-                target.SetState(NPCState.Dead);
-                npc.Brain?.Memory?.RecordEvent(new MemoryEvent
-                {
-                    Type = MemoryType.SawDeath,
-                    InvolvedCharacter = target.Id,
-                    Description = $"Killed {target.Name} in combat",
-                    Importance = 0.9f,
-                    Location = npc.CurrentLocation
-                });
+            rounds++;
 
-                // Generate news about the killing!
-                NewsSystem.Instance.WriteDeathNews(target.Name, npc.Name, npc.CurrentLocation ?? "unknown");
+            // Attacker strikes
+            long attackDamage = Math.Max(1, npc.Strength + npc.WeapPow - target.Defence);
+            attackDamage += random.Next(1, (int)Math.Max(2, npc.WeapPow / 3));
+            target.TakeDamage(attackDamage);
+            totalDamageToTarget += attackDamage;
 
-                // GD.Print($"[WorldSim] {npc.Name} killed {target.Name}!");
-            }
-            else
-            {
-                // GD.Print($"[WorldSim] {npc.Name} attacked {target.Name} for {damage} damage");
-            }
+            if (!target.IsAlive) break;
+
+            // Defender strikes back
+            long defenderDamage = Math.Max(1, target.Strength + target.WeapPow - npc.Defence);
+            defenderDamage += random.Next(1, (int)Math.Max(2, target.WeapPow / 3));
+            npc.TakeDamage(defenderDamage);
+            totalDamageToAttacker += defenderDamage;
         }
-        else
+
+        // Record the attack
+        npc.Brain?.RecordInteraction(target, InteractionType.Attacked);
+        target.Brain?.RecordInteraction(npc, InteractionType.Attacked);
+
+        // Update relationships - make them enemies
+        npc.AddRelationship(target.Id, 0);
+        target.AddRelationship(npc.Id, 0);
+
+        if (!target.IsAlive)
         {
-            // GD.Print($"[WorldSim] {npc.Name} attacked {target.Name} but missed");
+            target.IsDead = true;
+            target.SetState(NPCState.Dead);
+            QueueNPCForRespawn(target.Name);
+            npc.Brain?.Memory?.RecordEvent(new MemoryEvent
+            {
+                Type = MemoryType.SawDeath,
+                InvolvedCharacter = target.Id,
+                Description = $"Killed {target.Name} in combat",
+                Importance = 0.9f,
+                Location = npc.CurrentLocation
+            });
+
+            // Generate news about the killing
+            NewsSystem.Instance.WriteDeathNews(target.Name, npc.Name, npc.CurrentLocation ?? "unknown");
+
+            // Victor gains gold from the fallen
+            long stolenGold = Math.Max(0, target.Gold / 4);
+            if (stolenGold > 0)
+            {
+                npc.GainGold(stolenGold);
+                target.Gold -= stolenGold;
+            }
+
+            GD.Print($"[WorldSim] {npc.Name} killed {target.Name} in combat ({rounds} rounds)!");
+        }
+        else if (!npc.IsAlive)
+        {
+            // Attacker died instead!
+            npc.IsDead = true;
+            npc.SetState(NPCState.Dead);
+            QueueNPCForRespawn(npc.Name);
+            target.Brain?.Memory?.RecordEvent(new MemoryEvent
+            {
+                Type = MemoryType.SawDeath,
+                InvolvedCharacter = npc.Id,
+                Description = $"Killed {npc.Name} in self-defense",
+                Importance = 0.9f,
+                Location = target.CurrentLocation
+            });
+
+            NewsSystem.Instance.WriteDeathNews(npc.Name, target.Name, target.CurrentLocation ?? "unknown");
+            GD.Print($"[WorldSim] {npc.Name} was killed by {target.Name} in combat ({rounds} rounds)!");
         }
     }
     
@@ -3000,7 +3290,7 @@ public class WorldSimulator
     private bool SimulateTeamVsTeamCombat(List<NPC> team1, List<NPC> team2)
     {
         int rounds = 0;
-        const int maxRounds = 15;
+        const int maxRounds = 30;
 
         while (team1.Any(m => m.IsAlive) && team2.Any(m => m.IsAlive) && rounds < maxRounds)
         {
@@ -3018,6 +3308,8 @@ public class WorldSimulator
 
                 if (!target.IsAlive)
                 {
+                    target.IsDead = true;
+                    QueueNPCForRespawn(target.Name);
                     NewsSystem.Instance.WriteDeathNews(target.Name, attacker.Name, target.CurrentLocation ?? "battle");
                 }
             }
@@ -3034,6 +3326,8 @@ public class WorldSimulator
 
                 if (!target.IsAlive)
                 {
+                    target.IsDead = true;
+                    QueueNPCForRespawn(target.Name);
                     NewsSystem.Instance.WriteDeathNews(target.Name, attacker.Name, target.CurrentLocation ?? "battle");
                 }
             }
@@ -3058,10 +3352,15 @@ public class WorldSimulator
     /// </summary>
     private void UpdateTurfControl()
     {
-        // Get current turf controller
+        // Get current turf controller (NPC-side)
         var currentController = npcs.FirstOrDefault(n => n.CTurf && !string.IsNullOrEmpty(n.Team));
 
-        // Get all teams with their power
+        // Check if a player's team controls turf (set by WorldSimService from economy data).
+        // The player may have a team with no NPC members — the world sim can't see the player
+        // but should respect their city control until another team actively takes it.
+        bool playerTeamControlsTurf = !string.IsNullOrEmpty(PlayerTurfTeam);
+
+        // Get all NPC teams with their power
         var teams = npcs
             .Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive)
             .GroupBy(n => n.Team)
@@ -3079,8 +3378,9 @@ public class WorldSimulator
 
         var strongestTeam = teams.First();
 
-        // If no one controls turf and there's a strong team, small chance to claim it
-        if (currentController == null && strongestTeam.Power > 100 && random.NextDouble() < 0.005)
+        // If no one controls turf (and no player team holds it), small chance for strongest team to claim
+        if (currentController == null && !playerTeamControlsTurf &&
+            strongestTeam.Power > 100 && random.NextDouble() < 0.02)
         {
             foreach (var member in strongestTeam.Members)
             {
@@ -3162,7 +3462,7 @@ public class WorldSimulator
             foreach (var enemyId in npc.Enemies.ToList()) // ToList to avoid modification during iteration
             {
                 var enemy = npcs.FirstOrDefault(n => n.Id == enemyId);
-                if (enemy?.IsAlive == true && !enemy.IsDead && GD.Randf() < 0.05f) // 5% chance
+                if (enemy?.IsAlive == true && !enemy.IsDead && GD.Randf() < 0.12f) // 12% chance
                 {
                     // Escalate the rivalry - only if at same location
                     if (npc.CurrentLocation == enemy.CurrentLocation)

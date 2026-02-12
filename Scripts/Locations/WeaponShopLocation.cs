@@ -600,11 +600,14 @@ public class WeaponShopLocation : BaseLocation
         // Apply faction discount (The Crown gets 10% off at shops)
         adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
 
-        if (currentPlayer.Gold < adjustedPrice)
+        // Calculate total with tax
+        var (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
+
+        if (currentPlayer.Gold < totalWithTax)
         {
             terminal.WriteLine("");
             terminal.SetColor("red");
-            terminal.WriteLine($"You need {FormatNumber(adjustedPrice)} gold but only have {FormatNumber(currentPlayer.Gold)}!");
+            terminal.WriteLine($"You need {FormatNumber(totalWithTax)} gold but only have {FormatNumber(currentPlayer.Gold)}!");
             await Pause();
             return;
         }
@@ -637,18 +640,30 @@ public class WeaponShopLocation : BaseLocation
             terminal.WriteLine("Your shield will be unequipped.");
         }
 
+        // Show tax breakdown
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, adjustedPrice);
+
         terminal.WriteLine("");
         terminal.SetColor("white");
         terminal.Write($"Buy {item.Name} for ");
         terminal.SetColor("yellow");
-        terminal.Write(FormatNumber(adjustedPrice));
+        terminal.Write(FormatNumber(totalWithTax));
         terminal.SetColor("white");
-        var totalModifier = alignmentModifier * worldEventModifier;
-        if (Math.Abs(totalModifier - 1.0f) > 0.01f)
+        if (kingTax > 0 || cityTax > 0)
         {
             terminal.SetColor("gray");
-            terminal.Write($" (was {FormatNumber(item.Value)})");
+            terminal.Write($" (incl. tax)");
             terminal.SetColor("white");
+        }
+        else
+        {
+            var totalModifier = alignmentModifier * worldEventModifier;
+            if (Math.Abs(totalModifier - 1.0f) > 0.01f)
+            {
+                terminal.SetColor("gray");
+                terminal.Write($" (was {FormatNumber(item.Value)})");
+                terminal.SetColor("white");
+            }
         }
         terminal.Write(" gold? (Y/N): ");
 
@@ -658,8 +673,8 @@ public class WeaponShopLocation : BaseLocation
             return;
         }
 
-        currentPlayer.Gold -= adjustedPrice;
-        currentPlayer.Statistics.RecordPurchase(adjustedPrice);
+        currentPlayer.Gold -= totalWithTax;
+        currentPlayer.Statistics.RecordPurchase(totalWithTax);
 
         // Process city tax share from this sale
         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
@@ -672,7 +687,7 @@ public class WeaponShopLocation : BaseLocation
             if (targetSlot == null)
             {
                 // Player cancelled - refund and add to inventory instead
-                currentPlayer.Gold += adjustedPrice;
+                currentPlayer.Gold += totalWithTax;
                 terminal.SetColor("yellow");
                 terminal.WriteLine("Purchase cancelled.");
                 await Pause();
@@ -694,7 +709,7 @@ public class WeaponShopLocation : BaseLocation
 
             // Track shop purchase telemetry
             TelemetrySystem.Instance.TrackShopTransaction(
-                "weapon", "buy", item.Name, adjustedPrice,
+                "weapon", "buy", item.Name, totalWithTax,
                 currentPlayer.Level, currentPlayer.Gold
             );
 
@@ -705,7 +720,7 @@ public class WeaponShopLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine($"Failed to equip: {message}");
-            currentPlayer.Gold += adjustedPrice;
+            currentPlayer.Gold += totalWithTax;
         }
 
         // Auto-save after purchase
@@ -785,7 +800,22 @@ public class WeaponShopLocation : BaseLocation
 
         // Apply city control discount
         long adjustedWeaponPrice = CityControlSystem.Instance.ApplyDiscount(selectedWeapon.Value, currentPlayer);
-        currentPlayer.Gold -= adjustedWeaponPrice;
+
+        // Calculate total with tax
+        var (_, _, dualWieldTotal) = CityControlSystem.CalculateTaxedPrice(adjustedWeaponPrice);
+
+        if (currentPlayer.Gold < dualWieldTotal)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"You need {FormatNumber(dualWieldTotal)} gold (incl. tax) but only have {FormatNumber(currentPlayer.Gold)}!");
+            await Pause();
+            return;
+        }
+
+        // Show tax breakdown
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, selectedWeapon.Name, adjustedWeaponPrice);
+
+        currentPlayer.Gold -= dualWieldTotal;
 
         // Process city tax share from this sale
         CityControlSystem.Instance.ProcessSaleTax(adjustedWeaponPrice);
@@ -1014,7 +1044,10 @@ public class WeaponShopLocation : BaseLocation
             // Apply faction discount (The Crown gets 10% off at shops)
             adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
 
-            if (adjustedPrice > currentPlayer.Gold)
+            // Calculate total with tax
+            var (abKingTax, abCityTax, abTotal) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
+
+            if (abTotal > currentPlayer.Gold)
             {
                 weaponIndex++;
                 continue;
@@ -1029,8 +1062,12 @@ public class WeaponShopLocation : BaseLocation
             terminal.WriteLine($"  Weapon Power: {weapon.WeaponPower} (currently: {currentPow}, +{weapon.WeaponPower - currentPow})");
             terminal.SetColor("yellow");
             terminal.WriteLine($"  Price: {FormatNumber(adjustedPrice)} gold");
+
+            // Show tax breakdown
+            CityControlSystem.Instance.DisplayTaxBreakdown(terminal, weapon.Name, adjustedPrice);
+
             terminal.SetColor("gray");
-            terminal.WriteLine($"  (Gold after purchase: {FormatNumber(currentPlayer.Gold - adjustedPrice)})");
+            terminal.WriteLine($"  (Gold after purchase: {FormatNumber(currentPlayer.Gold - abTotal)})");
             terminal.WriteLine("");
 
             terminal.SetColor("white");
@@ -1047,9 +1084,9 @@ public class WeaponShopLocation : BaseLocation
             switch (choice.ToUpper().Trim())
             {
                 case "Y":
-                    // Purchase this weapon
-                    currentPlayer.Gold -= adjustedPrice;
-                    currentPlayer.Statistics.RecordPurchase(adjustedPrice);
+                    // Purchase this weapon (total includes tax)
+                    currentPlayer.Gold -= abTotal;
+                    currentPlayer.Statistics.RecordPurchase(abTotal);
                     CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
 
                     // For one-handed weapons, ask which slot to use
@@ -1060,7 +1097,7 @@ public class WeaponShopLocation : BaseLocation
                         if (targetSlot == null)
                         {
                             // Player cancelled - refund
-                            currentPlayer.Gold += adjustedPrice;
+                            currentPlayer.Gold += abTotal;
                             terminal.SetColor("yellow");
                             terminal.WriteLine("Purchase cancelled.");
                             await Pause();
@@ -1087,7 +1124,7 @@ public class WeaponShopLocation : BaseLocation
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine($"Failed: {message}");
-                        currentPlayer.Gold += adjustedPrice;
+                        currentPlayer.Gold += abTotal;
                     }
 
                     // Done with auto-buy after purchasing

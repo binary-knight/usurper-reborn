@@ -609,7 +609,9 @@ public partial class MagicShopLocation : BaseLocation
 
         if (int.TryParse(input, out int itemIndex) && itemIndex > 0 && itemIndex <= unidentifiedItems.Count)
         {
-            if (player.Gold < identifyCost)
+            var (idKingTax, idCityTax, idTotalWithTax) = CityControlSystem.CalculateTaxedPrice(identifyCost);
+
+            if (player.Gold < idTotalWithTax)
             {
                 DisplayMessage("You don't have enough gold for identification!", "red");
                 return;
@@ -617,13 +619,15 @@ public partial class MagicShopLocation : BaseLocation
 
             var item = unidentifiedItems[itemIndex - 1];
             string unidName = LootGenerator.GetUnidentifiedName(item);
-            DisplayMessage($"Identify the {unidName} for {identifyCost:N0} gold? (Y/N): ", "yellow", false);
+            CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Identification", identifyCost);
+            DisplayMessage($"Identify the {unidName} for {idTotalWithTax:N0} gold? (Y/N): ", "yellow", false);
             var confirm = terminal.GetInputSync("").ToUpper();
             DisplayMessage("");
 
             if (confirm == "Y")
             {
-                player.Gold -= identifyCost;
+                player.Gold -= idTotalWithTax;
+                CityControlSystem.Instance.ProcessSaleTax(identifyCost);
                 item.IsIdentified = true;
 
                 DisplayMessage($"{_ownerName} passes the item through a shimmer of arcane light...", "gray");
@@ -680,11 +684,12 @@ public partial class MagicShopLocation : BaseLocation
 
         // Calculate potion price with all modifiers (alignment, world events, faction, city, loyalty)
         long potionPrice = ApplyAllPriceModifiers(player.Level * GameConfig.HealingPotionLevelMultiplier, player);
-        int maxPotionsCanBuy = potionPrice > 0 ? (int)(player.Gold / potionPrice) : 0;
+        var (_, _, hpPotionUnitWithTax) = CityControlSystem.CalculateTaxedPrice(potionPrice);
+        int maxPotionsCanBuy = hpPotionUnitWithTax > 0 ? (int)(player.Gold / hpPotionUnitWithTax) : 0;
         int maxPotionsCanCarry = GameConfig.MaxHealingPotions - (int)player.Healing;
         int maxPotions = Math.Min(maxPotionsCanBuy, maxPotionsCanCarry);
 
-        if (player.Gold < potionPrice)
+        if (player.Gold < hpPotionUnitWithTax)
         {
             DisplayMessage("You don't have enough gold!", "red");
             return;
@@ -713,20 +718,22 @@ public partial class MagicShopLocation : BaseLocation
         if (int.TryParse(input, out int quantity) && quantity > 0 && quantity <= maxPotions)
         {
             long totalCost = quantity * potionPrice;
+            var (hpKingTax, hpCityTax, hpTotalWithTax) = CityControlSystem.CalculateTaxedPrice(totalCost);
 
-            if (player.Gold >= totalCost)
+            if (player.Gold >= hpTotalWithTax)
             {
-                player.Gold -= totalCost;
+                CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Healing Potions", totalCost);
+                player.Gold -= hpTotalWithTax;
                 player.Healing += quantity;
 
                 // Process city tax share from this sale
                 CityControlSystem.Instance.ProcessSaleTax(totalCost);
 
                 DisplayMessage($"Ok, it's a deal. You buy {quantity} potions.", "green");
-                DisplayMessage($"Total cost: {totalCost:N0} gold.", "gray");
+                DisplayMessage($"Total cost: {hpTotalWithTax:N0} gold.", "gray");
 
-                player.Statistics?.RecordGoldSpent(totalCost);
-                player.Statistics?.RecordMagicShopPurchase(totalCost);
+                player.Statistics?.RecordGoldSpent(hpTotalWithTax);
+                player.Statistics?.RecordMagicShopPurchase(hpTotalWithTax);
             }
             else
             {
@@ -788,8 +795,9 @@ public partial class MagicShopLocation : BaseLocation
 
         var targetItem = cursedItems[itemIndex - 1];
         long cost = CalculateCurseRemovalCost(targetItem, player);
+        var (curseKingTax, curseCityTax, curseTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
 
-        if (player.Gold < cost)
+        if (player.Gold < curseTotalWithTax)
         {
             DisplayMessage("");
             DisplayMessage("'You lack the gold for such a ritual,' the gnome says sadly.", "cyan");
@@ -798,11 +806,13 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         DisplayMessage("");
-        var confirm = await terminal.GetInput($"Remove the curse from {targetItem.Name} for {cost:N0} gold? (Y/N): ");
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Curse Removal", cost);
+        var confirm = await terminal.GetInput($"Remove the curse from {targetItem.Name} for {curseTotalWithTax:N0} gold? (Y/N): ");
 
         if (confirm.ToUpper() == "Y")
         {
-            player.Gold -= cost;
+            player.Gold -= curseTotalWithTax;
+            CityControlSystem.Instance.ProcessSaleTax(cost);
 
             // Dramatic curse removal scene
             DisplayMessage("");
@@ -825,8 +835,8 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage($"The {targetItem.Name} is now free of its curse!", "bright_green");
             DisplayMessage("'It is done,' the gnome says, looking tired but satisfied.", "cyan");
 
-            player.Statistics?.RecordGoldSpent(cost);
-            player.Statistics?.RecordMagicShopPurchase(cost);
+            player.Statistics?.RecordGoldSpent(curseTotalWithTax);
+            player.Statistics?.RecordMagicShopPurchase(curseTotalWithTax);
 
             // Special Ocean lore for certain items
             if (targetItem.Name.Contains("Drowned") || targetItem.Name.Contains("Ocean") || targetItem.Name.Contains("Deep"))
@@ -907,12 +917,13 @@ public partial class MagicShopLocation : BaseLocation
 
         long[] costs = { 0, 2000, 5000, 12000, 25000, 15000, 8000 };
         long cost = costs[enchantChoice];
+        var (enchKingTax, enchCityTax, enchTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
 
-        if (player.Gold < cost)
+        if (player.Gold < enchTotalWithTax)
         {
             DisplayMessage("");
             DisplayMessage("'The magical arts require material compensation,' the gnome says pointedly.", "cyan");
-            DisplayMessage($"You need {cost:N0} gold for this enchantment.", "red");
+            DisplayMessage($"You need {enchTotalWithTax:N0} gold for this enchantment.", "red");
             await terminal.WaitForKey();
             return;
         }
@@ -969,12 +980,14 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         DisplayMessage("");
-        var confirm = await terminal.GetInput($"Enchant {targetItem.Name} for {cost:N0} gold? (Y/N): ");
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Enchantment", cost);
+        var confirm = await terminal.GetInput($"Enchant {targetItem.Name} for {enchTotalWithTax:N0} gold? (Y/N): ");
 
         if (confirm.ToUpper() != "Y")
             return;
 
-        player.Gold -= cost;
+        player.Gold -= enchTotalWithTax;
+        CityControlSystem.Instance.ProcessSaleTax(cost);
 
         // Apply the enchantment
         int bonus = enchantChoice switch
@@ -1049,8 +1062,8 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         DisplayMessage("The enchantment is complete!", "bright_green");
 
-        player.Statistics?.RecordGoldSpent(cost);
-        player.Statistics?.RecordMagicShopPurchase(cost);
+        player.Statistics?.RecordGoldSpent(enchTotalWithTax);
+        player.Statistics?.RecordMagicShopPurchase(enchTotalWithTax);
     }
 
     private void ApplyStatEnchant(Item item, int statChoice, int bonus)
@@ -1107,12 +1120,13 @@ public partial class MagicShopLocation : BaseLocation
 
         // Calculate price based on player level
         long scrollPrice = CalculateResetScrollPrice(player.Level);
+        var (scrollKingTax, scrollCityTax, scrollTotalWithTax) = CityControlSystem.CalculateTaxedPrice(scrollPrice);
 
         DisplayMessage($"Reset Scroll Price: {scrollPrice:N0} gold", "yellow");
         DisplayMessage($"You have: {player.Gold:N0} gold", "gray");
         DisplayMessage("");
 
-        if (player.Gold < scrollPrice)
+        if (player.Gold < scrollTotalWithTax)
         {
             DisplayMessage("'You lack the gold for such powerful magic,' the gnome says.", "red");
             return;
@@ -1140,12 +1154,14 @@ public partial class MagicShopLocation : BaseLocation
         var selectedFloor = clearedFloors[floorChoice - 1];
 
         DisplayMessage("");
-        DisplayMessage($"Reset Floor {selectedFloor.Key} for {scrollPrice:N0} gold? (Y/N): ", "yellow", false);
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Dungeon Reset Scroll", scrollPrice);
+        DisplayMessage($"Reset Floor {selectedFloor.Key} for {scrollTotalWithTax:N0} gold? (Y/N): ", "yellow", false);
         var confirm = (await terminal.GetInput("")).ToUpper();
 
         if (confirm == "Y")
         {
-            player.Gold -= scrollPrice;
+            player.Gold -= scrollTotalWithTax;
+            CityControlSystem.Instance.ProcessSaleTax(scrollPrice);
 
             // Reset the floor by clearing its LastClearedAt timestamp
             // This will make ShouldRespawn() return true on next visit
@@ -1166,7 +1182,7 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage("'The dungeon stirs once more,' the gnome says with a knowing smile.", "gray");
 
             // Track telemetry
-            TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "buy", "Dungeon Reset Scroll", scrollPrice, player.Level, player.Gold);
+            TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "buy", "Dungeon Reset Scroll", scrollTotalWithTax, player.Level, player.Gold);
         }
         else
         {
@@ -2001,8 +2017,9 @@ public partial class MagicShopLocation : BaseLocation
                 int actualIdx = start + displayIdx - 1;
                 var item = items[actualIdx];
                 long price = ApplyAllPriceModifiers(item.Value, player);
+                var (accKingTax, accCityTax, accTotalWithTax) = CityControlSystem.CalculateTaxedPrice(price);
 
-                if (player.Gold < price)
+                if (player.Gold < accTotalWithTax)
                 {
                     DisplayMessage("You can't afford that!", "red");
                     await terminal.WaitForKey();
@@ -2045,10 +2062,11 @@ public partial class MagicShopLocation : BaseLocation
                 }
                 terminal.WriteLine("");
 
-                var buyConfirm = await terminal.GetInput($"  Buy for {price:N0} gold? (Y/N): ");
+                CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, price);
+                var buyConfirm = await terminal.GetInput($"  Buy for {accTotalWithTax:N0} gold? (Y/N): ");
                 if (buyConfirm.ToUpper() == "Y")
                 {
-                    player.Gold -= price;
+                    player.Gold -= accTotalWithTax;
                     if (player.EquipItem(item, out string msg))
                     {
                         player.RecalculateStats();
@@ -2069,10 +2087,10 @@ public partial class MagicShopLocation : BaseLocation
                         terminal.WriteLine($"  Purchased {item.Name}. {msg}");
                     }
 
-                    player.Statistics?.RecordPurchase(price);
-                    player.Statistics?.RecordAccessoryPurchase(price);
+                    player.Statistics?.RecordPurchase(accTotalWithTax);
+                    player.Statistics?.RecordAccessoryPurchase(accTotalWithTax);
                     CityControlSystem.Instance.ProcessSaleTax(price);
-                    TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "buy_accessory", item.Name, price, player.Level, player.Gold);
+                    TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "buy_accessory", item.Name, accTotalWithTax, player.Level, player.Gold);
 
                     // Check accessory collection achievement
                     if (player.GetEquipment(EquipmentSlot.LFinger) != null &&
@@ -2440,6 +2458,7 @@ public partial class MagicShopLocation : BaseLocation
         var selected = LoveSpells[spellIdx - 1];
         long spellCost = ApplyAllPriceModifiers(selected.baseCost + (player.Level * selected.levelScale), player);
         if (evilSurcharge) spellCost = (long)(spellCost * 1.2);
+        var (loveKingTax, loveCityTax, loveTotalWithTax) = CityControlSystem.CalculateTaxedPrice(spellCost);
 
         if (player.Level < selected.minLevel)
         {
@@ -2453,7 +2472,7 @@ public partial class MagicShopLocation : BaseLocation
             await terminal.WaitForKey();
             return;
         }
-        if (player.Gold < spellCost)
+        if (player.Gold < loveTotalWithTax)
         {
             DisplayMessage("  Insufficient gold.", "red");
             await terminal.WaitForKey();
@@ -2520,6 +2539,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine($"{afterName} (estimated)");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  Cost: {spellCost:N0} gold, {selected.manaCost} mana");
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Love Spell", spellCost);
         terminal.WriteLine("");
 
         var confirm = await terminal.GetInput("  Proceed? (Y/N): ");
@@ -2527,7 +2547,8 @@ public partial class MagicShopLocation : BaseLocation
             return;
 
         // Deduct costs
-        player.Gold -= spellCost;
+        player.Gold -= loveTotalWithTax;
+        CityControlSystem.Instance.ProcessSaleTax(spellCost);
         player.Mana -= selected.manaCost;
 
         // Check resistance (high Commitment NPCs)
@@ -2544,8 +2565,8 @@ public partial class MagicShopLocation : BaseLocation
             terminal.WriteLine($"  {targetNPC.Name1} has too strong a will for such charms.");
             terminal.SetColor("darkgray");
             terminal.WriteLine("  (Gold and mana still consumed)");
-            player.Statistics?.RecordLoveSpellCast(spellCost);
-            player.Statistics?.RecordGoldSpent(spellCost);
+            player.Statistics?.RecordLoveSpellCast(loveTotalWithTax);
+            player.Statistics?.RecordGoldSpent(loveTotalWithTax);
             await terminal.WaitForKey();
             return;
         }
@@ -2585,9 +2606,9 @@ public partial class MagicShopLocation : BaseLocation
         terminal.SetColor(GetRelationshipColor(newRel));
         terminal.WriteLine(newRelName);
 
-        player.Statistics?.RecordLoveSpellCast(spellCost);
-        player.Statistics?.RecordGoldSpent(spellCost);
-        TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "love_spell", selected.name, spellCost, player.Level, player.Gold);
+        player.Statistics?.RecordLoveSpellCast(loveTotalWithTax);
+        player.Statistics?.RecordGoldSpent(loveTotalWithTax);
+        TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "love_spell", selected.name, loveTotalWithTax, player.Level, player.Gold);
 
         if ((player.Statistics?.TotalLoveSpellsCast ?? 0) >= 5)
             AchievementSystem.TryUnlock(player, "love_magician");
@@ -2711,6 +2732,7 @@ public partial class MagicShopLocation : BaseLocation
 
         var selected = DeathSpells[spellIdx - 1];
         long spellCost = ApplyAllPriceModifiers(selected.baseCost + (player.Level * selected.levelScale), player);
+        var (deathKingTax, deathCityTax, deathTotalWithTax) = CityControlSystem.CalculateTaxedPrice(spellCost);
 
         if (player.Level < selected.minLevel)
         {
@@ -2726,7 +2748,7 @@ public partial class MagicShopLocation : BaseLocation
             await terminal.WaitForKey();
             return;
         }
-        if (player.Gold < spellCost)
+        if (player.Gold < deathTotalWithTax)
         {
             terminal.SetColor("red");
             terminal.WriteLine("  Insufficient gold.");
@@ -2798,6 +2820,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.Write("  Cost:     ");
         terminal.SetColor("yellow");
         terminal.WriteLine($"{spellCost:N0} gold, {selected.manaCost} mana");
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Death Spell", spellCost);
 
         terminal.SetColor("white");
         terminal.Write("  Darkness: ");
@@ -2814,7 +2837,8 @@ public partial class MagicShopLocation : BaseLocation
         if (confirm.ToUpper() != "Y") return;
 
         // Deduct costs
-        player.Gold -= spellCost;
+        player.Gold -= deathTotalWithTax;
+        CityControlSystem.Instance.ProcessSaleTax(spellCost);
         player.Mana -= selected.manaCost;
 
         // Calculate success
@@ -2860,7 +2884,7 @@ public partial class MagicShopLocation : BaseLocation
             if (affectedCount > 0)
                 terminal.WriteLine($"  News of the death spreads. {affectedCount} NPCs view you with suspicion.");
 
-            player.Statistics?.RecordDeathSpellCast(spellCost);
+            player.Statistics?.RecordDeathSpellCast(deathTotalWithTax);
             AchievementSystem.TryUnlock(player, "dark_magician");
             if ((player.Statistics?.TotalDeathSpellsCast ?? 0) >= 5)
                 AchievementSystem.TryUnlock(player, "angel_of_death");
@@ -2886,11 +2910,11 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.WriteLine("  (Gold and mana still consumed)");
 
-            player.Statistics?.RecordDeathSpellCast(spellCost);
+            player.Statistics?.RecordDeathSpellCast(deathTotalWithTax);
         }
 
-        player.Statistics?.RecordGoldSpent(spellCost);
-        TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "death_spell", selected.name, spellCost, player.Level, player.Gold);
+        player.Statistics?.RecordGoldSpent(deathTotalWithTax);
+        TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "death_spell", selected.name, deathTotalWithTax, player.Level, player.Gold);
 
         await terminal.WaitForKey();
     }
@@ -2906,7 +2930,8 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
 
         int potionPrice = (int)ApplyAllPriceModifiers(player.Level * 8, player);
-        int maxCanBuy = potionPrice > 0 ? (int)(player.Gold / potionPrice) : 0;
+        var (_, _, mpPotionUnitWithTax) = CityControlSystem.CalculateTaxedPrice(potionPrice);
+        int maxCanBuy = mpPotionUnitWithTax > 0 ? (int)(player.Gold / mpPotionUnitWithTax) : 0;
         int maxCanCarry = player.MaxManaPotions - (int)player.ManaPotions;
         int maxPotions = Math.Min(maxCanBuy, maxCanCarry);
         int manaRestored = 30 + player.Level * 2;
@@ -2934,14 +2959,16 @@ public partial class MagicShopLocation : BaseLocation
         if (int.TryParse(input, out int qty) && qty > 0 && qty <= maxPotions)
         {
             long totalCost = qty * potionPrice;
-            player.Gold -= totalCost;
+            var (mpKingTax, mpCityTax, mpTotalWithTax) = CityControlSystem.CalculateTaxedPrice(totalCost);
+            CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Mana Potions", totalCost);
+            player.Gold -= mpTotalWithTax;
             player.ManaPotions += qty;
 
             DisplayMessage($"You buy {qty} mana potion{(qty > 1 ? "s" : "")}.", "bright_green");
-            DisplayMessage($"Total cost: {totalCost:N0} gold.", "gray");
+            DisplayMessage($"Total cost: {mpTotalWithTax:N0} gold.", "gray");
 
-            player.Statistics?.RecordGoldSpent(totalCost);
-            player.Statistics?.RecordMagicShopPurchase(totalCost);
+            player.Statistics?.RecordGoldSpent(mpTotalWithTax);
+            player.Statistics?.RecordMagicShopPurchase(mpTotalWithTax);
             CityControlSystem.Instance.ProcessSaleTax(totalCost);
         }
         else
@@ -2966,10 +2993,12 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
 
         long scryCost = ApplyAllPriceModifiers(1000 + (player.Level * 50), player);
+        var (scryKingTax, scryCityTax, scryTotalWithTax) = CityControlSystem.CalculateTaxedPrice(scryCost);
         DisplayMessage($"Cost: {scryCost:N0} gold per reading", "yellow");
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Scrying", scryCost);
         DisplayMessage("");
 
-        if (player.Gold < scryCost)
+        if (player.Gold < scryTotalWithTax)
         {
             DisplayMessage("Insufficient gold.", "red");
             await terminal.WaitForKey();
@@ -2987,7 +3016,8 @@ public partial class MagicShopLocation : BaseLocation
         var target = await PickNPCTarget(player, allNPCs, "Scrying - Choose a Soul", showRelationship: true, showLevel: true);
         if (target == null) return;
 
-        player.Gold -= scryCost;
+        player.Gold -= scryTotalWithTax;
+        CityControlSystem.Instance.ProcessSaleTax(scryCost);
 
         DisplayMessage("");
         DisplayMessage("The mists part to reveal...", "magenta");
@@ -3014,8 +3044,8 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage($"  Personality: {trait1}, {trait2}", "gray");
         }
 
-        player.Statistics?.RecordGoldSpent(scryCost);
-        player.Statistics?.RecordMagicShopPurchase(scryCost);
+        player.Statistics?.RecordGoldSpent(scryTotalWithTax);
+        player.Statistics?.RecordMagicShopPurchase(scryTotalWithTax);
 
         await terminal.WaitForKey();
     }

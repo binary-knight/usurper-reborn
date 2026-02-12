@@ -1,9 +1,11 @@
-// Usurper Reborn - WebSocket to SSH Bridge + Stats API
+// Usurper Reborn - WebSocket to SSH Bridge + Stats API + NPC Analytics Dashboard
 // Proxies browser terminal connections to the game's SSH server
 // Serves /api/stats endpoint with live game statistics
+// Serves /api/dash/* endpoints for authenticated NPC analytics dashboard
 
 const http = require('http');
 const https = require('https');
+const crypto = require('crypto');
 const { Server } = require('ws');
 const { Client } = require('ssh2');
 
@@ -25,10 +27,29 @@ const FEED_POLL_MS = 5000; // SSE feed polls DB every 5 seconds
 const GITHUB_PAT = process.env.GITHUB_PAT || '';
 const SPONSORS_CACHE_TTL = 3600000; // 1 hour
 
+// Dashboard auth constants
+const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_KEYLEN = 64;
+const PBKDF2_DIGEST = 'sha256';
+const SESSION_TTL_DAYS = 7;
+const DASH_NPC_CACHE_TTL = 10000; // 10 seconds
+const DASH_EVENTS_CACHE_TTL = 5000; // 5 seconds
+const DASH_HOURLY_CACHE_TTL = 60000; // 60 seconds
+const DASH_SNAPSHOT_INTERVAL = 30000; // 30 seconds for NPC snapshots
+
 const CLASS_NAMES = {
   0: 'Alchemist', 1: 'Assassin', 2: 'Barbarian', 3: 'Bard',
   4: 'Cleric', 5: 'Jester', 6: 'Magician', 7: 'Paladin',
   8: 'Ranger', 9: 'Sage', 10: 'Warrior'
+};
+
+const RACE_NAMES = {
+  0: 'Human', 1: 'Elf', 2: 'Dwarf', 3: 'Orc', 4: 'Halfling',
+  5: 'Gnoll', 6: 'Troll', 7: 'Mutant'
+};
+
+const FACTION_NAMES = {
+  '-1': 'None', 0: 'The Crown', 1: 'The Shadows', 2: 'The Faith'
 };
 
 const ALLOWED_ORIGINS = [
@@ -41,13 +62,457 @@ const ALLOWED_ORIGINS = [
 
 // --- Database Setup ---
 let db = null;
+let dbWrite = null;
 if (Database) {
   try {
     db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
     db.pragma('journal_mode = WAL');
-    console.log(`[usurper-web] Database connected: ${DB_PATH}`);
+    console.log(`[usurper-web] Database connected (read-only): ${DB_PATH}`);
   } catch (err) {
     console.error(`[usurper-web] Database not available: ${err.message}`);
+  }
+
+  // Writable connection for dashboard auth tables only
+  try {
+    dbWrite = new Database(DB_PATH, { fileMustExist: true });
+    dbWrite.pragma('journal_mode = WAL');
+    console.log(`[usurper-web] Database connected (writable): ${DB_PATH}`);
+  } catch (err) {
+    console.error(`[usurper-web] Writable database not available: ${err.message}`);
+  }
+}
+
+// --- Dashboard Auth Tables ---
+function initDashboardTables() {
+  if (!dbWrite) return;
+  try {
+    dbWrite.exec(`
+      CREATE TABLE IF NOT EXISTS dashboard_users (
+        username TEXT PRIMARY KEY,
+        password_hash TEXT NOT NULL,
+        salt TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        last_login TEXT
+      );
+      CREATE TABLE IF NOT EXISTS dashboard_sessions (
+        token TEXT PRIMARY KEY,
+        username TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        expires_at TEXT NOT NULL
+      );
+    `);
+    console.log('[usurper-web] Dashboard auth tables initialized');
+  } catch (err) {
+    console.error(`[usurper-web] Failed to create dashboard tables: ${err.message}`);
+  }
+}
+initDashboardTables();
+
+// --- Dashboard Auth Functions ---
+function hashPassword(password, salt) {
+  if (!salt) salt = crypto.randomBytes(32).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST).toString('hex');
+  return { hash, salt };
+}
+
+function verifyPassword(password, storedHash, storedSalt) {
+  const { hash } = hashPassword(password, storedSalt);
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
+}
+
+function createSession(username) {
+  if (!dbWrite) return null;
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    dbWrite.prepare('INSERT INTO dashboard_sessions (token, username, expires_at) VALUES (?, ?, ?)').run(token, username, expiresAt);
+    dbWrite.prepare('UPDATE dashboard_users SET last_login = datetime(\'now\') WHERE username = ?').run(username);
+    return token;
+  } catch (err) {
+    console.error(`[usurper-web] Failed to create session: ${err.message}`);
+    return null;
+  }
+}
+
+function parseCookies(cookieHeader) {
+  const cookies = {};
+  if (!cookieHeader) return cookies;
+  cookieHeader.split(';').forEach(c => {
+    const [key, ...val] = c.trim().split('=');
+    if (key) cookies[key] = val.join('=');
+  });
+  return cookies;
+}
+
+function requireDashAuth(req) {
+  if (!dbWrite) return null;
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies.dash_token;
+  if (!token) return null;
+  try {
+    // Prune expired sessions lazily
+    dbWrite.prepare("DELETE FROM dashboard_sessions WHERE expires_at < datetime('now')").run();
+    const session = dbWrite.prepare('SELECT username FROM dashboard_sessions WHERE token = ? AND expires_at > datetime(\'now\')').get(token);
+    return session ? session.username : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 10000) { reject(new Error('Body too large')); req.destroy(); }
+    });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
+
+function sendJson(res, status, data, extraHeaders) {
+  res.setHeader('Content-Type', 'application/json');
+  if (extraHeaders) {
+    for (const [k, v] of Object.entries(extraHeaders)) res.setHeader(k, v);
+  }
+  res.writeHead(status);
+  res.end(JSON.stringify(data));
+}
+
+// --- Dashboard NPC Data Cache ---
+let dashNpcCache = null;
+let dashNpcCacheTime = 0;
+let dashEventsCache = null;
+let dashEventsCacheTime = 0;
+let dashHourlyCache = null;
+let dashHourlyCacheTime = 0;
+
+function getDashNpcs() {
+  const now = Date.now();
+  if (dashNpcCache && (now - dashNpcCacheTime) < DASH_NPC_CACHE_TTL) return dashNpcCache;
+  if (!db) return [];
+  try {
+    const row = db.prepare("SELECT value FROM world_state WHERE key = 'npcs'").get();
+    if (!row || !row.value) return [];
+    dashNpcCache = JSON.parse(row.value);
+    dashNpcCacheTime = now;
+    return dashNpcCache;
+  } catch (err) {
+    console.error(`[usurper-web] Dashboard NPC query error: ${err.message}`);
+    return dashNpcCache || [];
+  }
+}
+
+// Read royal court data from world_state (the authoritative source).
+// The world sim maintains the 'royal_court' key 24/7. Player sessions write to it
+// when they change king state (throne challenges, tax changes, treasury ops).
+// Falls back to 'economy' key if 'royal_court' doesn't exist yet.
+function getRoyalCourtFromWorldState() {
+  if (!db) return null;
+  try {
+    // Primary: dedicated royal_court key (full court data)
+    const row = db.prepare(`SELECT value FROM world_state WHERE key = 'royal_court'`).get();
+    if (row && row.value) return JSON.parse(row.value);
+  } catch (e) { /* royal_court key may not exist yet */ }
+  try {
+    // Fallback: economy key (has king name, treasury, tax rates)
+    const row = db.prepare(`SELECT value FROM world_state WHERE key = 'economy'`).get();
+    if (row && row.value) return JSON.parse(row.value);
+  } catch (e) { /* economy key may not exist yet */ }
+  return null;
+}
+
+// Derive city controller info from NPC data (isTeamLeader maps to CTurf in-game)
+function getCityControllerFromNpcs(npcs) {
+  if (!npcs || npcs.length === 0) return null;
+  const controllers = npcs.filter(n => {
+    const isLeader = n.isTeamLeader || n.IsTeamLeader;
+    const hasTeam = n.team || n.Team;
+    const alive = !(n.isDead || n.IsDead);
+    return isLeader && hasTeam && alive;
+  });
+  if (controllers.length === 0) return null;
+
+  const teamName = controllers[0].team || controllers[0].Team;
+  // All members of the controlling team (not just leaders)
+  const teamMembers = npcs.filter(n => (n.team || n.Team) === teamName && !(n.isDead || n.IsDead));
+  const teamLeader = teamMembers.sort((a, b) => (b.level || b.Level || 0) - (a.level || a.Level || 0))[0];
+  const totalPower = teamMembers.reduce((sum, n) => {
+    return sum + (n.level || n.Level || 0) + (n.strength || n.Strength || 0) + (n.defence || n.Defence || 0);
+  }, 0);
+
+  return {
+    teamName,
+    memberCount: teamMembers.length,
+    totalPower,
+    leaderName: teamLeader ? (teamLeader.name || teamLeader.Name || 'None') : 'None',
+    leaderBank: teamLeader ? (teamLeader.bankGold || teamLeader.BankGold || 0) : 0
+  };
+}
+
+function getDashSummary() {
+  const npcs = getDashNpcs();
+  if (!npcs || npcs.length === 0) return { total: 0 };
+
+  const alive = npcs.filter(n => !n.isDead && !n.IsDead);
+  const dead = npcs.filter(n => n.isDead || n.IsDead);
+  const married = npcs.filter(n => n.isMarried || n.IsMarried);
+  const pregnant = npcs.filter(n => n.pregnancyDueDate || n.PregnancyDueDate);
+  const teams = new Set(npcs.filter(n => n.team || n.Team).map(n => n.team || n.Team).filter(t => t));
+
+  // Class distribution
+  const classDist = {};
+  npcs.forEach(n => {
+    const cls = CLASS_NAMES[n.class] || CLASS_NAMES[n.Class] || 'Unknown';
+    classDist[cls] = (classDist[cls] || 0) + 1;
+  });
+
+  // Race distribution
+  const raceDist = {};
+  npcs.forEach(n => {
+    const race = RACE_NAMES[n.race] || RACE_NAMES[n.Race] || 'Unknown';
+    raceDist[race] = (raceDist[race] || 0) + 1;
+  });
+
+  // Faction distribution
+  const factionDist = {};
+  npcs.forEach(n => {
+    const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
+    const fname = FACTION_NAMES[fid] || 'None';
+    factionDist[fname] = (factionDist[fname] || 0) + 1;
+  });
+
+  // Location distribution
+  const locationDist = {};
+  npcs.forEach(n => {
+    const loc = n.location || n.Location || 'Unknown';
+    locationDist[loc] = (locationDist[loc] || 0) + 1;
+  });
+
+  // Level distribution (buckets)
+  const levelDist = {};
+  npcs.forEach(n => {
+    const lvl = n.level || n.Level || 1;
+    const bucket = Math.floor(lvl / 10) * 10;
+    const key = `${bucket}-${bucket + 9}`;
+    levelDist[key] = (levelDist[key] || 0) + 1;
+  });
+
+  // Age distribution (buckets)
+  const ageDist = {};
+  npcs.forEach(n => {
+    const age = n.age || n.Age || 0;
+    if (age > 0) {
+      const bucket = Math.floor(age / 10) * 10;
+      const key = `${bucket}-${bucket + 9}`;
+      ageDist[key] = (ageDist[key] || 0) + 1;
+    }
+  });
+
+  // Average level
+  const levels = npcs.map(n => n.level || n.Level || 1);
+  const avgLevel = levels.length > 0 ? (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1) : 0;
+
+  // Total gold
+  const totalGold = npcs.reduce((sum, n) => sum + (n.gold || n.Gold || 0), 0);
+
+  // King - from NPC data (which NPC has isKing flag)
+  const kingNpc = npcs.find(n => n.isKing || n.IsKing);
+
+  // Economy data: read from world_state (the authoritative source).
+  // The world sim maintains the 'royal_court' and 'economy' keys 24/7.
+  // Player sessions write to 'royal_court' when they change king state.
+  let economy = null;
+  try {
+    const royalCourt = getRoyalCourtFromWorldState();
+    const cityController = getCityControllerFromNpcs(npcs);
+
+    // Economy summary from world sim (daily income/expenses/revenue counters)
+    let econSummary = {};
+    try {
+      const econRow = db.prepare("SELECT value FROM world_state WHERE key = 'economy'").get();
+      if (econRow && econRow.value) econSummary = JSON.parse(econRow.value);
+    } catch (e) {}
+
+    if (royalCourt || cityController || Object.keys(econSummary).length > 0) {
+      economy = {
+        kingName: royalCourt?.kingName || econSummary.kingName || 'None',
+        kingIsActive: true,
+        treasury: royalCourt?.treasury ?? econSummary.treasury ?? 0,
+        taxRate: royalCourt?.taxRate ?? econSummary.taxRate ?? 0,
+        kingTaxPercent: royalCourt?.kingTaxPercent ?? econSummary.kingTaxPercent ?? 0,
+        cityTaxPercent: royalCourt?.cityTaxPercent ?? econSummary.cityTaxPercent ?? 0,
+        dailyTaxRevenue: econSummary.dailyTaxRevenue || 0,
+        dailyCityTaxRevenue: econSummary.dailyCityTaxRevenue || 0,
+        dailyIncome: econSummary.dailyIncome || 0,
+        dailyExpenses: econSummary.dailyExpenses || 0,
+        cityControlTeam: cityController?.teamName || econSummary.cityControlTeam || 'None',
+        cityControlMembers: cityController?.memberCount || econSummary.cityControlMembers || 0,
+        cityControlPower: cityController?.totalPower || econSummary.cityControlPower || 0,
+        cityControlLeader: cityController?.leaderName || econSummary.cityControlLeader || 'None',
+        cityControlLeaderBank: cityController?.leaderBank || econSummary.cityControlLeaderBank || 0
+      };
+    }
+  } catch (e) { /* economy data may not be available */ }
+
+  // Children data from world_state (serialized by WorldSimService)
+  let children = null;
+  try {
+    const childRow = db.prepare("SELECT value FROM world_state WHERE key = 'children'").get();
+    if (childRow && childRow.value) children = JSON.parse(childRow.value);
+  } catch (e) { /* children data may not exist yet */ }
+
+  return {
+    total: npcs.length,
+    alive: alive.length,
+    dead: dead.length,
+    married: married.length,
+    pregnant: pregnant.length,
+    teams: economy?.cityControlTeam && economy.cityControlTeam !== 'None' && !teams.has(economy.cityControlTeam)
+      ? teams.size + 1 : teams.size,
+    avgLevel: parseFloat(avgLevel),
+    totalGold,
+    king: economy?.kingName || (kingNpc ? (kingNpc.name || kingNpc.Name) : null),
+    classDist,
+    raceDist,
+    factionDist,
+    locationDist,
+    levelDist,
+    ageDist,
+    economy,
+    children
+  };
+}
+
+function getDashEvents() {
+  const now = Date.now();
+  if (dashEventsCache && (now - dashEventsCacheTime) < DASH_EVENTS_CACHE_TTL) return dashEventsCache;
+  if (!db) return [];
+  try {
+    dashEventsCache = db.prepare(`
+      SELECT id, message, category, player_name, created_at
+      FROM news ORDER BY created_at DESC LIMIT 500
+    `).all().map(row => ({
+      id: row.id,
+      message: row.message,
+      category: row.category,
+      playerName: row.player_name,
+      time: row.created_at
+    }));
+    dashEventsCacheTime = now;
+    return dashEventsCache;
+  } catch (err) {
+    return dashEventsCache || [];
+  }
+}
+
+function getDashEventsHourly() {
+  const now = Date.now();
+  if (dashHourlyCache && (now - dashHourlyCacheTime) < DASH_HOURLY_CACHE_TTL) return dashHourlyCache;
+  if (!db) return [];
+  try {
+    dashHourlyCache = db.prepare(`
+      SELECT
+        strftime('%Y-%m-%d %H:00', created_at) as hour,
+        category,
+        COUNT(*) as count
+      FROM news
+      WHERE created_at >= datetime('now', '-24 hours')
+      GROUP BY hour, category
+      ORDER BY hour ASC
+    `).all().map(row => ({
+      hour: row.hour,
+      category: row.category,
+      count: row.count
+    }));
+    dashHourlyCacheTime = now;
+    return dashHourlyCache;
+  } catch (err) {
+    return dashHourlyCache || [];
+  }
+}
+
+// --- Dashboard SSE Feed ---
+const dashSseClients = new Set();
+let dashLastNewsId = 0;
+let lastNpcSnapshotTime = 0;
+let lastNpcSnapshotHash = '';
+
+function initDashFeedIds() {
+  if (!db) return;
+  try {
+    const row = db.prepare(`SELECT MAX(id) as maxId FROM news`).get();
+    if (row && row.maxId) dashLastNewsId = row.maxId;
+    console.log(`[usurper-web] Dashboard feed initialized: newsId=${dashLastNewsId}`);
+  } catch (e) { /* table may not exist */ }
+}
+initDashFeedIds();
+
+function dashPollFeed() {
+  if (dashSseClients.size === 0 || !db) return;
+
+  try {
+    // New news events (all categories)
+    const newsRows = db.prepare(`
+      SELECT id, message, category, created_at FROM news
+      WHERE id > ? ORDER BY id ASC LIMIT 20
+    `).all(dashLastNewsId);
+
+    if (newsRows.length > 0) {
+      dashLastNewsId = newsRows[newsRows.length - 1].id;
+      const items = newsRows.map(r => ({ message: r.message, category: r.category, time: r.created_at }));
+      dashBroadcast('news', JSON.stringify({ items }));
+    }
+
+    // NPC snapshot (every 30 seconds)
+    const now = Date.now();
+    if (now - lastNpcSnapshotTime >= DASH_SNAPSHOT_INTERVAL) {
+      lastNpcSnapshotTime = now;
+      const npcs = getDashNpcs();
+      if (npcs && npcs.length > 0) {
+        // Compact snapshot for SSE (just key fields per NPC)
+        const snapshot = npcs.map(n => ({
+          name: n.name || n.Name,
+          level: n.level || n.Level || 1,
+          location: n.location || n.Location || 'Unknown',
+          alive: !(n.isDead || n.IsDead),
+          married: !!(n.isMarried || n.IsMarried),
+          faction: n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1),
+          isKing: !!(n.isKing || n.IsKing),
+          pregnant: !!(n.pregnancyDueDate || n.PregnancyDueDate),
+          emotion: n.emotionalState || n.EmotionalState || null,
+          hp: n.hp || n.HP || 0,
+          maxHp: n.maxHP || n.MaxHP || 1
+        }));
+        const hash = crypto.createHash('md5').update(JSON.stringify(snapshot)).digest('hex');
+        if (hash !== lastNpcSnapshotHash) {
+          lastNpcSnapshotHash = hash;
+          const summary = getDashSummary();
+          dashBroadcast('npc-snapshot', JSON.stringify({ npcs: snapshot, summary }));
+        }
+      }
+    }
+  } catch (e) {
+    // Silently ignore
+  }
+}
+
+function dashBroadcast(eventType, data) {
+  const msg = `event: ${eventType}\ndata: ${data}\n\n`;
+  for (const client of dashSseClients) {
+    try { client.write(msg); } catch (e) { dashSseClients.delete(client); }
+  }
+}
+
+// Dashboard heartbeat
+function dashHeartbeat() {
+  if (dashSseClients.size === 0) return;
+  const msg = `:heartbeat ${Date.now()}\n\n`;
+  for (const client of dashSseClients) {
+    try { client.write(msg); } catch (e) { dashSseClients.delete(client); }
   }
 }
 
@@ -231,13 +696,12 @@ function getStats() {
       marriageCount = marriageResult ? Math.floor(marriageResult.cnt / 2) : 0;
     } catch (e) { /* relationships may not exist */ }
 
-    // Current king
+    // Current king (from world_state - the authoritative source maintained by world sim)
     let king = null;
     try {
-      const kingRow = db.prepare(`SELECT value FROM world_state WHERE key = 'king'`).get();
-      if (kingRow && kingRow.value) {
-        const kingData = JSON.parse(kingRow.value);
-        king = kingData.name || kingData.Name || null;
+      const royalCourt = getRoyalCourtFromWorldState();
+      if (royalCourt && royalCourt.kingName) {
+        king = royalCourt.kingName;
       }
     } catch (e) { /* king may not exist */ }
 
@@ -301,6 +765,36 @@ function getStats() {
       }));
     } catch (e) { /* npc activities may not exist yet */ }
 
+    // Economy/tax data: from world_state (authoritative, maintained by world sim)
+    let economy = null;
+    try {
+      const royalCourt = getRoyalCourtFromWorldState();
+      let econSummary = {};
+      try {
+        const econRow = db.prepare(`SELECT value FROM world_state WHERE key = 'economy'`).get();
+        if (econRow && econRow.value) econSummary = JSON.parse(econRow.value);
+      } catch (e) {}
+
+      if (royalCourt || Object.keys(econSummary).length > 0) {
+        economy = {
+          kingName: royalCourt?.kingName || econSummary.kingName || 'None',
+          treasury: royalCourt?.treasury ?? econSummary.treasury ?? 0,
+          taxRate: royalCourt?.taxRate ?? econSummary.taxRate ?? 0,
+          kingTaxPercent: royalCourt?.kingTaxPercent ?? econSummary.kingTaxPercent ?? 0,
+          cityTaxPercent: royalCourt?.cityTaxPercent ?? econSummary.cityTaxPercent ?? 0,
+          dailyTaxRevenue: econSummary.dailyTaxRevenue || 0,
+          dailyCityTaxRevenue: econSummary.dailyCityTaxRevenue || 0,
+          dailyIncome: econSummary.dailyIncome || 0,
+          dailyExpenses: econSummary.dailyExpenses || 0,
+          cityControlTeam: econSummary.cityControlTeam || 'None',
+          cityControlMembers: econSummary.cityControlMembers || 0,
+          cityControlPower: econSummary.cityControlPower || 0,
+          cityControlLeader: econSummary.cityControlLeader || 'None',
+          cityControlLeaderBank: econSummary.cityControlLeaderBank || 0
+        };
+      }
+    } catch (e) { /* economy data may not be available */ }
+
     // PvP leaderboard
     let pvpLeaderboard = [];
     try {
@@ -358,6 +852,7 @@ function getStats() {
       },
       leaderboard: leaderboard,
       pvpLeaderboard: pvpLeaderboard,
+      economy: economy,
       news: news,
       npcActivities: npcActivities,
       cachedAt: new Date().toISOString()
@@ -370,7 +865,7 @@ function getStats() {
   }
 }
 
-// --- SSE Live Feed ---
+// --- SSE Live Feed (public) ---
 const sseClients = new Set();
 let lastNpcId = 0;
 let lastNewsId = 0;
@@ -429,11 +924,177 @@ function broadcast(type, items) {
   }
 }
 
-// Start feed polling
+// Start feed polling (public + dashboard)
 const feedTimer = setInterval(pollFeed, FEED_POLL_MS);
+const dashFeedTimer = setInterval(dashPollFeed, FEED_POLL_MS);
+const dashHeartbeatTimer = setInterval(dashHeartbeat, 15000);
+
+// --- Dashboard Route Handler ---
+async function handleDashRequest(req, res) {
+  const url = req.url;
+  const method = req.method;
+
+  // Auth endpoints (no auth required)
+  if (method === 'POST' && url === '/api/dash/register') {
+    if (!dbWrite) return sendJson(res, 500, { error: 'Database not available' });
+    try {
+      const body = await readBody(req);
+      const { username, password } = body;
+      if (!username || !password) return sendJson(res, 400, { error: 'Username and password required' });
+      if (username.length < 3 || username.length > 30) return sendJson(res, 400, { error: 'Username must be 3-30 characters' });
+      if (password.length < 6) return sendJson(res, 400, { error: 'Password must be at least 6 characters' });
+
+      // Check if username exists
+      const existing = dbWrite.prepare('SELECT username FROM dashboard_users WHERE LOWER(username) = LOWER(?)').get(username);
+      if (existing) return sendJson(res, 409, { error: 'Username already exists' });
+
+      const { hash, salt } = hashPassword(password);
+      dbWrite.prepare('INSERT INTO dashboard_users (username, password_hash, salt) VALUES (?, ?, ?)').run(username, hash, salt);
+
+      const token = createSession(username);
+      if (!token) return sendJson(res, 500, { error: 'Failed to create session' });
+
+      console.log(`[usurper-web] Dashboard user registered: ${username}`);
+      sendJson(res, 201, { ok: true, username }, {
+        'Set-Cookie': `dash_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_TTL_DAYS * 86400}`
+      });
+    } catch (err) {
+      sendJson(res, 400, { error: 'Invalid request' });
+    }
+    return true;
+  }
+
+  if (method === 'POST' && url === '/api/dash/login') {
+    if (!dbWrite) return sendJson(res, 500, { error: 'Database not available' });
+    try {
+      const body = await readBody(req);
+      const { username, password } = body;
+      if (!username || !password) return sendJson(res, 400, { error: 'Username and password required' });
+
+      const user = dbWrite.prepare('SELECT username, password_hash, salt FROM dashboard_users WHERE LOWER(username) = LOWER(?)').get(username);
+      if (!user) return sendJson(res, 401, { error: 'Invalid credentials' });
+
+      if (!verifyPassword(password, user.password_hash, user.salt)) {
+        return sendJson(res, 401, { error: 'Invalid credentials' });
+      }
+
+      const token = createSession(user.username);
+      if (!token) return sendJson(res, 500, { error: 'Failed to create session' });
+
+      console.log(`[usurper-web] Dashboard login: ${user.username}`);
+      sendJson(res, 200, { ok: true, username: user.username }, {
+        'Set-Cookie': `dash_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_TTL_DAYS * 86400}`
+      });
+    } catch (err) {
+      sendJson(res, 400, { error: 'Invalid request' });
+    }
+    return true;
+  }
+
+  if (method === 'POST' && url === '/api/dash/logout') {
+    const cookies = parseCookies(req.headers.cookie);
+    if (cookies.dash_token && dbWrite) {
+      try { dbWrite.prepare('DELETE FROM dashboard_sessions WHERE token = ?').run(cookies.dash_token); } catch (e) {}
+    }
+    sendJson(res, 200, { ok: true }, {
+      'Set-Cookie': 'dash_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'
+    });
+    return true;
+  }
+
+  if (method === 'GET' && url === '/api/dash/check') {
+    const user = requireDashAuth(req);
+    sendJson(res, 200, { authenticated: !!user, username: user || null });
+    return true;
+  }
+
+  // All remaining dash endpoints require auth
+  const user = requireDashAuth(req);
+  if (!user) {
+    sendJson(res, 401, { error: 'Authentication required' });
+    return true;
+  }
+
+  // Dashboard SSE feed
+  if (method === 'GET' && url === '/api/dash/feed') {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.writeHead(200);
+    res.write('retry: 5000\n\n');
+
+    dashSseClients.add(res);
+    console.log(`[usurper-web] Dashboard SSE connected: ${user} (${dashSseClients.size} total)`);
+
+    // Send initial snapshot immediately
+    try {
+      const npcs = getDashNpcs();
+      if (npcs && npcs.length > 0) {
+        const snapshot = npcs.map(n => ({
+          name: n.name || n.Name,
+          level: n.level || n.Level || 1,
+          location: n.location || n.Location || 'Unknown',
+          alive: !(n.isDead || n.IsDead),
+          married: !!(n.isMarried || n.IsMarried),
+          faction: n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1),
+          isKing: !!(n.isKing || n.IsKing),
+          pregnant: !!(n.pregnancyDueDate || n.PregnancyDueDate),
+          emotion: n.emotionalState || n.EmotionalState || null,
+          hp: n.hp || n.HP || 0,
+          maxHp: n.maxHP || n.MaxHP || 1
+        }));
+        const summary = getDashSummary();
+        res.write(`event: npc-snapshot\ndata: ${JSON.stringify({ npcs: snapshot, summary })}\n\n`);
+      }
+    } catch (e) {}
+
+    req.on('close', () => {
+      dashSseClients.delete(res);
+      console.log(`[usurper-web] Dashboard SSE disconnected: ${user} (${dashSseClients.size} total)`);
+    });
+    return true;
+  }
+
+  // Data endpoints
+  if (method === 'GET' && url === '/api/dash/npcs') {
+    const npcs = getDashNpcs();
+    sendJson(res, 200, npcs);
+    return true;
+  }
+
+  if (method === 'GET' && url === '/api/dash/summary') {
+    const summary = getDashSummary();
+    sendJson(res, 200, summary);
+    return true;
+  }
+
+  if (method === 'GET' && url === '/api/dash/events') {
+    const events = getDashEvents();
+    sendJson(res, 200, events);
+    return true;
+  }
+
+  if (method === 'GET' && url === '/api/dash/events/hourly') {
+    const hourly = getDashEventsHourly();
+    sendJson(res, 200, hourly);
+    return true;
+  }
+
+  return false; // Not a dash route
+}
 
 // --- HTTP Handler ---
 function handleHttpRequest(req, res) {
+  // Dashboard routes
+  if (req.url && req.url.startsWith('/api/dash/')) {
+    handleDashRequest(req, res).catch(err => {
+      console.error(`[usurper-web] Dashboard error: ${err.message}`);
+      if (!res.headersSent) sendJson(res, 500, { error: 'Internal error' });
+    });
+    return;
+  }
+
   if (req.method === 'GET' && req.url === '/api/feed') {
     // SSE endpoint for live feed
     res.setHeader('Content-Type', 'text/event-stream');
@@ -472,7 +1133,7 @@ function handleHttpRequest(req, res) {
     res.end(JSON.stringify(getStats()));
   } else if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.writeHead(204);
     res.end();
@@ -489,6 +1150,7 @@ const wss = new Server({ server: httpServer });
 httpServer.listen(WS_PORT, () => {
   console.log(`[usurper-web] HTTP + WebSocket server listening on port ${WS_PORT}`);
   console.log(`[usurper-web] Stats API: http://127.0.0.1:${WS_PORT}/api/stats`);
+  console.log(`[usurper-web] Dashboard API: http://127.0.0.1:${WS_PORT}/api/dash/*`);
   console.log(`[usurper-web] Proxying SSH to ${SSH_HOST}:${SSH_PORT}`);
 });
 
@@ -580,9 +1242,14 @@ wss.on('connection', (ws, req) => {
 function gracefulShutdown() {
   console.log('[usurper-web] Shutting down...');
   clearInterval(feedTimer);
+  clearInterval(dashFeedTimer);
+  clearInterval(dashHeartbeatTimer);
   for (const client of sseClients) { try { client.end(); } catch (e) {} }
+  for (const client of dashSseClients) { try { client.end(); } catch (e) {} }
   sseClients.clear();
+  dashSseClients.clear();
   if (db) db.close();
+  if (dbWrite) dbWrite.close();
   wss.close(() => httpServer.close(() => process.exit(0)));
 }
 process.on('SIGTERM', gracefulShutdown);

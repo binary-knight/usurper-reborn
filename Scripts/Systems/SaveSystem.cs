@@ -98,6 +98,24 @@ namespace UsurperRemake.Systems
                     SteamIntegration.SyncPlayerStats(playerChar.Statistics);
                 }
 
+                // In online mode, push NPC changes to shared world_state so the
+                // world sim and dashboard can see team changes, combat results, etc.
+                if (success && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive && OnlineStateManager.Instance != null)
+                {
+                    try
+                    {
+                        var sharedNpcData = OnlineStateManager.SerializeCurrentNPCs();
+                        await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData);
+                        await OnlineStateManager.Instance.SaveRoyalCourtToWorldState();
+                        await OnlineStateManager.Instance.SaveEconomyToWorldState();
+                        DebugLogger.Instance.LogDebug("SAVE", "NPC, royal court, and economy synced to world_state");
+                    }
+                    catch (Exception syncEx)
+                    {
+                        DebugLogger.Instance.LogError("SAVE", $"World state sync failed (non-fatal): {syncEx.Message}");
+                    }
+                }
+
                 return success;
             }
             catch (Exception ex)
@@ -170,6 +188,19 @@ namespace UsurperRemake.Systems
             if (success && player is Player playerChar && playerChar.Statistics != null && !player.DevMenuUsed)
             {
                 SteamIntegration.SyncPlayerStats(playerChar.Statistics);
+            }
+
+            // In online mode, push NPC changes to shared world_state
+            if (success && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive && OnlineStateManager.Instance != null)
+            {
+                try
+                {
+                    var sharedNpcData = OnlineStateManager.SerializeCurrentNPCs();
+                    await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData);
+                    await OnlineStateManager.Instance.SaveRoyalCourtToWorldState();
+                    await OnlineStateManager.Instance.SaveEconomyToWorldState();
+                }
+                catch { /* don't fail autosave for world_state sync */ }
             }
 
             return success;
@@ -733,6 +764,7 @@ namespace UsurperRemake.Systems
 
                     // Inventory
                     Gold = npc.Gold,
+                    BankGold = npc.BankGold,
                     Items = npc.Item?.ToArray() ?? new int[0],
 
                     // Market inventory for NPC trading
@@ -997,13 +1029,21 @@ namespace UsurperRemake.Systems
         private EmotionalStateData? SerializeEmotionalState(EmotionalState? state)
         {
             if (state == null) return null;
-            
+
             return new EmotionalStateData
             {
                 Happiness = state.GetEmotionIntensity(EmotionType.Joy),
                 Anger = state.GetEmotionIntensity(EmotionType.Anger),
                 Fear = state.GetEmotionIntensity(EmotionType.Fear),
-                Trust = state.GetEmotionIntensity(EmotionType.Gratitude) // Use Gratitude as Trust
+                Trust = state.GetEmotionIntensity(EmotionType.Gratitude),
+                Confidence = state.GetEmotionIntensity(EmotionType.Confidence),
+                Sadness = state.GetEmotionIntensity(EmotionType.Sadness),
+                Greed = state.GetEmotionIntensity(EmotionType.Greed),
+                Loneliness = state.GetEmotionIntensity(EmotionType.Loneliness),
+                Envy = state.GetEmotionIntensity(EmotionType.Envy),
+                Pride = state.GetEmotionIntensity(EmotionType.Pride),
+                Hope = state.GetEmotionIntensity(EmotionType.Hope),
+                Peace = state.GetEmotionIntensity(EmotionType.Peace)
             };
         }
         
@@ -1272,6 +1312,8 @@ namespace UsurperRemake.Systems
                         Treasury = king.Treasury,
                         TaxRate = king.TaxRate,
                         TotalReign = king.TotalReign,
+                        KingTaxPercent = king.KingTaxPercent,
+                        CityTaxPercent = king.CityTaxPercent,
 
                         // Court members
                         CourtMembers = king.CourtMembers.Select(m => new CourtMemberSaveData
@@ -1638,6 +1680,13 @@ namespace UsurperRemake.Systems
                     var king = global::CastleLocation.GetCurrentKing();
                     if (king != null)
                     {
+                        // Restore treasury and tax settings (previously missing!)
+                        king.Treasury = data.RoyalCourt.Treasury;
+                        king.TaxRate = data.RoyalCourt.TaxRate;
+                        king.TotalReign = data.RoyalCourt.TotalReign;
+                        king.KingTaxPercent = data.RoyalCourt.KingTaxPercent > 0 ? data.RoyalCourt.KingTaxPercent : 5;
+                        king.CityTaxPercent = data.RoyalCourt.CityTaxPercent > 0 ? data.RoyalCourt.CityTaxPercent : 2;
+
                         // Restore court members
                         king.CourtMembers = data.RoyalCourt.CourtMembers?.Select(m => new CourtMember
                         {

@@ -22,6 +22,8 @@ namespace UsurperRemake.Systems
 
         private WorldSimulator? worldSimulator;
         private DateTime lastSaveTime = DateTime.MinValue;
+        private long lastNpcVersion = 0;  // Track world_state NPC version to detect player changes
+        private long lastRoyalCourtVersion = 0;  // Track royal_court version to detect player changes (treasury, taxes, etc.)
 
         private readonly JsonSerializerOptions jsonOptions = new()
         {
@@ -57,6 +59,21 @@ namespace UsurperRemake.Systems
 
             // Phase 2: Load NPC state from database
             await LoadWorldState();
+
+            // Phase 2.5: Load king/royal court state from world_state (the authoritative source)
+            LoadRoyalCourtFromWorldState();
+
+            // Phase 2.6: Load children, marriages, and world events from world_state
+            // These must survive world sim restarts (previously lost on restart)
+            LoadChildrenState();
+            LoadMarriageRegistryState();
+            LoadWorldEventsState();
+
+            // Track initial versions so we can detect player modifications
+            lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+            lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
+            Console.Error.WriteLine($"[WORLDSIM] Initial NPC data version: {lastNpcVersion}");
+            Console.Error.WriteLine($"[WORLDSIM] Initial royal court version: {lastRoyalCourtVersion}");
 
             // Phase 3: Set the NPC XP multiplier
             WorldSimulator.NpcXpMultiplier = npcXpMultiplier;
@@ -197,19 +214,66 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Persist current NPC state to the shared database.
-        /// Uses the same serialization as OnlineStateManager.
+        /// Before saving, checks if a player session has modified the NPC data since our last save.
+        /// If so, reloads from DB first to pick up player changes (prevents divergence).
         /// </summary>
         private async Task SaveWorldState()
         {
             try
             {
+                // Check if NPC data was modified by a player session since our last save.
+                // Both game server and world sim write to the same world_state key.
+                // The version auto-increments on each write, so if it changed, a player saved.
+                long currentNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+                if (currentNpcVersion > lastNpcVersion && lastNpcVersion > 0)
+                {
+                    Console.Error.WriteLine($"[WORLDSIM] NPC data modified by game server (v{lastNpcVersion} → v{currentNpcVersion}). Reloading to pick up player changes...");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Reloading NPC state: version {lastNpcVersion} → {currentNpcVersion}");
+                    await LoadWorldState();
+                    // Reload royal court too (NPC changes often accompany king changes)
+                    LoadRoyalCourtFromWorldState();
+                    lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
+                }
+
+                // Check if royal court was modified by a player session since our last save.
+                // This catches changes that ONLY affect royal_court without changing NPC data:
+                // treasury deposits, tax policy changes, guard salary payments, etc.
+                long currentRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
+                if (currentRoyalCourtVersion > lastRoyalCourtVersion && lastRoyalCourtVersion > 0)
+                {
+                    Console.Error.WriteLine($"[WORLDSIM] Royal court modified by player (v{lastRoyalCourtVersion} → v{currentRoyalCourtVersion}). Reloading to pick up changes...");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Reloading royal court: version {lastRoyalCourtVersion} → {currentRoyalCourtVersion}");
+                    LoadRoyalCourtFromWorldState();
+                    lastRoyalCourtVersion = currentRoyalCourtVersion;
+                }
+
+                // Save our NPC state (either fresh from reload or accumulated simulation changes)
                 var npcData = OnlineStateManager.SerializeCurrentNPCs();
                 var json = JsonSerializer.Serialize(npcData, jsonOptions);
                 await sqlBackend.SaveWorldState(OnlineStateManager.KEY_NPCS, json);
 
+                // Track our save's version for the next cycle's comparison
+                lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+
                 var aliveCount = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
-                Console.Error.WriteLine($"[WORLDSIM] State saved: {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
-                DebugLogger.Instance.LogInfo("WORLDSIM", $"State persisted: {npcData.Count} NPCs ({aliveCount} alive)");
+                Console.Error.WriteLine($"[WORLDSIM] State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"State persisted: {npcData.Count} NPCs ({aliveCount} alive) v{lastNpcVersion}");
+
+                // Save royal court to world_state (authoritative - world sim maintains this)
+                await SaveRoyalCourtToWorldState();
+                lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
+
+                // Save economy summary for the dashboard
+                await SaveEconomyState();
+
+                // Save children data (dashboard + raw for round-trip)
+                await SaveChildrenState();
+
+                // Save NPC marriage registry (survives world sim restart)
+                await SaveMarriageRegistryState();
+
+                // Save world events (plagues, festivals, wars, etc.)
+                await SaveWorldEventsState();
 
                 // Prune old NPC activity entries (keep last 24 hours)
                 await sqlBackend.PruneOldNews("npc", 24);
@@ -218,6 +282,546 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save world state: {ex.Message}");
                 Console.Error.WriteLine($"[WORLDSIM] Error saving state: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Load royal court state from world_state.
+        /// The world_state 'royal_court' key is the single source of truth for king identity,
+        /// treasury, tax rates, court members, etc. Both the world sim and player sessions
+        /// read/write this key. The world sim is the primary maintainer; player actions
+        /// (throne challenges, tax changes) write updates to this key immediately.
+        /// </summary>
+        private void LoadRoyalCourtFromWorldState()
+        {
+            try
+            {
+                var json = sqlBackend.LoadWorldState("royal_court").GetAwaiter().GetResult();
+                if (string.IsNullOrEmpty(json)) return;
+
+                var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
+                if (royalCourt == null || string.IsNullOrEmpty(royalCourt.KingName)) return;
+
+                var king = CastleLocation.GetCurrentKing();
+
+                // Check if king identity changed (player took the throne, or NPC challenge)
+                if (king == null || king.Name != royalCourt.KingName)
+                {
+                    var kingNpc = NPCSpawnSystem.Instance.ActiveNPCs
+                        .FirstOrDefault(n => n.Name == royalCourt.KingName);
+                    if (kingNpc != null)
+                    {
+                        CastleLocation.SetCurrentKing(kingNpc);
+                        king = CastleLocation.GetCurrentKing();
+                        Console.Error.WriteLine($"[WORLDSIM] King loaded from world_state: {royalCourt.KingName}");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"[WORLDSIM] King '{royalCourt.KingName}' from world_state not found in NPCs");
+                        return;
+                    }
+                }
+
+                if (king != null)
+                {
+                    // Restore financial/political state from world_state (authoritative)
+                    king.Treasury = royalCourt.Treasury;
+                    king.TaxRate = royalCourt.TaxRate;
+                    king.TotalReign = royalCourt.TotalReign;
+                    king.KingTaxPercent = royalCourt.KingTaxPercent > 0 ? royalCourt.KingTaxPercent : 5;
+                    king.CityTaxPercent = royalCourt.CityTaxPercent > 0 ? royalCourt.CityTaxPercent : 2;
+
+                    // Restore court members
+                    if (royalCourt.CourtMembers != null)
+                    {
+                        king.CourtMembers = royalCourt.CourtMembers.Select(m => new CourtMember
+                        {
+                            Name = m.Name,
+                            Faction = (CourtFaction)m.Faction,
+                            Influence = m.Influence,
+                            LoyaltyToKing = m.LoyaltyToKing,
+                            Role = m.Role,
+                            IsPlotting = m.IsPlotting
+                        }).ToList();
+                    }
+
+                    // Restore heirs
+                    if (royalCourt.Heirs != null)
+                    {
+                        king.Heirs = royalCourt.Heirs.Select(h => new RoyalHeir
+                        {
+                            Name = h.Name,
+                            Age = h.Age,
+                            ClaimStrength = h.ClaimStrength,
+                            ParentName = h.ParentName,
+                            Sex = (CharacterSex)h.Sex,
+                            IsDesignated = h.IsDesignated
+                        }).ToList();
+                    }
+
+                    // Restore spouse
+                    if (royalCourt.Spouse != null)
+                    {
+                        king.Spouse = new RoyalSpouse
+                        {
+                            Name = royalCourt.Spouse.Name,
+                            Sex = (CharacterSex)royalCourt.Spouse.Sex,
+                            OriginalFaction = (CourtFaction)royalCourt.Spouse.OriginalFaction,
+                            Dowry = royalCourt.Spouse.Dowry,
+                            Happiness = royalCourt.Spouse.Happiness
+                        };
+                    }
+
+                    // Restore plots
+                    if (royalCourt.ActivePlots != null)
+                    {
+                        king.ActivePlots = royalCourt.ActivePlots.Select(p => new CourtIntrigue
+                        {
+                            PlotType = p.PlotType,
+                            Conspirators = p.Conspirators ?? new List<string>(),
+                            Target = p.Target,
+                            Progress = p.Progress,
+                            IsDiscovered = p.IsDiscovered
+                        }).ToList();
+                    }
+
+                    king.DesignatedHeir = royalCourt.DesignatedHeir;
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load royal court from world_state: {ex.Message}");
+                Console.Error.WriteLine($"[WORLDSIM] Royal court load error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Save current royal court state to world_state.
+        /// This is the authoritative write - the world sim maintains this data.
+        /// </summary>
+        private async Task SaveRoyalCourtToWorldState()
+        {
+            try
+            {
+                var king = CastleLocation.GetCurrentKing();
+                if (king == null) return;
+
+                var data = new RoyalCourtSaveData
+                {
+                    KingName = king.Name,
+                    Treasury = king.Treasury,
+                    TaxRate = king.TaxRate,
+                    TotalReign = king.TotalReign,
+                    KingTaxPercent = king.KingTaxPercent,
+                    CityTaxPercent = king.CityTaxPercent,
+                    DesignatedHeir = king.DesignatedHeir ?? "",
+                    CourtMembers = king.CourtMembers?.Select(m => new CourtMemberSaveData
+                    {
+                        Name = m.Name,
+                        Faction = (int)m.Faction,
+                        Influence = m.Influence,
+                        LoyaltyToKing = m.LoyaltyToKing,
+                        Role = m.Role,
+                        IsPlotting = m.IsPlotting
+                    }).ToList() ?? new List<CourtMemberSaveData>(),
+                    Heirs = king.Heirs?.Select(h => new RoyalHeirSaveData
+                    {
+                        Name = h.Name,
+                        Age = h.Age,
+                        ClaimStrength = h.ClaimStrength,
+                        ParentName = h.ParentName,
+                        Sex = (int)h.Sex,
+                        IsDesignated = h.IsDesignated
+                    }).ToList() ?? new List<RoyalHeirSaveData>(),
+                    Spouse = king.Spouse != null ? new RoyalSpouseSaveData
+                    {
+                        Name = king.Spouse.Name,
+                        Sex = (int)king.Spouse.Sex,
+                        OriginalFaction = (int)king.Spouse.OriginalFaction,
+                        Dowry = king.Spouse.Dowry,
+                        Happiness = king.Spouse.Happiness
+                    } : null,
+                    ActivePlots = king.ActivePlots?.Select(p => new CourtIntrigueSaveData
+                    {
+                        PlotType = p.PlotType,
+                        Conspirators = p.Conspirators,
+                        Target = p.Target,
+                        Progress = p.Progress,
+                        IsDiscovered = p.IsDiscovered
+                    }).ToList() ?? new List<CourtIntrigueSaveData>()
+                };
+
+                var json = JsonSerializer.Serialize(data, jsonOptions);
+                await sqlBackend.SaveWorldState("royal_court", json);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save royal court to world_state: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Save economy/tax data to the shared database for the dashboard to read.
+        /// The world sim runs headlessly (no player session), so it can't see the player.
+        /// If the game server previously wrote a player as city control leader, preserve
+        /// that info as long as the controlling team hasn't changed.
+        /// </summary>
+        private async Task SaveEconomyState()
+        {
+            try
+            {
+                var king = CastleLocation.GetCurrentKing();
+                var cityInfo = CityControlSystem.Instance.GetCityControlInfo();
+                var leader = CityControlSystem.Instance.GetCityControlLeader();
+
+                // World sim can't see the player, so leader.IsPlayer will always be false here.
+                // Check if the game server previously wrote economy data with a player leader.
+                // If the controlling team matches, preserve the player leader info and member count.
+                string leaderName = leader.Name;
+                long leaderBank = leader.BankGold;
+                bool leaderIsPlayer = leader.IsPlayer;
+                int memberCount = cityInfo.MemberCount;
+                long totalPower = cityInfo.TotalPower;
+
+                if (!leaderIsPlayer)
+                {
+                    try
+                    {
+                        var existingJson = await sqlBackend.LoadWorldState("economy");
+                        if (!string.IsNullOrEmpty(existingJson))
+                        {
+                            var existing = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(existingJson);
+                            if (existing != null &&
+                                existing.TryGetValue("cityControlLeaderIsPlayer", out var isPlayerEl) &&
+                                isPlayerEl.ValueKind == JsonValueKind.True &&
+                                existing.TryGetValue("cityControlTeam", out var teamEl) &&
+                                !string.IsNullOrEmpty(teamEl.GetString()))
+                            {
+                                // Game server wrote a player as leader — preserve their turf control
+                                // even if the world sim can't see the team (player-only team, player offline)
+                                var playerTeamName = teamEl.GetString()!;
+                                if (existing.TryGetValue("cityControlLeader", out var nameEl))
+                                    leaderName = nameEl.GetString() ?? leaderName;
+                                if (existing.TryGetValue("cityControlLeaderBank", out var bankEl))
+                                    leaderBank = bankEl.GetInt64();
+                                if (existing.TryGetValue("cityControlMembers", out var membersEl))
+                                    memberCount = membersEl.GetInt32();
+                                if (existing.TryGetValue("cityControlPower", out var powerEl))
+                                    totalPower = powerEl.GetInt64();
+                                leaderIsPlayer = true;
+                                // Override cityInfo.TeamName since the world sim might report "None"
+                                // for a player-only team
+                                cityInfo = (playerTeamName, memberCount, totalPower);
+                            }
+                        }
+                    }
+                    catch { /* ignore parse errors, fall through to NPC-only data */ }
+                }
+
+                // Tell the WorldSimulator about player turf control so it doesn't get overwritten
+                if (leaderIsPlayer && WorldSimulator.Instance != null)
+                    WorldSimulator.Instance.PlayerTurfTeam = cityInfo.TeamName;
+                else if (WorldSimulator.Instance != null)
+                    WorldSimulator.Instance.PlayerTurfTeam = null;
+
+                var economyData = new Dictionary<string, object?>
+                {
+                    ["kingName"] = king?.Name ?? "None",
+                    ["kingIsActive"] = king?.IsActive ?? false,
+                    ["treasury"] = king?.Treasury ?? 0,
+                    ["taxRate"] = king?.TaxRate ?? 0,
+                    ["kingTaxPercent"] = king?.KingTaxPercent ?? 0,
+                    ["cityTaxPercent"] = king?.CityTaxPercent ?? 0,
+                    ["dailyTaxRevenue"] = king?.DailyTaxRevenue ?? 0,
+                    ["dailyCityTaxRevenue"] = king?.DailyCityTaxRevenue ?? 0,
+                    ["dailyIncome"] = king?.CalculateDailyIncome() ?? 0,
+                    ["dailyExpenses"] = king?.CalculateDailyExpenses() ?? 0,
+                    ["cityControlTeam"] = cityInfo.TeamName,
+                    ["cityControlMembers"] = memberCount,
+                    ["cityControlPower"] = totalPower,
+                    ["cityControlLeader"] = leaderName,
+                    ["cityControlLeaderBank"] = leaderBank,
+                    ["cityControlLeaderIsPlayer"] = leaderIsPlayer,
+                    ["updatedAt"] = DateTime.UtcNow.ToString("o")
+                };
+
+                var json = JsonSerializer.Serialize(economyData, jsonOptions);
+                await sqlBackend.SaveWorldState("economy", json);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save economy state: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Save children data to the shared database.
+        /// Includes both display-friendly data (for the dashboard) AND raw ChildData (for round-trip deserialization).
+        /// The raw data ensures children survive world sim restarts.
+        /// </summary>
+        private async Task SaveChildrenState()
+        {
+            try
+            {
+                var familySystem = FamilySystem.Instance;
+                if (familySystem == null) return;
+
+                var children = familySystem.AllChildren.Where(c => !c.Deleted).ToList();
+
+                // Display-friendly data for the dashboard
+                var childrenData = children.Select(c => new Dictionary<string, object?>
+                {
+                    ["name"] = c.Name,
+                    ["age"] = c.Age,
+                    ["sex"] = c.Sex == CharacterSex.Male ? "Male" : "Female",
+                    ["mother"] = c.Mother,
+                    ["father"] = c.Father,
+                    ["soul"] = c.Soul,
+                    ["soulDesc"] = c.GetSoulDescription(),
+                    ["health"] = c.Health,
+                    ["royal"] = c.Royal,
+                    ["kidnapped"] = c.Kidnapped,
+                    ["birthDate"] = c.BirthDate.ToString("o"),
+                    ["location"] = c.Location == GameConfig.ChildLocationHome ? "Home" :
+                                   c.Location == GameConfig.ChildLocationOrphanage ? "Orphanage" : "Unknown"
+                }).ToList();
+
+                // Raw ChildData for round-trip serialization (survives world sim restart)
+                var childrenRaw = familySystem.SerializeChildren();
+
+                var wrapper = new Dictionary<string, object>
+                {
+                    ["count"] = childrenData.Count,
+                    ["children"] = childrenData,
+                    ["childrenRaw"] = childrenRaw,
+                    ["updatedAt"] = DateTime.UtcNow.ToString("o")
+                };
+
+                var json = JsonSerializer.Serialize(wrapper, jsonOptions);
+                await sqlBackend.SaveWorldState("children", json);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save children state: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Load children from world_state on startup.
+        /// Reads the raw ChildData array saved by SaveChildrenState() and populates FamilySystem.
+        /// </summary>
+        private void LoadChildrenState()
+        {
+            try
+            {
+                var json = sqlBackend.LoadWorldState("children").GetAwaiter().GetResult();
+                if (string.IsNullOrEmpty(json)) return;
+
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("childrenRaw", out var rawElement))
+                {
+                    Console.Error.WriteLine("[WORLDSIM] No childrenRaw in world_state (legacy format). Children will start empty.");
+                    return;
+                }
+
+                var childDataList = JsonSerializer.Deserialize<List<ChildData>>(rawElement.GetRawText(), jsonOptions);
+                if (childDataList != null && childDataList.Count > 0)
+                {
+                    FamilySystem.Instance.DeserializeChildren(childDataList);
+                    Console.Error.WriteLine($"[WORLDSIM] Loaded {childDataList.Count} children from world_state");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load children from world_state: {ex.Message}");
+                Console.Error.WriteLine($"[WORLDSIM] Children load error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Save NPCMarriageRegistry to world_state.
+        /// Persists NPC-NPC marriages and affair states so they survive world sim restarts.
+        /// </summary>
+        private async Task SaveMarriageRegistryState()
+        {
+            try
+            {
+                var registry = NPCMarriageRegistry.Instance;
+                var marriages = registry.GetAllMarriages();
+                var affairs = registry.GetAllAffairs();
+
+                var data = new Dictionary<string, object>
+                {
+                    ["marriages"] = marriages,
+                    ["affairs"] = affairs,
+                    ["updatedAt"] = DateTime.UtcNow.ToString("o")
+                };
+
+                var json = JsonSerializer.Serialize(data, jsonOptions);
+                await sqlBackend.SaveWorldState(OnlineStateManager.KEY_MARRIAGES, json);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save marriage registry: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Load NPCMarriageRegistry from world_state on startup.
+        /// Falls back to rebuilding from NPC IsMarried/SpouseName fields if no data exists.
+        /// </summary>
+        private void LoadMarriageRegistryState()
+        {
+            try
+            {
+                var json = sqlBackend.LoadWorldState(OnlineStateManager.KEY_MARRIAGES).GetAwaiter().GetResult();
+                if (string.IsNullOrEmpty(json))
+                {
+                    // No saved data — rebuild from NPC fields as fallback
+                    RebuildMarriageRegistryFromNPCs();
+                    return;
+                }
+
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Restore marriages
+                if (root.TryGetProperty("marriages", out var marriagesEl))
+                {
+                    var marriageData = JsonSerializer.Deserialize<List<NPCMarriageData>>(marriagesEl.GetRawText(), jsonOptions);
+                    NPCMarriageRegistry.Instance.RestoreMarriages(marriageData);
+                    Console.Error.WriteLine($"[WORLDSIM] Loaded {marriageData?.Count ?? 0} NPC marriages from world_state");
+                }
+
+                // Restore affairs
+                if (root.TryGetProperty("affairs", out var affairsEl))
+                {
+                    var affairData = JsonSerializer.Deserialize<List<AffairState>>(affairsEl.GetRawText(), jsonOptions);
+                    NPCMarriageRegistry.Instance.RestoreAffairs(affairData);
+                    Console.Error.WriteLine($"[WORLDSIM] Loaded {affairData?.Count ?? 0} affairs from world_state");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load marriage registry from world_state: {ex.Message}");
+                Console.Error.WriteLine($"[WORLDSIM] Marriage registry load error: {ex.Message}. Rebuilding from NPCs.");
+                RebuildMarriageRegistryFromNPCs();
+            }
+        }
+
+        /// <summary>
+        /// Rebuild the marriage registry from NPC IsMarried/SpouseName fields.
+        /// This is a lossy fallback — we can reconstruct marriages but not affairs.
+        /// </summary>
+        private void RebuildMarriageRegistryFromNPCs()
+        {
+            var npcs = NPCSpawnSystem.Instance.ActiveNPCs;
+            int rebuilt = 0;
+
+            foreach (var npc in npcs)
+            {
+                if (npc.IsMarried && !string.IsNullOrEmpty(npc.SpouseName))
+                {
+                    var spouse = npcs.FirstOrDefault(n => n.Name == npc.SpouseName);
+                    if (spouse != null && !NPCMarriageRegistry.Instance.IsMarriedToNPC(npc.ID))
+                    {
+                        NPCMarriageRegistry.Instance.RegisterMarriage(npc.ID, spouse.ID, npc.Name, spouse.Name);
+                        rebuilt++;
+                    }
+                }
+            }
+
+            if (rebuilt > 0)
+                Console.Error.WriteLine($"[WORLDSIM] Rebuilt {rebuilt} marriages from NPC fields (fallback)");
+        }
+
+        /// <summary>
+        /// Save world events to world_state so they survive world sim restarts.
+        /// Uses the same WorldEventData format as OnlineStateManager.
+        /// </summary>
+        private async Task SaveWorldEventsState()
+        {
+            try
+            {
+                var activeEvents = WorldEventSystem.Instance.GetActiveEvents();
+                var eventDataList = new List<WorldEventData>();
+
+                // Save global state flags
+                eventDataList.Add(new WorldEventData
+                {
+                    Id = "global_state",
+                    Type = "GlobalState",
+                    Title = "Global State",
+                    Description = WorldEventSystem.Instance.CurrentKingDecree,
+                    Parameters = new Dictionary<string, object>
+                    {
+                        ["PlaguActive"] = WorldEventSystem.Instance.PlaguActive,
+                        ["WarActive"] = WorldEventSystem.Instance.WarActive,
+                        ["FestivalActive"] = WorldEventSystem.Instance.FestivalActive
+                    }
+                });
+
+                foreach (var evt in activeEvents)
+                {
+                    var eventData = new WorldEventData
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Type = evt.Type.ToString(),
+                        Title = evt.Title,
+                        Description = evt.Description,
+                        StartTime = DateTime.Now.AddDays(-evt.StartDay),
+                        EndTime = DateTime.Now.AddDays(evt.DaysRemaining),
+                        Parameters = new Dictionary<string, object>
+                        {
+                            ["DaysRemaining"] = evt.DaysRemaining,
+                            ["StartDay"] = evt.StartDay
+                        }
+                    };
+
+                    // Save effects as Effect_<key> parameters
+                    foreach (var effect in evt.Effects)
+                    {
+                        eventData.Parameters[$"Effect_{effect.Key}"] = effect.Value;
+                    }
+
+                    eventDataList.Add(eventData);
+                }
+
+                var json = JsonSerializer.Serialize(eventDataList, jsonOptions);
+                await sqlBackend.SaveWorldState(OnlineStateManager.KEY_WORLD_EVENTS, json);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save world events: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Load world events from world_state on startup.
+        /// Uses WorldEventSystem.RestoreFromSaveData() which already handles the WorldEventData format.
+        /// </summary>
+        private void LoadWorldEventsState()
+        {
+            try
+            {
+                var json = sqlBackend.LoadWorldState(OnlineStateManager.KEY_WORLD_EVENTS).GetAwaiter().GetResult();
+                if (string.IsNullOrEmpty(json)) return;
+
+                var eventDataList = JsonSerializer.Deserialize<List<WorldEventData>>(json, jsonOptions);
+                if (eventDataList != null && eventDataList.Count > 0)
+                {
+                    // Use current day = 0 as placeholder; RestoreFromSaveData reads each event's own StartDay
+                    WorldEventSystem.Instance.RestoreFromSaveData(eventDataList, 0);
+                    var activeCount = WorldEventSystem.Instance.GetActiveEvents().Count;
+                    Console.Error.WriteLine($"[WORLDSIM] Loaded {activeCount} active world events from world_state");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load world events: {ex.Message}");
+                Console.Error.WriteLine($"[WORLDSIM] World events load error: {ex.Message}");
             }
         }
 
@@ -270,6 +874,15 @@ namespace UsurperRemake.Systems
                     Team = data.Team,
                     CTurf = data.IsTeamLeader,
                     IsDead = data.IsDead,
+
+                    // Lifecycle - aging and natural death (with migration for legacy data)
+                    Age = data.Age > 0 ? data.Age : new Random().Next(18, 50),
+                    BirthDate = data.BirthDate > DateTime.MinValue
+                        ? data.BirthDate
+                        : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : new Random().Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
+                    IsAgedDeath = data.IsAgedDeath,
+                    PregnancyDueDate = data.PregnancyDueDate,
+
                     IsMarried = data.IsMarried,
                     Married = data.Married,
                     SpouseName = data.SpouseName ?? "",
@@ -278,6 +891,7 @@ namespace UsurperRemake.Systems
                     Chivalry = data.Chivalry,
                     Darkness = data.Darkness,
                     Gold = data.Gold,
+                    BankGold = data.BankGold,
                     AI = CharacterAI.Computer
                 };
 
@@ -344,6 +958,76 @@ namespace UsurperRemake.Systems
                         Passion = data.PersonalityProfile.Passion,
                         Tenderness = data.PersonalityProfile.Tenderness
                     };
+
+                    // Migration: fill in Intelligence/Patience/Mysticism/Trustworthiness/Caution
+                    // if they were never set (legacy data where these traits defaulted to 0)
+                    if (npc.Personality.Intelligence <= 0 && npc.Personality.Patience <= 0 &&
+                        npc.Personality.Mysticism <= 0 && npc.Personality.Trustworthiness <= 0)
+                    {
+                        var archetype = (data.Archetype ?? "citizen").ToLower();
+                        var rng = new Random(npc.Name.GetHashCode()); // Deterministic per NPC name
+                        float Rf() => (float)rng.NextDouble();
+
+                        switch (archetype)
+                        {
+                            case "thug": case "brawler":
+                                npc.Personality.Intelligence = Rf() * 0.4f + 0.1f;
+                                npc.Personality.Patience = Rf() * 0.3f + 0.1f;
+                                npc.Personality.Mysticism = Rf() * 0.2f;
+                                npc.Personality.Trustworthiness = Rf() * 0.3f + 0.1f;
+                                npc.Personality.Caution = Rf() * 0.3f + 0.1f;
+                                break;
+                            case "merchant": case "trader":
+                                npc.Personality.Intelligence = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Patience = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Mysticism = Rf() * 0.3f;
+                                npc.Personality.Trustworthiness = Rf() * 0.4f + 0.4f;
+                                npc.Personality.Caution = Rf() * 0.3f + 0.5f;
+                                break;
+                            case "noble": case "aristocrat":
+                                npc.Personality.Intelligence = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Patience = Rf() * 0.3f + 0.4f;
+                                npc.Personality.Mysticism = Rf() * 0.3f + 0.1f;
+                                npc.Personality.Trustworthiness = Rf() * 0.4f + 0.3f;
+                                npc.Personality.Caution = Rf() * 0.3f + 0.4f;
+                                break;
+                            case "guard": case "soldier":
+                                npc.Personality.Intelligence = Rf() * 0.4f + 0.3f;
+                                npc.Personality.Patience = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Mysticism = Rf() * 0.2f + 0.1f;
+                                npc.Personality.Trustworthiness = Rf() * 0.2f + 0.6f;
+                                npc.Personality.Caution = Rf() * 0.3f + 0.4f;
+                                break;
+                            case "priest": case "cleric":
+                                npc.Personality.Intelligence = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Patience = Rf() * 0.2f + 0.7f;
+                                npc.Personality.Mysticism = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Trustworthiness = Rf() * 0.2f + 0.7f;
+                                npc.Personality.Caution = Rf() * 0.3f + 0.5f;
+                                break;
+                            case "mystic": case "mage":
+                                npc.Personality.Intelligence = Rf() * 0.2f + 0.8f;
+                                npc.Personality.Patience = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Mysticism = Rf() * 0.2f + 0.8f;
+                                npc.Personality.Trustworthiness = Rf() * 0.5f + 0.2f;
+                                npc.Personality.Caution = Rf() * 0.4f + 0.4f;
+                                break;
+                            case "craftsman": case "artisan":
+                                npc.Personality.Intelligence = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Patience = Rf() * 0.2f + 0.6f;
+                                npc.Personality.Mysticism = Rf() * 0.3f + 0.1f;
+                                npc.Personality.Trustworthiness = Rf() * 0.3f + 0.5f;
+                                npc.Personality.Caution = Rf() * 0.3f + 0.4f;
+                                break;
+                            default: // citizen/commoner
+                                npc.Personality.Intelligence = Rf() * 0.6f + 0.2f;
+                                npc.Personality.Patience = Rf() * 0.6f + 0.2f;
+                                npc.Personality.Mysticism = Rf() * 0.4f + 0.1f;
+                                npc.Personality.Trustworthiness = Rf() * 0.6f + 0.2f;
+                                npc.Personality.Caution = Rf() * 0.6f + 0.2f;
+                                break;
+                        }
+                    }
                 }
                 npc.Archetype = data.Archetype ?? "citizen";
 
@@ -402,6 +1086,22 @@ namespace UsurperRemake.Systems
                             npc.Brain.Emotions?.AddEmotion(EmotionType.Fear, data.EmotionalState.Fear, 120);
                         if (data.EmotionalState.Trust > 0)
                             npc.Brain.Emotions?.AddEmotion(EmotionType.Gratitude, data.EmotionalState.Trust, 120);
+                        if (data.EmotionalState.Confidence > 0)
+                            npc.Brain.Emotions?.AddEmotion(EmotionType.Confidence, data.EmotionalState.Confidence, 120);
+                        if (data.EmotionalState.Sadness > 0)
+                            npc.Brain.Emotions?.AddEmotion(EmotionType.Sadness, data.EmotionalState.Sadness, 120);
+                        if (data.EmotionalState.Greed > 0)
+                            npc.Brain.Emotions?.AddEmotion(EmotionType.Greed, data.EmotionalState.Greed, 120);
+                        if (data.EmotionalState.Loneliness > 0)
+                            npc.Brain.Emotions?.AddEmotion(EmotionType.Loneliness, data.EmotionalState.Loneliness, 120);
+                        if (data.EmotionalState.Envy > 0)
+                            npc.Brain.Emotions?.AddEmotion(EmotionType.Envy, data.EmotionalState.Envy, 120);
+                        if (data.EmotionalState.Pride > 0)
+                            npc.Brain.Emotions?.AddEmotion(EmotionType.Pride, data.EmotionalState.Pride, 120);
+                        if (data.EmotionalState.Hope > 0)
+                            npc.Brain.Emotions?.AddEmotion(EmotionType.Hope, data.EmotionalState.Hope, 120);
+                        if (data.EmotionalState.Peace > 0)
+                            npc.Brain.Emotions?.AddEmotion(EmotionType.Peace, data.EmotionalState.Peace, 120);
                     }
                 }
 

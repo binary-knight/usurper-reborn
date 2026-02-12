@@ -248,7 +248,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
-        // Get all teams from NPCs
+        // Get all teams from NPCs, then merge in the player's team
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
         var teamGroups = allNPCs
             .Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive)
@@ -257,28 +257,53 @@ public class TeamCornerLocation : BaseLocation
             {
                 TeamName = g.Key,
                 MemberCount = g.Count(),
-                TotalPower = g.Sum(m => m.Level + (int)m.Strength + (int)m.Defence),
+                TotalPower = (long)g.Sum(m => m.Level + (int)m.Strength + (int)m.Defence),
                 AverageLevel = (int)g.Average(m => m.Level),
-                ControlsTurf = g.Any(m => m.CTurf)
+                ControlsTurf = g.Any(m => m.CTurf),
+                IsPlayerTeam = false
             })
-            .OrderByDescending(t => t.TotalPower)
             .ToList();
 
-        // Add player's team if exists and has no NPC members yet
+        // Merge the player into the team list
         if (!string.IsNullOrEmpty(currentPlayer.Team))
         {
-            var playerTeamExists = teamGroups.Any(t => t.TeamName == currentPlayer.Team);
-            if (!playerTeamExists)
+            long playerPower = currentPlayer.Level + (long)currentPlayer.Strength + (long)currentPlayer.Defence;
+            var existingTeam = teamGroups.FirstOrDefault(t => t.TeamName == currentPlayer.Team);
+            if (existingTeam != null)
             {
-                terminal.SetColor("bright_cyan");
-                terminal.WriteLine($"Your Team: {currentPlayer.Team}");
-                var playerPower = currentPlayer.Level + (int)currentPlayer.Strength + (int)currentPlayer.Defence;
-                terminal.WriteLine($"  Members: 1 (just you), Power: {playerPower}, Turf: {(currentPlayer.CTurf ? "Yes" : "No")}");
-                terminal.WriteLine("");
+                // Player's team has NPC members too - add the player's stats
+                teamGroups.Remove(existingTeam);
+                int totalMembers = existingTeam.MemberCount + 1;
+                long totalPower = existingTeam.TotalPower + playerPower;
+                teamGroups.Add(new
+                {
+                    TeamName = existingTeam.TeamName,
+                    MemberCount = totalMembers,
+                    TotalPower = totalPower,
+                    AverageLevel = (int)(totalPower / totalMembers),
+                    ControlsTurf = existingTeam.ControlsTurf || currentPlayer.CTurf,
+                    IsPlayerTeam = true
+                });
+            }
+            else
+            {
+                // Player-only team (no NPC members)
+                teamGroups.Add(new
+                {
+                    TeamName = currentPlayer.Team,
+                    MemberCount = 1,
+                    TotalPower = playerPower,
+                    AverageLevel = currentPlayer.Level,
+                    ControlsTurf = currentPlayer.CTurf,
+                    IsPlayerTeam = true
+                });
             }
         }
 
-        if (teamGroups.Count == 0 && string.IsNullOrEmpty(currentPlayer.Team))
+        // Sort by power descending
+        teamGroups = teamGroups.OrderByDescending(t => t.TotalPower).ToList();
+
+        if (teamGroups.Count == 0)
         {
             terminal.SetColor("yellow");
             terminal.WriteLine("No teams have been formed yet.");
@@ -296,13 +321,14 @@ public class TeamCornerLocation : BaseLocation
             {
                 if (team.ControlsTurf)
                     terminal.SetColor("bright_yellow");
-                else if (team.TeamName == currentPlayer.Team)
+                else if (team.IsPlayerTeam)
                     terminal.SetColor("bright_cyan");
                 else
                     terminal.SetColor("white");
 
                 string turfMark = team.ControlsTurf ? "*" : "-";
-                terminal.WriteLine($"{rank,-5} {team.TeamName,-24} {team.MemberCount,-6} {team.TotalPower,-8} {team.AverageLevel,-8} {turfMark,-5}");
+                string nameDisplay = team.IsPlayerTeam ? $"{team.TeamName} (you)" : team.TeamName;
+                terminal.WriteLine($"{rank,-5} {nameDisplay,-24} {team.MemberCount,-6} {team.TotalPower,-8} {team.AverageLevel,-8} {turfMark,-5}");
                 rank++;
             }
 

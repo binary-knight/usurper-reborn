@@ -242,6 +242,9 @@ public class AdvancedMagicShopLocation : BaseLocation
         // Apply city control discount if player's team controls the city
         long adjustedCost = CityControlSystem.Instance.ApplyDiscount(identifyCost, player);
 
+        // Calculate total with tax
+        var (idKingTax, idCityTax, idTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedCost);
+
         terminal.WriteLine($"\n{GameConfig.MagicColor}=== Item Identification ==={GameConfig.TextColor}");
         if (adjustedCost < identifyCost)
         {
@@ -254,7 +257,10 @@ public class AdvancedMagicShopLocation : BaseLocation
             terminal.WriteLine($"Identification cost: {GameConfig.GoldColor}{adjustedCost:N0}{GameConfig.TextColor} gold");
         }
 
-        if (player.Gold < adjustedCost)
+        // Show tax breakdown
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Identification", adjustedCost);
+
+        if (player.Gold < idTotalWithTax)
         {
             terminal.WriteLine($"\n{GameConfig.ErrorColor}You don't have enough gold!{GameConfig.TextColor}");
             await terminal.WaitForKeyPress();
@@ -287,10 +293,10 @@ public class AdvancedMagicShopLocation : BaseLocation
 
         var itemIndex = unidentifiedItems[choice - 1];
 
-        // Charge gold
-        player.Gold -= adjustedCost;
+        // Charge gold (including tax)
+        player.Gold -= idTotalWithTax;
 
-        // Process city tax share from this sale
+        // Process city tax share from this sale (based on base price after discount)
         CityControlSystem.Instance.ProcessSaleTax(adjustedCost);
 
         // Identify the item (Pascal identification logic)
@@ -369,6 +375,9 @@ public class AdvancedMagicShopLocation : BaseLocation
         // Apply city control discount if player's team controls the city
         long adjustedCost = CityControlSystem.Instance.ApplyDiscount(totalCost, player);
 
+        // Calculate total with tax
+        var (potionKingTax, potionCityTax, potionTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedCost);
+
         // Confirm purchase
         if (adjustedCost < totalCost)
         {
@@ -380,6 +389,17 @@ public class AdvancedMagicShopLocation : BaseLocation
         {
             terminal.WriteLine($"\nTotal cost: {GameConfig.GoldColor}{adjustedCost:N0}{GameConfig.TextColor} gold");
         }
+
+        // Show tax breakdown
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Healing Potions", adjustedCost);
+
+        if (player.Gold < potionTotalWithTax)
+        {
+            terminal.WriteLine($"\n{GameConfig.ErrorColor}You can't afford that with tax included!{GameConfig.TextColor}");
+            await terminal.WaitForKeyPress();
+            return;
+        }
+
         terminal.Write("Confirm purchase? (Y/N): ");
 
         var confirm = await terminal.GetKeyCharAsync();
@@ -390,11 +410,11 @@ public class AdvancedMagicShopLocation : BaseLocation
             return;
         }
 
-        // Process purchase
-        player.Gold -= adjustedCost;
+        // Process purchase (including tax)
+        player.Gold -= potionTotalWithTax;
         player.Healing += quantity; // Add to healing potion count
 
-        // Process city tax share from this sale
+        // Process city tax share from this sale (based on base price after discount)
         CityControlSystem.Instance.ProcessSaleTax(adjustedCost);
 
         terminal.WriteLine($"\n{GameConfig.SuccessColor}You purchased {quantity} healing potions!{GameConfig.TextColor}");
@@ -469,7 +489,10 @@ public class AdvancedMagicShopLocation : BaseLocation
         // Apply city control discount if player's team controls the city
         long adjustedPrice = CityControlSystem.Instance.ApplyDiscount(selectedItem.Price, player);
 
-        if (player.Gold < adjustedPrice)
+        // Calculate total with tax
+        var (buyKingTax, buyCityTax, buyTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
+
+        if (player.Gold < buyTotalWithTax)
         {
             terminal.WriteLine($"\n{GameConfig.ErrorColor}You cannot afford this item!{GameConfig.TextColor}");
             await terminal.WaitForKeyPress();
@@ -485,14 +508,17 @@ public class AdvancedMagicShopLocation : BaseLocation
             return;
         }
 
-        // Complete purchase
-        player.Gold -= adjustedPrice;
+        // Show tax breakdown
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, selectedItem.Name, adjustedPrice);
+
+        // Complete purchase (including tax)
+        player.Gold -= buyTotalWithTax;
 
         // Store in legacy inventory slot
         player.Item[emptySlot] = selectedItem.ItemId;
         player.ItemType[emptySlot] = selectedItem.Type;
 
-        // Process city tax share from this sale
+        // Process city tax share from this sale (based on base price after discount)
         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
 
         if (adjustedPrice < selectedItem.Price)

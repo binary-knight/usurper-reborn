@@ -1951,7 +1951,7 @@ public abstract class BaseLocation
 
     // Track last ambush to prevent constant ambushes
     private static int _travelsSinceLastAmbush = 0;
-    private const int MIN_TRAVELS_BETWEEN_AMBUSHES = 3;
+    private const int MIN_TRAVELS_BETWEEN_AMBUSHES = 12;
 
     /// <summary>
     /// Check for and handle faction ambushes while traveling
@@ -1987,8 +1987,8 @@ public abstract class BaseLocation
 
         // Scale chance slightly by number of hostile NPCs (more enemies = slightly more danger)
         // But cap the bonus to prevent runaway scaling
-        int hostileBonus = Math.Min(10, potentialAmbushers.Count);
-        ambushChance = Math.Min(40, ambushChance + hostileBonus); // Cap at 40%
+        int hostileBonus = Math.Min(3, potentialAmbushers.Count / 5);
+        ambushChance = Math.Min(20, ambushChance + hostileBonus); // Cap at 20%
 
         if (random.Next(100) < ambushChance)
         {

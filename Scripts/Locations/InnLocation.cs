@@ -569,14 +569,21 @@ public class InnLocation : BaseLocation
     /// </summary>
     private async Task BuyDrink()
     {
-        if (currentPlayer.Gold < 5)
+        long drinkBasePrice = 5;
+        var (drinkKingTax, drinkCityTax, drinkTotalWithTax) = CityControlSystem.CalculateTaxedPrice(drinkBasePrice);
+
+        if (currentPlayer.Gold < drinkTotalWithTax)
         {
             terminal.WriteLine("You don't have enough gold for a drink!", "red");
             await Task.Delay(2000);
             return;
         }
-        
-        currentPlayer.Gold -= 5;
+
+        // Show tax breakdown
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Drink", drinkBasePrice);
+
+        currentPlayer.Gold -= drinkTotalWithTax;
+        CityControlSystem.Instance.ProcessSaleTax(drinkBasePrice);
         currentPlayer.DrinksLeft--;
         
         terminal.SetColor("green");
@@ -1792,14 +1799,21 @@ public class InnLocation : BaseLocation
     /// </summary>
     private async Task OrderFood()
     {
-        if (currentPlayer.Gold < 10)
+        long mealBasePrice = 10;
+        var (mealKingTax, mealCityTax, mealTotalWithTax) = CityControlSystem.CalculateTaxedPrice(mealBasePrice);
+
+        if (currentPlayer.Gold < mealTotalWithTax)
         {
             terminal.WriteLine("You don't have enough gold for a meal!", "red");
             await Task.Delay(2000);
             return;
         }
-        
-        currentPlayer.Gold -= 10;
+
+        // Show tax breakdown
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Meal", mealBasePrice);
+
+        currentPlayer.Gold -= mealTotalWithTax;
+        CityControlSystem.Instance.ProcessSaleTax(mealBasePrice);
         
         terminal.WriteLine("You order a hearty meal of roasted meat and bread.", "green");
         terminal.WriteLine("The food fills your belly and boosts your stamina!");

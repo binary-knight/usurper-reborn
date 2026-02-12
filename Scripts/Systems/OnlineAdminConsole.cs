@@ -125,6 +125,9 @@ namespace UsurperRemake.Systems
                     case "A":
                         await BroadcastMessage();
                         break;
+                    case "P":
+                        await ResetPlayerPassword();
+                        break;
                     case "W":
                         await FullGameReset();
                         break;
@@ -156,6 +159,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("  [3] Unban Player");
             terminal.WriteLine("  [4] Delete Player");
             terminal.WriteLine("  [5] Edit Player");
+            terminal.WriteLine("  [P] Reset Player Password");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
@@ -480,6 +484,44 @@ namespace UsurperRemake.Systems
             terminal.SetColor("green");
             terminal.WriteLine($"Player '{target.DisplayName}' has been permanently deleted.");
             DebugLogger.Instance.LogWarning("ADMIN", $"Player '{target.DisplayName}' deleted by {DoorMode.OnlineUsername}");
+            await ReadInput("Press Enter to continue...");
+        }
+
+        private async Task ResetPlayerPassword()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("═══ RESET PLAYER PASSWORD ═══");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            var username = await ReadInput("Enter username (or blank to cancel): ");
+            if (string.IsNullOrWhiteSpace(username))
+                return;
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Setting new password for '{username}'.");
+            terminal.WriteLine("The player will use this password to log in.");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.Write("Enter new password (min 4 chars): ");
+            var newPassword = await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true));
+            if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Password must be at least 4 characters. Cancelled.");
+                await ReadInput("Press Enter to continue...");
+                return;
+            }
+
+            var (success, message) = backend.AdminResetPassword(username, newPassword);
+            terminal.SetColor(success ? "green" : "red");
+            terminal.WriteLine(message);
+
+            if (success)
+                DebugLogger.Instance.LogWarning("ADMIN", $"Password reset for '{username}' by {DoorMode.OnlineUsername}");
+
             await ReadInput("Press Enter to continue...");
         }
 
