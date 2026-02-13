@@ -196,6 +196,7 @@ All NPCs showed 95%+ happiness, confidence, greed, and fear simultaneously. Emot
 - Transient emotions now modulate baselines by ±15% instead of overriding them
 - Result: NPCs now have distinct emotional profiles that reflect their personality (e.g., aggressive NPCs show high anger/low peace, sociable NPCs show high happiness/trust)
 
+
 ### Backspace in SSH/Online Mode (Critical)
 Backspace key produced garbage characters instead of erasing text. Affected both the login screen and in-game input.
 

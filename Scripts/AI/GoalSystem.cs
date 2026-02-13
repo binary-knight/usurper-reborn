@@ -43,11 +43,21 @@ public partial class GoalSystem
     
     public void UpdateGoals(NPC owner, WorldState world, MemorySystem memory, EmotionalState emotions)
     {
+        // Prune old completed/inactive goals to prevent unbounded list growth
+        if (goals.Count > 30)
+        {
+            goals.RemoveAll(g => (g.IsCompleted || !g.IsActive)
+                && (DateTime.Now - g.CreatedTime).TotalHours > 24);
+        }
+
         // Decay goal priorities over time
         foreach (var goal in goals)
         {
+            // Skip goals that are already completed or inactive
+            if (goal.IsCompleted || !goal.IsActive) continue;
+
             goal.Priority *= 0.995f; // Slow decay
-            
+
             // Check if goal should be completed or abandoned
             if (IsGoalCompleted(goal, owner, world))
             {

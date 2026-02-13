@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.29.1";
+    public const string Version = "0.29.2";
     public const string VersionName = "The Observatory";
 
     // From Pascal global_maxXX constants

@@ -563,11 +563,30 @@ public class WorldSimulator
                     _pregnancyFathers.Remove(npc.Name2 ?? npc.Name);
                 }
 
+                // Try to find the father - first alive, then even dead (for the child record)
                 var father = npcs.FirstOrDefault(n =>
                     n.Name2 == fatherName && n.IsAlive && !n.IsDead);
+
+                // If father is dead/missing, still create the child (use any NPC with that name)
+                if (father == null)
+                {
+                    father = npcs.FirstOrDefault(n => n.Name2 == fatherName);
+                }
+
                 if (father != null)
                 {
                     FamilySystem.Instance?.CreateNPCChild(npc, father);
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
+                        $"Child born to {npc.Name2} and {father.Name2}!");
+                    Console.Error.WriteLine($"[WORLDSIM] Birth: {npc.Name2} and {father.Name2} had a child!");
+                }
+                else
+                {
+                    // Father completely gone from the game - create child with mother only
+                    UsurperRemake.Systems.DebugLogger.Instance.LogWarning("LIFECYCLE",
+                        $"Birth: father '{fatherName}' not found for {npc.Name2}'s pregnancy. Creating child anyway.");
+                    Console.Error.WriteLine($"[WORLDSIM] Birth: father '{fatherName}' not found, creating child with mother only");
+                    FamilySystem.Instance?.CreateNPCChild(npc, npc); // Use mother as both parents
                 }
                 npc.PregnancyDueDate = null;
             }
@@ -3188,6 +3207,28 @@ public class WorldSimulator
         var player = GameEngine.Instance?.CurrentPlayer as Player;
         string? playerTeam = (!string.IsNullOrEmpty(player?.Team)) ? player.Team : null;
 
+        // Dissolve any 1-member teams (cleanup for teams that lost members to death/departure)
+        var soloTeams = teamMembers
+            .GroupBy(n => n.Team, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() == 1)
+            .ToList();
+        foreach (var soloGroup in soloTeams)
+        {
+            var solo = soloGroup.First();
+            // Don't dissolve the player's team
+            if (playerTeam != null && solo.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var oldTeam = solo.Team;
+            solo.Team = "";
+            solo.TeamPW = "";
+            solo.CTurf = false;
+            solo.TeamRec = 0;
+            NewsSystem.Instance.Newsy(true, $"The team '{oldTeam}' has disbanded as {solo.DisplayName} went solo!");
+        }
+
+        // Re-fetch after cleanup
+        teamMembers = npcs.Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive).ToList();
+
         foreach (var member in teamMembers)
         {
             // Never remove NPCs from the player's team via world simulation
@@ -3220,11 +3261,24 @@ public class WorldSimulator
                     GameEngine.AddNotification($"{member.DisplayName} has abandoned your team!");
                 }
 
-                // Check if team is now empty
+                // Check if team is now empty or solo
                 var remainingMembers = npcs.Count(n => n.Team == oldTeam && n.IsAlive);
                 if (remainingMembers == 0)
                 {
                     NewsSystem.Instance.Newsy(true, $"The team '{oldTeam}' has been disbanded!");
+                }
+                else if (remainingMembers == 1)
+                {
+                    // Dissolve single-member teams — can't be a team of one
+                    var soloMember = npcs.FirstOrDefault(n => n.Team == oldTeam && n.IsAlive);
+                    if (soloMember != null)
+                    {
+                        soloMember.Team = "";
+                        soloMember.TeamPW = "";
+                        soloMember.CTurf = false;
+                        soloMember.TeamRec = 0;
+                        NewsSystem.Instance.Newsy(true, $"The team '{oldTeam}' has disbanded as {soloMember.DisplayName} went solo!");
+                    }
                 }
             }
         }

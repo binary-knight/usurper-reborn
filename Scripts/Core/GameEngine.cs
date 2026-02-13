@@ -1434,8 +1434,9 @@ public partial class GameEngine : Node
         {
             // Load children from world_state (maintained by WorldSimService)
             var sharedChildren = await OnlineStateManager.Instance.LoadSharedChildren();
-            if (sharedChildren != null && sharedChildren.Count > 0)
+            if (sharedChildren != null)
             {
+                // Empty list is valid — means all children aged out or were converted to NPCs
                 FamilySystem.Instance.DeserializeChildren(sharedChildren);
                 DebugLogger.Instance.LogInfo("ONLINE", $"Children overridden from world_state: {sharedChildren.Count} children");
             }
@@ -1455,8 +1456,9 @@ public partial class GameEngine : Node
 
             // Load world events from world_state so player sees active plagues, festivals, etc.
             var sharedEvents = await OnlineStateManager.Instance.LoadSharedWorldEvents();
-            if (sharedEvents != null && sharedEvents.Count > 0)
+            if (sharedEvents != null)
             {
+                // Empty list is valid — means no active world events
                 WorldEventSystem.Instance.RestoreFromSaveData(sharedEvents, 0);
                 DebugLogger.Instance.LogInfo("ONLINE", $"World events loaded from world_state: {WorldEventSystem.Instance.GetActiveEvents().Count} active events");
             }

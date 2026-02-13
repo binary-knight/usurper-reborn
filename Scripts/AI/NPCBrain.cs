@@ -92,9 +92,10 @@ public class NPCBrain
     {
         if (personality.IsLikelyToJoinGang())
         {
-            if (string.IsNullOrEmpty(owner.Team))
+            if (string.IsNullOrEmpty(owner.Team) && string.IsNullOrEmpty(owner.GangId))
             {
-                goals.AddGoal(new Goal("Find Gang to Join", GoalType.Social, 0.6f));
+                if (!goals.AllGoals.Any(g => g.Name.Contains("Gang") || g.Name.Contains("Join")))
+                    goals.AddGoal(new Goal("Find Gang to Join", GoalType.Social, 0.6f));
             }
             else
             {
@@ -332,11 +333,12 @@ public class NPCBrain
     private void ProcessGangBehavior()
     {
         lastActivities["gang_behavior"] = DateTime.Now;
-        
-        if (string.IsNullOrEmpty(owner.Team))
+
+        if (string.IsNullOrEmpty(owner.Team) && string.IsNullOrEmpty(owner.GangId))
         {
             // Not in a gang - consider joining one
-            if (personality.IsLikelyToJoinGang() && random.Next(10) == 0)
+            if (personality.IsLikelyToJoinGang() && random.Next(10) == 0
+                && !goals.AllGoals.Any(g => g.Name.Contains("Gang") || g.Name.Contains("Join")))
             {
                 goals.AddGoal(new Goal("Find Gang to Join", GoalType.Social, 0.7f));
                 memory.AddMemory("I should look for a gang to join", "social", DateTime.Now);

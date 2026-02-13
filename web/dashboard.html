@@ -48,79 +48,7 @@
             z-index: 1000;
         }
 
-        /* --- Login Screen --- */
-        #login-screen {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .login-box {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 40px;
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-        .login-box h1 {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 13px;
-            color: var(--cyan);
-            text-shadow: var(--glow-cyan);
-            margin-bottom: 4px;
-        }
-        .login-box .subtitle {
-            color: var(--text-dim);
-            font-size: 12px;
-            margin-bottom: 24px;
-        }
-        .login-box input {
-            width: 100%;
-            padding: 10px 14px;
-            margin-bottom: 12px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            color: var(--text);
-            font-size: 14px;
-            font-family: 'JetBrains Mono', monospace;
-            outline: none;
-        }
-        .login-box input:focus { border-color: var(--cyan); }
-        .login-box .btn-row { display: flex; gap: 10px; margin-top: 8px; }
-        .login-box button {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-primary {
-            background: var(--cyan-dim);
-            color: #fff;
-            border-color: var(--cyan) !important;
-        }
-        .btn-primary:hover { background: var(--cyan); color: #000; }
-        .btn-secondary {
-            background: transparent;
-            color: var(--text-dim);
-        }
-        .btn-secondary:hover { background: var(--bg-card-hover); color: var(--text); }
-        .login-error {
-            color: var(--red);
-            font-size: 12px;
-            margin-top: 8px;
-            min-height: 18px;
-        }
-
         /* --- Dashboard Layout --- */
-        #dashboard { display: none; }
         .dash-header {
             padding: 12px 20px;
             border-bottom: 1px solid var(--border);
@@ -214,6 +142,7 @@
             grid-template-columns: 1fr 380px;
             gap: 16px;
             margin-bottom: 16px;
+            align-items: start;
         }
         @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
         .card {
@@ -264,7 +193,13 @@
         .map-npc-dot:hover ~ .map-npc-tooltip { opacity: 1; }
 
         /* --- Detail Panel --- */
-        .detail-panel { min-height: 400px; }
+        .detail-panel {
+            min-height: 400px;
+            max-height: calc(100vh - 80px);
+            overflow-y: auto;
+            position: sticky;
+            top: 64px;
+        }
         .detail-empty {
             color: var(--text-dim);
             font-size: 13px;
@@ -908,28 +843,12 @@
 </head>
 <body>
 
-<!-- Login Screen -->
-<div id="login-screen">
-    <div class="login-box">
-        <h1>USURPER REBORN</h1>
-        <div class="subtitle">NPC Analytics Dashboard</div>
-        <input type="text" id="auth-user" placeholder="Username" autocomplete="username" maxlength="30">
-        <input type="password" id="auth-pass" placeholder="Password" autocomplete="current-password" maxlength="100">
-        <div class="btn-row">
-            <button class="btn-primary" onclick="doLogin()">Login</button>
-            <button class="btn-secondary" onclick="doRegister()">Register</button>
-        </div>
-        <div class="login-error" id="auth-error"></div>
-    </div>
-</div>
-
 <!-- Dashboard -->
 <div id="dashboard">
     <div class="dash-header">
         <div class="dash-logo">USURPER REBORN <span>NPC ANALYTICS</span></div>
         <div class="dash-user">
-            <span id="dash-username"></span>
-            <button onclick="doLogout()">Logout</button>
+            <a href="/" style="color:var(--text-dim);text-decoration:none;font-size:12px;">Back to Main Site</a>
         </div>
     </div>
     <div class="dash-body">
@@ -1183,91 +1102,15 @@
 // Auth
 // ==========================================
 const API = '/api/dash';
-let currentUser = null;
-
 function escapeHtml(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-async function apiPost(path, body) {
-    const res = await fetch(API + path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(body)
-    });
-    return res.json();
-}
-
 async function apiGet(path) {
-    const res = await fetch(API + path, { credentials: 'same-origin' });
-    if (res.status === 401) { showLogin(); return null; }
+    const res = await fetch(API + path);
     return res.json();
 }
-
-function showLogin() {
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('dashboard').style.display = 'none';
-    if (feedSource) { feedSource.close(); feedSource = null; }
-}
-
-function showDashboard(username) {
-    currentUser = username;
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    document.getElementById('dash-username').textContent = username;
-    initDashboard();
-}
-
-async function checkSession() {
-    try {
-        const res = await fetch(API + '/check', { credentials: 'same-origin' });
-        if (res.ok) {
-            const data = await res.json();
-            if (data.username) { showDashboard(data.username); return; }
-        }
-    } catch (e) {}
-    showLogin();
-}
-
-async function doLogin() {
-    const u = document.getElementById('auth-user').value.trim();
-    const p = document.getElementById('auth-pass').value;
-    const err = document.getElementById('auth-error');
-    if (!u || !p) { err.textContent = 'Username and password required'; return; }
-    try {
-        const data = await apiPost('/login', { username: u, password: p });
-        if (data.ok) { err.textContent = ''; showDashboard(data.username); }
-        else { err.textContent = data.error || 'Login failed'; }
-    } catch (e) { err.textContent = 'Connection error'; }
-}
-
-async function doRegister() {
-    const u = document.getElementById('auth-user').value.trim();
-    const p = document.getElementById('auth-pass').value;
-    const err = document.getElementById('auth-error');
-    if (!u || !p) { err.textContent = 'Username and password required'; return; }
-    if (p.length < 6) { err.textContent = 'Password must be at least 6 characters'; return; }
-    try {
-        const data = await apiPost('/register', { username: u, password: p });
-        if (data.ok) { err.textContent = ''; showDashboard(data.username); }
-        else { err.textContent = data.error || 'Registration failed'; }
-    } catch (e) { err.textContent = 'Connection error'; }
-}
-
-async function doLogout() {
-    try { await apiPost('/logout', {}); } catch (e) {}
-    showLogin();
-}
-
-// Enter key triggers login
-document.getElementById('auth-pass').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') doLogin();
-});
-document.getElementById('auth-user').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') document.getElementById('auth-pass').focus();
-});
 
 // ==========================================
 // Dashboard State
@@ -1916,12 +1759,17 @@ function showNpcDetail(n) {
         html += '</div>';
     }
 
-    // Goals
+    // Goals (deduplicated, capped at 10)
     const goals = n.currentGoals || n.CurrentGoals;
     if (goals && goals.length > 0) {
         html += '<div class="detail-section"><h4>Active Goals</h4>';
-        goals.filter(g => g.isActive || g.IsActive).forEach(g => {
+        const seen = new Set();
+        let count = 0;
+        goals.filter(g => g.isActive || g.IsActive).sort((a,b) => (b.priority||b.Priority||0) - (a.priority||a.Priority||0)).forEach(g => {
             const gname = g.name || g.Name || '?';
+            if (seen.has(gname) || count >= 10) return;
+            seen.add(gname);
+            count++;
             const gtype = g.type || g.Type || '';
             const gprio = (g.priority || g.Priority || 0).toFixed(2);
             html += '<div class="goal-item">'
@@ -3316,13 +3164,19 @@ showNpcDetail = function(n) {
         html += '</div>';
     }
 
-    // Goals
+    // Goals (deduplicated, capped at 10)
     const goals = n.currentGoals || n.CurrentGoals;
     if (goals && goals.length > 0) {
         html += '<div class="detail-section"><h4>Active Goals</h4>';
-        goals.filter(g => g.isActive || g.IsActive).forEach(g => {
+        const seen = new Set();
+        let count = 0;
+        goals.filter(g => g.isActive || g.IsActive).sort((a,b) => (b.priority||b.Priority||0) - (a.priority||a.Priority||0)).forEach(g => {
+            const gname = g.name || g.Name || '?';
+            if (seen.has(gname) || count >= 10) return;
+            seen.add(gname);
+            count++;
             html += '<div class="goal-item">'
-                + '<span class="goal-name">' + escapeHtml(g.name || g.Name || '?') + '</span>'
+                + '<span class="goal-name">' + escapeHtml(gname) + '</span>'
                 + '<span class="goal-type">' + escapeHtml(g.type || g.Type || '') + '</span>'
                 + '<span class="goal-prio">' + (g.priority || g.Priority || 0).toFixed(2) + '</span></div>';
         });
@@ -3637,7 +3491,7 @@ connectSSE = function() {
 // ==========================================
 // Init
 // ==========================================
-checkSession();
+initDashboard();
 </script>
 </body>
 </html>

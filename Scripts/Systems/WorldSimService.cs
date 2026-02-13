@@ -229,7 +229,44 @@ namespace UsurperRemake.Systems
                 {
                     Console.Error.WriteLine($"[WORLDSIM] NPC data modified by game server (v{lastNpcVersion} → v{currentNpcVersion}). Reloading to pick up player changes...");
                     DebugLogger.Instance.LogInfo("WORLDSIM", $"Reloading NPC state: version {lastNpcVersion} → {currentNpcVersion}");
+
+                    // Capture world-sim-managed state BEFORE reloading from DB.
+                    // Player sessions write stale NPC data that may overwrite active pregnancies,
+                    // marriage state changes, or other world-sim-driven mutations.
+                    var activePregnancies = new Dictionary<string, DateTime>();
+                    foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
+                    {
+                        if (npc.PregnancyDueDate.HasValue)
+                        {
+                            var key = npc.Name2 ?? npc.Name1;
+                            activePregnancies[key] = npc.PregnancyDueDate.Value;
+                        }
+                    }
+
                     await LoadWorldState();
+
+                    // Merge back pregnancies that the player session overwrote with stale data
+                    if (activePregnancies.Count > 0)
+                    {
+                        int restored = 0;
+                        foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
+                        {
+                            var key = npc.Name2 ?? npc.Name1;
+                            if (!npc.PregnancyDueDate.HasValue && activePregnancies.TryGetValue(key, out var dueDate))
+                            {
+                                // Only restore if the due date hasn't already passed
+                                // (if it passed, the pregnancy should have been processed before the reload)
+                                npc.PregnancyDueDate = dueDate;
+                                restored++;
+                            }
+                        }
+                        if (restored > 0)
+                        {
+                            Console.Error.WriteLine($"[WORLDSIM] Restored {restored} active pregnancies that were overwritten by player save");
+                            DebugLogger.Instance.LogInfo("WORLDSIM", $"Restored {restored} pregnancies after player-triggered reload");
+                        }
+                    }
+
                     // Reload royal court too (NPC changes often accompany king changes)
                     LoadRoyalCourtFromWorldState();
                     lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
@@ -627,8 +664,9 @@ namespace UsurperRemake.Systems
                 }
 
                 var childDataList = JsonSerializer.Deserialize<List<ChildData>>(rawElement.GetRawText(), jsonOptions);
-                if (childDataList != null && childDataList.Count > 0)
+                if (childDataList != null)
                 {
+                    // Empty list is valid — means all children aged out or were converted to NPCs
                     FamilySystem.Instance.DeserializeChildren(childDataList);
                     Console.Error.WriteLine($"[WORLDSIM] Loaded {childDataList.Count} children from world_state");
                 }

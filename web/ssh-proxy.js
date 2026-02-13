@@ -1,7 +1,7 @@
 // Usurper Reborn - WebSocket to SSH Bridge + Stats API + NPC Analytics Dashboard
 // Proxies browser terminal connections to the game's SSH server
 // Serves /api/stats endpoint with live game statistics
-// Serves /api/dash/* endpoints for authenticated NPC analytics dashboard
+// Serves /api/dash/* endpoints for NPC analytics dashboard
 
 const http = require('http');
 const https = require('https');
@@ -27,11 +27,7 @@ const FEED_POLL_MS = 5000; // SSE feed polls DB every 5 seconds
 const GITHUB_PAT = process.env.GITHUB_PAT || '';
 const SPONSORS_CACHE_TTL = 3600000; // 1 hour
 
-// Dashboard auth constants
-const PBKDF2_ITERATIONS = 100000;
-const PBKDF2_KEYLEN = 64;
-const PBKDF2_DIGEST = 'sha256';
-const SESSION_TTL_DAYS = 7;
+// Dashboard cache constants
 const DASH_NPC_CACHE_TTL = 10000; // 10 seconds
 const DASH_EVENTS_CACHE_TTL = 5000; // 5 seconds
 const DASH_HOURLY_CACHE_TTL = 60000; // 60 seconds
@@ -79,83 +75,6 @@ if (Database) {
     console.log(`[usurper-web] Database connected (writable): ${DB_PATH}`);
   } catch (err) {
     console.error(`[usurper-web] Writable database not available: ${err.message}`);
-  }
-}
-
-// --- Dashboard Auth Tables ---
-function initDashboardTables() {
-  if (!dbWrite) return;
-  try {
-    dbWrite.exec(`
-      CREATE TABLE IF NOT EXISTS dashboard_users (
-        username TEXT PRIMARY KEY,
-        password_hash TEXT NOT NULL,
-        salt TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        last_login TEXT
-      );
-      CREATE TABLE IF NOT EXISTS dashboard_sessions (
-        token TEXT PRIMARY KEY,
-        username TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        expires_at TEXT NOT NULL
-      );
-    `);
-    console.log('[usurper-web] Dashboard auth tables initialized');
-  } catch (err) {
-    console.error(`[usurper-web] Failed to create dashboard tables: ${err.message}`);
-  }
-}
-initDashboardTables();
-
-// --- Dashboard Auth Functions ---
-function hashPassword(password, salt) {
-  if (!salt) salt = crypto.randomBytes(32).toString('hex');
-  const hash = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST).toString('hex');
-  return { hash, salt };
-}
-
-function verifyPassword(password, storedHash, storedSalt) {
-  const { hash } = hashPassword(password, storedSalt);
-  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
-}
-
-function createSession(username) {
-  if (!dbWrite) return null;
-  const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  try {
-    dbWrite.prepare('INSERT INTO dashboard_sessions (token, username, expires_at) VALUES (?, ?, ?)').run(token, username, expiresAt);
-    dbWrite.prepare('UPDATE dashboard_users SET last_login = datetime(\'now\') WHERE username = ?').run(username);
-    return token;
-  } catch (err) {
-    console.error(`[usurper-web] Failed to create session: ${err.message}`);
-    return null;
-  }
-}
-
-function parseCookies(cookieHeader) {
-  const cookies = {};
-  if (!cookieHeader) return cookies;
-  cookieHeader.split(';').forEach(c => {
-    const [key, ...val] = c.trim().split('=');
-    if (key) cookies[key] = val.join('=');
-  });
-  return cookies;
-}
-
-function requireDashAuth(req) {
-  if (!dbWrite) return null;
-  const cookies = parseCookies(req.headers.cookie);
-  const token = cookies.dash_token;
-  if (!token) return null;
-  try {
-    // Prune expired sessions lazily
-    dbWrite.prepare("DELETE FROM dashboard_sessions WHERE expires_at < datetime('now')").run();
-    const session = dbWrite.prepare('SELECT username FROM dashboard_sessions WHERE token = ? AND expires_at > datetime(\'now\')').get(token);
-    return session ? session.username : null;
-  } catch (err) {
-    return null;
   }
 }
 
@@ -672,16 +591,15 @@ function getStats() {
       GROUP BY class_id ORDER BY cnt DESC LIMIT 1
     `).get();
 
-    // Children count
+    // Children count (from world_state - authoritative source maintained by world sim)
     let childrenCount = 0;
     try {
-      const childResult = db.prepare(`
-        SELECT COALESCE(SUM(json_array_length(json_extract(player_data, '$.storySystems.children'))), 0) as cnt
-        FROM players WHERE is_banned = 0
-          AND json_extract(player_data, '$.storySystems.children') IS NOT NULL
-      `).get();
-      childrenCount = childResult ? childResult.cnt : 0;
-    } catch (e) { /* children array may not exist */ }
+      const childRow = db.prepare("SELECT value FROM world_state WHERE key = 'children'").get();
+      if (childRow && childRow.value) {
+        const childData = JSON.parse(childRow.value);
+        childrenCount = childData.count || 0;
+      }
+    } catch (e) { /* children data may not exist yet */ }
 
     // Marriage count
     let marriageCount = 0;
@@ -934,87 +852,6 @@ async function handleDashRequest(req, res) {
   const url = req.url;
   const method = req.method;
 
-  // Auth endpoints (no auth required)
-  if (method === 'POST' && url === '/api/dash/register') {
-    if (!dbWrite) return sendJson(res, 500, { error: 'Database not available' });
-    try {
-      const body = await readBody(req);
-      const { username, password } = body;
-      if (!username || !password) return sendJson(res, 400, { error: 'Username and password required' });
-      if (username.length < 3 || username.length > 30) return sendJson(res, 400, { error: 'Username must be 3-30 characters' });
-      if (password.length < 6) return sendJson(res, 400, { error: 'Password must be at least 6 characters' });
-
-      // Check if username exists
-      const existing = dbWrite.prepare('SELECT username FROM dashboard_users WHERE LOWER(username) = LOWER(?)').get(username);
-      if (existing) return sendJson(res, 409, { error: 'Username already exists' });
-
-      const { hash, salt } = hashPassword(password);
-      dbWrite.prepare('INSERT INTO dashboard_users (username, password_hash, salt) VALUES (?, ?, ?)').run(username, hash, salt);
-
-      const token = createSession(username);
-      if (!token) return sendJson(res, 500, { error: 'Failed to create session' });
-
-      console.log(`[usurper-web] Dashboard user registered: ${username}`);
-      sendJson(res, 201, { ok: true, username }, {
-        'Set-Cookie': `dash_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_TTL_DAYS * 86400}`
-      });
-    } catch (err) {
-      sendJson(res, 400, { error: 'Invalid request' });
-    }
-    return true;
-  }
-
-  if (method === 'POST' && url === '/api/dash/login') {
-    if (!dbWrite) return sendJson(res, 500, { error: 'Database not available' });
-    try {
-      const body = await readBody(req);
-      const { username, password } = body;
-      if (!username || !password) return sendJson(res, 400, { error: 'Username and password required' });
-
-      const user = dbWrite.prepare('SELECT username, password_hash, salt FROM dashboard_users WHERE LOWER(username) = LOWER(?)').get(username);
-      if (!user) return sendJson(res, 401, { error: 'Invalid credentials' });
-
-      if (!verifyPassword(password, user.password_hash, user.salt)) {
-        return sendJson(res, 401, { error: 'Invalid credentials' });
-      }
-
-      const token = createSession(user.username);
-      if (!token) return sendJson(res, 500, { error: 'Failed to create session' });
-
-      console.log(`[usurper-web] Dashboard login: ${user.username}`);
-      sendJson(res, 200, { ok: true, username: user.username }, {
-        'Set-Cookie': `dash_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_TTL_DAYS * 86400}`
-      });
-    } catch (err) {
-      sendJson(res, 400, { error: 'Invalid request' });
-    }
-    return true;
-  }
-
-  if (method === 'POST' && url === '/api/dash/logout') {
-    const cookies = parseCookies(req.headers.cookie);
-    if (cookies.dash_token && dbWrite) {
-      try { dbWrite.prepare('DELETE FROM dashboard_sessions WHERE token = ?').run(cookies.dash_token); } catch (e) {}
-    }
-    sendJson(res, 200, { ok: true }, {
-      'Set-Cookie': 'dash_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'
-    });
-    return true;
-  }
-
-  if (method === 'GET' && url === '/api/dash/check') {
-    const user = requireDashAuth(req);
-    sendJson(res, 200, { authenticated: !!user, username: user || null });
-    return true;
-  }
-
-  // All remaining dash endpoints require auth
-  const user = requireDashAuth(req);
-  if (!user) {
-    sendJson(res, 401, { error: 'Authentication required' });
-    return true;
-  }
-
   // Dashboard SSE feed
   if (method === 'GET' && url === '/api/dash/feed') {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -1025,7 +862,7 @@ async function handleDashRequest(req, res) {
     res.write('retry: 5000\n\n');
 
     dashSseClients.add(res);
-    console.log(`[usurper-web] Dashboard SSE connected: ${user} (${dashSseClients.size} total)`);
+    console.log(`[usurper-web] Dashboard SSE connected (${dashSseClients.size} total)`);
 
     // Send initial snapshot immediately
     try {
@@ -1051,7 +888,7 @@ async function handleDashRequest(req, res) {
 
     req.on('close', () => {
       dashSseClients.delete(res);
-      console.log(`[usurper-web] Dashboard SSE disconnected: ${user} (${dashSseClients.size} total)`);
+      console.log(`[usurper-web] Dashboard SSE disconnected (${dashSseClients.size} total)`);
     });
     return true;
   }

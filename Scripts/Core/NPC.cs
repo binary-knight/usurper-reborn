@@ -472,11 +472,12 @@ public partial class NPC : Character
     private void ProcessGangBehavior()
     {
         var random = new Random();
-        
-        if (string.IsNullOrEmpty(Team))
+
+        if (string.IsNullOrEmpty(Team) && string.IsNullOrEmpty(GangId))
         {
             // Not in a gang - consider joining one
-            if (Personality.IsLikelyToJoinGang() && random.Next(10) == 0)
+            if (Personality.IsLikelyToJoinGang() && random.Next(10) == 0
+                && !Goals.AllGoals.Any(g => g.Name.Contains("Gang") || g.Name.Contains("Join")))
             {
                 Goals.AddGoal(new Goal("Join Gang", GoalType.Social, 0.8f));
                 Memory.AddMemory("I should look for a gang to join", "social", DateTime.Now);
@@ -487,8 +488,10 @@ public partial class NPC : Character
             // In a gang - gang loyalty actions
             if (random.Next(5) == 0)
             {
-                Memory.AddMemory($"I'm loyal to {Team}", "gang", DateTime.Now);
-                Goals.AddGoal(new Goal("Support Gang", GoalType.Social, 0.7f));
+                string teamName = !string.IsNullOrEmpty(Team) ? Team : "my gang";
+                Memory.AddMemory($"I'm loyal to {teamName}", "gang", DateTime.Now);
+                if (!Goals.AllGoals.Any(g => g.Name == "Support Gang" && g.IsActive))
+                    Goals.AddGoal(new Goal("Support Gang", GoalType.Social, 0.7f));
             }
         }
     }

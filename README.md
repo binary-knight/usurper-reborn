@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.29.1** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.29.2** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,16 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.29.2 - Public Dashboard
+
+**Public NPC Analytics Dashboard:**
+- The Observatory dashboard is now publicly accessible at `/dashboard` — no login required
+- Added "Observatory" link in main site navigation and a connect card
+
+**Bug Fixes:**
+- Children/world events lost on player login: empty lists from world_state now properly clear stale save data
+- 1-member NPC teams cleaned up: solo teams now dissolve automatically instead of persisting indefinitely
 
 ### Completed in v0.29.1 - The Observatory
 
@@ -723,7 +733,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.29.1)
+### Known Issues (Alpha v0.29.2)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -738,4 +748,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.29.1 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.29.2 — The world is running. [Watch it live.](https://usurper-reborn.net)

@@ -860,8 +860,7 @@ Deaths (red), births (bright pink), coming-of-age (teal), birthdays (gold), leve
 ### NPC Analytics Dashboard ("The Observatory")
 **File**: `web/dashboard.html`
 
-Hidden authenticated dashboard at `/dashboard` for observing the NPC simulation in real-time:
-- **Auth**: PBKDF2 password hashing, 7-day session tokens in SQLite, HttpOnly cookies
+Public dashboard at `/dashboard` for observing the NPC simulation in real-time. Linked from main site navigation.
 - **World Map**: Location grid with NPC dots colored by faction, sized by level
 - **NPC Detail Panel**: Personality radar (13 traits), emotional state bars, goals, memories, relationships
 - **Demographics**: Class/race/faction doughnut charts, level histogram (Chart.js)
@@ -987,7 +986,7 @@ dotnet publish usurper-reloaded.csproj -c Release -r <rid> \
 
 ### Version
 ```csharp
-Version = "0.29.1"
+Version = "0.29.2"
 VersionName = "The Observatory"
 ```
 
