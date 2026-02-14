@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Usurper Reborn - Online Text RPG</title>
-    <meta name="description" content="A persistent online text RPG where 60+ autonomous NPCs live, work, marry, and die 24/7 - whether you're playing or not. The world doesn't wait for you.">
+    <title>Usurper Reborn - A World That Lives Without You</title>
+    <meta name="description" content="A philosophical text RPG where 60+ autonomous NPCs are born, live, and die whether you're playing or not. Five endings. Seven corrupted gods. One question: what remains when you let go?">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231a0a2e'/%3E%3Ctext x='16' y='22' font-family='serif' font-weight='bold' font-size='16' fill='%23ffaa00' text-anchor='middle'%3EUR%3C/text%3E%3Cpolygon points='10,7 16,3 22,7' fill='%23ffaa00'/%3E%3Cpolygon points='12,7 16,4.5 20,7' fill='%231a0a2e'/%3E%3Crect x='11' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3Crect x='15' y='5' width='2' height='4' fill='%23ffaa00'/%3E%3Crect x='19' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -509,6 +509,79 @@
             color: var(--gold);
             font-size: 12px;
             margin-top: 10px;
+        }
+
+        /* Manifesto / Philosophy section */
+        .manifesto-section {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .manifesto-section::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(ellipse at center, rgba(170, 102, 255, 0.04) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .manifesto-lead {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 48px;
+            font-size: 18px;
+            color: var(--text);
+            line-height: 1.8;
+            font-style: italic;
+        }
+
+        .manifesto-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 32px;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .manifesto-block {
+            padding-left: 20px;
+            border-left: 2px solid var(--purple);
+        }
+
+        .manifesto-block h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--purple);
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .manifesto-block p {
+            font-size: 15px;
+            color: var(--text-dim);
+            line-height: 1.7;
+        }
+
+        .manifesto-closing {
+            text-align: center;
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+        }
+
+        .manifesto-closing p {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--text-dim);
+            max-width: 500px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        .manifesto-closing .manifesto-play {
+            color: var(--text);
+            font-size: 14px;
+            margin-top: 16px;
         }
 
         /* Ending cards */
@@ -1051,6 +1124,12 @@
         .feed-scroll {
             max-height: 380px;
             overflow-y: auto;
+            overflow-anchor: none;
+        }
+
+        /* Prevent live-updating stats/feeds from causing page scroll jumps */
+        #stats-content, #stats-upper, #stats-feeds {
+            overflow-anchor: none;
         }
         .feed-scroll::-webkit-scrollbar { width: 4px; }
         .feed-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -1268,6 +1347,7 @@
         <a href="#" class="logo">USURPER REBORN</a>
         <nav class="nav-links">
             <a href="#live-stats">Live</a>
+            <a href="#philosophy">Philosophy</a>
             <a href="#features">Features</a>
             <a href="#story">Story</a>
             <a href="#gods">Old Gods</a>
@@ -1283,7 +1363,7 @@
 </header>
 
 <div class="announcement-banner">
-    <span class="banner-text">Usurper Reborn is coming to Steam on <span class="banner-date">March 2, 2026</span> &#8212; Wishlist coming soon!</span>
+    <span class="banner-text">Usurper Reborn is coming to Steam on <span class="banner-date">March 2, 2026</span> / Wishlist coming soon!</span>
 </div>
 
 <section class="hero">
@@ -1294,8 +1374,9 @@
         </div>
         <p class="hero-subtitle">A WORLD THAT LIVES WITHOUT YOU</p>
         <p class="hero-desc">
-            60+ autonomous NPCs wake up, go to work, fall in love, have children, and die of old age &mdash;
-            all while you're offline. Log back in and read the news. The world didn't wait.
+            60+ souls are born, fall in love, grow old, and die. Whether you're watching or not.
+            Beneath a 100-floor dungeon, seven corrupted gods wait for someone to ask the right question.
+            Five endings. Only one offers peace.
         </p>
         <div class="hero-buttons">
             <button class="btn btn-primary" id="play-btn" onclick="openTerminal()">Play Now in Browser</button>
@@ -1334,35 +1415,75 @@
     </div>
 </section>
 
+<!-- Philosophy / Manifesto -->
+<section id="philosophy" class="manifesto-section">
+    <div class="container">
+        <h2 class="section-title" style="color:var(--purple);text-shadow:var(--glow-purple)">// THE EXPERIMENT</h2>
+        <p class="section-subtitle">This isn't just a game. It's a question.</p>
+
+        <p class="manifesto-lead">
+            What happens when you build a world that doesn't need you?
+        </p>
+
+        <div class="manifesto-grid">
+            <div class="manifesto-block">
+                <h3>Impermanence</h3>
+                <p>Every NPC in this world has a birthday, a personality, and a death. They fall in love on their own. They have children who grow up and replace them. Log out for a week and the town you knew is different. Marriages, funerals, new faces. Nothing waits. Nothing is permanent. That's the point.</p>
+            </div>
+
+            <div class="manifesto-block">
+                <h3>The Cycle</h3>
+                <p>Beat the game, and it restarts. But this time the NPCs remember you. Faintly. By the third cycle, they're asking questions you can't answer. Is the loop a prison or a practice? Does the difference matter? The five endings aren't difficulty tiers. They're philosophical positions: power, compassion, independence, awakening, and release.</p>
+            </div>
+
+            <div class="manifesto-block">
+                <h3>The Gods Below</h3>
+                <p>Seven deities sealed in a 100-floor dungeon. Each one is a question wearing a body. A war god who forgot what honor means. A love goddess fading because no one believes love endures. A creator at the bottom, weary of eternity, who just wants to ask you: <em>what should I do?</em> Your answer determines everything. And the game remembers what you chose.</p>
+            </div>
+
+            <div class="manifesto-block">
+                <h3>Presence</h3>
+                <p>This is a text game. No cutscenes, no voice acting, no motion capture. Just a blinking cursor and your imagination. The world is rendered in words because the most important things can't be shown. They can only be felt. Play alone at 2am and make a choice about a god who begs for death. Or play online and discover that someone else made a different choice, and the world shifted because of it.</p>
+            </div>
+        </div>
+
+        <div class="manifesto-closing">
+            <p>Built at the intersection of philosophy, science, art, and nostalgia.<br>
+            A living world. A deep dungeon. A question with no easy answer.</p>
+            <p class="manifesto-play">Play alone. Play together. The world is already running.</p>
+        </div>
+    </div>
+</section>
+
 <!-- Features -->
 <section id="features">
     <div class="container">
-        <h2 class="section-title">// THE SIMULATION</h2>
+        <h2 class="section-title">// THE LIVING WORLD</h2>
         <p class="section-subtitle">Not a scripted world. An emergent one.</p>
         <div class="feature-grid">
             <div class="feature-card">
-                <h3>Autonomous NPCs</h3>
-                <p>60+ NPCs driven by goal-based AI. They choose careers, visit taverns, train at the guild, form opinions about each other, and remember what you did to them.</p>
+                <h3>Autonomous Souls</h3>
+                <p>60+ NPCs with personalities, goals, opinions, and memories. They choose careers, form friendships, hold grudges. They remember what you did to them, even across cycles.</p>
             </div>
             <div class="feature-card">
-                <h3>Lifecycles</h3>
-                <p>NPCs fall in love, marry, have children, age, and eventually die. Their children grow up and join the world. The population turns over. No one is permanent.</p>
+                <h3>Birth, Love, Death</h3>
+                <p>NPCs fall in love, marry, have children, age, and die. Their children grow up and take their place. The population turns over. No one is permanent. Not even the ones you care about.</p>
             </div>
             <div class="feature-card">
-                <h3>Emergent News</h3>
-                <p>Check the live feed and discover the blacksmith married the barmaid, the king was assassinated, a plague swept through town, or a new NPC just came of age.</p>
+                <h3>The News Never Stops</h3>
+                <p>Log in and discover the blacksmith married the barmaid, the king was assassinated, a plague swept through town, or a child you watched grow up just came of age.</p>
             </div>
             <div class="feature-card">
-                <h3>Persistent Multiplayer</h3>
-                <p>Connect via browser or SSH to a shared world that runs 24/7. Your actions affect other players. Their actions affect you. The simulation never stops.</p>
+                <h3>Shared World</h3>
+                <p>Play alone or connect to a persistent multiplayer world that runs 24/7. Your choices ripple through other players' experiences. Theirs ripple through yours.</p>
             </div>
             <div class="feature-card">
-                <h3>100-Floor Dungeon</h3>
-                <p>Deterministic generation, 7 corrupted Old Gods sealed in the depths, ancient seals to collect, and 5 possible endings based on how you confront the truth.</p>
+                <h3>100 Floors Down</h3>
+                <p>A dungeon that never changes layout but always changes meaning. Seven corrupted gods waiting in the dark. Ancient seals. Five endings. The deeper you go, the harder the questions.</p>
             </div>
             <div class="feature-card">
-                <h3>Deep Systems</h3>
-                <p>11 classes, 10 races, political intrigue, romance and marriage, court factions, PvP arena, companion quests, and a throne to usurp. Originally inspired by the 1993 BBS door game.</p>
+                <h3>A Game Within a Game</h3>
+                <p>11 classes, 10 races, political intrigue, romance, court factions, PvP, companion quests, and a throne to usurp. Inspired by the 1993 BBS door game that started it all.</p>
             </div>
         </div>
     </div>
@@ -1390,23 +1511,23 @@
 
         <div class="story-page">
             <h3>~ The Golden Age ~</h3>
-            <p>Long ago, in an age now lost to memory, the world was watched over by the Seven Divine &mdash; gods of immense power who guided mortalkind with wisdom and grace. Under their benevolent gaze, civilizations flourished.</p>
+            <p>Long ago, in an age now lost to memory, the world was watched over by the Seven Divine. Gods of immense power who guided mortalkind with wisdom and grace. Under their benevolent gaze, civilizations flourished.</p>
             <p>The god of war taught honor in battle. The goddess of love blessed every union. The god of light ensured truth prevailed over deception.</p>
             <p>It was an age of miracles. An age of heroes. An age of hope.</p>
         </div>
 
         <div class="story-page">
             <h3>~ The Sundering ~</h3>
-            <p>Then came the Sundering &mdash; a cataclysm whose cause remains unknown. Some say mortals grew too proud and turned away from the gods. Others whisper of a betrayal among the Divine themselves. Whatever the truth, the result was catastrophic.</p>
+            <p>Then came the Sundering. A cataclysm whose cause remains unknown. Some say mortals grew too proud and turned away from the gods. Others whisper of a betrayal among the Divine themselves. Whatever the truth, the result was catastrophic.</p>
             <p>The Seven were corrupted. Twisted. Imprisoned in realms of their own making.</p>
             <p>The god of war became rage incarnate, drowning in endless bloodshed. The goddess of love withered into jealousy and obsession. The god of light faded to barely a whisper, truth dying with each passing lie.</p>
         </div>
 
         <div class="story-page">
             <h3>~ The Age of Avarice ~</h3>
-            <p>Centuries have passed. The Old Gods are now mere legends &mdash; cautionary tales told to frighten children. In their absence, mortals have created new gods to worship, pale echoes of the Divine that once were.</p>
+            <p>Centuries have passed. The Old Gods are now mere legends. Cautionary tales told to frighten children. In their absence, mortals have created new gods to worship, pale echoes of the Divine that once were.</p>
             <p>And in this godless age, a new power has risen: <strong style="color:var(--gold)">AVARICE.</strong></p>
-            <p>The Halls of Avarice &mdash; a sprawling underground complex where adventurers seek fortune, glory, and power. Where the strong prey upon the weak. Where gold is the only god that matters.</p>
+            <p>The Halls of Avarice. A sprawling underground complex where adventurers seek fortune, glory, and power. Where the strong prey upon the weak. Where gold is the only god that matters.</p>
             <p>Some come seeking treasure. Some come seeking fame. Some come to escape their past. And some... some hear whispers in the dark. Ancient voices calling from the depths. Promising power. Demanding sacrifice.</p>
         </div>
 
@@ -1480,7 +1601,7 @@
                 <h3>Manwe</h3>
                 <div class="god-title">The Weary Creator</div>
                 <div class="god-domain">Creation &amp; Balance</div>
-                <p>The Supreme Creator. He waits at the end of all paths, weary of eternity. Your choices determine his fate &mdash; and yours.</p>
+                <p>The Supreme Creator. He waits at the end of all paths, weary of eternity. Your choices determine his fate. And yours.</p>
             </div>
         </div>
     </div>
@@ -1623,14 +1744,14 @@
 <section id="companions">
     <div class="container">
         <h2 class="section-title" style="color:var(--gold);text-shadow:var(--glow-gold)">// COMPANIONS</h2>
-        <p class="section-subtitle">Four souls whose fates intertwine with yours. They can fight, heal, die &mdash; and change your story forever.</p>
+        <p class="section-subtitle">Four souls whose fates intertwine with yours. They can fight, heal, and die. They will change your story.</p>
 
         <div class="companion-grid">
             <div class="companion-card">
                 <h3>Lyris</h3>
                 <div class="companion-title">The Wandering Star</div>
                 <div class="companion-desc">A mysterious traveler with silver-streaked hair and eyes that seem to hold ancient sorrow. She speaks in riddles and appears to know more than she reveals.</div>
-                <div class="companion-backstory">Once a priestess of Aurelion, the god of light. When the Old Gods were corrupted, she was cast out &mdash; neither fully mortal nor divine. She wanders endlessly, seeking a way to heal the gods she once served.</div>
+                <div class="companion-backstory">Once a priestess of Aurelion, the god of light. When the Old Gods were corrupted, she was cast out. Neither fully mortal nor divine. She wanders endlessly, seeking a way to heal the gods she once served.</div>
                 <div class="companion-meta">
                     <span>Hybrid (Magic/Healer)</span>
                     <span>Recruits: Level 15</span>
@@ -1656,7 +1777,7 @@
                 <h3>Mira</h3>
                 <div class="companion-title">The Faded Light</div>
                 <div class="companion-desc">A former priestess whose faith shattered when her temple was destroyed. Her healing powers remain, but her spirit is hollow. She helps others because she no longer knows what else to do.</div>
-                <div class="companion-backstory">Mira devoted her life to healing in Veloura's temple. When Veloura was corrupted, the temple turned on itself &mdash; healers became reapers. Mira escaped, but left her faith behind.</div>
+                <div class="companion-backstory">Mira devoted her life to healing in Veloura's temple. When Veloura was corrupted, the temple turned on itself. Healers became reapers. Mira escaped, but left her faith behind.</div>
                 <div class="companion-meta">
                     <span>Healer</span>
                     <span>Recruits: Level 20</span>
@@ -1668,8 +1789,8 @@
             <div class="companion-card">
                 <h3>Vex</h3>
                 <div class="companion-title">The Laughing Shadow</div>
-                <div class="companion-desc">A charming thief with a quick wit and quicker fingers. Vex treats everything as a joke &mdash; including death. But there's a sadness behind the smile that he never speaks of.</div>
-                <div class="companion-backstory">Born with a wasting disease &mdash; he's been dying his whole life, one day at a time. Rather than despair, he chose to laugh. He steals to survive, jokes to cope, and refuses to take anything seriously.</div>
+                <div class="companion-desc">A charming thief with a quick wit and quicker fingers. Vex treats everything as a joke. Including death. But there's a sadness behind the smile that he never speaks of.</div>
+                <div class="companion-backstory">Born with a wasting disease. He's been dying his whole life, one day at a time. Rather than despair, he chose to laugh. He steals to survive, jokes to cope, and refuses to take anything seriously.</div>
                 <div class="companion-meta">
                     <span>Damage</span>
                     <span>Recruits: Level 25</span>
@@ -1685,33 +1806,33 @@
 <section id="endings">
     <div class="container">
         <h2 class="section-title" style="color:var(--red);text-shadow:var(--glow-red)">// FIVE ENDINGS</h2>
-        <p class="section-subtitle">Your choices shape the fate of gods and mortals alike. Every path leads to a different truth.</p>
+        <p class="section-subtitle">Not difficulty tiers. Philosophical positions. Each one answers the same question differently.</p>
 
         <div class="ending-grid">
             <div class="ending-card" style="border-top:3px solid var(--red)">
                 <h3 style="color:var(--red)">The Usurper</h3>
-                <p>Seize divine power for yourself. Become the new tyrant. Rule for eternity &mdash; and discover that power is a prison of its own.</p>
-                <div class="ending-hint">Path of Darkness</div>
+                <p>Seize divine power. Become the new god. Rule forever. And discover that eternity is the cruelest prison.</p>
+                <div class="ending-hint">Attachment</div>
             </div>
             <div class="ending-card" style="border-top:3px solid var(--green)">
                 <h3 style="color:var(--green)">The Savior</h3>
-                <p>Choose mercy over vengeance. Redeem the corrupted gods and restore the Golden Age. Become a legend songs are sung about.</p>
-                <div class="ending-hint">Path of Light</div>
+                <p>Choose mercy. Heal the corrupted gods. Restore what was lost. Become a legend. But legends are stories others tell. You'll never know peace.</p>
+                <div class="ending-hint">Compassion</div>
             </div>
             <div class="ending-card" style="border-top:3px solid var(--gold)">
                 <h3 style="color:var(--gold)">The Defiant</h3>
-                <p>Reject all divine power. Shatter the artifacts. Free mortals from the gods forever. Walk into the sunrise &mdash; just a person who chose freedom.</p>
-                <div class="ending-hint">Path of Independence</div>
+                <p>Reject all of it. Shatter every artifact. Free mortals from gods forever. Walk into the sunrise as nothing more than a person who chose freedom.</p>
+                <div class="ending-hint">Non-attachment</div>
             </div>
             <div class="ending-card" style="border-top:3px solid var(--purple)">
                 <h3 style="color:var(--purple)">The True Awakening</h3>
-                <p>Break the cycle itself. Discover the truth about who you really are. Become the Bridge between divine and mortal &mdash; forever upward.</p>
-                <div class="ending-hint">Path of Balance (NG+)</div>
+                <p>See the cycle for what it is. Not a prison. A practice. Become the bridge between mortal and divine. The loop continues, but now you understand why.</p>
+                <div class="ending-hint">Awakening (NG+)</div>
             </div>
             <div class="ending-card" style="border-top:3px solid #ffffff">
                 <h3 style="color:#ffffff">Dissolution</h3>
-                <p>The ultimate secret. After seeing every ending, make a choice no fragment has ever made. Find peace at last.</p>
-                <div class="ending-hint">Secret Ending (Cycle 3+)</div>
+                <p>After every ending. After every cycle. Make the choice no one has ever made: let go completely. Not victory. Not defeat. Release.</p>
+                <div class="ending-hint">Nirvana (Cycle 3+)</div>
             </div>
         </div>
     </div>
@@ -1727,7 +1848,7 @@
             <div class="history-entry">
                 <h3>The Age of the BBS (1978-1999)</h3>
                 <p>Before the World Wide Web, Bulletin Board Systems were tiny digital worlds you dialed into with a telephone modem. You'd hear the screech of the handshake, watch ANSI art fill your screen, and connect to a community of people you'd never meet in person.</p>
-                <p>By 1992, there were over 25,000 BBSes in the United States alone. Each one was run by a "SysOp" from their basement or bedroom. You could post messages, download files, chat &mdash; and play games.</p>
+                <p>By 1992, there were over 25,000 BBSes in the United States alone. Each one was run by a "SysOp" from their basement or bedroom. You could post messages, download files, chat, and play games.</p>
             </div>
 
             <div class="history-entry">
@@ -1738,7 +1859,7 @@
 
             <div class="history-entry">
                 <h3>The Birth of Usurper (1993)</h3>
-                <p>In 1993, programmer <strong style="color:var(--gold)">Jakob Dangarden</strong> created Usurper. At a time when Legend of the Red Dragon dominated, Usurper dared to be different &mdash; offering multiple races and classes with real mechanical differences, a 100-level dungeon, team warfare, political systems, and complex character progression.</p>
+                <p>In 1993, programmer <strong style="color:var(--gold)">Jakob Dangarden</strong> created Usurper. At a time when Legend of the Red Dragon dominated, Usurper dared to be different. Multiple races and classes with real mechanical differences, a 100-level dungeon, team warfare, political systems, and complex character progression.</p>
                 <p>The game was set in the realm of Dorashire, where adventurers explored the Dungeons of Durunghins. The ultimate goal? Accumulate power and usurp the throne itself. Usurper quickly gained a devoted following. It was dark, complex, and rewarded mastery.</p>
             </div>
 
@@ -1752,7 +1873,7 @@
             <div class="history-entry">
                 <h3>Usurper Reborn (2024-Present)</h3>
                 <p>This remake began with a simple question: what if Usurper had continued to evolve? What if the limitations of 1990s hardware were lifted, but the soul of the game remained intact?</p>
-                <p>Created by <strong style="color:var(--gold)">Jason Knight</strong>, Usurper Reborn is built in C# with modern architecture, staying true to the original vision. The core gameplay, class system, dungeon structure, and political intrigue are all preserved &mdash; enhanced with 60 unique NPCs, dynamic world simulation, deep narrative systems, companion quests, and New Game+ cycles.</p>
+                <p>Created by <strong style="color:var(--gold)">Jason Knight</strong>, Usurper Reborn is built in C# with modern architecture, staying true to the original vision. The core gameplay, class system, dungeon structure, and political intrigue are all here. Enhanced with 60 unique NPCs, dynamic world simulation, deep narrative systems, companion quests, and New Game+ cycles.</p>
                 <p>The text-based interface is intentional. It's a love letter to an era when imagination filled in what graphics couldn't show.</p>
             </div>
         </div>
@@ -1770,13 +1891,22 @@
                 <button class="btn btn-primary" onclick="openTerminal()" style="width:100%;justify-content:center;">Play Now</button>
             </div>
             <div class="connect-card">
-                <h3>&#9658; SSH (Advanced)</h3>
-                <p>Connect with any SSH client for the best terminal experience. Use password: <code style="color:var(--gold)">play</code></p>
+                <h3>&#9658; SSH (Recommended)</h3>
+                <p>Encrypted connection. Use any terminal or MUD client that supports SSH.</p>
                 <div class="ssh-command" onclick="copyCommand(this)">
                     ssh usurper@play.usurper-reborn.net -p 4000
                     <span class="copy-hint">click to copy</span>
                 </div>
-                <p style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);">Password: <code style="color:var(--gold);font-size:14px;">play</code></p>
+                <p style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);">Password: <span style="color:var(--green);">play</span> / then login or register in-game</p>
+            </div>
+            <div class="connect-card">
+                <h3>&#9658; Telnet (Unencrypted)</h3>
+                <p>Classic telnet for MUD clients that don't support SSH. No encryption.</p>
+                <div class="ssh-command" onclick="copyCommand(this)">
+                    telnet play.usurper-reborn.net 4001
+                    <span class="copy-hint">click to copy</span>
+                </div>
+                <p style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);">No password needed / login or register at the welcome screen</p>
             </div>
             <div class="connect-card">
                 <h3>&#9658; Download</h3>
@@ -1868,7 +1998,7 @@
             <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank">Report Bug</a>
             <a href="https://discord.gg/EZhwgDT6Ta" target="_blank">Discord</a>
         </div>
-        <p>Usurper Reborn &mdash; A free, open-source recreation of Usurper (1993) by Jakob Dangarden</p>
+        <p>Usurper Reborn. A free, open-source recreation of Usurper (1993) by Jakob Dangarden.</p>
         <p style="margin-top:4px;">Licensed under GPL v2 &bull; Built with C# / .NET 8.0</p>
     </div>
 </footer>
@@ -2205,7 +2335,10 @@
             container.innerHTML = '<div id="stats-upper"></div><div id="stats-feeds"></div>';
             upperEl = document.getElementById('stats-upper');
         }
+        // Preserve scroll position so offscreen DOM changes don't jump the page
+        var scrollY = window.scrollY;
         upperEl.innerHTML = html;
+        window.scrollTo(0, scrollY);
 
         // Render feeds only once (they're kept alive by SSE after that)
         if (!feedsInitialized) {
@@ -2290,6 +2423,9 @@
                 var feed = document.getElementById(targetId);
                 if (!feed || !payload.items) return;
 
+                // Preserve scroll position so feed updates don't jump the page
+                var scrollY = window.scrollY;
+
                 // Remove empty placeholder
                 var empty = feed.querySelector('.feed-empty');
                 if (empty) empty.remove();
@@ -2316,6 +2452,9 @@
                 while (feed.children.length > MAX_FEED_ITEMS) {
                     feed.removeChild(feed.lastChild);
                 }
+
+                // Restore scroll position
+                window.scrollTo(0, scrollY);
             } catch (e) {}
         };
 

@@ -30,8 +30,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class ArchetypeTracker
     {
-        private static ArchetypeTracker? _instance;
-        public static ArchetypeTracker Instance => _instance ??= new ArchetypeTracker();
+        private static ArchetypeTracker? _fallbackInstance;
+        public static ArchetypeTracker Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Archetype;
+                return _fallbackInstance ??= new ArchetypeTracker();
+            }
+        }
 
         // Archetype scores - accumulate throughout gameplay
         private Dictionary<JungianArchetype, int> _scores = new();

@@ -279,8 +279,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class CycleSystem
     {
-        private static CycleSystem? instance;
-        public static CycleSystem Instance => instance ??= new CycleSystem();
+        private static CycleSystem? _fallbackInstance;
+        public static CycleSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Cycle;
+                return _fallbackInstance ??= new CycleSystem();
+            }
+        }
 
         /// <summary>
         /// Start a new cycle (New Game+)

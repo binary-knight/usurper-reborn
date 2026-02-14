@@ -14,8 +14,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class TownNPCStorySystem
     {
-        private static TownNPCStorySystem? _instance;
-        public static TownNPCStorySystem Instance => _instance ??= new TownNPCStorySystem();
+        private static TownNPCStorySystem? _fallbackInstance;
+        public static TownNPCStorySystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.TownNPCStories;
+                return _fallbackInstance ??= new TownNPCStorySystem();
+            }
+        }
 
         // Track story progress for each memorable NPC
         public Dictionary<string, MemorableNPCState> NPCStates { get; private set; } = new();
@@ -484,7 +492,7 @@ namespace UsurperRemake.Systems
 
         public TownNPCStorySystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
             InitializeNPCStates();
         }
 

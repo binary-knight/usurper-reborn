@@ -10,7 +10,26 @@
         <InvariantGlobalization>true</InvariantGlobalization>
         <!-- Define available configurations -->
         <Configurations>Debug;Release;Steam;SteamRelease</Configurations>
+        <!-- GC tuning for low-memory servers (t3.micro = 1GB RAM) -->
+        <!-- Workstation GC uses smaller heap segments and returns memory to OS -->
+        <ServerGarbageCollection>false</ServerGarbageCollection>
+        <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+        <RetainVMGarbageCollection>false</RetainVMGarbageCollection>
     </PropertyGroup>
+
+    <!-- Trimming for Release builds - removes unused framework code -->
+    <!-- Uses partial trim mode because System.Text.Json relies on reflection -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimMode>partial</TrimMode>
+    </PropertyGroup>
+
+    <!-- Keep System.Text.Json reflection working despite trimming.
+         The game uses reflection-based JsonSerializer.Deserialize<T>() everywhere.
+         Without this, the trimmer removes the reflection codepath and serialization breaks at runtime. -->
+    <ItemGroup Condition="'$(PublishTrimmed)' == 'true'">
+        <TrimmerRootAssembly Include="System.Text.Json" />
+    </ItemGroup>
 
     <!-- Steam build configuration - Release optimizations + Steam integration -->
     <PropertyGroup Condition="'$(Configuration)' == 'Steam' Or '$(Configuration)' == 'SteamRelease'">
@@ -21,11 +40,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+        <PackageReference Include="SSH.NET" Version="2025.1.0" />
         <PackageReference Include="System.IO.Ports" Version="10.0.2" />
         <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
-        <PackageReference Include="SSH.NET" Version="2024.1.0" />
     </ItemGroup>
 
     <!-- Steamworks.NET - only included in Steam builds -->

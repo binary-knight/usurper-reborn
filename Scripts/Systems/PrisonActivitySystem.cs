@@ -9,8 +9,16 @@ using System.Threading.Tasks;
 /// </summary>
 public class PrisonActivitySystem
 {
-    private static PrisonActivitySystem? instance;
-    public static PrisonActivitySystem Instance => instance ??= new PrisonActivitySystem();
+    private static PrisonActivitySystem? _fallbackInstance;
+    public static PrisonActivitySystem Instance
+    {
+        get
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null) return ctx.PrisonActivity;
+            return _fallbackInstance ??= new PrisonActivitySystem();
+        }
+    }
 
     private Random random = new();
 

@@ -122,6 +122,9 @@ public class DungeonLocation : BaseLocation
         // Restore NPC teammates (spouses, team members, lovers) from saved state
         await RestoreNPCTeammates(term);
 
+        // Restore player echoes (cooperative dungeon allies) from saved state
+        await RestorePlayerTeammates(term);
+
         // Check for dungeon entry fees for overleveled teammates
         // Player can always enter - unaffordable allies simply stay behind
         await CheckAndPayEntryFees(player, term);
@@ -691,6 +694,71 @@ public class DungeonLocation : BaseLocation
             term.SetColor("yellow");
             term.WriteLine($"{skippedCount} ally/allies couldn't rejoin - party is full (max {maxPartySize}).");
             term.WriteLine("Use Party Management to adjust your party composition.");
+            term.WriteLine("");
+            await Task.Delay(1500);
+        }
+    }
+
+    /// <summary>
+    /// Restore player echoes from database for cooperative dungeon runs.
+    /// Player allies are loaded as AI-controlled Characters with IsEcho = true.
+    /// </summary>
+    private async Task RestorePlayerTeammates(TerminalEmulator term)
+    {
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+
+        var playerNames = GameEngine.Instance?.DungeonPartyPlayerNames;
+        if (playerNames == null || playerNames.Count == 0) return;
+
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        const int maxPartySize = 4;
+        int restoredCount = 0;
+
+        foreach (var name in playerNames)
+        {
+            if (teammates.Count >= maxPartySize) break;
+
+            // Skip if already in party
+            if (teammates.Any(t => t.DisplayName.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            try
+            {
+                // Load player's save data from database
+                var saveData = await backend.ReadGameData(name.ToLower());
+                if (saveData?.Player == null) continue;
+
+                // Verify they're still on the same team
+                if (currentPlayer != null && !string.IsNullOrEmpty(currentPlayer.Team))
+                {
+                    if (saveData.Player.Team != currentPlayer.Team)
+                    {
+                        term.SetColor("yellow");
+                        term.WriteLine($"  {name} is no longer on your team.");
+                        continue;
+                    }
+                }
+
+                // Create echo character
+                var ally = PlayerCharacterLoader.CreateFromSaveData(saveData.Player, name, isEcho: true);
+                teammates.Add(ally);
+                restoredCount++;
+
+                term.SetColor("bright_cyan");
+                term.WriteLine($"  {name}'s echo materializes beside you!");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("DUNGEON", $"Failed to load player echo '{name}': {ex.Message}");
+            }
+        }
+
+        if (restoredCount > 0)
+        {
+            term.SetColor("gray");
+            term.WriteLine("  Player echoes fight as AI allies with their real stats.");
             term.WriteLine("");
             await Task.Delay(1500);
         }
@@ -4107,6 +4175,9 @@ public class DungeonLocation : BaseLocation
             SaveFloorState(player);
         }
 
+        // MUD mode: broadcast dungeon descent
+        UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} descends deeper into the dungeon.");
+
         terminal.ClearScreen();
         terminal.SetColor("blue");
         terminal.WriteLine("You descend the ancient stairs...");
@@ -5315,6 +5386,7 @@ public class DungeonLocation : BaseLocation
 
     // Static storage for recurring duelists per player
     private static Dictionary<string, RecurringDuelist> _playerDuelists = new();
+    private const int MaxPlayerDuelists = 200;
 
     private RecurringDuelist GetOrCreateRecurringDuelist(Character player)
     {
@@ -5349,6 +5421,12 @@ public class DungeonLocation : BaseLocation
             Level = Math.Max(1, player.Level - 2)
         };
 
+        // Evict oldest entries if over cap
+        if (_playerDuelists.Count >= MaxPlayerDuelists)
+        {
+            var firstKey = _playerDuelists.Keys.First();
+            _playerDuelists.Remove(firstKey);
+        }
         _playerDuelists[playerId] = newDuelist;
         return newDuelist;
     }

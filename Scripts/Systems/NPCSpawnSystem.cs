@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using UsurperRemake.Data;
@@ -8,7 +9,9 @@ using UsurperRemake.Data;
 namespace UsurperRemake.Systems
 {
     /// <summary>
-    /// NPC Spawn System - Creates and manages classic Usurper NPCs in the game world
+    /// NPC Spawn System - Creates and manages classic Usurper NPCs in the game world.
+    /// Thread-safe: uses ReaderWriterLockSlim for concurrent MUD mode access where
+    /// WorldSim writes (add/remove/clear) and multiple player sessions read.
     /// </summary>
     public class NPCSpawnSystem
     {
@@ -19,7 +22,48 @@ namespace UsurperRemake.Systems
         private Random random = new();
         private bool npcsInitialized = false;
 
-        public List<NPC> ActiveNPCs => spawnedNPCs;
+        /// <summary>
+        /// Lock for thread-safe access to the NPC list.
+        /// WorldSim takes write lock for add/remove/clear.
+        /// Player sessions take read lock for iteration/queries.
+        /// In single-player/BBS mode this is uncontended (no overhead).
+        /// </summary>
+        private readonly ReaderWriterLockSlim _npcLock = new(LockRecursionPolicy.SupportsRecursion);
+
+        // Cached snapshot for read access — invalidated when list mutates
+        private List<NPC>? _cachedSnapshot;
+        private int _snapshotVersion;
+        private int _listVersion;
+
+        /// <summary>
+        /// Get all active NPCs. In MUD mode, returns a cached snapshot for safe
+        /// concurrent iteration (invalidated when the list is mutated).
+        /// </summary>
+        public List<NPC> ActiveNPCs
+        {
+            get
+            {
+                // Fast path: if not in MUD mode, return the list directly (no contention possible)
+                if (!UsurperRemake.Server.SessionContext.IsActive &&
+                    UsurperRemake.Server.MudServer.Instance == null)
+                    return spawnedNPCs;
+
+                _npcLock.EnterReadLock();
+                try
+                {
+                    if (_cachedSnapshot == null || _snapshotVersion != _listVersion)
+                    {
+                        _cachedSnapshot = new List<NPC>(spawnedNPCs);
+                        _snapshotVersion = _listVersion;
+                    }
+                    return _cachedSnapshot;
+                }
+                finally
+                {
+                    _npcLock.ExitReadLock();
+                }
+            }
+        }
 
         /// <summary>
         /// Initialize all classic Usurper NPCs and spawn them into the world
@@ -30,26 +74,31 @@ namespace UsurperRemake.Systems
             // This handles cases where the flag is set but NPCs weren't actually created
             if (npcsInitialized && spawnedNPCs.Count > 0)
             {
-                // GD.Print($"[NPCSpawn] NPCs already initialized ({spawnedNPCs.Count} active)");
                 return;
             }
 
-            // GD.Print("[NPCSpawn] Initializing 50 classic Usurper NPCs...");
-
-            var npcTemplates = ClassicNPCs.GetClassicNPCs();
-            spawnedNPCs.Clear();
-
-            foreach (var template in npcTemplates)
+            _npcLock.EnterWriteLock();
+            try
             {
-                var npc = CreateNPCFromTemplate(template);
-                spawnedNPCs.Add(npc);
+                var npcTemplates = ClassicNPCs.GetClassicNPCs();
+                spawnedNPCs.Clear();
+
+                foreach (var template in npcTemplates)
+                {
+                    var npc = CreateNPCFromTemplate(template);
+                    spawnedNPCs.Add(npc);
+                }
+
+                // Distribute NPCs across locations
+                DistributeNPCsAcrossWorld();
+
+                npcsInitialized = true;
+                _listVersion++;
             }
-
-            // Distribute NPCs across locations
-            DistributeNPCsAcrossWorld();
-
-            npcsInitialized = true;
-            // GD.Print($"[NPCSpawn] Successfully initialized {spawnedNPCs.Count} NPCs");
+            finally
+            {
+                _npcLock.ExitWriteLock();
+            }
 
             await Task.CompletedTask;
         }
@@ -59,9 +108,17 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task ForceReinitializeNPCs()
         {
-            // GD.Print("[NPCSpawn] Force reinitializing NPCs...");
-            npcsInitialized = false;
-            spawnedNPCs.Clear();
+            _npcLock.EnterWriteLock();
+            try
+            {
+                npcsInitialized = false;
+                spawnedNPCs.Clear();
+                _listVersion++;
+            }
+            finally
+            {
+                _npcLock.ExitWriteLock();
+            }
             await InitializeClassicNPCs();
         }
 
@@ -661,7 +718,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public List<NPC> GetNPCsAtLocation(string locationId)
         {
-            return spawnedNPCs.Where(npc => npc.CurrentLocation == locationId && !npc.IsDead).ToList();
+            return ActiveNPCs.Where(npc => npc.CurrentLocation == locationId && !npc.IsDead).ToList();
         }
 
         /// <summary>
@@ -669,7 +726,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public NPC? GetNPCByName(string name, bool includeDead = false)
         {
-            return spawnedNPCs.FirstOrDefault(npc =>
+            return ActiveNPCs.FirstOrDefault(npc =>
                 npc.Name2.Equals(name, StringComparison.OrdinalIgnoreCase) &&
                 (includeDead || !npc.IsDead));
         }
@@ -679,9 +736,17 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void ResetNPCs()
         {
-            spawnedNPCs.Clear();
-            npcsInitialized = false;
-            // GD.Print("[NPCSpawn] NPCs reset");
+            _npcLock.EnterWriteLock();
+            try
+            {
+                spawnedNPCs.Clear();
+                npcsInitialized = false;
+                _listVersion++;
+            }
+            finally
+            {
+                _npcLock.ExitWriteLock();
+            }
         }
 
         /// <summary>
@@ -689,7 +754,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public List<NPC> GetPrisoners()
         {
-            return spawnedNPCs.Where(npc => npc.DaysInPrison > 0).ToList();
+            return ActiveNPCs.Where(npc => npc.DaysInPrison > 0).ToList();
         }
 
         /// <summary>
@@ -699,7 +764,7 @@ namespace UsurperRemake.Systems
         {
             if (string.IsNullOrWhiteSpace(searchName)) return null;
 
-            return spawnedNPCs.FirstOrDefault(npc =>
+            return ActiveNPCs.FirstOrDefault(npc =>
                 npc.DaysInPrison > 0 &&
                 npc.Name2.Contains(searchName, StringComparison.OrdinalIgnoreCase));
         }
@@ -748,9 +813,17 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void ClearAllNPCs()
         {
-            spawnedNPCs.Clear();
-            npcsInitialized = false;
-            // GD.Print("[NPCSpawn] All NPCs cleared for save restoration");
+            _npcLock.EnterWriteLock();
+            try
+            {
+                spawnedNPCs.Clear();
+                npcsInitialized = false;
+                _listVersion++;
+            }
+            finally
+            {
+                _npcLock.ExitWriteLock();
+            }
         }
 
         /// <summary>
@@ -761,18 +834,23 @@ namespace UsurperRemake.Systems
             if (npc == null)
                 return;
 
-            // Check for duplicate by ID or name to prevent double-adding
-            bool isDuplicate = spawnedNPCs.Any(existing =>
-                (!string.IsNullOrEmpty(existing.ID) && existing.ID == npc.ID) ||
-                existing.Name2.Equals(npc.Name2, StringComparison.OrdinalIgnoreCase));
+            _npcLock.EnterWriteLock();
+            try
+            {
+                // Check for duplicate by ID or name to prevent double-adding
+                bool isDuplicate = spawnedNPCs.Any(existing =>
+                    (!string.IsNullOrEmpty(existing.ID) && existing.ID == npc.ID) ||
+                    existing.Name2.Equals(npc.Name2, StringComparison.OrdinalIgnoreCase));
 
-            if (!isDuplicate)
-            {
-                spawnedNPCs.Add(npc);
+                if (!isDuplicate)
+                {
+                    spawnedNPCs.Add(npc);
+                    _listVersion++;
+                }
             }
-            else
+            finally
             {
-                // GD.Print($"[NPCSpawn] Skipping duplicate NPC: {npc.Name2}");
+                _npcLock.ExitWriteLock();
             }
         }
 
@@ -782,7 +860,6 @@ namespace UsurperRemake.Systems
         public void MarkAsInitialized()
         {
             npcsInitialized = true;
-            // GD.Print($"[NPCSpawn] Marked as initialized with {spawnedNPCs.Count} NPCs");
         }
 
         /// <summary>

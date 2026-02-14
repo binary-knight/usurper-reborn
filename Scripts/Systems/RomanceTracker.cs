@@ -11,8 +11,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class RomanceTracker
     {
-        private static RomanceTracker? _instance;
-        public static RomanceTracker Instance => _instance ??= new RomanceTracker();
+        private static RomanceTracker? _fallbackInstance;
+        public static RomanceTracker Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Romance;
+                return _fallbackInstance ??= new RomanceTracker();
+            }
+        }
 
         // Current relationships
         public List<Lover> CurrentLovers { get; set; } = new();
@@ -34,7 +42,7 @@ namespace UsurperRemake.Systems
 
         public RomanceTracker()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         /// <summary>

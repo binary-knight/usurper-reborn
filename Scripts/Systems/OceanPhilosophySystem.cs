@@ -15,8 +15,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class OceanPhilosophySystem
     {
-        private static OceanPhilosophySystem? _instance;
-        public static OceanPhilosophySystem Instance => _instance ??= new OceanPhilosophySystem();
+        private static OceanPhilosophySystem? _fallbackInstance;
+        public static OceanPhilosophySystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Ocean;
+                return _fallbackInstance ??= new OceanPhilosophySystem();
+            }
+        }
 
         /// <summary>
         /// Awakening Level (0-7): How close the player is to understanding the truth
@@ -164,7 +172,7 @@ namespace UsurperRemake.Systems
 
         public OceanPhilosophySystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         /// <summary>

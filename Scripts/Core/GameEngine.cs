@@ -18,14 +18,24 @@ using System.IO;
 public partial class GameEngine : Node
 {
     private static readonly Lazy<GameEngine> lazyInstance = new Lazy<GameEngine>(() => new GameEngine());
-    private static GameEngine? instance;
+    private static GameEngine? _fallbackInstance;
     private TerminalEmulator terminal;
     private Character? currentPlayer;
 
     /// <summary>
     /// Pending notifications to show the player (team events, important world events, etc.)
+    /// In MUD mode, stored per-session in SessionContext. In single-player, uses static queue.
     /// </summary>
-    public static Queue<string> PendingNotifications { get; } = new();
+    public static Queue<string> PendingNotifications
+    {
+        get
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null) return ctx.PendingNotifications;
+            return _staticPendingNotifications;
+        }
+    }
+    private static readonly Queue<string> _staticPendingNotifications = new();
 
     /// <summary>
     /// Add a notification to be shown to the player
@@ -34,14 +44,34 @@ public partial class GameEngine : Node
     {
         if (!string.IsNullOrWhiteSpace(message))
         {
-            PendingNotifications.Enqueue(message);
+            var queue = PendingNotifications;
+            // Cap notifications to prevent unbounded growth
+            while (queue.Count >= 100)
+                queue.Dequeue();
+            queue.Enqueue(message);
         }
     }
 
     /// <summary>
     /// Flag indicating an intentional exit (quit from menu) vs unexpected termination
+    /// In MUD mode, stored per-session in SessionContext.
     /// </summary>
-    public static bool IsIntentionalExit { get; private set; } = false;
+    public static bool IsIntentionalExit
+    {
+        get
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null) return ctx.IsIntentionalExit;
+            return _staticIsIntentionalExit;
+        }
+        private set
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null) ctx.IsIntentionalExit = value;
+            else _staticIsIntentionalExit = value;
+        }
+    }
+    private static bool _staticIsIntentionalExit = false;
 
     /// <summary>
     /// Mark the current session as an intentional exit (prevents warning on shutdown)
@@ -52,14 +82,18 @@ public partial class GameEngine : Node
     }
 
     /// <summary>
-    /// Thread-safe singleton accessor using Lazy initialization
+    /// Thread-safe singleton accessor. In MUD mode, returns the per-session engine.
+    /// In single-player/BBS, returns the static fallback instance.
     /// </summary>
     public static GameEngine Instance
     {
         get
         {
+            // MUD mode: per-session engine
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx?.Engine != null) return ctx.Engine;
             // If a specific instance was set (e.g., in Godot), use it
-            if (instance != null) return instance;
+            if (_fallbackInstance != null) return _fallbackInstance;
             // Otherwise use lazy initialization for thread safety
             return lazyInstance.Value;
         }
@@ -70,7 +104,9 @@ public partial class GameEngine : Node
     /// </summary>
     public static void SetInstance(GameEngine engine)
     {
-        instance = engine;
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        if (ctx != null) ctx.Engine = engine;
+        else _fallbackInstance = engine;
     }
     
     // Missing properties for compilation
@@ -104,7 +140,14 @@ public partial class GameEngine : Node
     public void ClearDungeonParty()
     {
         dungeonPartyNPCIds.Clear();
+        dungeonPartyPlayerNames.Clear();
     }
+
+    // Player echo teammates for cooperative dungeons (online mode)
+    private List<string> dungeonPartyPlayerNames = new();
+    public List<string> DungeonPartyPlayerNames => dungeonPartyPlayerNames;
+    public void SetDungeonPartyPlayers(IEnumerable<string> names) => dungeonPartyPlayerNames = names.ToList();
+    public void ClearDungeonPartyPlayers() => dungeonPartyPlayerNames.Clear();
 
     /// <summary>
     /// Auto-populate quickbar for characters migrating from pre-quickbar saves.
@@ -288,8 +331,10 @@ public partial class GameEngine : Node
         // Check if this BBS user has an existing save
         var existingSave = SaveSystem.Instance.GetMostRecentSave(playerName);
         bool isSysOp = UsurperRemake.BBS.DoorMode.IsSysOp;
-        bool isOnlineAdmin = UsurperRemake.BBS.DoorMode.IsOnlineMode &&
-            string.Equals(UsurperRemake.BBS.DoorMode.OnlineUsername, "rage", StringComparison.OrdinalIgnoreCase);
+        bool isOnlineAdmin = UsurperRemake.Server.SessionContext.IsActive
+            ? (UsurperRemake.Server.SessionContext.Current?.WizardLevel ?? UsurperRemake.Server.WizardLevel.Mortal) >= UsurperRemake.Server.WizardLevel.God
+            : UsurperRemake.BBS.DoorMode.IsOnlineMode &&
+                string.Equals(UsurperRemake.BBS.DoorMode.OnlineUsername, "rage", StringComparison.OrdinalIgnoreCase);
 
         if (existingSave != null)
         {
@@ -1403,6 +1448,26 @@ public partial class GameEngine : Node
             terminal.WriteLine("Save loaded successfully!", "bright_green");
             await Task.Delay(1000);
 
+            // Online mode: validate player's team still exists
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !string.IsNullOrEmpty(currentPlayer.Team))
+            {
+                if (SaveSystem.Instance?.Backend is SqlSaveBackend teamBackend)
+                {
+                    // Check if team exists in player_teams or NPC teams
+                    bool teamExists = teamBackend.IsTeamNameTaken(currentPlayer.Team) ||
+                        NPCSpawnSystem.Instance.ActiveNPCs.Any(n => n.Team == currentPlayer.Team);
+                    if (!teamExists)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"Your team '{currentPlayer.Team}' no longer exists. You have been removed.");
+                        currentPlayer.Team = "";
+                        currentPlayer.TeamPW = "";
+                        currentPlayer.CTurf = false;
+                        await Task.Delay(2000);
+                    }
+                }
+            }
+
             // Show "While you were gone" summary for online players
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend)
             {
@@ -1495,8 +1560,13 @@ public partial class GameEngine : Node
                 .Take(5)
                 .ToList();
 
+            // Get unread mail and pending trade counts
+            int unreadMail = backend.GetUnreadMailCount(username);
+            int pendingTrades = backend.GetPendingTradeOfferCount(username);
+
             // If nothing happened, skip silently
-            if (pvpAttacks.Count == 0 && directMessages.Count == 0 && news.Count == 0)
+            if (pvpAttacks.Count == 0 && directMessages.Count == 0 && news.Count == 0
+                && unreadMail == 0 && pendingTrades == 0)
                 return;
 
             terminal.WriteLine("");
@@ -1538,13 +1608,38 @@ public partial class GameEngine : Node
             {
                 terminal.WriteLine("");
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("  -- Messages --");
+                terminal.WriteLine($"  -- Messages ({unreadMail} unread) --");
                 foreach (var msg in directMessages)
                 {
                     terminal.SetColor("cyan");
                     string msgText = msg.Message.Length > 60 ? msg.Message.Substring(0, 57) + "..." : msg.Message;
                     terminal.WriteLine($"  [{msg.FromPlayer}]: {msgText}");
                 }
+                if (unreadMail > directMessages.Count)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  Type /mail to read your full mailbox.");
+                }
+            }
+            else if (unreadMail > 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  -- Mail ({unreadMail} unread) --");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Type /mail to read your mailbox.");
+            }
+
+            // --- Trade Packages Section ---
+            if (pendingTrades > 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  -- Trade Packages ({pendingTrades} pending) --");
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  You have {pendingTrades} package{(pendingTrades != 1 ? "s" : "")} waiting!");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Type /trade to view and accept.");
             }
 
             // --- World News Section ---
@@ -2679,6 +2774,12 @@ public partial class GameEngine : Node
                     if (data.EmotionalState.Peace > 0)
                         npc.Brain.Emotions?.AddEmotion(EmotionType.Peace, data.EmotionalState.Peace, 120);
                 }
+            }
+
+            // Restore enemy list
+            if (data.Enemies != null && data.Enemies.Count > 0)
+            {
+                npc.Enemies = new List<string>(data.Enemies);
             }
 
             // Fix Experience if it's 0 - legacy saves may not have tracked NPC XP

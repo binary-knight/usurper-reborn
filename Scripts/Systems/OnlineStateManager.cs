@@ -901,8 +901,12 @@ namespace UsurperRemake.Systems
                     Memories = SerializeMemoriesStatic(npc.Brain?.Memory),
                     CurrentGoals = SerializeGoalsStatic(npc.Brain?.Goals),
                     EmotionalState = SerializeEmotionalStateForDashboard(npc),
+                    // Scale from internal -1..1 to dashboard-expected -100..100
                     Relationships = npc.Brain?.Memory?.CharacterImpressions?.ToDictionary(
-                        kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, float>(),
+                        kvp => kvp.Key, kvp => kvp.Value * 100f) ?? new Dictionary<string, float>(),
+
+                    // Enemies
+                    Enemies = npc.Enemies?.ToList() ?? new List<string>(),
 
                     // Lifecycle
                     Age = npc.Age,

@@ -4,6 +4,7 @@ using UsurperRemake.Locations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Godot;
 
 public class WorldSimulator
@@ -20,6 +21,12 @@ public class WorldSimulator
     /// Set to less than 1.0 for 24/7 world sim mode to slow NPC progression.
     /// </summary>
     public static float NpcXpMultiplier { get; set; } = 1.0f;
+
+    /// <summary>
+    /// SQL backend for online mode. Set by WorldSimService so NPC marketplace
+    /// operations can use the shared auction_listings table.
+    /// </summary>
+    public static SqlSaveBackend? SqlBackend { get; set; }
 
     // Get the active NPC list from NPCSpawnSystem instead of caching
     // This ensures we always use the current list even after save/load
@@ -204,6 +211,9 @@ public class WorldSimulator
 
         // Process emotional cascades - strong emotions spread to nearby NPCs
         _currentTick++;
+        // Periodically prune cascade rate-limiter to free memory from dead/removed NPCs
+        if (_currentTick % 100 == 0)
+            _lastCascadeTick.Clear();
         foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && n.EmotionalState != null))
         {
             ProcessEmotionalCascades(npc);
@@ -804,7 +814,7 @@ public class WorldSimulator
         // Dungeon exploration - if HP is decent and level appropriate
         if (npc.HP > npc.MaxHP * 0.4 && npc.Level >= 1)
         {
-            activities.Add(("dungeon", 0.30));
+            activities.Add(("dungeon", 0.15));
         }
 
         // Shopping - if has gold
@@ -832,8 +842,8 @@ public class WorldSimulator
             activities.Add(("heal", 0.35));
         }
 
-        // Socialize/move around
-        activities.Add(("move", 0.10));
+        // Socialize/move around town
+        activities.Add(("move", 0.15));
 
         // Romance/Love Street - based on personality
         if (npc.Gold > 500 && npc.Brain?.Personality != null)
@@ -936,19 +946,19 @@ public class WorldSimulator
                 activities.Add(("dark_alley", alleyWeight));
         }
 
-        // Inn - rest, socialize, drink, gossip
+        // Inn - rest, socialize, drink, gossip (main social hub)
         {
-            float innWeight = 0.08f; // Moderate base
+            float innWeight = 0.15f; // Strong base — the Inn is where everyone gathers
             // Wounded NPCs rest at the inn
             if (npc.HP < npc.MaxHP * 0.7)
-                innWeight += 0.08f;
+                innWeight += 0.10f;
             // Sociable NPCs like the inn
             if (npc.Brain?.Personality != null)
-                innWeight += npc.Brain.Personality.Sociability * 0.06f;
+                innWeight += npc.Brain.Personality.Sociability * 0.08f;
             // Evening/night - everyone heads to the inn
             int hour = DateTime.Now.Hour;
             if (hour >= 18 || hour < 6)
-                innWeight += 0.08f;
+                innWeight += 0.10f;
             activities.Add(("inn", innWeight));
         }
 
@@ -967,17 +977,19 @@ public class WorldSimulator
             // In a team - team activities
             if (npc.HP > npc.MaxHP * 0.6)
             {
-                activities.Add(("team_dungeon", 0.20)); // Team dungeon run
+                activities.Add(("team_dungeon", 0.12)); // Team dungeon run
             }
             activities.Add(("team_recruit", 0.15)); // Recruit more members
         }
 
         if (activities.Count == 0) return;
 
-        // Apply personality-driven, time-of-day, and memory-based weight modifiers
+        // Apply personality-driven, time-of-day, memory, relationship, and world event weight modifiers
         ApplyPersonalityWeights(activities, npc);
         ApplyTimeOfDayWeights(activities);
         ApplyMemoryWeights(activities, npc);
+        ApplyRelationshipWeights(activities, npc);
+        ApplyWorldEventWeights(activities, npc);
 
         // Weighted random selection
         double totalWeight = activities.Sum(a => a.weight);
@@ -1110,6 +1122,31 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// Map a location name (as stored in NPC.CurrentLocation / MemoryEvent.Location)
+    /// to the activity action name used in the weight system. Returns null if no mapping.
+    /// </summary>
+    private static string? MapLocationToActivity(string location)
+    {
+        return location switch
+        {
+            "Dungeon" => "dungeon",
+            "Weapon Shop" or "Armor Shop" or "Magic Shop" => "shop",
+            "Market" => "marketplace",
+            "Inn" => "inn",
+            "Temple" or "Church" => "temple",
+            "Castle" => "castle",
+            "Love Street" => "love_street",
+            "Dark Alley" => "dark_alley",
+            "Bank" => "bank",
+            "Healer" => "heal",
+            "Home" => "go_home",
+            "Main Street" => "move",
+            "Gym" => "train",
+            _ => null
+        };
+    }
+
+    /// <summary>
     /// Apply personality-driven weight modifiers so NPCs behave according to their traits.
     /// Aggressive NPCs dungeon more, scholarly NPCs train more, sociable NPCs socialize more, etc.
     /// </summary>
@@ -1230,47 +1267,232 @@ public class WorldSimulator
     }
 
     /// <summary>
-    /// Apply memory-driven weight modifiers. NPCs who were recently attacked seek healing,
-    /// those who were betrayed stay home, those who traded return to shops.
+    /// Apply memory-driven weight modifiers. Processes all recent memories (not just 5)
+    /// and accumulates location-specific sentiment from MemoryEvent.Location + EmotionalImpact.
+    /// Defeat avoidance scales by severity (importance field).
     /// </summary>
     private static void ApplyMemoryWeights(List<(string action, double weight)> activities, NPC npc)
     {
         var memories = npc.Brain?.Memory?.GetRecentEvents(48); // last 48 hours
         if (memories == null || memories.Count == 0) return;
 
-        // Check the 5 most recent memories for behavioral influence
-        foreach (var mem in memories.Take(5))
+        // Track cumulative location sentiment: location -> sum of emotional impacts
+        var locationSentiment = new Dictionary<string, double>();
+
+        foreach (var mem in memories)
         {
+            // --- Global activity modifiers based on memory type ---
             switch (mem.Type)
             {
                 case MemoryType.Attacked:
                 case MemoryType.Defeated:
-                    MultiplyWeight(activities, "heal", 1.3);
-                    MultiplyWeight(activities, "dungeon", 0.7);
-                    MultiplyWeight(activities, "train", 1.2);
+                    // Scale dungeon avoidance by severity: importance 0.5 → 0.7x, importance 1.0 → 0.4x
+                    double defeatSeverity = 0.7 - (mem.Importance * 0.3);
+                    MultiplyWeight(activities, "dungeon", defeatSeverity);
+                    MultiplyWeight(activities, "team_dungeon", defeatSeverity + 0.1);
+                    MultiplyWeight(activities, "heal", 1.0 + mem.Importance * 0.5);  // 1.0–1.5x
+                    MultiplyWeight(activities, "train", 1.1 + mem.Importance * 0.2); // 1.1–1.3x
                     break;
+
                 case MemoryType.Betrayed:
                     MultiplyWeight(activities, "go_home", 1.3);
                     MultiplyWeight(activities, "move", 0.7);
                     MultiplyWeight(activities, "dungeon", 0.8);
                     break;
+
                 case MemoryType.Helped:
                 case MemoryType.Saved:
                 case MemoryType.Defended:
                     MultiplyWeight(activities, "dungeon", 1.1);
                     MultiplyWeight(activities, "team_dungeon", 1.1);
                     break;
+
                 case MemoryType.Traded:
                 case MemoryType.BoughtItem:
                 case MemoryType.SoldItem:
-                    MultiplyWeight(activities, "shop", 1.2);
+                    MultiplyWeight(activities, "shop", 1.15);
                     MultiplyWeight(activities, "marketplace", 1.2);
                     break;
+
                 case MemoryType.SawDeath:
                     MultiplyWeight(activities, "temple", 1.3);
                     MultiplyWeight(activities, "dungeon", 0.7);
                     break;
             }
+
+            // --- Accumulate location-specific sentiment ---
+            if (!string.IsNullOrEmpty(mem.Location))
+            {
+                double sentiment = mem.EmotionalImpact; // -1.0 to 1.0
+                if (!locationSentiment.ContainsKey(mem.Location))
+                    locationSentiment[mem.Location] = 0;
+                locationSentiment[mem.Location] += sentiment;
+            }
+        }
+
+        // --- Apply location sentiment to matching activities ---
+        foreach (var (location, sentiment) in locationSentiment)
+        {
+            string? activityName = MapLocationToActivity(location);
+            if (activityName == null) continue;
+
+            // Clamp sentiment to [-3, 3] to prevent runaway multipliers
+            double clamped = Math.Clamp(sentiment, -3.0, 3.0);
+
+            // Convert sentiment to multiplier: -3 → 0.4x, 0 → 1.0x, +3 → 1.6x
+            double multiplier = 1.0 + (clamped * 0.2);
+            MultiplyWeight(activities, activityName, multiplier);
+        }
+    }
+
+    /// <summary>
+    /// Apply relationship-driven weight modifiers. NPCs prefer locations where friends are
+    /// and avoid locations where enemies are. Boosts inn when friends are at the inn;
+    /// boosts move when friends are elsewhere.
+    /// </summary>
+    private void ApplyRelationshipWeights(List<(string action, double weight)> activities, NPC npc)
+    {
+        // Build a quick map: location -> (friendCount, enemyCount)
+        var locationPresence = new Dictionary<string, (int friends, int enemies)>();
+
+        foreach (var other in npcs)
+        {
+            if (other == npc || !other.IsAlive || other.IsDead) continue;
+            if (string.IsNullOrEmpty(other.CurrentLocation)) continue;
+
+            int rel = RelationshipSystem.GetRelationshipLevel(npc, other);
+            bool isFriend = rel <= GameConfig.RelationFriendship;  // 40 or below
+            bool isEnemy = rel >= GameConfig.RelationEnemy;         // 100 or above
+
+            if (!isFriend && !isEnemy) continue;
+
+            var loc = other.CurrentLocation;
+            if (!locationPresence.ContainsKey(loc))
+                locationPresence[loc] = (0, 0);
+
+            var current = locationPresence[loc];
+            if (isFriend)
+                locationPresence[loc] = (current.friends + 1, current.enemies);
+            else
+                locationPresence[loc] = (current.friends, current.enemies + 1);
+        }
+
+        if (locationPresence.Count == 0) return;
+
+        // Friends at the Inn specifically → boost inn activity
+        if (locationPresence.TryGetValue("Inn", out var innPresence))
+        {
+            if (innPresence.friends > 0)
+                MultiplyWeight(activities, "inn", 1.0 + innPresence.friends * 0.2); // +20% per friend
+            if (innPresence.enemies > 0)
+                MultiplyWeight(activities, "inn", Math.Max(0.4, 1.0 - innPresence.enemies * 0.25));
+        }
+
+        // Friends elsewhere (not at NPC's current location) → boost move to seek them out
+        bool friendsElsewhere = locationPresence.Any(kv =>
+            kv.Key != npc.CurrentLocation && kv.Value.friends > 0);
+        if (friendsElsewhere)
+            MultiplyWeight(activities, "move", 1.3);
+
+        // Boost/penalize specific activities based on friend/enemy presence at that location
+        foreach (var (location, presence) in locationPresence)
+        {
+            string? activity = MapLocationToActivity(location);
+            if (activity == null) continue;
+
+            if (presence.friends > 0)
+                MultiplyWeight(activities, activity, 1.0 + presence.friends * 0.15); // +15% per friend
+            if (presence.enemies > 0)
+                MultiplyWeight(activities, activity, Math.Max(0.3, 1.0 - presence.enemies * 0.3)); // -30% per enemy
+        }
+    }
+
+    /// <summary>
+    /// Apply world event-driven weight modifiers. NPCs react to active wars, plagues,
+    /// festivals, and throne changes based on personality and faction.
+    /// </summary>
+    private static void ApplyWorldEventWeights(List<(string action, double weight)> activities, NPC npc)
+    {
+        var worldEvents = WorldEventSystem.Instance;
+        if (worldEvents == null) return;
+
+        var personality = npc.Brain?.Personality;
+
+        // --- WAR: brave NPCs fight, cautious NPCs hide, Crown faction rallies ---
+        if (worldEvents.WarActive)
+        {
+            if (personality != null && (personality.Aggression > 0.5f || personality.Courage > 0.5f))
+            {
+                MultiplyWeight(activities, "dungeon", 1.4);
+                MultiplyWeight(activities, "team_dungeon", 1.35);
+                MultiplyWeight(activities, "train", 1.25);
+            }
+            if (personality != null && personality.Caution > 0.5f)
+            {
+                MultiplyWeight(activities, "go_home", 1.3);
+                MultiplyWeight(activities, "bank", 1.3);
+                MultiplyWeight(activities, "dungeon", 0.6);
+            }
+            if (npc.NPCFaction == Faction.TheCrown)
+            {
+                MultiplyWeight(activities, "castle", 1.5);
+                MultiplyWeight(activities, "train", 1.2);
+            }
+        }
+
+        // --- PLAGUE: everyone heals more, cautious avoid dungeon, sociable reduce contact ---
+        if (worldEvents.PlaguActive)
+        {
+            MultiplyWeight(activities, "heal", 1.3);
+            MultiplyWeight(activities, "temple", 1.25);
+            MultiplyWeight(activities, "marketplace", 0.8);
+
+            if (personality != null && personality.Caution > 0.4f)
+            {
+                MultiplyWeight(activities, "dungeon", 0.5);
+                MultiplyWeight(activities, "team_dungeon", 0.6);
+            }
+            if (personality != null && personality.Sociability > 0.5f)
+            {
+                MultiplyWeight(activities, "inn", 0.7);
+                MultiplyWeight(activities, "love_street", 0.6);
+                MultiplyWeight(activities, "move", 0.75);
+            }
+        }
+
+        // --- FESTIVAL: everyone celebrates, sociable NPCs party hard ---
+        if (worldEvents.FestivalActive)
+        {
+            MultiplyWeight(activities, "marketplace", 1.2);
+            MultiplyWeight(activities, "inn", 1.15);
+            MultiplyWeight(activities, "dungeon", 0.8);
+            MultiplyWeight(activities, "team_dungeon", 0.85);
+
+            if (personality != null && personality.Sociability > 0.5f)
+            {
+                MultiplyWeight(activities, "inn", 1.35);
+                MultiplyWeight(activities, "move", 1.25);
+                MultiplyWeight(activities, "love_street", 1.3);
+            }
+        }
+
+        // --- THRONE EVENTS: faction-specific reactions ---
+        var activeEvents = worldEvents.GetActiveEvents();
+        bool throneEvent = activeEvents.Any(e =>
+            e.Type == WorldEventSystem.EventType.KingMartialLaw ||
+            e.Type == WorldEventSystem.EventType.KingWarDeclaration);
+
+        if (throneEvent)
+        {
+            if (npc.NPCFaction == Faction.TheCrown)
+                MultiplyWeight(activities, "castle", 1.5);
+            if (npc.NPCFaction == Faction.TheShadows)
+            {
+                MultiplyWeight(activities, "dark_alley", 1.4);
+                MultiplyWeight(activities, "inn", 1.2);
+            }
+            if (npc.NPCFaction == Faction.TheFaith)
+                MultiplyWeight(activities, "temple", 1.4);
         }
     }
 
@@ -1518,6 +1740,12 @@ public class WorldSimulator
                 }
 
                 // GD.Print($"[WorldSim] Team '{npc.Team}' won! {survivors.Count} survivors shared {totalExp} XP and {totalGold} gold");
+
+                // Return to town after the fight
+                foreach (var member in survivors)
+                {
+                    member.UpdateLocation(member.HP < member.MaxHP * 0.5 ? "Healer" : "Inn");
+                }
             }
         }
         else
@@ -1668,6 +1896,12 @@ public class WorldSimulator
             }
 
             // GD.Print($"[WorldSim] {npc.Name} defeated {monster.Name}, gained {expGain} XP and {goldGain} gold");
+
+            // Return to town after the fight
+            var returnLocations = new[] { "Main Street", "Inn", "Main Street", "Healer" };
+            npc.UpdateLocation(npc.HP < npc.MaxHP * 0.5
+                ? "Healer"  // Wounded NPCs head to the healer
+                : returnLocations[random.Next(returnLocations.Length)]);
         }
         else if (!npc.IsAlive)
         {
@@ -1974,14 +2208,85 @@ public class WorldSimulator
         }
     }
     
+    /// <summary>
+    /// Move NPC to a location, biased by relationships. Friends attract, enemies repel.
+    /// Falls back to pure random if NPC has no meaningful relationships.
+    /// </summary>
     private void MoveNPCToRandomLocation(NPC npc)
     {
-        var newLocation = GameLocations[random.Next(GameLocations.Length)];
+        // Build weighted location list — base weight 1.0 for all locations
+        var locationWeights = new List<(string location, double weight)>();
+        foreach (var loc in GameLocations)
+            locationWeights.Add((loc, 1.0));
+
+        // Adjust weights based on where friends/enemies are
+        foreach (var other in npcs)
+        {
+            if (other == npc || !other.IsAlive || other.IsDead) continue;
+            if (string.IsNullOrEmpty(other.CurrentLocation)) continue;
+
+            int rel = RelationshipSystem.GetRelationshipLevel(npc, other);
+
+            for (int i = 0; i < locationWeights.Count; i++)
+            {
+                if (locationWeights[i].location != other.CurrentLocation) continue;
+
+                if (rel <= GameConfig.RelationFriendship) // friend or better
+                {
+                    // Closer relationship = stronger pull (married +0.9, friend +0.3)
+                    double friendBoost = 0.3 + (GameConfig.RelationFriendship - rel) / 50.0;
+                    locationWeights[i] = (locationWeights[i].location,
+                        locationWeights[i].weight + friendBoost);
+                }
+                else if (rel >= GameConfig.RelationEnemy) // enemy or worse
+                {
+                    double enemyPenalty = (rel - GameConfig.RelationEnemy) / 20.0;
+                    double newWeight = locationWeights[i].weight * (0.5 - enemyPenalty * 0.2);
+                    locationWeights[i] = (locationWeights[i].location,
+                        Math.Max(0.05, newWeight));
+                }
+                break;
+            }
+        }
+
+        // Zero out current location so NPC always moves somewhere new
+        for (int i = 0; i < locationWeights.Count; i++)
+        {
+            if (locationWeights[i].location == npc.CurrentLocation)
+            {
+                locationWeights[i] = (locationWeights[i].location, 0.0);
+                break;
+            }
+        }
+
+        // Weighted random selection
+        double totalWeight = locationWeights.Sum(lw => lw.weight);
+        if (totalWeight <= 0)
+        {
+            // Fallback: pure random
+            var fallback = GameLocations[random.Next(GameLocations.Length)];
+            if (fallback != npc.CurrentLocation)
+                npc.UpdateLocation(fallback);
+            return;
+        }
+
+        double roll = random.NextDouble() * totalWeight;
+        double cumulative = 0;
+        string newLocation = GameLocations[0];
+
+        foreach (var (location, weight) in locationWeights)
+        {
+            cumulative += weight;
+            if (roll <= cumulative)
+            {
+                newLocation = location;
+                break;
+            }
+        }
 
         if (newLocation != npc.CurrentLocation)
         {
             npc.UpdateLocation(newLocation);
-            // GD.Print($"[WorldSim] {npc.Name} moved to {newLocation}");
         }
     }
 
@@ -2268,25 +2573,33 @@ public class WorldSimulator
     }
 
     /// <summary>
-    /// NPC visits the Marketplace to list items or browse/buy
+    /// NPC visits the Marketplace to list items or browse/buy.
+    /// In online mode (SqlBackend set), uses the shared auction_listings table.
+    /// In single-player mode, uses the in-memory MarketplaceSystem.
     /// </summary>
     private void NPCVisitMarketplace(NPC npc)
     {
         npc.UpdateLocation("Market");
-        // GD.Print($"[WorldSim] {npc.Name} visits the Marketplace");
 
-        // 50% chance to list an item if has inventory
-        if (npc.MarketInventory.Count > 0 && random.NextDouble() < 0.5)
+        if (SqlBackend != null)
         {
-            var item = npc.MarketInventory[random.Next(npc.MarketInventory.Count)];
-            MarketplaceSystem.Instance.NPCListItem(npc, item);
-            npc.MarketInventory.Remove(item);
+            // Online mode: use SQL-backed auction house
+            NPCVisitMarketplaceSql(npc);
         }
-
-        // 50% chance to browse and potentially buy
-        if (npc.Gold > 500 && random.NextDouble() < 0.5)
+        else
         {
-            MarketplaceSystem.Instance.NPCBrowseAndBuy(npc);
+            // Single-player: use in-memory marketplace
+            if (npc.MarketInventory.Count > 0 && random.NextDouble() < 0.5)
+            {
+                var item = npc.MarketInventory[random.Next(npc.MarketInventory.Count)];
+                MarketplaceSystem.Instance.NPCListItem(npc, item);
+                npc.MarketInventory.Remove(item);
+            }
+
+            if (npc.Gold > 500 && random.NextDouble() < 0.5)
+            {
+                MarketplaceSystem.Instance.NPCBrowseAndBuy(npc);
+            }
         }
 
         // Meet other NPCs at marketplace for relationship building
@@ -2298,7 +2611,93 @@ public class WorldSimulator
         {
             var other = otherNPCs[random.Next(otherNPCs.Count)];
             RelationshipSystem.UpdateRelationship(npc, other, 1, 0, false);
-            // GD.Print($"[WorldSim] {npc.Name} and {other.Name} haggled together at the Marketplace");
+        }
+    }
+
+    /// <summary>
+    /// Online mode: NPC lists items and browses/buys from the shared auction_listings table.
+    /// Fire-and-forget async since SimulateStep is synchronous.
+    /// </summary>
+    private void NPCVisitMarketplaceSql(NPC npc)
+    {
+        var backend = SqlBackend!;
+
+        // 50% chance to list an item if has inventory
+        if (npc.MarketInventory.Count > 0 && random.NextDouble() < 0.5)
+        {
+            var item = npc.MarketInventory[random.Next(npc.MarketInventory.Count)];
+            long price = MarketplaceSystem.Instance.CalculateNPCPrice(item, npc);
+            string itemJson = JsonSerializer.Serialize(item);
+            npc.MarketInventory.Remove(item);
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await backend.CreateAuctionListing(npc.Name, item.Name, itemJson, price, hoursToExpire: 48);
+                    NewsSystem.Instance?.Newsy(false, $"{npc.Name} put {item.Name} up for sale at the marketplace.");
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Instance.LogError("MARKETPLACE", $"NPC list error: {ex.Message}");
+                }
+            });
+        }
+
+        // 50% chance to browse and potentially buy
+        if (npc.Gold > 500 && random.NextDouble() < 0.5)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var listings = await backend.GetActiveAuctionListings(20);
+                    if (listings.Count == 0) return;
+
+                    var affordable = listings
+                        .Where(l => l.Price <= npc.Gold * 0.8)
+                        .Where(l => !l.Seller.Equals(npc.Name, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    if (affordable.Count == 0) return;
+
+                    var chosen = affordable[random.Next(affordable.Count)];
+
+                    // Deserialize the item to check if NPC wants it
+                    var item = JsonSerializer.Deserialize<Item>(chosen.ItemJson);
+                    if (item == null) return;
+
+                    var tempListing = new MarketplaceSystem.MarketListing
+                    {
+                        Item = item, Seller = chosen.Seller, Price = chosen.Price
+                    };
+                    if (!MarketplaceSystem.Instance.NPCWantsToBuy(npc, tempListing)
+                        && random.NextDouble() >= 0.1) return;
+
+                    // Atomic SQL purchase
+                    bool bought = await backend.BuyAuctionListing(chosen.Id, npc.Name);
+                    if (!bought) return;
+
+                    npc.Gold -= chosen.Price;
+
+                    // Pay the seller (works for both players and NPCs)
+                    await backend.AddGoldToPlayer(chosen.Seller, chosen.Price);
+
+                    // Equip or store the purchased item
+                    MarketplaceSystem.Instance.EquipOrStoreItem(npc, item);
+
+                    NewsSystem.Instance?.Newsy(false,
+                        $"{npc.Name} bought {item.Name} from {chosen.Seller} at the marketplace.");
+
+                    // Notify seller
+                    await backend.SendMessage("Auction House", chosen.Seller, "auction",
+                        $"Your {item.Name} sold to {npc.Name} for {chosen.Price:N0} gold!");
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Instance.LogError("MARKETPLACE", $"NPC browse/buy error: {ex.Message}");
+                }
+            });
         }
     }
 
@@ -2588,8 +2987,10 @@ public class WorldSimulator
         target.Brain?.RecordInteraction(npc, InteractionType.Attacked);
 
         // Update relationships - make them enemies
-        npc.AddRelationship(target.Id, 0);
-        target.AddRelationship(npc.Id, 0);
+        if (!npc.Enemies.Contains(target.Id))
+            npc.Enemies.Add(target.Id);
+        if (!target.Enemies.Contains(npc.Id))
+            target.Enemies.Add(npc.Id);
 
         if (!target.IsAlive)
         {
@@ -2599,7 +3000,7 @@ public class WorldSimulator
             npc.Brain?.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.SawDeath,
-                InvolvedCharacter = target.Id,
+                InvolvedCharacter = target.Name2 ?? target.Name,
                 Description = $"Killed {target.Name} in combat",
                 Importance = 0.9f,
                 Location = npc.CurrentLocation
@@ -2627,7 +3028,7 @@ public class WorldSimulator
             target.Brain?.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.SawDeath,
-                InvolvedCharacter = npc.Id,
+                InvolvedCharacter = npc.Name2 ?? npc.Name,
                 Description = $"Killed {npc.Name} in self-defense",
                 Importance = 0.9f,
                 Location = target.CurrentLocation
@@ -3508,7 +3909,76 @@ public class WorldSimulator
     
     private void ProcessRivalries()
     {
-        // Check for escalating conflicts between enemies
+        // Seed new rivalries: aggressive NPCs at the same location may develop friction
+        var aliveNpcs = npcs.Where(npc => npc.IsAlive && !npc.IsDead).ToList();
+        foreach (var npc in aliveNpcs)
+        {
+            var personality = npc.Brain?.Personality;
+            if (personality == null || personality.Aggression < 0.5f) continue;
+            if (GD.Randf() > 0.08f) continue; // 8% chance per tick to develop a new rivalry
+
+            // Find a potential rival at the same location
+            var potentialRivals = aliveNpcs.Where(other =>
+                other.Id != npc.Id &&
+                !npc.Enemies.Contains(other.Id) &&
+                other.CurrentLocation == npc.CurrentLocation &&
+                !npc.IsMarried || (npc.SpouseName != (other.Name2 ?? other.Name)) // Don't rival your spouse
+            ).ToList();
+
+            if (potentialRivals.Count == 0) continue;
+
+            // Prefer rivals with opposing alignment or faction
+            NPC? rival = null;
+            foreach (var candidate in potentialRivals)
+            {
+                bool opposingAlignment = (npc.Chivalry > 200 && candidate.Darkness > 200) ||
+                                          (npc.Darkness > 200 && candidate.Chivalry > 200);
+                bool opposingFaction = npc.NPCFaction.HasValue && candidate.NPCFaction.HasValue &&
+                                       npc.NPCFaction != candidate.NPCFaction;
+                bool personalityClash = personality.Aggression > 0.7f &&
+                                        (candidate.Brain?.Personality?.Aggression ?? 0) > 0.6f;
+
+                if (opposingAlignment || opposingFaction || personalityClash)
+                {
+                    rival = candidate;
+                    break;
+                }
+            }
+
+            // Fallback: pick a random rival (less likely)
+            if (rival == null && GD.Randf() < 0.03f)
+                rival = potentialRivals[random.Next(potentialRivals.Count)];
+
+            if (rival != null)
+            {
+                npc.Enemies.Add(rival.Id);
+                rival.Enemies.Add(npc.Id);
+
+                // Record the enmity in memory
+                string npcName = npc.Name2 ?? npc.Name;
+                string rivalName = rival.Name2 ?? rival.Name;
+                npc.Brain?.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.MadeEnemy,
+                    InvolvedCharacter = rivalName,
+                    Description = $"Developed a rivalry with {rivalName}",
+                    Importance = 0.6f,
+                    Location = npc.CurrentLocation
+                });
+                rival.Brain?.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.MadeEnemy,
+                    InvolvedCharacter = npcName,
+                    Description = $"Developed a rivalry with {npcName}",
+                    Importance = 0.6f,
+                    Location = rival.CurrentLocation
+                });
+
+                NewsSystem.Instance?.Newsy(false, $"Tensions are rising between {npcName} and {rivalName} at the {npc.CurrentLocation}.");
+            }
+        }
+
+        // Escalate existing rivalries between enemies
         var enemies = npcs.Where(npc => npc.IsAlive && !npc.IsDead && npc.Enemies.Count > 0).ToList();
 
         foreach (var npc in enemies)
@@ -3522,14 +3992,14 @@ public class WorldSimulator
                     if (npc.CurrentLocation == enemy.CurrentLocation)
                     {
                         // Pick conflict type based on instigator's personality
-                        var personality = npc.Brain?.Personality;
+                        var personality2 = npc.Brain?.Personality;
                         var world = new WorldState(npcs);
 
-                        if (personality != null && personality.Greed > 0.5f && personality.Intelligence > 0.5f)
+                        if (personality2 != null && personality2.Greed > 0.5f && personality2.Intelligence > 0.5f)
                         {
                             ExecuteTheft(npc, enemy);
                         }
-                        else if (personality != null && personality.Courage > 0.6f && personality.Aggression < 0.6f)
+                        else if (personality2 != null && personality2.Courage > 0.6f && personality2.Aggression < 0.6f)
                         {
                             ExecuteChallenge(npc, enemy);
                         }
@@ -3561,19 +4031,25 @@ public class WorldSimulator
         thief.Brain?.Memory?.RecordEvent(new MemoryEvent
         {
             Type = MemoryType.GainedGold,
-            InvolvedCharacter = victim.Id,
+            InvolvedCharacter = victim.Name2 ?? victim.Name,
             Description = $"Stole {stolenAmount} gold from {victim.Name2 ?? victim.Name}",
             Importance = 0.7f,
             Location = thief.CurrentLocation
         });
         victim.Brain?.Memory?.RecordEvent(new MemoryEvent
         {
-            Type = MemoryType.LostGold,
-            InvolvedCharacter = thief.Id,
+            Type = MemoryType.Attacked,
+            InvolvedCharacter = thief.Name2 ?? thief.Name,
             Description = $"{thief.Name2 ?? thief.Name} stole {stolenAmount} gold from me",
             Importance = 0.8f,
             Location = victim.CurrentLocation
         });
+
+        // Theft creates enmity
+        if (!victim.Enemies.Contains(thief.Id))
+            victim.Enemies.Add(thief.Id);
+        if (!thief.Enemies.Contains(victim.Id))
+            thief.Enemies.Add(victim.Id);
 
         // Victim becomes angry
         victim.EmotionalState?.AddEmotion(EmotionType.Anger, 0.6f, 180);
@@ -3610,23 +4086,31 @@ public class WorldSimulator
         winner.EmotionalState?.AddEmotion(EmotionType.Pride, 0.4f, 240);
         loser.EmotionalState?.AddEmotion(EmotionType.Sadness, 0.4f, 180);
 
-        // Record memories
+        // Record memories — use names (not IDs) so impression system can track them
         winner.Brain?.Memory?.RecordEvent(new MemoryEvent
         {
-            Type = MemoryType.PersonalAchievement,
-            InvolvedCharacter = loser.Id,
+            Type = MemoryType.Defeated,
+            InvolvedCharacter = loserName,
             Description = $"Won a public challenge against {loserName}",
             Importance = 0.7f,
+            EmotionalImpact = 0.5f,
             Location = challenger.CurrentLocation
         });
         loser.Brain?.Memory?.RecordEvent(new MemoryEvent
         {
-            Type = MemoryType.PersonalFailure,
-            InvolvedCharacter = winner.Id,
+            Type = MemoryType.Defeated,
+            InvolvedCharacter = winnerName,
             Description = $"Lost a public challenge to {winnerName}",
             Importance = 0.6f,
+            EmotionalImpact = -0.5f,
             Location = challenger.CurrentLocation
         });
+
+        // Challenges deepen rivalries
+        if (!winner.Enemies.Contains(loser.Id))
+            winner.Enemies.Add(loser.Id);
+        if (!loser.Enemies.Contains(winner.Id))
+            loser.Enemies.Add(winner.Id);
 
         // Generate news
         NewsSystem.Instance?.Newsy($"{challengerName} publicly challenged {targetName} at the {challenger.CurrentLocation}! {winnerName} emerged victorious.");

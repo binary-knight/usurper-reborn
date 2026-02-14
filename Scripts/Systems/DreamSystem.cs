@@ -15,8 +15,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class DreamSystem
     {
-        private static DreamSystem? _instance;
-        public static DreamSystem Instance => _instance ??= new DreamSystem();
+        private static DreamSystem? _fallbackInstance;
+        public static DreamSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Dreams;
+                return _fallbackInstance ??= new DreamSystem();
+            }
+        }
 
         // Track experienced dreams
         public HashSet<string> ExperiencedDreams { get; private set; } = new();
@@ -431,7 +439,7 @@ namespace UsurperRemake.Systems
 
         public DreamSystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         /// <summary>

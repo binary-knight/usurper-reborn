@@ -299,53 +299,11 @@ public class ArenaLocation : BaseLocation
 
     /// <summary>
     /// Create a combat-ready Character from saved PlayerData.
-    /// The opponent always starts at full HP and is AI-controlled.
+    /// Delegates to the shared PlayerCharacterLoader utility.
     /// </summary>
     private Character CreateCombatCharacterFromSave(PlayerData playerData, string displayName)
     {
-        var opponent = new Character
-        {
-            Name1 = playerData.Name1,
-            Name2 = playerData.Name2 ?? displayName,
-            Level = playerData.Level,
-            HP = playerData.MaxHP,       // Full HP for defender (fair fight)
-            MaxHP = playerData.MaxHP,
-            Mana = playerData.MaxMana,
-            MaxMana = playerData.MaxMana,
-            Strength = playerData.Strength,
-            Defence = playerData.Defence,
-            Stamina = playerData.Stamina,
-            Agility = playerData.Agility,
-            Charisma = playerData.Charisma,
-            Dexterity = playerData.Dexterity,
-            Wisdom = playerData.Wisdom,
-            Intelligence = playerData.Intelligence,
-            Constitution = playerData.Constitution,
-            WeapPow = playerData.WeapPow,
-            ArmPow = playerData.ArmPow,
-            Healing = playerData.Healing,
-            ManaPotions = playerData.ManaPotions,
-            Race = playerData.Race,
-            Class = playerData.Class,
-            Sex = playerData.Sex == 'F' ? CharacterSex.Female : CharacterSex.Male,
-            Gold = playerData.Gold,
-            Poison = playerData.Poison,
-            AI = CharacterAI.Computer
-        };
-
-        // Restore spells so AI can cast them
-        if (playerData.Spells != null && playerData.Spells.Count > 0)
-        {
-            opponent.Spell = new List<List<bool>>(playerData.Spells);
-        }
-
-        // Restore abilities so AI can use them
-        if (playerData.LearnedAbilities != null && playerData.LearnedAbilities.Count > 0)
-        {
-            opponent.LearnedAbilities = new HashSet<string>(playerData.LearnedAbilities);
-        }
-
-        return opponent;
+        return PlayerCharacterLoader.CreateFromSaveData(playerData, displayName);
     }
 
     /// <summary>
@@ -378,6 +336,9 @@ public class ArenaLocation : BaseLocation
             if (goldStolen > 0)
                 await backend.DeductGoldFromPlayer(defenderUsername, goldStolen);
 
+            // Claim any bounties on the defeated player
+            long bountyReward = await backend.ClaimBounties(defenderUsername, myUsername);
+
             // Display victory
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
@@ -386,6 +347,12 @@ public class ArenaLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  Gold stolen from {target.DisplayName}: {goldStolen:N0}");
+            }
+            if (bountyReward > 0)
+            {
+                currentPlayer.Gold += bountyReward;
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"  BOUNTY COLLECTED: {bountyReward:N0} gold!");
             }
         }
         else if (result.Outcome == CombatOutcome.PlayerDied)

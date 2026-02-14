@@ -780,8 +780,10 @@ public class TelemetrySystem
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 ErrorLog($"PostHog error: {errorBody}");
-                // Re-queue events on failure
+                // Re-queue events on failure, but cap to prevent infinite buildup
                 pendingEvents.AddRange(eventsToSend);
+                if (pendingEvents.Count > MaxPendingEvents * 2)
+                    pendingEvents.RemoveRange(0, pendingEvents.Count - MaxPendingEvents);
             }
             else
             {

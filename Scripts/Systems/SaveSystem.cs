@@ -762,6 +762,9 @@ namespace UsurperRemake.Systems
                     // Relationships
                     Relationships = SerializeNPCRelationships(npc),
 
+                    // Enemies
+                    Enemies = npc.Enemies?.ToList() ?? new List<string>(),
+
                     // Inventory
                     Gold = npc.Gold,
                     BankGold = npc.BankGold,
@@ -1049,8 +1052,9 @@ namespace UsurperRemake.Systems
         
         private Dictionary<string, float> SerializeNPCRelationships(NPC npc)
         {
-            // This would serialize NPC relationships
-            return new Dictionary<string, float>();
+            // Scale from internal -1..1 to dashboard-expected -100..100
+            return npc.Brain?.Memory?.CharacterImpressions?.ToDictionary(
+                kvp => kvp.Key, kvp => kvp.Value * 100f) ?? new Dictionary<string, float>();
         }
         
         private List<WorldEventData> SerializeActiveEvents()
@@ -1268,6 +1272,7 @@ namespace UsurperRemake.Systems
             try
             {
                 data.DungeonPartyNPCIds = GameEngine.Instance?.DungeonPartyNPCIds?.ToList() ?? new List<string>();
+                data.DungeonPartyPlayerNames = GameEngine.Instance?.DungeonPartyPlayerNames?.ToList() ?? new List<string>();
                 if (data.DungeonPartyNPCIds.Count > 0)
                 {
                     GD.Print($"[SaveSystem] Saving {data.DungeonPartyNPCIds.Count} dungeon party NPCs: [{string.Join(", ", data.DungeonPartyNPCIds)}]");
@@ -1640,6 +1645,11 @@ namespace UsurperRemake.Systems
                 {
                     GameEngine.Instance?.SetDungeonPartyNPCs(data.DungeonPartyNPCIds);
                     GD.Print($"[SaveSystem] Restored {data.DungeonPartyNPCIds.Count} dungeon party NPCs");
+                }
+                if (data.DungeonPartyPlayerNames != null && data.DungeonPartyPlayerNames.Count > 0)
+                {
+                    GameEngine.Instance?.SetDungeonPartyPlayers(data.DungeonPartyPlayerNames);
+                    GD.Print($"[SaveSystem] Restored {data.DungeonPartyPlayerNames.Count} dungeon party player echoes");
                 }
             }
             catch { /* GameEngine not available */ }

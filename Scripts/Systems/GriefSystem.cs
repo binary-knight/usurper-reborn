@@ -21,8 +21,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class GriefSystem
     {
-        private static GriefSystem? _instance;
-        public static GriefSystem Instance => _instance ??= new GriefSystem();
+        private static GriefSystem? _fallbackInstance;
+        public static GriefSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Grief;
+                return _fallbackInstance ??= new GriefSystem();
+            }
+        }
 
         // Active grief states for story companions
         private Dictionary<CompanionId, GriefState> activeGrief = new();
@@ -66,7 +74,7 @@ namespace UsurperRemake.Systems
 
         public GriefSystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         /// <summary>

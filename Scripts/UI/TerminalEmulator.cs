@@ -3,6 +3,7 @@ using UsurperRemake.BBS;
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using System.Text;
 using System.Linq;
@@ -20,9 +21,51 @@ public partial class TerminalEmulator : Control
     private TaskCompletionSource<string> inputAwaiter;
     private int cursorX = 0, cursorY = 0;
     private string currentColor = "white";
+
+    // Stream-based I/O for MUD server mode (each session gets its own reader/writer)
+    private StreamReader? _streamReader;
+    private StreamWriter? _streamWriter;
+
+    /// <summary>Returns true when this terminal is backed by a TCP stream (MUD mode).</summary>
+    public bool IsStreamBacked => _streamWriter != null;
+
+    /// <summary>
+    /// Default constructor for Godot/Console mode (single-player, BBS door).
+    /// </summary>
+    public TerminalEmulator() { }
+
+    /// <summary>
+    /// Create a stream-backed terminal for MUD server sessions.
+    /// Each player session gets its own TerminalEmulator connected to their TCP stream.
+    /// </summary>
+    public TerminalEmulator(System.IO.Stream inputStream, System.IO.Stream outputStream)
+    {
+        _streamReader = new StreamReader(inputStream, System.Text.Encoding.UTF8);
+        _streamWriter = new StreamWriter(outputStream, new System.Text.UTF8Encoding(false))
+        {
+            AutoFlush = true,
+            NewLine = "\r\n" // Telnet/terminal convention
+        };
+    }
     
     // Static instance property for compatibility
-    public static TerminalEmulator Instance { get; private set; }
+    // In MUD mode, per-session terminal is stored in SessionContext
+    private static TerminalEmulator? _fallbackInstance;
+    public static TerminalEmulator Instance
+    {
+        get
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx?.Terminal != null) return ctx.Terminal;
+            return _fallbackInstance!;
+        }
+        private set
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null) ctx.Terminal = value;
+            else _fallbackInstance = value;
+        }
+    }
     
     // ANSI color mappings - supports both underscore and no-underscore variants
     private readonly Dictionary<string, Color> ansiColors = new Dictionary<string, Color>
@@ -124,7 +167,12 @@ public partial class TerminalEmulator : Control
     
     public void WriteLine(string text, string color = "white")
     {
-        if (display != null)
+        if (_streamWriter != null)
+        {
+            // MUD stream mode — write ANSI-colored output to TCP stream
+            WriteLineToStream(text, color);
+        }
+        else if (display != null)
         {
             // Convert simplified [colorname]text[/] format to BBCode [color=colorname]text[/color]
             string processedText = ConvertSimplifiedColorToBBCode(text);
@@ -317,8 +365,12 @@ public partial class TerminalEmulator : Control
         // Use current color if no color specified
         string effectiveColor = color ?? currentColor;
 
-        // If the Godot RichTextLabel is available use it, otherwise fall back to plain Console output
-        if (display != null)
+        if (_streamWriter != null)
+        {
+            // MUD stream mode — write ANSI-colored output to TCP stream
+            WriteToStream(text, effectiveColor);
+        }
+        else if (display != null)
         {
             var colorCode = ansiColors.ContainsKey(effectiveColor) ?
                 ansiColors[effectiveColor].ToHtml() : ansiColors["white"].ToHtml();
@@ -499,7 +551,13 @@ public partial class TerminalEmulator : Control
 
     public void ClearScreen()
     {
-        if (display != null)
+        if (_streamWriter != null)
+        {
+            // MUD stream mode — ANSI clear screen
+            _streamWriter.Write("\x1b[2J\x1b[H");
+            _streamWriter.Flush();
+        }
+        else if (display != null)
         {
             display.Clear();
         }
@@ -540,6 +598,24 @@ public partial class TerminalEmulator : Control
     
     public async Task<string> GetInput(string prompt = "> ")
     {
+        // MUD stream mode - read from TCP stream
+        if (_streamWriter != null && _streamReader != null)
+        {
+            Write(prompt, "bright_white");
+            var line = await _streamReader.ReadLineAsync();
+
+            // Update idle timeout tracker
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null)
+            {
+                var server = UsurperRemake.Server.MudServer.Instance;
+                if (server != null && server.ActiveSessions.TryGetValue(ctx.Username.ToLowerInvariant(), out var session))
+                    session.LastActivityTime = DateTime.UtcNow;
+            }
+
+            return line ?? string.Empty;
+        }
+
         // BBS socket mode - delegate entirely to BBSTerminalAdapter which reads from socket
         if (ShouldUseBBSAdapter())
         {
@@ -814,7 +890,11 @@ public partial class TerminalEmulator : Control
     public void SetColor(string color)
     {
         currentColor = color;
-        if (ShouldUseBBSAdapter())
+        if (_streamWriter != null)
+        {
+            _streamWriter.Write($"\x1b[{GetAnsiColorCode(color)}m");
+        }
+        else if (ShouldUseBBSAdapter())
         {
             BBSTerminalAdapter.Instance!.SetColor(color);
         }
@@ -827,8 +907,14 @@ public partial class TerminalEmulator : Control
     
     public async Task<string> GetKeyInput()
     {
+        // MUD stream mode - use line input since we can't read single keys from TCP
+        if (_streamWriter != null && _streamReader != null)
+        {
+            var input = await GetInput("");
+            return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
+        }
         // If running inside Godot, use line input and take first char
-        if (inputLine != null && display != null)
+        else if (inputLine != null && display != null)
         {
             var input = await GetInput("");
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
@@ -1137,4 +1223,95 @@ public partial class TerminalEmulator : Control
 
     // Synchronous helper for legacy code paths
     public string GetInputSync(string prompt = "> ") => GetInput(prompt).GetAwaiter().GetResult();
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MUD STREAM I/O HELPERS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Write a line with ANSI color to the MUD TCP stream.</summary>
+    private void WriteLineToStream(string text, string baseColor)
+    {
+        if (_streamWriter == null) return;
+
+        if (string.IsNullOrEmpty(text))
+        {
+            _streamWriter.WriteLine();
+            return;
+        }
+
+        // Check for inline color tags
+        if (!text.Contains("[") || !text.Contains("[/]"))
+        {
+            _streamWriter.Write($"\x1b[{GetAnsiColorCode(baseColor)}m");
+            _streamWriter.WriteLine(text);
+            _streamWriter.Write("\x1b[0m");
+        }
+        else
+        {
+            _streamWriter.Write($"\x1b[{GetAnsiColorCode(baseColor)}m");
+            WriteMarkupToStream(text);
+            _streamWriter.WriteLine();
+            _streamWriter.Write("\x1b[0m");
+        }
+    }
+
+    /// <summary>Write text (no newline) with ANSI color to the MUD TCP stream.</summary>
+    private void WriteToStream(string text, string color)
+    {
+        if (_streamWriter == null) return;
+        _streamWriter.Write($"\x1b[{GetAnsiColorCode(color)}m");
+        _streamWriter.Write(text);
+    }
+
+    /// <summary>Parse [colorname]text[/] markup and write to the MUD TCP stream using ANSI codes.</summary>
+    private void WriteMarkupToStream(string text)
+    {
+        if (_streamWriter == null) return;
+        int pos = 0;
+
+        while (pos < text.Length)
+        {
+            var tagMatch = System.Text.RegularExpressions.Regex.Match(
+                text.Substring(pos), @"^\[([a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (tagMatch.Success)
+            {
+                string colorName = tagMatch.Groups[1].Value;
+                pos += tagMatch.Length;
+                int depth = 1;
+                int contentStart = pos;
+                int contentEnd = pos;
+
+                while (pos < text.Length && depth > 0)
+                {
+                    if (pos + 2 <= text.Length - 1 && text[pos] == '[' && text[pos + 1] == '/' && text[pos + 2] == ']')
+                    {
+                        depth--;
+                        if (depth == 0) { contentEnd = pos; pos += 3; break; }
+                        pos += 3;
+                        continue;
+                    }
+                    var nestedMatch = System.Text.RegularExpressions.Regex.Match(
+                        text.Substring(pos), @"^\[([a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (nestedMatch.Success) { depth++; pos += nestedMatch.Length; continue; }
+                    pos++;
+                }
+
+                string content = text.Substring(contentStart, contentEnd - contentStart);
+                _streamWriter.Write($"\x1b[{GetAnsiColorCode(colorName)}m");
+                WriteMarkupToStream(content);
+                _streamWriter.Write("\x1b[0m");
+                continue;
+            }
+
+            if (pos + 2 <= text.Length - 1 && text[pos] == '[' && text[pos + 1] == '/' && text[pos + 2] == ']')
+            {
+                pos += 3;
+                continue;
+            }
+
+            _streamWriter.Write(text[pos]);
+            pos++;
+        }
+    }
 } 

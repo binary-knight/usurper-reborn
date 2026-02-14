@@ -15,8 +15,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class DivineBlessingSystem
     {
-        private static DivineBlessingSystem? _instance;
-        public static DivineBlessingSystem Instance => _instance ??= new DivineBlessingSystem();
+        private static DivineBlessingSystem? _fallbackInstance;
+        public static DivineBlessingSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.DivineBlessing;
+                return _fallbackInstance ??= new DivineBlessingSystem();
+            }
+        }
 
         // Track temporary blessings per player (from sacrifices/prayers)
         private Dictionary<string, TemporaryBlessing> temporaryBlessings = new();

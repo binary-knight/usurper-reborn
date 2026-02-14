@@ -13,8 +13,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class IntimacySystem
     {
-        private static IntimacySystem? _instance;
-        public static IntimacySystem Instance => _instance ??= new IntimacySystem();
+        private static IntimacySystem? _fallbackInstance;
+        public static IntimacySystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Intimacy;
+                return _fallbackInstance ??= new IntimacySystem();
+            }
+        }
 
         private TerminalEmulator? terminal;
         private Character? player;
@@ -22,7 +30,7 @@ namespace UsurperRemake.Systems
 
         public IntimacySystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         /// <summary>

@@ -13,8 +13,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class AlignmentSystem
     {
-        private static AlignmentSystem _instance;
-        public static AlignmentSystem Instance => _instance ??= new AlignmentSystem();
+        private static AlignmentSystem? _fallbackInstance;
+        public static AlignmentSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Alignment;
+                return _fallbackInstance ??= new AlignmentSystem();
+            }
+        }
 
         private Random _random = new Random();
 

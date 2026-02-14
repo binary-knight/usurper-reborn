@@ -19,8 +19,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class CompanionSystem
     {
-        private static CompanionSystem? _instance;
-        public static CompanionSystem Instance => _instance ??= new CompanionSystem();
+        private static CompanionSystem? _fallbackInstance;
+        public static CompanionSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Companions;
+                return _fallbackInstance ??= new CompanionSystem();
+            }
+        }
 
         // All available companions
         private Dictionary<CompanionId, Companion> companions = new();
@@ -43,7 +51,7 @@ namespace UsurperRemake.Systems
 
         public CompanionSystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
             InitializeCompanions();
         }
 

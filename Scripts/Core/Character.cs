@@ -240,6 +240,9 @@ public class Character
     public bool IsCompanion { get; set; } = false;
     public UsurperRemake.Systems.CompanionId? CompanionId { get; set; } = null;
 
+    // Player echo (loaded from DB for cooperative dungeons)
+    public bool IsEcho { get; set; } = false;
+
     // Combat Stamina System - resource for special abilities
     // Formula: MaxCombatStamina = 50 + (Stamina stat * 2) + (Level * 3)
     public long CurrentCombatStamina { get; set; } = 100;

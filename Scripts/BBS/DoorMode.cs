@@ -28,6 +28,12 @@ namespace UsurperRemake.BBS
         private static float _npcXpMultiplier = 0.25f;
         private static int _saveIntervalMinutes = 5;
 
+        // MUD server mode (single-process multiplayer)
+        private static bool _mudServerMode = false;
+        private static bool _mudRelayMode = false;
+        private static int _mudPort = 4000;
+        private static readonly List<string> _mudAdminUsers = new();
+
         // Windows API for hiding console window
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetConsoleWindow();
@@ -69,8 +75,18 @@ namespace UsurperRemake.BBS
 
         /// <summary>
         /// The username for the online session (from --user flag, SSH, or in-game auth).
+        /// In MUD mode, returns the per-session username from SessionContext.
         /// </summary>
-        public static string? OnlineUsername => _onlineUsername;
+        public static string? OnlineUsername
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null && !string.IsNullOrEmpty(ctx.Username))
+                    return ctx.Username;
+                return _onlineUsername;
+            }
+        }
 
         /// <summary>
         /// Set the online username after in-game authentication.
@@ -106,6 +122,24 @@ namespace UsurperRemake.BBS
 
         /// <summary>How often to persist NPC state to database, in minutes (default: 5).</summary>
         public static int SaveIntervalMinutes => _saveIntervalMinutes;
+
+        /// <summary>
+        /// True when running as a MUD server (--mud-server flag).
+        /// Single process serves all players via TCP on localhost.
+        /// </summary>
+        public static bool IsMudServerMode => _mudServerMode;
+
+        /// <summary>TCP port for MUD server (default: 4001).</summary>
+        public static int MudPort => _mudPort;
+
+        /// <summary>
+        /// True when running as a thin relay client (--mud-relay flag).
+        /// Bridges stdin/stdout to the MUD server TCP port.
+        /// </summary>
+        public static bool IsMudRelayMode => _mudRelayMode;
+
+        /// <summary>Admin usernames for MUD mode (from --admin flags).</summary>
+        public static IReadOnlyList<string> MudAdminUsers => _mudAdminUsers;
 
         /// <summary>
         /// Check command line args for door mode parameters
@@ -187,6 +221,32 @@ namespace UsurperRemake.BBS
                         _saveIntervalMinutes = mins;
                     i++;
                 }
+                // --mud-server starts the single-process MUD game server
+                else if (arg == "--mud-server")
+                {
+                    _mudServerMode = true;
+                    _onlineMode = true; // implies online mode
+                    Console.Error.WriteLine("[MUD] MUD server mode enabled");
+                }
+                // --mud-port <port> sets the TCP listen port (default: 4001)
+                else if (arg == "--mud-port" && i + 1 < args.Length)
+                {
+                    if (int.TryParse(args[i + 1], out int port) && port >= 1 && port <= 65535)
+                        _mudPort = port;
+                    i++;
+                }
+                // --mud-relay starts the thin relay client (bridges stdin/stdout to TCP)
+                else if (arg == "--mud-relay")
+                {
+                    _mudRelayMode = true;
+                    Console.Error.WriteLine("[RELAY] MUD relay mode enabled");
+                }
+                // --admin <username> adds a MUD server admin user (can be repeated)
+                else if (arg == "--admin" && i + 1 < args.Length)
+                {
+                    _mudAdminUsers.Add(args[i + 1].Trim());
+                    i++;
+                }
             }
 
             // Second pass: process commands (--door, --door32, etc.)
@@ -226,6 +286,30 @@ namespace UsurperRemake.BBS
                 if (arg == "--local" || arg == "-l")
                 {
                     _sessionInfo = DropFileParser.CreateLocalSession();
+                    return true;
+                }
+
+                // --mud-server (handled in first pass for flag, trigger entry here)
+                if (arg == "--mud-server")
+                {
+                    // MUD server doesn't need a session - it creates per-player sessions internally
+                    _sessionInfo = DropFileParser.CreateLocalSession();
+                    _sessionInfo.UserName = "__mud_server__";
+                    _sessionInfo.UserAlias = "__mud_server__";
+                    Console.Error.WriteLine($"[MUD] Port: {_mudPort}, Database: {_onlineDatabasePath}");
+                    return true;
+                }
+
+                // --mud-relay (handled in first pass for flag, trigger entry here)
+                if (arg == "--mud-relay")
+                {
+                    _sessionInfo = DropFileParser.CreateLocalSession();
+                    if (!string.IsNullOrEmpty(_onlineUsername) && _sessionInfo != null)
+                    {
+                        _sessionInfo.UserName = _onlineUsername;
+                        _sessionInfo.UserAlias = _onlineUsername;
+                    }
+                    Console.Error.WriteLine($"[RELAY] User: {_onlineUsername ?? "(none)"}, Port: {_mudPort}");
                     return true;
                 }
 
@@ -614,10 +698,16 @@ namespace UsurperRemake.BBS
         }
 
         /// <summary>
-        /// Get the player name from the drop file for character lookup/creation
+        /// Get the player name from the drop file for character lookup/creation.
+        /// In MUD mode, returns the per-session username from SessionContext.
         /// </summary>
         public static string GetPlayerName()
         {
+            // In MUD mode, each session has its own username via SessionContext
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null && !string.IsNullOrEmpty(ctx.Username))
+                return ctx.Username;
+
             if (_sessionInfo == null)
                 return "Player";
 

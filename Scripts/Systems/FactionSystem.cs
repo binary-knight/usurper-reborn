@@ -16,8 +16,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class FactionSystem
     {
-        private static FactionSystem? _instance;
-        public static FactionSystem Instance => _instance ??= new FactionSystem();
+        private static FactionSystem? _fallbackInstance;
+        public static FactionSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Factions;
+                return _fallbackInstance ??= new FactionSystem();
+            }
+        }
 
         // Player faction state
         public Faction? PlayerFaction { get; private set; }
@@ -210,7 +218,7 @@ namespace UsurperRemake.Systems
 
         public FactionSystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         /// <summary>

@@ -67,6 +67,18 @@ public abstract class BaseLocation
         // Track location visit statistics
         player.Statistics?.RecordLocationVisit(Name);
 
+        // MUD mode: show other players at this location
+        if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null)
+        {
+            var otherPlayers = UsurperRemake.Server.RoomRegistry.Instance.GetPlayerNamesAt(LocationId, player.DisplayName);
+            if (otherPlayers.Count > 0)
+            {
+                term.SetColor("cyan");
+                term.WriteLine($"  Also here: {string.Join(", ", otherPlayers)}");
+                term.SetColor("white");
+            }
+        }
+
         // Check for achievements on location entry (catches non-combat achievements)
         AchievementSystem.CheckAchievements(player);
         await AchievementSystem.ShowPendingNotifications(term);
@@ -250,6 +262,21 @@ public abstract class BaseLocation
             if (OnlineChatSystem.IsActive)
             {
                 OnlineChatSystem.Instance!.DisplayPendingMessages(terminal);
+            }
+
+            // MUD mode: drain incoming room/system messages (arrival/departure, chat, etc.)
+            if (UsurperRemake.Server.SessionContext.IsActive)
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                var session = ctx != null ? UsurperRemake.Server.MudServer.Instance?.ActiveSessions
+                    .GetValueOrDefault(ctx.Username.ToLowerInvariant()) : null;
+                if (session != null)
+                {
+                    while (session.IncomingMessages.TryDequeue(out var msg))
+                    {
+                        terminal.WriteLine(msg);
+                    }
+                }
             }
 
             // Get user choice
@@ -1416,11 +1443,31 @@ public abstract class BaseLocation
         // Handle slash commands (works from any location)
         if (choice.StartsWith("/"))
         {
-            // Try online chat commands first (preserve original casing for message content)
-            if (OnlineChatSystem.IsActive)
+            // MUD mode: route chat through in-memory system (instant delivery)
+            if (UsurperRemake.Server.SessionContext.IsActive)
+            {
+                var handled = await UsurperRemake.Server.MudChatSystem.TryProcessCommand(choice.Trim(), terminal);
+                if (handled)
+                {
+                    // Commands that produce multi-line output need a pause so the
+                    // location menu doesn't immediately redraw over the output
+                    var cmd = choice.Trim().Split(' ')[0].TrimStart('/').ToLowerInvariant();
+                    if (IsInfoDisplayCommand(cmd))
+                        await terminal.PressAnyKey();
+                    return (true, false);
+                }
+            }
+            // Legacy online mode: route through SQLite-polled chat system
+            else if (OnlineChatSystem.IsActive)
             {
                 var handled = await OnlineChatSystem.Instance!.TryProcessCommand(choice.Trim(), terminal);
-                if (handled) return (true, false);
+                if (handled)
+                {
+                    var cmd = choice.Trim().Split(' ')[0].TrimStart('/').ToLowerInvariant();
+                    if (IsInfoDisplayCommand(cmd))
+                        await terminal.PressAnyKey();
+                    return (true, false);
+                }
             }
 
             return await ProcessSlashCommand(choice.Substring(1).ToLower().Trim());
@@ -1512,6 +1559,57 @@ public abstract class BaseLocation
             case "report":
             case "bugreport":
                 await BugReportSystem.ReportBug(terminal, currentPlayer);
+                return (true, false);
+
+            case "mail":
+            case "mailbox":
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    await ShowMailbox();
+                else
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  Mail is only available in online mode.");
+                    await Task.Delay(1500);
+                }
+                return (true, false);
+
+            case "trade":
+            case "trades":
+            case "package":
+            case "packages":
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    await ShowTradeMenu();
+                else
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  Trading is only available in online mode.");
+                    await Task.Delay(1500);
+                }
+                return (true, false);
+
+            case "bounty":
+            case "bounties":
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    await ShowBountyMenu();
+                else
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  Bounties are only available in online mode.");
+                    await Task.Delay(1500);
+                }
+                return (true, false);
+
+            case "auction":
+            case "ah":
+            case "market":
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    await ShowAuctionMenu();
+                else
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  The Auction House is only available in online mode.");
+                    await Task.Delay(1500);
+                }
                 return (true, false);
 
             default:
@@ -1619,6 +1717,27 @@ public abstract class BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("║  ");
         terminal.SetColor("cyan");
+        terminal.Write("/mail     ");
+        terminal.SetColor("white");
+        terminal.WriteLine("        - Open your mailbox (online)                          ║");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("║  ");
+        terminal.SetColor("cyan");
+        terminal.Write("/trade    ");
+        terminal.SetColor("white");
+        terminal.WriteLine("        - View trade packages (online)                        ║");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("║  ");
+        terminal.SetColor("cyan");
+        terminal.Write("/auction  ");
+        terminal.SetColor("white");
+        terminal.WriteLine("        - Buy and sell items (Auction House)                   ║");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("║  ");
+        terminal.SetColor("cyan");
         terminal.Write("/bug      ");
         terminal.SetColor("white");
         terminal.WriteLine("        - Report a bug (opens GitHub)                        ║");
@@ -1649,8 +1768,8 @@ public abstract class BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("- Report bug         ║");
 
-        // Online chat commands (only shown when in online mode)
-        if (OnlineChatSystem.IsActive)
+        // Online/MUD chat commands
+        if (UsurperRemake.Server.SessionContext.IsActive || OnlineChatSystem.IsActive)
         {
             terminal.SetColor("white");
             terminal.WriteLine("║                                                                              ║");
@@ -1660,13 +1779,25 @@ public abstract class BaseLocation
             terminal.SetColor("bright_green");
             terminal.Write("/say <msg>          ");
             terminal.SetColor("white");
-            terminal.WriteLine("- Chat to all online players                         ║");
+            terminal.WriteLine("- Chat to players at your location                   ║");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("║  ");
+            terminal.SetColor("bright_green");
+            terminal.Write("/shout <msg>        ");
+            terminal.SetColor("white");
+            terminal.WriteLine("- Shout to all online players                        ║");
             terminal.SetColor("bright_yellow");
             terminal.Write("║  ");
             terminal.SetColor("bright_green");
             terminal.Write("/tell <name> <msg>  ");
             terminal.SetColor("white");
             terminal.WriteLine("- Private message to a player                        ║");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("║  ");
+            terminal.SetColor("bright_green");
+            terminal.Write("/emote <action>     ");
+            terminal.SetColor("white");
+            terminal.WriteLine("- Emote (e.g. /emote waves hello)                    ║");
             terminal.SetColor("bright_yellow");
             terminal.Write("║  ");
             terminal.SetColor("bright_green");
@@ -4220,5 +4351,1036 @@ public abstract class BaseLocation
         }
 
         await Task.CompletedTask;
+    }
+
+    // ========== Online Mail System ==========
+
+    /// <summary>
+    /// Show the player's mailbox with interactive options.
+    /// </summary>
+    protected async Task ShowMailbox()
+    {
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        string username = currentPlayer.DisplayName.ToLower();
+        int page = 0;
+        const int pageSize = 10;
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                              YOUR MAILBOX                                   ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            int unread = backend.GetUnreadMailCount(username);
+            var inbox = await backend.GetMailInbox(username, pageSize, page * pageSize);
+
+            terminal.SetColor("white");
+            terminal.WriteLine($"Unread: {unread}");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(new string('─', 70));
+
+            if (inbox.Count == 0 && page == 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("Your mailbox is empty.");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine($"{"#",-4} {"From",-16} {"Date",-12} {"Message",-36}");
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(new string('─', 70));
+
+                for (int i = 0; i < inbox.Count; i++)
+                {
+                    var msg = inbox[i];
+                    string unreadMark = msg.IsRead ? " " : "*";
+                    string dateStr = msg.CreatedAt.ToString("MMM dd");
+                    string msgPreview = msg.Message.Length > 35 ? msg.Message.Substring(0, 32) + "..." : msg.Message;
+
+                    terminal.SetColor(msg.IsRead ? "gray" : "white");
+                    terminal.WriteLine($"{unreadMark}{i + 1,-3} {msg.FromPlayer,-16} {dateStr,-12} {msgPreview,-36}");
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("[R]ead #  [S]end  [D]elete #  [N]ext Page  [P]rev Page  [Q]uit");
+            terminal.Write("> ");
+            terminal.SetColor("white");
+            string input = (await terminal.ReadLineAsync()).Trim();
+
+            if (string.IsNullOrEmpty(input) || input.ToUpper() == "Q")
+                break;
+
+            string cmd = input.ToUpper();
+
+            if (cmd == "N")
+            {
+                if (inbox.Count >= pageSize) page++;
+            }
+            else if (cmd == "P")
+            {
+                if (page > 0) page--;
+            }
+            else if (cmd == "S")
+            {
+                await SendMail(backend, username);
+            }
+            else if (cmd.StartsWith("R") && cmd.Length > 1 && int.TryParse(cmd.Substring(1).Trim(), out int readIdx))
+            {
+                if (readIdx >= 1 && readIdx <= inbox.Count)
+                    await ReadMail(backend, inbox[readIdx - 1]);
+            }
+            else if (cmd.StartsWith("D") && cmd.Length > 1 && int.TryParse(cmd.Substring(1).Trim(), out int delIdx))
+            {
+                if (delIdx >= 1 && delIdx <= inbox.Count)
+                {
+                    await backend.DeleteMessage(inbox[delIdx - 1].Id, username);
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine("Message deleted.");
+                    await Task.Delay(1000);
+                }
+            }
+            else if (int.TryParse(cmd, out int directRead) && directRead >= 1 && directRead <= inbox.Count)
+            {
+                await ReadMail(backend, inbox[directRead - 1]);
+            }
+        }
+    }
+
+    private async Task ReadMail(SqlSaveBackend backend, PlayerMessage msg)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"═══ MESSAGE FROM {msg.FromPlayer.ToUpper()} ═══");
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"Date: {msg.CreatedAt:yyyy-MM-dd HH:mm}");
+        terminal.SetColor("white");
+        terminal.WriteLine($"Type: {msg.MessageType}");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine(msg.Message);
+        terminal.WriteLine("");
+
+        // Mark as read (using existing MarkMessagesRead won't work for a single message,
+        // but the message has been seen)
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("Press Enter to continue...");
+        await terminal.ReadKeyAsync();
+    }
+
+    private async Task SendMail(SqlSaveBackend backend, string senderUsername)
+    {
+        // Spam protection
+        int sentToday = backend.GetMailsSentToday(senderUsername);
+        if (sentToday >= 20)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("You've reached the daily mail limit (20 messages).");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write("Send to: ");
+        terminal.SetColor("white");
+        string recipient = await terminal.ReadLineAsync();
+
+        if (string.IsNullOrWhiteSpace(recipient)) return;
+
+        // Validate recipient exists
+        if (!backend.PlayerExists(recipient))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"Player '{recipient}' not found.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.SetColor("cyan");
+        terminal.Write("Message (max 200 chars): ");
+        terminal.SetColor("white");
+        string message = await terminal.ReadLineAsync();
+
+        if (string.IsNullOrWhiteSpace(message)) return;
+        if (message.Length > 200)
+            message = message.Substring(0, 200);
+
+        await backend.SendMessage(currentPlayer.DisplayName, recipient, "mail", message);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"Message sent to {recipient}!");
+        await Task.Delay(1500);
+    }
+
+    // ========== Player Trading System ==========
+
+    /// <summary>
+    /// Show the player's trade packages menu.
+    /// </summary>
+    protected async Task ShowTradeMenu()
+    {
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        string username = currentPlayer.DisplayName.ToLower();
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                            TRADE PACKAGES                                   ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            // Get incoming and sent offers
+            var incoming = await backend.GetPendingTradeOffers(username);
+            var sent = await backend.GetSentTradeOffers(username);
+
+            // Show incoming
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"Incoming ({incoming.Count} pending):");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(new string('─', 65));
+
+            if (incoming.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  No pending packages.");
+            }
+            else
+            {
+                for (int i = 0; i < incoming.Count; i++)
+                {
+                    var offer = incoming[i];
+                    string itemDesc = ParseTradeItems(offer.ItemsJson);
+                    string goldStr = offer.Gold > 0 ? $"{offer.Gold:N0}g" : "";
+                    string details = !string.IsNullOrEmpty(itemDesc) && !string.IsNullOrEmpty(goldStr)
+                        ? $"{itemDesc} + {goldStr}" : $"{itemDesc}{goldStr}";
+                    if (string.IsNullOrEmpty(details)) details = "(empty)";
+
+                    terminal.SetColor("white");
+                    terminal.Write($"  {i + 1}. ");
+                    terminal.SetColor("bright_green");
+                    terminal.Write("[NEW] ");
+                    terminal.SetColor("white");
+                    terminal.Write($"From {offer.FromDisplayName}: {details}");
+                    if (!string.IsNullOrEmpty(offer.Message))
+                    {
+                        terminal.SetColor("gray");
+                        terminal.Write($"  \"{offer.Message}\"");
+                    }
+                    terminal.WriteLine("");
+                }
+            }
+
+            terminal.WriteLine("");
+
+            // Show sent
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"Sent ({sent.Count} pending):");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(new string('─', 65));
+
+            if (sent.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  No outgoing packages.");
+            }
+            else
+            {
+                int offset = incoming.Count;
+                for (int i = 0; i < sent.Count; i++)
+                {
+                    var offer = sent[i];
+                    string itemDesc = ParseTradeItems(offer.ItemsJson);
+                    string goldStr = offer.Gold > 0 ? $"{offer.Gold:N0}g" : "";
+                    string details = !string.IsNullOrEmpty(itemDesc) && !string.IsNullOrEmpty(goldStr)
+                        ? $"{itemDesc} + {goldStr}" : $"{itemDesc}{goldStr}";
+                    if (string.IsNullOrEmpty(details)) details = "(empty)";
+
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  {offset + i + 1}. To {offer.ToDisplayName}: {details}  (pending)");
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("[A]ccept #  [D]ecline #  [S]end Package  [C]ancel #  [Q]uit");
+            terminal.Write("> ");
+            terminal.SetColor("white");
+            string input = (await terminal.ReadLineAsync()).Trim();
+
+            if (string.IsNullOrEmpty(input) || input.ToUpper() == "Q")
+                break;
+
+            string cmd = input.ToUpper();
+
+            if (cmd == "S")
+            {
+                await SendTradePackage(backend, username);
+            }
+            else if (cmd.StartsWith("A") && cmd.Length > 1 && int.TryParse(cmd.Substring(1).Trim(), out int acceptIdx))
+            {
+                if (acceptIdx >= 1 && acceptIdx <= incoming.Count)
+                    await AcceptTradeOffer(backend, incoming[acceptIdx - 1]);
+            }
+            else if (cmd.StartsWith("D") && cmd.Length > 1 && int.TryParse(cmd.Substring(1).Trim(), out int declineIdx))
+            {
+                if (declineIdx >= 1 && declineIdx <= incoming.Count)
+                    await DeclineTradeOffer(backend, incoming[declineIdx - 1]);
+            }
+            else if (cmd.StartsWith("C") && cmd.Length > 1 && int.TryParse(cmd.Substring(1).Trim(), out int cancelIdx))
+            {
+                int sentIdx = cancelIdx - incoming.Count;
+                if (sentIdx >= 1 && sentIdx <= sent.Count)
+                    await CancelTradeOffer(backend, sent[sentIdx - 1]);
+            }
+        }
+    }
+
+    private string ParseTradeItems(string itemsJson)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(itemsJson) || itemsJson == "[]") return "";
+            var items = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, object>>>(itemsJson);
+            if (items == null || items.Count == 0) return "";
+            var names = items.Select(i => i.ContainsKey("name") ? i["name"]?.ToString() ?? "?" : "?");
+            return string.Join(", ", names);
+        }
+        catch { return "items"; }
+    }
+
+    private async Task AcceptTradeOffer(SqlSaveBackend backend, TradeOffer offer)
+    {
+        // Add gold to player
+        if (offer.Gold > 0)
+        {
+            currentPlayer.Gold += offer.Gold;
+        }
+
+        // Add items to player inventory
+        if (!string.IsNullOrEmpty(offer.ItemsJson) && offer.ItemsJson != "[]")
+        {
+            try
+            {
+                var items = System.Text.Json.JsonSerializer.Deserialize<List<UsurperRemake.Systems.InventoryItemData>>(
+                    offer.ItemsJson, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                if (items != null)
+                {
+                    foreach (var itemData in items)
+                    {
+                        currentPlayer.Inventory.Add(new Item
+                        {
+                            Name = itemData.Name ?? "Unknown",
+                            Type = itemData.Type,
+                            Value = itemData.Value,
+                            Attack = itemData.Attack,
+                            Armor = itemData.Armor,
+                            HP = itemData.HP,
+                            Mana = itemData.Mana,
+                            Strength = itemData.Strength,
+                            Defence = itemData.Defence,
+                            Dexterity = itemData.Dexterity
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("TRADE", $"Failed to parse trade items: {ex.Message}");
+            }
+        }
+
+        await backend.UpdateTradeOfferStatus(offer.Id, "accepted");
+        await backend.SendMessage("System", offer.FromPlayer, "trade",
+            $"{currentPlayer.DisplayName} accepted your package!");
+
+        terminal.SetColor("bright_green");
+        if (offer.Gold > 0)
+            terminal.WriteLine($"Received {offer.Gold:N0} gold!");
+        terminal.WriteLine("Package accepted!");
+        await Task.Delay(1500);
+    }
+
+    private async Task DeclineTradeOffer(SqlSaveBackend backend, TradeOffer offer)
+    {
+        await backend.UpdateTradeOfferStatus(offer.Id, "declined");
+
+        // Return gold to sender
+        if (offer.Gold > 0)
+        {
+            await backend.AddGoldToPlayer(offer.FromPlayer, offer.Gold);
+        }
+
+        // TODO: return items to sender (create return package or add directly)
+
+        await backend.SendMessage("System", offer.FromPlayer, "trade",
+            $"{currentPlayer.DisplayName} declined your package. Gold returned.");
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Package declined. Items/gold returned to sender.");
+        await Task.Delay(1500);
+    }
+
+    private async Task CancelTradeOffer(SqlSaveBackend backend, TradeOffer offer)
+    {
+        await backend.UpdateTradeOfferStatus(offer.Id, "cancelled");
+
+        // Return gold to sender (self)
+        if (offer.Gold > 0)
+        {
+            currentPlayer.Gold += offer.Gold;
+        }
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Package cancelled. Gold returned.");
+        await Task.Delay(1500);
+    }
+
+    private async Task SendTradePackage(SqlSaveBackend backend, string senderUsername)
+    {
+        // Check max outgoing
+        int sentCount = backend.GetSentTradeOfferCount(senderUsername);
+        if (sentCount >= 10)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("You have too many pending outgoing packages (max 10).");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write("Send to: ");
+        terminal.SetColor("white");
+        string recipient = await terminal.ReadLineAsync();
+
+        if (string.IsNullOrWhiteSpace(recipient)) return;
+
+        // Block self-trading
+        if (recipient.Equals(currentPlayer.DisplayName, StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("You can't send packages to yourself!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Validate recipient
+        if (!backend.PlayerExists(recipient))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"Player '{recipient}' not found.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Select items from inventory
+        var selectedItems = new List<Item>();
+        terminal.SetColor("cyan");
+        terminal.WriteLine("Select items to send (up to 5). Enter 0 when done.");
+
+        if (currentPlayer.Inventory.Count > 0)
+        {
+            for (int round = 0; round < 5; round++)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine("Your inventory:");
+                var available = currentPlayer.Inventory.Where(i => !selectedItems.Contains(i)).ToList();
+                for (int i = 0; i < available.Count; i++)
+                {
+                    terminal.WriteLine($"  {i + 1}. {available[i].Name} (value: {available[i].Value:N0}g)");
+                }
+
+                if (selectedItems.Count > 0)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"Selected: {string.Join(", ", selectedItems.Select(i => i.Name))}");
+                }
+
+                terminal.SetColor("cyan");
+                terminal.Write("Add item # (0 to stop): ");
+                terminal.SetColor("white");
+                string itemInput = await terminal.ReadLineAsync();
+
+                if (!int.TryParse(itemInput, out int itemIdx) || itemIdx == 0) break;
+                if (itemIdx >= 1 && itemIdx <= available.Count)
+                {
+                    selectedItems.Add(available[itemIdx - 1]);
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"Added {available[itemIdx - 1].Name}");
+                }
+            }
+        }
+
+        // Enter gold amount
+        terminal.SetColor("cyan");
+        terminal.Write($"Gold to send (you have {currentPlayer.Gold:N0}): ");
+        terminal.SetColor("white");
+        string goldInput = await terminal.ReadLineAsync();
+        long goldAmount = 0;
+        if (long.TryParse(goldInput, out long parsed) && parsed > 0)
+        {
+            goldAmount = Math.Min(parsed, currentPlayer.Gold);
+        }
+
+        // Must send something
+        if (selectedItems.Count == 0 && goldAmount == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("Package is empty - nothing to send.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Optional note
+        terminal.SetColor("cyan");
+        terminal.Write("Add a note (optional): ");
+        terminal.SetColor("white");
+        string note = await terminal.ReadLineAsync();
+        if (note?.Length > 100) note = note.Substring(0, 100);
+
+        // Confirm
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.Write($"Send ");
+        if (selectedItems.Count > 0)
+            terminal.Write($"{selectedItems.Count} item(s) ");
+        if (goldAmount > 0)
+            terminal.Write($"+ {goldAmount:N0} gold ");
+        terminal.Write($"to {recipient}? (Y/N): ");
+        terminal.SetColor("white");
+        string confirm = await terminal.ReadLineAsync();
+
+        if (confirm?.ToUpper().StartsWith("Y") != true)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("Cancelled.");
+            await Task.Delay(1000);
+            return;
+        }
+
+        // Remove items from inventory
+        foreach (var item in selectedItems)
+        {
+            currentPlayer.Inventory.Remove(item);
+        }
+
+        // Deduct gold
+        if (goldAmount > 0)
+        {
+            currentPlayer.Gold -= goldAmount;
+        }
+
+        // Serialize items
+        string itemsJson = "[]";
+        if (selectedItems.Count > 0)
+        {
+            var itemDataList = selectedItems.Select(i => new UsurperRemake.Systems.InventoryItemData
+            {
+                Name = i.Name,
+                Type = i.Type,
+                Value = i.Value,
+                Attack = i.Attack,
+                Armor = i.Armor,
+                HP = i.HP,
+                Mana = i.Mana,
+                Strength = i.Strength,
+                Defence = i.Defence,
+                Dexterity = i.Dexterity
+            }).ToList();
+            itemsJson = System.Text.Json.JsonSerializer.Serialize(itemDataList,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        }
+
+        await backend.CreateTradeOffer(senderUsername, recipient.ToLower(), itemsJson, goldAmount, note ?? "");
+        await backend.SendMessage(currentPlayer.DisplayName, recipient, "trade",
+            $"{currentPlayer.DisplayName} sent you a package! Type /trade to view.");
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"Package sent to {recipient}!");
+        await Task.Delay(1500);
+    }
+
+    // ========== Player Bounty System ==========
+
+    protected async Task ShowBountyMenu()
+    {
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                           BOUNTY BOARD                                     ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            var bounties = await backend.GetActiveBounties(20);
+            if (bounties.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  The bounty board is empty. No active bounties.");
+            }
+            else
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"  {"#",-4} {"Target",-20} {"Bounty",-15} {"Posted By",-20}");
+                terminal.WriteLine("  " + new string('─', 60));
+
+                for (int i = 0; i < bounties.Count; i++)
+                {
+                    var b = bounties[i];
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"  {i + 1,-4} ");
+                    terminal.SetColor("white");
+                    terminal.Write($"{b.TargetPlayer,-20} ");
+                    terminal.SetColor("bright_green");
+                    terminal.Write($"{b.Amount:N0} gold     ");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"{b.PlacedBy,-20}");
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  [P] Place Bounty    [M] My Bounties    [Q] Back");
+            terminal.SetColor("white");
+            terminal.Write("\n  Choice: ");
+            string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+
+            if (input == "Q" || input == "") break;
+
+            if (input == "P")
+            {
+                await PlaceBounty(backend);
+            }
+            else if (input == "M")
+            {
+                await ShowMyBounties(backend);
+            }
+        }
+    }
+
+    private async Task PlaceBounty(SqlSaveBackend backend)
+    {
+        string username = currentPlayer.DisplayName.ToLower();
+
+        // Check bounty limit (max 3 active per player)
+        int activeCount = backend.GetActiveBountyCount(username);
+        if (activeCount >= 3)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  You already have 3 active bounties. Wait for them to be claimed.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.Write("\n  Target player name: ");
+        string target = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (string.IsNullOrEmpty(target)) return;
+
+        if (target.ToLower() == username)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  You can't place a bounty on yourself!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Verify target exists
+        var allPlayers = await backend.GetAllPlayerSummaries();
+        var targetPlayer = allPlayers.FirstOrDefault(p => p.DisplayName.Equals(target, StringComparison.OrdinalIgnoreCase));
+        if (targetPlayer == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  Player not found.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        long minBounty = 500;
+        terminal.SetColor("white");
+        terminal.Write($"  Bounty amount (min {minBounty:N0}, you have {currentPlayer.Gold:N0}g): ");
+        string amountStr = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!long.TryParse(amountStr, out long amount) || amount < minBounty)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  Minimum bounty is {minBounty:N0} gold.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        if (amount > currentPlayer.Gold)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  You don't have enough gold!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        currentPlayer.Gold -= amount;
+        await backend.PlaceBounty(username, target.ToLower(), amount);
+        await backend.SendMessage(currentPlayer.DisplayName, target, "bounty",
+            $"A bounty of {amount:N0} gold has been placed on your head!");
+
+        if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+            _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews($"{currentPlayer.DisplayName} placed a {amount:N0}g bounty on {targetPlayer.DisplayName}!", "bounty");
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"\n  Bounty of {amount:N0} gold placed on {targetPlayer.DisplayName}!");
+        await Task.Delay(2000);
+    }
+
+    private async Task ShowMyBounties(SqlSaveBackend backend)
+    {
+        string username = currentPlayer.DisplayName.ToLower();
+        var myBounties = await backend.GetActiveBounties(50);
+        var placed = myBounties.Where(b => b.PlacedBy.Equals(username, StringComparison.OrdinalIgnoreCase)).ToList();
+        var onMe = await backend.GetBountiesOnPlayer(username);
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("\n  === Bounties You Placed ===");
+        if (placed.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  None.");
+        }
+        else
+        {
+            foreach (var b in placed)
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine($"  {b.TargetPlayer} - {b.Amount:N0} gold");
+            }
+        }
+
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("\n  === Bounties On You ===");
+        if (onMe.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  None. You're clean!");
+        }
+        else
+        {
+            long total = onMe.Sum(b => b.Amount);
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {onMe.Count} active bounties totaling {total:N0} gold!");
+            foreach (var b in onMe)
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine($"  {b.Amount:N0} gold - posted by {b.PlacedBy}");
+            }
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    // ========== Auction House System ==========
+
+    protected async Task ShowAuctionMenu()
+    {
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        // Clean up expired listings on entry
+        await backend.CleanupExpiredAuctions();
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                          AUCTION HOUSE                                     ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  [B] Browse Listings     [S] Sell Item     [M] My Listings    [Q] Back");
+            terminal.SetColor("white");
+            terminal.Write("\n  Choice: ");
+            string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+
+            if (input == "Q" || input == "") break;
+
+            switch (input)
+            {
+                case "B": await BrowseAuctions(backend); break;
+                case "S": await SellOnAuction(backend); break;
+                case "M": await ShowMyAuctions(backend); break;
+            }
+        }
+    }
+
+    private async Task BrowseAuctions(SqlSaveBackend backend)
+    {
+        var listings = await backend.GetActiveAuctionListings(50);
+        if (listings.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\n  No items for sale. Check back later!");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\n  ═══════════ AUCTION LISTINGS ═══════════");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine($"  {"#",-4} {"Item",-28} {"Price",-14} {"Seller",-16} {"Expires"}");
+        terminal.WriteLine("  " + new string('─', 72));
+
+        string username = currentPlayer.DisplayName.ToLower();
+        for (int i = 0; i < listings.Count; i++)
+        {
+            var l = listings[i];
+            bool isMine = l.Seller.Equals(username, StringComparison.OrdinalIgnoreCase);
+            var timeLeft = l.ExpiresAt - DateTime.UtcNow;
+            string expires = timeLeft.TotalHours > 1 ? $"{timeLeft.TotalHours:F0}h" : $"{timeLeft.TotalMinutes:F0}m";
+
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  {i + 1,-4} ");
+            terminal.SetColor("white");
+            terminal.Write($"{l.ItemName,-28} ");
+            terminal.SetColor("bright_green");
+            terminal.Write($"{l.Price:N0}g        ");
+            terminal.SetColor(isMine ? "cyan" : "gray");
+            terminal.Write($"{l.Seller,-16} ");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(expires);
+        }
+
+        terminal.SetColor("white");
+        terminal.Write("\n  Buy item # (or Enter to go back): ");
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > listings.Count) return;
+
+        var listing = listings[choice - 1];
+        if (listing.Seller.Equals(username, StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  You can't buy your own listing!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        if (currentPlayer.Gold < listing.Price)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  You need {listing.Price:N0} gold but only have {currentPlayer.Gold:N0}!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.SetColor("yellow");
+        terminal.Write($"  Buy {listing.ItemName} for {listing.Price:N0} gold? (Y/N): ");
+        string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+        if (confirm != "Y") return;
+
+        bool success = await backend.BuyAuctionListing(listing.Id, username);
+        if (!success)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  That item was already sold or expired!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Transfer gold and item
+        currentPlayer.Gold -= listing.Price;
+        await backend.AddGoldToPlayer(listing.Seller, listing.Price);
+
+        // Create item from JSON and add to inventory
+        try
+        {
+            var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson);
+            if (item != null)
+            {
+                currentPlayer.Inventory.Add(item);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"\n  Purchased {listing.ItemName} for {listing.Price:N0} gold!");
+            }
+        }
+        catch
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"\n  Purchased item but couldn't add to inventory. Gold was deducted.");
+        }
+
+        await backend.SendMessage("Auction House", listing.Seller, "auction",
+            $"Your {listing.ItemName} sold for {listing.Price:N0} gold!");
+
+        await Task.Delay(2000);
+    }
+
+    private async Task SellOnAuction(SqlSaveBackend backend)
+    {
+        if (currentPlayer.Inventory.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\n  You have no items to sell!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Check listing limit (max 5 active)
+        var myListings = await backend.GetMyAuctionListings(currentPlayer.DisplayName.ToLower());
+        int activeCount = myListings.Count(l => l.Status == "active");
+        if (activeCount >= 5)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  You already have 5 active listings. Cancel or wait for them to expire.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\n  ═══════════ YOUR INVENTORY ═══════════");
+        for (int i = 0; i < currentPlayer.Inventory.Count; i++)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  {i + 1,-4} ");
+            terminal.SetColor("white");
+            terminal.WriteLine(currentPlayer.Inventory[i].Name);
+        }
+
+        terminal.SetColor("white");
+        terminal.Write("\n  Item # to sell: ");
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > currentPlayer.Inventory.Count) return;
+
+        var item = currentPlayer.Inventory[choice - 1];
+
+        terminal.Write("  Asking price (gold): ");
+        string priceStr = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!long.TryParse(priceStr, out long price) || price < 1)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  Invalid price.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        string itemJson = System.Text.Json.JsonSerializer.Serialize(item);
+        int id = await backend.CreateAuctionListing(currentPlayer.DisplayName.ToLower(), item.Name, itemJson, price);
+        if (id > 0)
+        {
+            currentPlayer.Inventory.RemoveAt(choice - 1);
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"\n  {item.Name} listed for {price:N0} gold! Expires in 48 hours.");
+        }
+        else
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  Failed to create listing.");
+        }
+        await Task.Delay(2000);
+    }
+
+    private async Task ShowMyAuctions(SqlSaveBackend backend)
+    {
+        var listings = await backend.GetMyAuctionListings(currentPlayer.DisplayName.ToLower());
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\n  ═══════════ MY LISTINGS ═══════════");
+
+        if (listings.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  You have no listings.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        for (int i = 0; i < listings.Count; i++)
+        {
+            var l = listings[i];
+            string statusColor = l.Status switch
+            {
+                "active" => "bright_green",
+                "sold" => "bright_yellow",
+                "expired" => "red",
+                "cancelled" => "gray",
+                _ => "white"
+            };
+
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  {i + 1,-4} ");
+            terminal.SetColor("white");
+            terminal.Write($"{l.ItemName,-28} ");
+            terminal.SetColor("bright_green");
+            terminal.Write($"{l.Price:N0}g  ");
+            terminal.SetColor(statusColor);
+            terminal.WriteLine($"[{l.Status.ToUpper()}]");
+        }
+
+        terminal.SetColor("white");
+        terminal.Write("\n  Cancel listing # (or Enter to go back): ");
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > listings.Count) return;
+
+        var listing = listings[choice - 1];
+        if (listing.Status != "active")
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  Can only cancel active listings.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        bool cancelled = await backend.CancelAuctionListing(listing.Id, currentPlayer.DisplayName.ToLower());
+        if (cancelled)
+        {
+            // Return item to inventory
+            try
+            {
+                var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson);
+                if (item != null) currentPlayer.Inventory.Add(item);
+            }
+            catch { }
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  Listing cancelled. Item returned to inventory.");
+        }
+        await Task.Delay(1500);
+    }
+
+    /// <summary>
+    /// Returns true for slash commands that produce multi-line output and need
+    /// a "press any key" pause before the location menu redraws.
+    /// Chat/action commands (say, tell, emote, etc.) return false.
+    /// </summary>
+    private static bool IsInfoDisplayCommand(string cmd)
+    {
+        return cmd switch
+        {
+            "who" or "w" => true,
+            "stat" => true,
+            "wizhelp" => true,
+            "wizwho" => true,
+            "where" => true,
+            "wizlog" => true,
+            "holylight" => true,
+            "news" => true,
+            "help" => true,
+            _ => false
+        };
     }
 }

@@ -9,16 +9,24 @@ using Renci.SshNet;
 namespace UsurperRemake.Systems
 {
     /// <summary>
-    /// Client-side system for connecting to an online Usurper Reborn server via SSH.
-    /// Handles connection, authentication, credential storage, and I/O piping
-    /// between the local terminal and the remote game session.
+    /// Client-side system for connecting to an online Usurper Reborn MUD server via SSH.
+    /// Connects to the game server's SSH gateway (usurper@server:4000), which runs a relay
+    /// that bridges to the MUD game server. Authentication (Login/Register) and credential
+    /// storage are handled locally, with AUTH headers sent through the encrypted SSH channel.
+    ///
+    /// Flow:
+    ///   1. SSH connect to server:4000 as gateway user "usurper" / password "play"
+    ///   2. sshd ForceCommand launches relay client
+    ///   3. Client sends AUTH:username:password:connectionType through SSH shell
+    ///   4. Relay authenticates with MUD server and bridges I/O
+    ///   5. All game traffic flows through the encrypted SSH tunnel
     /// </summary>
     public class OnlinePlaySystem
     {
         private const string OFFICIAL_SERVER = "play.usurper-reborn.net";
         private const int OFFICIAL_PORT = 4000;
-        private const string GATEWAY_USERNAME = "usurper";
-        private const string GATEWAY_PASSWORD = "play";
+        private const string SSH_GATEWAY_USER = "usurper";
+        private const string SSH_GATEWAY_PASS = "play";
         private const string CREDENTIALS_FILE = "online_credentials.json";
 
         private readonly TerminalEmulator terminal;
@@ -34,8 +42,7 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Main entry point for the [O]nline Play menu option.
-        /// Connects directly to the official Usurper Reborn server.
-        /// The gateway account handles SSH transport; real auth is in-game.
+        /// Shows connection info and connects directly to the MUD server.
         /// </summary>
         public async Task StartOnlinePlay()
         {
@@ -52,7 +59,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("gray");
             terminal.WriteLine("  Connect to the Usurper Reborn online server.");
             terminal.WriteLine("  Your online character is stored on the server - separate from local saves.");
-            terminal.WriteLine("  You will create an account or login after connecting.");
+            terminal.WriteLine("  You will login or create an account after connecting.");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_white");
@@ -86,121 +93,50 @@ namespace UsurperRemake.Systems
             if (menuChoice.Trim().ToUpper() != "C")
                 return;
 
-            await ConnectAndPlay(OFFICIAL_SERVER, OFFICIAL_PORT, GATEWAY_USERNAME, GATEWAY_PASSWORD);
+            await ConnectAndPlay(OFFICIAL_SERVER, OFFICIAL_PORT);
         }
 
         /// <summary>
-        /// Prompt user for server, username, and password.
+        /// Establish SSH connection to the game server's SSH gateway.
+        /// Returns true if connected, false if connection failed.
         /// </summary>
-        private async Task<(string server, int port, string username, string password)?> PromptForCredentials()
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("bright_white");
-            var serverInput = await terminal.GetInput($"  Server [{OFFICIAL_SERVER}]: ");
-            var server = string.IsNullOrWhiteSpace(serverInput) ? OFFICIAL_SERVER : serverInput.Trim();
-
-            int port = OFFICIAL_PORT;
-            var portInput = await terminal.GetInput($"  Port [{OFFICIAL_PORT}]: ");
-            if (!string.IsNullOrWhiteSpace(portInput) && int.TryParse(portInput.Trim(), out int parsedPort))
-                port = parsedPort;
-
-            var username = await terminal.GetInput("  Username: ");
-            if (string.IsNullOrWhiteSpace(username))
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine("  Username is required.");
-                await terminal.PressAnyKey();
-                return null;
-            }
-            username = username.Trim();
-
-            var password = await terminal.GetInput("  Password: ");
-            if (string.IsNullOrWhiteSpace(password))
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine("  Password is required.");
-                await terminal.PressAnyKey();
-                return null;
-            }
-
-            // Offer to save
-            var save = await terminal.GetInput("  Save credentials for next time? (Y/N): ");
-            if (save.Trim().ToUpper() == "Y")
-            {
-                SaveCredentials(server, port, username, password);
-                terminal.SetColor("green");
-                terminal.WriteLine("  Credentials saved.");
-            }
-
-            return (server, port, username, password);
-        }
-
-        /// <summary>
-        /// Connect to the server via SSH and pipe I/O between local terminal and remote game.
-        /// </summary>
-        private async Task ConnectAndPlay(string server, int port, string username, string password)
+        private bool EstablishSSHConnection(string server, int port)
         {
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  Connecting to {server}:{port}...");
+            terminal.WriteLine($"  Connecting to {server}:{port} (encrypted)...");
 
             try
             {
-                // Create SSH connection
-                var connectionInfo = new ConnectionInfo(server, port, username,
-                    new PasswordAuthenticationMethod(username, password))
-                {
-                    Timeout = TimeSpan.FromSeconds(15),
-                    RetryAttempts = 2
-                };
-
-                sshClient = new SshClient(connectionInfo);
+                sshClient = new SshClient(server, port, SSH_GATEWAY_USER, SSH_GATEWAY_PASS);
+                sshClient.ConnectionInfo.Timeout = TimeSpan.FromSeconds(10);
                 sshClient.Connect();
 
+                // Open a shell stream (pseudo-terminal) for interactive I/O
+                shellStream = sshClient.CreateShellStream("xterm", 80, 24, 800, 600, 4096);
+
                 terminal.SetColor("bright_green");
-                terminal.WriteLine("  Connected! Starting game session...");
+                terminal.WriteLine("  Connected (SSH encrypted)!");
                 terminal.WriteLine("");
-
-                // Create shell stream (80x24 terminal, like classic BBS)
-                shellStream = sshClient.CreateShellStream("usurper", 80, 24, 800, 600, 4096);
-
-                // Pipe I/O between local terminal and remote shell
-                cancellationSource = new CancellationTokenSource();
-                await PipeIO(cancellationSource.Token);
-            }
-            catch (Renci.SshNet.Common.SshAuthenticationException)
-            {
-                terminal.SetColor("bright_red");
-                terminal.WriteLine("");
-                terminal.WriteLine("  Authentication failed. Check your username and password.");
-                terminal.SetColor("gray");
-                terminal.WriteLine("  If this is your first time, the server may require registration.");
-                await terminal.PressAnyKey();
+                return true;
             }
             catch (Renci.SshNet.Common.SshConnectionException ex)
             {
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("");
-                terminal.WriteLine($"  Connection failed: {ex.Message}");
+                terminal.WriteLine($"  SSH connection failed: {ex.Message}");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  Check that the server is running and reachable.");
-                await terminal.PressAnyKey();
+                terminal.WriteLine("  The server may be down or unreachable.");
+                return false;
             }
             catch (System.Net.Sockets.SocketException ex)
             {
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("");
-                terminal.WriteLine($"  Network error: {ex.Message}");
+                terminal.WriteLine($"  Connection failed: {ex.Message}");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  Check your internet connection and the server address.");
-                await terminal.PressAnyKey();
-            }
-            catch (TimeoutException)
-            {
-                terminal.SetColor("bright_red");
-                terminal.WriteLine("");
-                terminal.WriteLine("  Connection timed out. The server may be down or unreachable.");
-                await terminal.PressAnyKey();
+                terminal.WriteLine("  The server may be down or unreachable.");
+                return false;
             }
             catch (Exception ex)
             {
@@ -208,7 +144,290 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine($"  Error: {ex.Message}");
                 DebugLogger.Instance.LogError("ONLINE_PLAY", $"SSH connection error: {ex}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Connect to the MUD server via SSH, authenticate, and pipe I/O.
+        /// Shows a Login/Register menu, sends AUTH header through SSH tunnel, then bridges I/O.
+        /// </summary>
+        private async Task ConnectAndPlay(string server, int port)
+        {
+            if (!EstablishSSHConnection(server, port))
+            {
                 await terminal.PressAnyKey();
+                return;
+            }
+
+            // Drain any initial relay output (menu banner) before sending AUTH
+            await Task.Delay(500);
+            DrainShellStream();
+
+            // Auth loop — prompt for Login/Register until success or user quits
+            bool authenticated = false;
+            int attempts = 0;
+            const int MAX_ATTEMPTS = 5;
+
+            // Check for saved credentials
+            var savedCreds = LoadSavedCredentials();
+
+            while (!authenticated && attempts < MAX_ATTEMPTS)
+            {
+                attempts++;
+
+                // If we have saved credentials on first attempt, try them automatically
+                if (savedCreds != null && attempts == 1)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  Logging in as {savedCreds.Username}...");
+
+                    string authLine = $"AUTH:{savedCreds.Username}:{savedCreds.GetDecodedPassword()}:{GetConnectionType()}\n";
+                    shellStream!.Write(authLine);
+                    shellStream.Flush();
+
+                    var response = await ReadLineFromShell();
+                    if (response != null && response.Contains("OK"))
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine("  Logged in!");
+                        authenticated = true;
+                        break;
+                    }
+                    else
+                    {
+                        // Saved credentials failed — need to reconnect
+                        terminal.SetColor("yellow");
+                        var errMsg = response?.Contains("ERR:") == true
+                            ? response.Substring(response.IndexOf("ERR:") + 4).Trim()
+                            : "Connection lost";
+                        terminal.WriteLine($"  Saved login failed: {errMsg}");
+                        terminal.WriteLine("  Please log in manually.");
+                        terminal.WriteLine("");
+                        DeleteSavedCredentials();
+                        savedCreds = null;
+
+                        // Reconnect SSH for next attempt
+                        Disconnect();
+                        if (!EstablishSSHConnection(server, port))
+                        {
+                            await terminal.PressAnyKey();
+                            return;
+                        }
+                        await Task.Delay(500);
+                        DrainShellStream();
+                    }
+                }
+
+                // Show Login/Register menu
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("  ──────────────────────────────────────");
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("  Account Login");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("  ──────────────────────────────────────");
+                terminal.WriteLine("");
+
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_cyan");
+                terminal.Write("L");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Login to existing account");
+
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_green");
+                terminal.Write("R");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Register new account");
+
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_red");
+                terminal.Write("Q");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("gray");
+                terminal.WriteLine("Quit");
+
+                terminal.WriteLine("");
+                terminal.SetColor("bright_white");
+                var choice = (await terminal.GetInput("  Choice: ")).Trim().ToUpper();
+
+                if (choice == "Q" || string.IsNullOrEmpty(choice))
+                {
+                    Disconnect();
+                    return;
+                }
+
+                string? username = null;
+                string? password = null;
+                bool isRegistration = false;
+
+                if (choice == "L")
+                {
+                    // Login
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_white");
+                    username = (await terminal.GetInput("  Username: ")).Trim();
+                    if (string.IsNullOrEmpty(username)) continue;
+
+                    terminal.Write("  Password: ", "bright_white");
+                    password = (await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true))).Trim();
+                    if (string.IsNullOrEmpty(password)) continue;
+                }
+                else if (choice == "R")
+                {
+                    // Register
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_green");
+                    username = (await terminal.GetInput("  Choose a username: ")).Trim();
+                    if (string.IsNullOrEmpty(username)) continue;
+
+                    if (username.Length < 2 || username.Length > 20)
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine("  Username must be 2-20 characters.");
+                        terminal.WriteLine("");
+                        continue;
+                    }
+
+                    terminal.Write("  Choose a password: ", "bright_green");
+                    password = (await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true))).Trim();
+                    if (string.IsNullOrEmpty(password)) continue;
+
+                    if (password.Length < 4)
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine("  Password must be at least 4 characters.");
+                        terminal.WriteLine("");
+                        continue;
+                    }
+
+                    terminal.Write("  Confirm password: ", "bright_green");
+                    var confirm = (await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true))).Trim();
+                    if (password != confirm)
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine("  Passwords do not match.");
+                        terminal.WriteLine("");
+                        continue;
+                    }
+
+                    isRegistration = true;
+                }
+                else
+                {
+                    continue; // Invalid choice
+                }
+
+                // Send AUTH header through SSH tunnel to the relay
+                string connType = GetConnectionType();
+                string authHeader;
+                if (isRegistration)
+                    authHeader = $"AUTH:{username}:{password}:REGISTER:{connType}\n";
+                else
+                    authHeader = $"AUTH:{username}:{password}:{connType}\n";
+
+                try
+                {
+                    shellStream!.Write(authHeader);
+                    shellStream.Flush();
+                }
+                catch
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("  Lost connection to server.");
+                    await terminal.PressAnyKey();
+                    Disconnect();
+                    return;
+                }
+
+                // Read response from relay (may include relay menu output mixed in)
+                var authResponse = await ReadLineFromShell();
+                if (authResponse == null)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("  Server closed the connection.");
+                    await terminal.PressAnyKey();
+                    Disconnect();
+                    return;
+                }
+
+                // The relay echoes back through the SSH shell — look for OK or ERR in response
+                if (authResponse.Contains("ERR:"))
+                {
+                    var errStart = authResponse.IndexOf("ERR:") + 4;
+                    var errEnd = authResponse.IndexOf('\n', errStart);
+                    var errText = errEnd > errStart
+                        ? authResponse.Substring(errStart, errEnd - errStart).Trim()
+                        : authResponse.Substring(errStart).Trim();
+
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"  {errText}");
+                    terminal.WriteLine("");
+
+                    // Reconnect SSH for next attempt
+                    Disconnect();
+                    if (!EstablishSSHConnection(server, port))
+                    {
+                        await terminal.PressAnyKey();
+                        return;
+                    }
+                    await Task.Delay(500);
+                    DrainShellStream();
+                    continue;
+                }
+
+                if (authResponse.Contains("OK"))
+                {
+                    authenticated = true;
+
+                    // Offer to save credentials
+                    terminal.SetColor("bright_green");
+                    terminal.Write("  Authenticated! ");
+                    terminal.SetColor("gray");
+                    var save = (await terminal.GetInput("Save credentials for next time? (Y/N): ")).Trim().ToUpper();
+                    if (save == "Y")
+                    {
+                        SaveCredentials(server, port, username!, password!);
+                        terminal.SetColor("green");
+                        terminal.WriteLine("  Credentials saved.");
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"  Unexpected response from server.");
+                    DebugLogger.Instance.LogError("ONLINE_PLAY", $"Unexpected auth response: {authResponse}");
+                    Disconnect();
+                    return;
+                }
+            }
+
+            if (!authenticated)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("  Too many failed attempts. Returning to menu.");
+                await terminal.PressAnyKey();
+                Disconnect();
+                return;
+            }
+
+            // Auth succeeded — bridge local terminal ↔ SSH stream
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  Starting game session...");
+            terminal.WriteLine("");
+
+            cancellationSource = new CancellationTokenSource();
+            try
+            {
+                await PipeIO(cancellationSource.Token);
             }
             finally
             {
@@ -217,10 +436,89 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Pipe input/output between the local console and the remote SSH shell.
-        /// The remote game sends ANSI escape codes for colors. We try to enable
-        /// native VT processing on Windows, with a fallback ANSI parser that
-        /// translates escape codes to Console.ForegroundColor calls.
+        /// Drain any pending data from the SSH shell stream (e.g. relay's menu banner).
+        /// Discards the data since we handle auth locally.
+        /// </summary>
+        private void DrainShellStream()
+        {
+            try
+            {
+                if (shellStream == null) return;
+                while (shellStream.DataAvailable)
+                {
+                    var buffer = new byte[4096];
+                    shellStream.Read(buffer, 0, buffer.Length);
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Read response data from the SSH shell stream after sending an AUTH header.
+        /// Waits up to 5 seconds for data, returns the accumulated text.
+        /// The SSH PTY echoes our AUTH input back, so we look for "OK" or "ERR:"
+        /// as discrete lines (not just substring matches) to avoid false positives.
+        /// </summary>
+        private async Task<string?> ReadLineFromShell()
+        {
+            try
+            {
+                var result = new StringBuilder();
+                var deadline = DateTime.UtcNow.AddSeconds(5);
+
+                while (DateTime.UtcNow < deadline)
+                {
+                    if (shellStream!.DataAvailable)
+                    {
+                        var buffer = new byte[4096];
+                        int read = shellStream.Read(buffer, 0, buffer.Length);
+                        if (read > 0)
+                        {
+                            result.Append(Encoding.UTF8.GetString(buffer, 0, read));
+
+                            // Check each line for auth response markers.
+                            // The PTY echoes our AUTH input, so we need to look for
+                            // "OK" or "ERR:" as their own lines, not inside the echo.
+                            var text = result.ToString();
+                            var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var line in lines)
+                            {
+                                var trimmed = line.Trim();
+                                if (trimmed == "OK" || trimmed.StartsWith("ERR:"))
+                                    return text;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        await Task.Delay(50);
+                    }
+                }
+
+                return result.Length > 0 ? result.ToString() : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Determine connection type string for the AUTH header.
+        /// </summary>
+        private static string GetConnectionType()
+        {
+#if STEAM_BUILD
+            return "Steam";
+#else
+            return "Local";
+#endif
+        }
+
+        /// <summary>
+        /// Pipe input/output between the local console and the remote SSH shell stream.
+        /// The remote game sends ANSI escape codes for colors. We use a fallback ANSI
+        /// parser that translates escape codes to Console.ForegroundColor calls.
         /// Runs until the connection is closed or the player disconnects (Ctrl+]).
         /// </summary>
         private async Task PipeIO(CancellationToken ct)
@@ -228,7 +526,6 @@ namespace UsurperRemake.Systems
             // Always use our fallback ANSI parser which translates escape codes to
             // Console.ForegroundColor calls. Windows VT processing claims to work
             // (escape chars get consumed) but often fails to actually render colors.
-            // Our parser uses Console.ForegroundColor which reliably works everywhere.
             vtProcessingEnabled = false;
 
             Console.OutputEncoding = Encoding.UTF8;
@@ -237,48 +534,56 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("  Press Ctrl+] to disconnect.");
             terminal.WriteLine("");
 
-            // Read thread: read from SSH and write to Console.Out
+            // Read thread: read from SSH shell and write to Console.Out
             var readTask = Task.Run(async () =>
             {
                 var buffer = new byte[4096];
                 try
                 {
-                    while (!ct.IsCancellationRequested && sshClient!.IsConnected)
+                    while (!ct.IsCancellationRequested)
                     {
                         if (shellStream!.DataAvailable)
                         {
-                            int bytesRead = await shellStream.ReadAsync(buffer, 0, buffer.Length, ct);
-                            if (bytesRead > 0)
+                            int bytesRead = shellStream.Read(buffer, 0, buffer.Length);
+                            if (bytesRead == 0) break; // Server closed connection
+
+                            var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                            if (vtProcessingEnabled)
                             {
-                                var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                                if (vtProcessingEnabled)
-                                {
-                                    Console.Write(text);
-                                }
-                                else
-                                {
-                                    WriteAnsiToConsole(text);
-                                }
+                                Console.Write(text);
+                            }
+                            else
+                            {
+                                WriteAnsiToConsole(text);
                             }
                         }
                         else
                         {
-                            await Task.Delay(20, ct);
+                            // Check if SSH is still connected
+                            if (sshClient == null || !sshClient.IsConnected)
+                                break;
+                            await Task.Delay(10, ct);
                         }
                     }
                 }
                 catch (OperationCanceledException) { }
+                catch (IOException) { }
+                catch (ObjectDisposedException) { }
                 catch (Exception ex)
                 {
                     DebugLogger.Instance.LogError("ONLINE_PLAY", $"Read error: {ex.Message}");
                 }
             }, ct);
 
-            // Write loop: read keys from Console and send to SSH
+            // Write loop: read keys from Console and send to SSH shell
             try
             {
-                while (!ct.IsCancellationRequested && sshClient!.IsConnected)
+                while (!ct.IsCancellationRequested)
                 {
+                    // Check if the read task ended (server disconnected)
+                    if (readTask.IsCompleted)
+                        break;
+
                     if (Console.KeyAvailable)
                     {
                         var keyInfo = Console.ReadKey(intercept: true);
@@ -289,7 +594,7 @@ namespace UsurperRemake.Systems
                             break;
                         }
 
-                        // Convert key to string and send to SSH
+                        // Convert key to string and send to server
                         string keyStr;
                         if (keyInfo.Key == ConsoleKey.Enter)
                             keyStr = "\r";
@@ -322,6 +627,8 @@ namespace UsurperRemake.Systems
                 }
             }
             catch (OperationCanceledException) { }
+            catch (IOException) { }
+            catch (ObjectDisposedException) { }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("ONLINE_PLAY", $"Write error: {ex.Message}");
@@ -336,50 +643,6 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("  Disconnected from server.");
             await terminal.PressAnyKey();
         }
-
-        /// <summary>
-        /// Try to enable ANSI/VT100 escape sequence processing on Windows 10+ console.
-        /// Returns true if VT processing was confirmed enabled, false if fallback is needed.
-        /// </summary>
-        private static bool TryEnableVirtualTerminalProcessing()
-        {
-            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                System.Runtime.InteropServices.OSPlatform.Windows))
-                return true; // Linux/macOS terminals support ANSI natively
-
-            try
-            {
-                var handle = GetStdHandle(-11); // STD_OUTPUT_HANDLE
-                if (handle == IntPtr.Zero || handle == new IntPtr(-1))
-                    return false;
-
-                if (!GetConsoleMode(handle, out uint mode))
-                    return false;
-
-                mode |= 0x0004; // ENABLE_VIRTUAL_TERMINAL_PROCESSING
-                if (!SetConsoleMode(handle, mode))
-                    return false;
-
-                // Verify it actually stuck
-                if (!GetConsoleMode(handle, out uint verifyMode))
-                    return false;
-
-                return (verifyMode & 0x0004) != 0;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
-        private static extern IntPtr GetStdHandle(int nStdHandle);
-
-        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
-
-        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
 
         // =====================================================================
         // Fallback ANSI Parser - translates ANSI escape codes to Console colors
@@ -635,7 +898,7 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Disconnect from the SSH server and clean up resources.
+        /// Disconnect from the server and clean up resources.
         /// </summary>
         private void Disconnect()
         {

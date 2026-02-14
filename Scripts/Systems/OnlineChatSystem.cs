@@ -305,7 +305,7 @@ namespace UsurperRemake.Systems
                 return true;
             }
 
-            // /tell <player> <message> - private message
+            // /tell <player> <message> - private message (works online and offline)
             if (trimmed.StartsWith("/tell ", StringComparison.OrdinalIgnoreCase))
             {
                 var parts = trimmed.Substring(6).Trim();
@@ -316,12 +316,33 @@ namespace UsurperRemake.Systems
                     var message = parts.Substring(spaceIdx + 1).Trim();
                     if (!string.IsNullOrEmpty(message))
                     {
-                        await Tell(targetPlayer, message);
-                        terminal.SetColor("magenta");
-                        terminal.WriteLine($"[To {targetPlayer}] {message}");
-                        terminal.SetColor("green");
-                        terminal.WriteLine("  Message sent!");
-                        await Task.Delay(1500);
+                        // Validate recipient exists
+                        var sqlBackend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                        if (sqlBackend != null && !sqlBackend.PlayerExists(targetPlayer))
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"Player '{targetPlayer}' not found.");
+                            await Task.Delay(1500);
+                        }
+                        else
+                        {
+                            await Tell(targetPlayer, message);
+                            terminal.SetColor("magenta");
+                            terminal.WriteLine($"[To {targetPlayer}] {message}");
+
+                            // Check if target is online
+                            var onlinePlayers = await stateManager.GetOnlinePlayers();
+                            bool isOnline = onlinePlayers.Any(p =>
+                                p.DisplayName.Equals(targetPlayer, StringComparison.OrdinalIgnoreCase) ||
+                                p.Username.Equals(targetPlayer, StringComparison.OrdinalIgnoreCase));
+
+                            terminal.SetColor("green");
+                            if (isOnline)
+                                terminal.WriteLine("  Message sent!");
+                            else
+                                terminal.WriteLine($"  Message sent to {targetPlayer} (offline - they'll see it next login).");
+                            await Task.Delay(1500);
+                        }
                     }
                 }
                 else

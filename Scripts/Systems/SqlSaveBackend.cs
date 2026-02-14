@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using UsurperRemake.Server;
 
 namespace UsurperRemake.Systems
 {
@@ -122,11 +123,144 @@ namespace UsurperRemake.Systems
                         created_at TEXT DEFAULT (datetime('now'))
                     );
 
+                    CREATE TABLE IF NOT EXISTS player_teams (
+                        team_name TEXT PRIMARY KEY,
+                        password_hash TEXT NOT NULL,
+                        created_by TEXT NOT NULL,
+                        created_at TEXT DEFAULT (datetime('now')),
+                        member_count INTEGER DEFAULT 1,
+                        controls_turf INTEGER DEFAULT 0
+                    );
+
+                    CREATE TABLE IF NOT EXISTS trade_offers (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        from_player TEXT NOT NULL,
+                        to_player TEXT NOT NULL,
+                        items_json TEXT DEFAULT '[]',
+                        gold INTEGER DEFAULT 0,
+                        status TEXT DEFAULT 'pending',
+                        message TEXT DEFAULT '',
+                        created_at TEXT DEFAULT (datetime('now')),
+                        resolved_at TEXT
+                    );
+
+                    CREATE TABLE IF NOT EXISTS bounties (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        target_player TEXT NOT NULL,
+                        placed_by TEXT NOT NULL,
+                        amount INTEGER NOT NULL,
+                        placed_at TEXT DEFAULT (datetime('now')),
+                        claimed_by TEXT,
+                        claimed_at TEXT,
+                        status TEXT DEFAULT 'active'
+                    );
+
+                    CREATE TABLE IF NOT EXISTS auction_listings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        seller TEXT NOT NULL,
+                        item_name TEXT NOT NULL,
+                        item_json TEXT NOT NULL,
+                        price INTEGER NOT NULL,
+                        listed_at TEXT DEFAULT (datetime('now')),
+                        expires_at TEXT NOT NULL,
+                        buyer TEXT,
+                        status TEXT DEFAULT 'active'
+                    );
+
+                    CREATE TABLE IF NOT EXISTS team_wars (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        challenger_team TEXT NOT NULL,
+                        defender_team TEXT NOT NULL,
+                        status TEXT DEFAULT 'pending',
+                        challenger_wins INTEGER DEFAULT 0,
+                        defender_wins INTEGER DEFAULT 0,
+                        gold_wagered INTEGER DEFAULT 0,
+                        started_at TEXT DEFAULT (datetime('now')),
+                        finished_at TEXT
+                    );
+
+                    CREATE TABLE IF NOT EXISTS world_bosses (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        boss_name TEXT NOT NULL,
+                        boss_level INTEGER NOT NULL,
+                        max_hp INTEGER NOT NULL,
+                        current_hp INTEGER NOT NULL,
+                        boss_data_json TEXT DEFAULT '{}',
+                        started_at TEXT DEFAULT (datetime('now')),
+                        expires_at TEXT NOT NULL,
+                        status TEXT DEFAULT 'active'
+                    );
+
+                    CREATE TABLE IF NOT EXISTS world_boss_damage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        boss_id INTEGER NOT NULL,
+                        player_name TEXT NOT NULL,
+                        damage_dealt INTEGER NOT NULL,
+                        hits INTEGER DEFAULT 1,
+                        last_hit_at TEXT DEFAULT (datetime('now')),
+                        FOREIGN KEY (boss_id) REFERENCES world_bosses(id),
+                        UNIQUE(boss_id, player_name)
+                    );
+
+                    CREATE TABLE IF NOT EXISTS castle_sieges (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        team_name TEXT NOT NULL,
+                        guards_defeated INTEGER DEFAULT 0,
+                        total_guards INTEGER NOT NULL,
+                        result TEXT DEFAULT 'in_progress',
+                        started_at TEXT DEFAULT (datetime('now')),
+                        finished_at TEXT
+                    );
+
+                    CREATE TABLE IF NOT EXISTS team_upgrades (
+                        team_name TEXT NOT NULL,
+                        upgrade_type TEXT NOT NULL,
+                        level INTEGER DEFAULT 1,
+                        invested_gold INTEGER DEFAULT 0,
+                        PRIMARY KEY (team_name, upgrade_type)
+                    );
+
+                    CREATE TABLE IF NOT EXISTS team_vault (
+                        team_name TEXT PRIMARY KEY,
+                        gold INTEGER DEFAULT 0
+                    );
+
+                    CREATE TABLE IF NOT EXISTS wizard_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        wizard_name TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        target TEXT,
+                        details TEXT,
+                        created_at TEXT DEFAULT (datetime('now'))
+                    );
+
+                    CREATE TABLE IF NOT EXISTS wizard_flags (
+                        username TEXT PRIMARY KEY,
+                        is_frozen INTEGER DEFAULT 0,
+                        is_muted INTEGER DEFAULT 0,
+                        frozen_by TEXT,
+                        muted_by TEXT,
+                        frozen_at TEXT,
+                        muted_at TEXT
+                    );
+
                     CREATE INDEX IF NOT EXISTS idx_news_created ON news(created_at DESC);
                     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_player, is_read);
+                    CREATE INDEX IF NOT EXISTS idx_messages_to_type ON messages(to_player, message_type, is_read, created_at DESC);
                     CREATE INDEX IF NOT EXISTS idx_online_heartbeat ON online_players(last_heartbeat);
                     CREATE INDEX IF NOT EXISTS idx_pvp_attacker ON pvp_log(attacker, created_at);
                     CREATE INDEX IF NOT EXISTS idx_pvp_winner ON pvp_log(winner);
+                    CREATE INDEX IF NOT EXISTS idx_trade_to ON trade_offers(to_player, status);
+                    CREATE INDEX IF NOT EXISTS idx_trade_from ON trade_offers(from_player, status);
+                    CREATE INDEX IF NOT EXISTS idx_teams_power ON player_teams(member_count DESC);
+                    CREATE INDEX IF NOT EXISTS idx_bounties_target ON bounties(target_player, status);
+                    CREATE INDEX IF NOT EXISTS idx_bounties_placer ON bounties(placed_by, status);
+                    CREATE INDEX IF NOT EXISTS idx_auction_status ON auction_listings(status, expires_at);
+                    CREATE INDEX IF NOT EXISTS idx_auction_seller ON auction_listings(seller, status);
+                    CREATE INDEX IF NOT EXISTS idx_world_boss_damage ON world_boss_damage(boss_id, player_name);
+                    CREATE INDEX IF NOT EXISTS idx_team_wars_teams ON team_wars(challenger_team, defender_team, status);
+                    CREATE INDEX IF NOT EXISTS idx_wizard_log_created ON wizard_log(created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_wizard_log_wizard ON wizard_log(wizard_name, created_at DESC);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -136,6 +270,15 @@ namespace UsurperRemake.Systems
             {
                 using var migCmd = connection.CreateCommand();
                 migCmd.CommandText = "ALTER TABLE online_players ADD COLUMN connection_type TEXT DEFAULT 'Unknown';";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
+            // Migration: add wizard_level column to existing players table
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE players ADD COLUMN wizard_level INTEGER DEFAULT 0;";
                 migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
@@ -1772,11 +1915,1424 @@ namespace UsurperRemake.Systems
             }
             return entries;
         }
+
+    // ========== Player Teams ==========
+
+    public async Task<bool> CreatePlayerTeam(string teamName, string passwordHash, string createdBy)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "INSERT INTO player_teams (team_name, password_hash, created_by) VALUES (@name, @hash, @creator);";
+            cmd.Parameters.AddWithValue("@name", teamName);
+            cmd.Parameters.AddWithValue("@hash", passwordHash);
+            cmd.Parameters.AddWithValue("@creator", createdBy.ToLower());
+            await Task.Run(() => cmd.ExecuteNonQuery());
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to create player team '{teamName}': {ex.Message}");
+            return false;
+        }
     }
 
-    /// <summary>
-    /// Detailed player info for admin console.
-    /// </summary>
+    public async Task<(bool exists, bool passwordCorrect)> VerifyPlayerTeam(string teamName, string password)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT password_hash FROM player_teams WHERE team_name = @name;";
+            cmd.Parameters.AddWithValue("@name", teamName);
+            var result = await Task.Run(() => cmd.ExecuteScalar());
+            if (result == null) return (false, false);
+            var storedHash = result.ToString() ?? "";
+            return (true, VerifyPassword(password, storedHash));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to verify player team '{teamName}': {ex.Message}");
+            return (false, false);
+        }
+    }
+
+    public async Task<List<PlayerTeamInfo>> GetPlayerTeams()
+    {
+        var teams = new List<PlayerTeamInfo>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT team_name, created_by, member_count, controls_turf, created_at FROM player_teams ORDER BY member_count DESC;";
+            using var reader = await Task.Run(() => cmd.ExecuteReader());
+            while (reader.Read())
+            {
+                teams.Add(new PlayerTeamInfo
+                {
+                    TeamName = reader.GetString(0),
+                    CreatedBy = reader.GetString(1),
+                    MemberCount = reader.GetInt32(2),
+                    ControlsTurf = reader.GetInt32(3) != 0,
+                    CreatedAt = DateTime.TryParse(reader.GetString(4), out var dt) ? dt : DateTime.Now
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to get player teams: {ex.Message}");
+        }
+        return teams;
+    }
+
+    public async Task<List<PlayerSummary>> GetPlayerTeamMembers(string teamName, string? excludeUsername = null)
+    {
+        var members = new List<PlayerSummary>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT p.display_name,
+                       CAST(json_extract(p.player_data, '$.player.level') AS INTEGER) as level,
+                       CAST(json_extract(p.player_data, '$.player.class') AS INTEGER) as class_id,
+                       CAST(json_extract(p.player_data, '$.player.experience') AS INTEGER) as xp,
+                       p.last_login,
+                       CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online
+                FROM players p
+                LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
+                    AND op.last_heartbeat > datetime('now', '-120 seconds')
+                WHERE json_extract(p.player_data, '$.player.team') = @teamName
+                AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
+                AND p.is_banned = 0
+                AND p.username NOT LIKE 'emergency_%'
+                ORDER BY level DESC;
+            ";
+            cmd.Parameters.AddWithValue("@teamName", teamName);
+            using var reader = await Task.Run(() => cmd.ExecuteReader());
+            while (reader.Read())
+            {
+                var name = reader.GetString(0);
+                if (excludeUsername != null && name.Equals(excludeUsername, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                members.Add(new PlayerSummary
+                {
+                    DisplayName = name,
+                    Level = reader.IsDBNull(1) ? 1 : reader.GetInt32(1),
+                    ClassId = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+                    Experience = reader.IsDBNull(3) ? 0 : reader.GetInt64(3),
+                    IsOnline = reader.GetInt32(5) != 0
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to get player team members for '{teamName}': {ex.Message}");
+        }
+        return members;
+    }
+
+    public async Task DeletePlayerTeam(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM player_teams WHERE team_name = @name;";
+            cmd.Parameters.AddWithValue("@name", teamName);
+            await Task.Run(() => cmd.ExecuteNonQuery());
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to delete player team '{teamName}': {ex.Message}");
+        }
+    }
+
+    public async Task UpdatePlayerTeamMemberCount(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE player_teams SET member_count = (
+                    SELECT COUNT(*) FROM players
+                    WHERE json_extract(player_data, '$.player.team') = @teamName
+                    AND player_data != '{}' AND LENGTH(player_data) > 2
+                    AND is_banned = 0 AND username NOT LIKE 'emergency_%'
+                ) WHERE team_name = @teamName;
+            ";
+            cmd.Parameters.AddWithValue("@teamName", teamName);
+            await Task.Run(() => cmd.ExecuteNonQuery());
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to update team member count for '{teamName}': {ex.Message}");
+        }
+    }
+
+    public bool IsTeamNameTaken(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM player_teams WHERE team_name = @name;";
+            cmd.Parameters.AddWithValue("@name", teamName);
+            var count = Convert.ToInt32(cmd.ExecuteScalar());
+            return count > 0;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to check team name '{teamName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    public static string HashTeamPassword(string password)
+    {
+        return HashPassword(password);
+    }
+
+    // ========== Offline Mail ==========
+
+    public bool PlayerExists(string username)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0;";
+            cmd.Parameters.AddWithValue("@username", username);
+            return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+        }
+        catch { return false; }
+    }
+
+    public async Task<List<PlayerMessage>> GetMailInbox(string username, int limit = 20, int offset = 0)
+    {
+        var messages = new List<PlayerMessage>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT id, from_player, to_player, message_type, message, is_read, created_at
+                FROM messages
+                WHERE LOWER(to_player) = LOWER(@username)
+                AND to_player != '*'
+                ORDER BY created_at DESC
+                LIMIT @limit OFFSET @offset;
+            ";
+            cmd.Parameters.AddWithValue("@username", username);
+            cmd.Parameters.AddWithValue("@limit", limit);
+            cmd.Parameters.AddWithValue("@offset", offset);
+            using var reader = await Task.Run(() => cmd.ExecuteReader());
+            while (reader.Read())
+            {
+                messages.Add(new PlayerMessage
+                {
+                    Id = reader.GetInt32(0),
+                    FromPlayer = reader.GetString(1),
+                    ToPlayer = reader.GetString(2),
+                    MessageType = reader.GetString(3),
+                    Message = reader.GetString(4),
+                    IsRead = reader.GetInt32(5) != 0,
+                    CreatedAt = DateTime.TryParse(reader.GetString(6), out var dt) ? dt : DateTime.Now
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to get mail inbox for {username}: {ex.Message}");
+        }
+        return messages;
+    }
+
+    public int GetUnreadMailCount(string username)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COUNT(*) FROM messages
+                WHERE LOWER(to_player) = LOWER(@username)
+                AND to_player != '*' AND is_read = 0;
+            ";
+            cmd.Parameters.AddWithValue("@username", username);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+        catch { return 0; }
+    }
+
+    public async Task DeleteMessage(long messageId, string username)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM messages WHERE id = @id AND LOWER(to_player) = LOWER(@username);";
+            cmd.Parameters.AddWithValue("@id", messageId);
+            cmd.Parameters.AddWithValue("@username", username);
+            await Task.Run(() => cmd.ExecuteNonQuery());
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to delete message {messageId}: {ex.Message}");
+        }
+    }
+
+    public int GetMailsSentToday(string username)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COUNT(*) FROM messages
+                WHERE LOWER(from_player) = LOWER(@username)
+                AND message_type = 'mail'
+                AND created_at >= date('now');
+            ";
+            cmd.Parameters.AddWithValue("@username", username);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+        catch { return 0; }
+    }
+
+    // ========== Player Trading ==========
+
+    public async Task<long> CreateTradeOffer(string fromPlayer, string toPlayer, string itemsJson, long gold, string message)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO trade_offers (from_player, to_player, items_json, gold, message)
+                VALUES (@from, @to, @items, @gold, @msg);
+                SELECT last_insert_rowid();
+            ";
+            cmd.Parameters.AddWithValue("@from", fromPlayer.ToLower());
+            cmd.Parameters.AddWithValue("@to", toPlayer.ToLower());
+            cmd.Parameters.AddWithValue("@items", itemsJson);
+            cmd.Parameters.AddWithValue("@gold", gold);
+            cmd.Parameters.AddWithValue("@msg", message);
+            var result = await Task.Run(() => cmd.ExecuteScalar());
+            return Convert.ToInt64(result);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to create trade offer: {ex.Message}");
+            return -1;
+        }
+    }
+
+    public async Task<List<TradeOffer>> GetPendingTradeOffers(string username)
+    {
+        var offers = new List<TradeOffer>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT t.id, t.from_player, t.to_player, t.items_json, t.gold, t.status, t.message, t.created_at,
+                       COALESCE(p.display_name, t.from_player) as from_display
+                FROM trade_offers t
+                LEFT JOIN players p ON LOWER(p.username) = t.from_player
+                WHERE t.to_player = LOWER(@username) AND t.status = 'pending'
+                ORDER BY t.created_at DESC;
+            ";
+            cmd.Parameters.AddWithValue("@username", username);
+            using var reader = await Task.Run(() => cmd.ExecuteReader());
+            while (reader.Read())
+            {
+                offers.Add(new TradeOffer
+                {
+                    Id = reader.GetInt64(0),
+                    FromPlayer = reader.GetString(1),
+                    ToPlayer = reader.GetString(2),
+                    ItemsJson = reader.GetString(3),
+                    Gold = reader.GetInt64(4),
+                    Status = reader.GetString(5),
+                    Message = reader.GetString(6),
+                    CreatedAt = DateTime.TryParse(reader.GetString(7), out var dt) ? dt : DateTime.Now,
+                    FromDisplayName = reader.GetString(8)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to get pending trade offers for {username}: {ex.Message}");
+        }
+        return offers;
+    }
+
+    public async Task<List<TradeOffer>> GetSentTradeOffers(string username)
+    {
+        var offers = new List<TradeOffer>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT t.id, t.from_player, t.to_player, t.items_json, t.gold, t.status, t.message, t.created_at,
+                       COALESCE(p.display_name, t.to_player) as to_display
+                FROM trade_offers t
+                LEFT JOIN players p ON LOWER(p.username) = t.to_player
+                WHERE t.from_player = LOWER(@username) AND t.status = 'pending'
+                ORDER BY t.created_at DESC;
+            ";
+            cmd.Parameters.AddWithValue("@username", username);
+            using var reader = await Task.Run(() => cmd.ExecuteReader());
+            while (reader.Read())
+            {
+                offers.Add(new TradeOffer
+                {
+                    Id = reader.GetInt64(0),
+                    FromPlayer = reader.GetString(1),
+                    ToPlayer = reader.GetString(2),
+                    ItemsJson = reader.GetString(3),
+                    Gold = reader.GetInt64(4),
+                    Status = reader.GetString(5),
+                    Message = reader.GetString(6),
+                    CreatedAt = DateTime.TryParse(reader.GetString(7), out var dt) ? dt : DateTime.Now,
+                    ToDisplayName = reader.GetString(8)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to get sent trade offers for {username}: {ex.Message}");
+        }
+        return offers;
+    }
+
+    public async Task<TradeOffer?> GetTradeOffer(long offerId)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT id, from_player, to_player, items_json, gold, status, message, created_at FROM trade_offers WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", offerId);
+            using var reader = await Task.Run(() => cmd.ExecuteReader());
+            if (reader.Read())
+            {
+                return new TradeOffer
+                {
+                    Id = reader.GetInt64(0),
+                    FromPlayer = reader.GetString(1),
+                    ToPlayer = reader.GetString(2),
+                    ItemsJson = reader.GetString(3),
+                    Gold = reader.GetInt64(4),
+                    Status = reader.GetString(5),
+                    Message = reader.GetString(6),
+                    CreatedAt = DateTime.TryParse(reader.GetString(7), out var dt) ? dt : DateTime.Now
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to get trade offer {offerId}: {ex.Message}");
+        }
+        return null;
+    }
+
+    public async Task UpdateTradeOfferStatus(long offerId, string status)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "UPDATE trade_offers SET status = @status, resolved_at = datetime('now') WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", offerId);
+            cmd.Parameters.AddWithValue("@status", status);
+            await Task.Run(() => cmd.ExecuteNonQuery());
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to update trade offer {offerId}: {ex.Message}");
+        }
+    }
+
+    public int GetPendingTradeOfferCount(string username)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM trade_offers WHERE to_player = LOWER(@username) AND status = 'pending';";
+            cmd.Parameters.AddWithValue("@username", username);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+        catch { return 0; }
+    }
+
+    public int GetSentTradeOfferCount(string username)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM trade_offers WHERE from_player = LOWER(@username) AND status = 'pending';";
+            cmd.Parameters.AddWithValue("@username", username);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+        catch { return 0; }
+    }
+
+    public async Task ExpireOldTradeOffers()
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            // Get expired offers to return gold
+            using var selectCmd = connection.CreateCommand();
+            selectCmd.CommandText = @"
+                SELECT id, from_player, gold FROM trade_offers
+                WHERE status = 'pending' AND created_at < datetime('now', '-7 days');
+            ";
+            var expiredOffers = new List<(long id, string fromPlayer, long gold)>();
+            using (var reader = await Task.Run(() => selectCmd.ExecuteReader()))
+            {
+                while (reader.Read())
+                {
+                    expiredOffers.Add((reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2)));
+                }
+            }
+
+            // Mark expired and return gold
+            foreach (var (id, fromPlayer, gold) in expiredOffers)
+            {
+                await UpdateTradeOfferStatus(id, "expired");
+                if (gold > 0) await AddGoldToPlayer(fromPlayer, gold);
+                await SendMessage("System", fromPlayer, "trade", $"Your trade package expired and {gold:N0} gold was returned.");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to expire old trade offers: {ex.Message}");
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Bounties
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public async Task PlaceBounty(string placedBy, string targetPlayer, long amount)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"INSERT INTO bounties (target_player, placed_by, amount)
+                                VALUES (LOWER(@target), LOWER(@placer), @amount);";
+            cmd.Parameters.AddWithValue("@target", targetPlayer);
+            cmd.Parameters.AddWithValue("@placer", placedBy);
+            cmd.Parameters.AddWithValue("@amount", amount);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to place bounty: {ex.Message}"); }
+    }
+
+    public async Task<List<BountyInfo>> GetActiveBounties(int limit = 20)
+    {
+        var bounties = new List<BountyInfo>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT id, target_player, placed_by, amount, placed_at
+                                FROM bounties WHERE status = 'active'
+                                ORDER BY amount DESC LIMIT @limit;";
+            cmd.Parameters.AddWithValue("@limit", limit);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                bounties.Add(new BountyInfo
+                {
+                    Id = reader.GetInt32(0),
+                    TargetPlayer = reader.GetString(1),
+                    PlacedBy = reader.GetString(2),
+                    Amount = reader.GetInt64(3),
+                    PlacedAt = DateTime.TryParse(reader.GetString(4), out var dt) ? dt : DateTime.Now
+                });
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get bounties: {ex.Message}"); }
+        return bounties;
+    }
+
+    public async Task<List<BountyInfo>> GetBountiesOnPlayer(string targetPlayer)
+    {
+        var bounties = new List<BountyInfo>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT id, target_player, placed_by, amount, placed_at
+                                FROM bounties WHERE LOWER(target_player) = LOWER(@target) AND status = 'active'
+                                ORDER BY amount DESC;";
+            cmd.Parameters.AddWithValue("@target", targetPlayer);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                bounties.Add(new BountyInfo
+                {
+                    Id = reader.GetInt32(0),
+                    TargetPlayer = reader.GetString(1),
+                    PlacedBy = reader.GetString(2),
+                    Amount = reader.GetInt64(3),
+                    PlacedAt = DateTime.TryParse(reader.GetString(4), out var dt) ? dt : DateTime.Now
+                });
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get bounties on player: {ex.Message}"); }
+        return bounties;
+    }
+
+    public async Task<long> ClaimBounties(string targetPlayer, string claimedBy)
+    {
+        long totalClaimed = 0;
+        try
+        {
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+
+            // Sum active bounties
+            using (var sumCmd = connection.CreateCommand())
+            {
+                sumCmd.Transaction = transaction;
+                sumCmd.CommandText = @"SELECT COALESCE(SUM(amount), 0) FROM bounties
+                                      WHERE LOWER(target_player) = LOWER(@target) AND status = 'active';";
+                sumCmd.Parameters.AddWithValue("@target", targetPlayer);
+                totalClaimed = (long)(sumCmd.ExecuteScalar() ?? 0L);
+            }
+
+            if (totalClaimed > 0)
+            {
+                // Mark all claimed
+                using var updateCmd = connection.CreateCommand();
+                updateCmd.Transaction = transaction;
+                updateCmd.CommandText = @"UPDATE bounties SET status = 'claimed', claimed_by = LOWER(@claimer),
+                                         claimed_at = datetime('now')
+                                         WHERE LOWER(target_player) = LOWER(@target) AND status = 'active';";
+                updateCmd.Parameters.AddWithValue("@target", targetPlayer);
+                updateCmd.Parameters.AddWithValue("@claimer", claimedBy);
+                await updateCmd.ExecuteNonQueryAsync();
+            }
+
+            transaction.Commit();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to claim bounties: {ex.Message}"); }
+        return totalClaimed;
+    }
+
+    public int GetActiveBountyCount(string placedBy)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT COUNT(*) FROM bounties WHERE LOWER(placed_by) = LOWER(@placer) AND status = 'active';";
+            cmd.Parameters.AddWithValue("@placer", placedBy);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+        catch { return 0; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Auction House
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public async Task<int> CreateAuctionListing(string seller, string itemName, string itemJson, long price, int hoursToExpire = 48)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"INSERT INTO auction_listings (seller, item_name, item_json, price, expires_at)
+                                VALUES (LOWER(@seller), @itemName, @itemJson, @price, datetime('now', '+' || @hours || ' hours'))
+                                RETURNING id;";
+            cmd.Parameters.AddWithValue("@seller", seller);
+            cmd.Parameters.AddWithValue("@itemName", itemName);
+            cmd.Parameters.AddWithValue("@itemJson", itemJson);
+            cmd.Parameters.AddWithValue("@price", price);
+            cmd.Parameters.AddWithValue("@hours", hoursToExpire);
+            var result = await cmd.ExecuteScalarAsync();
+            return Convert.ToInt32(result);
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to create auction: {ex.Message}"); return -1; }
+    }
+
+    public async Task<List<AuctionListing>> GetActiveAuctionListings(int limit = 50)
+    {
+        var listings = new List<AuctionListing>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT id, seller, item_name, item_json, price, listed_at, expires_at
+                                FROM auction_listings WHERE status = 'active' AND expires_at > datetime('now')
+                                ORDER BY listed_at DESC LIMIT @limit;";
+            cmd.Parameters.AddWithValue("@limit", limit);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                listings.Add(new AuctionListing
+                {
+                    Id = reader.GetInt32(0),
+                    Seller = reader.GetString(1),
+                    ItemName = reader.GetString(2),
+                    ItemJson = reader.GetString(3),
+                    Price = reader.GetInt64(4),
+                    ListedAt = DateTime.TryParse(reader.GetString(5), out var lt) ? lt : DateTime.Now,
+                    ExpiresAt = DateTime.TryParse(reader.GetString(6), out var et) ? et : DateTime.Now,
+                    Status = "active"
+                });
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get auction listings: {ex.Message}"); }
+        return listings;
+    }
+
+    public async Task<AuctionListing?> GetAuctionListing(int listingId)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT id, seller, item_name, item_json, price, listed_at, expires_at, status
+                                FROM auction_listings WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", listingId);
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                return new AuctionListing
+                {
+                    Id = reader.GetInt32(0),
+                    Seller = reader.GetString(1),
+                    ItemName = reader.GetString(2),
+                    ItemJson = reader.GetString(3),
+                    Price = reader.GetInt64(4),
+                    ListedAt = DateTime.TryParse(reader.GetString(5), out var lt) ? lt : DateTime.Now,
+                    ExpiresAt = DateTime.TryParse(reader.GetString(6), out var et) ? et : DateTime.Now,
+                    Status = reader.GetString(7)
+                };
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get auction listing: {ex.Message}"); }
+        return null;
+    }
+
+    public async Task<bool> BuyAuctionListing(int listingId, string buyer)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE auction_listings SET status = 'sold', buyer = LOWER(@buyer)
+                                WHERE id = @id AND status = 'active' AND expires_at > datetime('now');";
+            cmd.Parameters.AddWithValue("@id", listingId);
+            cmd.Parameters.AddWithValue("@buyer", buyer);
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected > 0;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to buy auction: {ex.Message}"); return false; }
+    }
+
+    public async Task<bool> CancelAuctionListing(int listingId, string seller)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE auction_listings SET status = 'cancelled'
+                                WHERE id = @id AND LOWER(seller) = LOWER(@seller) AND status = 'active';";
+            cmd.Parameters.AddWithValue("@id", listingId);
+            cmd.Parameters.AddWithValue("@seller", seller);
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected > 0;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to cancel auction: {ex.Message}"); return false; }
+    }
+
+    public async Task<List<AuctionListing>> GetMyAuctionListings(string seller)
+    {
+        var listings = new List<AuctionListing>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT id, seller, item_name, item_json, price, listed_at, expires_at, status
+                                FROM auction_listings WHERE LOWER(seller) = LOWER(@seller)
+                                ORDER BY listed_at DESC LIMIT 20;";
+            cmd.Parameters.AddWithValue("@seller", seller);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                listings.Add(new AuctionListing
+                {
+                    Id = reader.GetInt32(0),
+                    Seller = reader.GetString(1),
+                    ItemName = reader.GetString(2),
+                    ItemJson = reader.GetString(3),
+                    Price = reader.GetInt64(4),
+                    ListedAt = DateTime.TryParse(reader.GetString(5), out var lt) ? lt : DateTime.Now,
+                    ExpiresAt = DateTime.TryParse(reader.GetString(6), out var et) ? et : DateTime.Now,
+                    Status = reader.GetString(7)
+                });
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get my auctions: {ex.Message}"); }
+        return listings;
+    }
+
+    public async Task CleanupExpiredAuctions()
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE auction_listings SET status = 'expired'
+                                WHERE status = 'active' AND expires_at <= datetime('now');";
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to cleanup auctions: {ex.Message}"); }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Team Wars
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public async Task<int> CreateTeamWar(string challengerTeam, string defenderTeam, long goldWagered)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"INSERT INTO team_wars (challenger_team, defender_team, status, gold_wagered)
+                                VALUES (@challenger, @defender, 'active', @gold) RETURNING id;";
+            cmd.Parameters.AddWithValue("@challenger", challengerTeam);
+            cmd.Parameters.AddWithValue("@defender", defenderTeam);
+            cmd.Parameters.AddWithValue("@gold", goldWagered);
+            var result = await cmd.ExecuteScalarAsync();
+            return Convert.ToInt32(result);
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to create team war: {ex.Message}"); return -1; }
+    }
+
+    public async Task UpdateTeamWarScore(int warId, bool challengerWon)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            string col = challengerWon ? "challenger_wins" : "defender_wins";
+            cmd.CommandText = $"UPDATE team_wars SET {col} = {col} + 1 WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", warId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to update war score: {ex.Message}"); }
+    }
+
+    public async Task CompleteTeamWar(int warId, string result)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE team_wars SET status = @result, finished_at = datetime('now') WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", warId);
+            cmd.Parameters.AddWithValue("@result", result);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete team war: {ex.Message}"); }
+    }
+
+    public async Task<List<TeamWarInfo>> GetTeamWarHistory(string teamName, int limit = 10)
+    {
+        var wars = new List<TeamWarInfo>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT id, challenger_team, defender_team, status, challenger_wins, defender_wins,
+                                       gold_wagered, started_at, finished_at
+                                FROM team_wars
+                                WHERE (challenger_team = @team OR defender_team = @team)
+                                ORDER BY started_at DESC LIMIT @limit;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            cmd.Parameters.AddWithValue("@limit", limit);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                wars.Add(new TeamWarInfo
+                {
+                    Id = reader.GetInt32(0),
+                    ChallengerTeam = reader.GetString(1),
+                    DefenderTeam = reader.GetString(2),
+                    Status = reader.GetString(3),
+                    ChallengerWins = reader.GetInt32(4),
+                    DefenderWins = reader.GetInt32(5),
+                    GoldWagered = reader.GetInt64(6),
+                    StartedAt = DateTime.TryParse(reader.GetString(7), out var st) ? st : DateTime.Now,
+                    FinishedAt = reader.IsDBNull(8) ? null : DateTime.TryParse(reader.GetString(8), out var ft) ? ft : null
+                });
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get war history: {ex.Message}"); }
+        return wars;
+    }
+
+    public bool HasActiveTeamWar(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT COUNT(*) FROM team_wars
+                                WHERE (challenger_team = @team OR defender_team = @team) AND status = 'active';";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+        }
+        catch { return false; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // World Bosses
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public async Task<int> SpawnWorldBoss(string bossName, int bossLevel, long maxHp, int hoursToExpire = 24)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"INSERT INTO world_bosses (boss_name, boss_level, max_hp, current_hp, expires_at)
+                                VALUES (@name, @level, @hp, @hp, datetime('now', '+' || @hours || ' hours'))
+                                RETURNING id;";
+            cmd.Parameters.AddWithValue("@name", bossName);
+            cmd.Parameters.AddWithValue("@level", bossLevel);
+            cmd.Parameters.AddWithValue("@hp", maxHp);
+            cmd.Parameters.AddWithValue("@hours", hoursToExpire);
+            var result = await cmd.ExecuteScalarAsync();
+            return Convert.ToInt32(result);
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to spawn world boss: {ex.Message}"); return -1; }
+    }
+
+    public async Task<WorldBossInfo?> GetActiveWorldBoss()
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT id, boss_name, boss_level, max_hp, current_hp, started_at, expires_at
+                                FROM world_bosses WHERE status = 'active' AND expires_at > datetime('now')
+                                ORDER BY started_at DESC LIMIT 1;";
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                return new WorldBossInfo
+                {
+                    Id = reader.GetInt32(0),
+                    BossName = reader.GetString(1),
+                    BossLevel = reader.GetInt32(2),
+                    MaxHP = reader.GetInt64(3),
+                    CurrentHP = reader.GetInt64(4),
+                    StartedAt = DateTime.TryParse(reader.GetString(5), out var st) ? st : DateTime.Now,
+                    ExpiresAt = DateTime.TryParse(reader.GetString(6), out var et) ? et : DateTime.Now
+                };
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get world boss: {ex.Message}"); }
+        return null;
+    }
+
+    public async Task<long> RecordWorldBossDamage(int bossId, string playerName, long damage)
+    {
+        long remainingHp = 0;
+        try
+        {
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+
+            // Update boss HP
+            using (var updateCmd = connection.CreateCommand())
+            {
+                updateCmd.Transaction = transaction;
+                updateCmd.CommandText = @"UPDATE world_bosses SET current_hp = MAX(0, current_hp - @damage)
+                                         WHERE id = @id AND status = 'active';";
+                updateCmd.Parameters.AddWithValue("@id", bossId);
+                updateCmd.Parameters.AddWithValue("@damage", damage);
+                await updateCmd.ExecuteNonQueryAsync();
+            }
+
+            // Upsert player damage
+            using (var dmgCmd = connection.CreateCommand())
+            {
+                dmgCmd.Transaction = transaction;
+                dmgCmd.CommandText = @"INSERT INTO world_boss_damage (boss_id, player_name, damage_dealt, hits)
+                                      VALUES (@bossId, LOWER(@player), @damage, 1)
+                                      ON CONFLICT(boss_id, player_name) DO UPDATE SET
+                                          damage_dealt = damage_dealt + @damage,
+                                          hits = hits + 1,
+                                          last_hit_at = datetime('now');";
+                dmgCmd.Parameters.AddWithValue("@bossId", bossId);
+                dmgCmd.Parameters.AddWithValue("@player", playerName);
+                dmgCmd.Parameters.AddWithValue("@damage", damage);
+                await dmgCmd.ExecuteNonQueryAsync();
+            }
+
+            // Get remaining HP
+            using (var hpCmd = connection.CreateCommand())
+            {
+                hpCmd.Transaction = transaction;
+                hpCmd.CommandText = "SELECT current_hp FROM world_bosses WHERE id = @id;";
+                hpCmd.Parameters.AddWithValue("@id", bossId);
+                remainingHp = Convert.ToInt64(hpCmd.ExecuteScalar() ?? 0);
+            }
+
+            // If dead, mark defeated
+            if (remainingHp <= 0)
+            {
+                using var defeatCmd = connection.CreateCommand();
+                defeatCmd.Transaction = transaction;
+                defeatCmd.CommandText = @"UPDATE world_bosses SET status = 'defeated' WHERE id = @id;";
+                defeatCmd.Parameters.AddWithValue("@id", bossId);
+                await defeatCmd.ExecuteNonQueryAsync();
+            }
+
+            transaction.Commit();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to record world boss damage: {ex.Message}"); }
+        return remainingHp;
+    }
+
+    public async Task<List<WorldBossDamageEntry>> GetWorldBossDamageLeaderboard(int bossId, int limit = 20)
+    {
+        var entries = new List<WorldBossDamageEntry>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT player_name, damage_dealt, hits FROM world_boss_damage
+                                WHERE boss_id = @id ORDER BY damage_dealt DESC LIMIT @limit;";
+            cmd.Parameters.AddWithValue("@id", bossId);
+            cmd.Parameters.AddWithValue("@limit", limit);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                entries.Add(new WorldBossDamageEntry
+                {
+                    PlayerName = reader.GetString(0),
+                    DamageDealt = reader.GetInt64(1),
+                    Hits = reader.GetInt32(2)
+                });
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get boss damage leaderboard: {ex.Message}"); }
+        return entries;
+    }
+
+    public async Task ExpireWorldBosses()
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE world_bosses SET status = 'expired'
+                                WHERE status = 'active' AND expires_at <= datetime('now');";
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to expire world bosses: {ex.Message}"); }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Castle Sieges
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public async Task<int> StartCastleSiege(string teamName, int totalGuards)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"INSERT INTO castle_sieges (team_name, total_guards)
+                                VALUES (@team, @guards) RETURNING id;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            cmd.Parameters.AddWithValue("@guards", totalGuards);
+            var result = await cmd.ExecuteScalarAsync();
+            return Convert.ToInt32(result);
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to start siege: {ex.Message}"); return -1; }
+    }
+
+    public async Task UpdateSiegeProgress(int siegeId, int guardsDefeated)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE castle_sieges SET guards_defeated = @defeated WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", siegeId);
+            cmd.Parameters.AddWithValue("@defeated", guardsDefeated);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to update siege: {ex.Message}"); }
+    }
+
+    public async Task CompleteSiege(int siegeId, string result)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE castle_sieges SET result = @result, finished_at = datetime('now') WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", siegeId);
+            cmd.Parameters.AddWithValue("@result", result);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete siege: {ex.Message}"); }
+    }
+
+    public bool CanTeamSiege(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            // 24h cooldown between sieges
+            cmd.CommandText = @"SELECT COUNT(*) FROM castle_sieges
+                                WHERE team_name = @team AND started_at > datetime('now', '-24 hours');";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            return Convert.ToInt32(cmd.ExecuteScalar()) == 0;
+        }
+        catch { return false; }
+    }
+
+    public async Task<List<CastleSiegeInfo>> GetSiegeHistory(int limit = 10)
+    {
+        var sieges = new List<CastleSiegeInfo>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT id, team_name, guards_defeated, total_guards, result, started_at
+                                FROM castle_sieges ORDER BY started_at DESC LIMIT @limit;";
+            cmd.Parameters.AddWithValue("@limit", limit);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                sieges.Add(new CastleSiegeInfo
+                {
+                    Id = reader.GetInt32(0),
+                    TeamName = reader.GetString(1),
+                    GuardsDefeated = reader.GetInt32(2),
+                    TotalGuards = reader.GetInt32(3),
+                    Result = reader.GetString(4),
+                    StartedAt = DateTime.TryParse(reader.GetString(5), out var st) ? st : DateTime.Now
+                });
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get siege history: {ex.Message}"); }
+        return sieges;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Team Headquarters / Upgrades / Vault
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public async Task<List<TeamUpgradeInfo>> GetTeamUpgrades(string teamName)
+    {
+        var upgrades = new List<TeamUpgradeInfo>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT upgrade_type, level, invested_gold FROM team_upgrades
+                                WHERE team_name = @team ORDER BY upgrade_type;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                upgrades.Add(new TeamUpgradeInfo
+                {
+                    UpgradeType = reader.GetString(0),
+                    Level = reader.GetInt32(1),
+                    InvestedGold = reader.GetInt64(2)
+                });
+            }
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to get team upgrades: {ex.Message}"); }
+        return upgrades;
+    }
+
+    public async Task<bool> UpgradeTeamFacility(string teamName, string upgradeType, long cost)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"INSERT INTO team_upgrades (team_name, upgrade_type, level, invested_gold)
+                                VALUES (@team, @type, 1, @cost)
+                                ON CONFLICT(team_name, upgrade_type) DO UPDATE SET
+                                    level = level + 1,
+                                    invested_gold = invested_gold + @cost;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            cmd.Parameters.AddWithValue("@type", upgradeType);
+            cmd.Parameters.AddWithValue("@cost", cost);
+            await cmd.ExecuteNonQueryAsync();
+            return true;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to upgrade facility: {ex.Message}"); return false; }
+    }
+
+    public async Task<long> GetTeamVaultGold(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT gold FROM team_vault WHERE team_name = @team;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            var result = cmd.ExecuteScalar();
+            return result != null ? Convert.ToInt64(result) : 0;
+        }
+        catch { return 0; }
+    }
+
+    public async Task<bool> DepositToTeamVault(string teamName, long amount)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"INSERT INTO team_vault (team_name, gold) VALUES (@team, @amount)
+                                ON CONFLICT(team_name) DO UPDATE SET gold = gold + @amount;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            cmd.Parameters.AddWithValue("@amount", amount);
+            await cmd.ExecuteNonQueryAsync();
+            return true;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to deposit to vault: {ex.Message}"); return false; }
+    }
+
+    public async Task<bool> WithdrawFromTeamVault(string teamName, long amount)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE team_vault SET gold = gold - @amount
+                                WHERE team_name = @team AND gold >= @amount;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            cmd.Parameters.AddWithValue("@amount", amount);
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected > 0;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to withdraw from vault: {ex.Message}"); return false; }
+    }
+
+    public int GetTeamUpgradeLevel(string teamName, string upgradeType)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT level FROM team_upgrades WHERE team_name = @team AND upgrade_type = @type;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            cmd.Parameters.AddWithValue("@type", upgradeType);
+            var result = cmd.ExecuteScalar();
+            return result != null ? Convert.ToInt32(result) : 0;
+        }
+        catch { return 0; }
+    }
+        // =====================================================================
+        // Wizard System
+        // =====================================================================
+
+        /// <summary>Get the wizard level for a player. Returns Mortal if not found.</summary>
+        public async Task<WizardLevel> GetWizardLevel(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT wizard_level FROM players WHERE LOWER(username) = LOWER(@username)";
+                cmd.Parameters.AddWithValue("@username", username);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result != null && result != DBNull.Value)
+                    return (WizardLevel)Convert.ToInt32(result);
+                return WizardLevel.Mortal;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"GetWizardLevel failed for '{username}': {ex.Message}");
+                return WizardLevel.Mortal;
+            }
+        }
+
+        /// <summary>Set the wizard level for a player.</summary>
+        public async Task SetWizardLevel(string username, WizardLevel level)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE players SET wizard_level = @level WHERE LOWER(username) = LOWER(@username)";
+                cmd.Parameters.AddWithValue("@level", (int)level);
+                cmd.Parameters.AddWithValue("@username", username);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"SetWizardLevel failed for '{username}': {ex.Message}");
+            }
+        }
+
+        /// <summary>Get freeze/mute flags for a player.</summary>
+        public async Task<(bool isFrozen, bool isMuted)> GetWizardFlags(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT is_frozen, is_muted FROM wizard_flags WHERE LOWER(username) = LOWER(@username)";
+                cmd.Parameters.AddWithValue("@username", username);
+                using var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    return (reader.GetInt32(0) != 0, reader.GetInt32(1) != 0);
+                }
+                return (false, false);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"GetWizardFlags failed for '{username}': {ex.Message}");
+                return (false, false);
+            }
+        }
+
+        /// <summary>Set frozen status for a player.</summary>
+        public async Task SetFrozen(string username, bool frozen, string? frozenBy = null)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO wizard_flags (username, is_frozen, frozen_by, frozen_at)
+                    VALUES (LOWER(@username), @frozen, @frozenBy, datetime('now'))
+                    ON CONFLICT(username) DO UPDATE SET
+                        is_frozen = @frozen,
+                        frozen_by = CASE WHEN @frozen = 1 THEN @frozenBy ELSE NULL END,
+                        frozen_at = CASE WHEN @frozen = 1 THEN datetime('now') ELSE NULL END";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@frozen", frozen ? 1 : 0);
+                cmd.Parameters.AddWithValue("@frozenBy", (object?)frozenBy ?? DBNull.Value);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"SetFrozen failed for '{username}': {ex.Message}");
+            }
+        }
+
+        /// <summary>Set muted status for a player.</summary>
+        public async Task SetMuted(string username, bool muted, string? mutedBy = null)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO wizard_flags (username, is_muted, muted_by, muted_at)
+                    VALUES (LOWER(@username), @muted, @mutedBy, datetime('now'))
+                    ON CONFLICT(username) DO UPDATE SET
+                        is_muted = @muted,
+                        muted_by = CASE WHEN @muted = 1 THEN @mutedBy ELSE NULL END,
+                        muted_at = CASE WHEN @muted = 1 THEN datetime('now') ELSE NULL END";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@muted", muted ? 1 : 0);
+                cmd.Parameters.AddWithValue("@mutedBy", (object?)mutedBy ?? DBNull.Value);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"SetMuted failed for '{username}': {ex.Message}");
+            }
+        }
+
+        /// <summary>Log a wizard action to the audit trail.</summary>
+        public void LogWizardAction(string wizardName, string action, string? target = null, string? details = null)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO wizard_log (wizard_name, action, target, details)
+                    VALUES (@wizard, @action, @target, @details)";
+                cmd.Parameters.AddWithValue("@wizard", wizardName);
+                cmd.Parameters.AddWithValue("@action", action);
+                cmd.Parameters.AddWithValue("@target", (object?)target ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@details", (object?)details ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"LogWizardAction failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>Get recent wizard log entries.</summary>
+        public async Task<List<WizardLogEntry>> GetRecentWizardLog(int count = 50)
+        {
+            var entries = new List<WizardLogEntry>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT wizard_name, action, target, details, created_at
+                    FROM wizard_log ORDER BY created_at DESC LIMIT @count";
+                cmd.Parameters.AddWithValue("@count", count);
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    entries.Add(new WizardLogEntry
+                    {
+                        WizardName = reader.GetString(0),
+                        Action = reader.GetString(1),
+                        Target = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        Details = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        CreatedAt = reader.GetString(4)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"GetRecentWizardLog failed: {ex.Message}");
+            }
+            return entries;
+        }
+
+    } // end class SqlSaveBackend
+
+    public class WizardLogEntry
+    {
+        public string WizardName { get; set; } = "";
+        public string Action { get; set; } = "";
+        public string? Target { get; set; }
+        public string? Details { get; set; }
+        public string CreatedAt { get; set; } = "";
+    }
+
     public class AdminPlayerInfo
     {
         public string Username { get; set; } = "";

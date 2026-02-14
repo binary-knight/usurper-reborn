@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -102,6 +103,15 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("Communication:");
         terminal.SetColor("white");
         WriteMenuOption("M", "Message Teammates", "!", "Resurrect Teammate");
+        if (DoorMode.IsOnlineMode)
+        {
+            WriteMenuOption("W", "Recruit Player Ally", "", "");
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Online Features:");
+            terminal.SetColor("white");
+            WriteMenuOption("B", "Team Battle (War)", "H", "Team Headquarters");
+        }
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -211,6 +221,21 @@ public class TeamCornerLocation : BaseLocation
                 await EquipMember();
                 return false;
 
+            case "W":
+                if (DoorMode.IsOnlineMode)
+                    await RecruitPlayerAlly();
+                return false;
+
+            case "B":
+                if (DoorMode.IsOnlineMode)
+                    await TeamWarMenu();
+                return false;
+
+            case "H":
+                if (DoorMode.IsOnlineMode)
+                    await TeamHeadquartersMenu();
+                return false;
+
             case "!":
                 await ResurrectTeammate();
                 return false;
@@ -297,6 +322,32 @@ public class TeamCornerLocation : BaseLocation
                     ControlsTurf = currentPlayer.CTurf,
                     IsPlayerTeam = true
                 });
+            }
+        }
+
+        // Online mode: merge player teams from database
+        if (DoorMode.IsOnlineMode)
+        {
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (backend != null)
+            {
+                var playerTeams = await backend.GetPlayerTeams();
+                foreach (var pt in playerTeams)
+                {
+                    // Skip if this team is already in the list (NPC team or player's own team)
+                    if (teamGroups.Any(t => t.TeamName == pt.TeamName))
+                        continue;
+
+                    teamGroups.Add(new
+                    {
+                        TeamName = pt.TeamName,
+                        MemberCount = pt.MemberCount,
+                        TotalPower = (long)(pt.MemberCount * 50), // Estimate power from member count
+                        AverageLevel = 0,
+                        ControlsTurf = pt.ControlsTurf,
+                        IsPlayerTeam = false
+                    });
+                }
             }
         }
 
@@ -437,10 +488,23 @@ public class TeamCornerLocation : BaseLocation
             .OrderByDescending(n => n.Level)
             .ToList();
 
-        if (teamMembers.Count == 0)
+        // Online mode: also get player members from database
+        List<PlayerSummary> playerMembers = new();
+        if (DoorMode.IsOnlineMode)
+        {
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (backend != null)
+            {
+                string myUsername = currentPlayer.DisplayName.ToLower();
+                playerMembers = await backend.GetPlayerTeamMembers(teamName, myUsername);
+            }
+        }
+
+        bool hasMembers = teamMembers.Count > 0 || playerMembers.Count > 0;
+        if (!hasMembers)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"No NPC members found in team '{teamName}'.");
+            terminal.WriteLine($"No other members found in team '{teamName}'.");
             if (currentPlayer.Team == teamName)
             {
                 terminal.WriteLine("(You are the only member!)");
@@ -455,6 +519,16 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.WriteLine(new string('─', 75));
 
+            // Show player members first
+            foreach (var pm in playerMembers)
+            {
+                terminal.SetColor("bright_cyan");
+                string className = pm.ClassId >= 0 ? ((CharacterClass)pm.ClassId).ToString() : "?";
+                string onlineStatus = pm.IsOnline ? "Online" : "Offline";
+                terminal.WriteLine($"{pm.DisplayName,-20} {className,-12} {pm.Level,-5} {"?",-12} {"?",-15} {onlineStatus,-8}");
+            }
+
+            // Show NPC members
             foreach (var member in teamMembers)
             {
                 string hpDisplay = $"{member.HP}/{member.MaxHP}";
@@ -472,10 +546,21 @@ public class TeamCornerLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"Total: {teamMembers.Count} NPC members, {teamMembers.Count(m => m.IsAlive)} alive");
+            int totalCount = teamMembers.Count + playerMembers.Count;
+            terminal.WriteLine($"Total: {totalCount} members ({playerMembers.Count} players, {teamMembers.Count} NPCs)");
         }
         else
         {
+            // Show player members
+            foreach (var pm in playerMembers)
+            {
+                string className = pm.ClassId >= 0 ? ((CharacterClass)pm.ClassId).ToString() : "?";
+                string onlineTag = pm.IsOnline ? " [ONLINE]" : "";
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {pm.DisplayName} - Level {pm.Level} {className}{onlineTag}");
+            }
+
+            // Show NPC members
             foreach (var member in teamMembers)
             {
                 string status = member.IsAlive ? "" : " (Dead)";
@@ -543,7 +628,7 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Check if team name already exists
+        // Check if team name already exists (NPC teams + player teams)
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
         if (allNPCs.Any(n => n.Team == teamName))
         {
@@ -551,6 +636,19 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("A team with that name already exists!");
             await Task.Delay(2000);
             return;
+        }
+
+        // Online mode: also check player_teams table
+        if (DoorMode.IsOnlineMode)
+        {
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (backend != null && backend.IsTeamNameTaken(teamName))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("A player team with that name already exists!");
+                await Task.Delay(2000);
+                return;
+            }
         }
 
         // Get password
@@ -574,6 +672,18 @@ public class TeamCornerLocation : BaseLocation
         currentPlayer.CTurf = false;
         currentPlayer.TeamRec = 0;
 
+        // Online mode: register in player_teams table
+        if (DoorMode.IsOnlineMode)
+        {
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (backend != null)
+            {
+                string hashedPW = SqlSaveBackend.HashTeamPassword(password);
+                string username = currentPlayer.DisplayName.ToLower();
+                await backend.CreatePlayerTeam(teamName, hashedPW, username);
+            }
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
         terminal.WriteLine($"Gang '{teamName}' created successfully!");
@@ -584,6 +694,9 @@ public class TeamCornerLocation : BaseLocation
 
         // Generate news
         NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} formed a new team: '{teamName}'!");
+        if (DoorMode.IsOnlineMode)
+            UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
+                $"{currentPlayer.DisplayName} formed a new team: '{teamName}'!", "team");
 
         terminal.SetColor("darkgray");
         terminal.WriteLine("Press Enter to continue...");
@@ -614,7 +727,55 @@ public class TeamCornerLocation : BaseLocation
         if (string.IsNullOrEmpty(teamName))
             return;
 
-        // Find a team member to get the password from
+        // Online mode: check player_teams table first
+        if (DoorMode.IsOnlineMode)
+        {
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (backend != null)
+            {
+                terminal.SetColor("cyan");
+                terminal.Write("Enter password: ");
+                terminal.SetColor("white");
+                string password = await terminal.ReadLineAsync();
+
+                var (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
+                if (exists && pwCorrect)
+                {
+                    currentPlayer.Team = teamName;
+                    currentPlayer.TeamPW = password;
+                    currentPlayer.CTurf = false;
+
+                    await backend.UpdatePlayerTeamMemberCount(teamName);
+
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"Correct! You are now a member of {teamName}!");
+                    terminal.WriteLine("");
+
+                    NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} joined the team '{teamName}'!");
+                    if (DoorMode.IsOnlineMode)
+                        UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
+                            $"{currentPlayer.DisplayName} joined the team '{teamName}'!", "team");
+
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine("Press Enter to continue...");
+                    await terminal.ReadKeyAsync();
+                    return;
+                }
+                else if (exists)
+                {
+                    terminal.WriteLine("");
+                    terminal.SetColor("red");
+                    terminal.WriteLine("Wrong password! Access denied.");
+                    terminal.WriteLine("");
+                    await Task.Delay(2000);
+                    return;
+                }
+                // If not found in player_teams, fall through to NPC team search
+            }
+        }
+
+        // Find a team member to get the password from (NPC teams)
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
         var teamMember = allNPCs.FirstOrDefault(n => n.Team == teamName && n.IsAlive);
 
@@ -629,12 +790,12 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write("Enter password: ");
         terminal.SetColor("white");
-        string password = await terminal.ReadLineAsync();
+        string npcPassword = await terminal.ReadLineAsync();
 
-        if (password == teamMember.TeamPW)
+        if (npcPassword == teamMember.TeamPW)
         {
             currentPlayer.Team = teamName;
-            currentPlayer.TeamPW = password;
+            currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
 
             terminal.WriteLine("");
@@ -643,6 +804,9 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} joined the team '{teamName}'!");
+            if (DoorMode.IsOnlineMode)
+                UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
+                    $"{currentPlayer.DisplayName} joined the team '{teamName}'!", "team");
 
             terminal.SetColor("darkgray");
             terminal.WriteLine("Press Enter to continue...");
@@ -686,12 +850,25 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.CTurf = false;
             currentPlayer.TeamRec = 0;
 
+            // Online mode: update member count, delete team if empty
+            if (DoorMode.IsOnlineMode)
+            {
+                var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                if (backend != null)
+                {
+                    await backend.UpdatePlayerTeamMemberCount(oldTeam);
+                }
+            }
+
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
             terminal.WriteLine("You have left the team!");
             terminal.WriteLine("");
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} left the team '{oldTeam}'!");
+            if (DoorMode.IsOnlineMode)
+                UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
+                    $"{currentPlayer.DisplayName} left the team '{oldTeam}'!", "team");
 
             terminal.SetColor("darkgray");
             terminal.WriteLine("Press Enter to continue...");
@@ -1179,6 +1356,108 @@ public class TeamCornerLocation : BaseLocation
 
                 NewsSystem.Instance.Newsy(true, $"{toResurrect.DisplayName} was resurrected by their team '{currentPlayer.Team}'!");
             }
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("Press Enter to continue...");
+        await terminal.ReadKeyAsync();
+    }
+
+    /// <summary>
+    /// Recruit a player's echo as a dungeon ally (online mode only).
+    /// Their character will be loaded from the database and fight as AI.
+    /// </summary>
+    private async Task RecruitPlayerAlly()
+    {
+        if (string.IsNullOrEmpty(currentPlayer.Team))
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine("You must be in a team to recruit player allies!");
+            terminal.WriteLine("Create or join a team first.");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+            return;
+        }
+
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        string myUsername = currentPlayer.DisplayName.ToLower();
+        var teammates = await backend.GetPlayerTeamMembers(currentPlayer.Team, myUsername);
+
+        if (teammates.Count == 0)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("No other players found on your team.");
+            terminal.WriteLine("Recruit other players to join your team first!");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                          RECRUIT PLAYER ALLY                                ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"Team: {currentPlayer.Team}");
+        terminal.WriteLine("");
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("Available Player Allies:");
+        terminal.SetColor("white");
+        terminal.WriteLine($"{"#",-3} {"Name",-18} {"Class",-12} {"Level",-6} {"Status",-10}");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(new string('─', 52));
+
+        terminal.SetColor("white");
+        for (int i = 0; i < teammates.Count; i++)
+        {
+            var tm = teammates[i];
+            string className = tm.ClassId >= 0 ? ((CharacterClass)tm.ClassId).ToString() : "Unknown";
+            string status = tm.IsOnline ? "Online" : "Offline";
+            terminal.WriteLine($"{i + 1,-3} {tm.DisplayName,-18} {className,-12} {tm.Level,-6} {status,-10}");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine("Their echo fights alongside you in the dungeon.");
+        terminal.WriteLine("");
+
+        terminal.SetColor("cyan");
+        terminal.Write("Select ally (0 to cancel): ");
+        terminal.SetColor("white");
+        string input = await terminal.ReadLineAsync();
+
+        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= teammates.Count)
+        {
+            var selected = teammates[choice - 1];
+
+            // Check if already recruited
+            var partyNames = GameEngine.Instance?.DungeonPartyPlayerNames ?? new List<string>();
+            if (partyNames.Contains(selected.DisplayName, StringComparer.OrdinalIgnoreCase))
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"{selected.DisplayName}'s echo is already in your party!");
+                await Task.Delay(2000);
+                return;
+            }
+
+            // Add to dungeon party
+            var names = new List<string>(partyNames) { selected.DisplayName };
+            GameEngine.Instance?.SetDungeonPartyPlayers(names);
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"{selected.DisplayName}'s echo will join your next dungeon run!");
+            terminal.SetColor("gray");
+            terminal.WriteLine("They'll fight as AI-controlled allies with their real stats.");
         }
 
         terminal.WriteLine("");
@@ -1757,4 +2036,454 @@ public class TeamCornerLocation : BaseLocation
     };
 
     #endregion
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Team Wars
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private async Task TeamWarMenu()
+    {
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        if (string.IsNullOrEmpty(currentPlayer.Team))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  You must be in a team to wage war!");
+            await Task.Delay(2000);
+            return;
+        }
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                            TEAM WARS                                       ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Your Team: {currentPlayer.Team}");
+            terminal.WriteLine("");
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  [C] Challenge a Team    [H] War History    [Q] Back");
+            terminal.SetColor("white");
+            terminal.Write("\n  Choice: ");
+            string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+
+            if (input == "Q" || input == "") break;
+            if (input == "C") await ChallengeTeamWar(backend);
+            if (input == "H") await ShowWarHistory(backend);
+        }
+    }
+
+    private async Task ChallengeTeamWar(SqlSaveBackend backend)
+    {
+        string myTeam = currentPlayer.Team;
+
+        if (backend.HasActiveTeamWar(myTeam))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  Your team already has an active war!");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Show available teams to challenge
+        var allTeams = await backend.GetPlayerTeams();
+        var opponents = allTeams.Where(t => t.TeamName != myTeam && t.MemberCount > 0).ToList();
+        if (opponents.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\n  No other teams to challenge.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("\n  ═══════════ CHOOSE OPPONENT TEAM ═══════════");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine($"  {"#",-4} {"Team",-25} {"Members",-10}");
+        terminal.WriteLine("  " + new string('─', 40));
+
+        for (int i = 0; i < opponents.Count; i++)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  {i + 1,-4} ");
+            terminal.SetColor("white");
+            terminal.Write($"{opponents[i].TeamName,-25} ");
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"{opponents[i].MemberCount}");
+        }
+
+        terminal.SetColor("white");
+        terminal.Write("\n  Challenge team #: ");
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > opponents.Count) return;
+
+        var enemyTeam = opponents[choice - 1];
+        long wager = Math.Max(1000, currentPlayer.Level * 200);
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"\n  War wager: {wager:N0} gold (winner takes all)");
+        terminal.Write("  Confirm war against " + enemyTeam.TeamName + "? (Y/N): ");
+        string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+        if (confirm != "Y") return;
+
+        if (currentPlayer.Gold < wager)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  Not enough gold for the war wager!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        currentPlayer.Gold -= wager;
+
+        // Load both teams' members for combat
+        var myMembers = await backend.GetPlayerTeamMembers(myTeam);
+        var enemyMembers = await backend.GetPlayerTeamMembers(enemyTeam.TeamName);
+
+        if (myMembers.Count == 0 || enemyMembers.Count == 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  One of the teams has no members!");
+            currentPlayer.Gold += wager; // refund
+            await Task.Delay(1500);
+            return;
+        }
+
+        int warId = await backend.CreateTeamWar(myTeam, enemyTeam.TeamName, wager);
+        if (warId < 0)
+        {
+            currentPlayer.Gold += wager; // refund
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════════");
+        terminal.WriteLine($"        TEAM WAR: {myTeam} vs {enemyTeam.TeamName}");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════════");
+        terminal.WriteLine("");
+
+        int myWins = 0, enemyWins = 0;
+        int rounds = Math.Min(myMembers.Count, enemyMembers.Count);
+
+        for (int i = 0; i < rounds; i++)
+        {
+            var mySummary = myMembers[i];
+            var enemySummary = enemyMembers[i];
+
+            // Load characters from save data
+            var myData = await backend.ReadGameData(mySummary.DisplayName);
+            var enemyData = await backend.ReadGameData(enemySummary.DisplayName);
+            if (myData?.Player == null || enemyData?.Player == null) continue;
+
+            var myFighter = PlayerCharacterLoader.CreateFromSaveData(myData.Player, mySummary.DisplayName);
+            var enemyFighter = PlayerCharacterLoader.CreateFromSaveData(enemyData.Player, enemySummary.DisplayName);
+
+            // Quick auto-resolved combat (no UI, just determine winner by stats)
+            long myPower = myFighter.Level * 10 + myFighter.Strength + myFighter.WeapPow + myFighter.Dexterity;
+            long enemyPower = enemyFighter.Level * 10 + enemyFighter.Strength + enemyFighter.WeapPow + enemyFighter.Dexterity;
+            // Add randomness (±20%)
+            var rng = new Random();
+            myPower = (long)(myPower * (0.8 + rng.NextDouble() * 0.4));
+            enemyPower = (long)(enemyPower * (0.8 + rng.NextDouble() * 0.4));
+
+            bool myWin = myPower >= enemyPower;
+            if (myWin) myWins++; else enemyWins++;
+
+            terminal.SetColor(myWin ? "bright_green" : "bright_red");
+            terminal.Write($"  Round {i + 1}: ");
+            terminal.SetColor("white");
+            terminal.Write($"{mySummary.DisplayName} (Lv{mySummary.Level}) vs {enemySummary.DisplayName} (Lv{enemySummary.Level}) ");
+            terminal.SetColor(myWin ? "bright_green" : "bright_red");
+            terminal.WriteLine(myWin ? $"- {mySummary.DisplayName} WINS!" : $"- {enemySummary.DisplayName} WINS!");
+
+            await backend.UpdateTeamWarScore(warId, myWin);
+            await Task.Delay(800);
+        }
+
+        terminal.WriteLine("");
+        bool weWon = myWins > enemyWins;
+        string result = weWon ? "challenger_won" : "defender_won";
+        await backend.CompleteTeamWar(warId, result);
+
+        if (weWon)
+        {
+            long reward = wager * 2;
+            currentPlayer.Gold += reward;
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  ═══ YOUR TEAM WINS! ═══");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Score: {myWins} - {enemyWins}");
+            terminal.WriteLine($"  War spoils: {reward:N0} gold!");
+        }
+        else
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  ═══ YOUR TEAM LOSES! ═══");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Score: {myWins} - {enemyWins}");
+            terminal.WriteLine($"  Lost {wager:N0} gold in war wager.");
+        }
+
+        if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+        {
+            string winner = weWon ? myTeam : enemyTeam.TeamName;
+            _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                $"Team {winner} won the war between {myTeam} and {enemyTeam.TeamName}! ({myWins}-{enemyWins})", "team_war");
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    private async Task ShowWarHistory(SqlSaveBackend backend)
+    {
+        string myTeam = currentPlayer.Team;
+        var wars = await backend.GetTeamWarHistory(myTeam);
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("\n  ═══════════ WAR HISTORY ═══════════");
+
+        if (wars.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  No wars fought yet.");
+        }
+        else
+        {
+            foreach (var war in wars)
+            {
+                bool weChallenger = war.ChallengerTeam == myTeam;
+                string opponent = weChallenger ? war.DefenderTeam : war.ChallengerTeam;
+                int ourWins = weChallenger ? war.ChallengerWins : war.DefenderWins;
+                int theirWins = weChallenger ? war.DefenderWins : war.ChallengerWins;
+                bool weWon = ourWins > theirWins;
+
+                terminal.SetColor(weWon ? "bright_green" : "bright_red");
+                terminal.Write($"  {(weWon ? "WIN" : "LOSS")} ");
+                terminal.SetColor("white");
+                terminal.Write($"vs {opponent} ");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"({ourWins}-{theirWins}) {war.GoldWagered:N0}g");
+            }
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Team Headquarters
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static readonly Dictionary<string, (string Name, string Description, long BaseCost)> UpgradeDefinitions = new()
+    {
+        ["armory"]   = ("Armory",          "+5% attack per level",       5000),
+        ["barracks"] = ("Barracks",        "+5% defense per level",      5000),
+        ["training"] = ("Training Grounds", "+5% XP bonus per level",    8000),
+        ["vault"]    = ("Vault",           "+50,000 vault capacity/lv",  3000),
+        ["infirmary"]= ("Infirmary",       "+10% healing per level",     4000),
+    };
+
+    private async Task TeamHeadquartersMenu()
+    {
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        if (string.IsNullOrEmpty(currentPlayer.Team))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  You must be in a team to access headquarters!");
+            await Task.Delay(2000);
+            return;
+        }
+
+        string teamName = currentPlayer.Team;
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine($"║              TEAM HEADQUARTERS - {teamName,-30}           ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            // Show upgrades
+            var upgrades = await backend.GetTeamUpgrades(teamName);
+            long vaultGold = await backend.GetTeamVaultGold(teamName);
+            int vaultLevel = backend.GetTeamUpgradeLevel(teamName, "vault");
+            long vaultCapacity = 50000 + (vaultLevel * 50000);
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  ═══ Facilities ═══");
+            terminal.WriteLine("");
+
+            int idx = 1;
+            foreach (var (key, def) in UpgradeDefinitions)
+            {
+                var existing = upgrades.FirstOrDefault(u => u.UpgradeType == key);
+                int level = existing?.Level ?? 0;
+                long nextCost = def.BaseCost * (level + 1);
+
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"  {idx}. ");
+                terminal.SetColor("white");
+                terminal.Write($"{def.Name,-22} ");
+                terminal.SetColor(level > 0 ? "bright_green" : "gray");
+                terminal.Write($"Lv {level,-4} ");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"({def.Description})  [Upgrade: {nextCost:N0}g]");
+                idx++;
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  Team Vault: {vaultGold:N0} / {vaultCapacity:N0} gold");
+            terminal.WriteLine("");
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  [U] Upgrade Facility    [D] Deposit Gold    [W] Withdraw Gold    [Q] Back");
+            terminal.SetColor("white");
+            terminal.Write("\n  Choice: ");
+            string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+
+            if (input == "Q" || input == "") break;
+
+            switch (input)
+            {
+                case "U": await UpgradeFacility(backend, teamName); break;
+                case "D": await DepositToVault(backend, teamName); break;
+                case "W": await WithdrawFromVault(backend, teamName); break;
+            }
+        }
+    }
+
+    private async Task UpgradeFacility(SqlSaveBackend backend, string teamName)
+    {
+        var keys = UpgradeDefinitions.Keys.ToList();
+
+        terminal.SetColor("white");
+        terminal.Write("\n  Upgrade # (1-5): ");
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > keys.Count) return;
+
+        string key = keys[choice - 1];
+        var def = UpgradeDefinitions[key];
+        int currentLevel = backend.GetTeamUpgradeLevel(teamName, key);
+
+        if (currentLevel >= 10)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  Maximum level reached!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        long cost = def.BaseCost * (currentLevel + 1);
+
+        // Try team vault first, then personal gold
+        long vaultGold = await backend.GetTeamVaultGold(teamName);
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  Upgrade {def.Name} to Lv {currentLevel + 1} costs {cost:N0} gold.");
+        terminal.WriteLine($"  Team vault has {vaultGold:N0}g, you have {currentPlayer.Gold:N0}g.");
+        terminal.Write("  Pay from [V]ault or [P]ersonal gold? ");
+        string payChoice = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+
+        if (payChoice == "V")
+        {
+            if (vaultGold < cost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  Not enough gold in vault!");
+                await Task.Delay(1500);
+                return;
+            }
+            bool withdrawn = await backend.WithdrawFromTeamVault(teamName, cost);
+            if (!withdrawn) { terminal.SetColor("red"); terminal.WriteLine("  Failed!"); await Task.Delay(1500); return; }
+        }
+        else if (payChoice == "P")
+        {
+            if (currentPlayer.Gold < cost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  Not enough personal gold!");
+                await Task.Delay(1500);
+                return;
+            }
+            currentPlayer.Gold -= cost;
+        }
+        else return;
+
+        await backend.UpgradeTeamFacility(teamName, key, cost);
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"\n  {def.Name} upgraded to Level {currentLevel + 1}!");
+        await Task.Delay(2000);
+    }
+
+    private async Task DepositToVault(SqlSaveBackend backend, string teamName)
+    {
+        int vaultLevel = backend.GetTeamUpgradeLevel(teamName, "vault");
+        long vaultCapacity = 50000 + (vaultLevel * 50000);
+        long currentVault = await backend.GetTeamVaultGold(teamName);
+        long space = vaultCapacity - currentVault;
+
+        if (space <= 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  Vault is full! Upgrade it for more capacity.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.Write($"\n  Deposit how much? (max {Math.Min(space, currentPlayer.Gold):N0}): ");
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!long.TryParse(input, out long amount) || amount <= 0) return;
+
+        amount = Math.Min(amount, Math.Min(space, currentPlayer.Gold));
+        if (amount <= 0) return;
+
+        currentPlayer.Gold -= amount;
+        await backend.DepositToTeamVault(teamName, amount);
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  Deposited {amount:N0} gold into the team vault!");
+        await Task.Delay(1500);
+    }
+
+    private async Task WithdrawFromVault(SqlSaveBackend backend, string teamName)
+    {
+        long currentVault = await backend.GetTeamVaultGold(teamName);
+        if (currentVault <= 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\n  The vault is empty.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.Write($"\n  Withdraw how much? (vault has {currentVault:N0}): ");
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!long.TryParse(input, out long amount) || amount <= 0) return;
+
+        amount = Math.Min(amount, currentVault);
+        bool success = await backend.WithdrawFromTeamVault(teamName, amount);
+        if (success)
+        {
+            currentPlayer.Gold += amount;
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  Withdrew {amount:N0} gold from the team vault!");
+        }
+        else
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  Withdrawal failed.");
+        }
+        await Task.Delay(1500);
+    }
 }

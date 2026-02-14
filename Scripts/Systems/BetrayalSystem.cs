@@ -13,8 +13,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class BetrayalSystem
     {
-        private static BetrayalSystem? instance;
-        public static BetrayalSystem Instance => instance ??= new BetrayalSystem();
+        private static BetrayalSystem? _fallbackInstance;
+        public static BetrayalSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Betrayal;
+                return _fallbackInstance ??= new BetrayalSystem();
+            }
+        }
 
         // Hidden betrayal point tracking per NPC
         private Dictionary<string, BetrayalProfile> betrayalProfiles = new();

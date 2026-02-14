@@ -855,8 +855,84 @@ public static class EnhancedNPCBehaviors
         }
     }
 
-    private static void ProcessFriendshipDevelopment(NPC npc, List<NPC> others) { /* Friendship logic */ }
-    private static void ProcessEnemyRelationships(NPC npc) { /* Enemy tracking */ }
+    /// <summary>
+    /// Sociable NPCs develop friendships with compatible others over time.
+    /// Called every world sim tick per NPC.
+    /// </summary>
+    private static void ProcessFriendshipDevelopment(NPC npc, List<NPC> others)
+    {
+        if (npc.IsDead || npc.Personality == null || npc.Brain == null) return;
+
+        // Sociability drives how often NPCs seek friendship (1-5% per tick)
+        float friendChance = 0.01f + npc.Personality.Sociability * 0.04f;
+        if (random.NextDouble() > friendChance) return;
+
+        // Pick a random living NPC that isn't self, isn't spouse
+        var candidates = others.Where(o =>
+            o != npc && !o.IsDead && o.Brain != null && o.Personality != null
+            && o.Name != npc.SpouseName).ToList();
+        if (candidates.Count == 0) return;
+
+        var target = candidates[random.Next(candidates.Count)];
+
+        // Compatibility based on personality similarity
+        float compat = 0f;
+
+        // Similar loyalty = bonding
+        compat += 1f - Math.Abs(npc.Personality.Loyalty - target.Personality!.Loyalty);
+        // Similar courage
+        compat += 1f - Math.Abs(npc.Personality.Courage - target.Personality.Courage);
+        // Both sociable = more likely
+        compat += (npc.Personality.Sociability + target.Personality.Sociability) * 0.5f;
+        // Same class = camaraderie
+        if (npc.Class == target.Class) compat += 0.5f;
+        // Opposite aggression = clash
+        compat -= Math.Abs(npc.Personality.Aggression - target.Personality.Aggression) * 0.5f;
+
+        compat /= 4f; // Normalize to roughly 0-1
+
+        if (compat > 0.4f && random.NextDouble() < compat)
+        {
+            // Positive interaction — compliment, help, share drink
+            var types = new[] { InteractionType.Complimented, InteractionType.Helped, InteractionType.SharedDrink };
+            var interType = types[random.Next(types.Length)];
+            npc.Brain.RecordInteraction(target, interType);
+            target.Brain?.RecordInteraction(npc, interType);
+        }
+    }
+
+    /// <summary>
+    /// Aggressive or vengeful NPCs develop rivalries with incompatible others.
+    /// Called every world sim tick per NPC.
+    /// </summary>
+    private static void ProcessEnemyRelationships(NPC npc)
+    {
+        if (npc.IsDead || npc.Personality == null || npc.Brain?.Memory == null) return;
+
+        // Vengeful/aggressive NPCs hold grudges and pick fights (1-4% per tick)
+        float rivalChance = 0.01f + (npc.Personality.Aggression + npc.Personality.Vengefulness) * 0.015f;
+        if (random.NextDouble() > rivalChance) return;
+
+        // Look at existing negative impressions and deepen them
+        var impressions = npc.Brain.Memory.CharacterImpressions;
+        var enemies = impressions.Where(kvp => kvp.Value < -0.1f).ToList();
+
+        if (enemies.Count > 0)
+        {
+            // Vengeful NPCs brood on existing enemies — deepen the grudge
+            var worst = enemies.OrderBy(e => e.Value).First();
+
+            // Find the actual NPC to record a proper interaction
+            var targetNpc = NPCSpawnSystem.Instance?.GetNPCByName(worst.Key);
+            if (targetNpc != null && !targetNpc.IsDead && targetNpc.Brain != null)
+            {
+                npc.Brain.RecordInteraction(targetNpc, InteractionType.Threatened);
+                // Target may retaliate if also aggressive
+                if (targetNpc.Personality != null && targetNpc.Personality.Aggression > 0.4f)
+                    targetNpc.Brain.RecordInteraction(npc, InteractionType.Insulted);
+            }
+        }
+    }
     
     #endregion
     

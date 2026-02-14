@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using UsurperRemake;
 using UsurperRemake.Systems;
 using UsurperRemake.BBS;
+using UsurperRemake.Server;
 
 // Console bootstrapper for Usurper Reborn
 //
@@ -35,6 +36,12 @@ namespace UsurperConsole
 
         static async Task Main(string[] args)
         {
+            // Enable System.Text.Json reflection-based serialization.
+            // The trimmer sets IsReflectionEnabledByDefault=false in runtimeconfig,
+            // but we use reflection-based JsonSerializer.Deserialize<T>() everywhere.
+            // Must be called before any JSON operations.
+            AppContext.SetSwitch("System.Text.Json.JsonSerializer.IsReflectionEnabledByDefault", true);
+
             // Set up global exception handlers FIRST so we catch everything
             SetupGlobalExceptionHandlers();
 
@@ -123,6 +130,20 @@ namespace UsurperConsole
                 if (DoorMode.IsWorldSimMode)
                 {
                     await RunWorldSimMode();
+                    return;
+                }
+
+                // MUD server mode: start the TCP game server
+                if (DoorMode.IsMudServerMode)
+                {
+                    await RunMudServerMode();
+                    return;
+                }
+
+                // MUD relay mode: thin stdin/stdout ↔ TCP bridge
+                if (DoorMode.IsMudRelayMode)
+                {
+                    await RunMudRelayMode();
                     return;
                 }
 
@@ -246,6 +267,66 @@ namespace UsurperConsole
                 DoorMode.Log("Shutting down door mode...");
                 DoorMode.Shutdown();
             }
+        }
+
+        /// <summary>
+        /// Run the MUD game server: single process, all players connect via TCP.
+        /// </summary>
+        private static async Task RunMudServerMode()
+        {
+            Console.Error.WriteLine($"[MUD] Starting Usurper Reborn MUD Server v{GameConfig.Version}");
+            Console.Error.WriteLine($"[MUD] Port: {DoorMode.MudPort}, Database: {DoorMode.OnlineDatabasePath}");
+
+            // Set up cancellation for graceful shutdown
+            using var cts = new CancellationTokenSource();
+
+            Console.CancelKeyPress += (sender, e) =>
+            {
+                e.Cancel = true;
+                Console.Error.WriteLine("[MUD] Shutdown signal received (Ctrl+C)...");
+                cts.Cancel();
+            };
+            AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+            {
+                if (!cts.IsCancellationRequested)
+                {
+                    Console.Error.WriteLine("[MUD] Process exit signal received...");
+                    cts.Cancel();
+                }
+            };
+
+            var server = new MudServer(DoorMode.MudPort, DoorMode.OnlineDatabasePath);
+
+            // Add admin users from --admin flags (bootstrapped as God in DB on startup)
+            foreach (var admin in DoorMode.MudAdminUsers)
+            {
+                server.BootstrapAdminUsers.Add(admin);
+                Console.Error.WriteLine($"[MUD] Bootstrap admin: {admin}");
+            }
+
+            await server.RunAsync(cts.Token);
+        }
+
+        /// <summary>
+        /// Run the thin relay client: bridges stdin/stdout to the MUD server TCP port.
+        /// Used as SSH ForceCommand target.
+        /// </summary>
+        private static async Task RunMudRelayMode()
+        {
+            var username = DoorMode.OnlineUsername ?? "anonymous";
+            var connectionType = DetectConnectionType();
+
+            Console.Error.WriteLine($"[RELAY] Connecting to MUD server on port {DoorMode.MudPort} as '{username}' ({connectionType})");
+
+            using var cts = new CancellationTokenSource();
+
+            Console.CancelKeyPress += (sender, e) =>
+            {
+                e.Cancel = true;
+                cts.Cancel();
+            };
+
+            await RelayClient.RunAsync(username, DoorMode.MudPort, connectionType, cts.Token);
         }
 
         /// <summary>

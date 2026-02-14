@@ -270,9 +270,10 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Have NPC equip or store an item after purchasing
+        /// Have NPC equip or store an item after purchasing.
+        /// Internal so WorldSimulator can use it for online marketplace NPC purchases.
         /// </summary>
-        private void EquipOrStoreItem(NPC npc, global::Item item)
+        internal void EquipOrStoreItem(NPC npc, global::Item item)
         {
             if (item.Type == global::ObjType.Weapon)
             {

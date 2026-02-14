@@ -14,8 +14,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class MoralParadoxSystem
     {
-        private static MoralParadoxSystem? instance;
-        public static MoralParadoxSystem Instance => instance ??= new MoralParadoxSystem();
+        private static MoralParadoxSystem? _fallbackInstance;
+        public static MoralParadoxSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.MoralParadox;
+                return _fallbackInstance ??= new MoralParadoxSystem();
+            }
+        }
 
         // All moral paradoxes in the game
         private Dictionary<string, MoralParadox> paradoxes = new();

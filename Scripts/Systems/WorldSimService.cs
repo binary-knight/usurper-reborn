@@ -172,6 +172,9 @@ namespace UsurperRemake.Systems
             worldSimulator = new WorldSimulator();
             worldSimulator.SetActive(true);
 
+            // Give the world sim access to the SQL backend for online marketplace operations
+            WorldSimulator.SqlBackend = sqlBackend;
+
             Console.Error.WriteLine("[WORLDSIM] Minimal systems initialized");
             DebugLogger.Instance.LogInfo("WORLDSIM", "Minimal systems initialized for headless simulation");
         }

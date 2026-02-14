@@ -171,7 +171,37 @@ namespace UsurperRemake.Systems
         public string ToPlayer { get; set; } = "";
         public string MessageType { get; set; } = "";
         public string Message { get; set; } = "";
+        public bool IsRead { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    /// <summary>
+    /// Player team info for rankings and listings.
+    /// </summary>
+    public class PlayerTeamInfo
+    {
+        public string TeamName { get; set; } = "";
+        public string CreatedBy { get; set; } = "";
+        public int MemberCount { get; set; }
+        public bool ControlsTurf { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    /// <summary>
+    /// Async trade offer between players.
+    /// </summary>
+    public class TradeOffer
+    {
+        public long Id { get; set; }
+        public string FromPlayer { get; set; } = "";
+        public string ToPlayer { get; set; } = "";
+        public string ItemsJson { get; set; } = "[]";
+        public long Gold { get; set; }
+        public string Status { get; set; } = "pending";
+        public string Message { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+        public string FromDisplayName { get; set; } = "";
+        public string ToDisplayName { get; set; } = "";
     }
 
     /// <summary>
@@ -201,5 +231,101 @@ namespace UsurperRemake.Systems
         public int AttackerLevel { get; set; }
         public int DefenderLevel { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Bounties
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public class BountyInfo
+    {
+        public int Id { get; set; }
+        public string TargetPlayer { get; set; } = "";
+        public string PlacedBy { get; set; } = "";
+        public long Amount { get; set; }
+        public DateTime PlacedAt { get; set; }
+        public string Status { get; set; } = "active";
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Auction House
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public class AuctionListing
+    {
+        public int Id { get; set; }
+        public string Seller { get; set; } = "";
+        public string ItemName { get; set; } = "";
+        public string ItemJson { get; set; } = "{}";
+        public long Price { get; set; }
+        public DateTime ListedAt { get; set; }
+        public DateTime ExpiresAt { get; set; }
+        public string? Buyer { get; set; }
+        public string Status { get; set; } = "active";
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Team Wars
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public class TeamWarInfo
+    {
+        public int Id { get; set; }
+        public string ChallengerTeam { get; set; } = "";
+        public string DefenderTeam { get; set; } = "";
+        public string Status { get; set; } = "pending";
+        public int ChallengerWins { get; set; }
+        public int DefenderWins { get; set; }
+        public long GoldWagered { get; set; }
+        public DateTime StartedAt { get; set; }
+        public DateTime? FinishedAt { get; set; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // World Bosses
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public class WorldBossInfo
+    {
+        public int Id { get; set; }
+        public string BossName { get; set; } = "";
+        public int BossLevel { get; set; }
+        public long MaxHP { get; set; }
+        public long CurrentHP { get; set; }
+        public DateTime StartedAt { get; set; }
+        public DateTime ExpiresAt { get; set; }
+        public string Status { get; set; } = "active";
+    }
+
+    public class WorldBossDamageEntry
+    {
+        public string PlayerName { get; set; } = "";
+        public long DamageDealt { get; set; }
+        public int Hits { get; set; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Castle Sieges
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public class CastleSiegeInfo
+    {
+        public int Id { get; set; }
+        public string TeamName { get; set; } = "";
+        public int GuardsDefeated { get; set; }
+        public int TotalGuards { get; set; }
+        public string Result { get; set; } = "in_progress";
+        public DateTime StartedAt { get; set; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Team Headquarters
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public class TeamUpgradeInfo
+    {
+        public string UpgradeType { get; set; } = "";
+        public int Level { get; set; }
+        public long InvestedGold { get; set; }
     }
 }

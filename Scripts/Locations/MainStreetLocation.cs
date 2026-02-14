@@ -246,16 +246,14 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor("white");
         terminal.Write("agic Shop   ");
 
-        // Marketplace removed - waiting for multiplayer support
-        // terminal.SetColor("darkgray");
-        // terminal.Write("[");
-        // terminal.SetColor("bright_cyan");
-        // terminal.Write("J");
-        // terminal.SetColor("darkgray");
-        // terminal.Write("]");
-        // terminal.SetColor("white");
-        // terminal.WriteLine("Marketplace");
-        terminal.WriteLine(""); // Blank space where Marketplace was
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_cyan");
+        terminal.Write("J");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.WriteLine("Marketplace");
 
         // Row 3 - Services
         terminal.SetColor("darkgray");
@@ -481,7 +479,16 @@ public class MainStreetLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("]");
             terminal.SetColor("white");
-            terminal.WriteLine("Arena (PvP)");
+            terminal.Write("Arena (PvP)  ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_magenta");
+            terminal.Write("7");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("World Boss");
         }
 
         terminal.WriteLine("");
@@ -513,7 +520,7 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("  W - Weapon Shop");
         terminal.WriteLine("  A - Armor Shop");
         terminal.WriteLine("  M - Magic Shop");
-        // terminal.WriteLine("  J - Marketplace");  // Removed - waiting for multiplayer
+        terminal.WriteLine("  J - Marketplace");
         terminal.WriteLine("  B - Bank");
         terminal.WriteLine("  1 - Healer");
         terminal.WriteLine("");
@@ -551,6 +558,7 @@ public class MainStreetLocation : BaseLocation
             terminal.WriteLine("  4 - Chat");
             terminal.WriteLine("  5 - News Feed");
             terminal.WriteLine("  6 - Arena (PvP)");
+            terminal.WriteLine("  7 - World Boss");
             terminal.WriteLine("  /say message - Broadcast chat");
             terminal.WriteLine("  /tell player message - Private message");
             terminal.WriteLine("  /who - See online players");
@@ -663,10 +671,17 @@ public class MainStreetLocation : BaseLocation
                 await Task.Delay(1500);
                 throw new LocationExitException(GameLocation.LoveCorner);
                 
-            // Marketplace removed - waiting for multiplayer support
-            // case "J":
-            //     await NavigateToLocation(GameLocation.Marketplace);
-            //     return true;
+            case "J":
+                if (DoorMode.IsOnlineMode)
+                {
+                    await ShowAuctionMenu();
+                    return false;
+                }
+                else
+                {
+                    await NavigateToLocation(GameLocation.Marketplace);
+                    return true;
+                }
                 
             case "R":
                 await ShowRelations();
@@ -759,6 +774,13 @@ public class MainStreetLocation : BaseLocation
                 if (DoorMode.IsOnlineMode)
                 {
                     throw new LocationExitException(GameLocation.Arena);
+                }
+                return false;
+
+            case "7":
+                if (DoorMode.IsOnlineMode)
+                {
+                    await ShowWorldBossMenu();
                 }
                 return false;
 
@@ -2416,7 +2438,7 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("  [C] Castle        - Visit the royal court");
         terminal.WriteLine("  [Y] Your Home     - Rest and manage your belongings");
         terminal.WriteLine("  [*] Level Master  - Train to increase your level");
-        // terminal.WriteLine("  [K] Marketplace   - Trade goods and find bargains");  // Removed - waiting for multiplayer
+        terminal.WriteLine("  [J] Marketplace   - Buy and sell items with other players");
         terminal.WriteLine("  [X] Dark Alley    - Shady dealings and criminal activity");
         terminal.WriteLine("");
 
@@ -2704,4 +2726,207 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor("gray");
         await terminal.PressAnyKey("Press Enter to return to Main Street...");
     }
-} 
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // World Boss
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static readonly (string Name, int Level, long BaseHP)[] WorldBossTemplates = new[]
+    {
+        ("The Abyssal Leviathan",    40, 50000L),
+        ("Void Colossus",            50, 80000L),
+        ("Shadowlord Malachar",      35, 40000L),
+        ("The Crimson Wyrm",         45, 65000L),
+        ("Lich King Vareth",         55, 100000L),
+        ("The Iron Titan",           60, 120000L),
+        ("Dread Serpent Nidhogg",    70, 150000L),
+        ("The Nameless Horror",      80, 200000L),
+    };
+
+    private async Task ShowWorldBossMenu()
+    {
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        // Expire old bosses and possibly spawn new one
+        await backend.ExpireWorldBosses();
+        var boss = await backend.GetActiveWorldBoss();
+
+        if (boss == null)
+        {
+            // Spawn a new boss
+            var rng = new Random();
+            var template = WorldBossTemplates[rng.Next(WorldBossTemplates.Length)];
+            int bossId = await backend.SpawnWorldBoss(template.Name, template.Level, template.BaseHP, 24);
+            boss = await backend.GetActiveWorldBoss();
+        }
+
+        if (boss == null)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\n  No world boss is active right now.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                            WORLD BOSS                                      ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            // Refresh boss state
+            boss = await backend.GetActiveWorldBoss();
+            if (boss == null || boss.Status != "active")
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("  The World Boss has been defeated! Check back later for a new challenge.");
+                await terminal.PressAnyKey();
+                break;
+            }
+
+            double hpPercent = (double)boss.CurrentHP / boss.MaxHP * 100;
+            string hpBar = new string('█', (int)(hpPercent / 5)) + new string('░', 20 - (int)(hpPercent / 5));
+            string hpColor = hpPercent > 50 ? "bright_green" : hpPercent > 25 ? "bright_yellow" : "bright_red";
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {boss.BossName}  (Level {boss.BossLevel})");
+            terminal.SetColor(hpColor);
+            terminal.WriteLine($"  HP: [{hpBar}] {boss.CurrentHP:N0} / {boss.MaxHP:N0} ({hpPercent:F1}%)");
+
+            var timeLeft = boss.ExpiresAt - DateTime.UtcNow;
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  Expires in: {timeLeft.Hours}h {timeLeft.Minutes}m");
+            terminal.WriteLine("");
+
+            // Show damage leaderboard
+            var leaderboard = await backend.GetWorldBossDamageLeaderboard(boss.Id, 10);
+            if (leaderboard.Count > 0)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  ═══ Damage Leaderboard ═══");
+                for (int i = 0; i < leaderboard.Count; i++)
+                {
+                    var entry = leaderboard[i];
+                    terminal.SetColor(i < 3 ? "bright_yellow" : "white");
+                    terminal.WriteLine($"  {i + 1,2}. {entry.PlayerName,-20} {entry.DamageDealt:N0} dmg ({entry.Hits} hits)");
+                }
+                terminal.WriteLine("");
+            }
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  [A] Attack Boss    [Q] Back");
+            terminal.SetColor("white");
+            terminal.Write("\n  Choice: ");
+            string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+
+            if (input == "Q" || input == "") break;
+
+            if (input == "A")
+            {
+                await AttackWorldBoss(backend, boss);
+            }
+        }
+    }
+
+    private async Task AttackWorldBoss(SqlSaveBackend backend, WorldBossInfo boss)
+    {
+        if (currentPlayer.HP <= 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  You're too injured to fight! Heal first.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Create a boss monster for combat
+        var bossMonster = new Character
+        {
+            Name1 = boss.BossName,
+            Name2 = boss.BossName,
+            Level = boss.BossLevel,
+            HP = Math.Min((int)boss.CurrentHP, int.MaxValue),
+            MaxHP = Math.Min((int)boss.MaxHP, int.MaxValue),
+            Strength = boss.BossLevel * 3 + 20,
+            Defence = boss.BossLevel * 2 + 15,
+            Dexterity = boss.BossLevel * 2 + 10,
+            Agility = boss.BossLevel + 10,
+            AI = CharacterAI.Computer
+        };
+
+        // Run combat (limited rounds - player gets 5 rounds then boss "retreats")
+        long totalDamage = 0;
+        int rounds = 5;
+        var rng = new Random();
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"\n  You charge at {boss.BossName}!\n");
+
+        for (int i = 0; i < rounds && currentPlayer.HP > 0; i++)
+        {
+            // Player attacks
+            long playerDmg = Math.Max(1, currentPlayer.Strength + currentPlayer.WeapPow - bossMonster.Defence / 2);
+            playerDmg = (long)(playerDmg * (0.7 + rng.NextDouble() * 0.6));
+            totalDamage += playerDmg;
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  Round {i + 1}: You strike for {playerDmg:N0} damage!");
+
+            // Boss counter-attacks
+            long bossDmg = Math.Max(1, bossMonster.Strength - currentPlayer.Defence / 2);
+            bossDmg = (long)(bossDmg * (0.5 + rng.NextDouble() * 0.5));
+            currentPlayer.HP = Math.Max(0, currentPlayer.HP - bossDmg);
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {boss.BossName} strikes back for {bossDmg:N0} damage! (HP: {currentPlayer.HP}/{currentPlayer.MaxHP})");
+            await Task.Delay(500);
+        }
+
+        terminal.WriteLine("");
+
+        if (totalDamage > 0)
+        {
+            long remainingHp = await backend.RecordWorldBossDamage(boss.Id, currentPlayer.DisplayName.ToLower(), totalDamage);
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Total damage dealt: {totalDamage:N0}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  Boss HP remaining: {Math.Max(0, remainingHp):N0}");
+
+            if (remainingHp <= 0)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"\n  {boss.BossName} HAS BEEN DEFEATED!");
+                terminal.SetColor("yellow");
+
+                // Reward all contributors
+                long goldReward = boss.BossLevel * 100;
+                long xpReward = boss.BossLevel * 50;
+                currentPlayer.Gold += goldReward;
+                currentPlayer.Experience += xpReward;
+                terminal.WriteLine($"  You earned {goldReward:N0} gold and {xpReward:N0} XP for your contribution!");
+
+                if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+                    _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                        $"{boss.BossName} has been defeated! {currentPlayer.DisplayName} dealt the final blow!", "world_boss");
+            }
+        }
+
+        if (currentPlayer.HP <= 0)
+        {
+            currentPlayer.HP = Math.Max(1, currentPlayer.MaxHP / 4);
+            terminal.SetColor("red");
+            terminal.WriteLine("  You were struck down! Healers drag you to safety.");
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  Revived with {currentPlayer.HP}/{currentPlayer.MaxHP} HP.");
+        }
+
+        // Autosave after boss fight
+        await SaveSystem.Instance.AutoSave(currentPlayer as Player);
+        await terminal.PressAnyKey();
+    }
+}

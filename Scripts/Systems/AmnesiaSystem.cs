@@ -16,8 +16,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class AmnesiaSystem
     {
-        private static AmnesiaSystem? _instance;
-        public static AmnesiaSystem Instance => _instance ??= new AmnesiaSystem();
+        private static AmnesiaSystem? _fallbackInstance;
+        public static AmnesiaSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Amnesia;
+                return _fallbackInstance ??= new AmnesiaSystem();
+            }
+        }
 
         /// <summary>
         /// Collected memory fragments
@@ -241,7 +249,7 @@ namespace UsurperRemake.Systems
 
         public AmnesiaSystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         /// <summary>

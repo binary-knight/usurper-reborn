@@ -1,0 +1,42 @@
+# Usurper Reborn - MUD Game Server Systemd Service
+# Single-process TCP game server on port 4000. All players connect directly
+# via TCP (from Windows/Steam client, web proxy, or relay).
+# World simulator runs in-process as a background task.
+#
+# Install:
+#   sudo cp usurper-mud.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable usurper-mud
+#   sudo systemctl start usurper-mud
+#
+# Monitor:
+#   sudo systemctl status usurper-mud
+#   sudo journalctl -u usurper-mud -f
+#
+# This replaces both sshd-usurper (player connections) and
+# usurper-world.service (world simulation).
+
+[Unit]
+Description=Usurper Reborn MUD Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=usurper
+Group=usurper
+WorkingDirectory=/opt/usurper
+ExecStart=/opt/usurper/UsurperReborn --mud-server --mud-port 4000 --db /var/usurper/usurper_online.db --sim-interval 30 --npc-xp 3.0 --save-interval 5
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/usurper/logs/mud-server.log
+StandardError=append:/var/usurper/logs/mud-server.log
+
+# Graceful shutdown: allow time for player saves and world state persistence
+TimeoutStopSec=60
+
+# Resource limits
+LimitNOFILE=4096
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

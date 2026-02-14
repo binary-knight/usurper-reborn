@@ -17,8 +17,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class StrangerEncounterSystem
     {
-        private static StrangerEncounterSystem? _instance;
-        public static StrangerEncounterSystem Instance => _instance ??= new StrangerEncounterSystem();
+        private static StrangerEncounterSystem? _fallbackInstance;
+        public static StrangerEncounterSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.StrangerEncounters;
+                return _fallbackInstance ??= new StrangerEncounterSystem();
+            }
+        }
 
         // Core encounter tracking
         public int EncountersHad { get; private set; } = 0;
@@ -677,7 +685,7 @@ namespace UsurperRemake.Systems
 
         public StrangerEncounterSystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         // ═══════════════════════════════════════════════════════════════════

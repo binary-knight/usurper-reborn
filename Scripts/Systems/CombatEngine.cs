@@ -42,10 +42,14 @@ public partial class CombatEngine
         "TIP: [T]aunt lowers enemy defense, making them easier to hit.",
         "TIP: [I]disarm can remove a monster's weapon, reducing their damage.",
         "TIP: Spellcasters can press [S] to cast spells using Mana.",
-        "TIP: Barbarians can [G]rage for increased combat power!",
-        "TIP: Rangers can use [V]ranged attacks from a distance.",
         "TIP: Check [L]hide to attempt to escape or reposition.",
-        "TIP: Use healing potions [I] mid-combat if your HP gets low."
+        "TIP: Use healing potions [H] mid-combat if your HP gets low."
+    };
+    // Class-specific tips shown only to the relevant class
+    private static readonly Dictionary<CharacterClass, string[]> ClassSpecificTips = new()
+    {
+        { CharacterClass.Barbarian, new[] { "TIP: Barbarians can [G]rage for increased combat power!" } },
+        { CharacterClass.Ranger, new[] { "TIP: Rangers can use [V]ranged attacks from a distance." } },
     };
 
     /// <summary>
@@ -80,7 +84,12 @@ public partial class CombatEngine
         if (combatTipCounter >= tipFrequency)
         {
             combatTipCounter = 0;
-            string tip = CombatTips[random.Next(CombatTips.Length)];
+            // 30% chance to show a class-specific tip if one exists
+            string tip;
+            if (random.Next(100) < 30 && ClassSpecificTips.TryGetValue(player.Class, out var classTips))
+                tip = classTips[random.Next(classTips.Length)];
+            else
+                tip = CombatTips[random.Next(CombatTips.Length)];
             terminal.SetColor("dark_gray");
             terminal.WriteLine($"  {tip}");
             terminal.WriteLine("");
@@ -104,6 +113,12 @@ public partial class CombatEngine
     /// </summary>
     public async Task<CombatResult> PlayerVsPlayer(Character attacker, Character defender)
     {
+        // Wizard godmode: save HP/Mana before combat to restore after
+        bool isGodMode = UsurperRemake.Server.SessionContext.IsActive
+            && (UsurperRemake.Server.SessionContext.Current?.WizardGodMode ?? false);
+        long godModeHP = attacker.HP;
+        long godModeMana = attacker.Mana;
+
         // Store player reference for combat speed setting
         currentPlayer = attacker;
 
@@ -143,6 +158,14 @@ public partial class CombatEngine
         }
         
         await DeterminePvPOutcome(result);
+
+        // Wizard godmode: ensure HP/Mana fully restored after PvP combat
+        if (isGodMode)
+        {
+            attacker.HP = godModeHP;
+            attacker.Mana = godModeMana;
+        }
+
         return result;
     }
 
@@ -156,6 +179,12 @@ public partial class CombatEngine
         List<Character>? teammates = null,
         bool offerMonkEncounter = true)
     {
+        // Wizard godmode: save HP/Mana before combat to restore after
+        bool isGodMode = UsurperRemake.Server.SessionContext.IsActive
+            && (UsurperRemake.Server.SessionContext.Current?.WizardGodMode ?? false);
+        long godModeHP = player.HP;
+        long godModeMana = player.Mana;
+
         // Store player reference for combat speed setting
         currentPlayer = player;
 
@@ -191,6 +220,12 @@ public partial class CombatEngine
         // Initialize combat state
         globalBegged = false;
         globalEscape = false;
+
+        // MUD mode: broadcast combat start to room
+        if (monsters.Count == 1)
+            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} draws their weapon and attacks {monsters[0].Name}!");
+        else
+            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} draws their weapon and engages {monsters.Count} enemies!");
 
         // Show combat introduction
         terminal.ClearScreen();
@@ -388,6 +423,7 @@ public partial class CombatEngine
         if (globalEscape)
         {
             result.Outcome = CombatOutcome.PlayerEscaped;
+            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} fled from combat!");
             terminal.SetColor("yellow");
             terminal.WriteLine("You escaped from combat!");
 
@@ -431,13 +467,32 @@ public partial class CombatEngine
         }
         else if (!player.IsAlive)
         {
-            result.Outcome = CombatOutcome.PlayerDied;
-            await HandlePlayerDeath(result);
+            // Wizard godmode: restore HP/Mana so wizard cannot die
+            if (isGodMode)
+            {
+                player.HP = godModeHP;
+                player.Mana = godModeMana;
+                result.Outcome = CombatOutcome.Victory;
+                await HandleVictoryMultiMonster(result, offerMonkEncounter);
+            }
+            else
+            {
+                result.Outcome = CombatOutcome.PlayerDied;
+                UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} has fallen in combat!");
+                await HandlePlayerDeath(result);
+            }
         }
         else if (!monsters.Any(m => m.IsAlive))
         {
             result.Outcome = CombatOutcome.Victory;
             await HandleVictoryMultiMonster(result, offerMonkEncounter);
+        }
+
+        // Wizard godmode: ensure HP/Mana fully restored after combat
+        if (isGodMode)
+        {
+            player.HP = godModeHP;
+            player.Mana = godModeMana;
         }
 
         return result;
@@ -2130,6 +2185,13 @@ public partial class CombatEngine
         terminal.SetColor("bright_green");
         terminal.WriteLine($"You have slain the {result.Monster.Name}!");
         terminal.WriteLine("");
+
+        // MUD mode: broadcast victory to room
+        if (isBoss)
+            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} has defeated the mighty {result.Monster.Name}!");
+        else
+            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} defeated {result.Monster.Name}.");
+
         QuestSystem.OnMonsterKilled(result.Player, result.Monster.Name, isBoss);
 
         // Calculate rewards (Pascal-compatible) with world event and difficulty modifiers
@@ -5910,7 +5972,17 @@ public partial class CombatEngine
         // Check if teammate died
         if (!companion.IsAlive)
         {
-            if (companion.IsCompanion && companion.CompanionId.HasValue)
+            if (companion.IsEcho)
+            {
+                // Player echo "death" - just dissipates, no permanent effect
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {companion.DisplayName}'s echo dissipates into mist...");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Their real self is unharmed.");
+                result.Teammates?.Remove(companion);
+            }
+            else if (companion.IsCompanion && companion.CompanionId.HasValue)
             {
                 // Story companion death
                 await HandleCompanionDeath(companion, monster.Name, result);
@@ -6054,6 +6126,19 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandleVictoryMultiMonster(CombatResult result, bool offerMonkEncounter)
     {
+        // MUD mode: broadcast victory
+        if (result.DefeatedMonsters.Count > 0)
+        {
+            var monsterNames = string.Join(", ", result.DefeatedMonsters.Select(m => m.Name).Distinct());
+            bool anyBoss = result.DefeatedMonsters.Any(m => m.IsBoss);
+            if (anyBoss)
+                UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} has defeated the mighty {monsterNames}!");
+            else if (result.DefeatedMonsters.Count == 1)
+                UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} defeated {monsterNames}.");
+            else
+                UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} defeated {result.DefeatedMonsters.Count} enemies!");
+        }
+
         terminal.WriteLine("");
 
         // Use enhanced victory message
@@ -8275,11 +8360,11 @@ public partial class CombatEngine
         long teammateXP = playerXP / 2;
         if (teammateXP <= 0) return;
 
-        // Count eligible teammates first
+        // Count eligible teammates first (echoes don't get XP but still count for team bonus)
         int eligibleCount = 0;
         foreach (var t in teammates)
         {
-            if (t != null && t.IsAlive && !t.IsCompanion && t.Level < 100)
+            if (t != null && t.IsAlive && !t.IsCompanion && !t.IsEcho && t.Level < 100)
                 eligibleCount++;
         }
         if (eligibleCount == 0) return;
@@ -8292,6 +8377,7 @@ public partial class CombatEngine
         {
             if (teammate == null || !teammate.IsAlive) continue;
             if (teammate.IsCompanion) continue; // Companions are handled separately by CompanionSystem
+            if (teammate.IsEcho) continue; // Player echoes don't gain XP (loaded from DB)
             if (teammate.Level >= 100) continue; // Max level cap
 
             // Award XP

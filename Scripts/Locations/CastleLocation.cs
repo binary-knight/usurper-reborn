@@ -14,7 +14,9 @@ public class CastleLocation : BaseLocation
 {
     private static King currentKing = null;
     private static List<MonarchRecord> monarchHistory = new();
+    private const int MaxMonarchHistory = 100;
     private static List<RoyalMailMessage> royalMail = new();
+    private const int MaxRoyalMail = 50;
     private bool playerIsKing = false;
     private Random random = new Random();
 
@@ -429,6 +431,19 @@ public class CastleLocation : BaseLocation
             }
         }
 
+        // Castle Siege option (online mode, team required)
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !string.IsNullOrEmpty(currentPlayer.Team))
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_red");
+            terminal.Write("B");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("esiege the Castle (Team Siege)");
+        }
+
         terminal.WriteLine("");
 
         // The Crown faction option - only show if not already a member
@@ -630,6 +645,17 @@ public class CastleLocation : BaseLocation
 
             case "J": // The Crown faction recruitment
                 await ShowCrownRecruitment();
+                return false;
+
+            case "B": // Castle Siege (online mode, team required)
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    await CastleSiegeMenu();
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("Castle siege is only available in online mode!");
+                    await Task.Delay(1500);
+                }
                 return false;
 
             case "R":
@@ -1077,6 +1103,9 @@ public class CastleLocation : BaseLocation
                 Date = DateTime.Now.AddDays(-random.Next(1, 7))
             });
         }
+        // Cap royal mail to prevent unbounded growth
+        while (royalMail.Count > MaxRoyalMail)
+            royalMail.RemoveAt(0);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -3238,6 +3267,8 @@ public class CastleLocation : BaseLocation
                 CoronationDate = currentKing.CoronationDate,
                 EndReason = $"Defeated by {currentPlayer.DisplayName}"
             });
+            while (monarchHistory.Count > MaxMonarchHistory)
+                monarchHistory.RemoveAt(0);
 
             // Crown new monarch
             currentPlayer.King = true;
@@ -3397,6 +3428,8 @@ public class CastleLocation : BaseLocation
                 CoronationDate = currentKing.CoronationDate,
                 EndReason = "Abdicated"
             });
+            while (monarchHistory.Count > MaxMonarchHistory)
+                monarchHistory.RemoveAt(0);
 
             terminal.WriteLine("");
             terminal.SetColor("gray");
@@ -4753,6 +4786,8 @@ public class CastleLocation : BaseLocation
             DaysReigned = 0,
             EndReason = ""
         });
+        while (monarchHistory.Count > MaxMonarchHistory)
+            monarchHistory.RemoveAt(0);
 
         // Persist to world_state so world sim picks up the new NPC king
         PersistRoyalCourtToWorldState();
@@ -5005,6 +5040,464 @@ public class CastleLocation : BaseLocation
     }
 
     #endregion
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Castle Siege (Online Mode — Team-Based Assault)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private async Task CastleSiegeMenu()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                           CASTLE SIEGE                                      ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+        if (backend == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Online backend not available.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Must be on a team
+        if (string.IsNullOrEmpty(currentPlayer.Team))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("You must be on a team to siege the castle!");
+            terminal.WriteLine("Visit the Team Corner to create or join a team.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Must have a king to siege
+        if (currentKing == null || !currentKing.IsActive)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("There is no king to overthrow! The throne sits empty.");
+            terminal.WriteLine("Use [C]laim Empty Throne instead.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Can't siege your own throne
+        if (currentKing.Name.Equals(currentPlayer.DisplayName, StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("You cannot siege your own castle!");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // 24h cooldown
+        if (!backend.CanTeamSiege(currentPlayer.Team))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("Your team has already attempted a siege in the last 24 hours.");
+            terminal.WriteLine("The castle defenses are on high alert. Try again later.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Minimum level
+        if (currentPlayer.Level < GameConfig.MinLevelKing)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"You must be at least level {GameConfig.MinLevelKing} to lead a siege.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Show siege info
+        terminal.SetColor("white");
+        terminal.WriteLine($"Your team '{currentPlayer.Team}' prepares to storm the castle!");
+        terminal.WriteLine("");
+
+        int totalGuards = currentKing.TotalGuardCount;
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"  King: {currentKing.GetTitle()} {currentKing.Name}");
+        terminal.SetColor("red");
+        terminal.WriteLine($"  Monster Guards: {currentKing.MonsterGuards.Count}");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  Royal Guards: {currentKing.Guards.Count}");
+        terminal.SetColor("white");
+        terminal.WriteLine($"  Total Defenders: {totalGuards}");
+        terminal.WriteLine("");
+
+        // Load team members for the assault
+        var teamMembers = await backend.GetPlayerTeamMembers(currentPlayer.Team, currentPlayer.DisplayName);
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("Your siege force:");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  YOU — {currentPlayer.DisplayName} (Lv {currentPlayer.Level} {currentPlayer.Class})");
+        foreach (var member in teamMembers)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {member.DisplayName} (Lv {member.Level})");
+        }
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_red");
+        terminal.Write("Launch the siege? (Y/N): ");
+        terminal.SetColor("white");
+        string confirm = await terminal.ReadLineAsync();
+
+        if (confirm?.ToUpper() != "Y")
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("Your team stands down. Perhaps another day...");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Start siege in DB
+        int siegeId = await backend.StartCastleSiege(currentPlayer.Team, Math.Max(1, totalGuards));
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════════");
+        terminal.WriteLine("           THE SIEGE BEGINS!");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════════");
+        terminal.WriteLine("");
+
+        // Calculate team power
+        long teamPower = currentPlayer.Strength + currentPlayer.WeapPow + currentPlayer.Level * 5;
+        long teamDefense = currentPlayer.Defence + currentPlayer.ArmPow;
+        long teamHP = currentPlayer.HP;
+        int memberCount = 1 + teamMembers.Count;
+
+        foreach (var member in teamMembers)
+        {
+            // Each member adds combat power
+            teamPower += member.Level * 8;
+            teamDefense += member.Level * 3;
+            teamHP += member.Level * 20;
+        }
+
+        int guardsDefeated = 0;
+        bool siegeFailed = false;
+
+        // PHASE 1: Monster Guards
+        foreach (var monster in currentKing.MonsterGuards.ToList())
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($">>> Monster Guard: {monster.Name} (Level {monster.Level}) blocks the path! <<<");
+            terminal.WriteLine("");
+
+            long monsterHP = monster.HP;
+            long monsterStr = monster.Strength + monster.WeapPow;
+            long monsterDef = monster.Defence;
+
+            int rounds = 0;
+            while (monsterHP > 0 && teamHP > 0 && rounds < 20)
+            {
+                rounds++;
+
+                // Team attacks (combined)
+                long teamDmg = Math.Max(1, teamPower - monsterDef);
+                teamDmg = (long)(teamDmg * (0.8 + random.NextDouble() * 0.4));
+                monsterHP -= teamDmg;
+
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  Your team strikes {monster.Name} for {teamDmg} damage! (HP: {Math.Max(0, monsterHP)})");
+
+                if (monsterHP <= 0) break;
+
+                // Monster retaliates
+                long monsterDmg = Math.Max(1, monsterStr - teamDefense / memberCount);
+                monsterDmg = (long)(monsterDmg * (0.8 + random.NextDouble() * 0.4));
+                teamHP -= monsterDmg;
+
+                terminal.SetColor("red");
+                terminal.WriteLine($"  {monster.Name} strikes back for {monsterDmg}! (Team HP: {Math.Max(0, teamHP)})");
+
+                await Task.Delay(250);
+            }
+
+            if (teamHP <= 0)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"Your siege force was overwhelmed by {monster.Name}!");
+                siegeFailed = true;
+                break;
+            }
+            else
+            {
+                guardsDefeated++;
+                currentKing.MonsterGuards.Remove(monster);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {monster.Name} has been defeated!");
+                terminal.WriteLine("");
+                await Task.Delay(500);
+            }
+        }
+
+        // PHASE 2: NPC Guards
+        if (!siegeFailed)
+        {
+            foreach (var guard in currentKing.Guards.ToList())
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($">>> Royal Guard: {guard.Name} (Loyalty: {guard.Loyalty}%) stands firm! <<<");
+                terminal.WriteLine("");
+
+                // Low loyalty guards may surrender during siege
+                if (guard.Loyalty < 25 && random.Next(100) < 40)
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"  {guard.Name} throws down their weapon and surrenders!");
+                    guardsDefeated++;
+                    currentKing.Guards.Remove(guard);
+                    await Task.Delay(500);
+                    continue;
+                }
+
+                var actualNpc = NPCSpawnSystem.Instance?.GetNPCByName(guard.Name);
+                long guardStr = actualNpc?.Strength ?? (50 + random.Next(50));
+                long guardHP = actualNpc?.HP ?? (200 + random.Next(200));
+                long guardDef = actualNpc?.Defence ?? 20;
+                float loyaltyMod = guard.Loyalty / 100f;
+                guardStr = (long)(guardStr * loyaltyMod);
+
+                int rounds = 0;
+                while (guardHP > 0 && teamHP > 0 && rounds < 20)
+                {
+                    rounds++;
+
+                    long teamDmg = Math.Max(1, teamPower - guardDef);
+                    teamDmg = (long)(teamDmg * (0.8 + random.NextDouble() * 0.4));
+                    guardHP -= teamDmg;
+
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  Your team strikes {guard.Name} for {teamDmg}! (HP: {Math.Max(0, guardHP)})");
+
+                    if (guardHP <= 0) break;
+
+                    long guardDmg = Math.Max(1, guardStr - teamDefense / memberCount);
+                    guardDmg = (long)(guardDmg * (0.8 + random.NextDouble() * 0.4));
+                    teamHP -= guardDmg;
+
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  {guard.Name} fights back for {guardDmg}! (Team HP: {Math.Max(0, teamHP)})");
+
+                    await Task.Delay(250);
+                }
+
+                if (teamHP <= 0)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"Your siege force was defeated by {guard.Name}!");
+                    siegeFailed = true;
+                    break;
+                }
+                else
+                {
+                    guardsDefeated++;
+                    currentKing.Guards.Remove(guard);
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  {guard.Name} has been defeated!");
+                    terminal.WriteLine("");
+                    await Task.Delay(500);
+                }
+            }
+        }
+
+        await backend.UpdateSiegeProgress(siegeId, guardsDefeated);
+
+        if (siegeFailed)
+        {
+            await backend.CompleteSiege(siegeId, "failed");
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine("═══════════════════════════════════════════════════════════════");
+            terminal.WriteLine("          THE SIEGE HAS FAILED!");
+            terminal.WriteLine("═══════════════════════════════════════════════════════════════");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("Your battered team retreats from the castle walls.");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"Guards defeated: {guardsDefeated}/{Math.Max(1, totalGuards)}");
+            currentPlayer.HP = Math.Max(1, currentPlayer.HP / 2);
+            terminal.SetColor("red");
+            terminal.WriteLine("You lost half your HP in the failed assault.");
+
+            UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
+                $"{currentPlayer.Team} attempted to siege the castle but was repelled! ({guardsDefeated}/{totalGuards} guards defeated)",
+                "siege");
+
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // PHASE 3: Challenge the King!
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════════");
+        terminal.WriteLine("          ALL GUARDS DEFEATED — THE THRONE ROOM AWAITS!");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════════");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"Your team storms the throne room. {currentKing.GetTitle()} {currentKing.Name}");
+        terminal.WriteLine("rises from the throne, drawing their weapon...");
+        terminal.WriteLine("");
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("As siege leader, you must face the king in single combat.");
+        terminal.SetColor("gray");
+        terminal.WriteLine("(Your team holds back the remaining servants.)");
+        terminal.WriteLine("");
+
+        // Apply damage taken during siege to player
+        long hpLost = currentPlayer.HP - Math.Max(1, (long)(currentPlayer.HP * (teamHP / (double)Math.Max(1, currentPlayer.HP + teamMembers.Count * 100))));
+        currentPlayer.HP = Math.Max(currentPlayer.HP / 2, currentPlayer.HP - hpLost); // At least keep 50% HP
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"Your HP after the siege assault: {currentPlayer.HP}/{currentPlayer.MaxHP}");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_red");
+        terminal.Write("Face the king? (Y/N): ");
+        terminal.SetColor("white");
+        string faceKing = await terminal.ReadLineAsync();
+
+        if (faceKing?.ToUpper() != "Y")
+        {
+            await backend.CompleteSiege(siegeId, "retreated");
+            terminal.SetColor("gray");
+            terminal.WriteLine("Your team secured the guards but you declined to face the king.");
+            terminal.WriteLine("The king's remaining loyalists rally and your team retreats.");
+
+            UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
+                $"{currentPlayer.Team} breached the castle defenses but retreated before facing the king!",
+                "siege");
+
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Fight the king (randomized stats like solo throne challenge)
+        long kingHP = 500 + random.Next(500);
+        long kingStr = 100 + random.Next(100);
+        long kingDef = 50 + random.Next(50);
+        long playerHP = currentPlayer.HP;
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"=== {currentKing.GetTitle()} {currentKing.Name} vs {currentPlayer.DisplayName} ===");
+        terminal.WriteLine("");
+
+        int kingRounds = 0;
+        while (kingHP > 0 && playerHP > 0 && kingRounds < 30)
+        {
+            kingRounds++;
+
+            // Player attacks
+            long playerDamage = Math.Max(1, currentPlayer.Strength + currentPlayer.WeapPow - kingDef);
+            playerDamage = (long)(playerDamage * (0.8 + random.NextDouble() * 0.4));
+            kingHP -= playerDamage;
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"You strike {currentKing.Name} for {playerDamage} damage! (King HP: {Math.Max(0, kingHP)})");
+
+            if (kingHP <= 0) break;
+
+            // King attacks
+            long kingDamage = Math.Max(1, kingStr - currentPlayer.Defence - currentPlayer.ArmPow);
+            kingDamage = (long)(kingDamage * (0.8 + random.NextDouble() * 0.4));
+            playerHP -= kingDamage;
+
+            terminal.SetColor("red");
+            terminal.WriteLine($"{currentKing.Name} strikes you for {kingDamage}! (Your HP: {Math.Max(0, playerHP)})");
+
+            await Task.Delay(300);
+        }
+
+        if (playerHP <= 0)
+        {
+            // King wins
+            await backend.CompleteSiege(siegeId, "king_won");
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine($"{currentKing.Name} has defeated you!");
+            terminal.WriteLine("The siege has failed at the final hurdle.");
+            currentPlayer.HP = 1;
+
+            UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
+                $"{currentPlayer.Team} sieged the castle but {currentPlayer.DisplayName} fell to {currentKing.Name} in combat!",
+                "siege");
+
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // VICTORY — Player takes the throne!
+        await backend.CompleteSiege(siegeId, "victory");
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                    THE SIEGE IS VICTORIOUS!                                  ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"{currentKing.Name} falls to the ground, defeated.");
+        terminal.WriteLine("The crown tumbles from their head and rolls to your feet...");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        // Must leave team to become king
+        string siegeTeam = currentPlayer.Team;
+        CityControlSystem.Instance.ForceLeaveTeam(currentPlayer);
+        GameEngine.Instance?.ClearDungeonParty();
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"You leave '{siegeTeam}' to take the crown.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Record old monarch in history
+        string oldKingName = currentKing.Name;
+        monarchHistory.Add(new MonarchRecord
+        {
+            Name = currentKing.Name,
+            Title = currentKing.GetTitle(),
+            DaysReigned = (int)currentKing.TotalReign,
+            CoronationDate = currentKing.CoronationDate,
+            EndReason = $"Overthrown by {siegeTeam} siege"
+        });
+        while (monarchHistory.Count > MaxMonarchHistory)
+            monarchHistory.RemoveAt(0);
+
+        // Crown new monarch
+        currentPlayer.King = true;
+        currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex);
+        playerIsKing = true;
+        currentPlayer.PKills++;
+        UsurperRemake.Systems.ArchetypeTracker.Instance.RecordBecameKing();
+
+        currentPlayer.HP = playerHP;
+
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"ALL HAIL {currentPlayer.DisplayName.ToUpper()}, THE NEW RULER!");
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("Your team's siege will be remembered in the annals of history.");
+
+        UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
+            $"{siegeTeam} has conquered the castle! {currentPlayer.DisplayName} overthrew {oldKingName} and claims the throne!",
+            "siege");
+
+        // Persist royal court changes
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            PersistRoyalCourtToWorldState();
+
+        await terminal.PressAnyKey();
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -14,8 +14,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class MetaProgressionSystem
     {
-        private static MetaProgressionSystem? instance;
-        public static MetaProgressionSystem Instance => instance ??= new MetaProgressionSystem();
+        private static MetaProgressionSystem? _fallbackInstance;
+        public static MetaProgressionSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.MetaProgression;
+                return _fallbackInstance ??= new MetaProgressionSystem();
+            }
+        }
 
         private MetaProgressionData data;
         private readonly string saveFilePath;

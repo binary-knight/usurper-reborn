@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.29.2** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.30.0** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,28 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.30.0 - Band of Brothers
+
+**Multiplayer Expansion (10 features):**
+- Player Teams: create/join teams visible to all players, team rankings
+- Offline Mail (`/mail`): full mailbox with paginated inbox, send to offline players
+- Player Trading (`/trade`): async item/gold packages with accept/decline
+- Cooperative Dungeons: recruit teammates' echoes as AI allies in the dungeon
+- Player Bounties (`/bounty`): place gold bounties, auto-claimed on PvP victory
+- Auction House (`/auction`): list items for sale, browse/buy from other players
+- Team Wars: challenge other teams to round-robin combat with gold wagers
+- World Boss Events: server-wide bosses with shared damage tracking and rewards
+- Castle Siege: team-based castle assault through guards to challenge the king
+- Team Headquarters: upgradeable facilities (armory, barracks, vault, etc.)
+
+**Server Optimization:**
+- Publish size reduced 71% (116MB → 34MB) via IL trimming and dependency cleanup
+- Memory per session reduced ~50% via Workstation GC, HeapHardLimit, collection caps
+
+**Bug Fixes:**
+- Combat tips no longer show class-specific hints to wrong classes
+- Fixed healing potion tip showing wrong key
 
 ### Completed in v0.29.2 - Public Dashboard
 
@@ -733,7 +755,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.29.2)
+### Known Issues (Alpha v0.30.0)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -748,4 +770,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.29.2 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.30.0 — The world is running. [Watch it live.](https://usurper-reborn.net)

@@ -16,12 +16,20 @@ try {
   console.error(`[usurper-web] better-sqlite3 not available: ${err.message}`);
 }
 
+const net = require('net');
+
 const WS_PORT = 3000;
 const SSH_HOST = '127.0.0.1';
 const SSH_PORT = 4000;
 const SSH_USER = 'usurper';
 const SSH_PASS = 'play';
 const DB_PATH = '/var/usurper/usurper_online.db';
+
+// MUD mode: connect directly to MUD TCP server instead of through SSH
+// Default ON since the MUD server now listens directly on port 4000.
+// Set MUD_MODE=0 to fall back to legacy SSH mode if needed.
+const MUD_MODE = process.env.MUD_MODE !== '0';
+const MUD_PORT = parseInt(process.env.MUD_PORT || '4000', 10);
 const CACHE_TTL = 30000; // 30 seconds
 const FEED_POLL_MS = 5000; // SSE feed polls DB every 5 seconds
 const GITHUB_PAT = process.env.GITHUB_PAT || '';
@@ -1003,76 +1011,122 @@ wss.on('connection', (ws, req) => {
     return;
   }
 
-  console.log(`[usurper-web] New connection from ${clientIP}`);
+  console.log(`[usurper-web] New connection from ${clientIP} (${MUD_MODE ? 'MUD TCP' : 'SSH'} mode)`);
 
-  const ssh = new Client();
-  let sshStream = null;
+  if (MUD_MODE) {
+    // MUD mode: connect directly to TCP game server (lower latency, no SSH overhead)
+    // No AUTH header is sent — the MUD server detects the raw connection and
+    // presents an interactive login/register menu directly to the user.
+    const tcp = net.connect({ host: '127.0.0.1', port: MUD_PORT }, () => {
+      console.log(`[usurper-web] TCP connected to MUD server for ${clientIP}`);
+    });
 
-  ssh.on('ready', () => {
-    console.log(`[usurper-web] SSH connected for ${clientIP}`);
-
-    ssh.shell({ term: 'xterm-256color', cols: 80, rows: 24 }, (err, stream) => {
-      if (err) {
-        console.error(`[usurper-web] Shell error: ${err.message}`);
-        ws.close(1011, 'SSH shell failed');
-        return;
+    // TCP → WebSocket
+    tcp.on('data', (data) => {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(data);
       }
+    });
 
-      sshStream = stream;
+    tcp.on('close', () => {
+      console.log(`[usurper-web] TCP closed for ${clientIP}`);
+      ws.close(1000, 'Session ended');
+    });
 
-      // SSH stdout → WebSocket (send raw Buffer to preserve UTF-8 encoding)
-      stream.on('data', (data) => {
-        if (ws.readyState === ws.OPEN) {
-          ws.send(data);
+    tcp.on('error', (err) => {
+      console.error(`[usurper-web] TCP error for ${clientIP}: ${err.message}`);
+      if (ws.readyState === ws.OPEN) {
+        ws.close(1011, 'Game server connection failed');
+      }
+    });
+
+    // WebSocket → TCP
+    ws.on('message', (data) => {
+      if (!tcp.destroyed) {
+        tcp.write(data);
+      }
+    });
+
+    ws.on('close', () => {
+      console.log(`[usurper-web] WebSocket closed for ${clientIP}`);
+      tcp.destroy();
+    });
+
+    ws.on('error', (err) => {
+      console.error(`[usurper-web] WebSocket error for ${clientIP}: ${err.message}`);
+      tcp.destroy();
+    });
+  } else {
+    // Legacy SSH mode: proxy through sshd-usurper
+    const ssh = new Client();
+    let sshStream = null;
+
+    ssh.on('ready', () => {
+      console.log(`[usurper-web] SSH connected for ${clientIP}`);
+
+      ssh.shell({ term: 'xterm-256color', cols: 80, rows: 24 }, (err, stream) => {
+        if (err) {
+          console.error(`[usurper-web] Shell error: ${err.message}`);
+          ws.close(1011, 'SSH shell failed');
+          return;
         }
-      });
 
-      // SSH stderr → WebSocket (send raw Buffer to preserve UTF-8 encoding)
-      stream.stderr.on('data', (data) => {
-        if (ws.readyState === ws.OPEN) {
-          ws.send(data);
-        }
-      });
+        sshStream = stream;
 
-      stream.on('close', () => {
-        console.log(`[usurper-web] SSH stream closed for ${clientIP}`);
-        ws.close(1000, 'Session ended');
+        // SSH stdout → WebSocket (send raw Buffer to preserve UTF-8 encoding)
+        stream.on('data', (data) => {
+          if (ws.readyState === ws.OPEN) {
+            ws.send(data);
+          }
+        });
+
+        // SSH stderr → WebSocket (send raw Buffer to preserve UTF-8 encoding)
+        stream.stderr.on('data', (data) => {
+          if (ws.readyState === ws.OPEN) {
+            ws.send(data);
+          }
+        });
+
+        stream.on('close', () => {
+          console.log(`[usurper-web] SSH stream closed for ${clientIP}`);
+          ws.close(1000, 'Session ended');
+        });
       });
     });
-  });
 
-  ssh.on('error', (err) => {
-    console.error(`[usurper-web] SSH error for ${clientIP}: ${err.message}`);
-    if (ws.readyState === ws.OPEN) {
-      ws.close(1011, 'SSH connection failed');
-    }
-  });
+    ssh.on('error', (err) => {
+      console.error(`[usurper-web] SSH error for ${clientIP}: ${err.message}`);
+      if (ws.readyState === ws.OPEN) {
+        ws.close(1011, 'SSH connection failed');
+      }
+    });
 
-  // WebSocket data → SSH stdin
-  ws.on('message', (data) => {
-    if (sshStream) {
-      sshStream.write(data);
-    }
-  });
+    // WebSocket data → SSH stdin
+    ws.on('message', (data) => {
+      if (sshStream) {
+        sshStream.write(data);
+      }
+    });
 
-  ws.on('close', () => {
-    console.log(`[usurper-web] WebSocket closed for ${clientIP}`);
-    ssh.end();
-  });
+    ws.on('close', () => {
+      console.log(`[usurper-web] WebSocket closed for ${clientIP}`);
+      ssh.end();
+    });
 
-  ws.on('error', (err) => {
-    console.error(`[usurper-web] WebSocket error for ${clientIP}: ${err.message}`);
-    ssh.end();
-  });
+    ws.on('error', (err) => {
+      console.error(`[usurper-web] WebSocket error for ${clientIP}: ${err.message}`);
+      ssh.end();
+    });
 
-  // Initiate SSH connection
-  ssh.connect({
-    host: SSH_HOST,
-    port: SSH_PORT,
-    username: SSH_USER,
-    password: SSH_PASS,
-    readyTimeout: 10000,
-  });
+    // Initiate SSH connection
+    ssh.connect({
+      host: SSH_HOST,
+      port: SSH_PORT,
+      username: SSH_USER,
+      password: SSH_PASS,
+      readyTimeout: 10000,
+    });
+  }
 });
 
 // Graceful shutdown

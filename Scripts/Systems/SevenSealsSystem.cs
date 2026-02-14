@@ -13,8 +13,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class SevenSealsSystem
     {
-        private static SevenSealsSystem? instance;
-        public static SevenSealsSystem Instance => instance ??= new SevenSealsSystem();
+        private static SevenSealsSystem? _fallbackInstance;
+        public static SevenSealsSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.SevenSeals;
+                return _fallbackInstance ??= new SevenSealsSystem();
+            }
+        }
 
         private Dictionary<SealType, SealData> seals = new();
 

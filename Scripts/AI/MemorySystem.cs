@@ -84,6 +84,19 @@ public partial class MemorySystem
             MemoryType.Saved => 0.8f,
             MemoryType.Abandoned => -0.5f,
             MemoryType.SocialInteraction => 0.3f,
+            // Observation types
+            MemoryType.SawDeath => -0.4f,
+            MemoryType.SawBetrayat => -0.3f,
+            MemoryType.SawCombat => -0.1f,
+            // Personal events
+            MemoryType.PersonalFailure => -0.3f,
+            MemoryType.PersonalAchievement => 0.2f,
+            // Economic events
+            MemoryType.LostGold => -0.5f,
+            MemoryType.GainedGold => 0.1f,
+            // Social events
+            MemoryType.MadeEnemy => -0.7f,
+            MemoryType.MadeFriend => 0.5f,
             _ => 0.0f
         };
     }

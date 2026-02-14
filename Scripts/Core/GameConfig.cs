@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.29.2";
-    public const string VersionName = "The Observatory";
+    public const string Version = "0.30.0";
+    public const string VersionName = "Band of Brothers";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

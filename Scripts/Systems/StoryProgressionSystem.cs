@@ -11,8 +11,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class StoryProgressionSystem
     {
-        private static StoryProgressionSystem? _instance;
-        public static StoryProgressionSystem Instance => _instance ??= new StoryProgressionSystem();
+        private static StoryProgressionSystem? _fallbackInstance;
+        public static StoryProgressionSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Story;
+                return _fallbackInstance ??= new StoryProgressionSystem();
+            }
+        }
 
         // Current story state
         public StoryChapter CurrentChapter { get; private set; } = StoryChapter.Awakening;
@@ -553,7 +561,7 @@ namespace UsurperRemake.Systems
         {
             EventLog.Add(evt);
             // Keep log size manageable
-            if (EventLog.Count > 1000)
+            if (EventLog.Count > 500)
                 EventLog.RemoveAt(0);
         }
 

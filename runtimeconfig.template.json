@@ -1,0 +1,9 @@
+{
+  "configProperties": {
+    "System.GC.Server": false,
+    "System.GC.Concurrent": false,
+    "System.GC.RetainVM": false,
+    "System.GC.HeapHardLimit": 536870912,
+    "System.Text.Json.JsonSerializer.IsReflectionEnabledByDefault": true
+  }
+}

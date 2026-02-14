@@ -22,25 +22,28 @@ public class LocationManager
     // Pascal-compatible navigation table (from ONLINE.PAS)
     private Dictionary<GameLocation, List<GameLocation>> navigationTable;
     
-    private static LocationManager? _instance;
+    private static LocationManager? _fallbackInstance;
     public static LocationManager Instance
     {
         get
         {
-            if (_instance == null)
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx?.LocationManager != null) return ctx.LocationManager;
+            if (_fallbackInstance == null)
             {
                 // Create a default terminal for head-less scenarios
-                _instance = new LocationManager(new TerminalEmulator());
+                _fallbackInstance = new LocationManager(new TerminalEmulator());
             }
-            return _instance;
+            return _fallbackInstance;
         }
     }
 
     // Ensure that any manually created manager becomes the global instance
     private void RegisterAsSingleton()
     {
-        if (_instance == null)
-            _instance = this;
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        if (ctx != null) ctx.LocationManager = this;
+        else if (_fallbackInstance == null) _fallbackInstance = this;
     }
 
     public LocationManager() : this(new TerminalEmulator())
@@ -231,9 +234,17 @@ public class LocationManager
         
         // Update player location (Pascal compatibility)
         currentPlayer.Location = (int)locationId;
-        
-        // GD.Print($"[LocationManager] Player {player.DisplayName} entering {BaseLocation.GetLocationName(locationId)}");
-        
+
+        // MUD mode: update room registry for presence tracking
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        if (ctx != null && UsurperRemake.Server.RoomRegistry.Instance != null)
+        {
+            var session = UsurperRemake.Server.MudServer.Instance?.ActiveSessions
+                .GetValueOrDefault(ctx.Username.ToLowerInvariant());
+            if (session != null)
+                UsurperRemake.Server.RoomRegistry.Instance.PlayerEntered(locationId, session);
+        }
+
         // Enter the location
         try
         {

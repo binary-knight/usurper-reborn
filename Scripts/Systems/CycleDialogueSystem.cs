@@ -16,8 +16,16 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class CycleDialogueSystem
     {
-        private static CycleDialogueSystem? _instance;
-        public static CycleDialogueSystem Instance => _instance ??= new CycleDialogueSystem();
+        private static CycleDialogueSystem? _fallbackInstance;
+        public static CycleDialogueSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.CycleDialogue;
+                return _fallbackInstance ??= new CycleDialogueSystem();
+            }
+        }
 
         private readonly Random _random = new();
 
@@ -307,7 +315,7 @@ namespace UsurperRemake.Systems
 
         public CycleDialogueSystem()
         {
-            _instance = this;
+            _fallbackInstance = this;
         }
 
         /// <summary>

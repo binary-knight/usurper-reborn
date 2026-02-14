@@ -46,6 +46,9 @@ namespace UsurperRemake.Systems
         // Dungeon party NPCs (spouses, team members, lovers added via party management)
         public List<string> DungeonPartyNPCIds { get; set; } = new();
 
+        // Dungeon party player echoes (recruited via Team Corner)
+        public List<string> DungeonPartyPlayerNames { get; set; } = new();
+
         // Grief state - full grief system data (supports multiple griefs)
         public int GriefStage { get; set; }  // Legacy field for backwards compatibility
         public int GriefDaysRemaining { get; set; }  // Legacy
@@ -530,6 +533,9 @@ namespace UsurperRemake.Systems
 
         // Relationships
         public Dictionary<string, float> Relationships { get; set; } = new();
+
+        // Enemy list (NPC IDs of rivals)
+        public List<string> Enemies { get; set; } = new();
 
         // Marketplace inventory - items NPC has to sell
         public List<MarketItemData> MarketInventory { get; set; } = new();
