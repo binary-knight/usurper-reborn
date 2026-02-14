@@ -2124,8 +2124,14 @@ public partial class GameEngine : Node
             : new List<ObjType>();
 
         // Restore dynamic equipment FIRST (before EquippedItems, so IDs are registered)
-        // Clear any existing dynamic equipment to avoid conflicts
-        EquipmentDatabase.ClearDynamicEquipment();
+        // In single-player, clear all dynamic equipment to avoid stale entries from previous saves.
+        // In MUD/online mode, DO NOT clear — EquipmentDatabase is static and shared across all
+        // player sessions. Clearing it wipes other players' equipment, causing items to disappear
+        // or show wrong items in wrong slots (e.g., another player's longbow in your ring slot).
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            EquipmentDatabase.ClearDynamicEquipment();
+        }
 
         if (playerData.DynamicEquipment != null && playerData.DynamicEquipment.Count > 0)
         {

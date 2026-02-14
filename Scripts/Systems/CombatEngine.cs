@@ -5331,6 +5331,15 @@ public partial class CombatEngine
             }
             totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
             await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.Name);
+
+            // Apply spell special effects to each surviving monster
+            if (!string.IsNullOrEmpty(spellResult.SpecialEffect) && spellResult.SpecialEffect != "fizzle" && spellResult.SpecialEffect != "fail")
+            {
+                foreach (var m in monsters.Where(m => m.IsAlive))
+                {
+                    HandleSpecialSpellEffectOnMonster(m, spellResult.SpecialEffect, spellResult.Duration, player, spellResult.Damage, result);
+                }
+            }
         }
         // Handle single target attack/debuff spells
         else
@@ -5364,16 +5373,16 @@ public partial class CombatEngine
                 // Handle debuff special effects
                 if (!string.IsNullOrEmpty(spellResult.SpecialEffect) && spellResult.SpecialEffect != "fizzle" && spellResult.SpecialEffect != "fail")
                 {
-                    HandleSpecialSpellEffectOnMonster(target, spellResult.SpecialEffect, spellResult.Duration);
+                    HandleSpecialSpellEffectOnMonster(target, spellResult.SpecialEffect, spellResult.Duration, player, spellResult.Damage, result);
                 }
             }
         }
     }
 
     /// <summary>
-    /// Apply special spell effects to a monster (sleep, fear, etc.)
+    /// Apply special spell effects to a monster (sleep, fear, stun, poison, freeze, holy, drain, etc.)
     /// </summary>
-    private void HandleSpecialSpellEffectOnMonster(Monster target, string effect, int duration)
+    private void HandleSpecialSpellEffectOnMonster(Monster target, string effect, int duration, Character player, long spellDamage, CombatResult result)
     {
         switch (effect.ToLower())
         {
@@ -5382,21 +5391,189 @@ public partial class CombatEngine
                 target.SleepDuration = duration > 0 ? duration : 3;
                 terminal.WriteLine($"{target.Name} falls asleep!", "cyan");
                 break;
+
             case "fear":
                 target.IsFeared = true;
                 target.FearDuration = duration > 0 ? duration : 3;
                 terminal.WriteLine($"{target.Name} cowers in fear!", "yellow");
                 break;
+
             case "stun":
             case "lightning":
                 target.IsStunned = true;
                 target.StunDuration = duration > 0 ? duration : 1;
                 terminal.WriteLine($"{target.Name} is stunned!", "bright_yellow");
                 break;
+
             case "slow":
                 target.IsSlowed = true;
                 target.SlowDuration = duration > 0 ? duration : 3;
                 terminal.WriteLine($"{target.Name} is slowed!", "gray");
+                break;
+
+            case "poison":
+                target.Poisoned = true;
+                target.PoisonRounds = duration > 0 ? duration : 5;
+                terminal.WriteLine($"{target.Name} is poisoned!", "dark_green");
+                break;
+
+            case "freeze":
+                target.IsFrozen = true;
+                target.FrozenDuration = duration > 0 ? duration : 2;
+                terminal.WriteLine($"{target.Name} is frozen solid!", "bright_cyan");
+                break;
+
+            case "frost":
+                target.IsSlowed = true;
+                target.SlowDuration = duration > 0 ? duration : 2;
+                terminal.WriteLine($"{target.Name} is chilled to the bone!", "cyan");
+                break;
+
+            case "web":
+                target.IsStunned = true;
+                target.StunDuration = duration > 0 ? duration : 2;
+                terminal.WriteLine($"{target.Name} is entangled in sticky webs!", "white");
+                break;
+
+            case "confusion":
+                target.IsConfused = true;
+                target.ConfusedDuration = duration > 0 ? duration : 3;
+                terminal.WriteLine($"{target.Name} stumbles around in confusion!", "magenta");
+                break;
+
+            case "mass_confusion":
+                target.IsConfused = true;
+                target.ConfusedDuration = duration > 0 ? duration : 3;
+                terminal.WriteLine($"{target.Name} is overwhelmed by psychic chaos!", "magenta");
+                break;
+
+            case "dominate":
+                target.Charmed = true;
+                target.IsFriendly = true;
+                terminal.WriteLine($"{target.Name}'s will is broken — it serves you now!", "bright_magenta");
+                break;
+
+            case "holy":
+                // Bonus damage vs Undead and Demons
+                if (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon)
+                {
+                    long holyBonus = (long)(spellDamage * 0.5);
+                    target.HP -= holyBonus;
+                    terminal.WriteLine($"Holy light sears {target.Name} for {holyBonus} bonus damage!", "bright_yellow");
+                    result.CombatLog.Add($"Holy bonus: {holyBonus} vs {target.MonsterClass}");
+                }
+                break;
+
+            case "fire":
+                // Burn DoT — reuse poison mechanics for fire damage over time
+                target.Poisoned = true;
+                target.PoisonRounds = duration > 0 ? duration : 2;
+                terminal.WriteLine($"{target.Name} catches fire!", "red");
+                break;
+
+            case "drain":
+                // Heal caster for 50% of spell damage
+                if (spellDamage > 0)
+                {
+                    long healAmount = spellDamage / 2;
+                    long oldHP = player.HP;
+                    player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
+                    long actualHeal = player.HP - oldHP;
+                    if (actualHeal > 0)
+                    {
+                        terminal.WriteLine($"You drain {actualHeal} life force from {target.Name}!", "bright_green");
+                    }
+                }
+                break;
+
+            case "death":
+                // Instant kill chance if target below 20% HP (never on bosses)
+                if (!target.IsBoss && target.HP < target.MaxHP * 0.20)
+                {
+                    if (random.Next(100) < 30)
+                    {
+                        terminal.WriteLine($"The death magic claims {target.Name}'s remaining life force!", "dark_red");
+                        target.HP = 0;
+                        result.CombatLog.Add($"Death spell instant kill on {target.Name}");
+                    }
+                    else
+                    {
+                        terminal.WriteLine($"{target.Name} resists the killing blow!", "gray");
+                    }
+                }
+                break;
+
+            case "disintegrate":
+                // Reduce target defense by 25% for rest of combat
+                int defReduction = (int)(target.ArmPow * 0.25);
+                target.ArmPow = Math.Max(0, target.ArmPow - defReduction);
+                terminal.WriteLine($"{target.Name}'s armor disintegrates! (-{defReduction} defense)", "bright_red");
+                break;
+
+            case "psychic":
+                // 25% chance to confuse target for 1 round
+                if (random.Next(100) < 25)
+                {
+                    target.IsConfused = true;
+                    target.ConfusedDuration = 1;
+                    terminal.WriteLine($"The psychic blast rattles {target.Name}'s mind!", "magenta");
+                }
+                break;
+
+            case "dispel":
+                // Clear monster positive states
+                target.Charmed = false;
+                target.IsFriendly = false;
+                target.IsConverted = false;
+                terminal.WriteLine($"Dark enchantments are stripped from {target.Name}!", "bright_white");
+                break;
+
+            case "convert":
+            {
+                // Conversion: flee/pacify/join based on CHA vs level
+                terminal.WriteLine($"{target.Name} is touched by divine light!", "white");
+                int conversionChance = 30 + (int)(player.Charisma / 5) - (target.Level * 2);
+                conversionChance = Math.Clamp(conversionChance, 5, 85);
+
+                if (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon)
+                {
+                    conversionChance /= 2;
+                    terminal.WriteLine("The unholy creature resists the divine light!", "dark_red");
+                }
+
+                if (random.Next(100) < conversionChance)
+                {
+                    int effectRoll = random.Next(100);
+                    if (effectRoll < 40)
+                    {
+                        terminal.WriteLine($"{target.Name} sees the error of its ways and flees!", "bright_cyan");
+                        target.HP = 0;
+                        target.Fled = true;
+                    }
+                    else if (effectRoll < 70)
+                    {
+                        terminal.WriteLine($"{target.Name} is pacified by the holy light!", "bright_green");
+                        target.IsStunned = true;
+                        target.StunDuration = 3 + random.Next(1, 4);
+                        target.IsFriendly = true;
+                    }
+                    else
+                    {
+                        terminal.WriteLine($"{target.Name} is converted to your cause!", "bright_yellow");
+                        target.IsFriendly = true;
+                        target.IsConverted = true;
+                    }
+                }
+                else
+                {
+                    terminal.WriteLine($"{target.Name} resists the conversion attempt!", "gray");
+                }
+                break;
+            }
+
+            case "escape":
+                terminal.WriteLine($"{player.DisplayName} vanishes in a whirl of arcane energy!", "magenta");
+                globalEscape = true;
                 break;
         }
     }
@@ -9001,21 +9178,29 @@ public partial class CombatEngine
                 break;
                 
             case "sleep":
+                if (target != null)
+                {
+                    target.IsSleeping = true;
+                    target.SleepDuration = 3;
+                    terminal.WriteLine($"{target.Name} falls into a magical slumber!", "cyan");
+                }
+                break;
+
             case "freeze":
                 if (target != null)
                 {
-                    int duration = 2;
-                    target.StunRounds = duration;
-                    terminal.WriteLine($"{target.Name} is stunned for {duration} rounds!", "blue");
+                    target.IsFrozen = true;
+                    target.FrozenDuration = 2;
+                    terminal.WriteLine($"{target.Name} is frozen solid!", "bright_cyan");
                 }
                 break;
-                
+
             case "fear":
                 if (target != null)
                 {
-                    target.WeakenRounds = 3;
-                    target.Strength = Math.Max(1, target.Strength - 4);
-                    terminal.WriteLine($"{target.Name} is weakened by fear!", "yellow");
+                    target.IsFeared = true;
+                    target.FearDuration = 3;
+                    terminal.WriteLine($"{target.Name} cowers in fear!", "yellow");
                 }
                 break;
                 
@@ -9090,7 +9275,8 @@ public partial class CombatEngine
                             terminal.SetColor("bright_green");
                             terminal.WriteLine($"{target.Name} is pacified by the holy light!");
                             terminal.WriteLine("It gazes at you with newfound respect...");
-                            target.StunRounds = 3 + random.Next(1, 4); // Stunned (won't attack) for 3-6 rounds
+                            target.IsStunned = true;
+                            target.StunDuration = 3 + random.Next(1, 4); // Stunned (won't attack) for 3-6 rounds
                             target.IsFriendly = true; // Mark as temporarily friendly
                         }
                         else
@@ -9121,7 +9307,9 @@ public partial class CombatEngine
             case "slow":
                 if (target != null)
                 {
-                    target.WeakenRounds = 3;
+                    target.IsSlowed = true;
+                    target.SlowDuration = 3;
+                    terminal.WriteLine($"{target.Name} is slowed!", "gray");
                 }
                 break;
 
@@ -9168,6 +9356,42 @@ public partial class CombatEngine
                 {
                     terminal.WriteLine($" - {itm.Name}  (Type: {itm.Type}, Pow: {itm.Attack}/{itm.Armor})", "white");
                 }
+                break;
+
+            case "mirror":
+            case "invisible":
+            case "shadow":
+                caster.ApplyStatus(StatusEffect.Blur, 999);
+                terminal.WriteLine($"{caster.DisplayName}'s form shimmers and becomes indistinct!", "cyan");
+                break;
+
+            case "avatar":
+                // Divine Avatar: boost all combat stats
+                caster.TempAttackBonus += 55;
+                caster.TempDefenseBonus += 55;
+                terminal.WriteLine($"{caster.DisplayName} channels divine power! (+55 ATK/DEF)", "bright_yellow");
+                break;
+
+            case "wish":
+                // Wish: double all combat stats
+                caster.TempAttackBonus += (int)caster.Strength;
+                caster.TempDefenseBonus += (int)caster.Defense;
+                terminal.WriteLine($"{caster.DisplayName}'s wish reshapes reality! All combat stats doubled!", "bright_magenta");
+                break;
+
+            case "timestop":
+                // Time Stop: dodge + attack/defense bonus for 1 round
+                caster.DodgeNextAttack = true;
+                caster.TempAttackBonus += 35;
+                caster.TempDefenseBonus += 35;
+                terminal.WriteLine($"{caster.DisplayName} freezes time itself! (+35 ATK/DEF, dodge next attack)", "bright_cyan");
+                break;
+
+            case "mindblank":
+                // Mind Blank: full status immunity
+                caster.HasStatusImmunity = true;
+                caster.StatusImmunityDuration = 999;
+                terminal.WriteLine($"{caster.DisplayName}'s mind becomes an impenetrable fortress!", "bright_white");
                 break;
         }
     }

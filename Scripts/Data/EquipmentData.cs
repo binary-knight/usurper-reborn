@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 /// <summary>
 /// Central equipment database containing all weapons, armor, shields, and accessories
@@ -57,6 +58,7 @@ public static class EquipmentDatabase
     // Dynamic equipment starts at high ID to avoid conflicts
     private const int DynamicEquipmentStart = 100000;
     private static int _nextDynamicId = DynamicEquipmentStart;
+    private static readonly object _lock = new object();
 
     #region Lookup Methods
 
@@ -66,7 +68,10 @@ public static class EquipmentDatabase
     public static Equipment GetById(int id)
     {
         EnsureInitialized();
-        return _allEquipment.TryGetValue(id, out var equip) ? equip : null;
+        lock (_lock)
+        {
+            return _allEquipment.TryGetValue(id, out var equip) ? equip : null;
+        }
     }
 
     /// <summary>
@@ -76,34 +81,44 @@ public static class EquipmentDatabase
     {
         if (string.IsNullOrEmpty(name)) return null;
         EnsureInitialized();
-        return _allEquipment.Values.FirstOrDefault(e =>
-            e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        lock (_lock)
+        {
+            return _allEquipment.Values.FirstOrDefault(e =>
+                e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
     }
 
     /// <summary>
     /// Register a dynamic equipment item (from inventory/crafting)
-    /// Returns the assigned ID
+    /// Returns the assigned ID. Thread-safe for concurrent MUD sessions.
     /// </summary>
     public static int RegisterDynamic(Equipment equip)
     {
         EnsureInitialized();
-        equip.Id = _nextDynamicId++;
-        _allEquipment[equip.Id] = equip;
-        return equip.Id;
+        lock (_lock)
+        {
+            equip.Id = _nextDynamicId++;
+            _allEquipment[equip.Id] = equip;
+            return equip.Id;
+        }
     }
 
     /// <summary>
-    /// Register a dynamic equipment item with a specific ID (for loading saves)
+    /// Register a dynamic equipment item with a specific ID (for loading saves).
+    /// Thread-safe for concurrent MUD sessions.
     /// </summary>
     public static void RegisterDynamicWithId(Equipment equip, int id)
     {
         EnsureInitialized();
-        equip.Id = id;
-        _allEquipment[id] = equip;
-        // Keep _nextDynamicId above any loaded ID to avoid conflicts
-        if (id >= _nextDynamicId)
+        lock (_lock)
         {
-            _nextDynamicId = id + 1;
+            equip.Id = id;
+            _allEquipment[id] = equip;
+            // Keep _nextDynamicId above any loaded ID to avoid conflicts
+            if (id >= _nextDynamicId)
+            {
+                _nextDynamicId = id + 1;
+            }
         }
     }
 
@@ -113,23 +128,31 @@ public static class EquipmentDatabase
     public static List<Equipment> GetDynamicEquipment()
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Id >= DynamicEquipmentStart)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Id >= DynamicEquipmentStart)
+                .ToList();
+        }
     }
 
     /// <summary>
-    /// Clear all dynamic equipment (for loading fresh save)
+    /// Clear all dynamic equipment (for loading fresh save in single-player).
+    /// WARNING: In MUD mode, this wipes ALL sessions' equipment since the database is static.
+    /// Callers must gate this with a single-player check.
     /// </summary>
     public static void ClearDynamicEquipment()
     {
         EnsureInitialized();
-        var dynamicIds = _allEquipment.Keys.Where(id => id >= DynamicEquipmentStart).ToList();
-        foreach (var id in dynamicIds)
+        lock (_lock)
         {
-            _allEquipment.Remove(id);
+            var dynamicIds = _allEquipment.Keys.Where(id => id >= DynamicEquipmentStart).ToList();
+            foreach (var id in dynamicIds)
+            {
+                _allEquipment.Remove(id);
+            }
+            _nextDynamicId = DynamicEquipmentStart;
         }
-        _nextDynamicId = DynamicEquipmentStart;
     }
 
     /// <summary>
