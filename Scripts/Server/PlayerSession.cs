@@ -108,6 +108,10 @@ public class PlayerSession : IDisposable
             // Create per-session terminal backed by the TCP stream
             ctx.Terminal = new TerminalEmulator(_stream, _stream);
 
+            // Enable real-time message delivery: terminal polls this during GetInput()
+            ctx.Terminal.MessageSource = () =>
+                IncomingMessages.TryDequeue(out var msg) ? msg : null;
+
             // Initialize all per-session story/mechanics systems
             ctx.InitializeSystems();
 
@@ -164,6 +168,14 @@ public class PlayerSession : IDisposable
             if (WizardLevel >= WizardLevel.Builder)
                 WizNet.SystemNotify($"{WizardConstants.GetTitle(WizardLevel)} {Username} has connected.");
 
+            // Global login announcement (suppress for invisible wizards)
+            if (!IsWizInvisible)
+            {
+                _server.BroadcastToAll(
+                    $"\u001b[1;33m  {Username} has entered the realm. [{ConnectionType}]\u001b[0m",
+                    excludeUsername: Username);
+            }
+
             // Run the standard BBS door mode game loop
             // This is the same path SSH players use today, but now backed by
             // the TCP stream instead of Console stdin/stdout
@@ -217,6 +229,18 @@ public class PlayerSession : IDisposable
             }
             catch { }
 
+            // Global logout announcement (suppress for invisible wizards)
+            try
+            {
+                if (!IsWizInvisible)
+                {
+                    _server.BroadcastToAll(
+                        $"\u001b[1;33m  {Username} has left the realm.\u001b[0m",
+                        excludeUsername: Username);
+                }
+            }
+            catch { }
+
             // Remove from room registry
             try
             {
@@ -224,14 +248,16 @@ public class PlayerSession : IDisposable
             }
             catch { }
 
-            // Clean up online tracking
+            // Clean up online tracking (use session-local references, not static singleton)
             try
             {
-                if (OnlineChatSystem.IsActive)
-                    OnlineChatSystem.Instance?.Shutdown();
+                var sessionChat = ctx.OnlineChat;
+                var sessionOsm = ctx.OnlineState;
 
-                if (OnlineStateManager.IsActive)
-                    await OnlineStateManager.Instance!.Shutdown();
+                sessionChat?.Shutdown();
+
+                if (sessionOsm != null)
+                    await sessionOsm.Shutdown();
             }
             catch (Exception ex)
             {

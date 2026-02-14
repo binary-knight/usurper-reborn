@@ -231,8 +231,9 @@ public partial class Quest
     {
         foreach (var objective in Objectives.Where(o => o.ObjectiveType == type && !o.IsComplete))
         {
-            // If targetId is specified, only update matching objectives
-            if (!string.IsNullOrEmpty(targetId) && objective.TargetId != targetId) continue;
+            // If both caller and objective specify targetIds, they must match.
+            // Empty objective TargetId means "match any target of this type".
+            if (!string.IsNullOrEmpty(targetId) && !string.IsNullOrEmpty(objective.TargetId) && objective.TargetId != targetId) continue;
 
             objective.CurrentProgress += amount;
             if (objective.CurrentProgress >= objective.RequiredProgress)

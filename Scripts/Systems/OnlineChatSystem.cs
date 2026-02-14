@@ -12,15 +12,21 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class OnlineChatSystem
     {
-        private static OnlineChatSystem? instance;
-        public static OnlineChatSystem? Instance => instance;
+        private static OnlineChatSystem? _fallbackInstance;
+
+        /// <summary>
+        /// Returns the per-session OnlineChatSystem when in MUD mode (via SessionContext),
+        /// or the static fallback instance for SSH-per-process mode.
+        /// </summary>
+        public static OnlineChatSystem? Instance =>
+            UsurperRemake.Server.SessionContext.Current?.OnlineChat ?? _fallbackInstance;
 
         private readonly OnlineStateManager stateManager;
         private readonly Queue<ChatMessage> pendingMessages = new();
         private readonly List<ChatMessage> messageHistory = new();
         private const int MAX_HISTORY = 100;
 
-        public static bool IsActive => instance != null;
+        public static bool IsActive => Instance != null;
 
         /// <summary>
         /// Number of unread messages waiting to be displayed.
@@ -29,11 +35,19 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Initialize the chat system. Call after OnlineStateManager is initialized.
+        /// In MUD mode, stored on SessionContext for per-session isolation.
         /// </summary>
         public static OnlineChatSystem Initialize(OnlineStateManager stateManager)
         {
-            instance = new OnlineChatSystem(stateManager);
-            return instance;
+            var chat = new OnlineChatSystem(stateManager);
+
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null)
+                ctx.OnlineChat = chat;
+            else
+                _fallbackInstance = chat;
+
+            return chat;
         }
 
         private OnlineChatSystem(OnlineStateManager stateManager)
@@ -411,7 +425,11 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void Shutdown()
         {
-            instance = null;
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null && ctx.OnlineChat == this)
+                ctx.OnlineChat = null;
+            else if (_fallbackInstance == this)
+                _fallbackInstance = null;
         }
     }
 

@@ -595,9 +595,18 @@ public partial class GameEngine : Node
         combatEngine = new CombatEngine();
 
         // World simulator – start background AI processing
-        // Note: worldNPCs is already initialized by InitializeNPCs() called earlier
-        worldSimulator = new WorldSimulator();
-        worldSimulator.StartSimulation(worldNPCs ?? new List<NPC>());
+        // In MUD/online mode, only the first session should create and start the simulator.
+        // Subsequent sessions reuse the existing shared instance to avoid N background loops
+        // all processing the same NPC list (which causes N× respawn messages).
+        if (WorldSimulator.Instance != null && WorldSimulator.Instance.IsRunning)
+        {
+            worldSimulator = WorldSimulator.Instance;
+        }
+        else
+        {
+            worldSimulator = new WorldSimulator();
+            worldSimulator.StartSimulation(worldNPCs ?? new List<NPC>());
+        }
 
         // Initialize collections
         worldMonsters = new List<Monster>();
@@ -630,8 +639,9 @@ public partial class GameEngine : Node
         // Check for daily reset
         await dailyManager.CheckDailyReset();
 
-        // Update world simulation
-        worldSimulator?.SimulateStep();
+        // World simulation is driven by WorldSimulator.StartSimulation() background loop.
+        // Do NOT call SimulateStep() here — it causes double-ticking and in MUD mode
+        // each session would double the sim rate.
 
         // Process NPC behaviors and maintenance
         await RunNPCMaintenanceCycle();
@@ -1474,6 +1484,9 @@ public partial class GameEngine : Node
                 await ShowWhileYouWereGone(sqlBackend);
             }
 
+            // Ensure quests are regenerated with corrected data
+            QuestSystem.EnsureQuestsExist(currentPlayer?.Level ?? 10);
+
             // Start game at saved location
             await locationManager.EnterLocation(GameLocation.MainStreet, currentPlayer);
         }
@@ -1801,12 +1814,9 @@ public partial class GameEngine : Node
     /// </summary>
     private async Task CreateNewGame(string playerName)
     {
-        // Reset singleton systems for new game
+        // Reset per-player session systems for new game
         UsurperRemake.Systems.RomanceTracker.Instance.Reset();
-        UsurperRemake.Systems.FamilySystem.Instance.Reset();
-        UsurperRemake.Systems.NPCSpawnSystem.Instance.ResetNPCs();
         UsurperRemake.Systems.CompanionSystem.Instance?.ResetAllCompanions();
-        WorldInitializerSystem.Instance.ResetWorld();
         UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
         UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();
         UsurperRemake.Systems.FactionSystem.Instance.Reset();
@@ -1817,8 +1827,18 @@ public partial class GameEngine : Node
         UsurperRemake.Systems.DreamSystem.Instance.Reset();
         UsurperRemake.Systems.OceanPhilosophySystem.Instance.Reset();
         UsurperRemake.Systems.GriefSystem.Instance.Reset();
-        NPCMarriageRegistry.Instance.Reset();
-        NPCDialogueDatabase.ClearAllTracking();
+
+        // In online mode, world-level systems (NPCs, children, marriages) are shared
+        // across all players and managed by the WorldSimService. Don't reset them
+        // when a single player creates a new character.
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            UsurperRemake.Systems.FamilySystem.Instance.Reset();
+            UsurperRemake.Systems.NPCSpawnSystem.Instance.ResetNPCs();
+            WorldInitializerSystem.Instance.ResetWorld();
+            NPCMarriageRegistry.Instance.Reset();
+            NPCDialogueDatabase.ClearAllTracking();
+        }
 
         // Clear dungeon party from previous saves
         ClearDungeonParty();
@@ -1905,10 +1925,10 @@ public partial class GameEngine : Node
                 await WorldInitializerSystem.Instance.InitializeWorld(100);
                 terminal.WriteLine("History has been written. Your adventure begins!", "bright_green");
             }
-
-            // Initialize starter quests if none exist
-            QuestSystem.EnsureQuestsExist();
         }
+
+        // Ensure quests exist (also regenerates stale starter quests with corrected data)
+        QuestSystem.EnsureQuestsExist();
 
         // Check if player is allowed to play
         if (!currentPlayer.Allowed)

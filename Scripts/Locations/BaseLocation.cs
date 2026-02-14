@@ -29,6 +29,9 @@ public abstract class BaseLocation
     // NPC approach tracking - prevents spam from same NPC
     private static readonly Dictionary<string, int> _lastApproachedTurn = new();
     private const int MinTurnsBetweenApproaches = 10;
+
+    /// <summary>When true, the next loop iteration skips DisplayLocation() redraw. Used for chat commands.</summary>
+    protected bool _skipNextRedraw;
     
     public BaseLocation(GameLocation locationId, string name, string description)
     {
@@ -248,33 +251,41 @@ public abstract class BaseLocation
 
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {
-            // Autosave BEFORE displaying location (save stable state)
-            // This ensures we don't save during quit/exit actions
-            if (currentPlayer != null)
+            if (_skipNextRedraw)
             {
-                await SaveSystem.Instance.AutoSave(currentPlayer);
+                _skipNextRedraw = false;
+                // Just re-prompt without redrawing the full location
             }
-
-            // Display location
-            DisplayLocation();
-
-            // Show any pending online chat messages
-            if (OnlineChatSystem.IsActive)
+            else
             {
-                OnlineChatSystem.Instance!.DisplayPendingMessages(terminal);
-            }
-
-            // MUD mode: drain incoming room/system messages (arrival/departure, chat, etc.)
-            if (UsurperRemake.Server.SessionContext.IsActive)
-            {
-                var ctx = UsurperRemake.Server.SessionContext.Current;
-                var session = ctx != null ? UsurperRemake.Server.MudServer.Instance?.ActiveSessions
-                    .GetValueOrDefault(ctx.Username.ToLowerInvariant()) : null;
-                if (session != null)
+                // Autosave BEFORE displaying location (save stable state)
+                // This ensures we don't save during quit/exit actions
+                if (currentPlayer != null)
                 {
-                    while (session.IncomingMessages.TryDequeue(out var msg))
+                    await SaveSystem.Instance.AutoSave(currentPlayer);
+                }
+
+                // Display location
+                DisplayLocation();
+
+                // Show any pending online chat messages
+                if (OnlineChatSystem.IsActive)
+                {
+                    OnlineChatSystem.Instance!.DisplayPendingMessages(terminal);
+                }
+
+                // MUD mode: drain incoming room/system messages (arrival/departure, chat, etc.)
+                if (UsurperRemake.Server.SessionContext.IsActive)
+                {
+                    var ctx = UsurperRemake.Server.SessionContext.Current;
+                    var session = ctx != null ? UsurperRemake.Server.MudServer.Instance?.ActiveSessions
+                        .GetValueOrDefault(ctx.Username.ToLowerInvariant()) : null;
+                    if (session != null)
                     {
-                        terminal.WriteLine(msg);
+                        while (session.IncomingMessages.TryDequeue(out var msg))
+                        {
+                            terminal.WriteLine(msg);
+                        }
                     }
                 }
             }
@@ -1449,11 +1460,17 @@ public abstract class BaseLocation
                 var handled = await UsurperRemake.Server.MudChatSystem.TryProcessCommand(choice.Trim(), terminal);
                 if (handled)
                 {
-                    // Commands that produce multi-line output need a pause so the
-                    // location menu doesn't immediately redraw over the output
                     var cmd = choice.Trim().Split(' ')[0].TrimStart('/').ToLowerInvariant();
                     if (IsInfoDisplayCommand(cmd))
+                    {
+                        // Info commands produce multi-line output — pause before redraw
                         await terminal.PressAnyKey();
+                    }
+                    else
+                    {
+                        // Chat commands: skip menu redraw so conversation stays visible
+                        _skipNextRedraw = true;
+                    }
                     return (true, false);
                 }
             }
@@ -1807,9 +1824,9 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write("║  ");
             terminal.SetColor("bright_green");
-            terminal.Write("/news               ");
+            terminal.Write("/gossip <msg>       ");
             terminal.SetColor("white");
-            terminal.WriteLine("- Recent server news                                 ║");
+            terminal.WriteLine("- Global out-of-character chat (/gos)                ║");
         }
 
         terminal.SetColor("bright_cyan");
@@ -4035,7 +4052,9 @@ public abstract class BaseLocation
         if (!LocationNPCs.Contains(npc))
         {
             LocationNPCs.Add(npc);
-            npc.CurrentLocation = LocationId.ToString().ToLower();
+            // Don't override CurrentLocation here — it was already set correctly
+            // by NPC.UpdateLocation() before this method is called.
+            // Using LocationId.ToString().ToLower() produced broken names like "theinn".
         }
     }
     
@@ -4516,6 +4535,10 @@ public abstract class BaseLocation
 
         await backend.SendMessage(currentPlayer.DisplayName, recipient, "mail", message);
 
+        // Real-time notification in MUD mode
+        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(recipient,
+            $"\u001b[35m  [Mail] {currentPlayer.DisplayName}: {message}\u001b[0m");
+
         terminal.SetColor("bright_green");
         terminal.WriteLine($"Message sent to {recipient}!");
         await Task.Delay(1500);
@@ -4705,6 +4728,8 @@ public abstract class BaseLocation
         await backend.UpdateTradeOfferStatus(offer.Id, "accepted");
         await backend.SendMessage("System", offer.FromPlayer, "trade",
             $"{currentPlayer.DisplayName} accepted your package!");
+        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(offer.FromPlayer,
+            $"\u001b[92m  {currentPlayer.DisplayName} accepted your package!\u001b[0m");
 
         terminal.SetColor("bright_green");
         if (offer.Gold > 0)
@@ -4727,6 +4752,8 @@ public abstract class BaseLocation
 
         await backend.SendMessage("System", offer.FromPlayer, "trade",
             $"{currentPlayer.DisplayName} declined your package. Gold returned.");
+        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(offer.FromPlayer,
+            $"\u001b[93m  {currentPlayer.DisplayName} declined your package. Gold returned.\u001b[0m");
 
         terminal.SetColor("yellow");
         terminal.WriteLine("Package declined. Items/gold returned to sender.");
@@ -4909,6 +4936,10 @@ public abstract class BaseLocation
         await backend.SendMessage(currentPlayer.DisplayName, recipient, "trade",
             $"{currentPlayer.DisplayName} sent you a package! Type /trade to view.");
 
+        // Real-time notification in MUD mode
+        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(recipient,
+            $"\u001b[93m  {currentPlayer.DisplayName} sent you a package! Type /trade to view.\u001b[0m");
+
         terminal.SetColor("bright_green");
         terminal.WriteLine($"Package sent to {recipient}!");
         await Task.Delay(1500);
@@ -5038,6 +5069,8 @@ public abstract class BaseLocation
         await backend.PlaceBounty(username, target.ToLower(), amount);
         await backend.SendMessage(currentPlayer.DisplayName, target, "bounty",
             $"A bounty of {amount:N0} gold has been placed on your head!");
+        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(target,
+            $"\u001b[91m  A bounty of {amount:N0} gold has been placed on your head!\u001b[0m");
 
         if (UsurperRemake.Systems.OnlineStateManager.IsActive)
             _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews($"{currentPlayer.DisplayName} placed a {amount:N0}g bounty on {targetPlayer.DisplayName}!", "bounty");
@@ -5139,57 +5172,222 @@ public abstract class BaseLocation
             return;
         }
 
+        // Deserialize all items upfront for stats display
+        var items = new Item?[listings.Count];
+        for (int i = 0; i < listings.Count; i++)
+        {
+            try { items[i] = System.Text.Json.JsonSerializer.Deserialize<Item>(listings[i].ItemJson); }
+            catch { items[i] = null; }
+        }
+
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("\n  ═══════════ AUCTION LISTINGS ═══════════");
         terminal.SetColor("darkgray");
-        terminal.WriteLine($"  {"#",-4} {"Item",-28} {"Price",-14} {"Seller",-16} {"Expires"}");
-        terminal.WriteLine("  " + new string('─', 72));
+        string priceHeader = "Price".PadLeft(10);
+        terminal.WriteLine($"  {"#",-4} {"Item",-24} {"Stats",-16} {priceHeader}   {"Seller",-14} {"Expires"}");
+        terminal.WriteLine("  " + new string('─', 74));
 
         string username = currentPlayer.DisplayName.ToLower();
         for (int i = 0; i < listings.Count; i++)
         {
             var l = listings[i];
+            var item = items[i];
             bool isMine = l.Seller.Equals(username, StringComparison.OrdinalIgnoreCase);
             var timeLeft = l.ExpiresAt - DateTime.UtcNow;
             string expires = timeLeft.TotalHours > 1 ? $"{timeLeft.TotalHours:F0}h" : $"{timeLeft.TotalMinutes:F0}m";
 
+            // Build compact stats string from item data
+            string stats = GetItemStatsCompact(item);
+
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1,-4} ");
             terminal.SetColor("white");
-            terminal.Write($"{l.ItemName,-28} ");
+            terminal.Write($"{Truncate(l.ItemName, 23),-24} ");
+            terminal.SetColor("cyan");
+            terminal.Write($"{stats,-16} ");
             terminal.SetColor("bright_green");
-            terminal.Write($"{l.Price:N0}g        ");
+            terminal.Write($"{l.Price:N0}g".PadLeft(10));
+            terminal.Write("   ");
             terminal.SetColor(isMine ? "cyan" : "gray");
-            terminal.Write($"{l.Seller,-16} ");
+            terminal.Write($"{Truncate(l.Seller, 13),-14} ");
             terminal.SetColor("darkgray");
             terminal.WriteLine(expires);
         }
 
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("\n  Enter # to inspect/buy, or press Enter to go back.");
         terminal.SetColor("white");
-        terminal.Write("\n  Buy item # (or Enter to go back): ");
+        terminal.Write("  Choice: ");
         string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
         if (!int.TryParse(input, out int choice) || choice < 1 || choice > listings.Count) return;
 
         var listing = listings[choice - 1];
-        if (listing.Seller.Equals(username, StringComparison.OrdinalIgnoreCase))
+        var selectedItem = items[choice - 1];
+
+        // Show full item details before purchase
+        await ShowAuctionItemDetails(listing, selectedItem, username, backend);
+    }
+
+    private static string Truncate(string s, int maxLen)
+    {
+        if (s.Length <= maxLen) return s;
+        return s.Substring(0, maxLen - 1) + "…";
+    }
+
+    private static string GetItemStatsCompact(Item? item)
+    {
+        if (item == null) return "???";
+
+        var parts = new List<string>();
+        if (item.Attack > 0) parts.Add($"A:{item.Attack}");
+        if (item.Armor > 0) parts.Add($"D:{item.Armor}");
+        if (item.HP > 0) parts.Add($"HP:{item.HP}");
+        if (item.Strength > 0) parts.Add($"S:{item.Strength}");
+        if (item.Defence > 0) parts.Add($"Df:{item.Defence}");
+        if (item.Mana > 0) parts.Add($"M:{item.Mana}");
+
+        if (parts.Count == 0)
         {
-            terminal.SetColor("red");
-            terminal.WriteLine("  You can't buy your own listing!");
-            await Task.Delay(1500);
+            // Consumable/misc items
+            string typeName = GetItemTypeName(item.Type);
+            return typeName;
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    private static string GetItemTypeName(ObjType type)
+    {
+        return type switch
+        {
+            ObjType.Weapon => "Weapon",
+            ObjType.Head => "Helm",
+            ObjType.Body => "Armor",
+            ObjType.Arms => "Arms",
+            ObjType.Hands => "Gloves",
+            ObjType.Fingers => "Ring",
+            ObjType.Legs => "Legs",
+            ObjType.Feet => "Boots",
+            ObjType.Waist => "Belt",
+            ObjType.Neck => "Necklace",
+            ObjType.Face => "Face",
+            ObjType.Shield => "Shield",
+            ObjType.Abody => "Cloak",
+            ObjType.Food => "Food",
+            ObjType.Drink => "Drink",
+            ObjType.Magic => "Magic",
+            ObjType.Potion => "Potion",
+            _ => "Item"
+        };
+    }
+
+    private async Task ShowAuctionItemDetails(AuctionListing listing, Item? item, string username, SqlSaveBackend backend)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\n  ═══════════ ITEM DETAILS ═══════════");
+        terminal.SetColor("white");
+        terminal.WriteLine($"\n  {listing.ItemName}");
+
+        if (item != null)
+        {
+            terminal.SetColor("darkgray");
+            terminal.WriteLine($"  Type: {GetItemTypeName(item.Type)}    Value: {item.Value:N0}g");
+
+            // Stat bonuses
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("");
+            var statLines = new List<(string label, int value)>();
+            if (item.Attack != 0) statLines.Add(("Attack", item.Attack));
+            if (item.Armor != 0) statLines.Add(("Armor", item.Armor));
+            if (item.HP != 0) statLines.Add(("HP", item.HP));
+            if (item.Strength != 0) statLines.Add(("Strength", item.Strength));
+            if (item.Defence != 0) statLines.Add(("Defence", item.Defence));
+            if (item.Stamina != 0) statLines.Add(("Stamina", item.Stamina));
+            if (item.Agility != 0) statLines.Add(("Agility", item.Agility));
+            if (item.Dexterity != 0) statLines.Add(("Dexterity", item.Dexterity));
+            if (item.Wisdom != 0) statLines.Add(("Wisdom", item.Wisdom));
+            if (item.Charisma != 0) statLines.Add(("Charisma", item.Charisma));
+            if (item.Mana != 0) statLines.Add(("Mana", item.Mana));
+
+            if (statLines.Count > 0)
+            {
+                foreach (var (label, value) in statLines)
+                {
+                    terminal.SetColor(value > 0 ? "bright_green" : "red");
+                    terminal.WriteLine($"  {label,-12} {(value > 0 ? "+" : "")}{value}");
+                }
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  No stat bonuses");
+            }
+
+            // Requirements and flags
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("");
+            if (item.MinLevel > 0)
+                terminal.WriteLine($"  Requires Level {item.MinLevel}+");
+            if (item.StrengthNeeded > 0)
+                terminal.WriteLine($"  Requires {item.StrengthNeeded} Strength");
+            if (item.RequiresGood || item.OnlyForGood)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  Requires Good alignment");
+            }
+            if (item.RequiresEvil || item.OnlyForEvil)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("  Requires Evil alignment");
+            }
+            if (item.Cursed || item.IsCursed)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  CURSED");
+            }
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  (Item details unavailable)");
+        }
+
+        // Sale info
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("");
+        var timeLeft = listing.ExpiresAt - DateTime.UtcNow;
+        string expires = timeLeft.TotalHours > 1 ? $"{timeLeft.TotalHours:F0} hours" : $"{timeLeft.TotalMinutes:F0} minutes";
+        terminal.WriteLine($"  Seller: {listing.Seller}    Expires in: {expires}");
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"\n  Price: {listing.Price:N0} gold");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine($"  Your gold: {currentPlayer.Gold:N0}");
+
+        // Purchase flow
+        bool isMine = listing.Seller.Equals(username, StringComparison.OrdinalIgnoreCase);
+        if (isMine)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine("\n  This is your listing.");
+            terminal.Write("  Press Enter to go back.");
+            await terminal.ReadLineAsync();
             return;
         }
 
         if (currentPlayer.Gold < listing.Price)
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"  You need {listing.Price:N0} gold but only have {currentPlayer.Gold:N0}!");
-            await Task.Delay(1500);
+            terminal.WriteLine($"\n  You need {listing.Price - currentPlayer.Gold:N0} more gold to buy this.");
+            terminal.Write("  Press Enter to go back.");
+            await terminal.ReadLineAsync();
             return;
         }
 
         terminal.SetColor("yellow");
-        terminal.Write($"  Buy {listing.ItemName} for {listing.Price:N0} gold? (Y/N): ");
+        terminal.Write($"\n  Buy for {listing.Price:N0} gold? (Y/N): ");
         string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
         if (confirm != "Y") return;
 
@@ -5202,17 +5400,16 @@ public abstract class BaseLocation
             return;
         }
 
-        // Transfer gold and item
+        // Deduct gold from buyer (seller collects from My Listings)
         currentPlayer.Gold -= listing.Price;
-        await backend.AddGoldToPlayer(listing.Seller, listing.Price);
 
         // Create item from JSON and add to inventory
         try
         {
-            var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson);
-            if (item != null)
+            var purchasedItem = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson);
+            if (purchasedItem != null)
             {
-                currentPlayer.Inventory.Add(item);
+                currentPlayer.Inventory.Add(purchasedItem);
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"\n  Purchased {listing.ItemName} for {listing.Price:N0} gold!");
             }
@@ -5224,10 +5421,36 @@ public abstract class BaseLocation
         }
 
         await backend.SendMessage("Auction House", listing.Seller, "auction",
-            $"Your {listing.ItemName} sold for {listing.Price:N0} gold!");
+            $"Your {listing.ItemName} sold for {listing.Price:N0} gold! Visit the Auction House to collect.");
+        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(listing.Seller,
+            $"\u001b[93m  [Auction] Your {listing.ItemName} sold for {listing.Price:N0} gold! Visit the Auction House to collect.\u001b[0m");
 
         await Task.Delay(2000);
     }
+
+    private static (long fee, int basePct, int taxPct) CalculateAuctionFee(long price, int durationHours)
+    {
+        int basePct = durationHours switch
+        {
+            12 => 5,
+            24 => 4,
+            48 => 3,
+            72 => 2,
+            _ => 3
+        };
+        var king = CastleLocation.GetCurrentKing();
+        int taxPct = king?.KingTaxPercent ?? 0;
+        long fee = Math.Max(1, (price * (basePct + taxPct)) / 100);
+        return (fee, basePct, taxPct);
+    }
+
+    private static readonly (int hours, string label)[] AuctionDurations =
+    {
+        (12, "12 hours"),
+        (24, "24 hours"),
+        (48, "48 hours"),
+        (72, "72 hours")
+    };
 
     private async Task SellOnAuction(SqlSaveBackend backend)
     {
@@ -5278,13 +5501,64 @@ public abstract class BaseLocation
             return;
         }
 
+        // Duration selection with fee display
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\n  Select listing duration:");
+        for (int i = 0; i < AuctionDurations.Length; i++)
+        {
+            var (hours, label) = AuctionDurations[i];
+            var (fee, basePct, taxPct) = CalculateAuctionFee(price, hours);
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  [{i + 1}] {label,-12}");
+            terminal.SetColor("gray");
+            terminal.Write("  Fee: ");
+            terminal.SetColor("white");
+            terminal.Write($"{fee:N0}g");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine($"  ({basePct}% base + {taxPct}% tax)");
+        }
+
+        terminal.SetColor("white");
+        terminal.Write("\n  Duration (1-4): ");
+        string durInput = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (!int.TryParse(durInput, out int durChoice) || durChoice < 1 || durChoice > AuctionDurations.Length) return;
+
+        int chosenHours = AuctionDurations[durChoice - 1].hours;
+        string chosenLabel = AuctionDurations[durChoice - 1].label;
+        var (listingFee, _, _) = CalculateAuctionFee(price, chosenHours);
+
+        // Check player can afford the fee
+        if (currentPlayer.Gold < listingFee)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n  You need {listingFee:N0} gold for the listing fee. You have {currentPlayer.Gold:N0}.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Confirm
+        terminal.SetColor("yellow");
+        terminal.Write($"\n  List {item.Name} for {price:N0}g ({chosenLabel}, fee: {listingFee:N0}g)? (Y/N): ");
+        string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+        if (confirm != "Y") return;
+
         string itemJson = System.Text.Json.JsonSerializer.Serialize(item);
-        int id = await backend.CreateAuctionListing(currentPlayer.DisplayName.ToLower(), item.Name, itemJson, price);
+        int id = await backend.CreateAuctionListing(currentPlayer.DisplayName.ToLower(), item.Name, itemJson, price, chosenHours);
         if (id > 0)
         {
             currentPlayer.Inventory.RemoveAt(choice - 1);
+
+            // Deduct listing fee and route through tax system
+            currentPlayer.Gold -= listingFee;
+            CityControlSystem.Instance.ProcessSaleTax(listingFee);
+
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"\n  {item.Name} listed for {price:N0} gold! Expires in 48 hours.");
+            terminal.WriteLine($"\n  {item.Name} listed for {price:N0} gold! Fee: {listingFee:N0}g. Expires in {chosenLabel}.");
+
+            // Global announcement
+            UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
+                $"\u001b[93m  [Auction] {currentPlayer.DisplayName} just listed {item.Name} for {price:N0} gold! ({chosenLabel})\u001b[0m",
+                excludeUsername: currentPlayer.DisplayName);
         }
         else
         {
@@ -5309,31 +5583,93 @@ public abstract class BaseLocation
             return;
         }
 
+        // Calculate uncollected gold
+        long uncollectedGold = 0;
+        var soldUncollected = new List<int>(); // indices of sold+uncollected listings
         for (int i = 0; i < listings.Count; i++)
         {
             var l = listings[i];
+            if (l.Status == "sold" && !l.GoldCollected)
+            {
+                uncollectedGold += l.Price;
+                soldUncollected.Add(i);
+            }
+        }
+
+        for (int i = 0; i < listings.Count; i++)
+        {
+            var l = listings[i];
+            string statusText = l.Status.ToUpper();
             string statusColor = l.Status switch
             {
                 "active" => "bright_green",
-                "sold" => "bright_yellow",
+                "sold" => l.GoldCollected ? "gray" : "bright_yellow",
                 "expired" => "red",
                 "cancelled" => "gray",
                 _ => "white"
             };
 
+            if (l.Status == "sold" && !l.GoldCollected)
+                statusText = "SOLD - COLLECT GOLD";
+            else if (l.Status == "sold" && l.GoldCollected)
+                statusText = "SOLD - COLLECTED";
+
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1,-4} ");
             terminal.SetColor("white");
-            terminal.Write($"{l.ItemName,-28} ");
+            terminal.Write($"{Truncate(l.ItemName, 23),-24} ");
             terminal.SetColor("bright_green");
-            terminal.Write($"{l.Price:N0}g  ");
+            terminal.Write($"{l.Price:N0}g".PadLeft(10));
+            terminal.Write("  ");
             terminal.SetColor(statusColor);
-            terminal.WriteLine($"[{l.Status.ToUpper()}]");
+            terminal.WriteLine($"[{statusText}]");
+        }
+
+        // Show uncollected gold summary
+        if (uncollectedGold > 0)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"\n  Gold awaiting collection: {uncollectedGold:N0}g ({soldUncollected.Count} item{(soldUncollected.Count != 1 ? "s" : "")})");
         }
 
         terminal.SetColor("white");
-        terminal.Write("\n  Cancel listing # (or Enter to go back): ");
-        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        terminal.WriteLine("");
+        if (uncollectedGold > 0)
+            terminal.WriteLine("  [C] Collect all gold    [#] Cancel active listing    [Enter] Back");
+        else
+            terminal.WriteLine("  [#] Cancel active listing    [Enter] Back");
+
+        terminal.Write("\n  Choice: ");
+        string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+        if (string.IsNullOrEmpty(input)) return;
+
+        // Collect all gold
+        if (input == "C" && uncollectedGold > 0)
+        {
+            long totalCollected = 0;
+            foreach (int idx in soldUncollected)
+            {
+                var l = listings[idx];
+                bool collected = await backend.CollectAuctionGold(l.Id, currentPlayer.DisplayName.ToLower());
+                if (collected)
+                    totalCollected += l.Price;
+            }
+            if (totalCollected > 0)
+            {
+                currentPlayer.Gold += totalCollected;
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"\n  Collected {totalCollected:N0} gold from auction sales!");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("\n  No gold to collect.");
+            }
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Cancel a listing
         if (!int.TryParse(input, out int choice) || choice < 1 || choice > listings.Count) return;
 
         var listing = listings[choice - 1];
@@ -5378,7 +5714,6 @@ public abstract class BaseLocation
             "where" => true,
             "wizlog" => true,
             "holylight" => true,
-            "news" => true,
             "help" => true,
             _ => false
         };

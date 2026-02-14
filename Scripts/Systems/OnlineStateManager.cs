@@ -17,8 +17,14 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class OnlineStateManager
     {
-        private static OnlineStateManager? instance;
-        public static OnlineStateManager? Instance => instance;
+        private static OnlineStateManager? _fallbackInstance;
+
+        /// <summary>
+        /// Returns the per-session OnlineStateManager when in MUD mode (via SessionContext),
+        /// or the static fallback instance for SSH-per-process mode.
+        /// </summary>
+        public static OnlineStateManager? Instance =>
+            UsurperRemake.Server.SessionContext.Current?.OnlineState ?? _fallbackInstance;
 
         private readonly IOnlineSaveBackend backend;
         private readonly string username;
@@ -44,17 +50,27 @@ namespace UsurperRemake.Systems
         public const string KEY_MARRIAGES = "marriages";
 
         /// <summary>
-        /// True if online state management is active.
+        /// True if online state management is active (checks per-session first, then fallback).
         /// </summary>
-        public static bool IsActive => instance != null;
+        public static bool IsActive => Instance != null;
 
         /// <summary>
-        /// Initialize the online state manager. Call once at startup when --online is active.
+        /// Initialize the online state manager. In MUD mode, the instance is stored on
+        /// SessionContext for per-session isolation. In SSH-per-process mode, stored as
+        /// a static fallback.
         /// </summary>
         public static OnlineStateManager Initialize(IOnlineSaveBackend backend, string username)
         {
-            instance = new OnlineStateManager(backend, username);
-            return instance;
+            var osm = new OnlineStateManager(backend, username);
+
+            // If running inside a MUD session, store on the session context
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null)
+                ctx.OnlineState = osm;
+            else
+                _fallbackInstance = osm; // SSH-per-process mode
+
+            return osm;
         }
 
         private OnlineStateManager(IOnlineSaveBackend backend, string username)
@@ -824,14 +840,19 @@ namespace UsurperRemake.Systems
             {
                 await backend.UnregisterOnline(username);
                 await backend.UpdatePlayerSession(username, isLogin: false);
-                DebugLogger.Instance.LogInfo("ONLINE", "Online tracking stopped");
+                DebugLogger.Instance.LogInfo("ONLINE", $"Online tracking stopped for '{username}'");
             }
             catch (Exception ex)
             {
-                DebugLogger.Instance.LogError("ONLINE", $"Error during shutdown: {ex.Message}");
+                DebugLogger.Instance.LogError("ONLINE", $"Error during shutdown for '{username}': {ex.Message}");
             }
 
-            instance = null;
+            // Clear the correct reference
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null && ctx.OnlineState == this)
+                ctx.OnlineState = null;
+            else if (_fallbackInstance == this)
+                _fallbackInstance = null;
         }
 
         // =====================================================================

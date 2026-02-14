@@ -14,6 +14,7 @@ public class WorldSimulator
     public static WorldSimulator? Instance => _instance;
 
     private bool isRunning = false;
+    public bool IsRunning => isRunning;
     private Random random = new Random();
 
     /// <summary>
@@ -59,9 +60,71 @@ public class WorldSimulator
     private static readonly Dictionary<string, int> _lastCascadeTick = new();
     private static int _currentTick = 0;
 
+    // === Online mode rate-limiting (persistent server needs realistic pacing) ===
+    // Per-NPC combat count per "sim day" (resets every TICKS_PER_SIM_DAY ticks)
+    private readonly Dictionary<string, int> _npcDailyCombats = new();
+    // Per-pair escalation cooldown: "npcA|npcB" -> tick when last escalation happened
+    private readonly Dictionary<string, int> _pairEscalationCooldown = new();
+    // Per-pair tension message cooldown: "npcA|npcB" -> tick when last "tensions rising" message sent
+    private readonly Dictionary<string, int> _tensionMessageCooldown = new();
+    // Per-NPC last team action tick (join/form/recruit) to prevent team churn
+    private readonly Dictionary<string, int> _npcTeamActionCooldown = new();
+    // Tick of last daily reset for rate-limiting counters
+    private int _lastDailyResetTick = 0;
+    // One "sim day" = ~1 hour of real time (120 ticks at 30s each)
+    private const int TICKS_PER_SIM_DAY = 120;
+    // Max combats per NPC per sim-day in online mode
+    private const int MAX_DAILY_COMBATS_ONLINE = 3;
+    // Cooldown ticks between escalations for same enemy pair (~5 min)
+    private const int PAIR_ESCALATION_COOLDOWN_TICKS = 10;
+    // Cooldown ticks between "tensions rising" messages for same pair (~30 min)
+    private const int TENSION_MESSAGE_COOLDOWN_TICKS = 60;
+    // Cooldown ticks before an NPC can do another team action (~15 min)
+    private const int TEAM_ACTION_COOLDOWN_TICKS = 30;
+
     public WorldSimulator()
     {
         _instance = this;
+    }
+
+    /// <summary>
+    /// Get a canonical key for an NPC pair (order-independent) for cooldown tracking.
+    /// </summary>
+    private static string GetPairKey(string id1, string id2) =>
+        string.CompareOrdinal(id1, id2) <= 0 ? $"{id1}|{id2}" : $"{id2}|{id1}";
+
+    /// <summary>
+    /// Reset daily rate-limiting counters. Called every TICKS_PER_SIM_DAY ticks.
+    /// </summary>
+    private void ResetDailyCounters()
+    {
+        _npcDailyCombats.Clear();
+        // Prune expired cooldowns (older than their respective thresholds)
+        var expiredPairs = _pairEscalationCooldown.Where(kv => _currentTick - kv.Value > PAIR_ESCALATION_COOLDOWN_TICKS).Select(kv => kv.Key).ToList();
+        foreach (var key in expiredPairs) _pairEscalationCooldown.Remove(key);
+        var expiredTensions = _tensionMessageCooldown.Where(kv => _currentTick - kv.Value > TENSION_MESSAGE_COOLDOWN_TICKS).Select(kv => kv.Key).ToList();
+        foreach (var key in expiredTensions) _tensionMessageCooldown.Remove(key);
+        var expiredTeam = _npcTeamActionCooldown.Where(kv => _currentTick - kv.Value > TEAM_ACTION_COOLDOWN_TICKS).Select(kv => kv.Key).ToList();
+        foreach (var key in expiredTeam) _npcTeamActionCooldown.Remove(key);
+    }
+
+    /// <summary>
+    /// Check if an NPC has hit their daily combat cap (online mode only).
+    /// </summary>
+    private bool HasHitDailyCombatCap(string npcId)
+    {
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return false;
+        return _npcDailyCombats.TryGetValue(npcId, out int count) && count >= MAX_DAILY_COMBATS_ONLINE;
+    }
+
+    /// <summary>
+    /// Record a combat for daily cap tracking.
+    /// </summary>
+    private void RecordCombat(string npcId)
+    {
+        if (!_npcDailyCombats.ContainsKey(npcId))
+            _npcDailyCombats[npcId] = 0;
+        _npcDailyCombats[npcId]++;
     }
 
     /// <summary>
@@ -214,6 +277,12 @@ public class WorldSimulator
         // Periodically prune cascade rate-limiter to free memory from dead/removed NPCs
         if (_currentTick % 100 == 0)
             _lastCascadeTick.Clear();
+        // Reset daily rate-limiting counters every sim-day (online mode)
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && _currentTick - _lastDailyResetTick >= TICKS_PER_SIM_DAY)
+        {
+            _lastDailyResetTick = _currentTick;
+            ResetDailyCounters();
+        }
         foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && n.EmotionalState != null))
         {
             ProcessEmotionalCascades(npc);
@@ -743,8 +812,10 @@ public class WorldSimulator
             processed.Add(npc.Name2 ?? npc.Name);
             processed.Add(spouse.Name2 ?? spouse.Name);
 
-            // Base divorce chance: 0.3% per tick (~1 per 5 hours of sim time)
-            float divorceChance = 0.003f;
+            // Base divorce chance per tick
+            // Online: 0.02% per tick (~2.4% per hour, ~one divorce per ~40 hours per couple)
+            // Single-player: 0.3% per tick (unchanged — sessions are short)
+            float divorceChance = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0.0002f : 0.003f;
 
             var profile1 = npc.Brain?.Personality;
             var profile2 = spouse.Brain?.Personality;
@@ -805,8 +876,11 @@ public class WorldSimulator
     /// </summary>
     private void ProcessNPCActivities(NPC npc, WorldState world)
     {
-        // 15% chance per tick to do something interesting
-        if (random.NextDouble() > 0.15) return;
+        // Chance per tick to do something interesting
+        // Online: 5% (was 15%) — more realistic pacing for persistent server
+        // Single-player: 15% (unchanged)
+        double activityChance = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0.05 : 0.15;
+        if (random.NextDouble() > activityChance) return;
 
         // Weight activities based on NPC state
         var activities = new List<(string action, double weight)>();
@@ -1501,6 +1575,14 @@ public class WorldSimulator
     /// </summary>
     private void NPCTeamRecruitment(NPC npc)
     {
+        // Online mode: cooldown on team actions to prevent rapid join/leave/form churn
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            if (_npcTeamActionCooldown.TryGetValue(npc.Id, out int lastTick) &&
+                _currentTick - lastTick < TEAM_ACTION_COOLDOWN_TICKS)
+                return;
+        }
+
         if (string.IsNullOrEmpty(npc.Team))
         {
             // Try to join an existing team or form a new one
@@ -1530,7 +1612,9 @@ public class WorldSimulator
             .Where(g => g.Count() < MAX_TEAM_SIZE)
             .ToList();
 
-        if (teamsAtLocation.Any() && random.NextDouble() < 0.75)
+        // Online: 30% join chance (was 75%) — teams grow more gradually
+        float joinChance = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0.30f : 0.75f;
+        if (teamsAtLocation.Any() && random.NextDouble() < joinChance)
         {
             // Try to join an existing team
             var teamGroup = teamsAtLocation[random.Next(teamsAtLocation.Count)];
@@ -1547,7 +1631,7 @@ public class WorldSimulator
                     npc.CTurf = teamLeader.CTurf;
 
                     NewsSystem.Instance.Newsy(true, $"{npc.Name} joined the team '{npc.Team}'!");
-                    // GD.Print($"[WorldSim] {npc.Name} joined team '{npc.Team}'");
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode) _npcTeamActionCooldown[npc.Id] = _currentTick;
                     return;
                 }
             }
@@ -1572,7 +1656,9 @@ public class WorldSimulator
                 .ToList();
         }
 
-        if (nearbyUnteamed.Count >= 1 && random.NextDouble() < 0.5)
+        // Online: 15% form chance (was 50%) — new teams are rarer events
+        float formChance = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0.15f : 0.50f;
+        if (nearbyUnteamed.Count >= 1 && random.NextDouble() < formChance)
         {
             // Form a new team
             var teamName = GenerateTeamName();
@@ -1601,7 +1687,11 @@ public class WorldSimulator
                 bestRecruit.CTurf = false;
 
                 NewsSystem.Instance.Newsy(true, $"{npc.Name} formed a new team called '{teamName}' with {bestRecruit.Name}!");
-                // GD.Print($"[WorldSim] {npc.Name} formed team '{teamName}' with {bestRecruit.Name}");
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    _npcTeamActionCooldown[npc.Id] = _currentTick;
+                    _npcTeamActionCooldown[bestRecruit.Id] = _currentTick;
+                }
             }
             else
             {
@@ -1660,7 +1750,11 @@ public class WorldSimulator
             {
                 NewsSystem.Instance.Newsy(true, $"{npc.Name} recruited {candidate.Name} into '{npc.Team}'!");
             }
-            // GD.Print($"[WorldSim] {npc.Name} recruited {candidate.Name} into team '{npc.Team}'");
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                _npcTeamActionCooldown[npc.Id] = _currentTick;
+                _npcTeamActionCooldown[candidate.Id] = _currentTick;
+            }
         }
     }
 
@@ -2953,6 +3047,7 @@ public class WorldSimulator
     private void ExecuteAttack(NPC npc, string targetId, WorldState world)
     {
         if (string.IsNullOrEmpty(targetId)) return;
+        if (targetId == npc.Id) return; // Guard against self-attack
 
         var target = world.GetNPCById(targetId);
         if (target == null || target.CurrentLocation != npc.CurrentLocation || !target.IsAlive) return;
@@ -3641,7 +3736,9 @@ public class WorldSimulator
             bool likelyToLeave = member.Brain?.Personality?.IsLikelyToBetray() == true ||
                                  member.Loyalty < 30;
 
-            if (likelyToLeave && random.NextDouble() < 0.01) // 1% chance per tick
+            // Online: 0.1% per tick (~12% per hour). Single-player: 1% per tick (unchanged).
+            float abandonChance = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0.001f : 0.01f;
+            if (likelyToLeave && random.NextDouble() < abandonChance)
             {
                 string oldTeam = member.Team;
 
@@ -3909,13 +4006,22 @@ public class WorldSimulator
     
     private void ProcessRivalries()
     {
-        // Seed new rivalries: aggressive NPCs at the same location may develop friction
+        bool isOnline = UsurperRemake.BBS.DoorMode.IsOnlineMode;
+
+        // --- Seed new rivalries ---
+        // Online: 2% chance (was 8%) — rivalries develop slowly over hours, not minutes
+        // Single-player: 8% chance (unchanged)
+        float newRivalryChance = isOnline ? 0.02f : 0.08f;
+
         var aliveNpcs = npcs.Where(npc => npc.IsAlive && !npc.IsDead).ToList();
         foreach (var npc in aliveNpcs)
         {
             var personality = npc.Brain?.Personality;
             if (personality == null || personality.Aggression < 0.5f) continue;
-            if (GD.Randf() > 0.08f) continue; // 8% chance per tick to develop a new rivalry
+            if (GD.Randf() > newRivalryChance) continue;
+
+            // Online mode: cap enemy list size to prevent runaway escalation
+            if (isOnline && npc.Enemies.Count >= 5) continue;
 
             // Find a potential rival at the same location
             var potentialRivals = aliveNpcs.Where(other =>
@@ -3946,7 +4052,8 @@ public class WorldSimulator
             }
 
             // Fallback: pick a random rival (less likely)
-            if (rival == null && GD.Randf() < 0.03f)
+            float fallbackChance = isOnline ? 0.01f : 0.03f;
+            if (rival == null && GD.Randf() < fallbackChance)
                 rival = potentialRivals[random.Next(potentialRivals.Count)];
 
             if (rival != null)
@@ -3974,42 +4081,121 @@ public class WorldSimulator
                     Location = rival.CurrentLocation
                 });
 
-                NewsSystem.Instance?.Newsy(false, $"Tensions are rising between {npcName} and {rivalName} at the {npc.CurrentLocation}.");
+                // In online mode, use cooldown to prevent spamming the same message
+                string pairKey = GetPairKey(npc.Id, rival.Id);
+                if (!isOnline || !_tensionMessageCooldown.ContainsKey(pairKey))
+                {
+                    NewsSystem.Instance?.Newsy(false, $"Tensions are rising between {npcName} and {rivalName} at the {npc.CurrentLocation}.");
+                    if (isOnline) _tensionMessageCooldown[pairKey] = _currentTick;
+                }
             }
         }
 
-        // Escalate existing rivalries between enemies
+        // --- Escalate existing rivalries between enemies ---
+        // Online: 3% chance (was 12%) with per-pair cooldown and daily combat cap
+        // Single-player: 12% chance (unchanged)
+        float escalationChance = isOnline ? 0.03f : 0.12f;
+
         var enemies = npcs.Where(npc => npc.IsAlive && !npc.IsDead && npc.Enemies.Count > 0).ToList();
 
         foreach (var npc in enemies)
         {
+            // Clean corrupt self-references from enemy list
+            npc.Enemies.RemoveAll(eid => eid == npc.Id);
+            if (npc.Enemies.Count == 0) continue;
+
+            // Online: skip NPC if they've hit their daily combat cap
+            if (isOnline && HasHitDailyCombatCap(npc.Id)) continue;
+
             foreach (var enemyId in npc.Enemies.ToList()) // ToList to avoid modification during iteration
             {
                 var enemy = npcs.FirstOrDefault(n => n.Id == enemyId);
-                if (enemy?.IsAlive == true && !enemy.IsDead && GD.Randf() < 0.12f) // 12% chance
-                {
-                    // Escalate the rivalry - only if at same location
-                    if (npc.CurrentLocation == enemy.CurrentLocation)
-                    {
-                        // Pick conflict type based on instigator's personality
-                        var personality2 = npc.Brain?.Personality;
-                        var world = new WorldState(npcs);
+                if (enemy == null || enemy.Id == npc.Id) continue; // skip self (corrupt enemy list)
+                if (!enemy.IsAlive || enemy.IsDead) continue;
+                if (GD.Randf() >= escalationChance) continue;
 
-                        if (personality2 != null && personality2.Greed > 0.5f && personality2.Intelligence > 0.5f)
-                        {
-                            ExecuteTheft(npc, enemy);
-                        }
-                        else if (personality2 != null && personality2.Courage > 0.6f && personality2.Aggression < 0.6f)
-                        {
-                            ExecuteChallenge(npc, enemy);
-                        }
-                        else
-                        {
-                            // Default: brawl (existing combat)
-                            ExecuteAttack(npc, enemyId, world);
-                            AddGossip($"{npc.Name2 ?? npc.Name} got into a brawl with {enemy.Name2 ?? enemy.Name} at the {npc.CurrentLocation}");
-                        }
+                // Must be at same location to escalate
+                if (npc.CurrentLocation != enemy.CurrentLocation) continue;
+
+                // Online: check per-pair cooldown
+                if (isOnline)
+                {
+                    string pairKey = GetPairKey(npc.Id, enemyId);
+                    if (_pairEscalationCooldown.TryGetValue(pairKey, out int lastTick) &&
+                        _currentTick - lastTick < PAIR_ESCALATION_COOLDOWN_TICKS)
+                        continue;
+                    _pairEscalationCooldown[pairKey] = _currentTick;
+
+                    // Also check enemy's daily combat cap
+                    if (HasHitDailyCombatCap(enemyId)) continue;
+                }
+
+                // Pick conflict type based on instigator's personality
+                var personality2 = npc.Brain?.Personality;
+                var world = new WorldState(npcs);
+
+                if (personality2 != null && personality2.Greed > 0.5f && personality2.Intelligence > 0.5f)
+                {
+                    ExecuteTheft(npc, enemy);
+                }
+                else if (personality2 != null && personality2.Courage > 0.6f && personality2.Aggression < 0.6f)
+                {
+                    ExecuteChallenge(npc, enemy);
+                }
+                else
+                {
+                    // Default: brawl (existing combat)
+                    ExecuteAttack(npc, enemyId, world);
+                    AddGossip($"{npc.Name2 ?? npc.Name} got into a brawl with {enemy.Name2 ?? enemy.Name} at the {npc.CurrentLocation}");
+                }
+
+                // Record combat for daily cap
+                if (isOnline)
+                {
+                    RecordCombat(npc.Id);
+                    RecordCombat(enemyId);
+                }
+            }
+        }
+
+        // --- Online mode: periodic enemy reconciliation ---
+        // Every sim-day, enemies have a chance to bury the hatchet
+        if (isOnline && _currentTick % TICKS_PER_SIM_DAY == 0)
+        {
+            ProcessReconciliation(aliveNpcs);
+        }
+    }
+
+    /// <summary>
+    /// Enemies gradually reconcile over time. Low-aggression NPCs drop old rivalries.
+    /// Each enemy pair has a 10-20% chance per sim-day to reconcile (based on personality).
+    /// </summary>
+    private void ProcessReconciliation(List<NPC> aliveNpcs)
+    {
+        foreach (var npc in aliveNpcs)
+        {
+            if (npc.Enemies.Count == 0) continue;
+            var personality = npc.Brain?.Personality;
+            // Base reconciliation chance: 15%. Low aggression increases it, high aggression decreases it.
+            float baseChance = 0.15f;
+            if (personality != null)
+            {
+                baseChance += (1f - personality.Aggression) * 0.10f; // Peaceful NPCs reconcile more
+                baseChance -= personality.Aggression * 0.05f;        // Aggressive NPCs hold grudges
+            }
+            baseChance = Math.Clamp(baseChance, 0.05f, 0.30f);
+
+            foreach (var enemyId in npc.Enemies.ToList())
+            {
+                if (GD.Randf() < baseChance)
+                {
+                    npc.Enemies.Remove(enemyId);
+                    var enemy = npcs.FirstOrDefault(n => n.Id == enemyId);
+                    if (enemy != null)
+                    {
+                        enemy.Enemies.Remove(npc.Id);
                     }
+                    // No news for reconciliation — it happens quietly
                 }
             }
         }
@@ -4020,6 +4206,8 @@ public class WorldSimulator
     /// </summary>
     private void ExecuteTheft(NPC thief, NPC victim)
     {
+        // Guard against self-theft (corrupt enemy list)
+        if (thief.Id == victim.Id) return;
         if (victim.Gold <= 0) return;
 
         // Steal 5-15% of victim's gold
@@ -4068,6 +4256,7 @@ public class WorldSimulator
     /// </summary>
     private void ExecuteChallenge(NPC challenger, NPC target)
     {
+        if (challenger.Id == target.Id) return; // Guard against self-challenge
         string challengerName = challenger.Name2 ?? challenger.Name;
         string targetName = target.Name2 ?? target.Name;
 

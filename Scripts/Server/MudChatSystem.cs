@@ -13,14 +13,14 @@ namespace UsurperRemake.Server;
 ///   /shout message    → global broadcast (all connected players see it)
 ///   /tell player msg  → instant private message to a specific player
 ///   /emote action     → room-scoped emote ("* PlayerName waves hello")
+///   /gossip message   → global out-of-character chat channel (/gos shortcut)
 ///   /who              → show all online players and their locations
-///   /news             → show recent world news (delegates to existing NewsSystem)
 ///
 /// Wizard commands are routed to WizardCommandSystem before normal chat processing.
 /// </summary>
 public static class MudChatSystem
 {
-    private static readonly string[] ChatCommands = { "say", "s", "shout", "tell", "t", "emote", "me" };
+    private static readonly string[] ChatCommands = { "say", "s", "shout", "tell", "t", "emote", "me", "gossip", "gos" };
 
     /// <summary>
     /// Try to process a slash command as a MUD chat command.
@@ -89,6 +89,10 @@ public static class MudChatSystem
             case "emote":
             case "me":
                 return HandleEmote(username, args, terminal);
+
+            case "gossip":
+            case "gos":
+                return HandleGossip(username, args, terminal);
 
             case "who":
             case "w":
@@ -206,6 +210,27 @@ public static class MudChatSystem
         RoomRegistry.Instance.BroadcastToRoom(
             location.Value,
             $"\u001b[1;36m  * {username} {action}\u001b[0m",
+            excludeUsername: username);
+
+        return true;
+    }
+
+    private static bool HandleGossip(string username, string message, TerminalEmulator terminal)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  Gossip what? Usage: /gossip <message>  (or /gos)");
+            return true;
+        }
+
+        // Show to sender
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  [Gossip] You: {message}");
+
+        // Broadcast to ALL connected players (global out-of-character channel)
+        RoomRegistry.Instance!.BroadcastGlobal(
+            $"\u001b[92m  [Gossip] {username}: {message}\u001b[0m",
             excludeUsername: username);
 
         return true;

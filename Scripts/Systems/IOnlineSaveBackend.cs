@@ -262,6 +262,7 @@ namespace UsurperRemake.Systems
         public DateTime ExpiresAt { get; set; }
         public string? Buyer { get; set; }
         public string Status { get; set; } = "active";
+        public bool GoldCollected { get; set; }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

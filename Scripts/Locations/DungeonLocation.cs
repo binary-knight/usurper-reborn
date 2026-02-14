@@ -9302,7 +9302,7 @@ public class DungeonLocation : BaseLocation
         for (int i = 0; i < leverCount; i++)
         {
             if (!int.TryParse(parts[i], out int lever)) return false;
-            if ((lever - 1).ToString() != puzzle.Solution[i]) return false;
+            if (lever.ToString() != puzzle.Solution[i]) return false;
         }
 
         return true;

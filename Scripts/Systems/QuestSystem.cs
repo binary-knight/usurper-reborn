@@ -108,7 +108,7 @@ public partial class QuestSystem : Node
     /// <summary>
     /// Complete quest and give rewards (Pascal: Quest completion from PLYQUEST.PAS)
     /// </summary>
-    public static QuestCompletionResult CompleteQuest(Character player, string questId, TerminalUI terminal)
+    public static QuestCompletionResult CompleteQuest(Character player, string questId, TerminalEmulator terminal)
     {
         var quest = GetQuestById(questId);
         if (quest == null) return QuestCompletionResult.QuestNotFound;
@@ -121,11 +121,28 @@ public partial class QuestSystem : Node
         {
             return QuestCompletionResult.RequirementsNotMet;
         }
-        
+
+        // Display completion banner
+        terminal.WriteLine("");
+        terminal.WriteLine("╔════════════════════════════════════════╗", "bright_yellow");
+        terminal.WriteLine("║         QUEST COMPLETED!               ║", "bright_yellow");
+        terminal.WriteLine("╚════════════════════════════════════════╝", "bright_yellow");
+        terminal.WriteLine("");
+
+        // For equipment purchase quests, remove the purchased item from the player
+        // (the quest says "the Merchant Guild needs it", so the item is handed over)
+        if (quest.QuestTarget == QuestTarget.BuyWeapon ||
+            quest.QuestTarget == QuestTarget.BuyArmor ||
+            quest.QuestTarget == QuestTarget.BuyAccessory ||
+            quest.QuestTarget == QuestTarget.BuyShield)
+        {
+            RemoveQuestEquipment(player, quest, terminal);
+        }
+
         // Calculate and give rewards (Pascal reward calculations)
         var rewardAmount = quest.CalculateReward(player.Level);
         ApplyQuestReward(player, quest, rewardAmount, terminal);
-        
+
         // Mark quest as complete
         quest.Deleted = true;
         quest.Occupier = "";
@@ -601,48 +618,89 @@ public partial class QuestSystem : Node
     /// <summary>
     /// Apply quest reward to player (Pascal: Reward application)
     /// </summary>
-    private static void ApplyQuestReward(Character player, Quest quest, long rewardAmount, TerminalUI terminal)
+    private static void ApplyQuestReward(Character player, Quest quest, long rewardAmount, TerminalEmulator terminal)
     {
-        if (quest.Reward == 0 || rewardAmount == 0) return;
-        
-        terminal.WriteLine("", "white");
-        terminal.WriteLine("═══════════════════════════════════════", "bright_green");
-        terminal.WriteLine("          QUEST COMPLETED!", "bright_green");
-        terminal.WriteLine("═══════════════════════════════════════", "bright_green");
-        terminal.WriteLine("", "white");
-        
+        // Fallback: if reward is 0 (e.g. old save data), give a minimum reward
+        if (quest.Reward == 0 || rewardAmount == 0)
+        {
+            quest.Reward = 1;
+            if (quest.RewardType == QuestRewardType.Nothing)
+                quest.RewardType = QuestRewardType.Money;
+            rewardAmount = quest.CalculateReward(player.Level);
+            if (rewardAmount == 0)
+                rewardAmount = player.Level * 100; // absolute fallback
+        }
+
         switch (quest.RewardType)
         {
             case QuestRewardType.Experience:
                 player.Experience += rewardAmount;
-                terminal.WriteLine($"You gain {rewardAmount} experience points!", "bright_green");
+                terminal.WriteLine($"  Reward: {rewardAmount} experience points!", "bright_green");
                 break;
-                
+
             case QuestRewardType.Money:
                 player.Gold += rewardAmount;
-                terminal.WriteLine($"You receive {rewardAmount} gold!", "bright_yellow");
+                terminal.WriteLine($"  Reward: {rewardAmount} gold!", "bright_yellow");
                 break;
-                
+
             case QuestRewardType.Potions:
                 player.Healing += (int)rewardAmount;
-                terminal.WriteLine($"You receive {rewardAmount} healing potions!", "bright_cyan");
+                terminal.WriteLine($"  Reward: {rewardAmount} healing potions!", "bright_cyan");
                 break;
-                
+
             case QuestRewardType.Darkness:
                 player.Darkness += (int)rewardAmount;
-                terminal.WriteLine($"You gain {rewardAmount} darkness points!", "dark_red");
+                terminal.WriteLine($"  Reward: {rewardAmount} darkness points!", "red");
                 break;
-                
+
             case QuestRewardType.Chivalry:
                 player.Chivalry += (int)rewardAmount;
-                terminal.WriteLine($"You gain {rewardAmount} chivalry points!", "bright_white");
+                terminal.WriteLine($"  Reward: {rewardAmount} chivalry points!", "bright_white");
+                break;
+
+            default:
+                player.Gold += player.Level * 100;
+                terminal.WriteLine($"  Reward: {player.Level * 100} gold!", "bright_yellow");
                 break;
         }
-        
-        terminal.WriteLine($"Congratulations! You have now completed {player.RoyQuests + 1} quests in your career.", "white");
-        terminal.WriteLine("", "white");
     }
     
+    /// <summary>
+    /// Remove the purchased equipment from the player when turning in an equipment quest.
+    /// Checks equipped slots and inventory for the matching item.
+    /// </summary>
+    private static void RemoveQuestEquipment(Character player, Quest quest, TerminalEmulator terminal)
+    {
+        // Find the target equipment name from the quest objectives
+        var equipObjective = quest.Objectives.FirstOrDefault(o =>
+            o.ObjectiveType == QuestObjectiveType.PurchaseEquipment);
+        if (equipObjective == null) return;
+
+        var targetName = equipObjective.TargetName;
+        if (string.IsNullOrEmpty(targetName)) return;
+
+        // Check equipped slots for the item
+        foreach (var slot in Enum.GetValues<EquipmentSlot>())
+        {
+            var equipped = player.GetEquipment(slot);
+            if (equipped != null && equipped.Name.Equals(targetName, StringComparison.OrdinalIgnoreCase))
+            {
+                player.UnequipSlot(slot);
+                terminal.WriteLine($"  You hand over your {targetName} to the Merchant Guild.", "gray");
+                return;
+            }
+        }
+
+        // Check inventory (legacy Item list)
+        var inventoryItem = player.Inventory?.FirstOrDefault(i =>
+            i.Name.Equals(targetName, StringComparison.OrdinalIgnoreCase));
+        if (inventoryItem != null)
+        {
+            player.Inventory.Remove(inventoryItem);
+            terminal.WriteLine($"  You hand over your {targetName} to the Merchant Guild.", "gray");
+        }
+    }
+
     /// <summary>
     /// Process quest failure (Pascal: Quest failure handling)
     /// </summary>
@@ -1071,67 +1129,73 @@ public partial class QuestSystem : Node
     /// </summary>
     public static void InitializeStarterQuests()
     {
-        // Don't add if there are already quests
-        if (questDatabase.Count > 0) return;
+        // Remove unclaimed Royal Council starter quests so they get regenerated
+        // with updated monster names and objectives. Claimed quests are preserved.
+        questDatabase.RemoveAll(q =>
+            q.Initiator == "Royal Council" &&
+            string.IsNullOrEmpty(q.Occupier) &&
+            !q.Deleted);
 
-        // GD.Print("[QuestSystem] Initializing starter quests...");
+        // Don't add if there are already Royal Council quests (player has claimed some)
+        if (questDatabase.Any(q => q.Initiator == "Royal Council"))
+            return;
 
-        // Beginner quests (levels 1-10)
-        CreateStarterQuest("The King's Pest Control",
-            "Clear the rats from the castle cellars",
-            QuestTarget.Monster, 1, 1, 10,
-            new[] { ("Giant Rat", 5), ("Sewer Rat", 3) });
+        // Beginner quests (levels 1-15)
+        CreateStarterQuest("Wolf Pack",
+            "Wolves have been menacing travelers near the dungeon. Hunt them down.",
+            QuestTarget.Monster, 1, 1, 15,
+            new[] { ("Wolf", 5), ("Dire Wolf", 2) });
 
         CreateStarterQuest("Goblin Menace",
-            "A goblin tribe has been raiding merchant caravans",
+            "Goblins from the dungeon have been raiding merchant caravans. Thin their numbers.",
             QuestTarget.Monster, 1, 1, 15,
-            new[] { ("Goblin", 4), ("Goblin Scout", 2) });
+            new[] { ("Goblin", 4), ("Hobgoblin", 2) });
 
         CreateStarterQuest("Undead Rising",
-            "Skeletons have been spotted near the old cemetery",
+            "The undead are stirring in the dungeon depths. Destroy them before they spread.",
             QuestTarget.Monster, 2, 5, 20,
-            new[] { ("Skeleton", 5), ("Skeleton Warrior", 2) });
+            new[] { ("Zombie", 5), ("Ghoul", 2) });
 
-        // Intermediate quests (levels 10-30)
+        // Intermediate quests (levels 10-35)
         CreateStarterQuest("The Orc Warlord",
-            "An orc chieftain threatens the northern villages",
-            QuestTarget.Monster, 2, 10, 30,
-            new[] { ("Orc", 6), ("Orc Warrior", 3), ("Orc Shaman", 1) });
+            "An orc warband grows in strength deep in the dungeon. Cull their forces.",
+            QuestTarget.Monster, 2, 10, 35,
+            new[] { ("Orc", 6), ("Orc Warrior", 3), ("Orc Berserker", 1) });
 
-        CreateStarterQuest("Troll Bridge",
-            "Trolls have taken control of the eastern bridge",
-            QuestTarget.Monster, 2, 15, 35,
-            new[] { ("Troll", 3), ("Cave Troll", 2) });
+        CreateStarterQuest("Troll Hunt",
+            "Ogres and trolls lurk in the dungeon's middle levels. Clear them out.",
+            QuestTarget.Monster, 2, 15, 40,
+            new[] { ("Ogre", 3), ("Troll", 2) });
 
         CreateStarterQuest("Dungeon Delve",
-            "Explore the dungeon depths and report back",
+            "Explore the dungeon depths and report back what you find.",
             QuestTarget.ReachFloor, 2, 10, 40,
             floorTarget: 10);
 
-        // Advanced quests (levels 25-50)
-        CreateStarterQuest("Dragon's Lair",
-            "A young dragon terrorizes the countryside",
-            QuestTarget.ClearBoss, 3, 25, 50,
-            new[] { ("Young Dragon", 1), ("Drake", 2) });
+        // Advanced quests (levels 20-55)
+        CreateStarterQuest("Dragon Hunt",
+            "Draconic creatures infest the deeper dungeon levels. Slay them.",
+            QuestTarget.Monster, 3, 20, 55,
+            new[] { ("Drake", 3), ("Wyvern", 1) });
 
         CreateStarterQuest("The Deep Descent",
-            "Reach the 25th floor of the dungeon",
+            "Reach the 25th floor of the dungeon.",
             QuestTarget.ReachFloor, 3, 20, 60,
             floorTarget: 25);
 
-        CreateStarterQuest("Artifact Recovery",
-            "An ancient artifact was lost in the dungeon",
-            QuestTarget.FindArtifact, 3, 25, 55,
+        CreateStarterQuest("Deep Exploration",
+            "Scouts report strange activity on the 15th floor. Investigate the depths.",
+            QuestTarget.ReachFloor, 3, 10, 40,
             floorTarget: 15);
 
-        // Expert quests (levels 40+)
+        // Expert quests (levels 50+)
         CreateStarterQuest("The Lich King",
-            "An ancient lich has awakened in the deep dungeon",
-            QuestTarget.ClearBoss, 4, 40, 100,
-            new[] { ("Lich", 1), ("Wraith", 4), ("Specter", 3) });
+            "An ancient lich commands undead legions in the deep dungeon. Destroy them all.",
+            QuestTarget.Monster, 4, 50, 100,
+            new[] { ("Lich", 1), ("Wraith", 4), ("Shade", 3) });
 
         CreateStarterQuest("Abyssal Expedition",
-            "Reach the 50th floor of the dungeon",
+            "Reach the 50th floor of the dungeon.",
             QuestTarget.ReachFloor, 4, 35, 100,
             floorTarget: 50);
 
@@ -1168,8 +1232,22 @@ public partial class QuestSystem : Node
             }
         }
 
-        // Add objective for floor-based quests
-        if (target == QuestTarget.ReachFloor && floorTarget > 0)
+        // Add objectives based on quest type
+        if (target == QuestTarget.Monster && monsters != null)
+        {
+            // Create a KillSpecificMonster objective for each monster type
+            foreach (var (name, count) in monsters)
+            {
+                quest.Objectives.Add(new QuestObjective(
+                    QuestObjectiveType.KillSpecificMonster,
+                    $"Kill {count} {name}{(count > 1 ? "s" : "")}",
+                    count,
+                    name.ToLower().Replace(" ", "_"),
+                    name
+                ));
+            }
+        }
+        else if (target == QuestTarget.ReachFloor && floorTarget > 0)
         {
             quest.Objectives.Add(new QuestObjective(
                 QuestObjectiveType.ReachDungeonFloor,
@@ -1177,16 +1255,6 @@ public partial class QuestSystem : Node
                 floorTarget,
                 "",
                 $"Floor {floorTarget}"
-            ));
-        }
-        else if (target == QuestTarget.FindArtifact && floorTarget > 0)
-        {
-            quest.Objectives.Add(new QuestObjective(
-                QuestObjectiveType.FindArtifact,
-                "Find the ancient artifact",
-                1,
-                "",
-                "Ancient Artifact"
             ));
         }
         else if (target == QuestTarget.ClearBoss)
@@ -1212,10 +1280,9 @@ public partial class QuestSystem : Node
     /// </summary>
     public static void EnsureQuestsExist(int playerLevel = 10)
     {
-        if (questDatabase.Count == 0)
-        {
-            InitializeStarterQuests();
-        }
+        // Always call — InitializeStarterQuests handles its own
+        // idempotency (removes stale unclaimed quests, skips if claimed exist)
+        InitializeStarterQuests();
 
         // Also ensure King bounties exist
         RefreshKingBounties();
@@ -1571,9 +1638,10 @@ public partial class QuestSystem : Node
     /// </summary>
     private static string GetRandomMonsterForLevel(int playerLevel)
     {
-        var lowLevel = new[] { "Giant Rat", "Goblin", "Kobold", "Skeleton", "Zombie" };
-        var midLevel = new[] { "Orc", "Troll", "Ogre", "Wraith", "Specter" };
-        var highLevel = new[] { "Dragon", "Demon", "Lich", "Vampire", "Dark Knight" };
+        // Use actual MonsterFamilies names that players will encounter in the dungeon
+        var lowLevel = new[] { "Wolf", "Goblin", "Kobold", "Zombie", "Imp" };
+        var midLevel = new[] { "Orc", "Troll", "Ogre", "Wraith", "Wyvern" };
+        var highLevel = new[] { "Ancient Dragon", "Archfiend", "Lich", "Titan", "Void Entity" };
 
         if (playerLevel <= 15)
             return lowLevel[random.Next(lowLevel.Length)];

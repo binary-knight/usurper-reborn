@@ -274,6 +274,15 @@ namespace UsurperRemake.Systems
             }
             catch { /* Column already exists - expected */ }
 
+            // Migration: add gold_collected column to auction_listings
+            try
+            {
+                using var migCmd2 = connection.CreateCommand();
+                migCmd2.CommandText = "ALTER TABLE auction_listings ADD COLUMN gold_collected INTEGER DEFAULT 0;";
+                migCmd2.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
             // Migration: add wizard_level column to existing players table
             try
             {
@@ -2667,7 +2676,7 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"SELECT id, seller, item_name, item_json, price, listed_at, expires_at, status
+            cmd.CommandText = @"SELECT id, seller, item_name, item_json, price, listed_at, expires_at, status, COALESCE(gold_collected, 0)
                                 FROM auction_listings WHERE LOWER(seller) = LOWER(@seller)
                                 ORDER BY listed_at DESC LIMIT 20;";
             cmd.Parameters.AddWithValue("@seller", seller);
@@ -2683,7 +2692,8 @@ namespace UsurperRemake.Systems
                     Price = reader.GetInt64(4),
                     ListedAt = DateTime.TryParse(reader.GetString(5), out var lt) ? lt : DateTime.Now,
                     ExpiresAt = DateTime.TryParse(reader.GetString(6), out var et) ? et : DateTime.Now,
-                    Status = reader.GetString(7)
+                    Status = reader.GetString(7),
+                    GoldCollected = reader.GetInt32(8) != 0
                 });
             }
         }
@@ -2702,6 +2712,22 @@ namespace UsurperRemake.Systems
             await cmd.ExecuteNonQueryAsync();
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to cleanup auctions: {ex.Message}"); }
+    }
+
+    public async Task<bool> CollectAuctionGold(int listingId, string seller)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE auction_listings SET gold_collected = 1
+                                WHERE id = @id AND LOWER(seller) = LOWER(@seller) AND status = 'sold' AND COALESCE(gold_collected, 0) = 0;";
+            cmd.Parameters.AddWithValue("@id", listingId);
+            cmd.Parameters.AddWithValue("@seller", seller);
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected > 0;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to collect auction gold: {ex.Message}"); return false; }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

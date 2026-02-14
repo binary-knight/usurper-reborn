@@ -293,12 +293,7 @@ public class QuestHallLocation : BaseLocation
 
             if (result == QuestCompletionResult.Success)
             {
-                terminal.WriteLine("");
-                terminal.WriteLine("╔════════════════════════════════════════╗", "bright_yellow");
-                terminal.WriteLine("║         QUEST COMPLETED!               ║", "bright_yellow");
-                terminal.WriteLine("╚════════════════════════════════════════╝", "bright_yellow");
-                terminal.WriteLine("");
-                terminal.WriteLine("The clerk nods approvingly and hands you your reward.", "white");
+                terminal.WriteLine($"  Quests completed: {currentPlayer.RoyQuests}", "gray");
             }
             else if (result == QuestCompletionResult.RequirementsNotMet)
             {
@@ -310,7 +305,7 @@ public class QuestHallLocation : BaseLocation
             }
         }
 
-        await Task.Delay(500);
+        await terminal.PressAnyKey();
     }
 
     private async Task ViewBountyBoard()
@@ -414,8 +409,8 @@ public class QuestHallLocation : BaseLocation
             }
         }
 
-        // Show monster targets if any
-        if (quest.Monsters.Count > 0)
+        // Show monster targets if any (legacy display, kept for quests that populate Monsters list)
+        if (quest.Monsters.Count > 0 && quest.Objectives.Count == 0)
         {
             terminal.WriteLine("  Targets:", "cyan");
             foreach (var monster in quest.Monsters)
@@ -423,5 +418,19 @@ public class QuestHallLocation : BaseLocation
                 terminal.WriteLine($"    - {monster.MonsterName} x{monster.Count}");
             }
         }
+
+        // Show completion hint
+        terminal.SetColor("darkgray");
+        if (quest.QuestTarget == QuestTarget.Monster || quest.QuestTarget == QuestTarget.ClearBoss)
+            terminal.WriteLine("  Hint: Fight monsters in the Dungeon to complete this quest.");
+        else if (quest.QuestTarget == QuestTarget.ReachFloor)
+            terminal.WriteLine("  Hint: Explore deeper into the Dungeon to reach the target floor.");
+        else if (quest.QuestTarget == QuestTarget.FindArtifact)
+            terminal.WriteLine("  Hint: Search dungeon rooms for the artifact.");
+        else if (quest.QuestTarget == QuestTarget.BuyWeapon || quest.QuestTarget == QuestTarget.BuyArmor ||
+                 quest.QuestTarget == QuestTarget.BuyAccessory || quest.QuestTarget == QuestTarget.BuyShield)
+            terminal.WriteLine("  Hint: Purchase the item from the appropriate shop in town.");
+        else if (quest.QuestTarget == QuestTarget.DefeatNPC)
+            terminal.WriteLine("  Hint: Find and defeat the target in combat.");
     }
 }

@@ -30,6 +30,13 @@ public partial class TerminalEmulator : Control
     public bool IsStreamBacked => _streamWriter != null;
 
     /// <summary>
+    /// When set, GetInput() runs a background pump that calls this function every ~100ms
+    /// to check for incoming messages. Returns a pre-formatted ANSI string, or null if empty.
+    /// Only used in MUD stream mode for real-time chat delivery.
+    /// </summary>
+    public Func<string?>? MessageSource { get; set; }
+
+    /// <summary>
     /// Default constructor for Godot/Console mode (single-player, BBS door).
     /// </summary>
     public TerminalEmulator() { }
@@ -602,7 +609,27 @@ public partial class TerminalEmulator : Control
         if (_streamWriter != null && _streamReader != null)
         {
             Write(prompt, "bright_white");
-            var line = await _streamReader.ReadLineAsync();
+
+            string? line;
+            if (MessageSource != null)
+            {
+                // Run message pump concurrently with input reading for real-time chat
+                using var pumpCts = new CancellationTokenSource();
+                var pumpTask = RunMessagePumpAsync(prompt, pumpCts.Token);
+                try
+                {
+                    line = await _streamReader.ReadLineAsync();
+                }
+                finally
+                {
+                    pumpCts.Cancel();
+                    try { await pumpTask; } catch (OperationCanceledException) { }
+                }
+            }
+            else
+            {
+                line = await _streamReader.ReadLineAsync();
+            }
 
             // Update idle timeout tracker
             var ctx = UsurperRemake.Server.SessionContext.Current;
@@ -1223,6 +1250,48 @@ public partial class TerminalEmulator : Control
 
     // Synchronous helper for legacy code paths
     public string GetInputSync(string prompt = "> ") => GetInput(prompt).GetAwaiter().GetResult();
+
+    // ═══════════════════════════════════════════════════════════════════
+    // REAL-TIME MESSAGE PUMP (MUD mode only)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Background task that polls MessageSource every 100ms and writes incoming
+    /// messages directly to the TCP stream while ReadLineAsync is pending.
+    /// Clears the current prompt line, writes message(s), then redraws the prompt.
+    /// This is standard MUD behavior — messages appear inline during input.
+    /// </summary>
+    private async Task RunMessagePumpAsync(string prompt, CancellationToken ct)
+    {
+        if (_streamWriter == null || MessageSource == null) return;
+
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(100, ct);
+
+                bool anyWritten = false;
+                string? msg;
+                while ((msg = MessageSource()) != null)
+                {
+                    // Erase the prompt line, write the message
+                    _streamWriter.Write("\r\x1b[2K"); // CR + erase entire line
+                    _streamWriter.Write(msg);
+                    _streamWriter.Write("\r\n\x1b[0m"); // newline + reset color
+                    anyWritten = true;
+                }
+
+                if (anyWritten)
+                {
+                    // Redraw the prompt
+                    _streamWriter.Write($"\x1b[{GetAnsiColorCode("bright_white")}m{prompt}");
+                    _streamWriter.Flush();
+                }
+            }
+        }
+        catch (OperationCanceledException) { /* Normal cancellation when input received */ }
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     // MUD STREAM I/O HELPERS

@@ -437,6 +437,8 @@ public class ArenaLocation : BaseLocation
                 ? $"[Arena] {myName} attacked you in the Arena and won! They stole {goldStolen:N0} of your gold."
                 : $"[Arena] {myName} attacked you in the Arena but your shadow defeated them! You gained {goldStolen:N0} gold.";
             await backend.SendMessage(myUsername, defenderUsername, "pvp", notifyMsg);
+            UsurperRemake.Server.MudServer.Instance?.SendToPlayer(defenderUsername,
+                $"\u001b[91m  {notifyMsg}\u001b[0m");
         }
 
         // Autosave (attacker damage persists)

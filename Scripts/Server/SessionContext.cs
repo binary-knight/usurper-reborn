@@ -77,6 +77,10 @@ public class SessionContext : IDisposable
     public RomanceTracker Romance { get; set; } = null!;
     public IntimacySystem Intimacy { get; set; } = null!;
 
+    // --- Per-Session Online Systems ---
+    public OnlineStateManager? OnlineState { get; set; }
+    public OnlineChatSystem? OnlineChat { get; set; }
+
     // --- Per-Session Wizard State ---
     public WizardLevel WizardLevel { get; set; } = WizardLevel.Mortal;
     public bool WizardGodMode { get; set; } = false;
