@@ -236,6 +236,11 @@ public class Character
     public int TempDefenseBonusDuration { get; set; } = 0;
     public bool DodgeNextAttack { get; set; } = false;
 
+    // Ability-applied combat state flags (combat-transient, not serialized)
+    public bool HasBloodlust { get; set; } = false;      // Barbarian: heal on kill
+    public bool HasStatusImmunity { get; set; } = false;  // Immune to debuffs
+    public int StatusImmunityDuration { get; set; } = 0;
+
     // Companion system integration
     public bool IsCompanion { get; set; } = false;
     public UsurperRemake.Systems.CompanionId? CompanionId { get; set; } = null;
@@ -1175,6 +1180,9 @@ public class Character
         HasOceanMemory = false;
         DamageAbsorptionPool = 0;
         MagicACBonus = 0;
+        HasBloodlust = false;
+        HasStatusImmunity = false;
+        StatusImmunityDuration = 0;
     }
 
     /// <summary>

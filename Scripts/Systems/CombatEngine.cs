@@ -198,6 +198,9 @@ public partial class CombatEngine
         player.TempDefenseBonus = 0;
         player.TempDefenseBonusDuration = 0;
         player.DodgeNextAttack = false;
+        player.HasBloodlust = false;
+        player.HasStatusImmunity = false;
+        player.StatusImmunityDuration = 0;
         abilityCooldowns.Clear();
 
         // Initialize combat stamina for player and teammates
@@ -1785,6 +1788,117 @@ public partial class CombatEngine
             monster.Charmed = false;
         }
 
+        // Check if monster is sleeping (from Sleep spell or ability)
+        if (monster.IsSleeping)
+        {
+            terminal.WriteLine($"{monster.Name} is fast asleep!", "cyan");
+            monster.SleepDuration--;
+            if (monster.SleepDuration <= 0)
+            {
+                monster.IsSleeping = false;
+                terminal.WriteLine($"{monster.Name} wakes up!", "yellow");
+            }
+            await Task.Delay(GetCombatDelay(600));
+            return;
+        }
+
+        // Check if monster is feared (from Fear spell or Intimidating Roar)
+        if (monster.IsFeared)
+        {
+            terminal.WriteLine($"{monster.Name} cowers in fear and cannot attack!", "yellow");
+            monster.FearDuration--;
+            if (monster.FearDuration <= 0)
+            {
+                monster.IsFeared = false;
+                terminal.WriteLine($"{monster.Name} shakes off the fear!", "yellow");
+            }
+            await Task.Delay(GetCombatDelay(600));
+            return;
+        }
+
+        // Check if monster is stunned (modern stun from spells, distinct from legacy Stunned)
+        if (monster.IsStunned)
+        {
+            terminal.WriteLine($"{monster.Name} is stunned and cannot act!", "bright_yellow");
+            monster.StunDuration--;
+            if (monster.StunDuration <= 0)
+            {
+                monster.IsStunned = false;
+            }
+            await Task.Delay(GetCombatDelay(600));
+            return;
+        }
+
+        // Check if monster is frozen (from Frost Bomb)
+        if (monster.IsFrozen)
+        {
+            terminal.WriteLine($"{monster.Name} is frozen solid and cannot act!", "bright_cyan");
+            monster.FrozenDuration--;
+            if (monster.FrozenDuration <= 0)
+            {
+                monster.IsFrozen = false;
+                terminal.WriteLine($"The ice around {monster.Name} shatters!", "cyan");
+            }
+            await Task.Delay(GetCombatDelay(600));
+            return;
+        }
+
+        // Check if monster is confused (from Deadly Joke)
+        if (monster.IsConfused)
+        {
+            monster.ConfusedDuration--;
+            if (random.Next(100) < 50)
+            {
+                terminal.WriteLine($"{monster.Name} stumbles around in confusion!", "magenta");
+                if (monster.ConfusedDuration <= 0) monster.IsConfused = false;
+                await Task.Delay(GetCombatDelay(600));
+                return;
+            }
+            else if (random.Next(100) < 25)
+            {
+                long selfDmg = Math.Max(1, monster.Strength / 3);
+                monster.HP -= selfDmg;
+                terminal.SetColor("magenta");
+                terminal.WriteLine($"{monster.Name} hits itself in confusion for {selfDmg} damage!");
+                if (monster.HP <= 0)
+                {
+                    monster.HP = 0;
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"{monster.Name} defeats itself!");
+                }
+                if (monster.ConfusedDuration <= 0) monster.IsConfused = false;
+                await Task.Delay(GetCombatDelay(600));
+                return;
+            }
+            if (monster.ConfusedDuration <= 0) monster.IsConfused = false;
+            // Falls through to normal action
+        }
+
+        // Check if monster is slowed (from Slow spell)
+        if (monster.IsSlowed)
+        {
+            monster.SlowDuration--;
+            if (random.Next(100) < 50)
+            {
+                terminal.WriteLine($"{monster.Name} moves sluggishly and wastes its turn!", "gray");
+                if (monster.SlowDuration <= 0) monster.IsSlowed = false;
+                await Task.Delay(GetCombatDelay(600));
+                return;
+            }
+            if (monster.SlowDuration <= 0) monster.IsSlowed = false;
+        }
+
+        // Tick down marked duration
+        if (monster.IsMarked)
+        {
+            monster.MarkedDuration--;
+            if (monster.MarkedDuration <= 0)
+            {
+                monster.IsMarked = false;
+                terminal.WriteLine($"The mark on {monster.Name} fades.", "gray");
+            }
+        }
+
         // Check if player will dodge the next attack
         if (player.DodgeNextAttack)
         {
@@ -1979,6 +2093,15 @@ public partial class CombatEngine
             }
         }
 
+        // Invulnerable: divine shield blocks all damage
+        if (player.HasStatus(StatusEffect.Invulnerable))
+        {
+            terminal.WriteLine("The attack cannot penetrate your divine shield!", "bright_white");
+            result.CombatLog.Add($"{monster.Name}'s attack blocked by Invulnerable");
+            await Task.Delay(GetCombatDelay(600));
+            return;
+        }
+
         // Apply damage
         player.HP = Math.Max(0, player.HP - actualDamage);
 
@@ -2045,10 +2168,18 @@ public partial class CombatEngine
         // Apply direct damage
         if (abilityResult.DirectDamage > 0)
         {
-            long actualDamage = Math.Max(1, abilityResult.DirectDamage - (player.Defence / 3));
-            player.HP -= actualDamage;
-            terminal.WriteLine($"You take {actualDamage} damage!", "red");
-            result.CombatLog.Add($"{monster.Name} uses {abilityName} for {actualDamage} damage");
+            if (player.HasStatus(StatusEffect.Invulnerable))
+            {
+                terminal.WriteLine("Your divine shield absorbs the ability!", "bright_white");
+                result.CombatLog.Add($"{monster.Name}'s {abilityName} blocked by Invulnerable");
+            }
+            else
+            {
+                long actualDamage = Math.Max(1, abilityResult.DirectDamage - (player.Defence / 3));
+                player.HP -= actualDamage;
+                terminal.WriteLine($"You take {actualDamage} damage!", "red");
+                result.CombatLog.Add($"{monster.Name} uses {abilityName} for {actualDamage} damage");
+            }
         }
 
         // Apply mana drain
@@ -2061,7 +2192,12 @@ public partial class CombatEngine
         // Apply status effects
         if (abilityResult.InflictStatus != StatusEffect.None && abilityResult.StatusChance > 0)
         {
-            if (random.Next(100) < abilityResult.StatusChance)
+            if (player.HasStatusImmunity)
+            {
+                terminal.WriteLine($"Your iron will resists {abilityResult.InflictStatus}!", "bright_white");
+                result.CombatLog.Add($"Player resists {abilityResult.InflictStatus} (status immunity)");
+            }
+            else if (random.Next(100) < abilityResult.StatusChance)
             {
                 player.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
                 terminal.WriteLine($"You are afflicted with {abilityResult.InflictStatus}!", "yellow");
@@ -2072,24 +2208,40 @@ public partial class CombatEngine
         // Apply life steal
         if (abilityResult.LifeStealPercent > 0 && abilityResult.DamageMultiplier > 0)
         {
-            // Do a regular attack with life steal
-            long damage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
-            damage = Math.Max(1, damage - player.Defence);
-            player.HP -= damage;
-            long healAmount = damage * abilityResult.LifeStealPercent / 100;
-            monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmount);
-            terminal.WriteLine($"You take {damage} damage! {monster.Name} heals {healAmount}!", "magenta");
-            result.CombatLog.Add($"{monster.Name} life drains for {damage} damage, heals {healAmount}");
+            if (player.HasStatus(StatusEffect.Invulnerable))
+            {
+                terminal.WriteLine("Your divine shield deflects the life drain!", "bright_white");
+                result.CombatLog.Add($"{monster.Name}'s life drain blocked by Invulnerable");
+            }
+            else
+            {
+                // Do a regular attack with life steal
+                long damage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
+                damage = Math.Max(1, damage - player.Defence);
+                player.HP -= damage;
+                long healAmount = damage * abilityResult.LifeStealPercent / 100;
+                monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmount);
+                terminal.WriteLine($"You take {damage} damage! {monster.Name} heals {healAmount}!", "magenta");
+                result.CombatLog.Add($"{monster.Name} life drains for {damage} damage, heals {healAmount}");
+            }
         }
 
         // Apply damage multiplier attacks (non-life steal)
         if (abilityResult.DamageMultiplier > 0 && abilityResult.LifeStealPercent == 0 && abilityResult.DirectDamage == 0)
         {
-            long damage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
-            damage = Math.Max(1, damage - player.Defence);
-            player.HP -= damage;
-            terminal.WriteLine($"You take {damage} damage!", "red");
-            result.CombatLog.Add($"{monster.Name} uses {abilityName} for {damage} damage");
+            if (player.HasStatus(StatusEffect.Invulnerable))
+            {
+                terminal.WriteLine("Your divine shield absorbs the blow!", "bright_white");
+                result.CombatLog.Add($"{monster.Name}'s {abilityName} blocked by Invulnerable");
+            }
+            else
+            {
+                long damage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
+                damage = Math.Max(1, damage - player.Defence);
+                player.HP -= damage;
+                terminal.WriteLine($"You take {damage} damage!", "red");
+                result.CombatLog.Add($"{monster.Name} uses {abilityName} for {damage} damage");
+            }
         }
 
         return abilityResult.SkipNormalAttack || abilityResult.DirectDamage > 0 || abilityResult.ManaDrain > 0
@@ -3508,6 +3660,19 @@ public partial class CombatEngine
         foreach (var monster in livingMonsters)
         {
             long actualDamage = Math.Max(1, damagePerMonster - monster.ArmPow);
+
+            // Marked targets take 30% bonus damage
+            if (monster.IsMarked)
+                actualDamage = (long)(actualDamage * 1.3);
+
+            // Wake sleeping monsters on damage
+            if (monster.IsSleeping)
+            {
+                monster.IsSleeping = false;
+                monster.SleepDuration = 0;
+                terminal.WriteLine($"{monster.Name} wakes up from the attack!", "yellow");
+            }
+
             monster.HP -= actualDamage;
 
             // Track damage dealt statistics
@@ -3524,6 +3689,18 @@ public partial class CombatEngine
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {monster.Name} has been defeated!");
                 result.DefeatedMonsters.Add(monster);
+
+                // Bloodlust heal-on-kill
+                if (result.Player != null && result.Player.HasBloodlust)
+                {
+                    long bloodlustHeal = Math.Min(result.Player.Level * 2 + 20, result.Player.MaxHP - result.Player.HP);
+                    if (bloodlustHeal > 0)
+                    {
+                        result.Player.HP += bloodlustHeal;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"  BLOODLUST! +{bloodlustHeal} HP!");
+                    }
+                }
             }
 
             result.CombatLog.Add($"{monster.Name} took {actualDamage} damage from {damageSource}");
@@ -3541,6 +3718,15 @@ public partial class CombatEngine
 
         long actualDamage = Math.Max(1, damage - target.ArmPow);
 
+        // Marked target takes 30% bonus damage
+        if (target.IsMarked)
+        {
+            long markedBonus = (long)(actualDamage * 0.3);
+            actualDamage += markedBonus;
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"[MARKED] +{markedBonus} bonus damage!");
+        }
+
         // Apply alignment bonus damage if attacker is provided
         if (attacker != null)
         {
@@ -3554,6 +3740,14 @@ public partial class CombatEngine
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(bonusDesc);
             }
+        }
+
+        // Wake sleeping monsters on damage
+        if (target.IsSleeping)
+        {
+            target.IsSleeping = false;
+            target.SleepDuration = 0;
+            terminal.WriteLine($"{target.Name} wakes up from the attack!", "yellow");
         }
 
         target.HP -= actualDamage;
@@ -3593,6 +3787,19 @@ public partial class CombatEngine
             terminal.WriteLine(deathMessage);
 
             result.DefeatedMonsters.Add(target);
+
+            // Bloodlust heal-on-kill
+            if (result.Player != null && result.Player.HasBloodlust)
+            {
+                long bloodlustHeal = Math.Min(result.Player.Level * 2 + 20, result.Player.MaxHP - result.Player.HP);
+                if (bloodlustHeal > 0)
+                {
+                    result.Player.HP += bloodlustHeal;
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"BLOODLUST! You feast on the kill and recover {bloodlustHeal} HP!");
+                }
+            }
+
             await Task.Delay(GetCombatDelay(800));
         }
 
@@ -4477,14 +4684,474 @@ public partial class CombatEngine
                 break;
 
             case "inspire":
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine("Your inspiring melody bolsters your allies!");
-                // Could buff teammates if they exist
+                if (result.Teammates != null && result.Teammates.Count > 0)
+                {
+                    foreach (var teammate in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        teammate.TempAttackBonus += 15;
+                        teammate.TempAttackBonusDuration = Math.Max(teammate.TempAttackBonusDuration, 3);
+                    }
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("Your allies are inspired! (+15 Attack for 3 rounds)");
+                }
+                else
+                {
+                    player.TempAttackBonus += 10;
+                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("The melody steels your resolve! (+10 Attack for 3 rounds)");
+                }
                 break;
 
             case "resist_all":
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                 terminal.SetColor("bright_white");
-                terminal.WriteLine("Your will becomes unbreakable! You resist all effects!");
+                terminal.WriteLine("Your will becomes unbreakable! Status effects cannot touch you!");
+                break;
+
+            // === DAMAGE ENHANCEMENT EFFECTS ===
+
+            case "reckless":
+                player.TempDefenseBonus -= 20;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 1);
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("Reckless swing! You leave yourself exposed!");
+                break;
+
+            case "desperate":
+                if (player.HP < player.MaxHP * 0.4 && target != null && target.IsAlive)
+                {
+                    long desperateDmg = (long)(abilityResult.Damage * 0.5);
+                    desperateDmg = Math.Max(1, desperateDmg - target.Defence / 4);
+                    target.HP -= desperateDmg;
+                    result.TotalDamageDealt += desperateDmg;
+                    result.Player?.Statistics.RecordDamageDealt(desperateDmg, false);
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"DESPERATION! {desperateDmg} bonus damage!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"{target.Name} is slain!");
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
+                }
+                break;
+
+            case "fire":
+                if (target != null && target.IsAlive)
+                {
+                    bool fireVulnerable = target.MonsterClass == MonsterClass.Plant || target.MonsterClass == MonsterClass.Beast;
+                    if (fireVulnerable)
+                    {
+                        long fireBonusDmg = abilityResult.Damage / 2;
+                        target.HP -= fireBonusDmg;
+                        result.TotalDamageDealt += fireBonusDmg;
+                        result.Player?.Statistics.RecordDamageDealt(fireBonusDmg, false);
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"The fire burns intensely! {fireBonusDmg} bonus damage!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("The bomb explodes in a burst of flame!");
+                    }
+                    target.Poisoned = true;
+                    target.PoisonRounds = Math.Max(target.PoisonRounds, 2);
+                }
+                break;
+
+            case "holy":
+                if (target != null && target.IsAlive &&
+                    (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
+                {
+                    long holyBonusDmg = abilityResult.Damage;
+                    target.HP -= holyBonusDmg;
+                    result.TotalDamageDealt += holyBonusDmg;
+                    result.Player?.Statistics.RecordDamageDealt(holyBonusDmg, false);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"HOLY SMITE! The undead burns with divine fire! +{holyBonusDmg} damage!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"{target.Name} is purified!");
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("Divine energy radiates from your weapon!");
+                }
+                break;
+
+            case "holy_avenger":
+                if (target != null && target.IsAlive &&
+                    (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
+                {
+                    long avengerBonusDmg = (long)(abilityResult.Damage * 0.75);
+                    target.HP -= avengerBonusDmg;
+                    result.TotalDamageDealt += avengerBonusDmg;
+                    result.Player?.Statistics.RecordDamageDealt(avengerBonusDmg, false);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"DIVINE VENGEANCE! +{avengerBonusDmg} holy damage!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
+                }
+                {
+                    long avengerHeal = Math.Min(player.Level * 2, player.MaxHP - player.HP);
+                    if (avengerHeal > 0)
+                    {
+                        player.HP += avengerHeal;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"Divine energy heals you for {avengerHeal} HP!");
+                    }
+                }
+                break;
+
+            case "critical":
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("You strike a vital point!");
+                break;
+
+            case "fury":
+                player.IsRaging = true;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
+                    player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("THE WAR GOD'S FURY BURNS WITHIN YOU!");
+                break;
+
+            case "champion":
+                {
+                    long champHeal = Math.Min(player.Level * 3, player.MaxHP - player.HP);
+                    if (champHeal > 0)
+                    {
+                        player.HP += champHeal;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"The Champion's spirit heals you for {champHeal} HP!");
+                    }
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("A strike worthy of legends!");
+                }
+                break;
+
+            // === AOE EFFECTS ===
+
+            case "aoe_holy":
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("Divine judgment rains down upon all enemies!");
+                    var livingMonsHoly = monsters.Where(m => m.IsAlive).ToList();
+                    foreach (var m in livingMonsHoly)
+                    {
+                        long holyAoeDmg = abilityResult.Damage / Math.Max(1, livingMonsHoly.Count);
+                        if (m.MonsterClass == MonsterClass.Undead || m.MonsterClass == MonsterClass.Demon || m.Undead > 0)
+                            holyAoeDmg = (long)(holyAoeDmg * 1.5);
+                        long actualHolyDmg = Math.Max(1, holyAoeDmg - m.ArmPow / 2);
+                        if (m.IsSleeping) { m.IsSleeping = false; m.SleepDuration = 0; }
+                        m.HP -= actualHolyDmg;
+                        result.Player?.Statistics.RecordDamageDealt(actualHolyDmg, false);
+                        result.TotalDamageDealt += actualHolyDmg;
+                        bool isUndead = m.MonsterClass == MonsterClass.Undead || m.Undead > 0;
+                        terminal.SetColor("yellow");
+                        terminal.Write($"  {m.Name}: ");
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine($"-{actualHolyDmg} HP{(isUndead ? " (HOLY!)" : "")}");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            terminal.SetColor("bright_green");
+                            terminal.WriteLine($"  {m.Name} is purified!");
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
+                    }
+                }
+                break;
+
+            // === CROWD CONTROL EFFECTS ===
+
+            case "fear":
+                if (target != null && target.IsAlive)
+                {
+                    int fearChance = target.IsBoss ? 35 : 70;
+                    if (random.Next(100) < fearChance)
+                    {
+                        target.IsFeared = true;
+                        target.FearDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"{target.Name} is terrified by your roar!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"{target.Name} resists your intimidation!");
+                    }
+                }
+                break;
+
+            case "confusion":
+                if (target != null && target.IsAlive)
+                {
+                    int confuseChance = target.IsBoss ? 30 : 65;
+                    if (random.Next(100) < confuseChance)
+                    {
+                        target.IsConfused = true;
+                        target.ConfusedDuration = 2;
+                        terminal.SetColor("magenta");
+                        terminal.WriteLine($"{target.Name} is bewildered by the joke!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"{target.Name} doesn't get the joke.");
+                    }
+                }
+                break;
+
+            case "freeze":
+                if (target != null && target.IsAlive)
+                {
+                    int freezeChance = target.IsBoss ? 40 : 75;
+                    if (random.Next(100) < freezeChance)
+                    {
+                        target.IsFrozen = true;
+                        target.FrozenDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine($"{target.Name} is frozen solid!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"The frost bites {target.Name} but doesn't freeze it!");
+                    }
+                }
+                break;
+
+            // === KILL/MULTI-HIT EFFECTS ===
+
+            case "instant_kill":
+                if (target != null && target.IsAlive && target.HP < target.MaxHP * 0.25 && !target.IsBoss)
+                {
+                    if (random.Next(100) < 50)
+                    {
+                        long killDmg = target.HP;
+                        target.HP = 0;
+                        result.TotalDamageDealt += killDmg;
+                        result.Player?.Statistics.RecordDamageDealt(killDmg, false);
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"ASSASSINATED! {target.Name} falls instantly!");
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
+                    else
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine("The killing blow narrowly misses the vital spot!");
+                    }
+                }
+                break;
+
+            case "multi_hit":
+                if (target != null && target.IsAlive)
+                {
+                    int extraHits = random.Next(2, 5);
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"FRENZY! {extraHits} additional strikes!");
+                    for (int i = 0; i < extraHits && target.IsAlive; i++)
+                    {
+                        long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - target.Defence / 4);
+                        frenzyDmg = (long)(frenzyDmg * (0.8 + random.NextDouble() * 0.4));
+                        target.HP -= frenzyDmg;
+                        result.TotalDamageDealt += frenzyDmg;
+                        result.Player?.Statistics.RecordDamageDealt(frenzyDmg, false);
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"  Strike {i + 1}: {frenzyDmg} damage!");
+                        if (target.HP <= 0)
+                        {
+                            target.HP = 0;
+                            terminal.SetColor("bright_green");
+                            terminal.WriteLine($"  {target.Name} is torn apart!");
+                            if (!result.DefeatedMonsters.Contains(target))
+                                result.DefeatedMonsters.Add(target);
+                        }
+                    }
+                }
+                break;
+
+            case "execute_all":
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("DEATH BLOSSOM! Blades strike in every direction!");
+                    var livingMonsDB = monsters.Where(m => m.IsAlive).ToList();
+                    foreach (var m in livingMonsDB)
+                    {
+                        long blossomDmg = Math.Max(1, abilityResult.Damage / Math.Max(1, livingMonsDB.Count) - m.Defence / 3);
+                        if (m.HP < m.MaxHP * 0.3)
+                        {
+                            blossomDmg *= 2;
+                            terminal.SetColor("bright_red");
+                            terminal.Write($"  EXECUTE {m.Name}: ");
+                        }
+                        else
+                        {
+                            terminal.SetColor("red");
+                            terminal.Write($"  {m.Name}: ");
+                        }
+                        if (m.IsSleeping) { m.IsSleeping = false; m.SleepDuration = 0; }
+                        m.HP -= blossomDmg;
+                        result.TotalDamageDealt += blossomDmg;
+                        result.Player?.Statistics.RecordDamageDealt(blossomDmg, false);
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"-{blossomDmg} HP");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            terminal.SetColor("bright_green");
+                            terminal.WriteLine($"  {m.Name} is slain!");
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
+                    }
+                }
+                break;
+
+            // === BUFF/UTILITY EFFECTS ===
+
+            case "evasion":
+                player.DodgeNextAttack = true;
+                player.TempDefenseBonus += 50;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 2);
+                terminal.SetColor("magenta");
+                terminal.WriteLine("You melt into the shadows, nearly impossible to hit!");
+                break;
+
+            case "stealth":
+                player.DodgeNextAttack = true;
+                terminal.SetColor("green");
+                terminal.WriteLine("You blend perfectly with your surroundings!");
+                break;
+
+            case "marked":
+                if (target != null && target.IsAlive)
+                {
+                    target.IsMarked = true;
+                    target.MarkedDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"{target.Name} is marked! All attacks deal 30% bonus damage!");
+                }
+                break;
+
+            case "bloodlust":
+                player.HasBloodlust = true;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("BLOODLUST! Each kill will heal you!");
+                break;
+
+            case "immunity":
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                {
+                    var toRemove = player.ActiveStatuses.Keys.Where(s => s.IsNegative()).ToList();
+                    foreach (var s in toRemove) player.ActiveStatuses.Remove(s);
+                }
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("UNSTOPPABLE! You shrug off all afflictions!");
+                break;
+
+            case "invulnerable":
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Invulnerable))
+                    player.ActiveStatuses[StatusEffect.Invulnerable] = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("A divine shield of pure light surrounds you!");
+                break;
+
+            case "cleanse":
+                {
+                    var cleansable = player.ActiveStatuses.Keys.Where(s => s.IsNegative()).ToList();
+                    foreach (var s in cleansable) player.ActiveStatuses.Remove(s);
+                    terminal.SetColor("bright_white");
+                    if (cleansable.Count > 0)
+                        terminal.WriteLine($"Cleansing light purges {cleansable.Count} affliction(s)!");
+                    else
+                        terminal.WriteLine("Holy light washes over you!");
+                }
+                break;
+
+            case "vanish":
+                player.DodgeNextAttack = true;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
+                    player.ActiveStatuses[StatusEffect.Hidden] = 1;
+                terminal.SetColor("magenta");
+                terminal.WriteLine("You vanish completely! Your next attack will strike from the shadows!");
+                break;
+
+            case "shadow":
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
+                    player.ActiveStatuses[StatusEffect.Hidden] = 2;
+                terminal.SetColor("magenta");
+                terminal.WriteLine("Shadows embrace you. Noctura's power flows through you!");
+                break;
+
+            case "transmute":
+                {
+                    var negToRemove = player.ActiveStatuses.Keys.Where(s => s.IsNegative()).ToList();
+                    foreach (var s in negToRemove) player.ActiveStatuses.Remove(s);
+                    if (!player.ActiveStatuses.ContainsKey(StatusEffect.Regenerating))
+                        player.ActiveStatuses[StatusEffect.Regenerating] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("Alchemical energy transforms your body! All ailments purged!");
+                }
+                break;
+
+            case "legend":
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Regenerating))
+                    player.ActiveStatuses[StatusEffect.Regenerating] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("You become the legend! Songs of power flow through you!");
+                break;
+
+            case "legendary":
+                if (target != null && target.IsAlive)
+                {
+                    target.IsStunned = true;
+                    target.StunDuration = 1;
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"LEGENDARY SHOT! {target.Name} staggers from the devastating hit!");
+                }
+                break;
+
+            case "avatar":
+                player.IsRaging = true;
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
+                    player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("YOU BECOME DESTRUCTION INCARNATE! NOTHING CAN STOP YOU!");
+                break;
+
+            case "avatar_light":
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Invulnerable))
+                    player.ActiveStatuses[StatusEffect.Invulnerable] = 1;
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("DIVINE LIGHT FLOODS YOUR BEING! YOU ARE THE AVATAR OF LIGHT!");
+                break;
+
+            case "guaranteed_hit":
+                terminal.SetColor("cyan");
+                terminal.WriteLine("Your aim is true!");
                 break;
         }
 
@@ -7309,6 +7976,390 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 terminal.WriteLine("You prepare to dodge the next attack!", "cyan");
                 break;
+
+            case "inspire":
+                player.TempAttackBonus += 10;
+                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("The melody steels your resolve! (+10 Attack for 3 rounds)");
+                break;
+
+            case "resist_all":
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("Your will becomes unbreakable! Status effects cannot touch you!");
+                break;
+
+            case "reckless":
+                player.TempDefenseBonus -= 20;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 1);
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("Reckless swing! You leave yourself exposed!");
+                break;
+
+            case "desperate":
+                if (player.HP < player.MaxHP * 0.4 && monster != null && monster.IsAlive)
+                {
+                    long desperateDmg = (long)(abilityResult.Damage * 0.5);
+                    desperateDmg = Math.Max(1, desperateDmg - monster.Defence / 4);
+                    monster.HP -= desperateDmg;
+                    result.TotalDamageDealt += desperateDmg;
+                    player.Statistics.RecordDamageDealt(desperateDmg, false);
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"DESPERATION! {desperateDmg} bonus damage!");
+                    if (monster.HP <= 0)
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"{monster.Name} is slain!");
+                    }
+                }
+                break;
+
+            case "fire":
+                if (monster != null && monster.IsAlive)
+                {
+                    bool fireVulnerable = monster.MonsterClass == MonsterClass.Plant || monster.MonsterClass == MonsterClass.Beast;
+                    if (fireVulnerable)
+                    {
+                        long fireBonusDmg = abilityResult.Damage / 2;
+                        monster.HP -= fireBonusDmg;
+                        result.TotalDamageDealt += fireBonusDmg;
+                        player.Statistics.RecordDamageDealt(fireBonusDmg, false);
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"The fire burns intensely! {fireBonusDmg} bonus damage!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("The bomb explodes in a burst of flame!");
+                    }
+                    monster.Poisoned = true;
+                    monster.PoisonRounds = Math.Max(monster.PoisonRounds, 2);
+                }
+                break;
+
+            case "holy":
+                if (monster != null && monster.IsAlive &&
+                    (monster.MonsterClass == MonsterClass.Undead || monster.MonsterClass == MonsterClass.Demon || monster.Undead > 0))
+                {
+                    long holyBonusDmg = abilityResult.Damage;
+                    monster.HP -= holyBonusDmg;
+                    result.TotalDamageDealt += holyBonusDmg;
+                    player.Statistics.RecordDamageDealt(holyBonusDmg, false);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"HOLY SMITE! The undead burns with divine fire! +{holyBonusDmg} damage!");
+                }
+                else
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("Divine energy radiates from your weapon!");
+                }
+                break;
+
+            case "holy_avenger":
+                if (monster != null && monster.IsAlive &&
+                    (monster.MonsterClass == MonsterClass.Undead || monster.MonsterClass == MonsterClass.Demon || monster.Undead > 0))
+                {
+                    long avengerBonusDmg = (long)(abilityResult.Damage * 0.75);
+                    monster.HP -= avengerBonusDmg;
+                    result.TotalDamageDealt += avengerBonusDmg;
+                    player.Statistics.RecordDamageDealt(avengerBonusDmg, false);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"DIVINE VENGEANCE! +{avengerBonusDmg} holy damage!");
+                }
+                {
+                    long avengerHeal = Math.Min(player.Level * 2, player.MaxHP - player.HP);
+                    if (avengerHeal > 0)
+                    {
+                        player.HP += avengerHeal;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"Divine energy heals you for {avengerHeal} HP!");
+                    }
+                }
+                break;
+
+            case "critical":
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("You strike a vital point!");
+                break;
+
+            case "fury":
+                player.IsRaging = true;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
+                    player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("THE WAR GOD'S FURY BURNS WITHIN YOU!");
+                break;
+
+            case "champion":
+                {
+                    long champHeal = Math.Min(player.Level * 3, player.MaxHP - player.HP);
+                    if (champHeal > 0)
+                    {
+                        player.HP += champHeal;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"The Champion's spirit heals you for {champHeal} HP!");
+                    }
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("A strike worthy of legends!");
+                }
+                break;
+
+            case "aoe_holy":
+                if (monster != null && monster.IsAlive)
+                {
+                    long holyAoeDmg = abilityResult.Damage;
+                    if (monster.MonsterClass == MonsterClass.Undead || monster.MonsterClass == MonsterClass.Demon || monster.Undead > 0)
+                        holyAoeDmg = (long)(holyAoeDmg * 1.5);
+                    monster.HP -= holyAoeDmg;
+                    result.TotalDamageDealt += holyAoeDmg;
+                    player.Statistics.RecordDamageDealt(holyAoeDmg, false);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"Divine judgment strikes for {holyAoeDmg} damage!");
+                }
+                break;
+
+            case "fear":
+                if (monster != null && monster.IsAlive)
+                {
+                    int fearChance = monster.IsBoss ? 35 : 70;
+                    if (random.Next(100) < fearChance)
+                    {
+                        monster.IsFeared = true;
+                        monster.FearDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"{monster.Name} is terrified by your roar!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"{monster.Name} resists your intimidation!");
+                    }
+                }
+                break;
+
+            case "confusion":
+                if (monster != null && monster.IsAlive)
+                {
+                    int confuseChance = monster.IsBoss ? 30 : 65;
+                    if (random.Next(100) < confuseChance)
+                    {
+                        monster.IsConfused = true;
+                        monster.ConfusedDuration = 2;
+                        terminal.SetColor("magenta");
+                        terminal.WriteLine($"{monster.Name} is bewildered by the joke!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"{monster.Name} doesn't get the joke.");
+                    }
+                }
+                break;
+
+            case "freeze":
+                if (monster != null && monster.IsAlive)
+                {
+                    int freezeChance = monster.IsBoss ? 40 : 75;
+                    if (random.Next(100) < freezeChance)
+                    {
+                        monster.IsFrozen = true;
+                        monster.FrozenDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine($"{monster.Name} is frozen solid!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"The frost bites {monster.Name} but doesn't freeze it!");
+                    }
+                }
+                break;
+
+            case "instant_kill":
+                if (monster != null && monster.IsAlive && monster.HP < monster.MaxHP * 0.25 && !monster.IsBoss)
+                {
+                    if (random.Next(100) < 50)
+                    {
+                        long killDmg = monster.HP;
+                        monster.HP = 0;
+                        result.TotalDamageDealt += killDmg;
+                        player.Statistics.RecordDamageDealt(killDmg, false);
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"ASSASSINATED! {monster.Name} falls instantly!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine("The killing blow narrowly misses the vital spot!");
+                    }
+                }
+                break;
+
+            case "multi_hit":
+                if (monster != null && monster.IsAlive)
+                {
+                    int extraHits = random.Next(2, 5);
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"FRENZY! {extraHits} additional strikes!");
+                    for (int i = 0; i < extraHits && monster.IsAlive; i++)
+                    {
+                        long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - monster.Defence / 4);
+                        frenzyDmg = (long)(frenzyDmg * (0.8 + random.NextDouble() * 0.4));
+                        monster.HP -= frenzyDmg;
+                        result.TotalDamageDealt += frenzyDmg;
+                        player.Statistics.RecordDamageDealt(frenzyDmg, false);
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"  Strike {i + 1}: {frenzyDmg} damage!");
+                        if (monster.HP <= 0)
+                        {
+                            terminal.SetColor("bright_green");
+                            terminal.WriteLine($"  {monster.Name} is torn apart!");
+                        }
+                    }
+                }
+                break;
+
+            case "execute_all":
+                // In single-monster, behaves like execute
+                if (monster != null && monster.IsAlive && monster.HP < monster.MaxHP * 0.3)
+                {
+                    long executeDmg = abilityResult.Damage;
+                    monster.HP -= executeDmg;
+                    result.TotalDamageDealt += executeDmg;
+                    player.Statistics.RecordDamageDealt(executeDmg, false);
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"DEATH BLOSSOM EXECUTE! +{executeDmg} damage!");
+                }
+                break;
+
+            case "evasion":
+                player.DodgeNextAttack = true;
+                player.TempDefenseBonus += 50;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 2);
+                terminal.SetColor("magenta");
+                terminal.WriteLine("You melt into the shadows, nearly impossible to hit!");
+                break;
+
+            case "stealth":
+                player.DodgeNextAttack = true;
+                terminal.SetColor("green");
+                terminal.WriteLine("You blend perfectly with your surroundings!");
+                break;
+
+            case "marked":
+                if (monster != null && monster.IsAlive)
+                {
+                    monster.IsMarked = true;
+                    monster.MarkedDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"{monster.Name} is marked! All attacks deal 30% bonus damage!");
+                }
+                break;
+
+            case "bloodlust":
+                player.HasBloodlust = true;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("BLOODLUST! Each kill will heal you!");
+                break;
+
+            case "immunity":
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                {
+                    var toRemoveNeg = player.ActiveStatuses.Keys.Where(s => s.IsNegative()).ToList();
+                    foreach (var s in toRemoveNeg) player.ActiveStatuses.Remove(s);
+                }
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("UNSTOPPABLE! You shrug off all afflictions!");
+                break;
+
+            case "invulnerable":
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Invulnerable))
+                    player.ActiveStatuses[StatusEffect.Invulnerable] = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("A divine shield of pure light surrounds you!");
+                break;
+
+            case "cleanse":
+                {
+                    var cleansable = player.ActiveStatuses.Keys.Where(s => s.IsNegative()).ToList();
+                    foreach (var s in cleansable) player.ActiveStatuses.Remove(s);
+                    terminal.SetColor("bright_white");
+                    if (cleansable.Count > 0)
+                        terminal.WriteLine($"Cleansing light purges {cleansable.Count} affliction(s)!");
+                    else
+                        terminal.WriteLine("Holy light washes over you!");
+                }
+                break;
+
+            case "vanish":
+                player.DodgeNextAttack = true;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
+                    player.ActiveStatuses[StatusEffect.Hidden] = 1;
+                terminal.SetColor("magenta");
+                terminal.WriteLine("You vanish completely! Your next attack will strike from the shadows!");
+                break;
+
+            case "shadow":
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
+                    player.ActiveStatuses[StatusEffect.Hidden] = 2;
+                terminal.SetColor("magenta");
+                terminal.WriteLine("Shadows embrace you. Noctura's power flows through you!");
+                break;
+
+            case "transmute":
+                {
+                    var negToRemove = player.ActiveStatuses.Keys.Where(s => s.IsNegative()).ToList();
+                    foreach (var s in negToRemove) player.ActiveStatuses.Remove(s);
+                    if (!player.ActiveStatuses.ContainsKey(StatusEffect.Regenerating))
+                        player.ActiveStatuses[StatusEffect.Regenerating] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("Alchemical energy transforms your body! All ailments purged!");
+                }
+                break;
+
+            case "legend":
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Regenerating))
+                    player.ActiveStatuses[StatusEffect.Regenerating] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("You become the legend! Songs of power flow through you!");
+                break;
+
+            case "legendary":
+                if (monster != null && monster.IsAlive)
+                {
+                    monster.IsStunned = true;
+                    monster.StunDuration = 1;
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"LEGENDARY SHOT! {monster.Name} staggers from the devastating hit!");
+                }
+                break;
+
+            case "avatar":
+                player.IsRaging = true;
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
+                    player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("YOU BECOME DESTRUCTION INCARNATE! NOTHING CAN STOP YOU!");
+                break;
+
+            case "avatar_light":
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Invulnerable))
+                    player.ActiveStatuses[StatusEffect.Invulnerable] = 1;
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("DIVINE LIGHT FLOODS YOUR BEING! YOU ARE THE AVATAR OF LIGHT!");
+                break;
+
+            case "guaranteed_hit":
+                terminal.SetColor("cyan");
+                terminal.WriteLine("Your aim is true!");
+                break;
         }
 
         await Task.CompletedTask;
@@ -7365,6 +8416,18 @@ public partial class CombatEngine
             if (player.TempDefenseBonusDuration <= 0)
             {
                 player.TempDefenseBonus = 0;
+            }
+        }
+
+        // Tick down status immunity duration
+        if (player.HasStatusImmunity)
+        {
+            player.StatusImmunityDuration--;
+            if (player.StatusImmunityDuration <= 0)
+            {
+                player.HasStatusImmunity = false;
+                terminal.SetColor("gray");
+                terminal.WriteLine("Your status immunity fades.");
             }
         }
 

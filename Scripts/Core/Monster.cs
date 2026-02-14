@@ -99,6 +99,14 @@ public class Monster
     public bool IsSlowed { get; set; } = false;
     public int SlowDuration { get; set; } = 0;
 
+    // Ability-applied status effects
+    public bool IsMarked { get; set; } = false;        // Marked for death/hunt - takes bonus damage
+    public int MarkedDuration { get; set; } = 0;
+    public bool IsFrozen { get; set; } = false;         // Frozen solid - cannot act
+    public int FrozenDuration { get; set; } = 0;
+    public bool IsConfused { get; set; } = false;       // Confused - may skip or hit self
+    public int ConfusedDuration { get; set; } = 0;
+
     // Ability use tracking to prevent infinite stacking
     public bool HasHardenedArmor { get; set; } = false;
     public bool HasEnraged { get; set; } = false;
