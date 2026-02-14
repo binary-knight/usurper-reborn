@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.30.2** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.30.5** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,37 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.30.5 - Spell Effects Overhaul & Equipment Fix
+
+**Spell Effects Overhaul:**
+- Every caster spell's SpecialEffect now works in multi-monster dungeon combat. Previously, the multi-monster spell handler only recognized 4 of 41 effect types — spells like Fireball, Ice Storm, Freeze, Poison Touch, Dominate, Steal Life, and many more dealt raw damage only with no status effects.
+- AoE spells (Ice Storm, Chain Lightning, Holy Explosion, Meteor Swarm, Psychic Scream, Mass Confusion, God's Finger) now apply their SpecialEffect to all surviving monsters after dealing damage.
+- Self-buff spells (Mirror Image, Divine Avatar, Wish, Time Stop, Mind Blank) now properly apply their effects instead of silently doing nothing.
+- Each caster class now has a distinct combat identity: Cleric (holy healer/protector), Magician (elemental devastator), Sage (mind/nature controller).
+
+**Critical Bug Fix (Online MUD):**
+- Equipment disappearing from body/neck/ring slots or wrong items appearing in wrong slots. In MUD mode, all player sessions share a static EquipmentDatabase — when any player logged in, it wiped the entire dynamic equipment registry for all players and reset ID counters, causing equipment to vanish or cross between players. Fixed with online-mode gate and thread-safe locking.
+
+### Completed in v0.30.4 - Class Ability Effects Overhaul
+
+**Ability Effects Overhaul:**
+- Every non-spellcaster class ability now has a unique combat effect. Previously ~25 of 30+ ability special effects did nothing — players spent stamina on abilities and got only base damage.
+- New effects for all 11 classes: Warrior (Reckless Attack, Champion's Strike), Barbarian (Frenzy multi-hit, Bloodlust heal-on-kill, Intimidating Roar), Paladin (Divine Smite, Divine Shield invulnerability, Holy Avenger), Assassin (Death Mark, Assassinate instant-kill, Shadow Step), Ranger (Hunter's Mark, Legendary Shot stun), Bard/Jester (Inspiring Tune, Deadly Joke confusion), Alchemist (Fire/Frost Bombs, Transmutation).
+- Monster status effects (Sleep, Fear, Stun, Slow, Freeze, Confusion, Marked) now actually checked in combat — previously set by spells but never enforced.
+- New combat mechanics: invulnerability blocks all damage, status immunity blocks debuffs, sleep breaks on damage, bloodlust heal-on-kill.
+
+### Completed in v0.30.3 - Bug Fixes & Online World Sim
+
+**Bug Fixes:**
+- NPC chat crash (Object reference not set) — creating `new Character` instead of `new Player` caused null casts
+- Accessory purchase quests never tracking — Magic Shop was missing `QuestSystem.OnEquipmentPurchased()` call
+- Ability/spell descriptions missing from Level Master combat abilities menu
+- NPC XP multiplier silently rejected on server (validation cap too low)
+- NPC polygamy bug — monogamous NPCs could end up with multiple spouses
+- "Tensions are rising" message spam dominating 17% of the news feed
+- Dead king still ruling — NPC king deaths now properly vacate the throne
+- Dashboard marriage count always showing 0
 
 ### Completed in v0.30.2 - Bug Fixes & World Sim Pacing
 - Quest system completely rebuilt: all 11 starter quests now use real monster names and track properly
@@ -768,7 +799,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.30.2)
+### Known Issues (Alpha v0.30.5)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -783,4 +814,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.30.2 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.30.5 — The world is running. [Watch it live.](https://usurper-reborn.net)
