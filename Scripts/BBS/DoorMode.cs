@@ -206,11 +206,11 @@ namespace UsurperRemake.BBS
                         _simIntervalSeconds = interval;
                     i++;
                 }
-                // --npc-xp <multiplier> sets the NPC XP gain multiplier (0.01 - 2.0)
+                // --npc-xp <multiplier> sets the NPC XP gain multiplier (0.01 - 10.0)
                 else if (arg == "--npc-xp" && i + 1 < args.Length)
                 {
                     if (float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out float mult) && mult >= 0.01f && mult <= 2.0f)
+                        System.Globalization.CultureInfo.InvariantCulture, out float mult) && mult >= 0.01f && mult <= 10.0f)
                         _npcXpMultiplier = mult;
                     i++;
                 }

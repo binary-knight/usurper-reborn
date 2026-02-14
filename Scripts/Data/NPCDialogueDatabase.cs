@@ -323,6 +323,7 @@ namespace UsurperRemake.Data
 
         private static string? GetPlayerContext(Player player)
         {
+            if (player == null) return null;
             // Return the most notable context about the player
             float hpPercent = player.MaxHP > 0 ? (float)player.HP / player.MaxHP : 1f;
             if (hpPercent < 0.25f) return "low_hp";
@@ -340,7 +341,7 @@ namespace UsurperRemake.Data
 
         private static string? GetRecentMemoryType(NPC npc, Player player)
         {
-            if (npc.Memory == null) return null;
+            if (npc.Memory == null || player == null) return null;
 
             string playerName = player.Name2 ?? player.Name1 ?? "";
             var memories = npc.Memory.GetMemoriesAboutCharacter(playerName);

@@ -555,6 +555,23 @@ public static class EnhancedNPCBehaviors
     /// </summary>
     private static void ExecuteNPCMarriage(NPC npc1, NPC npc2)
     {
+        // Defense-in-depth: if either is already married, they must be poly/open
+        var p1 = npc1.Brain?.Personality;
+        var p2 = npc2.Brain?.Personality;
+
+        if (npc1.Married || npc1.IsMarried)
+        {
+            bool poly1 = p1?.RelationshipPref == RelationshipPreference.Polyamorous
+                       || p1?.RelationshipPref == RelationshipPreference.OpenRelationship;
+            if (!poly1) return;
+        }
+        if (npc2.Married || npc2.IsMarried)
+        {
+            bool poly2 = p2?.RelationshipPref == RelationshipPreference.Polyamorous
+                       || p2?.RelationshipPref == RelationshipPreference.OpenRelationship;
+            if (!poly2) return;
+        }
+
         // Check if this is a polyamorous union (either party already married)
         bool isPoly = (npc1.Married || npc1.IsMarried) || (npc2.Married || npc2.IsMarried);
 

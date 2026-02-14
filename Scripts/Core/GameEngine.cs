@@ -1974,7 +1974,7 @@ public partial class GameEngine : Node
     /// </summary>
     private Character RestorePlayerFromSaveData(PlayerData playerData)
     {
-        var player = new Character
+        Character player = new Player
         {
             // Unique player identifier (critical for romance/family systems)
             ID = !string.IsNullOrEmpty(playerData.Id) ? playerData.Id : (playerData.Name2 ?? playerData.Name1 ?? Guid.NewGuid().ToString()),

@@ -77,8 +77,10 @@ public class WorldSimulator
     private const int MAX_DAILY_COMBATS_ONLINE = 3;
     // Cooldown ticks between escalations for same enemy pair (~5 min)
     private const int PAIR_ESCALATION_COOLDOWN_TICKS = 10;
-    // Cooldown ticks between "tensions rising" messages for same pair (~30 min)
-    private const int TENSION_MESSAGE_COOLDOWN_TICKS = 60;
+    // Cooldown ticks between "tensions rising" messages for same pair (~1 hour at 30s intervals)
+    private const int TENSION_MESSAGE_COOLDOWN_TICKS = 120;
+    // Max tension messages per sim tick in online mode (prevents feed domination)
+    private const int MAX_TENSION_MESSAGES_PER_TICK = 2;
     // Cooldown ticks before an NPC can do another team action (~15 min)
     private const int TEAM_ACTION_COOLDOWN_TICKS = 30;
 
@@ -296,6 +298,23 @@ public class WorldSimulator
 
         // Update relationships and social dynamics
         UpdateSocialDynamics();
+    }
+
+    /// <summary>
+    /// Check if a dying NPC is the current king. If so, vacate the throne.
+    /// </summary>
+    private static void CheckKingDeath(NPC npc)
+    {
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null || !king.IsActive) return;
+
+        string npcName = npc.Name2 ?? npc.Name;
+        if (king.Name == npcName || king.Name == npc.Name)
+        {
+            CastleLocation.VacateThrone(npc.IsAgedDeath
+                ? "The ruler has died of old age."
+                : "The ruler has fallen in battle.");
+        }
     }
 
     /// <summary>
@@ -576,6 +595,7 @@ public class WorldSimulator
                     npc.IsDead = true;
                     npc.IsAgedDeath = true;
                     npc.HP = 0;
+                    CheckKingDeath(npc);
 
                     // Remove from respawn queue if somehow queued
                     deadNPCRespawnTimers.Remove(npc.Name);
@@ -1853,6 +1873,7 @@ public class WorldSimulator
                 {
                     deadMember.IsDead = true;
                     QueueNPCForRespawn(deadMember.Name);
+                    CheckKingDeath(deadMember);
                     NewsSystem.Instance.WriteDeathNews(deadMember.Name, killerName, "the Dungeon");
                 }
                 GD.Print($"[WorldSim] Team '{npc.Team}' was defeated! {dead.Count} members died");
@@ -2002,6 +2023,7 @@ public class WorldSimulator
             // NPC died - mark as dead and queue for respawn
             npc.IsDead = true;
             QueueNPCForRespawn(npc.Name);
+            CheckKingDeath(npc);
             NewsSystem.Instance.WriteDeathNews(npc.Name, monster.Name, "the Dungeon");
             GD.Print($"[WorldSim] {npc.Name} was slain by {monster.Name} in the dungeon!");
         }
@@ -3092,6 +3114,7 @@ public class WorldSimulator
             target.IsDead = true;
             target.SetState(NPCState.Dead);
             QueueNPCForRespawn(target.Name);
+            CheckKingDeath(target);
             npc.Brain?.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.SawDeath,
@@ -3120,6 +3143,7 @@ public class WorldSimulator
             npc.IsDead = true;
             npc.SetState(NPCState.Dead);
             QueueNPCForRespawn(npc.Name);
+            CheckKingDeath(npc);
             target.Brain?.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.SawDeath,
@@ -3862,6 +3886,7 @@ public class WorldSimulator
                 {
                     target.IsDead = true;
                     QueueNPCForRespawn(target.Name);
+                    CheckKingDeath(target);
                     NewsSystem.Instance.WriteDeathNews(target.Name, attacker.Name, target.CurrentLocation ?? "battle");
                 }
             }
@@ -3880,6 +3905,7 @@ public class WorldSimulator
                 {
                     target.IsDead = true;
                     QueueNPCForRespawn(target.Name);
+                    CheckKingDeath(target);
                     NewsSystem.Instance.WriteDeathNews(target.Name, attacker.Name, target.CurrentLocation ?? "battle");
                 }
             }
@@ -4004,9 +4030,12 @@ public class WorldSimulator
         }
     }
     
+    private int _tensionMessagesThisTick = 0;
+
     private void ProcessRivalries()
     {
         bool isOnline = UsurperRemake.BBS.DoorMode.IsOnlineMode;
+        _tensionMessagesThisTick = 0;
 
         // --- Seed new rivalries ---
         // Online: 2% chance (was 8%) — rivalries develop slowly over hours, not minutes
@@ -4081,12 +4110,20 @@ public class WorldSimulator
                     Location = rival.CurrentLocation
                 });
 
-                // In online mode, use cooldown to prevent spamming the same message
+                // In online mode, use cooldown and per-tick cap to prevent feed domination
                 string pairKey = GetPairKey(npc.Id, rival.Id);
-                if (!isOnline || !_tensionMessageCooldown.ContainsKey(pairKey))
+                bool cooldownActive = false;
+                if (isOnline && _tensionMessageCooldown.TryGetValue(pairKey, out int lastTensionTick))
+                    cooldownActive = (_currentTick - lastTensionTick) < TENSION_MESSAGE_COOLDOWN_TICKS;
+
+                if (!cooldownActive && (!isOnline || _tensionMessagesThisTick < MAX_TENSION_MESSAGES_PER_TICK))
                 {
                     NewsSystem.Instance?.Newsy(false, $"Tensions are rising between {npcName} and {rivalName} at the {npc.CurrentLocation}.");
-                    if (isOnline) _tensionMessageCooldown[pairKey] = _currentTick;
+                    if (isOnline)
+                    {
+                        _tensionMessageCooldown[pairKey] = _currentTick;
+                        _tensionMessagesThisTick++;
+                    }
                 }
             }
         }

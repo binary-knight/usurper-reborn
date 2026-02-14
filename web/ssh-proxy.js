@@ -609,18 +609,16 @@ function getStats() {
       }
     } catch (e) { /* children data may not exist yet */ }
 
-    // Marriage count
+    // Marriage count (from world_state NPC data - divide by 2 since each marriage has 2 entries)
     let marriageCount = 0;
     try {
-      const marriageResult = db.prepare(`
-        SELECT COUNT(*) as cnt
-        FROM players, json_each(json_extract(player_data, '$.storySystems.relationships'))
-        WHERE is_banned = 0
-          AND json_extract(player_data, '$.storySystems.relationships') IS NOT NULL
-          AND json_extract(json_each.value, '$.marriedDays') > 0
-      `).get();
-      marriageCount = marriageResult ? Math.floor(marriageResult.cnt / 2) : 0;
-    } catch (e) { /* relationships may not exist */ }
+      const npcRow = db.prepare("SELECT value FROM world_state WHERE key = 'npcs'").get();
+      if (npcRow && npcRow.value) {
+        const npcs = JSON.parse(npcRow.value);
+        const marriedCount = npcs.filter(n => n.isMarried || n.IsMarried).length;
+        marriageCount = Math.floor(marriedCount / 2);
+      }
+    } catch (e) { /* npcs may not exist */ }
 
     // Current king (from world_state - the authoritative source maintained by world sim)
     let king = null;

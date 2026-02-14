@@ -4826,6 +4826,39 @@ public class CastleLocation : BaseLocation
         // GD.Print($"[Castle] {npc.Name} has been restored as monarch");
     }
 
+    /// <summary>
+    /// Called when the current king dies. Vacates the throne and posts news.
+    /// Static so it can be called from WorldSimulator without a CastleLocation instance.
+    /// </summary>
+    public static void VacateThrone(string reason)
+    {
+        var king = GetCurrentKing();
+        if (king == null || !king.IsActive) return;
+
+        string kingName = king.Name;
+        king.IsActive = false;
+
+        // Post news
+        NewsSystem.Instance?.Newsy(true, $"{kingName} is no longer ruler! The throne stands vacant. {reason}");
+
+        // Persist to world_state in online mode
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            var osm = OnlineStateManager.Instance;
+            if (osm != null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await osm.SaveRoyalCourtToWorldState(); }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.Instance.LogError("CASTLE", $"Failed to persist throne vacancy: {ex.Message}");
+                    }
+                });
+            }
+        }
+    }
+
     #region The Crown Faction Recruitment
 
     /// <summary>

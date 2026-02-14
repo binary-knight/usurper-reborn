@@ -1246,7 +1246,13 @@ public static class ClassAbilitySystem
                         terminal.SetColor("bright_yellow");
                         terminal.Write($"  [{i + 1}] ");
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"{ability.Name,-24} ({ability.StaminaCost} ST)");
+                        terminal.Write($"{ability.Name,-24} ({ability.StaminaCost} ST)");
+                        if (!string.IsNullOrEmpty(ability.Description))
+                        {
+                            terminal.SetColor("gray");
+                            terminal.Write($"  {ability.Description}");
+                        }
+                        terminal.WriteLine("");
                     }
                     else
                     {
@@ -1276,7 +1282,13 @@ public static class ClassAbilitySystem
                 {
                     char letter = (char)('a' + i);
                     terminal.SetColor("green");
-                    terminal.WriteLine($"  [{letter}] {unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST) Lv{unequipped[i].LevelRequired}");
+                    terminal.Write($"  [{letter}] {unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST) Lv{unequipped[i].LevelRequired}");
+                    if (!string.IsNullOrEmpty(unequipped[i].Description))
+                    {
+                        terminal.SetColor("gray");
+                        terminal.Write($"  {unequipped[i].Description}");
+                    }
+                    terminal.WriteLine("");
                 }
             }
 
@@ -1290,7 +1302,10 @@ public static class ClassAbilitySystem
                 foreach (var ability in locked)
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"      {ability.Name,-24} ({ability.StaminaCost} ST) Requires Lv{ability.LevelRequired}");
+                    terminal.Write($"      {ability.Name,-24} ({ability.StaminaCost} ST) Requires Lv{ability.LevelRequired}");
+                    if (!string.IsNullOrEmpty(ability.Description))
+                        terminal.Write($"  {ability.Description}");
+                    terminal.WriteLine("");
                 }
             }
 

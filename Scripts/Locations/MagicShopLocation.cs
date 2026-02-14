@@ -2092,6 +2092,9 @@ public partial class MagicShopLocation : BaseLocation
                     CityControlSystem.Instance.ProcessSaleTax(price);
                     TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "buy_accessory", item.Name, accTotalWithTax, player.Level, player.Gold);
 
+                    // Check for equipment quest completion
+                    QuestSystem.OnEquipmentPurchased(player, item);
+
                     // Check accessory collection achievement
                     if (player.GetEquipment(EquipmentSlot.LFinger) != null &&
                         player.GetEquipment(EquipmentSlot.RFinger) != null &&
