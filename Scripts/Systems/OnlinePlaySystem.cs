@@ -112,8 +112,15 @@ namespace UsurperRemake.Systems
                 sshClient.ConnectionInfo.Timeout = TimeSpan.FromSeconds(10);
                 sshClient.Connect();
 
-                // Open a shell stream (pseudo-terminal) for interactive I/O
-                shellStream = sshClient.CreateShellStream("xterm", 80, 24, 800, 600, 4096);
+                // Open a shell stream with PTY echo disabled.
+                // We handle all line editing (backspace, echo) locally on the client
+                // and only send complete lines. This prevents PTY echo responses from
+                // corrupting the client's ANSI parser (which caused garbage output on backspace).
+                var terminalModes = new System.Collections.Generic.Dictionary<Renci.SshNet.Common.TerminalModes, uint>
+                {
+                    { Renci.SshNet.Common.TerminalModes.ECHO, 0 }
+                };
+                shellStream = sshClient.CreateShellStream("xterm", 80, 24, 800, 600, 4096, terminalModes);
 
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("  Connected (SSH encrypted)!");
@@ -575,7 +582,10 @@ namespace UsurperRemake.Systems
                 }
             }, ct);
 
-            // Write loop: read keys from Console and send to SSH shell
+            // Write loop: buffer input locally and send complete lines on Enter.
+            // All line editing (backspace, character echo) is handled locally.
+            // PTY echo is disabled, so we don't get corrupted echo responses.
+            var inputBuffer = new StringBuilder();
             try
             {
                 while (!ct.IsCancellationRequested)
@@ -594,31 +604,30 @@ namespace UsurperRemake.Systems
                             break;
                         }
 
-                        // Convert key to string and send to server
-                        string keyStr;
                         if (keyInfo.Key == ConsoleKey.Enter)
-                            keyStr = "\r";
+                        {
+                            // Send the complete line to the server
+                            shellStream!.Write(inputBuffer.ToString() + "\n");
+                            shellStream.Flush();
+                            Console.Write("\r\n"); // Local newline echo
+                            inputBuffer.Clear();
+                        }
                         else if (keyInfo.Key == ConsoleKey.Backspace)
-                            keyStr = "\x7f";
-                        else if (keyInfo.Key == ConsoleKey.Escape)
-                            keyStr = "\x1b";
-                        else if (keyInfo.Key == ConsoleKey.Tab)
-                            keyStr = "\t";
-                        else if (keyInfo.Key == ConsoleKey.UpArrow)
-                            keyStr = "\x1b[A";
-                        else if (keyInfo.Key == ConsoleKey.DownArrow)
-                            keyStr = "\x1b[B";
-                        else if (keyInfo.Key == ConsoleKey.RightArrow)
-                            keyStr = "\x1b[C";
-                        else if (keyInfo.Key == ConsoleKey.LeftArrow)
-                            keyStr = "\x1b[D";
-                        else if (keyInfo.KeyChar != '\0')
-                            keyStr = keyInfo.KeyChar.ToString();
-                        else
-                            continue;
-
-                        shellStream!.Write(keyStr);
-                        shellStream.Flush();
+                        {
+                            // Handle backspace locally — erase last character
+                            if (inputBuffer.Length > 0)
+                            {
+                                inputBuffer.Remove(inputBuffer.Length - 1, 1);
+                                Console.Write("\b \b"); // Visual backspace
+                            }
+                        }
+                        else if (keyInfo.KeyChar >= ' ' && keyInfo.KeyChar != '\x7f')
+                        {
+                            // Printable character — buffer and echo locally
+                            inputBuffer.Append(keyInfo.KeyChar);
+                            Console.Write(keyInfo.KeyChar);
+                        }
+                        // Non-printable keys (arrows, escape, tab) are ignored
                     }
                     else
                     {

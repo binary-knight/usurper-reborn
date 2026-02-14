@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.30.0** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.30.1** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,9 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.30.1 - Hotfix
+- Fixed backspace causing garbage output in game client when connected to online server
 
 ### Completed in v0.30.0 - Band of Brothers
 
@@ -755,7 +758,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.30.0)
+### Known Issues (Alpha v0.30.1)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -770,4 +773,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.30.0 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.30.1 — The world is running. [Watch it live.](https://usurper-reborn.net)
