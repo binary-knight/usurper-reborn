@@ -84,6 +84,14 @@ public partial class PrisonLocation : BaseLocation
                 player.CellDoorOpen = false;
                 player.RescuedBy = "";
                 player.HP = Math.Max(player.HP, player.MaxHP / 2); // Restore some health
+
+                // Reduce Darkness for serving time — prevents arrest loop
+                long darknessReduction = Math.Min(player.Darkness, 75);
+                if (darknessReduction > 0)
+                {
+                    player.Darkness -= darknessReduction;
+                    await terminal.WriteColorLineAsync($"Your time served has reduced your dark reputation. (-{darknessReduction} Darkness)", "bright_green");
+                }
                 await Task.Delay(1500);
                 throw new LocationExitException(GameLocation.MainStreet);
             }

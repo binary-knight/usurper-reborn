@@ -6282,6 +6282,16 @@ public partial class CombatEngine
                     result.DefeatedMonsters.Add(monster);
                 }
             }
+
+            // Apply spell special effects to each surviving monster (same as player AoE path)
+            if (!string.IsNullOrEmpty(spellResult.SpecialEffect) && spellResult.SpecialEffect != "fizzle" && spellResult.SpecialEffect != "fail")
+            {
+                foreach (var m in livingMonsters.Where(m => m.IsAlive))
+                {
+                    HandleSpecialSpellEffectOnMonster(m, spellResult.SpecialEffect, spellResult.Duration, teammate, spellResult.Damage, result);
+                }
+            }
+
             result.CombatLog.Add($"{teammate.DisplayName} casts {spell.Name} for {damage} total damage!");
         }
         else
@@ -6303,6 +6313,13 @@ public partial class CombatEngine
                     terminal.WriteLine($"{target.Name} is destroyed!");
                     result.DefeatedMonsters.Add(target);
                 }
+
+                // Apply spell special effect to target (same as player single-target path)
+                if (target.IsAlive && !string.IsNullOrEmpty(spellResult.SpecialEffect) && spellResult.SpecialEffect != "fizzle" && spellResult.SpecialEffect != "fail")
+                {
+                    HandleSpecialSpellEffectOnMonster(target, spellResult.SpecialEffect, spellResult.Duration, teammate, spellResult.Damage, result);
+                }
+
                 result.CombatLog.Add($"{teammate.DisplayName} casts {spell.Name} on {target.Name} for {actualDamage} damage!");
             }
         }
@@ -6312,226 +6329,110 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// NPC teammate attempts to use their class-specific ability
+    /// NPC teammate attempts to use a class ability via the full ClassAbilitySystem.
+    /// Uses the same ApplyAbilityEffectsMultiMonster as the player, so all 30+ ability
+    /// effects (stun, poison, execute, frenzy, holy, rage, etc.) work for teammates too.
     /// </summary>
     private async Task<bool> TryTeammateClassAbility(Character teammate, List<Monster> monsters, CombatResult result)
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return false;
 
-        // Check class-specific abilities
-        switch (teammate.Class)
+        // Get all abilities available to this teammate's class and level
+        var availableAbilities = ClassAbilitySystem.GetAvailableAbilities(teammate);
+        if (availableAbilities == null || availableAbilities.Count == 0) return false;
+
+        // Filter to abilities the teammate can afford (stamina-wise)
+        var affordableAbilities = availableAbilities
+            .Where(a => teammate.CurrentCombatStamina >= a.StaminaCost)
+            .ToList();
+        if (affordableAbilities.Count == 0) return false;
+
+        // 30% chance to use an ability (don't spam every round)
+        if (random.Next(100) >= 30) return false;
+
+        // AI: Pick the best ability for the situation
+        ClassAbilitySystem.ClassAbility? chosenAbility = null;
+
+        // Prefer attack abilities — pick the strongest one available
+        var attackAbilities = affordableAbilities
+            .Where(a => a.Type == ClassAbilitySystem.AbilityType.Attack || a.Type == ClassAbilitySystem.AbilityType.Debuff)
+            .OrderByDescending(a => a.LevelRequired)
+            .ToList();
+
+        // If multiple monsters alive, prefer AoE abilities
+        if (livingMonsters.Count >= 3)
         {
-            case CharacterClass.Warrior:
-                // Warriors can use Power Attack (costs stamina/HP but deals extra damage)
-                if (teammate.HP > teammate.MaxHP * 0.3 && random.Next(100) < 25)
-                {
-                    return await TeammateWarriorPowerAttack(teammate, livingMonsters, result);
-                }
-                break;
-
-            case CharacterClass.Ranger:
-                // Rangers can use Multi-Shot (attacks multiple targets)
-                if (livingMonsters.Count >= 2 && random.Next(100) < 30)
-                {
-                    return await TeammateRangerMultiShot(teammate, livingMonsters, result);
-                }
-                break;
-
-            case CharacterClass.Assassin:
-                // Assassins can backstab for critical damage
-                if (random.Next(100) < 35)
-                {
-                    return await TeammateAssassinBackstab(teammate, livingMonsters, result);
-                }
-                break;
-
-            case CharacterClass.Paladin:
-                // Paladins can smite evil
-                if (teammate.Mana >= 15 && random.Next(100) < 30)
-                {
-                    return await TeammatePaladinSmite(teammate, livingMonsters, result);
-                }
-                break;
-
-            case CharacterClass.Bard:
-                // Bards can inspire allies (buff)
-                if (teammate.Mana >= 10 && random.Next(100) < 20)
-                {
-                    return await TeammateBardInspire(teammate, result);
-                }
-                break;
+            var aoeAbility = attackAbilities.FirstOrDefault(a =>
+                a.SpecialEffect == "aoe" || a.SpecialEffect == "whirlwind" ||
+                a.SpecialEffect == "fire" || a.SpecialEffect == "holy_aoe");
+            if (aoeAbility != null) chosenAbility = aoeAbility;
         }
 
-        return false;
-    }
-
-    private async Task<bool> TeammateWarriorPowerAttack(Character teammate, List<Monster> monsters, CombatResult result)
-    {
-        var target = monsters.OrderBy(m => m.HP).FirstOrDefault();
-        if (target == null) return false;
-
-        // Power attack costs 5% HP but deals 2x damage
-        long hpCost = Math.Max(1, teammate.MaxHP / 20);
-        teammate.HP -= hpCost;
-
-        long damage = CalculateBaseDamage(teammate) * 2;
-        long actualDamage = Math.Min(damage, target.HP);
-        target.HP -= (int)actualDamage;
-
-        terminal.WriteLine("");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"{teammate.DisplayName} uses POWER ATTACK!");
-        terminal.SetColor("bright_red");
-        terminal.WriteLine($"{target.Name} takes {actualDamage} damage!");
-
-        if (target.HP <= 0)
+        // If a monster is low HP, prefer execute-type abilities
+        if (chosenAbility == null && livingMonsters.Any(m => m.HP < m.MaxHP * 0.3))
         {
-            target.HP = 0;
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"{target.Name} is defeated!");
-            result.DefeatedMonsters.Add(target);
+            var executeAbility = attackAbilities.FirstOrDefault(a =>
+                a.SpecialEffect == "execute" || a.SpecialEffect == "assassinate");
+            if (executeAbility != null) chosenAbility = executeAbility;
         }
 
-        result.CombatLog.Add($"{teammate.DisplayName} Power Attack hits {target.Name} for {actualDamage}!");
-        await Task.Delay(GetCombatDelay(700));
-        return true;
-    }
+        // Otherwise use the strongest attack ability
+        if (chosenAbility == null && attackAbilities.Count > 0)
+        {
+            chosenAbility = attackAbilities[0]; // Highest level required = strongest
+        }
 
-    private async Task<bool> TeammateRangerMultiShot(Character teammate, List<Monster> monsters, CombatResult result)
-    {
+        // If no attack abilities, try buff/defense (20% chance)
+        if (chosenAbility == null && random.Next(100) < 20)
+        {
+            chosenAbility = affordableAbilities
+                .Where(a => a.Type == ClassAbilitySystem.AbilityType.Buff || a.Type == ClassAbilitySystem.AbilityType.Defense || a.Type == ClassAbilitySystem.AbilityType.Heal)
+                .OrderByDescending(a => a.LevelRequired)
+                .FirstOrDefault();
+        }
+
+        if (chosenAbility == null) return false;
+
+        // Use the ability through the proper system (calculates damage, scaling, effects)
+        var abilityResult = ClassAbilitySystem.UseAbility(teammate, chosenAbility.Id, random);
+        if (!abilityResult.Success) return false;
+
+        // Display ability usage
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"{teammate.DisplayName} fires a MULTI-SHOT!");
+        terminal.WriteLine($"» {teammate.DisplayName} uses {chosenAbility.Name}! (-{chosenAbility.StaminaCost} stamina)");
+        await Task.Delay(GetCombatDelay(500));
 
-        long baseDamage = CalculateBaseDamage(teammate) / 2; // Half damage but hits multiple
-        int targetsHit = Math.Min(3, monsters.Count);
-
-        for (int i = 0; i < targetsHit; i++)
+        // Get target for the ability
+        Monster? target = null;
+        if (chosenAbility.Type == ClassAbilitySystem.AbilityType.Attack || chosenAbility.Type == ClassAbilitySystem.AbilityType.Debuff)
         {
-            var target = monsters[i];
-            if (!target.IsAlive) continue;
-
-            long actualDamage = Math.Min(baseDamage, target.HP);
-            target.HP -= (int)actualDamage;
-
-            terminal.SetColor("bright_red");
-            terminal.WriteLine($"  {target.Name} takes {actualDamage} damage!");
-
-            if (target.HP <= 0)
+            // Target low HP monster for execute abilities, otherwise weakest
+            if (chosenAbility.SpecialEffect == "execute" || chosenAbility.SpecialEffect == "assassinate")
             {
-                target.HP = 0;
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"  {target.Name} is defeated!");
-                result.DefeatedMonsters.Add(target);
+                target = livingMonsters.OrderBy(m => (double)m.HP / m.MaxHP).FirstOrDefault();
+            }
+            else
+            {
+                target = livingMonsters.OrderBy(m => m.HP).FirstOrDefault();
             }
         }
+        else
+        {
+            // For buff/defense/heal, still need a target for the method signature
+            target = livingMonsters.FirstOrDefault();
+        }
 
-        result.CombatLog.Add($"{teammate.DisplayName} Multi-Shot hits {targetsHit} targets!");
-        await Task.Delay(GetCombatDelay(700));
-        return true;
-    }
-
-    private async Task<bool> TeammateAssassinBackstab(Character teammate, List<Monster> monsters, CombatResult result)
-    {
-        var target = monsters.OrderBy(m => m.HP).FirstOrDefault();
         if (target == null) return false;
 
-        // Backstab has a chance to crit (3x damage) or normal (1.5x)
-        bool crit = random.Next(100) < 40; // 40% crit chance
-        double multiplier = crit ? 3.0 : 1.5;
+        // Apply ability effects through the full system (same as player path)
+        await ApplyAbilityEffectsMultiMonster(teammate, target, livingMonsters, abilityResult, result);
 
-        long damage = (long)(CalculateBaseDamage(teammate) * multiplier);
-        long actualDamage = Math.Min(damage, target.HP);
-        target.HP -= (int)actualDamage;
+        // Log the action
+        result.CombatLog.Add($"{teammate.DisplayName} uses {chosenAbility.Name}");
 
-        terminal.WriteLine("");
-        terminal.SetColor("dark_magenta");
-        terminal.WriteLine($"{teammate.DisplayName} strikes from the shadows!");
-        if (crit)
-        {
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("CRITICAL BACKSTAB!");
-        }
-        terminal.SetColor("bright_red");
-        terminal.WriteLine($"{target.Name} takes {actualDamage} damage!");
-
-        if (target.HP <= 0)
-        {
-            target.HP = 0;
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"{target.Name} is defeated!");
-            result.DefeatedMonsters.Add(target);
-        }
-
-        result.CombatLog.Add($"{teammate.DisplayName} Backstab {(crit ? "CRIT " : "")}hits {target.Name} for {actualDamage}!");
-        await Task.Delay(GetCombatDelay(700));
-        return true;
-    }
-
-    private async Task<bool> TeammatePaladinSmite(Character teammate, List<Monster> monsters, CombatResult result)
-    {
-        var target = monsters.OrderBy(m => m.HP).FirstOrDefault();
-        if (target == null) return false;
-
-        teammate.Mana -= 15;
-
-        // Smite deals weapon damage + holy damage
-        long damage = CalculateBaseDamage(teammate) + (teammate.Level * 5) + (teammate.Wisdom / 2);
-        long actualDamage = Math.Min(damage, target.HP);
-        target.HP -= (int)actualDamage;
-
-        terminal.WriteLine("");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"{teammate.DisplayName} calls down HOLY SMITE!");
-        terminal.SetColor("bright_white");
-        terminal.WriteLine($"Divine light strikes {target.Name}!");
-        terminal.SetColor("bright_red");
-        terminal.WriteLine($"{target.Name} takes {actualDamage} holy damage!");
-
-        if (target.HP <= 0)
-        {
-            target.HP = 0;
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"{target.Name} is destroyed!");
-            result.DefeatedMonsters.Add(target);
-        }
-
-        result.CombatLog.Add($"{teammate.DisplayName} Smite hits {target.Name} for {actualDamage}!");
-        await Task.Delay(GetCombatDelay(700));
-        return true;
-    }
-
-    private async Task<bool> TeammateBardInspire(Character teammate, CombatResult result)
-    {
-        teammate.Mana -= 10;
-
-        terminal.WriteLine("");
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"{teammate.DisplayName} plays an inspiring melody!");
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("The party feels invigorated!");
-
-        // Apply a small attack buff (tracked in result for this combat)
-        result.CombatLog.Add($"{teammate.DisplayName} inspires the party with a battle hymn!");
-
-        // Give a small heal to all party members
-        if (currentTeammates != null)
-        {
-            int healAmount = teammate.Level * 2 + 10;
-            foreach (var ally in currentTeammates.Where(t => t.IsAlive))
-            {
-                ally.HP = Math.Min(ally.MaxHP, ally.HP + healAmount);
-            }
-            if (currentPlayer != null && currentPlayer.IsAlive)
-            {
-                currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
-            }
-            terminal.SetColor("green");
-            terminal.WriteLine($"Everyone recovers {healAmount} HP!");
-        }
-
-        await Task.Delay(GetCombatDelay(700));
+        await Task.Delay(GetCombatDelay(800));
         return true;
     }
 

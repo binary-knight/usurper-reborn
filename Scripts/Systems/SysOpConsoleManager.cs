@@ -79,6 +79,9 @@ namespace UsurperRemake.Systems
                     case "9":
                         await CheckForUpdates();
                         break;
+                    case "P":
+                        await PardonPlayer();
+                        break;
                     case "Q":
                         done = true;
                         break;
@@ -162,6 +165,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("  [1] View All Players");
             terminal.WriteLine("  [2] Delete Player");
             terminal.WriteLine("  [3] Reset Game (Wipe All Data)");
+            terminal.WriteLine("  [P] Pardon Player (Release from Prison / Clear Darkness)");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
@@ -334,6 +338,102 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine("Deletion cancelled.");
+            }
+
+            await terminal.GetInputAsync("Press Enter to continue...");
+        }
+
+        private async Task PardonPlayer()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══ PARDON PLAYER ═══");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("This releases a player from prison and/or reduces their Darkness.");
+            terminal.WriteLine("");
+
+            terminal.Write("Enter player name to pardon (or blank to cancel): ");
+            var playerName = await terminal.GetInputAsync("");
+
+            if (string.IsNullOrWhiteSpace(playerName))
+                return;
+
+            try
+            {
+                var saveBackend = SaveSystem.Instance.Backend;
+                var saveData = await saveBackend.ReadGameData(playerName);
+
+                if (saveData == null)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"Player '{playerName}' not found.");
+                    await terminal.GetInputAsync("Press Enter to continue...");
+                    return;
+                }
+
+                // Show current status
+                terminal.SetColor("white");
+                terminal.WriteLine($"  Player: {saveData.Player.Name2 ?? playerName}");
+                terminal.WriteLine($"  Level:  {saveData.Player.Level}");
+                terminal.SetColor(saveData.Player.DaysInPrison > 0 ? "red" : "green");
+                terminal.WriteLine($"  Prison: {saveData.Player.DaysInPrison} day(s)");
+                terminal.SetColor(saveData.Player.Darkness > 100 ? "red" : "green");
+                terminal.WriteLine($"  Darkness: {saveData.Player.Darkness}{(saveData.Player.Darkness > 100 ? " (WANTED)" : "")}");
+                terminal.WriteLine("");
+
+                // Offer options
+                terminal.SetColor("white");
+                terminal.WriteLine("  [1] Release from prison (set days to 0)");
+                terminal.WriteLine("  [2] Clear Darkness (set to 0)");
+                terminal.WriteLine("  [3] Full pardon (release + clear Darkness)");
+                terminal.WriteLine("  [Q] Cancel");
+                terminal.Write("Choice: ");
+                var choice = await terminal.GetInputAsync("");
+
+                bool modified = false;
+                switch (choice.ToUpper())
+                {
+                    case "1":
+                        saveData.Player.DaysInPrison = 0;
+                        modified = true;
+                        terminal.SetColor("green");
+                        terminal.WriteLine("Prison sentence cleared.");
+                        break;
+                    case "2":
+                        saveData.Player.Darkness = 0;
+                        modified = true;
+                        terminal.SetColor("green");
+                        terminal.WriteLine("Darkness cleared.");
+                        break;
+                    case "3":
+                        saveData.Player.DaysInPrison = 0;
+                        saveData.Player.Darkness = 0;
+                        modified = true;
+                        terminal.SetColor("green");
+                        terminal.WriteLine("Full pardon granted — prison and Darkness cleared.");
+                        break;
+                    default:
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("Cancelled.");
+                        await terminal.GetInputAsync("Press Enter to continue...");
+                        return;
+                }
+
+                if (modified)
+                {
+                    await saveBackend.WriteGameData(playerName, saveData);
+
+                    DebugLogger.Instance.LogWarning("SYSOP", $"SysOp pardoned player: {playerName} (Prison={saveData.Player.DaysInPrison}, Darkness={saveData.Player.Darkness})");
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"Player '{playerName}' has been pardoned and save updated.");
+                }
+            }
+            catch (Exception ex)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"Error pardoning player: {ex.Message}");
             }
 
             await terminal.GetInputAsync("Press Enter to continue...");

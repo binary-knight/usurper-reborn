@@ -450,6 +450,18 @@ public class DailySystemManager
     {
         var terminal = GameEngine.Instance?.Terminal;
 
+        // Decrement player prison sentence on daily reset
+        var prisoner = GameEngine.Instance?.CurrentPlayer;
+        if (prisoner != null && prisoner.DaysInPrison > 0)
+        {
+            prisoner.DaysInPrison--;
+            prisoner.PrisonEscapes = (byte)Math.Min(prisoner.PrisonEscapes + 1, GameConfig.MaxPrisonEscapeAttempts);
+            if (terminal != null)
+            {
+                terminal.WriteLine($"A day passes in prison... ({prisoner.DaysInPrison} day{(prisoner.DaysInPrison == 1 ? "" : "s")} remaining)", "yellow");
+            }
+        }
+
         // Process World Event System - this handles all major events
         await WorldEventSystem.Instance.ProcessDailyEvents(currentDay);
 

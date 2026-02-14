@@ -2703,6 +2703,33 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor(alignColor);
         terminal.WriteLine($"║  Chivalry: {chivalry,4}  -  {alignmentDesc,-55} ║");
 
+        // Show Darkness and wanted status
+        long darkness = currentPlayer.Darkness;
+        string darkDesc;
+        string darkColor;
+        if (darkness > 100)
+        {
+            darkDesc = "WANTED by the Royal Guard!";
+            darkColor = "bright_red";
+        }
+        else if (darkness > 50)
+        {
+            darkDesc = "Suspicious reputation";
+            darkColor = "yellow";
+        }
+        else if (darkness > 20)
+        {
+            darkDesc = "Rumored misdeeds";
+            darkColor = "gray";
+        }
+        else
+        {
+            darkDesc = "Clean record";
+            darkColor = "bright_green";
+        }
+        terminal.SetColor(darkColor);
+        terminal.WriteLine($"║  Darkness: {darkness,4}  -  {darkDesc,-55} ║");
+
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
 

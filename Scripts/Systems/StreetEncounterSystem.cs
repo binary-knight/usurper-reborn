@@ -1085,6 +1085,8 @@ public class StreetEncounterSystem
         {
             terminal.SetColor("red");
             terminal.WriteLine("  \"Halt! We've been looking for you!\"");
+            terminal.SetColor("magenta");
+            terminal.WriteLine($"  (Your dark reputation precedes you — Darkness: {player.Darkness})");
             terminal.WriteLine("");
 
             terminal.SetColor("white");
@@ -1096,8 +1098,25 @@ public class StreetEncounterSystem
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("  The guards arrest you and take you to prison...");
+                terminal.WriteLine("");
+
+                // Confiscate some gold
+                long confiscated = Math.Min(player.Gold, player.Gold / 4 + 50);
+                if (confiscated > 0)
+                {
+                    player.Gold -= confiscated;
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  The guards confiscate {confiscated} gold!");
+                }
+
+                int sentence = GameConfig.DefaultPrisonSentence;
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  You are sentenced to {sentence} day{(sentence == 1 ? "" : "s")} in prison.");
+                await Task.Delay(2000);
+
+                player.DaysInPrison = (byte)Math.Min(255, sentence);
                 result.Message = "Arrested by guards!";
-                // TODO: Send to prison
+                throw new LocationExitException(GameLocation.Prison);
             }
             else if (choice == "F")
             {
@@ -1111,6 +1130,22 @@ public class StreetEncounterSystem
                     player.Darkness += 30;
                     terminal.SetColor("red");
                     terminal.WriteLine("  (+30 Darkness for attacking guards)");
+                }
+                else if (player.IsAlive)
+                {
+                    // Lost the fight but survived — arrested
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  The guards overpower you and clap you in irons!");
+                    int sentence = GameConfig.DefaultPrisonSentence + 2; // Extra for resisting with violence
+                    player.Darkness += 30;
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  You are sentenced to {sentence} days in prison for resisting arrest.");
+                    await Task.Delay(2000);
+
+                    player.DaysInPrison = (byte)Math.Min(255, sentence);
+                    result.Message = "Defeated and arrested!";
+                    throw new LocationExitException(GameLocation.Prison);
                 }
             }
             else if (choice == "B" && player.Gold >= 100)
@@ -1133,7 +1168,19 @@ public class StreetEncounterSystem
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine("  The guards catch you!");
-                    // TODO: Send to prison
+                    terminal.WriteLine("");
+
+                    // Extra day for resisting
+                    int sentence = GameConfig.DefaultPrisonSentence + 1;
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"  \"Running from the law, eh? That'll cost you extra!\"");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  You are sentenced to {sentence} days in prison.");
+                    await Task.Delay(2000);
+
+                    player.DaysInPrison = (byte)Math.Min(255, sentence);
+                    result.Message = "Caught by guards!";
+                    throw new LocationExitException(GameLocation.Prison);
                 }
             }
         }

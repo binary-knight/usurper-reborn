@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.30.5";
+    public const string Version = "0.30.6";
     public const string VersionName = "Band of Brothers";
 
     // From Pascal global_maxXX constants
