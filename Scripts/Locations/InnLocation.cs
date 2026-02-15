@@ -1034,7 +1034,7 @@ public class InnLocation : BaseLocation
 
         // Create monster from NPC for combat
         var npcMonster = Monster.CreateMonster(
-            nr: 100,
+            nr: npc.Level,
             name: npc.Name2,
             hps: npc.HP,
             strength: npc.Strength,
@@ -1076,6 +1076,17 @@ public class InnLocation : BaseLocation
 
             // Update relationship negatively
             RelationshipSystem.UpdateRelationship(currentPlayer, npc, -1, 5, false, false);
+
+            // Record defeat memory on NPC for consequence encounters
+            npc.Memory?.RecordEvent(new MemoryEvent
+            {
+                Type = MemoryType.Defeated,
+                Description = $"Defeated in a tavern duel by {currentPlayer.Name2}",
+                InvolvedCharacter = currentPlayer.Name2,
+                Importance = 0.8f,
+                EmotionalImpact = -0.7f,
+                Location = "Inn"
+            });
 
             // Generate news
             NewsSystem.Instance?.Newsy(true, $"{currentPlayer.Name} defeated {npc.Name2} in a tavern brawl!");

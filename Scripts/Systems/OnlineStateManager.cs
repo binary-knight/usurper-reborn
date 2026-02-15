@@ -393,7 +393,7 @@ namespace UsurperRemake.Systems
 
                 var json = JsonSerializer.Serialize(data, jsonOptions);
                 await backend.SaveWorldState("royal_court", json);
-                DebugLogger.Instance.LogInfo("ONLINE", $"Royal court saved to world_state: {king.Name}");
+                DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king.Name}");
             }
             catch (Exception ex)
             {

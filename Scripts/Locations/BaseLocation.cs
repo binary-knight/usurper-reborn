@@ -232,22 +232,38 @@ public abstract class BaseLocation
     {
         bool exitLocation = false;
 
-        // Check for random encounter when first entering location
+        // Check for encounters when first entering location
         if (ShouldCheckForEncounters())
         {
-            var encounterResult = await StreetEncounterSystem.Instance.CheckForEncounter(
-                currentPlayer, LocationId, terminal);
+            // Priority: consequence encounters (grudges, jealous spouses, throne challengers)
+            var consequenceResult = await StreetEncounterSystem.Instance
+                .CheckForConsequenceEncounter(currentPlayer, LocationId, terminal);
 
-            if (encounterResult.EncounterOccurred)
+            if (consequenceResult.EncounterOccurred)
             {
-                // If player died in encounter, exit
                 if (!currentPlayer.IsAlive)
                     return;
+            }
+            else
+            {
+                // Normal random encounter (only if no consequence encounter fired)
+                var encounterResult = await StreetEncounterSystem.Instance.CheckForEncounter(
+                    currentPlayer, LocationId, terminal);
+
+                if (encounterResult.EncounterOccurred)
+                {
+                    if (!currentPlayer.IsAlive)
+                        return;
+                }
             }
         }
 
         // Check for narrative encounters (Stranger, Town NPCs)
         await CheckNarrativeEncounters();
+
+        // Check for NPC petitions (world-state-driven encounters)
+        if (currentPlayer.IsAlive)
+            await NPCPetitionSystem.Instance.CheckForPetition(currentPlayer, LocationId, terminal);
 
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {

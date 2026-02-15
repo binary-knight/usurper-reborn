@@ -87,7 +87,7 @@ public partial class GoalSystem
             GoalType.Social when goal.Name.Contains("Power") => owner.King,
             GoalType.Social when goal.Name.Contains("Ruler") => owner.King,
             GoalType.Personal when goal.Name.Contains("Strength") => owner.Level >= 20,
-            GoalType.Social when goal.Name.Contains("Gang") => !string.IsNullOrEmpty(owner.GangId),
+            GoalType.Social when goal.Name.Contains("Join") || goal.Name.Contains("Find Gang") => !string.IsNullOrEmpty(owner.GangId),
             _ => false
         };
     }
@@ -128,7 +128,7 @@ public partial class GoalSystem
             NewsSystem.Instance?.Newsy($"{npcName}'s team now controls the city and collects tax revenue from every sale!");
             WorldSimulator.AddGossip($"{npcName}'s gang took over the city");
         }
-        else if (goal.Name.Contains("Gang"))
+        else if (goal.Name.Contains("Join") || goal.Name.Contains("Find Gang"))
         {
             owner.EmotionalState?.AddEmotion(EmotionType.Joy, 0.3f, 180);
             NewsSystem.Instance?.Newsy($"{npcName} has formed a powerful new alliance!");

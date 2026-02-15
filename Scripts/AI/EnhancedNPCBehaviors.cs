@@ -680,7 +680,27 @@ public static class EnhancedNPCBehaviors
             // Failed attempt - might raise suspicion
             if (random.NextDouble() < 0.2f) // 20% chance spouse notices
             {
+                int oldSuspicion = affair.SpouseSuspicion;
                 affair.SpouseSuspicion = Math.Min(100, affair.SpouseSuspicion + random.Next(10, 25));
+
+                // Record betrayal memory on spouse when suspicion crosses threshold
+                if (oldSuspicion < GameConfig.MinSuspicionForConfrontation &&
+                    affair.SpouseSuspicion >= GameConfig.MinSuspicionForConfrontation)
+                {
+                    string spouseName = RelationshipSystem.GetSpouseName(marriedNpc);
+                    var spouse = !string.IsNullOrEmpty(spouseName)
+                        ? UsurperRemake.Systems.NPCSpawnSystem.Instance?.GetNPCByName(spouseName)
+                        : null;
+                    spouse?.Memory?.RecordEvent(new MemoryEvent
+                    {
+                        Type = MemoryType.Betrayed,
+                        Description = $"Suspects {player.Name2} is having an affair with {marriedNpc.Name2}",
+                        InvolvedCharacter = player.Name2,
+                        Importance = 0.9f,
+                        EmotionalImpact = -0.8f
+                    });
+                }
+
                 return new AffairResult
                 {
                     Success = false,

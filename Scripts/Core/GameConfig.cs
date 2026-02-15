@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.30.6";
-    public const string VersionName = "Band of Brothers";
+    public const string Version = "0.30.8";
+    public const string VersionName = "The Living World";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -342,7 +342,22 @@ public static partial class GameConfig
     public const int MinDaysBeforeMarriage = 7;        // Minimum days of relationship before marriage (v0.26)
     public const int BaseProposalAcceptance = 50;      // Base 50% chance NPC accepts proposal (v0.26)
     public const int MaxDailyRelationshipGain = 2;     // Max relationship steps per day per NPC (v0.26)
-    
+
+    // NPC Petition System (v0.30.8)
+    public const int PetitionMinLocationChanges = 8;    // Min location changes between petitions
+    public const int PetitionMinRealMinutes = 5;        // Min real minutes between petitions
+    public const float PetitionBaseChance = 0.35f;      // 35% chance when eligible
+    public const int PetitionMaxPerSession = 3;         // Max petitions per play session
+
+    // NPC Consequence Encounter System (v0.30.8)
+    public const int MinMovesBetweenConsequences = 5;       // Min location changes between consequences
+    public const int MinMinutesBetweenConsequences = 3;     // Min real minutes between consequences
+    public const float GrudgeConfrontationChance = 0.30f;   // 30% chance when eligible
+    public const float SpouseConfrontationChance = 0.25f;   // 25% chance when suspicious spouse found
+    public const float ThroneEncounterChance = 0.08f;       // 8% base throne challenge
+    public const float CityContestChance = 0.10f;           // 10% base city contest
+    public const int MinSuspicionForConfrontation = 40;     // Spouse suspicion threshold
+
     // Divine Services
     public const long BlessingCost = 500;              // Cost for divine blessing
     public const long HolyWaterCost = 200;             // Cost for holy water

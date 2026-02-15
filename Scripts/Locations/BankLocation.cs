@@ -1006,6 +1006,13 @@ public class BankLocation : BaseLocation
             return;
         }
 
+        // Initialize robbery attempts if not yet set this session
+        // (BankRobberyAttempts is not serialized — starts at 0 each session)
+        if (currentPlayer.BankRobberyAttempts <= 0 && _robberyAttemptsToday == 0)
+        {
+            currentPlayer.BankRobberyAttempts = GameConfig.DefaultBankRobberyAttempts;
+        }
+
         // Check daily robbery limit
         if (currentPlayer.BankRobberyAttempts <= 0)
         {
@@ -1334,7 +1341,7 @@ public class BankLocation : BaseLocation
         }
 
         // Reset daily robbery attempts
-        player.BankRobberyAttempts = 2;
+        player.BankRobberyAttempts = GameConfig.DefaultBankRobberyAttempts;
     }
 
     /// <summary>

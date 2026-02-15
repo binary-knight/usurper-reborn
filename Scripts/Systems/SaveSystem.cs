@@ -675,6 +675,11 @@ namespace UsurperRemake.Systems
         {
             var npcData = new List<NPCData>();
 
+            // In online mode, NPC data is authoritative in world_state table —
+            // skip serializing 60 NPCs into every player save (saves ~9MB per player)
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                return npcData;
+
             // Get all NPCs from NPCSpawnSystem
             var worldNPCs = GetWorldNPCs();
 

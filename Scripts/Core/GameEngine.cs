@@ -878,16 +878,36 @@ public partial class GameEngine : Node
             terminal.WriteLine($"  v{GameConfig.Version}");
             terminal.WriteLine("");
 
-            // Menu options with clean color hierarchy
+            // PLAY section
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("  ── PLAY ──────────────────────────────────────────────────────────────────");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("bright_cyan");
-            terminal.Write("E");
+            terminal.Write("S");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("bright_green");
-            terminal.WriteLine("Enter the Game");
+            terminal.WriteLine("Single-Player");
 
+            // Online Multiplayer - not shown in BBS door mode or online server mode (they're already online)
+            if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("O");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("Online Multiplayer - Shared World");
+            }
+
+            terminal.WriteLine("");
+
+            // INFO section
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("  ── INFO ──────────────────────────────────────────────────────────────────");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("bright_cyan");
@@ -913,7 +933,7 @@ public partial class GameEngine : Node
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine("BBS List - Play Usurper Reborn Online!");
+            terminal.WriteLine("BBS & Online Server List");
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -923,20 +943,6 @@ public partial class GameEngine : Node
             terminal.Write("] ");
             terminal.SetColor("gray");
             terminal.WriteLine("Credits");
-
-            // Online Play - not shown in BBS door mode or online server mode (they're already online)
-            if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
-            {
-                terminal.WriteLine("");
-                terminal.SetColor("darkgray");
-                terminal.Write("  [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("O");
-                terminal.SetColor("darkgray");
-                terminal.Write("] ");
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine("Online Play - Connect to Shared World");
-            }
 
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
@@ -968,7 +974,8 @@ public partial class GameEngine : Node
 
             switch (choice.ToUpper())
             {
-                case "E":
+                case "S":
+                case "E": // Legacy fallback
                     await EnterGame();
                     break;
                 case "I":

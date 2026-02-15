@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 
 /// <summary>
 /// Street Encounter System - Handles random encounters, PvP attacks, and street events
@@ -60,7 +61,11 @@ public class StreetEncounterSystem
         BeggarEncounter,      // Beggar asks for gold
         RumorEncounter,       // Hear interesting gossip
         GuardPatrol,          // Guards question you
-        Ambush                // Pre-planned attack
+        Ambush,               // Pre-planned attack
+        GrudgeConfrontation,  // Defeated NPC seeking revenge
+        SpouseConfrontation,  // Suspicious spouse confronting player
+        ThroneChallenge,      // Ambitious NPC challenges player king
+        CityControlContest    // Rival team contests player's city control
     }
 
     /// <summary>
@@ -1311,6 +1316,21 @@ public class StreetEncounterSystem
             // Handle NPC death
             npc.HP = 0;
 
+            // Record defeat memory on the real NPC for consequence encounters
+            var realNpc = NPCSpawnSystem.Instance?.GetNPCByName(npc.Name2 ?? npc.Name);
+            if (realNpc != null)
+            {
+                realNpc.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.Defeated,
+                    Description = $"Defeated in street combat by {player.Name2}",
+                    InvolvedCharacter = player.Name2,
+                    Importance = 0.8f,
+                    EmotionalImpact = -0.7f,
+                    Location = "Street"
+                });
+            }
+
             // Check for bounty reward BEFORE calling OnNPCDefeated
             string npcNameForBounty = npc.Name ?? npc.Name2 ?? "";
             long bountyReward = QuestSystem.AutoCompleteBountyForNPC(player, npcNameForBounty);
@@ -1745,6 +1765,673 @@ public class StreetEncounterSystem
 
         return result;
     }
+
+    #region Consequence Encounters
+
+    // Rate limiting for consequence encounters
+    private static int _consequenceLocationChanges = 0;
+    private static DateTime _lastConsequenceTime = DateTime.MinValue;
+
+    /// <summary>
+    /// Check for consequence encounters — NPCs retaliating for player wrongs.
+    /// Called BEFORE random encounters in BaseLocation.LocationLoop().
+    /// </summary>
+    public async Task<EncounterResult> CheckForConsequenceEncounter(
+        Character player, GameLocation location, TerminalEmulator terminal)
+    {
+        var result = new EncounterResult();
+        _consequenceLocationChanges++;
+
+        // Rate limiting
+        if (_consequenceLocationChanges < GameConfig.MinMovesBetweenConsequences)
+            return result;
+        if ((DateTime.Now - _lastConsequenceTime).TotalMinutes < GameConfig.MinMinutesBetweenConsequences)
+            return result;
+        // Shared cooldown with petition system
+        if ((DateTime.Now - NPCPetitionSystem.LastWorldEncounterTime).TotalMinutes < GameConfig.MinMinutesBetweenConsequences)
+            return result;
+
+        // Skip safe zones
+        if (location == GameLocation.Home || location == GameLocation.Bank || location == GameLocation.Church)
+            return result;
+
+        var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (npcs == null || npcs.Count == 0) return result;
+
+        // Priority order: grudge, jealous spouse, throne challenge, city contest
+        if (_random.NextDouble() < GameConfig.GrudgeConfrontationChance)
+        {
+            var grudgeNpc = FindGrudgeNPC(player, npcs);
+            if (grudgeNpc != null)
+            {
+                MarkConsequenceFired();
+                await ExecuteGrudgeConfrontation(grudgeNpc, player, terminal, result);
+                return result;
+            }
+        }
+
+        if (_random.NextDouble() < GameConfig.SpouseConfrontationChance)
+        {
+            var jealousSpouse = FindJealousSpouse(player, npcs);
+            if (jealousSpouse != null)
+            {
+                MarkConsequenceFired();
+                await ExecuteSpouseConfrontation(jealousSpouse, player, terminal, result);
+                return result;
+            }
+        }
+
+        if (player.King && (location == GameLocation.Castle || location == GameLocation.MainStreet))
+        {
+            if (_random.NextDouble() < GameConfig.ThroneEncounterChance)
+            {
+                var challenger = FindThroneChallenger(player, npcs);
+                if (challenger != null)
+                {
+                    MarkConsequenceFired();
+                    await ExecuteThroneChallenge(challenger, player, terminal, result);
+                    return result;
+                }
+            }
+        }
+
+        if (location == GameLocation.DarkAlley || location == GameLocation.MainStreet ||
+            location == GameLocation.AnchorRoad)
+        {
+            if (_random.NextDouble() < GameConfig.CityContestChance)
+            {
+                var rival = FindCityContestRival(player, npcs);
+                if (rival != null)
+                {
+                    MarkConsequenceFired();
+                    await ExecuteCityControlContest(rival, player, terminal, result);
+                    return result;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private void MarkConsequenceFired()
+    {
+        _consequenceLocationChanges = 0;
+        _lastConsequenceTime = DateTime.Now;
+        NPCPetitionSystem.LastWorldEncounterTime = DateTime.Now;
+    }
+
+    #region Find Consequence NPCs
+
+    private NPC? FindGrudgeNPC(Character player, List<NPC> npcs)
+    {
+        return npcs.FirstOrDefault(npc =>
+            !npc.IsDead && npc.IsAlive &&
+            npc.Memory != null &&
+            npc.Memory.GetCharacterImpression(player.Name2) <= -0.5f &&
+            npc.Memory.HasMemoryOfEvent(MemoryType.Defeated, player.Name2, hoursAgo: 168) && // 7 days
+            Math.Abs(npc.Level - player.Level) <= 10);
+    }
+
+    private NPC? FindJealousSpouse(Character player, List<NPC> npcs)
+    {
+        var affairs = NPCMarriageRegistry.Instance?.GetAllAffairs();
+        if (affairs == null) return null;
+
+        foreach (var affair in affairs)
+        {
+            if (affair.SpouseSuspicion < GameConfig.MinSuspicionForConfrontation) continue;
+            if (affair.SeducerId != player.ID && affair.SeducerId != player.Name2) continue;
+
+            // Find the married NPC's spouse
+            var marriedNpc = npcs.FirstOrDefault(n => n.ID == affair.MarriedNpcId || n.Name2 == affair.MarriedNpcId);
+            if (marriedNpc == null) continue;
+
+            string spouseName = RelationshipSystem.GetSpouseName(marriedNpc);
+            if (string.IsNullOrEmpty(spouseName)) continue;
+
+            var spouse = NPCSpawnSystem.Instance?.GetNPCByName(spouseName);
+            if (spouse != null && !spouse.IsDead && spouse.IsAlive)
+                return spouse;
+        }
+
+        return null;
+    }
+
+    private NPC? FindThroneChallenger(Character player, List<NPC> npcs)
+    {
+        return npcs.FirstOrDefault(npc =>
+            !npc.IsDead && npc.IsAlive &&
+            npc.Level >= 15 &&
+            npc.Brain?.Personality != null &&
+            npc.Brain.Personality.Ambition > 0.6f);
+    }
+
+    private NPC? FindCityContestRival(Character player, List<NPC> npcs)
+    {
+        if (string.IsNullOrEmpty(player.Team)) return null;
+
+        // Find NPC in a rival team
+        return npcs.FirstOrDefault(npc =>
+            !npc.IsDead && npc.IsAlive &&
+            !string.IsNullOrEmpty(npc.Team) &&
+            npc.Team != player.Team &&
+            npc.Level >= 5);
+    }
+
+    #endregion
+
+    #region Consequence Encounter Scenes
+
+    private async Task ExecuteGrudgeConfrontation(NPC grudgeNpc, Character player,
+        TerminalEmulator terminal, EncounterResult result)
+    {
+        result.EncounterOccurred = true;
+        result.Type = EncounterType.GrudgeConfrontation;
+
+        terminal.ClearScreen();
+        UIHelper.DrawBoxTop(terminal, "GRUDGE CONFRONTATION!", "bright_red");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxLine(terminal, $"  {grudgeNpc.Name2} steps into your path, eyes burning with rage.", "bright_red", "white");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxLine(terminal, $"  \"You thought I'd forget what you did to me? Think again.\"", "bright_red", "bright_cyan");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxLine(terminal, $"  Level {grudgeNpc.Level} {grudgeNpc.Class} — HP: {grudgeNpc.HP}/{grudgeNpc.MaxHP}", "bright_red", "yellow");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxSeparator(terminal, "bright_red");
+        UIHelper.DrawMenuOption(terminal, "F", "Fight", "bright_red", "bright_yellow", "white");
+        UIHelper.DrawMenuOption(terminal, "A", "Apologize", "bright_red", "bright_yellow", "white");
+        long bribeCost = grudgeNpc.Level * 30;
+        UIHelper.DrawMenuOption(terminal, "B", $"Bribe ({bribeCost}g)", "bright_red", "bright_yellow", "yellow");
+        UIHelper.DrawMenuOption(terminal, "R", "Run", "bright_red", "bright_yellow", "gray");
+        UIHelper.DrawBoxBottom(terminal, "bright_red");
+
+        var choice = await terminal.GetInput("\n  Your response? ");
+
+        switch (choice.ToUpper())
+        {
+            case "F": // Fight
+                await FightNPC(player, grudgeNpc, result, terminal);
+                if (result.Victory)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"\n  {grudgeNpc.Name2} falls. The grudge is settled.");
+                    // Clear the grudge memory
+                    grudgeNpc.Memory?.RecordEvent(new MemoryEvent
+                    {
+                        Type = MemoryType.Defeated,
+                        Description = $"Defeated again by {player.Name2} — grudge settled",
+                        InvolvedCharacter = player.Name2,
+                        Importance = 0.5f,
+                        EmotionalImpact = -0.3f
+                    });
+                    NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2} in a grudge match!");
+                }
+                else
+                {
+                    long goldTaken = player.Gold / 10;
+                    player.Gold -= goldTaken;
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\n  {grudgeNpc.Name2} takes {goldTaken} gold and walks away satisfied.");
+                    result.GoldLost = goldTaken;
+                    NewsSystem.Instance?.Newsy($"{grudgeNpc.Name2} got revenge on {player.Name2}!");
+                }
+                break;
+
+            case "A": // Apologize
+                int apologyChance = Math.Min(75, 30 + (int)(player.Charisma * 2));
+                if (_random.Next(100) < apologyChance)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"\n  {grudgeNpc.Name2} hesitates... then lowers their fists.");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  \"Fine. But don't cross me again.\"");
+
+                    // Partially clear grudge
+                    grudgeNpc.Memory?.RecordEvent(new MemoryEvent
+                    {
+                        Type = MemoryType.SocialInteraction,
+                        Description = $"{player.Name2} apologized sincerely",
+                        InvolvedCharacter = player.Name2,
+                        Importance = 0.6f,
+                        EmotionalImpact = 0.3f
+                    });
+                    player.Darkness = Math.Max(0, player.Darkness - 5);
+                }
+                else
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"\n  \"SORRY doesn't cut it!\"");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {grudgeNpc.Name2} attacks with fury! (+15% STR)");
+                    grudgeNpc.Strength = (long)(grudgeNpc.Strength * 1.15);
+                    await FightNPC(player, grudgeNpc, result, terminal);
+                }
+                break;
+
+            case "B": // Bribe
+                if (player.Gold >= bribeCost)
+                {
+                    int bribeChance = Math.Min(80, 60 + (int)(player.Charisma * 2));
+                    if (_random.Next(100) < bribeChance)
+                    {
+                        player.Gold -= bribeCost;
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} pockets the {bribeCost} gold.");
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"  \"We're even. For now.\"");
+                        result.GoldLost = bribeCost;
+
+                        grudgeNpc.Memory?.RecordEvent(new MemoryEvent
+                        {
+                            Type = MemoryType.GainedGold,
+                            Description = $"{player.Name2} paid off their debt",
+                            InvolvedCharacter = player.Name2,
+                            Importance = 0.5f,
+                            EmotionalImpact = 0.2f
+                        });
+                    }
+                    else
+                    {
+                        player.Gold -= bribeCost;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} takes the gold AND attacks!");
+                        result.GoldLost = bribeCost;
+                        await FightNPC(player, grudgeNpc, result, terminal);
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\n  You don't have enough gold! {grudgeNpc.Name2} attacks!");
+                    await FightNPC(player, grudgeNpc, result, terminal);
+                }
+                break;
+
+            default: // Run
+                int fleeChance = Math.Min(75, 30 + (int)(player.Dexterity * 2));
+                if (_random.Next(100) < fleeChance)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"\n  You slip away before {grudgeNpc.Name2} can react!");
+                }
+                else
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"\n  {grudgeNpc.Name2} catches you! They get the first strike!");
+                    await FightNPC(player, grudgeNpc, result, terminal);
+                }
+                break;
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    private async Task ExecuteSpouseConfrontation(NPC spouse, Character player,
+        TerminalEmulator terminal, EncounterResult result)
+    {
+        result.EncounterOccurred = true;
+        result.Type = EncounterType.SpouseConfrontation;
+
+        // Find who the player is having an affair with (the spouse's partner)
+        string partnerName = RelationshipSystem.GetSpouseName(spouse);
+
+        terminal.ClearScreen();
+        UIHelper.DrawBoxTop(terminal, "JEALOUS SPOUSE!", "bright_red");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxLine(terminal, $"  {spouse.Name2} blocks your way, fists clenched.", "bright_red", "white");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxLine(terminal, $"  \"I know what you've been doing with {partnerName}.\"", "bright_red", "bright_cyan");
+        UIHelper.DrawBoxLine(terminal, $"  \"Did you think I wouldn't find out?\"", "bright_red", "cyan");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxSeparator(terminal, "bright_red");
+        UIHelper.DrawMenuOption(terminal, "D", "Deny everything", "bright_red", "bright_yellow", "white");
+        UIHelper.DrawMenuOption(terminal, "A", "Admit and apologize", "bright_red", "bright_yellow", "white");
+        UIHelper.DrawMenuOption(terminal, "T", "Taunt them", "bright_red", "bright_yellow", "red");
+        UIHelper.DrawMenuOption(terminal, "F", "Fight", "bright_red", "bright_yellow", "white");
+        UIHelper.DrawBoxBottom(terminal, "bright_red");
+
+        var choice = await terminal.GetInput("\n  Your response? ");
+
+        switch (choice.ToUpper())
+        {
+            case "D": // Deny
+                int denyChance = Math.Min(75, 40 + (int)(player.Charisma * 2));
+                if (_random.Next(100) < denyChance)
+                {
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"\n  \"I don't know what you're talking about. We're just friends.\"");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {spouse.Name2} looks uncertain and backs down.");
+
+                    // Reduce suspicion
+                    var affairs = NPCMarriageRegistry.Instance?.GetAllAffairs();
+                    if (affairs != null)
+                    {
+                        foreach (var affair in affairs)
+                        {
+                            if (affair.SeducerId == player.ID || affair.SeducerId == player.Name2)
+                            {
+                                affair.SpouseSuspicion = Math.Max(0, affair.SpouseSuspicion - 20);
+                                break;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"\n  \"LIAR! I've seen the looks between you two!\"");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {spouse.Name2} attacks in a rage!");
+                    await FightNPC(player, spouse, result, terminal);
+                }
+                break;
+
+            case "A": // Admit
+                terminal.SetColor("white");
+                terminal.WriteLine($"\n  \"You're right. I'm sorry. It was wrong of me.\"");
+                terminal.SetColor("yellow");
+                long damage = 10 + _random.Next(15);
+                player.HP = Math.Max(1, player.HP - damage);
+                terminal.WriteLine($"  {spouse.Name2} punches you! (-{damage} HP)");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  \"Stay away from {partnerName}. This is your only warning.\"");
+
+                // Reduce suspicion significantly
+                var admitAffairs = NPCMarriageRegistry.Instance?.GetAllAffairs();
+                if (admitAffairs != null)
+                {
+                    foreach (var affair in admitAffairs)
+                    {
+                        if (affair.SeducerId == player.ID || affair.SeducerId == player.Name2)
+                        {
+                            affair.SpouseSuspicion = Math.Max(0, affair.SpouseSuspicion - 30);
+                            break;
+                        }
+                    }
+                }
+
+                // Relationship damaged
+                RelationshipSystem.UpdateRelationship(player, spouse, -1, 3);
+                break;
+
+            case "T": // Taunt
+                terminal.SetColor("red");
+                terminal.WriteLine($"\n  \"Maybe if you were a better spouse, {partnerName} wouldn't need to look elsewhere.\"");
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"  {spouse.Name2} ROARS with fury! (+25% STR)");
+                spouse.Strength = (long)(spouse.Strength * 1.25);
+                await FightNPC(player, spouse, result, terminal);
+
+                player.Darkness += 10;
+
+                if (result.Victory)
+                {
+                    NewsSystem.Instance?.Newsy($"{player.Name2} humiliated {spouse.Name2} in a confrontation over an affair!");
+                }
+                break;
+
+            default: // Fight
+                terminal.SetColor("white");
+                terminal.WriteLine($"\n  \"If that's how you want to settle this...\"");
+                await FightNPC(player, spouse, result, terminal);
+                player.Darkness += 10;
+
+                NewsSystem.Instance?.Newsy($"{player.Name2} and {spouse.Name2} came to blows over a love affair!");
+                break;
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    private async Task ExecuteThroneChallenge(NPC challenger, Character player,
+        TerminalEmulator terminal, EncounterResult result)
+    {
+        result.EncounterOccurred = true;
+        result.Type = EncounterType.ThroneChallenge;
+
+        var king = CastleLocation.GetCurrentKing();
+
+        terminal.ClearScreen();
+        UIHelper.DrawBoxTop(terminal, "THRONE CHALLENGE!", "bright_yellow");
+        UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
+        UIHelper.DrawBoxLine(terminal, $"  {challenger.Name2}, a powerful Level {challenger.Level} {challenger.Class}, confronts you.", "bright_yellow", "white");
+        UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
+        UIHelper.DrawBoxLine(terminal, $"  \"Your reign ends today. The throne belongs to someone worthy!\"", "bright_yellow", "bright_cyan");
+        UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
+        UIHelper.DrawBoxSeparator(terminal, "bright_yellow");
+        UIHelper.DrawMenuOption(terminal, "A", "Accept the challenge", "bright_yellow", "bright_cyan", "bright_green");
+        UIHelper.DrawMenuOption(terminal, "D", "Dismiss (send guards)", "bright_yellow", "bright_cyan", "white");
+        UIHelper.DrawMenuOption(terminal, "N", "Negotiate", "bright_yellow", "bright_cyan", "white");
+        UIHelper.DrawMenuOption(terminal, "I", "Imprison them", "bright_yellow", "bright_cyan", "red");
+        UIHelper.DrawBoxBottom(terminal, "bright_yellow");
+
+        var choice = await terminal.GetInput("\n  Your decree, Majesty? ");
+
+        switch (choice.ToUpper())
+        {
+            case "A": // Accept
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"\n  \"I accept your challenge. Let us settle this with steel!\"");
+                await FightNPC(player, challenger, result, terminal);
+
+                if (result.Victory)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"\n  {challenger.Name2} falls! Your reign continues unchallenged.");
+                    player.Fame += 25;
+
+                    // Imprison the challenger
+                    NPCSpawnSystem.Instance?.ImprisonNPC(challenger, 7);
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"  {challenger.Name2} is imprisoned for 7 days.");
+                    NewsSystem.Instance?.Newsy($"King {player.Name2} defeated {challenger.Name2}'s throne challenge! The challenger is imprisoned.");
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\n  You are defeated! {challenger.Name2} claims the throne!");
+                    player.King = false;
+                    // NPC becomes king
+                    if (king != null)
+                    {
+                        king.Name = challenger.Name2;
+                        king.AI = CharacterAI.Civilian;
+                    }
+                    NewsSystem.Instance?.Newsy($"{challenger.Name2} defeated King {player.Name2} and seized the throne!");
+                }
+                break;
+
+            case "D": // Dismiss with guards
+                if (king?.Guards != null && king.Guards.Count > 0)
+                {
+                    int avgLoyalty = (int)king.Guards.Average(g => g.Loyalty);
+                    if (avgLoyalty >= 30)
+                    {
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"\n  \"Guards! Remove this fool from my sight!\"");
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  Your loyal guards drag {challenger.Name2} away.");
+                        NewsSystem.Instance?.Newsy($"King {player.Name2}'s guards repelled {challenger.Name2}'s challenge.");
+                    }
+                    else
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"\n  Your guards hesitate... their loyalty wavers!");
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"  You must face {challenger.Name2} yourself!");
+                        await FightNPC(player, challenger, result, terminal);
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\n  You have no guards! You must face {challenger.Name2} yourself!");
+                    await FightNPC(player, challenger, result, terminal);
+                }
+                break;
+
+            case "N": // Negotiate
+                int negotiateChance = Math.Min(70, 30 + (int)(player.Charisma * 2));
+                if (_random.Next(100) < negotiateChance)
+                {
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine($"\n  \"Perhaps there's a role for someone of your talents in my court.\"");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {challenger.Name2} considers... \"A seat on the court? That could work.\"");
+
+                    if (king != null)
+                    {
+                        king.CourtMembers.Add(new CourtMember
+                        {
+                            Name = challenger.Name2,
+                            Role = "Advisor",
+                            LoyaltyToKing = 40
+                        });
+                    }
+
+                    NewsSystem.Instance?.Newsy($"King {player.Name2} negotiated with would-be usurper {challenger.Name2}, offering them a court position.");
+                }
+                else
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"\n  \"I don't want a SEAT. I want the THRONE!\"");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {challenger.Name2} attacks!");
+                    await FightNPC(player, challenger, result, terminal);
+                }
+                break;
+
+            default: // Imprison
+                if (king?.Guards != null && king.Guards.Count > 0)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\n  \"Seize them! 14 days in the dungeon for treason!\"");
+
+                    NPCSpawnSystem.Instance?.ImprisonNPC(challenger, 14);
+
+                    // Guards lose loyalty (tyrannical act)
+                    foreach (var guard in king.Guards)
+                        guard.Loyalty = Math.Max(0, guard.Loyalty - 10);
+
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"  {challenger.Name2} is dragged away. Your guards exchange uneasy glances.");
+                    player.Darkness += 5;
+                    NewsSystem.Instance?.Newsy($"King {player.Name2} imprisoned {challenger.Name2} for challenging the throne.");
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\n  Without guards, you can't imprison anyone!");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {challenger.Name2} laughs and attacks!");
+                    await FightNPC(player, challenger, result, terminal);
+                }
+                break;
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    private async Task ExecuteCityControlContest(NPC rival, Character player,
+        TerminalEmulator terminal, EncounterResult result)
+    {
+        result.EncounterOccurred = true;
+        result.Type = EncounterType.CityControlContest;
+
+        string rivalTeam = rival.Team ?? "Unknown";
+
+        terminal.ClearScreen();
+        UIHelper.DrawBoxTop(terminal, "TURF WAR!", "bright_red");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxLine(terminal, $"  Members of '{rivalTeam}' surround you.", "bright_red", "white");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxLine(terminal, $"  {rival.Name2}: \"Your team's hold on this city ends now!\"", "bright_red", "bright_cyan");
+        UIHelper.DrawBoxEmpty(terminal, "bright_red");
+        UIHelper.DrawBoxSeparator(terminal, "bright_red");
+        UIHelper.DrawMenuOption(terminal, "F", "Fight their champion", "bright_red", "bright_yellow", "bright_green");
+        long payoffCost = rival.Level * 50;
+        UIHelper.DrawMenuOption(terminal, "P", $"Pay them off ({payoffCost}g)", "bright_red", "bright_yellow", "yellow");
+        UIHelper.DrawMenuOption(terminal, "S", "Surrender turf", "bright_red", "bright_yellow", "gray");
+        UIHelper.DrawMenuOption(terminal, "R", "Run", "bright_red", "bright_yellow", "gray");
+        UIHelper.DrawBoxBottom(terminal, "bright_red");
+
+        var choice = await terminal.GetInput("\n  Your response? ");
+
+        switch (choice.ToUpper())
+        {
+            case "F": // Fight champion
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"\n  \"I'll fight your best. Bring it on!\"");
+                await FightNPC(player, rival, result, terminal);
+
+                if (result.Victory)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"\n  {rival.Name2} falls! '{rivalTeam}' retreats in shame.");
+                    player.Fame += 20;
+                    NewsSystem.Instance?.Newsy($"{player.Name2} defended their turf by defeating {rival.Name2} of '{rivalTeam}'!");
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\n  '{rivalTeam}' cheers as their champion stands victorious.");
+                    NewsSystem.Instance?.Newsy($"'{rivalTeam}' defeated {player.Name2} in a turf war!");
+                }
+                break;
+
+            case "P": // Pay off
+                if (player.Gold >= payoffCost)
+                {
+                    player.Gold -= payoffCost;
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"\n  You hand over {payoffCost} gold.");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {rival.Name2}: \"Smart move. We'll leave you alone... for now.\"");
+                    result.GoldLost = payoffCost;
+                    NewsSystem.Instance?.Newsy($"{player.Name2} paid off '{rivalTeam}' to avoid a turf war.");
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\n  You don't have enough gold!");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {rival.Name2}: \"Then we settle this the hard way!\"");
+                    await FightNPC(player, rival, result, terminal);
+                }
+                break;
+
+            case "S": // Surrender
+                terminal.SetColor("gray");
+                terminal.WriteLine($"\n  \"Fine. Take it. It's yours.\"");
+                terminal.SetColor("white");
+                terminal.WriteLine($"  '{rivalTeam}' takes control of the area. Your reputation takes a hit.");
+                player.Fame = Math.Max(0, player.Fame - 10);
+                NewsSystem.Instance?.Newsy($"{player.Name2} surrendered turf to '{rivalTeam}' without a fight.");
+                break;
+
+            default: // Run
+                int fleeChance = Math.Min(75, 30 + (int)(player.Dexterity * 2));
+                if (_random.Next(100) < fleeChance)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"\n  You dodge through the crowd and escape!");
+                }
+                else
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"\n  They cut off your escape! {rival.Name2} attacks!");
+                    await FightNPC(player, rival, result, terminal);
+                }
+                break;
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    #endregion
+
+    #endregion
 }
 
 /// <summary>

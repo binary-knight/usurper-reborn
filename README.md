@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.30.5** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.30.8** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,31 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.30.8 - The Living World
+
+**NPC Petition System:** NPCs now approach players with problems, requests, and opportunities based on actual world events. 8 petition types: troubled marriages, matchmaker requests, custody disputes, faction missions, royal petitions, dying wishes, missing persons, and rivalry reports. Every choice has real consequences — NPC memories, relationships, alignment, faction standing, and news feed all update.
+
+**NPC Consequence Encounters:** NPCs remember what you've done and come back for payback. 4 encounter types: grudge confrontations (defeated NPCs seek revenge), jealous spouse (affair discovered), throne challenges (ambitious NPCs), and city control contests (rival teams). Fires based on actual NPC memories and world state.
+
+**Main Menu Redesign:** Play modes (Single-Player, Online Multiplayer) clearly separated from info sections. `[S]` for Single-Player, `[O]` promoted to main play section.
+
+**Bug Fixes:**
+- NPC "formed a powerful new alliance" news spam — "Support Gang" goals repeatedly completing and firing news
+- Online player saves bloated to 9MB each — NPC data (60 NPCs with full brain/memory/goals) no longer saved per-player in online mode since world_state is authoritative
+
+### Completed in v0.30.7 - Bug Fixes
+
+- Bank robbery always said "exhausted robbery attempts" — attempts never serialized, defaulted to 0 every session
+- NPC inn duels gave Level 100 rewards regardless of actual NPC level — hardcoded monster level
+- Royal court save log spam — downgraded to Debug level
+
+### Completed in v0.30.6 - NPC Teammate Combat Overhaul & Guard Arrest Fix
+
+- NPC teammates now use the full spell effect and class ability systems in dungeon combat (previously 5 hardcoded abilities, no spell effects)
+- All 11 classes use their full ability trees; all 18 spell effects trigger for teammates
+- Guard arrest system fixed — surrendering/losing now sends players to prison with daily sentence tracking
+- Player reputation system with NPC-visible fame/infamy affecting encounters
 
 ### Completed in v0.30.5 - Spell Effects Overhaul & Equipment Fix
 
