@@ -1645,6 +1645,13 @@ public abstract class BaseLocation
                 }
                 return (true, false);
 
+            case "m":
+            case "mat":
+            case "mats":
+            case "materials":
+                await ShowMaterials();
+                return (true, false);
+
             default:
                 terminal.WriteLine("");
                 terminal.SetColor("red");
@@ -1735,6 +1742,17 @@ public abstract class BaseLocation
         terminal.Write("/pot");
         terminal.SetColor("white");
         terminal.WriteLine("- Use a healing potion                                   ║");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("║  ");
+        terminal.SetColor("cyan");
+        terminal.Write("/materials");
+        terminal.SetColor("gray");
+        terminal.Write("or ");
+        terminal.SetColor("cyan");
+        terminal.Write("/mat");
+        terminal.SetColor("white");
+        terminal.WriteLine("- View crafting materials                                 ║");
 
         terminal.SetColor("bright_yellow");
         terminal.Write("║  ");
@@ -1886,6 +1904,54 @@ public abstract class BaseLocation
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  ... and {activeQuests.Count - 5} more quests.");
             }
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Show crafting materials collection
+    /// </summary>
+    protected async Task ShowMaterials()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                          CRAFTING MATERIALS                                  ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        bool hasAny = false;
+        foreach (var matDef in GameConfig.CraftingMaterials)
+        {
+            int count = 0;
+            currentPlayer?.CraftingMaterials?.TryGetValue(matDef.Id, out count);
+
+            if (count > 0)
+            {
+                hasAny = true;
+                terminal.SetColor(matDef.Color);
+                terminal.Write($"  {matDef.Name}");
+                terminal.SetColor("white");
+                terminal.Write($" x{count}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  — {matDef.Description}");
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"    Found on dungeon floors {matDef.FloorMin}-{matDef.FloorMax}");
+                terminal.WriteLine("");
+            }
+        }
+
+        if (!hasAny)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  You have no crafting materials.");
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("  Rare materials can be found in the dungeon depths.");
+            terminal.WriteLine("  Defeat monsters, open treasure chests, and challenge Old Gods");
+            terminal.WriteLine("  to collect materials needed for powerful enchantments.");
         }
 
         terminal.WriteLine("");

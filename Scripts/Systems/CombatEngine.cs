@@ -1469,6 +1469,9 @@ public partial class CombatEngine
             terminal.WriteLine($"Dark power drains {lifesteal} life from your enemy!", "dark_magenta");
         }
 
+        // Elemental enchant procs (v0.30.9)
+        CheckElementalEnchantProcs(attacker, target, actualDamage, result);
+
         // Chance to improve basic attack skill from successful use
         if (TrainingSystem.TryImproveFromUse(attacker, "basic_attack", random))
         {
@@ -2692,6 +2695,57 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// Check for elemental enchant procs on player's equipped weapon (single-monster combat).
+    /// </summary>
+    private void CheckElementalEnchantProcs(Character attacker, Monster target, long damage, CombatResult result)
+    {
+        var weapon = attacker.GetEquipment(EquipmentSlot.MainHand);
+        if (weapon == null) return;
+
+        if (weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
+        {
+            long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
+            target.HP = Math.Max(0, target.HP - fireDamage);
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"Flames erupt from your weapon! {fireDamage} fire damage! (Phoenix Fire)");
+            result.TotalDamageDealt += fireDamage;
+            attacker.Statistics?.RecordDamageDealt(fireDamage, false);
+        }
+
+        if (weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
+        {
+            target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"Frost spreads from the impact! {target.Name}'s defence reduced! (Frostbite)");
+        }
+    }
+
+    /// <summary>
+    /// Check for elemental enchant procs in multi-monster combat.
+    /// </summary>
+    private void CheckElementalEnchantProcsMonster(Character attacker, Monster target, long damage)
+    {
+        var weapon = attacker.GetEquipment(EquipmentSlot.MainHand);
+        if (weapon == null) return;
+
+        if (weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
+        {
+            long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
+            target.HP -= fireDamage;
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  Flames erupt! {fireDamage} fire damage to {target.Name}! (Phoenix Fire)");
+            attacker.Statistics?.RecordDamageDealt(fireDamage, false);
+        }
+
+        if (weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
+        {
+            target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  Frost spreads! {target.Name}'s defence reduced! (Frostbite)");
+        }
+    }
+
+    /// <summary>
     /// Automatically use healing potions to restore HP after combat.
     /// Fires before the monk purchase so players heal first, then buy replacements.
     /// </summary>
@@ -2743,6 +2797,9 @@ public partial class CombatEngine
                 loot = LootGenerator.GenerateMiniBossLoot(monster.Level, result.Player.Class);
                 if (loot != null)
                 {
+                    // Cap MinLevel to player's level — if you killed it, you earned it
+                    if (loot.MinLevel > result.Player.Level)
+                        loot.MinLevel = result.Player.Level;
                     terminal.WriteLine("");
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine("The Champion drops valuable equipment!");
@@ -2757,6 +2814,9 @@ public partial class CombatEngine
                 loot = LootGenerator.GenerateBossLoot(monster.Level, result.Player.Class);
                 if (loot != null)
                 {
+                    // Cap MinLevel to player's level — if you killed it, you earned it
+                    if (loot.MinLevel > result.Player.Level)
+                        loot.MinLevel = result.Player.Level;
                     terminal.WriteLine("");
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine("The Boss drops powerful equipment!");
@@ -2784,6 +2844,9 @@ public partial class CombatEngine
 
                 if (loot != null)
                 {
+                    // Cap MinLevel to player's level — if you killed it, you earned it
+                    if (loot.MinLevel > result.Player.Level)
+                        loot.MinLevel = result.Player.Level;
                     // Display the drop with excitement!
                     await DisplayEquipmentDrop(loot, monster, result.Player);
                 }
@@ -3716,6 +3779,10 @@ public partial class CombatEngine
             terminal.Write($"{monster.Name}: ");
             terminal.SetColor("red");
             terminal.WriteLine($"-{actualDamage} HP");
+
+            // Elemental enchant procs (v0.30.9)
+            if (result.Player != null)
+                CheckElementalEnchantProcsMonster(result.Player, monster, actualDamage);
 
             if (monster.HP <= 0)
             {

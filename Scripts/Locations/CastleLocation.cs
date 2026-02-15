@@ -3297,6 +3297,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("The guards drag you from the castle...");
 
             await Task.Delay(3000);
+            await NavigateToLocation(GameLocation.MainStreet);
             return true; // Exit castle
         }
     }
@@ -3451,6 +3452,7 @@ public class CastleLocation : BaseLocation
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has abdicated the throne! The kingdom is in chaos!");
 
             await Task.Delay(4000);
+            await NavigateToLocation(GameLocation.MainStreet);
             return true; // Exit castle
         }
         else

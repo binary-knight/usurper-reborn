@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.30.8** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.40.0** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,44 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.40.0 - The Price of Power
+
+**Rare Crafting Materials:**
+- 8 lore-themed materials tied to Old God domains drop from specific dungeon floor ranges (Crimson War Shard, Withered Heart Petal, Iron Judgment Link, Shadow Silk Thread, Fading Starlight Dust, Terravok's Heartstone, Eye of Manwe, Heart of the Ocean)
+- Drop rates: 3% regular monsters, 25% mini-bosses, 100% floor bosses, 8% treasure chests
+- Old Gods drop guaranteed thematic materials + Heart of the Ocean for floor 50+ gods
+- View collection with `/materials` command from anywhere
+
+**Material Requirements:**
+- High-tier enchantments (Mythic through Frostbite) now require rare materials in addition to gold
+- 4th and 5th stat training sessions require Heart of the Ocean and Eye of Manwe
+- Material availability shown in green/red in enchantment and training UIs
+
+**Boss Difficulty Tuning:**
+- Final 3 Old Gods significantly buffed: Aurelion 6,500→10,000 HP, Terravok 9,000→16,000 HP, Manwe 12,000→22,000 HP
+- New divine armor mechanic — unenchanted weapons deal 25-50% less damage against late-game gods
+- Artifact damage bonus — +3% per collected artifact (up to +21% with all 7)
+
+**Enchanting Expansion:**
+- 5 new enchantment tiers: Mythic (+24), Legendary (+30), Godforged (+38), Phoenix Fire, Frostbite
+- Max enchantments per item raised from 3 to 5, with failure risk on 4th (25%) and 5th (50%)
+- Elemental enchantments add combat effects (fire damage, defense reduction)
+
+**Stat Training:**
+- Master Trainer at the Inn offers permanent +1 to any stat, up to 5 times each
+- Costs escalate quadratically per training session
+
+**Gambling Den:**
+- Three gambling games beneath the Inn: High-Low Dice, Skull & Bones (blackjack), Arm Wrestling
+
+**Economy Rebalancing:**
+- Daily alive bonus reduced 71%, NPC recruitment costs 4x higher, daily NPC team wages added
+- NPCs leave your team after 3 days of unpaid wages with mail notification
+
+**Bug Fixes:**
+- Equipment drops no longer require higher levels than the player who earned them
+- Throne abdication no longer crashes the game
 
 ### Completed in v0.30.8 - The Living World
 
@@ -824,7 +862,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.30.5)
+### Known Issues (Alpha v0.40.0)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -839,4 +877,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.30.5 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.40.0 — The world is running. [Watch it live.](https://usurper-reborn.net)

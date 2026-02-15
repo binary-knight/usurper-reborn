@@ -322,6 +322,36 @@ public class Character
     public Dictionary<string, TrainingSystem.ProficiencyLevel> SkillProficiencies { get; set; } = new();
     public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();
 
+    // Gold-based Stat Training (v0.30.9) - separate from TrainingPoints system
+    public Dictionary<string, int> StatTrainingCounts { get; set; } = new();
+
+    // NPC Team Wage Tracking (v0.30.9) - tracks consecutive unpaid days per NPC
+    public Dictionary<string, int> UnpaidWageDays { get; set; } = new();
+
+    // Crafting Materials (v0.30.9) - rare lore-themed materials for high-tier enchantments and training
+    public Dictionary<string, int> CraftingMaterials { get; set; } = new();
+
+    public bool HasMaterial(string materialId, int count = 1)
+    {
+        return CraftingMaterials.TryGetValue(materialId, out int owned) && owned >= count;
+    }
+
+    public bool ConsumeMaterial(string materialId, int count = 1)
+    {
+        if (!HasMaterial(materialId, count)) return false;
+        CraftingMaterials[materialId] -= count;
+        if (CraftingMaterials[materialId] <= 0)
+            CraftingMaterials.Remove(materialId);
+        return true;
+    }
+
+    public void AddMaterial(string materialId, int count = 1)
+    {
+        if (!CraftingMaterials.ContainsKey(materialId))
+            CraftingMaterials[materialId] = 0;
+        CraftingMaterials[materialId] += count;
+    }
+
     // Home Upgrade System - Gold sinks
     public int HomeLevel { get; set; } = 0;
     public int ChestLevel { get; set; } = 0;

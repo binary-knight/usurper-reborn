@@ -216,9 +216,12 @@ public class MaintenanceSystem
             WriteIfNotSilent($"  {player.Name2}: Alive bonus +{bonus}", "green");
         }
         
+        // NPC team daily wages (v0.30.9)
+        await ProcessTeamWages(player);
+
         // Class-specific daily processing
         await ProcessClassSpecificMaintenance(player, config);
-        
+
         // Reset daily parameters (Pascal: "resetting all kinds of daily parameters")
         ResetDailyParameters(player, config);
         
@@ -259,6 +262,89 @@ public class MaintenanceSystem
         }
     }
     
+    /// <summary>
+    /// Process daily NPC team wages - deduct gold for each NPC on the player's team.
+    /// NPCs leave after MaxUnpaidWageDays consecutive days without pay, sending a mail.
+    /// </summary>
+    private async Task ProcessTeamWages(Character player)
+    {
+        if (string.IsNullOrEmpty(player.Team)) return;
+
+        var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (allNPCs == null) return;
+
+        var teamNPCs = allNPCs.Where(n => n.Team == player.Team && n.IsAlive && !n.IsDead).ToList();
+        if (teamNPCs.Count == 0) return;
+
+        long totalWages = 0;
+        foreach (var npc in teamNPCs)
+            totalWages += npc.Level * GameConfig.NpcDailyWagePerLevel;
+
+        if (totalWages <= 0) return;
+
+        if (player.Gold >= totalWages)
+        {
+            // Pay all wages
+            player.Gold -= totalWages;
+            player.Statistics?.RecordGoldSpent(totalWages);
+            WriteIfNotSilent($"  Team wages: -{totalWages:N0}g ({teamNPCs.Count} members)", "yellow");
+
+            // Clear all unpaid days since we paid in full
+            player.UnpaidWageDays?.Clear();
+        }
+        else
+        {
+            // Can't afford full wages
+            long partialPay = player.Gold;
+            player.Gold = 0;
+            if (partialPay > 0)
+                player.Statistics?.RecordGoldSpent(partialPay);
+
+            WriteIfNotSilent($"  Team wages: Can't afford {totalWages:N0}g! (had {partialPay:N0}g)", "red");
+
+            // Track unpaid days per NPC and check for departures
+            var npcsToRemove = new List<NPC>();
+            foreach (var npc in teamNPCs)
+            {
+                string npcKey = npc.Name2 ?? npc.DisplayName;
+                player.UnpaidWageDays ??= new Dictionary<string, int>();
+
+                if (!player.UnpaidWageDays.ContainsKey(npcKey))
+                    player.UnpaidWageDays[npcKey] = 0;
+
+                player.UnpaidWageDays[npcKey]++;
+
+                if (player.UnpaidWageDays[npcKey] >= GameConfig.MaxUnpaidWageDays)
+                {
+                    npcsToRemove.Add(npc);
+                }
+            }
+
+            // Process NPC departures
+            foreach (var npc in npcsToRemove)
+            {
+                string npcKey = npc.Name2 ?? npc.DisplayName;
+                npc.Team = "";
+                npc.TeamPW = "";
+                player.UnpaidWageDays?.Remove(npcKey);
+
+                WriteIfNotSilent($"  {npc.DisplayName} has LEFT your team due to unpaid wages!", "bright_red");
+
+                // Send mail to player explaining why they left
+                if (OnlineStateManager.Instance != null)
+                {
+                    string mailMessage = $"{npc.DisplayName} has left your team. \"You haven't paid me in {GameConfig.MaxUnpaidWageDays} days. I'm no charity worker — find yourself another sword arm. Maybe when your coffers aren't empty, we can talk again.\"";
+                    await OnlineStateManager.Instance.SendMessage(player.Name2 ?? "", "team_departure", mailMessage);
+                }
+
+                // Also post to news
+                NewsSystem.Instance?.Newsy(true, $"{npc.DisplayName} quit {player.DisplayName}'s team over unpaid wages!");
+            }
+        }
+
+        await Task.CompletedTask;
+    }
+
     /// <summary>
     /// Process class-specific daily maintenance
     /// Pascal: Class-specific processing in MAINT.PAS

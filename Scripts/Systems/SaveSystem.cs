@@ -390,7 +390,9 @@ namespace UsurperRemake.Systems
                     Rarity = (int)equip.Rarity,
                     WeaponType = (int)equip.WeaponType,
                     Handedness = (int)equip.Handedness,
-                    ArmorType = (int)equip.ArmorType
+                    ArmorType = (int)equip.ArmorType,
+                    HasFireEnchant = equip.HasFireEnchant,
+                    HasFrostEnchant = equip.HasFrostEnchant
                 }).ToList(),
 
                 // Base stats
@@ -503,6 +505,11 @@ namespace UsurperRemake.Systems
                     kvp => kvp.Key,
                     kvp => (int)kvp.Value) ?? new Dictionary<string, int>(),
                 SkillTrainingProgress = player.SkillTrainingProgress ?? new Dictionary<string, int>(),
+
+                // Gold-based stat training (v0.30.9)
+                StatTrainingCounts = player.StatTrainingCounts ?? new Dictionary<string, int>(),
+                UnpaidWageDays = player.UnpaidWageDays ?? new Dictionary<string, int>(),
+                CraftingMaterials = player.CraftingMaterials ?? new Dictionary<string, int>(),
 
                 // Spells and skills
                 Spells = player.Spell ?? new List<List<bool>>(),
@@ -825,7 +832,9 @@ namespace UsurperRemake.Systems
                             Rarity = (int)equip.Rarity,
                             WeaponType = (int)equip.WeaponType,
                             Handedness = (int)equip.Handedness,
-                            ArmorType = (int)equip.ArmorType
+                            ArmorType = (int)equip.ArmorType,
+                            HasFireEnchant = equip.HasFireEnchant,
+                            HasFrostEnchant = equip.HasFrostEnchant
                         }).ToList() ?? new List<DynamicEquipmentData>()
                 });
             }

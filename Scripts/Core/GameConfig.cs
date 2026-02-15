@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.30.8";
-    public const string VersionName = "The Living World";
+    public const string Version = "0.40.0";
+    public const string VersionName = "The Price of Power";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -357,6 +357,79 @@ public static partial class GameConfig
     public const float ThroneEncounterChance = 0.08f;       // 8% base throne challenge
     public const float CityContestChance = 0.10f;           // 10% base city contest
     public const int MinSuspicionForConfrontation = 40;     // Spouse suspicion threshold
+
+    // Economy Tuning (v0.30.9)
+    public const int NpcRecruitmentCostPerLevel = 2000;       // Gold cost per NPC level to recruit (was hardcoded 500)
+    public const int NpcDailyWagePerLevel = 100;              // Daily gold wage per NPC level for team members
+    public const int MaxUnpaidWageDays = 3;                   // NPC leaves team after this many days of unpaid wages
+
+    // Stat Training (v0.30.9)
+    public const int StatTrainingBaseCostPerLevel = 500;      // Base gold cost = playerLevel * this value
+    public const int MaxStatTrainingsPerStat = 5;             // Max times each stat can be trained for gold
+
+    // Gambling Den (v0.30.9)
+    public const int GamblingMaxDoubleDown = 3;               // Max double-or-nothing rounds in High-Low
+    public const double HighLowPayoutMultiplier = 1.8;        // High-Low correct guess payout
+    public const double BlackjackPayoutMultiplier = 2.0;      // Skull & Bones normal win payout
+    public const double BlackjackBonusPayout = 2.5;           // Skull & Bones blackjack (21 in 2) payout
+    public const int ArmWrestleBetPerLevel = 200;             // Arm wrestling bet = NPC level * this
+    public const int MaxArmWrestlesPerDay = 3;                // Max arm wrestling matches per day
+
+    // Enchanting Expansion (v0.30.9)
+    public const int MaxEnchantments = 5;                     // Max enchantments per item (was 3)
+    public const float FourthEnchantFailChance = 0.25f;       // 25% failure on 4th enchant
+    public const float FifthEnchantFailChance = 0.50f;        // 50% failure on 5th enchant
+    public const float FireEnchantProcChance = 0.20f;         // 20% chance for fire damage per attack
+    public const float FireEnchantDamageMultiplier = 0.15f;   // Fire damage = weapon damage * 15%
+    public const float FrostEnchantProcChance = 0.15f;        // 15% chance for frost slow per attack
+    public const int FrostEnchantAgiReduction = 3;            // AGI reduction from frost slow
+    public const int FrostEnchantDuration = 2;                // Frost slow lasts 2 turns
+
+    // Crafting Materials (v0.30.9) - Rare dungeon drops for high-tier enchantments and training
+    public const double MaterialDropChanceRegular = 0.03;      // 3% from regular monsters in floor range
+    public const double MaterialDropChanceMiniBoss = 0.25;     // 25% from mini-bosses in range
+    public const double MaterialDropChanceTreasure = 0.08;     // 8% from treasure chests in range
+    public const int MaterialDropCountBossMin = 1;             // Boss guaranteed drop min
+    public const int MaterialDropCountBossMax = 2;             // Boss guaranteed drop max
+
+    // Divine Armor - late-game Old Gods resist unenchanted weapons
+    public const double AurelionDivineShield = 0.25;           // 25% damage reduction vs unenchanted
+    public const double TerravokStoneSkin = 0.35;              // 35% damage reduction vs unenchanted
+    public const double ManweCreatorsWard = 0.50;              // 50% damage reduction vs unenchanted
+    public const double ArtifactBossDamageBonus = 0.03;        // +3% player damage per artifact collected
+
+    public class CraftingMaterialDef
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Color { get; set; } = "white";
+        public int FloorMin { get; set; }
+        public int FloorMax { get; set; }
+        public string? ThematicGod { get; set; }  // OldGodType name as string (e.g. "Maelketh")
+    }
+
+    public static readonly CraftingMaterialDef[] CraftingMaterials = new[]
+    {
+        new CraftingMaterialDef { Id = "crimson_war_shard",     Name = "Crimson War Shard",     Description = "A fragment of crystallized battle fury, still warm to the touch",          Color = "bright_red",    FloorMin = 20,  FloorMax = 35,  ThematicGod = "Maelketh" },
+        new CraftingMaterialDef { Id = "withered_heart_petal",  Name = "Withered Heart Petal",  Description = "A flower petal that weeps when held, preserved from love's corruption",    Color = "magenta",       FloorMin = 35,  FloorMax = 50,  ThematicGod = "Veloura" },
+        new CraftingMaterialDef { Id = "iron_judgment_link",    Name = "Iron Judgment Link",    Description = "A single link from the chains that bound fallen gods",                     Color = "white",         FloorMin = 50,  FloorMax = 65,  ThematicGod = "Thorgrim" },
+        new CraftingMaterialDef { Id = "shadow_silk_thread",    Name = "Shadow Silk Thread",    Description = "Thread spun from living shadow, visible only in darkness",                  Color = "dark_magenta",  FloorMin = 60,  FloorMax = 75,  ThematicGod = "Noctura" },
+        new CraftingMaterialDef { Id = "fading_starlight_dust", Name = "Fading Starlight Dust", Description = "Luminescent powder from a dying god's halo",                               Color = "bright_yellow", FloorMin = 75,  FloorMax = 90,  ThematicGod = "Aurelion" },
+        new CraftingMaterialDef { Id = "terravoks_heartstone",  Name = "Terravok's Heartstone", Description = "A stone that pulses like a sleeping giant's heartbeat",                    Color = "bright_green",  FloorMin = 85,  FloorMax = 100, ThematicGod = "Terravok" },
+        new CraftingMaterialDef { Id = "eye_of_manwe",          Name = "Eye of Manwe",          Description = "An obsidian orb that shows reflections of things that never were",         Color = "bright_cyan",   FloorMin = 95,  FloorMax = 100, ThematicGod = "Manwe" },
+        new CraftingMaterialDef { Id = "heart_of_the_ocean",    Name = "Heart of the Ocean",    Description = "An iridescent pearl that hums with the memory of every wave",              Color = "cyan",          FloorMin = 50,  FloorMax = 100, ThematicGod = null },
+    };
+
+    public static CraftingMaterialDef? GetMaterialById(string id)
+    {
+        return CraftingMaterials.FirstOrDefault(m => m.Id == id);
+    }
+
+    public static List<CraftingMaterialDef> GetMaterialsForFloor(int floor)
+    {
+        return CraftingMaterials.Where(m => floor >= m.FloorMin && floor <= m.FloorMax).ToList();
+    }
 
     // Divine Services
     public const long BlessingCost = 500;              // Cost for divine blessing
@@ -839,7 +912,7 @@ Alchemist - Potion makers and researchers. Requires intellect and patience.
     // ═══════════════════════════════════════════════════════════════
     
     // Daily Player Processing (Pascal maintenance formulas)
-    public const int AliveBonus = 350;                    // level * 350 per day alive
+    public const int AliveBonus = 100;                    // level * 100 per day alive (nerfed from 350 in v0.30.9)
     public const long MaxAliveBonus = 1500000000;         // Maximum alive bonus allowed
     public const int DailyDungeonFights = 10;           // Daily dungeon fights reset
     public const int DailyPlayerFights = 3;             // Daily player fights reset

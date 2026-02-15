@@ -419,8 +419,25 @@ public class InnLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.WriteLine("Team Corner");
+        terminal.Write("Team Corner                ");
 
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("W");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.WriteLine("Train with the Master");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_red");
+        terminal.Write("L");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.WriteLine("Gambling Den");
 
         // Show companion option if available
         if (recruitableCompanions.Any())
@@ -537,6 +554,14 @@ public class InnLocation : BaseLocation
 
             case "P":
                 await ManageParty();
+                return false;
+
+            case "W":
+                await HandleStatTraining();
+                return false;
+
+            case "L":
+                await HandleGamblingDen();
                 return false;
 
             case "Q":
@@ -2634,4 +2659,772 @@ public class InnLocation : BaseLocation
     }
 
     #endregion
-} 
+
+    #region Stat Training
+
+    private async Task HandleStatTraining()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                         THE MASTER TRAINER                                  ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("A scarred veteran sits in the corner, methodically sharpening a blade.");
+        terminal.WriteLine("He looks up as you approach.");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"You want to get stronger? I can help — for a price.\"");
+        terminal.WriteLine("\"Each session pushes your body and mind beyond its natural limits.\"");
+        terminal.WriteLine("\"But the deeper we go, the harder it gets — and the more it costs.\"");
+        terminal.WriteLine("");
+
+        var statNames = new[] { "STR", "DEX", "CON", "INT", "WIS", "CHA", "AGI", "STA" };
+        var statLabels = new[] { "Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma", "Agility", "Stamina" };
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"{"#",-4} {"Stat",-16} {"Current",-10} {"Trained",-10} {"Next Cost",-12}");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(new string('─', 55));
+
+        for (int i = 0; i < statNames.Length; i++)
+        {
+            int timesTrained = 0;
+            currentPlayer.StatTrainingCounts?.TryGetValue(statNames[i], out timesTrained);
+
+            long currentVal = GetStatValue(statNames[i]);
+            string trainedStr = $"{timesTrained}/{GameConfig.MaxStatTrainingsPerStat}";
+
+            if (timesTrained >= GameConfig.MaxStatTrainingsPerStat)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {"MAXED",-12}");
+            }
+            else
+            {
+                long cost = CalculateTrainingCost(timesTrained);
+                terminal.SetColor("white");
+                terminal.Write($"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {cost:N0}g");
+
+                // Show material requirements for 4th/5th training
+                var matReqs = GetTrainingMaterialRequirements(timesTrained);
+                if (matReqs != null)
+                {
+                    terminal.Write("  ");
+                    for (int j = 0; j < matReqs.Length; j++)
+                    {
+                        var mat = GameConfig.GetMaterialById(matReqs[j].materialId);
+                        bool has = currentPlayer.HasMaterial(matReqs[j].materialId, matReqs[j].count);
+                        terminal.SetColor(has ? "bright_green" : "red");
+                        terminal.Write($"{matReqs[j].count}x {mat?.Name ?? matReqs[j].materialId}");
+                        if (j < matReqs.Length - 1)
+                        {
+                            terminal.SetColor("gray");
+                            terminal.Write(" + ");
+                        }
+                    }
+                }
+                terminal.WriteLine("");
+            }
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"Your Gold: {currentPlayer.Gold:N0}");
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write("Choose stat to train (1-8, 0 to leave): ");
+        terminal.SetColor("white");
+        string input = await terminal.ReadLineAsync();
+
+        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= 8)
+        {
+            string statKey = statNames[choice - 1];
+            string statLabel = statLabels[choice - 1];
+
+            int timesTrained = 0;
+            currentPlayer.StatTrainingCounts?.TryGetValue(statKey, out timesTrained);
+
+            if (timesTrained >= GameConfig.MaxStatTrainingsPerStat)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"\"Your {statLabel} has been pushed as far as training can take it.\"");
+                terminal.WriteLine("\"You'll need to find other ways to grow stronger.\"");
+                await terminal.PressAnyKey();
+                return;
+            }
+
+            long cost = CalculateTrainingCost(timesTrained);
+
+            if (currentPlayer.Gold < cost)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("red");
+                terminal.WriteLine($"You need {cost:N0} gold but only have {currentPlayer.Gold:N0}.");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("\"Come back when you can afford my services.\"");
+                await terminal.PressAnyKey();
+                return;
+            }
+
+            // Check material requirements for 4th/5th training
+            var trainingMatReqs = GetTrainingMaterialRequirements(timesTrained);
+            if (trainingMatReqs != null)
+            {
+                var missing = trainingMatReqs.Where(r => !currentPlayer.HasMaterial(r.materialId, r.count)).ToList();
+                if (missing.Count > 0)
+                {
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine("\"This level of training requires rare materials to push past your limits.\"");
+                    foreach (var req in missing)
+                    {
+                        var mat = GameConfig.GetMaterialById(req.materialId);
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"  Missing: {req.count}x {mat?.Name ?? req.materialId}");
+                    }
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine("  These materials can be found deep in the dungeon.");
+                    await terminal.PressAnyKey();
+                    return;
+                }
+            }
+
+            // Pay and train
+            currentPlayer.Gold -= cost;
+            currentPlayer.Statistics?.RecordGoldSpent(cost);
+
+            // Consume materials
+            if (trainingMatReqs != null)
+            {
+                foreach (var req in trainingMatReqs)
+                {
+                    currentPlayer.ConsumeMaterial(req.materialId, req.count);
+                    var mat = GameConfig.GetMaterialById(req.materialId);
+                    terminal.SetColor(mat?.Color ?? "white");
+                    terminal.WriteLine($"  The {mat?.Name ?? req.materialId} dissolves into your body, fueling the transformation...");
+                }
+                await Task.Delay(500);
+            }
+
+            // Apply the +1 stat bonus
+            ApplyStatBonus(statKey);
+
+            // Record training
+            currentPlayer.StatTrainingCounts ??= new Dictionary<string, int>();
+            currentPlayer.StatTrainingCounts[statKey] = timesTrained + 1;
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"You pay the Master Trainer {cost:N0} gold.");
+            terminal.WriteLine("");
+
+            // Training narrative
+            switch (statKey)
+            {
+                case "STR":
+                    terminal.SetColor("white");
+                    terminal.WriteLine("Hours of lifting, pulling, and breaking things later...");
+                    break;
+                case "DEX":
+                    terminal.SetColor("white");
+                    terminal.WriteLine("Dodging thrown knives, catching falling coins, threading needles...");
+                    break;
+                case "CON":
+                    terminal.SetColor("white");
+                    terminal.WriteLine("Endurance runs, ice baths, and a truly terrible herbal tonic...");
+                    break;
+                case "INT":
+                    terminal.SetColor("white");
+                    terminal.WriteLine("Puzzles, strategy games, and ancient texts until your head throbs...");
+                    break;
+                case "WIS":
+                    terminal.SetColor("white");
+                    terminal.WriteLine("Meditation, perception drills, and learning to listen to silence...");
+                    break;
+                case "CHA":
+                    terminal.SetColor("white");
+                    terminal.WriteLine("Public speaking, negotiation exercises, and a very expensive haircut...");
+                    break;
+                case "AGI":
+                    terminal.SetColor("white");
+                    terminal.WriteLine("Obstacle courses, balance beams, and jumping over increasingly sharp things...");
+                    break;
+                case "STA":
+                    terminal.SetColor("white");
+                    terminal.WriteLine("Running until you collapse, then running some more...");
+                    break;
+            }
+
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+            long newVal = GetStatValue(statKey);
+            terminal.WriteLine($"Your {statLabel} increased to {newVal}! (+1)");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"\"Good work. You've got {GameConfig.MaxStatTrainingsPerStat - timesTrained - 1} more sessions available for {statLabel}.\"");
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    private long CalculateTrainingCost(int timesTrained)
+    {
+        long baseCost = currentPlayer.Level * GameConfig.StatTrainingBaseCostPerLevel;
+        return baseCost * (long)((timesTrained + 1) * (timesTrained + 1));
+    }
+
+    /// <summary>
+    /// Returns material requirements for the Nth stat training (0-indexed).
+    /// 4th training (index 3) requires Heart of the Ocean.
+    /// 5th training (index 4) requires Heart of the Ocean + Eye of Manwe.
+    /// </summary>
+    private static (string materialId, int count)[]? GetTrainingMaterialRequirements(int timesTrained)
+    {
+        return timesTrained switch
+        {
+            3 => new[] { ("heart_of_the_ocean", 1) },
+            4 => new[] { ("heart_of_the_ocean", 1), ("eye_of_manwe", 1) },
+            _ => null
+        };
+    }
+
+    private long GetStatValue(string statKey)
+    {
+        return statKey switch
+        {
+            "STR" => currentPlayer.Strength,
+            "DEX" => currentPlayer.Dexterity,
+            "CON" => currentPlayer.Constitution,
+            "INT" => currentPlayer.Intelligence,
+            "WIS" => currentPlayer.Wisdom,
+            "CHA" => currentPlayer.Charisma,
+            "AGI" => currentPlayer.Agility,
+            "STA" => currentPlayer.Stamina,
+            _ => 0
+        };
+    }
+
+    private void ApplyStatBonus(string statKey)
+    {
+        switch (statKey)
+        {
+            case "STR": currentPlayer.BaseStrength++; currentPlayer.Strength++; break;
+            case "DEX": currentPlayer.BaseDexterity++; currentPlayer.Dexterity++; break;
+            case "CON": currentPlayer.BaseConstitution++; currentPlayer.Constitution++; break;
+            case "INT": currentPlayer.BaseIntelligence++; currentPlayer.Intelligence++; break;
+            case "WIS": currentPlayer.BaseWisdom++; currentPlayer.Wisdom++; break;
+            case "CHA": currentPlayer.BaseCharisma++; currentPlayer.Charisma++; break;
+            case "AGI": currentPlayer.BaseAgility++; currentPlayer.Agility++; break;
+            case "STA": currentPlayer.BaseStamina++; currentPlayer.Stamina++; break;
+        }
+    }
+
+    #endregion
+
+    #region Gambling Den
+
+    private int _armWrestlesToday = 0;
+
+    private async Task HandleGamblingDen()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                            GAMBLING DEN                                     ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("You descend a narrow staircase into a smoky room beneath the Inn.");
+        terminal.WriteLine("The clatter of dice and murmur of wagers fill the air.");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"Your Gold: {currentPlayer.Gold:N0}");
+        terminal.WriteLine("");
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("Games Available:");
+        terminal.WriteLine("");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.WriteLine("High-Low Dice       (Guess higher or lower, 1.8x payout)");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_cyan");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.WriteLine("Skull & Bones       (Blackjack with bone tiles, 2x payout)");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_red");
+        terminal.Write("3");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.WriteLine($"Arm Wrestling       (STR contest vs NPC, {_armWrestlesToday}/{GameConfig.MaxArmWrestlesPerDay} today)");
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write("Choose a game (0 to leave): ");
+        terminal.SetColor("white");
+        string input = await terminal.ReadLineAsync();
+
+        switch (input?.Trim())
+        {
+            case "1":
+                await PlayHighLowDice();
+                break;
+            case "2":
+                await PlaySkullAndBones();
+                break;
+            case "3":
+                await PlayArmWrestling();
+                break;
+        }
+    }
+
+    private async Task PlayHighLowDice()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("═══════════ HIGH-LOW DICE ═══════════");
+        terminal.WriteLine("");
+
+        if (currentPlayer.Gold <= 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("You don't have any gold to wager!");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"Gold on hand: {currentPlayer.Gold:N0}");
+        terminal.SetColor("cyan");
+        terminal.Write("How much will you wager? ");
+        terminal.SetColor("white");
+        string betInput = await terminal.ReadLineAsync();
+
+        if (!long.TryParse(betInput, out long bet) || bet <= 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Invalid bet.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        if (bet > currentPlayer.Gold)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("You don't have that much gold!");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var rng = new Random();
+        int doubleDownCount = 0;
+
+        while (true)
+        {
+            int firstRoll = rng.Next(1, 7);
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"The dealer rolls: [{firstRoll}]");
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.Write("Will the next roll be [H]igher or [L]ower? ");
+            terminal.SetColor("white");
+            string guess = (await terminal.ReadLineAsync()).ToUpper().Trim();
+
+            if (guess != "H" && guess != "L")
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Invalid choice. Bet forfeited.");
+                currentPlayer.Gold -= bet;
+                currentPlayer.Statistics?.RecordGoldSpent(bet);
+                break;
+            }
+
+            int secondRoll = rng.Next(1, 7);
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"The next roll: [{secondRoll}]");
+            await Task.Delay(800);
+
+            if (secondRoll == firstRoll)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("It's a tie! Your bet is returned.");
+                break;
+            }
+
+            bool guessedHigher = guess == "H";
+            bool wasHigher = secondRoll > firstRoll;
+
+            if (guessedHigher == wasHigher)
+            {
+                long winnings = (long)(bet * GameConfig.HighLowPayoutMultiplier) - bet;
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"You win! +{winnings:N0} gold!");
+                doubleDownCount++;
+
+                if (doubleDownCount < GameConfig.GamblingMaxDoubleDown)
+                {
+                    long totalPot = bet + winnings;
+                    terminal.WriteLine("");
+                    terminal.SetColor("cyan");
+                    terminal.Write($"Double or nothing? Current pot: {totalPot:N0}g [Y/N] ");
+                    terminal.SetColor("white");
+                    string dd = (await terminal.ReadLineAsync()).ToUpper().Trim();
+
+                    if (dd == "Y")
+                    {
+                        bet = totalPot;
+                        continue;
+                    }
+                    else
+                    {
+                        currentPlayer.Gold += winnings;
+                        break;
+                    }
+                }
+                else
+                {
+                    currentPlayer.Gold += winnings;
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("Maximum double-downs reached. Collecting winnings!");
+                    break;
+                }
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"You lose! -{bet:N0} gold.");
+                currentPlayer.Gold -= bet;
+                currentPlayer.Statistics?.RecordGoldSpent(bet);
+                break;
+            }
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"Gold remaining: {currentPlayer.Gold:N0}");
+        await terminal.PressAnyKey();
+    }
+
+    private async Task PlaySkullAndBones()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════ SKULL & BONES ═══════════");
+        terminal.WriteLine("");
+
+        if (currentPlayer.Gold <= 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("You don't have any gold to wager!");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.WriteLine("Rules: Draw bone tiles to reach 21 without going over.");
+        terminal.WriteLine("Face tiles (Skull, Crown, Sword) = 10. Dealer stands on 17.");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine($"Gold on hand: {currentPlayer.Gold:N0}");
+        terminal.SetColor("cyan");
+        terminal.Write("How much will you wager? ");
+        terminal.SetColor("white");
+        string betInput = await terminal.ReadLineAsync();
+
+        if (!long.TryParse(betInput, out long bet) || bet <= 0 || bet > currentPlayer.Gold)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(bet > currentPlayer.Gold ? "You don't have that much gold!" : "Invalid bet.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var rng = new Random();
+        string[] faceTiles = { "Skull", "Crown", "Sword" };
+
+        // Player's turn
+        int playerTotal = 0;
+        int playerCards = 0;
+        var playerHand = new List<string>();
+
+        int DrawTile()
+        {
+            int val = rng.Next(1, 11);
+            if (val == 10)
+            {
+                string face = faceTiles[rng.Next(faceTiles.Length)];
+                playerHand.Add(face);
+            }
+            else
+            {
+                playerHand.Add(val.ToString());
+            }
+            return val;
+        }
+
+        // Initial two tiles
+        int tile1 = DrawTile();
+        playerTotal += tile1;
+        playerCards++;
+        int tile2 = DrawTile();
+        playerTotal += tile2;
+        playerCards++;
+
+        // Check for blackjack
+        bool playerBlackjack = playerTotal == 21 && playerCards == 2;
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"Your tiles: {string.Join(", ", playerHand)} = {playerTotal}");
+
+        if (playerBlackjack)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("SKULL & BONES! Natural 21!");
+        }
+
+        // Player draws
+        while (playerTotal < 21 && !playerBlackjack)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.Write("[H]it or [S]tand? ");
+            terminal.SetColor("white");
+            string action = (await terminal.ReadLineAsync()).ToUpper().Trim();
+
+            if (action == "H")
+            {
+                playerHand.Clear();
+                int newTile = rng.Next(1, 11);
+                string tileName = newTile == 10 ? faceTiles[rng.Next(faceTiles.Length)] : newTile.ToString();
+                playerTotal += newTile;
+                playerCards++;
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"You drew: {tileName} ({newTile}) — Total: {playerTotal}");
+
+                if (playerTotal > 21)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("BUST! You went over 21.");
+                    currentPlayer.Gold -= bet;
+                    currentPlayer.Statistics?.RecordGoldSpent(bet);
+                    terminal.WriteLine($"You lose {bet:N0} gold. Remaining: {currentPlayer.Gold:N0}");
+                    await terminal.PressAnyKey();
+                    return;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Dealer's turn
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Dealer's turn...");
+        await Task.Delay(800);
+
+        int dealerTotal = 0;
+        int dealerCards = 0;
+        while (dealerTotal < 17)
+        {
+            int tile = rng.Next(1, 11);
+            dealerTotal += tile;
+            dealerCards++;
+        }
+
+        bool dealerBlackjack = dealerTotal == 21 && dealerCards == 2;
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"Dealer's total: {dealerTotal}");
+        await Task.Delay(500);
+
+        // Determine winner
+        terminal.WriteLine("");
+        if (dealerTotal > 21)
+        {
+            terminal.SetColor("bright_green");
+            long winnings = playerBlackjack ? (long)(bet * GameConfig.BlackjackBonusPayout) - bet : bet;
+            terminal.WriteLine($"Dealer busts! You win {winnings:N0} gold!");
+            currentPlayer.Gold += winnings;
+        }
+        else if (playerBlackjack && !dealerBlackjack)
+        {
+            long winnings = (long)(bet * GameConfig.BlackjackBonusPayout) - bet;
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"Skull & Bones beats dealer! You win {winnings:N0} gold!");
+            currentPlayer.Gold += winnings;
+        }
+        else if (playerTotal > dealerTotal)
+        {
+            long winnings = (long)(bet * GameConfig.BlackjackPayoutMultiplier) - bet;
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"You beat the dealer! You win {winnings:N0} gold!");
+            currentPlayer.Gold += winnings;
+        }
+        else if (playerTotal == dealerTotal)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("Push! Bet returned.");
+        }
+        else
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"Dealer wins. You lose {bet:N0} gold.");
+            currentPlayer.Gold -= bet;
+            currentPlayer.Statistics?.RecordGoldSpent(bet);
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"Gold remaining: {currentPlayer.Gold:N0}");
+        await terminal.PressAnyKey();
+    }
+
+    private async Task PlayArmWrestling()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("═══════════ ARM WRESTLING ═══════════");
+        terminal.WriteLine("");
+
+        if (_armWrestlesToday >= GameConfig.MaxArmWrestlesPerDay)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("\"You've had enough for today, friend. Come back tomorrow.\"");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Find an NPC to wrestle
+        var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (allNPCs == null || allNPCs.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("No one seems interested in arm wrestling right now.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var rng = new Random();
+        var candidates = allNPCs.Where(n => n.IsAlive && !n.IsDead).ToList();
+        if (candidates.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("No one seems interested in arm wrestling right now.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var opponent = candidates[rng.Next(candidates.Count)];
+        long wagerAmount = opponent.Level * GameConfig.ArmWrestleBetPerLevel;
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"{opponent.DisplayName} (Level {opponent.Level}, STR {opponent.Strength}) slams their");
+        terminal.WriteLine("elbow on the table and grins at you.");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"\"{wagerAmount:N0} gold says I can put you down.\"");
+        terminal.WriteLine("");
+
+        if (currentPlayer.Gold < wagerAmount)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"You need {wagerAmount:N0} gold to accept the challenge.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.SetColor("cyan");
+        terminal.Write($"Accept the challenge? ({wagerAmount:N0}g) [Y/N] ");
+        terminal.SetColor("white");
+        string accept = (await terminal.ReadLineAsync()).ToUpper().Trim();
+
+        if (accept != "Y")
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("You back away from the table.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        _armWrestlesToday++;
+
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine("You clasp hands...");
+        await Task.Delay(1000);
+        terminal.WriteLine("Three... two... one... GO!");
+        await Task.Delay(800);
+
+        // STR contest with randomness
+        double playerScore = currentPlayer.Strength * (0.7 + rng.NextDouble() * 0.6);
+        double npcScore = opponent.Strength * (0.7 + rng.NextDouble() * 0.6);
+
+        terminal.WriteLine("");
+        if (playerScore > npcScore)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"You slam {opponent.DisplayName}'s arm to the table!");
+            terminal.WriteLine($"You win {wagerAmount:N0} gold!");
+            currentPlayer.Gold += wagerAmount;
+
+            // Positive impression
+            if (opponent.Brain?.Memory != null && currentPlayer.Name2 != null)
+            {
+                var impr = opponent.Brain.Memory.CharacterImpressions;
+                impr[currentPlayer.Name2] = (impr.TryGetValue(currentPlayer.Name2, out float c1) ? c1 : 0f) + 0.1f;
+            }
+        }
+        else if (playerScore < npcScore)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"{opponent.DisplayName} forces your arm down with a grunt!");
+            terminal.WriteLine($"You lose {wagerAmount:N0} gold.");
+            currentPlayer.Gold -= wagerAmount;
+            currentPlayer.Statistics?.RecordGoldSpent(wagerAmount);
+
+            // Slightly negative impression
+            if (opponent.Brain?.Memory != null && currentPlayer.Name2 != null)
+            {
+                var impr = opponent.Brain.Memory.CharacterImpressions;
+                impr[currentPlayer.Name2] = (impr.TryGetValue(currentPlayer.Name2, out float c2) ? c2 : 0f) - 0.1f;
+            }
+        }
+        else
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("Neither of you can budge! It's a draw.");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"Gold remaining: {currentPlayer.Gold:N0}");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine($"Arm wrestling matches today: {_armWrestlesToday}/{GameConfig.MaxArmWrestlesPerDay}");
+        await terminal.PressAnyKey();
+    }
+
+    #endregion
+}

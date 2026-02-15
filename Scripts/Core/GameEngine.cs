@@ -2168,7 +2168,9 @@ public partial class GameEngine : Node
                     Rarity = (EquipmentRarity)equipData.Rarity,
                     WeaponType = (WeaponType)equipData.WeaponType,
                     Handedness = (WeaponHandedness)equipData.Handedness,
-                    ArmorType = (ArmorType)equipData.ArmorType
+                    ArmorType = (ArmorType)equipData.ArmorType,
+                    HasFireEnchant = equipData.HasFireEnchant,
+                    HasFrostEnchant = equipData.HasFrostEnchant
                 };
                 // Register with the original ID so EquippedItems references still work
                 EquipmentDatabase.RegisterDynamicWithId(equipment, equipData.Id);
@@ -2280,6 +2282,14 @@ public partial class GameEngine : Node
         {
             player.SkillTrainingProgress = new Dictionary<string, int>(playerData.SkillTrainingProgress);
         }
+
+        // Restore gold-based stat training (v0.30.9)
+        if (playerData.StatTrainingCounts?.Count > 0)
+            player.StatTrainingCounts = new Dictionary<string, int>(playerData.StatTrainingCounts);
+        if (playerData.UnpaidWageDays?.Count > 0)
+            player.UnpaidWageDays = new Dictionary<string, int>(playerData.UnpaidWageDays);
+        if (playerData.CraftingMaterials?.Count > 0)
+            player.CraftingMaterials = new Dictionary<string, int>(playerData.CraftingMaterials);
 
         // Restore spells and skills (ensure lists are never null)
         if (playerData.Spells?.Count > 0)
@@ -2886,7 +2896,9 @@ public partial class GameEngine : Node
                         Rarity = (EquipmentRarity)equipData.Rarity,
                         WeaponType = (WeaponType)equipData.WeaponType,
                         Handedness = (WeaponHandedness)equipData.Handedness,
-                        ArmorType = (ArmorType)equipData.ArmorType
+                        ArmorType = (ArmorType)equipData.ArmorType,
+                        HasFireEnchant = equipData.HasFireEnchant,
+                        HasFrostEnchant = equipData.HasFrostEnchant
                     };
 
                     // Register and get the new ID (may differ from saved ID)

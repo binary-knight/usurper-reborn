@@ -345,7 +345,7 @@ namespace UsurperRemake.Systems
             // GD.Print($"[BossSystem] Starting encounter with {boss.Name}");
 
             // Play introduction
-            await PlayBossIntroduction(boss, terminal);
+            await PlayBossIntroduction(boss, player, terminal);
 
             // Run dialogue
             var dialogueResult = await DialogueSystem.Instance.StartDialogue(
@@ -393,7 +393,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Play boss introduction sequence
         /// </summary>
-        private async Task PlayBossIntroduction(OldGodBossData boss, TerminalEmulator terminal)
+        private async Task PlayBossIntroduction(OldGodBossData boss, Character player, TerminalEmulator terminal)
         {
             terminal.Clear();
             terminal.WriteLine("");
@@ -422,6 +422,27 @@ namespace UsurperRemake.Systems
             // Show boss stats
             terminal.WriteLine($"  Level: {boss.Level}", "gray");
             terminal.WriteLine($"  HP: {boss.HP:N0}", "red");
+
+            // Warning for unenchanted weapons against gods with divine armor
+            double divineArmor = GetDivineArmorReduction(boss.Type, player);
+            if (divineArmor > 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_red");
+                string armorName = boss.Type switch
+                {
+                    OldGodType.Aurelion => "Divine Shield",
+                    OldGodType.Terravok => "Stone Skin",
+                    OldGodType.Manwe => "Creator's Ward",
+                    _ => "Divine Armor"
+                };
+                terminal.WriteLine($"  WARNING: {boss.Name} is protected by {armorName}!");
+                terminal.SetColor("red");
+                terminal.WriteLine($"  Your unenchanted weapon will deal {divineArmor * 100:N0}% LESS damage.");
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  Enchant your weapon at the Magic Shop to bypass this protection.");
+            }
+
             terminal.WriteLine("");
 
             await terminal.GetInputAsync("  Press Enter to face the Old God...");
@@ -1018,6 +1039,22 @@ namespace UsurperRemake.Systems
             double phaseResist = (1.0 - (currentPhase - 1) * 0.1) * activeCombatModifiers.BossDefenseMultiplier;
             damage = (long)(damage * phaseResist);
 
+            // Artifact damage bonus: +3% per collected artifact
+            int artifactCount = StoryProgressionSystem.Instance?.CollectedArtifacts?.Count ?? 0;
+            if (artifactCount > 0)
+            {
+                double artifactBonus = 1.0 + (artifactCount * GameConfig.ArtifactBossDamageBonus);
+                damage = (long)(damage * artifactBonus);
+            }
+
+            // Divine armor: late-game gods resist unenchanted weapons
+            double divineReduction = GetDivineArmorReduction(boss.Type, player);
+            if (divineReduction > 0)
+            {
+                damage = (long)(damage * (1.0 - divineReduction));
+                terminal.WriteLine($"  Your unenchanted blade barely scratches {boss.Name}'s divine ward!", "red");
+            }
+
             // Rage boost: chance for extra attack
             bool extraAttack = activeCombatModifiers.HasRageBoost && random.NextDouble() < 0.3;
 
@@ -1082,6 +1119,22 @@ namespace UsurperRemake.Systems
             double phaseResist = (1.0 - (currentPhase - 1) * 0.05) * activeCombatModifiers.BossDefenseMultiplier;
             damage = (long)(damage * phaseResist);
 
+            // Artifact damage bonus: +3% per collected artifact
+            int artifactCount = StoryProgressionSystem.Instance?.CollectedArtifacts?.Count ?? 0;
+            if (artifactCount > 0)
+            {
+                double artifactBonus = 1.0 + (artifactCount * GameConfig.ArtifactBossDamageBonus);
+                damage = (long)(damage * artifactBonus);
+            }
+
+            // Divine armor: late-game gods resist unenchanted weapons
+            double divineReduction = GetDivineArmorReduction(boss.Type, player);
+            if (divineReduction > 0)
+            {
+                damage = (long)(damage * (1.0 - divineReduction));
+                terminal.WriteLine($"  Your unenchanted weapon struggles against {boss.Name}'s divine ward!", "red");
+            }
+
             if (isCritical)
             {
                 terminal.WriteLine($"  CRITICAL! You unleash a devastating special attack!", "bright_magenta");
@@ -1095,6 +1148,27 @@ namespace UsurperRemake.Systems
             bossCurrentHP -= damage;
 
             await Task.Delay(1000);
+        }
+
+        /// <summary>
+        /// Calculate divine armor damage reduction for late-game Old Gods.
+        /// Gods with divine armor resist unenchanted weapons.
+        /// Having ANY enchantment on the main-hand weapon removes the penalty.
+        /// </summary>
+        private double GetDivineArmorReduction(OldGodType godType, Character player)
+        {
+            // Check if weapon has any enchantments
+            var weapon = player.GetEquipment(EquipmentSlot.MainHand);
+            if (weapon != null && weapon.GetEnchantmentCount() > 0)
+                return 0; // Enchanted weapon — no penalty
+
+            return godType switch
+            {
+                OldGodType.Aurelion => GameConfig.AurelionDivineShield,
+                OldGodType.Terravok => GameConfig.TerravokStoneSkin,
+                OldGodType.Manwe => GameConfig.ManweCreatorsWard,
+                _ => 0
+            };
         }
 
         /// <summary>
@@ -1375,6 +1449,25 @@ namespace UsurperRemake.Systems
             player.Chivalry += 100;
             terminal.WriteLine($"  (+100 Chivalry)", "bright_green");
 
+            // Award thematic crafting materials (same as defeat)
+            var thematicMaterial = GameConfig.CraftingMaterials.FirstOrDefault(
+                m => m.ThematicGod == boss.Type.ToString());
+            if (thematicMaterial != null)
+            {
+                player.AddMaterial(thematicMaterial.Id, 2);
+                terminal.WriteLine("");
+                terminal.SetColor(thematicMaterial.Color);
+                terminal.WriteLine($"  {boss.Name} bestows upon you {thematicMaterial.Name} x2!");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  \"{thematicMaterial.Description}\"");
+            }
+            if (boss.DungeonFloor >= 50)
+            {
+                player.AddMaterial("heart_of_the_ocean", 1);
+                terminal.SetColor("cyan");
+                terminal.WriteLine("  An iridescent pearl materializes — a Heart of the Ocean!");
+            }
+
             OnBossSaved?.Invoke(boss.Type);
 
             // Queue Stranger encounter after first Old God
@@ -1425,6 +1518,26 @@ namespace UsurperRemake.Systems
 
             // Award artifact
             await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
+
+            // Award thematic crafting materials
+            var thematicMaterial = GameConfig.CraftingMaterials.FirstOrDefault(
+                m => m.ThematicGod == boss.Type.ToString());
+            if (thematicMaterial != null)
+            {
+                player.AddMaterial(thematicMaterial.Id, 2);
+                terminal.WriteLine("");
+                terminal.SetColor(thematicMaterial.Color);
+                terminal.WriteLine($"  The essence of {boss.Name} crystallizes into {thematicMaterial.Name} x2!");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  \"{thematicMaterial.Description}\"");
+            }
+            if (boss.DungeonFloor >= 50)
+            {
+                player.AddMaterial("heart_of_the_ocean", 1);
+                terminal.SetColor("cyan");
+                terminal.WriteLine("  An iridescent pearl materializes — a Heart of the Ocean!");
+            }
+            terminal.WriteLine("");
 
             // Award experience
             long xpReward = boss.Level * 2000;

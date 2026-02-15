@@ -943,7 +943,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine("Available Recruits:");
         terminal.SetColor("white");
-        terminal.WriteLine($"{"#",-3} {"Name",-18} {"Class",-12} {"Lvl",-5} {"Location",-14} {"Cost",-10}");
+        terminal.WriteLine($"{"#",-3} {"Name",-18} {"Class",-12} {"Lvl",-5} {"Cost",-12} {"Wage/Day",-10}");
         terminal.SetColor("darkgray");
         terminal.WriteLine(new string('─', 65));
 
@@ -952,10 +952,9 @@ public class TeamCornerLocation : BaseLocation
         {
             var npc = availableNPCs[i];
             long recruitCost = CalculateRecruitmentCost(npc, currentPlayer);
-            string location = npc.CurrentLocation ?? "Unknown";
-            if (location.Length > 13) location = location.Substring(0, 13);
+            long dailyWage = npc.Level * GameConfig.NpcDailyWagePerLevel;
 
-            terminal.WriteLine($"{i + 1,-3} {npc.DisplayName,-18} {npc.Class,-12} {npc.Level,-5} {location,-14} {recruitCost:N0}g");
+            terminal.WriteLine($"{i + 1,-3} {npc.DisplayName,-18} {npc.Class,-12} {npc.Level,-5} {recruitCost:N0}g{"",-4} {dailyWage:N0}g");
         }
 
         terminal.WriteLine("");
@@ -991,6 +990,9 @@ public class TeamCornerLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"{recruit.DisplayName} has joined your team!");
                 terminal.WriteLine($"You paid {cost:N0} gold for recruitment.");
+                long wage = recruit.Level * GameConfig.NpcDailyWagePerLevel;
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"Daily wage: {wage:N0} gold/day (deducted automatically)");
                 terminal.WriteLine("");
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine($"\"{recruit.DisplayName} says: 'I'll fight alongside you, boss!'\"");
@@ -1015,7 +1017,7 @@ public class TeamCornerLocation : BaseLocation
     /// </summary>
     private long CalculateRecruitmentCost(NPC npc, Character recruiter)
     {
-        long baseCost = npc.Level * 500;
+        long baseCost = npc.Level * GameConfig.NpcRecruitmentCostPerLevel;
         baseCost += ((long)npc.Strength + (long)npc.Defence + (long)npc.Agility) * 20;
 
         if (npc.Level > recruiter.Level)

@@ -348,6 +348,15 @@ namespace UsurperRemake.Systems
         public Dictionary<string, int> SkillProficiencies { get; set; } = new();  // Skill name -> proficiency level
         public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();  // Skill name -> progress
 
+        // Gold-based stat training (v0.30.9)
+        public Dictionary<string, int> StatTrainingCounts { get; set; } = new();
+
+        // NPC team wage tracking (v0.30.9)
+        public Dictionary<string, int> UnpaidWageDays { get; set; } = new();
+
+        // Crafting Materials (v0.30.9)
+        public Dictionary<string, int> CraftingMaterials { get; set; } = new();
+
         // Spells array: [spellIndex][0=known, 1=mastered]
         public List<List<bool>> Spells { get; set; } = new();
 
@@ -622,6 +631,10 @@ namespace UsurperRemake.Systems
         public int WeaponType { get; set; }  // WeaponType enum as int
         public int Handedness { get; set; }  // WeaponHandedness enum as int
         public int ArmorType { get; set; }  // ArmorType enum as int
+
+        // Elemental enchant flags (v0.30.9)
+        public bool HasFireEnchant { get; set; }
+        public bool HasFrostEnchant { get; set; }
     }
 
     /// <summary>

@@ -726,6 +726,10 @@ public class Equipment
     public bool IsIdentified { get; set; } = true;
     public bool IsUnique { get; set; }              // Only one can exist
 
+    // Elemental enchant flags (v0.30.9)
+    public bool HasFireEnchant { get; set; }
+    public bool HasFrostEnchant { get; set; }
+
     /// <summary>
     /// Create a new equipment item
     /// </summary>

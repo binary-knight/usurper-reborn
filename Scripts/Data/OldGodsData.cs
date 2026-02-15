@@ -449,8 +449,8 @@ namespace UsurperRemake.Data
                 Name = "Aurelion, The Fading Light",
                 Title = "God of Light and Truth",
                 Level = 90,           // Above floor 85 - requires preparation
-                HP = 6500,            // Radiant but fading power
-                MaxHP = 6500,
+                HP = 10000,           // Radiant but fading power — divine armor makes enchanted weapons essential
+                MaxHP = 10000,
                 Strength = 160,
                 Defence = 120,
                 Agility = 100,
@@ -556,8 +556,8 @@ namespace UsurperRemake.Data
                 Name = "Terravok, The Sleeping Mountain",
                 Title = "God of Earth and Endurance",
                 Level = 98,           // Near floor 95 - penultimate challenge
-                HP = 9000,            // Massive HP pool - endurance fight
-                MaxHP = 9000,
+                HP = 16000,           // Massive HP pool — divine stone skin demands preparation
+                MaxHP = 16000,
                 Strength = 200,       // Devastating slow hits
                 Defence = 250,        // Incredibly tanky
                 Agility = 25,
@@ -665,8 +665,8 @@ namespace UsurperRemake.Data
                 Name = "Manwe, The Weary Creator",
                 Title = "Supreme God of Creation and Balance",
                 Level = 100,          // Final boss - the ultimate challenge
-                HP = 12000,           // The Creator - multi-phase epic fight
-                MaxHP = 12000,
+                HP = 22000,           // The Creator — requires full enchants and artifacts to overcome
+                MaxHP = 22000,
                 Strength = 220,
                 Defence = 200,
                 Agility = 180,

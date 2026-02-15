@@ -1282,6 +1282,22 @@ public partial class MagicShopLocation : BaseLocation
         ("Ward",            0,  12000L, 200, 15, "+20 magic resist, +2 defence"),
         ("Predator",        0,  25000L, 500, 30, "+5% crit, +10% crit damage"),
         ("Lifedrinker",     0,  30000L, 500, 35, "+3% lifesteal"),
+        // New tiers (v0.30.9)
+        ("Mythic",          24, 180000L, 2000, 55, "+24 to one stat"),
+        ("Legendary",       30, 300000L, 3000, 65, "+30 to one stat"),
+        ("Godforged",       38, 500000L, 5000, 75, "+38 to one stat"),
+        ("Phoenix Fire",    20, 400000L, 4000, 60, "+20 power + fire damage on hit"),
+        ("Frostbite",       20, 400000L, 4000, 60, "+20 power + chance to slow enemies"),
+    };
+
+    // Material requirements for high-tier enchantments (0-indexed tier → required materials)
+    private static readonly Dictionary<int, (string materialId, int count)[]> EnchantMaterialRequirements = new()
+    {
+        [9]  = new[] { ("fading_starlight_dust", 1) },                                         // Mythic
+        [10] = new[] { ("heart_of_the_ocean", 1), ("shadow_silk_thread", 1) },                 // Legendary
+        [11] = new[] { ("eye_of_manwe", 1), ("terravoks_heartstone", 1) },                     // Godforged
+        [12] = new[] { ("crimson_war_shard", 1), ("fading_starlight_dust", 1) },               // Phoenix Fire
+        [13] = new[] { ("shadow_silk_thread", 1), ("fading_starlight_dust", 1) },              // Frostbite
     };
 
     private static readonly string[] StatNames = { "Weapon Power", "Strength", "Dexterity", "Defence", "Wisdom", "Armor Class" };
@@ -1341,14 +1357,14 @@ public partial class MagicShopLocation : BaseLocation
                 terminal.Write($"{slotName,-9}");
 
                 // Item name with enchant/cursed tags
-                string enchTag = equip.GetEnchantmentCount() > 0 ? $" [E:{equip.GetEnchantmentCount()}/3]" : "";
+                string enchTag = equip.GetEnchantmentCount() > 0 ? $" [E:{equip.GetEnchantmentCount()}/{GameConfig.MaxEnchantments}]" : "";
                 string cursedTag = equip.IsCursed ? " [CURSED]" : "";
                 string displayName = equip.Name + enchTag + cursedTag;
                 if (displayName.Length > 34) displayName = displayName.Substring(0, 31) + "...";
 
                 if (equip.IsCursed)
                     terminal.SetColor("red");
-                else if (equip.GetEnchantmentCount() >= 3)
+                else if (equip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
                     terminal.SetColor("darkgray");
                 else
                     terminal.SetColor(equip.GetRarityColor());
@@ -1399,11 +1415,11 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        if (selectedEquip.GetEnchantmentCount() >= 3)
+        if (selectedEquip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
         {
             DisplayMessage("");
-            DisplayMessage("'This item already holds three enchantments. Any more would shatter it.'", "red");
-            DisplayMessage("'Remove an enchantment first if you want to add a different one.'", "cyan");
+            DisplayMessage($"'This item already holds {GameConfig.MaxEnchantments} enchantments. Any more would shatter it.'", "red");
+            DisplayMessage("'Even I cannot push an item beyond its limits.'", "cyan");
             await terminal.WaitForKey();
             return;
         }
@@ -1510,6 +1526,77 @@ public partial class MagicShopLocation : BaseLocation
             terminal.WriteLine("");
         }
 
+        // Section: High-tier and Elemental enchants (tiers 10-14)
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine("  ─── Mythic & Elemental Enchantments ───");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("   #  Tier             Effect                          Cost");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("  ─── ──────────────── ─────────────────────────────── ──────────────");
+
+        for (int i = 9; i < EnchantTiers.Length; i++)
+        {
+            var tier = EnchantTiers[i];
+            long cost = ApplyAllPriceModifiers(tier.baseCost + (player.Level * tier.levelScale), player);
+            bool canAfford = player.Gold >= cost;
+            bool meetsLevel = player.Level >= tier.minLevel;
+
+            terminal.SetColor("gray");
+            terminal.Write($"  [{i + 1,2}] ");
+
+            if (!meetsLevel)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write($"{tier.name,-17}{tier.description,-30}{cost,10:N0}g");
+                terminal.SetColor("red");
+                terminal.Write($"  Lv.{tier.minLevel}+");
+            }
+            else
+            {
+                terminal.SetColor(canAfford ? "bright_magenta" : "red");
+                terminal.Write($"{tier.name,-17}");
+                terminal.SetColor(canAfford ? "cyan" : "red");
+                terminal.Write($"{tier.description,-30}");
+                terminal.SetColor(canAfford ? "yellow" : "red");
+                terminal.Write($"{cost,10:N0}g");
+
+                // Show material requirements for high-tier enchants
+                if (EnchantMaterialRequirements.TryGetValue(i, out var reqs))
+                {
+                    var matNames = reqs.Select(r => {
+                        var mat = GameConfig.GetMaterialById(r.materialId);
+                        bool has = player.HasMaterial(r.materialId, r.count);
+                        return (name: $"{r.count}x {mat?.Name ?? r.materialId}", has);
+                    }).ToList();
+                    bool hasAll = matNames.All(m => m.has);
+                    terminal.Write("  ");
+                    for (int j = 0; j < matNames.Count; j++)
+                    {
+                        terminal.SetColor(matNames[j].has ? "bright_green" : "red");
+                        terminal.Write(matNames[j].name);
+                        if (j < matNames.Count - 1)
+                        {
+                            terminal.SetColor("gray");
+                            terminal.Write(" + ");
+                        }
+                    }
+                }
+            }
+            terminal.WriteLine("");
+        }
+
+        // Show warning about 4th/5th enchant failure risk
+        int currentEnchants = selectedEquip.GetEnchantmentCount();
+        if (currentEnchants >= 3)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_red");
+            float failChance = currentEnchants == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
+            terminal.WriteLine($"  WARNING: This item has {currentEnchants} enchantments. Adding another has a {failChance * 100:N0}% chance");
+            terminal.WriteLine("  of FAILURE — gold is consumed and a random existing enchant is destroyed!");
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine("  [0] Cancel");
@@ -1544,9 +1631,30 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        // For stat-specific enchants (tiers 1-4), let player choose stat
+        // Check material requirements for high-tier enchants
+        if (EnchantMaterialRequirements.TryGetValue(tierChoice - 1, out var matReqs))
+        {
+            var missing = matReqs.Where(r => !player.HasMaterial(r.materialId, r.count)).ToList();
+            if (missing.Count > 0)
+            {
+                DisplayMessage("");
+                DisplayMessage("'This enchantment requires rare materials,' the gnome says.", "cyan");
+                foreach (var req in missing)
+                {
+                    var mat = GameConfig.GetMaterialById(req.materialId);
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  Missing: {req.count}x {mat?.Name ?? req.materialId}");
+                }
+                terminal.SetColor("darkgray");
+                terminal.WriteLine("  These materials can be found deep in the dungeon.");
+                await terminal.WaitForKey();
+                return;
+            }
+        }
+
+        // For stat-specific enchants (tiers 1-4, 10-12), let player choose stat
         int statChoice = -1;
-        if (tierChoice >= 1 && tierChoice <= 4)
+        if ((tierChoice >= 1 && tierChoice <= 4) || (tierChoice >= 10 && tierChoice <= 12))
         {
             terminal.WriteLine("");
             terminal.SetColor("white");
@@ -1566,7 +1674,7 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         // Confirm
-        string enchantDesc = tierChoice <= 4 ? $"+{selectedTier.bonus} {StatNames[statChoice - 1]}" : selectedTier.description;
+        string enchantDesc = (tierChoice <= 4 || (tierChoice >= 10 && tierChoice <= 12)) ? $"+{selectedTier.bonus} {StatNames[statChoice - 1]}" : selectedTier.description;
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.Write($"  Enchant ");
@@ -1581,6 +1689,16 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  Cost: {enchantCost:N0} gold");
+        // Show material cost in confirmation
+        if (EnchantMaterialRequirements.TryGetValue(tierChoice - 1, out var confirmReqs))
+        {
+            terminal.SetColor("bright_magenta");
+            var matList = confirmReqs.Select(r => {
+                var mat = GameConfig.GetMaterialById(r.materialId);
+                return $"{r.count}x {mat?.Name ?? r.materialId}";
+            });
+            terminal.WriteLine($"  Materials: {string.Join(" + ", matList)}");
+        }
         terminal.WriteLine("");
         var confirm = await terminal.GetInput("  Proceed? (Y/N): ");
         if (confirm.ToUpper() != "Y")
@@ -1588,6 +1706,74 @@ public partial class MagicShopLocation : BaseLocation
 
         // Execute enchantment
         player.Gold -= enchantCost;
+
+        // Consume materials (even on failure for 4th/5th enchant)
+        if (EnchantMaterialRequirements.TryGetValue(tierChoice - 1, out var consumeReqs))
+        {
+            foreach (var req in consumeReqs)
+            {
+                player.ConsumeMaterial(req.materialId, req.count);
+                var mat = GameConfig.GetMaterialById(req.materialId);
+                terminal.SetColor(mat?.Color ?? "white");
+                terminal.WriteLine($"  The {mat?.Name ?? req.materialId} dissolves into the enchantment...");
+            }
+            await Task.Delay(500);
+        }
+
+        // Check for failure on 4th/5th enchantment
+        int currentEnchantCount = selectedEquip.GetEnchantmentCount();
+        if (currentEnchantCount >= 3)
+        {
+            float failChance = currentEnchantCount == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
+            var rng = new Random();
+            if (rng.NextDouble() < failChance)
+            {
+                // FAILURE — gold consumed, random existing enchant destroyed
+                DisplayMessage("");
+                DisplayMessage($"{_ownerName} places the item on the anvil...", "gray");
+                await Task.Delay(500);
+                DisplayMessage("The runes flare wildly! Unstable energies crackle!", "bright_red");
+                await Task.Delay(500);
+                DisplayMessage("CRACK! The enchantment backfires!", "bright_red");
+                await Task.Delay(500);
+
+                // Destroy one random existing enchant by decrementing count
+                var damaged = selectedEquip.Clone();
+                int oldCount = damaged.GetEnchantmentCount();
+                if (oldCount > 0)
+                {
+                    // Replace the enchant marker with decremented count
+                    string newMarker = oldCount > 1 ? $"[E:{oldCount - 1}]" : "";
+                    damaged.Description = System.Text.RegularExpressions.Regex.Replace(
+                        damaged.Description ?? "", @"\[E:\d+\]", newMarker).Trim();
+
+                    // Reduce a random stat bonus as if one enchant was lost
+                    var rngStat = rng.Next(6);
+                    switch (rngStat)
+                    {
+                        case 0: damaged.WeaponPower = Math.Max(0, damaged.WeaponPower - 5); break;
+                        case 1: damaged.StrengthBonus = Math.Max(0, damaged.StrengthBonus - 5); break;
+                        case 2: damaged.DexterityBonus = Math.Max(0, damaged.DexterityBonus - 5); break;
+                        case 3: damaged.DefenceBonus = Math.Max(0, damaged.DefenceBonus - 5); break;
+                        case 4: damaged.WisdomBonus = Math.Max(0, damaged.WisdomBonus - 5); break;
+                        case 5: damaged.ArmorClass = Math.Max(0, damaged.ArmorClass - 5); break;
+                    }
+
+                    EquipmentDatabase.RegisterDynamic(damaged);
+                    player.UnequipSlot(selectedSlot);
+                    player.EquipItem(damaged, selectedSlot, out _);
+                    player.RecalculateStats();
+                }
+
+                DisplayMessage("");
+                DisplayMessage("An existing enchantment was destroyed in the backlash!", "bright_red");
+                DisplayMessage($"'I warned you... that's the risk of pushing beyond three enchantments.'", "cyan");
+                DisplayMessage($"Your {enchantCost:N0} gold has been consumed by the failed attempt.", "yellow");
+                player.Statistics?.RecordGoldSpent(enchantCost);
+                await terminal.WaitForKey();
+                return;
+            }
+        }
 
         // Clone the equipment
         var enchanted = selectedEquip.Clone();
@@ -1622,6 +1808,20 @@ public partial class MagicShopLocation : BaseLocation
             case 9: // Lifedrinker
                 enchanted.LifeSteal += 3;
                 suffix = " (Lifedrinker)";
+                break;
+            case 10: case 11: case 12: // Mythic/Legendary/Godforged stat enchants
+                ApplyEquipmentStatBonus(enchanted, statChoice, selectedTier.bonus);
+                suffix = $" +{selectedTier.bonus} {StatNames[statChoice - 1].Substring(0, 3)}";
+                break;
+            case 13: // Phoenix Fire
+                enchanted.WeaponPower += 20;
+                enchanted.HasFireEnchant = true;
+                suffix = " (Phoenix Fire)";
+                break;
+            case 14: // Frostbite
+                enchanted.WeaponPower += 20;
+                enchanted.HasFrostEnchant = true;
+                suffix = " (Frostbite)";
                 break;
             default:
                 suffix = "";

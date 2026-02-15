@@ -2989,6 +2989,62 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// Check for crafting material drops after dungeon combat victory.
+    /// Materials only drop from monsters within specific floor ranges.
+    /// </summary>
+    private async Task CheckForMaterialDrop(Character player, bool isBoss, bool isMiniBoss)
+    {
+        var eligibleMaterials = GameConfig.GetMaterialsForFloor(currentDungeonLevel);
+        if (eligibleMaterials.Count == 0) return;
+
+        double dropChance;
+        int dropCount = 1;
+
+        if (isBoss)
+        {
+            dropChance = 1.0;
+            dropCount = dungeonRandom.Next(GameConfig.MaterialDropCountBossMin, GameConfig.MaterialDropCountBossMax + 1);
+        }
+        else if (isMiniBoss)
+        {
+            dropChance = GameConfig.MaterialDropChanceMiniBoss;
+        }
+        else
+        {
+            dropChance = GameConfig.MaterialDropChanceRegular;
+        }
+
+        if (dungeonRandom.NextDouble() < dropChance)
+        {
+            var material = eligibleMaterials[dungeonRandom.Next(eligibleMaterials.Count)];
+            player.AddMaterial(material.Id, dropCount);
+            await DisplayMaterialDrop(material, dropCount);
+        }
+    }
+
+    /// <summary>
+    /// Display a dramatic material drop notification
+    /// </summary>
+    private async Task DisplayMaterialDrop(GameConfig.CraftingMaterialDef material, int count)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  ══════════════════════════════════════════");
+        terminal.SetColor(material.Color);
+        terminal.WriteLine("    ** RARE MATERIAL FOUND! **");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  ══════════════════════════════════════════");
+        terminal.SetColor(material.Color);
+        terminal.WriteLine($"    {material.Name}" + (count > 1 ? $" x{count}" : ""));
+        terminal.SetColor("gray");
+        terminal.WriteLine($"    \"{material.Description}\"");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  ══════════════════════════════════════════");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+    }
+
+    /// <summary>
     /// Check if player evades a trap based on agility
     /// Returns true if trap is evaded, false if it hits
     /// </summary>
@@ -3297,6 +3353,11 @@ public class DungeonLocation : BaseLocation
                 // Artifact drop chance for specific floor bosses
                 await CheckArtifactDrop(player, currentDungeonLevel);
             }
+
+            // Check for rare crafting material drops
+            bool hadBoss = room.IsBossRoom;
+            bool hadMiniBoss = monsters.Any(m => m.IsMiniBoss);
+            await CheckForMaterialDrop(player, hadBoss, hadMiniBoss);
 
             await Task.Delay(2000);
         }
@@ -5509,6 +5570,19 @@ public class DungeonLocation : BaseLocation
 
                 currentPlayer.Gold += goldFound;
                 currentPlayer.Experience += expGained;
+
+                // Crafting material chance from treasure chests
+                var eligibleMaterials = GameConfig.GetMaterialsForFloor(currentDungeonLevel);
+                if (eligibleMaterials.Count > 0 && dungeonRandom.NextDouble() < GameConfig.MaterialDropChanceTreasure)
+                {
+                    var material = eligibleMaterials[dungeonRandom.Next(eligibleMaterials.Count)];
+                    currentPlayer.AddMaterial(material.Id, 1);
+                    terminal.WriteLine("");
+                    terminal.SetColor(material.Color);
+                    terminal.WriteLine($"Among the treasure, you discover a {material.Name}!");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"\"{material.Description}\"");
+                }
             }
             else if (chestRoll < 9)
             {
