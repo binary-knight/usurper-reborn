@@ -74,6 +74,20 @@ The main menu now clearly separates play modes from information:
 
 ---
 
+## World Simulation Tuning
+
+### NPC Orientation & Demographics
+- NPC sexual orientation distribution rebalanced to realistic proportions: ~96% straight, ~1.5% gay/lesbian, ~1.5% bisexual, ~1% asexual
+- All 60 classic NPCs normalized: 57 straight, 1 gay (Thorn Blackblade), 1 lesbian (Dagger Dee), 1 asexual (Zen Master Lotus)
+- Non-heterosexual relationships now serve as rare flavor encounters rather than being commonplace
+- Default NPC orientation changed from Bisexual to Straight
+
+### Marriage & Pregnancy Rates
+- NPC marriage attempt rate reduced from 2% to 0.2% per world tick — marriages now develop gradually over hours rather than minutes
+- Pregnancy rates reduced ~4x across all population levels to prevent baby booms
+
+---
+
 ## Bug Fixes
 
 - **NPC "formed a powerful new alliance" news spam**: The GoalSystem's "Support Gang" goal (created every tick for NPCs already in gangs) matched the generic "Gang" completion check, immediately completing and firing alliance news every world sim tick. Fixed by narrowing `IsGoalCompleted` and `OnGoalCompleted` to only match "Join"/"Find Gang" goals.
@@ -89,7 +103,10 @@ The main menu now clearly separates play modes from information:
 | `Scripts/Systems/StreetEncounterSystem.cs` | Added `CheckForConsequenceEncounter()` with 4 encounter types (grudge, jealous spouse, throne challenge, city contest), defeat memory recording in street combat, rate limiting with shared cooldown |
 | `Scripts/Locations/BaseLocation.cs` | Wire petition system after narrative encounters; wire consequence encounters BEFORE random encounters with priority ordering |
 | `Scripts/Locations/InnLocation.cs` | Record defeat memories when player wins tavern duels |
-| `Scripts/AI/EnhancedNPCBehaviors.cs` | Record betrayal memories on spouse when affair suspicion crosses confrontation threshold |
+| `Scripts/AI/EnhancedNPCBehaviors.cs` | Record betrayal memories on spouse when affair suspicion crosses confrontation threshold; marriage attempt rate reduced from 2% to 0.2% per tick |
+| `Scripts/AI/PersonalityProfile.cs` | Orientation distribution rebalanced (96% straight, 1.5% gay/lesbian, 1.5% bisexual, 1% asexual); default orientation changed to Straight |
+| `Scripts/Data/ClassicNPCs.cs` | All 60 NPCs normalized to realistic orientation distribution (57 straight, 1 gay, 1 lesbian, 1 asexual) |
+| `Scripts/Systems/WorldSimulator.cs` | Pregnancy rates reduced ~4x across all population levels |
 | `Scripts/Core/GameConfig.cs` | Version 0.30.8, petition pacing constants, consequence encounter constants (`MinMovesBetweenConsequences`, `GrudgeConfrontationChance`, `SpouseConfrontationChance`, `ThroneEncounterChance`, `CityContestChance`, `MinSuspicionForConfrontation`) |
 | `Scripts/Core/GameEngine.cs` | Redesigned main menu with PLAY/INFO sections, `[S]` for Single-Player, `[O]` promoted to PLAY section |
 | `Scripts/AI/GoalSystem.cs` | Fixed "formed a powerful new alliance" news spam — `IsGoalCompleted` and `OnGoalCompleted` now only match gang-joining goals, not "Support Gang" |

@@ -2598,6 +2598,9 @@ public partial class CombatEngine
         }
         await CheckForEquipmentDrop(result);
 
+        // Auto-heal with potions after combat, then offer to buy replacements
+        AutoHealWithPotions(result.Player);
+
         // Monk potion purchase option - Pascal PLVSMON.PAS monk encounter
         await OfferMonkPotionPurchase(result.Player);
 
@@ -2686,6 +2689,37 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.WriteLine("The monk bows and departs.", "gray");
         await Task.Delay(GetCombatDelay(2000));
+    }
+
+    /// <summary>
+    /// Automatically use healing potions to restore HP after combat.
+    /// Fires before the monk purchase so players heal first, then buy replacements.
+    /// </summary>
+    private void AutoHealWithPotions(Character player)
+    {
+        if (player.Healing <= 0 || player.HP >= player.MaxHP)
+            return;
+
+        int healPerPotion = Math.Max(1, (int)(player.MaxHP / 4));
+        long hpNeeded = player.MaxHP - player.HP;
+        int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
+        int potionsUsed = (int)Math.Min(potionsNeeded, player.Healing);
+
+        long totalHealed = 0;
+        for (int i = 0; i < potionsUsed; i++)
+        {
+            long healAmount = Math.Min(healPerPotion, player.MaxHP - player.HP);
+            player.HP += healAmount;
+            totalHealed += healAmount;
+            player.Healing--;
+            player.Statistics?.RecordPotionUsed((int)healAmount);
+        }
+
+        if (potionsUsed > 0)
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine($"You drink {potionsUsed} potion{(potionsUsed > 1 ? "s" : "")} and recover {totalHealed:N0} HP. ({player.HP}/{player.MaxHP} HP, {player.Healing} potions left)", "green");
+        }
     }
 
     /// <summary>
@@ -7064,6 +7098,9 @@ public partial class CombatEngine
         await AchievementSystem.ShowPendingNotifications(terminal);
 
         await Task.Delay(GetCombatDelay(2000));
+
+        // Auto-heal with potions after combat, then offer to buy replacements
+        AutoHealWithPotions(result.Player);
 
         // Monk encounter ONLY if requested
         if (offerMonkEncounter)

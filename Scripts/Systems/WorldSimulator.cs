@@ -697,9 +697,10 @@ public class WorldSimulator
         int totalPop = aliveCount + childCount;
 
         // Dynamic rate: higher when underpopulated, lower when overpopulated
-        int pregnancyDenominator = totalPop < 40 ? 33   // ~3% if underpopulated
-                                 : totalPop > 80 ? 200  // ~0.5% if overpopulated
-                                 : 100;                  // ~1% normal
+        // Values are denominator for random check (higher = less likely per tick)
+        int pregnancyDenominator = totalPop < 40 ? 150   // ~0.67% if underpopulated
+                                 : totalPop > 80 ? 800   // ~0.125% if overpopulated
+                                 : 400;                   // ~0.25% normal
 
         // Eligible females (married or not) may become pregnant
         var eligibleFemales = npcs.Where(n =>

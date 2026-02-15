@@ -47,9 +47,40 @@ namespace UsurperRemake.UI
         /// </summary>
         public static void DrawBoxLine(TerminalEmulator terminal, string text, string borderColor = "bright_blue", string textColor = "white")
         {
-            // Truncate if too long
+            // Word-wrap if too long instead of truncating
             if (text.Length > BoxWidth)
-                text = text.Substring(0, BoxWidth);
+            {
+                // Find leading whitespace to preserve indent on wrapped lines
+                int indent = 0;
+                while (indent < text.Length && text[indent] == ' ') indent++;
+                string indentStr = new string(' ', indent);
+
+                // Word-wrap the text
+                string remaining = text;
+                while (remaining.Length > 0)
+                {
+                    if (remaining.Length <= BoxWidth)
+                    {
+                        string padded = remaining.PadRight(BoxWidth);
+                        terminal.Write($"{Vertical}", borderColor);
+                        terminal.Write(padded, textColor);
+                        terminal.WriteLine($"{Vertical}", borderColor);
+                        break;
+                    }
+
+                    // Find last space within BoxWidth
+                    int breakAt = remaining.LastIndexOf(' ', BoxWidth - 1);
+                    if (breakAt <= indent) breakAt = BoxWidth; // No good break point, force break
+
+                    string line = remaining.Substring(0, breakAt).PadRight(BoxWidth);
+                    terminal.Write($"{Vertical}", borderColor);
+                    terminal.Write(line, textColor);
+                    terminal.WriteLine($"{Vertical}", borderColor);
+
+                    remaining = indentStr + remaining.Substring(breakAt).TrimStart();
+                }
+                return;
+            }
 
             // Pad to fill the box
             string paddedText = text.PadRight(BoxWidth);

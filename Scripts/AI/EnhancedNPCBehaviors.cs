@@ -145,7 +145,7 @@ public static class EnhancedNPCBehaviors
         // Marriage system
         if (!npc.Married && npc.Level >= 5)
         {
-            if (random.Next(50) == 0) // 2% chance per cycle
+            if (random.Next(500) == 0) // 0.2% chance per cycle (~1 attempt per NPC per 4 hours)
             {
                 AttemptNPCMarriage(npc, allNPCs);
             }

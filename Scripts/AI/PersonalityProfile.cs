@@ -86,7 +86,7 @@ public class PersonalityProfile
     public float Tenderness { get; set; }      // Preference for gentle vs. rough intimacy
 
     // Sexual/romantic identity
-    public SexualOrientation Orientation { get; set; } = SexualOrientation.Bisexual;
+    public SexualOrientation Orientation { get; set; } = SexualOrientation.Straight;
     public GenderIdentity Gender { get; set; } = GenderIdentity.Male;
     public RomanceStyle IntimateStyle { get; set; } = RomanceStyle.Switch;
     public RelationshipPreference RelationshipPref { get; set; } = RelationshipPreference.Undecided;
@@ -376,18 +376,15 @@ public class PersonalityProfile
                 break;
         }
 
-        // Randomly assign orientation with realistic distribution
+        // Randomly assign orientation — heterosexual is the vast majority,
+        // non-hetero relationships are rare flavor (~1-2% of the population)
         float orientationRoll = GD.Randf();
-        if (orientationRoll < 0.70f)
+        if (orientationRoll < 0.96f)
             profile.Orientation = SexualOrientation.Straight;
-        else if (orientationRoll < 0.85f)
-            profile.Orientation = SexualOrientation.Bisexual;
-        else if (orientationRoll < 0.92f)
+        else if (orientationRoll < 0.975f)
             profile.Orientation = profile.Gender == GenderIdentity.Female ? SexualOrientation.Lesbian : SexualOrientation.Gay;
-        else if (orientationRoll < 0.96f)
-            profile.Orientation = SexualOrientation.Pansexual;
-        else if (orientationRoll < 0.98f)
-            profile.Orientation = SexualOrientation.Demisexual;
+        else if (orientationRoll < 0.99f)
+            profile.Orientation = SexualOrientation.Bisexual;
         else
             profile.Orientation = SexualOrientation.Asexual;
 

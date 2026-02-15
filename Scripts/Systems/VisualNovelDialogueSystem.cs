@@ -626,6 +626,21 @@ namespace UsurperRemake.Systems
                 });
             }
 
+            // Ask affair partner to leave their spouse (active affair with progress >= 100)
+            if (npc.IsMarried && !string.IsNullOrEmpty(npc.SpouseName) && npc.SpouseName != player!.Name2)
+            {
+                var affair = NPCMarriageRegistry.Instance.GetAffair(npc.ID, player!.ID);
+                if (affair != null && affair.IsActive)
+                {
+                    options.Add(new ConversationOption
+                    {
+                        Type = ConversationType.AskToLeave,
+                        Text = $"Leave {npc.SpouseName}. Be with me.",
+                        Color = "bright_yellow"
+                    });
+                }
+            }
+
             // Provocation (for conflict/rivalry paths)
             if (relationLevel >= 60) // Only for neutral or worse
             {
@@ -948,6 +963,9 @@ namespace UsurperRemake.Systems
                     break;
                 case ConversationType.Provoke:
                     await HandleProvocationOption(npc, relationLevel);
+                    break;
+                case ConversationType.AskToLeave:
+                    await HandleAskToLeaveOption(npc, relationLevel);
                     break;
             }
 
@@ -1808,6 +1826,139 @@ namespace UsurperRemake.Systems
             await terminal.GetInput("  Press Enter to continue...");
         }
 
+        private async Task HandleAskToLeaveOption(NPC npc, int relationLevel)
+        {
+            terminal!.SetColor("bright_yellow");
+            terminal.WriteLine($"  You take {npc.Name2}'s hand and look them in the eye...");
+            terminal.WriteLine("");
+            await Task.Delay(800);
+
+            terminal.SetColor("white");
+            terminal.WriteLine($"  \"I'm tired of sneaking around. Leave {npc.SpouseName}. Be with me.\"");
+            terminal.WriteLine("");
+            await Task.Delay(600);
+
+            var affair = NPCMarriageRegistry.Instance.GetAffair(npc.ID, player!.ID);
+            var profile = npc.Brain?.Personality;
+            if (affair == null || profile == null)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {npc.Name2} stares at you blankly.");
+                await terminal.GetInput("  Press Enter to continue...");
+                return;
+            }
+
+            // CHA-based persuasion check, modified by affair state
+            float baseChance = 0.15f;
+
+            // Player charisma is a major factor
+            baseChance += Math.Max(0, (player.Charisma - 30) / 150f); // Up to +0.47 at CHA 100
+
+            // Affair depth matters hugely
+            baseChance += affair.AffairProgress * 0.002f; // Up to +0.4 at max (200)
+
+            // Low commitment NPCs are easier to convince
+            baseChance += (1f - profile.Commitment) * 0.2f;
+
+            // Secret meetings show real connection
+            baseChance += Math.Min(0.15f, affair.SecretMeetings * 0.015f);
+
+            // If spouse already suspects, easier to leave ("it's already ruined")
+            if (affair.SpouseSuspicion >= 60)
+                baseChance += 0.15f;
+
+            // High commitment makes it very hard
+            if (profile.Commitment > 0.8f)
+                baseChance *= 0.4f;
+
+            baseChance = Math.Clamp(baseChance, 0.05f, 0.85f);
+
+            if (random.NextDouble() < baseChance)
+            {
+                // They agree to leave!
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  ═══ A Decision Is Made ═══");
+                terminal.WriteLine("");
+                await Task.Delay(500);
+
+                terminal.SetColor("yellow");
+                if (affair.SpouseSuspicion >= 60)
+                    terminal.WriteLine($"  {npc.Name2}'s eyes fill with tears. \"{npc.SpouseName} already suspects. You're right... I choose you.\"");
+                else
+                    terminal.WriteLine($"  {npc.Name2} squeezes your hand. \"I've been thinking about it too. I can't live this lie anymore.\"");
+                terminal.WriteLine("");
+                await Task.Delay(800);
+
+                // Offer player a choice - become spouse or just lovers
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  [M] \"Marry me.\" - Make them your spouse");
+                terminal.WriteLine($"  [L] \"Stay with me.\" - Become lovers");
+                terminal.WriteLine($"  [N] \"I changed my mind.\" - Back out");
+                terminal.WriteLine("");
+                terminal.Write("  Your choice: ");
+                string? choice = await terminal.GetInput("");
+
+                if (choice?.Trim().ToUpper() == "M" || choice?.Trim().ToUpper() == "L")
+                {
+                    bool marry = choice.Trim().ToUpper() == "M";
+                    string exSpouseName = npc.SpouseName ?? "their spouse";
+                    EnhancedNPCBehaviors.ProcessAffairDivorce(npc, player!, marry);
+
+                    if (marry)
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"  {npc.Name2} leaves {exSpouseName} and becomes your spouse!");
+                        NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} for {player.Name}!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"  {npc.Name2} is now your lover.");
+                        RomanceTracker.Instance.AddLover(npc.ID, 50, false);
+                        NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} in a scandal involving {player.Name}!");
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  {npc.Name2} looks confused as you pull away...");
+                    terminal.WriteLine($"  \"You asked ME to leave and now you back out?!\"");
+                    RelationshipSystem.UpdateRelationship(player!, npc, -3);
+                }
+            }
+            else
+            {
+                // They refuse (for now)
+                terminal.SetColor("yellow");
+
+                if (profile.Commitment > 0.7f)
+                {
+                    terminal.WriteLine($"  {npc.Name2} pulls their hand away.");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  \"What we have is... exciting. But I made vows to {npc.SpouseName}. I can't just throw that away.\"");
+                }
+                else if (affair.AffairProgress < 120)
+                {
+                    terminal.WriteLine($"  {npc.Name2} hesitates, conflicted.");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  \"I... I'm not ready for that. Not yet. Give me more time.\"");
+                }
+                else
+                {
+                    terminal.WriteLine($"  {npc.Name2} looks away, torn.");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  \"I want to... but I'm afraid. What if it all goes wrong?\"");
+                }
+
+                // Asking still pushes the affair forward a bit
+                affair.AffairProgress = Math.Min(200, affair.AffairProgress + 10);
+                RelationshipSystem.UpdateRelationship(player!, npc, 1);
+            }
+
+            terminal.WriteLine("");
+            await terminal.GetInput("  Press Enter to continue...");
+        }
+
         private async Task HandleMarriageProposal(NPC npc, int relationLevel)
         {
             terminal!.ClearScreen();
@@ -2118,7 +2269,8 @@ namespace UsurperRemake.Systems
         Intimate,
         Proposition,
         Propose,
-        Provoke
+        Provoke,
+        AskToLeave
     }
 
     /// <summary>
