@@ -156,13 +156,15 @@ All potion healing now uses the same scaling formula: `30 + level*5 + random(10-
 
 ## Improvement: Auction House Atmosphere Overhaul
 
-The Auction House display was bare — just a menu with no personality. It now features:
+The Auction House display was bare — just a menu with no personality. Both the single-player and online/MUD Auction House now feature:
 
 - **Grimjaw the half-orc auctioneer** — a gruff shopkeeper character who reacts to current market activity (empty stalls, a few listings, busy day)
 - **Dynamic atmospheric text** — the hall description changes based on how many items are listed (buzzing crowds vs. empty counters)
-- **Listing summary on the main screen** — player and NPC listing counts with total market value displayed at a glance
+- **Listing summary on the main screen** — listing count with total market value displayed at a glance
 - **Formatted bulletin board** — listings now display in clean columns with item name, price, seller, and age. NPC sellers shown in cyan, player sellers in green.
 - **Styled status screen** — your active listings and market overview are presented with proper headers, separators, and color-coded stats
+- **NPC interaction in online mode** — NPCs visiting the Auction House now appear in the "People here" list, and you can talk to them with `[0] Talk`
+- **Full status line and global commands** — the online Auction House now shows your HP/Gold/Mana status bar and supports all quick commands (inventory, help, etc.)
 
 ## Bug Fix: Dormitory Menu Missing Sleep/Attack Options
 
@@ -220,6 +222,15 @@ The Anchor Road menu is now organized into three clean sections:
 
 Accidentally pressing Enter, X, or any key other than the valid options (H/M/N) during the wandering monk encounter would dismiss him without buying anything. The monk now only accepts valid choices — [H]ealing potions, [M]ana potions, or [N]o thanks — and reprompts on invalid input.
 
+## Bug Fix: Missing Person Petitions Too Frequent in Multiplayer
+
+The NPC petition system (where NPCs ask you to find their missing friends/spouse) fired far too frequently in online/MUD mode — players reported getting petitions every other minute. This happened because the petition rate-limiting state (location change counter, cooldown timer, session counter) was stored on a shared singleton, so all concurrent players' location changes accumulated together, triggering petitions much faster than intended.
+
+**Fixes:**
+- **Per-player rate limiting**: All petition state (location changes, cooldown timer, session count, petitioned NPC list) is now tracked per-player via a dictionary keyed by character name. One player moving between locations no longer accelerates petitions for everyone else.
+- **Duplicate quest prevention**: Players could accumulate multiple identical "Bring back [NPC]" quests for the same missing person. The system now checks your active quests before creating a new Missing Person petition — if you already have a quest targeting that NPC, the petition is skipped.
+- **Talk-to-NPC quest completion**: Missing Person quests now have "Find [NPC] or learn their fate" as the primary objective (TalkToNPC type). If the missing NPC has respawned, simply talking to them completes the quest. The dungeon objectives (reach floor, kill monsters) are now optional alternative completion paths for cases where the NPC is still dead.
+
 ## Improvement: Quest Board Cleaned Up
 
 The Quest Hall was showing an excessive number of quests (20+), including many duplicates of the same quest type. Available quests are now deduplicated by name and capped at 10, making the board much easier to read and choose from.
@@ -245,6 +256,29 @@ Players could never miss melee attacks against same-level or lower-level monster
 
 Players will still auto-hit monsters 10+ levels below them. Bosses and higher-level monsters are noticeably harder to hit. The Sunforged Blade artifact (attacks cannot miss) is now a meaningful power instead of redundant.
 
+## Bug Fix: Ring/Necklace Loot Drops Showing Wrong Comparison
+
+When a ring or necklace dropped from a dungeon boss or mini-boss, the loot screen showed "Armor Power: +0" (meaningless for accessories) and compared "Armor: 0 -> 0 (same)" against the currently equipped ring. This made it look like the game was comparing armor against the wrong slot when it was actually a ring-vs-ring comparison with misleading labels.
+
+**Fixes:**
+- Ring drops now show "Type: Ring" instead of "Armor Power: +0"; necklace drops show "Type: Necklace"
+- Comparison header now shows the slot name (e.g., "COMPARISON (Ring slot):")
+- Accessories compare "Stat Total" (sum of all stat bonuses) instead of showing a meaningless armor comparison
+
+## Improvement: Smart Ring Slot Equipping
+
+Equipping a ring from loot or inventory was unintuitive — it always went to the left finger slot, replacing whatever was there even if the right finger was empty.
+
+**Improvements:**
+- Rings now auto-equip to an empty finger slot if one is available (prefers left finger, falls back to right)
+- When both ring slots are occupied and a new ring drops, the game prompts which finger to replace (showing both currently equipped rings) or to put the new ring in inventory
+
+## Bug Fix: AI Teammate Abilities Say "You Deal X Damage"
+
+When a companion or NPC team partner used a class ability in dungeon combat, all the ability messages used second-person ("You deal 45 damage!", "You recover 30 HP!", "BERSERKER RAGE! You enter a blood fury!") even though it was the AI teammate performing the action, not the player.
+
+All ability effect messages in multi-monster combat now check whether the acting character is the player or a teammate. Teammate ability messages use their name instead of "You" (e.g., "Sir Cedric deals 45 damage!", "Sir Cedric recovers 30 HP!"). This covers all 25+ ability special effects including damage, healing, buffs, rage, fear, stealth, bloodlust, and more.
+
 ## Files Changed
 
 | File | Change |
@@ -259,7 +293,7 @@ Players will still auto-hit monsters 10+ levels below them. Bosses and higher-le
 | `Scripts/Systems/OnlineAdminConsole.cs` | Password reset uses `ReadInput()` instead of static `ReadLineWithBackspace()` |
 | `Scripts/Locations/MainStreetLocation.cs` | `QuitGame()` returns `bool` so cancel/Inn navigation stays in location |
 | `Scripts/Systems/BugReportSystem.cs` | Added `IsOnlineMode` flag; `GetBuildTypeString()` for Local/Online/Steam/BBS; player name in all outputs |
-| `Scripts/Systems/NPCPetitionSystem.cs` | Missing Person [I] Investigate creates a quest (reach floor + kill monsters) instead of giving immediate gold |
+| `Scripts/Systems/NPCPetitionSystem.cs` | Per-player rate limiting via `PlayerPetitionState` dictionary (fixes shared singleton in MUD mode); duplicate quest prevention checks active quests before creating Missing Person petitions; Missing Person quests now have TalkToNPC as primary objective with dungeon objectives as optional alternatives |
 | `Scripts/Systems/QuestSystem.cs` | Added `AddQuestToDatabase()` public method for external quest creation |
 | `Scripts/Systems/InventorySystem.cs` | Equip from backpack looks up weapon in equipment database for correct handedness/type instead of name guessing |
 | `Scripts/Systems/CombatEngine.cs` | Loot weapon equip looks up equipment database for handedness instead of hardcoding OneHanded |
@@ -278,7 +312,7 @@ Players will still auto-hit monsters 10+ levels below them. Bosses and higher-le
 | `Scripts/Core/GameConfig.cs` | Renamed `Marketplace` enum to `AuctionHouse` |
 | `Scripts/Locations/AnchorRoadLocation.cs` | Major rewrite — stripped dead redirect code (QuestHall, Temple, Castle, Online War, Dormitory), fixed Bounty Hunting with real CombatEngine PvP, rewrote Gang War with sequential 1v1 CombatEngine fights, added The Gauntlet 10-wave endurance challenge, updated menu to 3-section layout |
 | `Scripts/Locations/DormitoryLocation.cs` | New box header, atmospheric description, styled menu with all options visible (sleep/attack/list/examine/wake) |
-| `Scripts/Locations/BaseLocation.cs` | Fixed Church NPC location string; updated AuctionHouse display names; NPC flavor text always uses location-contextual system instead of stale CurrentActivity |
+| `Scripts/Locations/BaseLocation.cs` | Fixed Church NPC location string; updated AuctionHouse display names; NPC flavor text always uses location-contextual system instead of stale CurrentActivity; online Auction House (`ShowAuctionMenu`) overhauled with Grimjaw auctioneer, atmosphere, listing summary, NPC display, `[0] Talk` via `TalkToNPCAtLocation()`, status line, and global command support |
 | `Scripts/Locations/MainStreetLocation.cs` | Menu text `Marketplace` → `Auction House`; removed `Z - Team Area` from screen reader menu; added `[L]odging` to classic and screen reader menus with ProcessChoice handler |
 | `Scripts/Core/GameEngine.cs` | Updated NPC location strings and location lookup aliases for Auction House |
 | `Scripts/Core/NPC.cs` | Merchant default location and guard patrol updated to "Auction House"; added "auctionhouse" lookup alias |
@@ -296,9 +330,10 @@ Players will still auto-hit monsters 10+ levels below them. Bosses and higher-le
 | `Scripts/Systems/OpeningStorySystem.cs` | Updated narrative text |
 | `Scripts/Systems/MarketplaceSystem.cs` | Updated news messages to "Auction House" |
 | `Scripts/Systems/NPCPetitionSystem.cs` | Added duplicate target prevention and randomization for faction missions |
-| `Scripts/Systems/CombatEngine.cs` | Added `V - Attempt to Save` to dungeon combat screen reader menu; monk encounter now 25% chance instead of 100%; monk input validation loop (only accepts H/M/N); unified all potion healing formulas to `30 + level*5 + random(10,30)` across `ExecuteUseItem`, `AutoHealWithPotions`, `TeammateHealWithPotion`, and `ProcessComputerPlayerAction`; monster AC bumped from `level/5 + defence/20` to `level/3 + defence/15` |
+| `Scripts/Systems/CombatEngine.cs` | Added `V - Attempt to Save` to dungeon combat screen reader menu; monk encounter now 25% chance instead of 100%; monk input validation loop (only accepts H/M/N); unified all potion healing formulas to `30 + level*5 + random(10,30)` across `ExecuteUseItem`, `AutoHealWithPotions`, `TeammateHealWithPotion`, and `ProcessComputerPlayerAction`; monster AC bumped from `level/5 + defence/20` to `level/3 + defence/15`; fixed accessory loot display (rings show "Type: Ring" instead of "Armor Power: +0", necklaces show "Type: Necklace"); accessory comparison uses stat totals instead of armor; comparison header shows slot name; added `PromptForRingSlot()` for when both finger slots are occupied; `ApplyAbilityEffectsMultiMonster()` now uses `isPlayer`/`actorName` pattern so all 25+ ability effects show teammate name instead of "You" when AI partners use abilities |
+| `Scripts/Core/Character.cs` | Smart ring slot auto-determine in `EquipItem()`: rings auto-equip to empty finger slot instead of always replacing left finger |
 | `Scripts/Locations/QuestHallLocation.cs` | Faith "Redeem" quests now show correct hint ("talk to NPC" instead of "defeat in combat") |
-| `Scripts/Core/Quest.cs` | `UpdateObjectiveProgress` TargetId matching now case-insensitive |
+| `Scripts/Core/Quest.cs` | `UpdateObjectiveProgress` TargetId matching now case-insensitive; `AreAllObjectivesComplete()` supports alternative completion for RescueNPC quests (all optional objectives complete also satisfies the quest) |
 | `Scripts/Systems/QuestSystem.cs` | Defeating a quest target NPC now also satisfies TalkToNPC objectives (Faith redeem quests completable via combat) |
 | `Scripts/Systems/AchievementSystem.cs` | Added `gauntlet_champion` achievement (Gold tier, 250g reward) for surviving all 10 Gauntlet waves |
 | `Scripts/Systems/TrainingSystem.cs` | Diminishing returns on player attack modifier (full up to +6, half rate above) to prevent auto-hit at high levels |

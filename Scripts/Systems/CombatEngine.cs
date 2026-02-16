@@ -3344,6 +3344,12 @@ public partial class CombatEngine
 
             if (lootItem.Type == global::ObjType.Weapon)
                 terminal.WriteLine($"  Attack Power: +{lootItem.Attack}");
+            else if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
+            {
+                // Accessories don't have armor — show item type instead
+                string itemTypeName = lootItem.Type == global::ObjType.Fingers ? "Ring" : "Necklace";
+                terminal.WriteLine($"  Type: {itemTypeName}");
+            }
             else
                 terminal.WriteLine($"  Armor Power: +{lootItem.Armor}");
 
@@ -3512,6 +3518,26 @@ public partial class CombatEngine
                     }
                 }
 
+                // For rings, prompt if both finger slots are full
+                if (equipment.Slot == EquipmentSlot.LFinger || equipment.Slot == EquipmentSlot.RFinger)
+                {
+                    var leftRing = player.GetEquipment(EquipmentSlot.LFinger);
+                    var rightRing = player.GetEquipment(EquipmentSlot.RFinger);
+
+                    if (leftRing != null && rightRing != null)
+                    {
+                        targetSlot = await PromptForRingSlot(player);
+                        if (targetSlot == null)
+                        {
+                            // Player chose inventory
+                            player.Inventory.Add(lootItem);
+                            terminal.SetColor("cyan");
+                            terminal.WriteLine($"Added {lootItem.Name} to your inventory.");
+                            break;
+                        }
+                    }
+                }
+
                 // Try to equip the item
                 if (player.EquipItem(equipment, targetSlot, out string equipMsg))
                 {
@@ -3580,9 +3606,6 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine("  ─────────────────────────────────────");
-        terminal.SetColor("white");
-        terminal.WriteLine("  COMPARISON WITH EQUIPPED:");
-
         // Determine which slot this item would go in
         EquipmentSlot targetSlot = lootItem.Type switch
         {
@@ -3602,6 +3625,19 @@ public partial class CombatEngine
             _ => EquipmentSlot.Body
         };
 
+        // Show slot name in comparison header
+        string slotDisplayName = targetSlot switch
+        {
+            EquipmentSlot.MainHand => "Main Hand",
+            EquipmentSlot.OffHand => "Off Hand",
+            EquipmentSlot.LFinger => "Ring",
+            EquipmentSlot.RFinger => "Ring",
+            EquipmentSlot.Neck => "Necklace",
+            _ => targetSlot.ToString()
+        };
+        terminal.SetColor("white");
+        terminal.WriteLine($"  COMPARISON ({slotDisplayName} slot):");
+
         // Get currently equipped item
         var currentEquip = player.GetEquipment(targetSlot);
 
@@ -3615,7 +3651,7 @@ public partial class CombatEngine
             terminal.SetColor("cyan");
             terminal.WriteLine($"  Currently Equipped: {currentEquip.Name}");
 
-            // Compare primary stat (Attack for weapons, Armor for armor)
+            // Compare primary stat (Attack for weapons, Armor for armor, stat value for accessories)
             if (lootItem.Type == global::ObjType.Weapon)
             {
                 int currentPower = currentEquip.WeaponPower;
@@ -3624,6 +3660,35 @@ public partial class CombatEngine
 
                 terminal.SetColor("white");
                 terminal.Write($"  Attack: {currentPower} -> {newPower} ");
+                if (diff > 0)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"(+{diff} UPGRADE)");
+                }
+                else if (diff < 0)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"({diff} downgrade)");
+                }
+                else
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("(same)");
+                }
+            }
+            else if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
+            {
+                // Accessories: compare total stat value instead of armor
+                int currentStatTotal = currentEquip.StrengthBonus + currentEquip.DexterityBonus +
+                    currentEquip.WisdomBonus + currentEquip.MaxHPBonus + currentEquip.MaxManaBonus +
+                    currentEquip.DefenceBonus + currentEquip.AgilityBonus + currentEquip.ConstitutionBonus +
+                    currentEquip.IntelligenceBonus + currentEquip.CharismaBonus;
+                int newStatTotal = lootItem.Strength + lootItem.Dexterity + lootItem.Wisdom +
+                    lootItem.HP + lootItem.Mana + lootItem.Defence;
+                int diff = newStatTotal - currentStatTotal;
+
+                terminal.SetColor("white");
+                terminal.Write($"  Stat Total: {currentStatTotal} -> {newStatTotal} ");
                 if (diff > 0)
                 {
                     terminal.SetColor("bright_green");
@@ -3758,6 +3823,57 @@ public partial class CombatEngine
             "M" => EquipmentSlot.MainHand,
             "O" => EquipmentSlot.OffHand,
             _ => null // Cancel
+        };
+    }
+
+    private async Task<EquipmentSlot?> PromptForRingSlot(Character player)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("Both ring slots are occupied. Which ring would you like to replace?");
+        terminal.WriteLine("");
+
+        var leftRing = player.GetEquipment(EquipmentSlot.LFinger);
+        var rightRing = player.GetEquipment(EquipmentSlot.RFinger);
+
+        terminal.SetColor("white");
+        terminal.Write("  (L) Left Finger:  ");
+        if (leftRing != null)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(leftRing.Name);
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("Empty");
+        }
+
+        terminal.SetColor("white");
+        terminal.Write("  (R) Right Finger: ");
+        if (rightRing != null)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(rightRing.Name);
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("Empty");
+        }
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  (I) Add to inventory instead");
+        terminal.WriteLine("");
+
+        terminal.Write("Your choice: ");
+        var slotChoice = await terminal.GetKeyInput();
+
+        return slotChoice.ToUpper() switch
+        {
+            "L" => EquipmentSlot.LFinger,
+            "R" => EquipmentSlot.RFinger,
+            _ => null // Inventory
         };
     }
 
@@ -5158,6 +5274,10 @@ public partial class CombatEngine
         var ability = abilityResult.AbilityUsed;
         if (ability == null) return;
 
+        // Determine if this is the player or an AI teammate for message formatting
+        bool isPlayer = (player == currentPlayer);
+        string actorName = isPlayer ? "You" : player.DisplayName;
+
         // Apply damage
         if (abilityResult.Damage > 0 && target != null && target.IsAlive)
         {
@@ -5174,7 +5294,9 @@ public partial class CombatEngine
             {
                 actualDamage = (long)(actualDamage * 1.5);
                 terminal.SetColor("bright_red");
-                terminal.WriteLine("LAST STAND! Desperation fuels your attack!");
+                terminal.WriteLine(isPlayer
+                    ? "LAST STAND! Desperation fuels your attack!"
+                    : $"LAST STAND! Desperation fuels {actorName}'s attack!");
             }
             else if (abilityResult.SpecialEffect == "armor_pierce")
             {
@@ -5214,7 +5336,9 @@ public partial class CombatEngine
                 result.Player?.Statistics.RecordDamageDealt(actualDamage, false);
 
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"You deal {actualDamage} damage to {target.Name}!");
+                terminal.WriteLine(isPlayer
+                    ? $"You deal {actualDamage} damage to {target.Name}!"
+                    : $"{actorName} deals {actualDamage} damage to {target.Name}!");
 
                 if (target.HP <= 0)
                 {
@@ -5233,7 +5357,9 @@ public partial class CombatEngine
             player.HP += actualHealing;
 
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"You recover {actualHealing} HP!");
+            terminal.WriteLine(isPlayer
+                ? $"You recover {actualHealing} HP!"
+                : $"{actorName} recovers {actualHealing} HP!");
         }
 
         // Apply buffs
@@ -5242,7 +5368,9 @@ public partial class CombatEngine
             player.TempAttackBonus = abilityResult.AttackBonus;
             player.TempAttackBonusDuration = abilityResult.Duration;
             terminal.SetColor("cyan");
-            terminal.WriteLine($"Attack increased by {abilityResult.AttackBonus} for {abilityResult.Duration} rounds!");
+            terminal.WriteLine(isPlayer
+                ? $"Attack increased by {abilityResult.AttackBonus} for {abilityResult.Duration} rounds!"
+                : $"{actorName}'s attack increased by {abilityResult.AttackBonus} for {abilityResult.Duration} rounds!");
         }
 
         if (abilityResult.DefenseBonus > 0)
@@ -5250,7 +5378,9 @@ public partial class CombatEngine
             player.TempDefenseBonus = abilityResult.DefenseBonus;
             player.TempDefenseBonusDuration = abilityResult.Duration;
             terminal.SetColor("cyan");
-            terminal.WriteLine($"Defense increased by {abilityResult.DefenseBonus} for {abilityResult.Duration} rounds!");
+            terminal.WriteLine(isPlayer
+                ? $"Defense increased by {abilityResult.DefenseBonus} for {abilityResult.Duration} rounds!"
+                : $"{actorName}'s defense increased by {abilityResult.DefenseBonus} for {abilityResult.Duration} rounds!");
         }
         else if (abilityResult.DefenseBonus < 0)
         {
@@ -5258,7 +5388,9 @@ public partial class CombatEngine
             player.TempDefenseBonus = abilityResult.DefenseBonus;
             player.TempDefenseBonusDuration = abilityResult.Duration;
             terminal.SetColor("yellow");
-            terminal.WriteLine($"Defense reduced by {-abilityResult.DefenseBonus} (rage)!");
+            terminal.WriteLine(isPlayer
+                ? $"Defense reduced by {-abilityResult.DefenseBonus} (rage)!"
+                : $"{actorName}'s defense reduced by {-abilityResult.DefenseBonus} (rage)!");
         }
 
         // Handle special effects
@@ -5266,8 +5398,10 @@ public partial class CombatEngine
         {
             case "escape":
                 terminal.SetColor("magenta");
-                terminal.WriteLine("You vanish in a puff of smoke!");
-                globalEscape = true;
+                terminal.WriteLine(isPlayer
+                    ? "You vanish in a puff of smoke!"
+                    : $"{actorName} vanishes in a puff of smoke!");
+                if (isPlayer) globalEscape = true;
                 break;
 
             case "stun":
@@ -5308,7 +5442,9 @@ public partial class CombatEngine
 
             case "smoke":
                 terminal.SetColor("gray");
-                terminal.WriteLine("A cloud of smoke obscures you from attack!");
+                terminal.WriteLine(isPlayer
+                    ? "A cloud of smoke obscures you from attack!"
+                    : $"A cloud of smoke obscures {actorName} from attack!");
                 player.TempDefenseBonus += 40;
                 player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 2);
                 break;
@@ -5316,13 +5452,17 @@ public partial class CombatEngine
             case "rage":
                 player.IsRaging = true;
                 terminal.SetColor("bright_red");
-                terminal.WriteLine("BERSERKER RAGE! You enter a blood fury!");
+                terminal.WriteLine(isPlayer
+                    ? "BERSERKER RAGE! You enter a blood fury!"
+                    : $"BERSERKER RAGE! {actorName} enters a blood fury!");
                 break;
 
             case "dodge_next":
                 player.DodgeNextAttack = true;
                 terminal.SetColor("cyan");
-                terminal.WriteLine("You prepare to dodge the next attack!");
+                terminal.WriteLine(isPlayer
+                    ? "You prepare to dodge the next attack!"
+                    : $"{actorName} prepares to dodge the next attack!");
                 break;
 
             case "inspire":
@@ -5334,14 +5474,18 @@ public partial class CombatEngine
                         teammate.TempAttackBonusDuration = Math.Max(teammate.TempAttackBonusDuration, 3);
                     }
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("Your allies are inspired! (+15 Attack for 3 rounds)");
+                    terminal.WriteLine(isPlayer
+                        ? "Your allies are inspired! (+15 Attack for 3 rounds)"
+                        : $"{actorName}'s melody inspires the party! (+15 Attack for 3 rounds)");
                 }
                 else
                 {
                     player.TempAttackBonus += 10;
                     player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("The melody steels your resolve! (+10 Attack for 3 rounds)");
+                    terminal.WriteLine(isPlayer
+                        ? "The melody steels your resolve! (+10 Attack for 3 rounds)"
+                        : $"The melody steels {actorName}'s resolve! (+10 Attack for 3 rounds)");
                 }
                 break;
 
@@ -5349,7 +5493,9 @@ public partial class CombatEngine
                 player.HasStatusImmunity = true;
                 player.StatusImmunityDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                 terminal.SetColor("bright_white");
-                terminal.WriteLine("Your will becomes unbreakable! Status effects cannot touch you!");
+                terminal.WriteLine(isPlayer
+                    ? "Your will becomes unbreakable! Status effects cannot touch you!"
+                    : $"{actorName}'s will becomes unbreakable! Status effects cannot touch them!");
                 break;
 
             // === DAMAGE ENHANCEMENT EFFECTS ===
@@ -5358,7 +5504,9 @@ public partial class CombatEngine
                 player.TempDefenseBonus -= 20;
                 player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 1);
                 terminal.SetColor("bright_red");
-                terminal.WriteLine("Reckless swing! You leave yourself exposed!");
+                terminal.WriteLine(isPlayer
+                    ? "Reckless swing! You leave yourself exposed!"
+                    : $"Reckless swing! {actorName} leaves themselves exposed!");
                 break;
 
             case "desperate":
@@ -5427,7 +5575,9 @@ public partial class CombatEngine
                 else
                 {
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("Divine energy radiates from your weapon!");
+                    terminal.WriteLine(isPlayer
+                        ? "Divine energy radiates from your weapon!"
+                        : $"Divine energy radiates from {actorName}'s weapon!");
                 }
                 break;
 
@@ -5454,14 +5604,18 @@ public partial class CombatEngine
                     {
                         player.HP += avengerHeal;
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"Divine energy heals you for {avengerHeal} HP!");
+                        terminal.WriteLine(isPlayer
+                            ? $"Divine energy heals you for {avengerHeal} HP!"
+                            : $"Divine energy heals {actorName} for {avengerHeal} HP!");
                     }
                 }
                 break;
 
             case "critical":
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("You strike a vital point!");
+                terminal.WriteLine(isPlayer
+                    ? "You strike a vital point!"
+                    : $"{actorName} strikes a vital point!");
                 break;
 
             case "fury":
@@ -5469,7 +5623,9 @@ public partial class CombatEngine
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
                     player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                 terminal.SetColor("bright_red");
-                terminal.WriteLine("THE WAR GOD'S FURY BURNS WITHIN YOU!");
+                terminal.WriteLine(isPlayer
+                    ? "THE WAR GOD'S FURY BURNS WITHIN YOU!"
+                    : $"THE WAR GOD'S FURY BURNS WITHIN {actorName.ToUpper()}!");
                 break;
 
             case "champion":
@@ -5479,7 +5635,9 @@ public partial class CombatEngine
                     {
                         player.HP += champHeal;
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"The Champion's spirit heals you for {champHeal} HP!");
+                        terminal.WriteLine(isPlayer
+                            ? $"The Champion's spirit heals you for {champHeal} HP!"
+                            : $"The Champion's spirit heals {actorName} for {champHeal} HP!");
                     }
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine("A strike worthy of legends!");
@@ -5531,12 +5689,16 @@ public partial class CombatEngine
                         target.IsFeared = true;
                         target.FearDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine($"{target.Name} is terrified by your roar!");
+                        terminal.WriteLine(isPlayer
+                            ? $"{target.Name} is terrified by your roar!"
+                            : $"{target.Name} is terrified by {actorName}'s roar!");
                     }
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"{target.Name} resists your intimidation!");
+                        terminal.WriteLine(isPlayer
+                            ? $"{target.Name} resists your intimidation!"
+                            : $"{target.Name} resists {actorName}'s intimidation!");
                     }
                 }
                 break;
@@ -5674,13 +5836,17 @@ public partial class CombatEngine
                 player.TempDefenseBonus += 50;
                 player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 2);
                 terminal.SetColor("magenta");
-                terminal.WriteLine("You melt into the shadows, nearly impossible to hit!");
+                terminal.WriteLine(isPlayer
+                    ? "You melt into the shadows, nearly impossible to hit!"
+                    : $"{actorName} melts into the shadows, nearly impossible to hit!");
                 break;
 
             case "stealth":
                 player.DodgeNextAttack = true;
                 terminal.SetColor("green");
-                terminal.WriteLine("You blend perfectly with your surroundings!");
+                terminal.WriteLine(isPlayer
+                    ? "You blend perfectly with your surroundings!"
+                    : $"{actorName} blends perfectly with their surroundings!");
                 break;
 
             case "marked":
@@ -5696,7 +5862,9 @@ public partial class CombatEngine
             case "bloodlust":
                 player.HasBloodlust = true;
                 terminal.SetColor("bright_red");
-                terminal.WriteLine("BLOODLUST! Each kill will heal you!");
+                terminal.WriteLine(isPlayer
+                    ? "BLOODLUST! Each kill will heal you!"
+                    : $"BLOODLUST! Each kill will heal {actorName}!");
                 break;
 
             case "immunity":
@@ -5707,14 +5875,18 @@ public partial class CombatEngine
                     foreach (var s in toRemove) player.ActiveStatuses.Remove(s);
                 }
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("UNSTOPPABLE! You shrug off all afflictions!");
+                terminal.WriteLine(isPlayer
+                    ? "UNSTOPPABLE! You shrug off all afflictions!"
+                    : $"UNSTOPPABLE! {actorName} shrugs off all afflictions!");
                 break;
 
             case "invulnerable":
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Invulnerable))
                     player.ActiveStatuses[StatusEffect.Invulnerable] = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
                 terminal.SetColor("bright_white");
-                terminal.WriteLine("A divine shield of pure light surrounds you!");
+                terminal.WriteLine(isPlayer
+                    ? "A divine shield of pure light surrounds you!"
+                    : $"A divine shield of pure light surrounds {actorName}!");
                 break;
 
             case "cleanse":
@@ -5725,7 +5897,9 @@ public partial class CombatEngine
                     if (cleansable.Count > 0)
                         terminal.WriteLine($"Cleansing light purges {cleansable.Count} affliction(s)!");
                     else
-                        terminal.WriteLine("Holy light washes over you!");
+                        terminal.WriteLine(isPlayer
+                            ? "Holy light washes over you!"
+                            : $"Holy light washes over {actorName}!");
                 }
                 break;
 
@@ -5734,14 +5908,18 @@ public partial class CombatEngine
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 1;
                 terminal.SetColor("magenta");
-                terminal.WriteLine("You vanish completely! Your next attack will strike from the shadows!");
+                terminal.WriteLine(isPlayer
+                    ? "You vanish completely! Your next attack will strike from the shadows!"
+                    : $"{actorName} vanishes completely! Their next attack will strike from the shadows!");
                 break;
 
             case "shadow":
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2;
                 terminal.SetColor("magenta");
-                terminal.WriteLine("Shadows embrace you. Noctura's power flows through you!");
+                terminal.WriteLine(isPlayer
+                    ? "Shadows embrace you. Noctura's power flows through you!"
+                    : $"Shadows embrace {actorName}. Noctura's power flows through them!");
                 break;
 
             case "transmute":

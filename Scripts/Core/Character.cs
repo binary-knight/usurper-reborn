@@ -513,6 +513,21 @@ public class Character
                 slot = EquipmentSlot.MainHand;
             else if (item.Handedness == WeaponHandedness.OffHandOnly)
                 slot = EquipmentSlot.OffHand;
+
+            // Smart ring slot selection: prefer empty slot over replacing
+            if (slot == EquipmentSlot.LFinger || slot == EquipmentSlot.RFinger)
+            {
+                var leftRing = GetEquipment(EquipmentSlot.LFinger);
+                var rightRing = GetEquipment(EquipmentSlot.RFinger);
+
+                if (leftRing == null && rightRing == null)
+                    slot = EquipmentSlot.LFinger; // Both empty, use left
+                else if (leftRing == null)
+                    slot = EquipmentSlot.LFinger; // Left empty, use it
+                else if (rightRing == null)
+                    slot = EquipmentSlot.RFinger; // Right empty, use it
+                // else both full — keep original slot (caller should prompt)
+            }
         }
 
         // Handle shields/off-hand - must unequip 2H weapon first if equipping off-hand

@@ -5331,16 +5331,175 @@ public abstract class BaseLocation
         while (true)
         {
             terminal.ClearScreen();
+
+            // Header
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                          AUCTION HOUSE                                     ║");
-            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("║                             AUCTION HOUSE                                   ║");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine("  [B] Browse Listings     [S] Sell Item     [M] My Listings    [Q] Back");
+
+            // Get listing count for atmospheric text
+            var listings = await backend.GetActiveAuctionListings(50);
+            int totalListings = listings.Count;
+
+            // Atmospheric description
             terminal.SetColor("white");
-            terminal.Write("\n  Choice: ");
-            string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+            terminal.Write("A cavernous hall of polished stone, lined with glass display cases and ");
+            terminal.WriteLine("wooden");
+            terminal.Write("stalls. ");
+            if (totalListings > 10)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("The air buzzes with haggling voices and the clink of coin purses.");
+            }
+            else if (totalListings > 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("A few merchants stand behind their stalls, calling to passersby.");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("The stalls stand mostly empty today, dust settling on the counters.");
+            }
+            terminal.WriteLine("");
+
+            // Auctioneer flavor
+            terminal.SetColor("yellow");
+            terminal.Write("Grimjaw");
+            terminal.SetColor("gray");
+            terminal.Write(", the half-orc auctioneer, looms behind the registry desk. ");
+            if (totalListings == 0)
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("He yawns.");
+                terminal.SetColor("yellow");
+                terminal.WriteLine("\"Slow day. You selling or just wasting my time?\"");
+            }
+            else if (totalListings < 5)
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                terminal.WriteLine("\"Got a few things worth looking at. Browse the board.\"");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                terminal.WriteLine("\"Plenty of goods today! Step up, step up!\"");
+            }
+            terminal.WriteLine("");
+
+            // Listing summary
+            if (totalListings > 0)
+            {
+                long totalValue = 0;
+                foreach (var l in listings) totalValue += l.Price;
+                terminal.SetColor("cyan");
+                terminal.Write("  Listings: ");
+                terminal.SetColor("white");
+                terminal.Write($"{totalListings}");
+                terminal.SetColor("gray");
+                terminal.Write("   Total value: ");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"{totalValue:N0} {GameConfig.MoneyType}");
+                terminal.WriteLine("");
+            }
+
+            // Show NPCs present at the Auction House
+            var npcsHere = (NPCSpawnSystem.Instance.ActiveNPCs ?? new List<NPC>())
+                .Where(npc => npc.IsAlive && !npc.IsDead &&
+                       npc.CurrentLocation?.Equals("Auction House", StringComparison.OrdinalIgnoreCase) == true)
+                .ToList();
+
+            if (npcsHere.Count > 0)
+            {
+                terminal.SetColor("gray");
+                terminal.Write("  People here: ");
+                for (int i = 0; i < npcsHere.Count && i < 8; i++)
+                {
+                    if (i > 0) terminal.Write(", ");
+                    terminal.SetColor("cyan");
+                    terminal.Write(npcsHere[i].Name2);
+                }
+                if (npcsHere.Count > 8)
+                {
+                    terminal.SetColor("gray");
+                    terminal.Write($" and {npcsHere.Count - 8} others");
+                }
+                terminal.SetColor("gray");
+                terminal.WriteLine("");
+                terminal.WriteLine("");
+            }
+
+            // Menu
+            terminal.SetColor("cyan");
+            terminal.WriteLine("What would you like to do?");
+            terminal.WriteLine("");
+
+            // Row 1
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("B");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("rowse Listings        ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_green");
+            terminal.Write("S");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("ell Item       ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_green");
+            terminal.Write("M");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("y Listings");
+
+            // Row 2
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_red");
+            terminal.Write("Q");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("uit to Town           ");
+
+            if (npcsHere.Count > 0)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_green");
+                terminal.Write("0");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.Write($" Talk ({npcsHere.Count})");
+            }
+            terminal.WriteLine("");
+            terminal.WriteLine("");
+
+            // Status line
+            ShowStatusLine();
+
+            terminal.SetColor("bright_white");
+            string input = await terminal.GetInput("Your choice: ");
+            input = input?.Trim().ToUpper() ?? "";
 
             if (input == "Q" || input == "") break;
 
@@ -5349,8 +5508,77 @@ public abstract class BaseLocation
                 case "B": await BrowseAuctions(backend); break;
                 case "S": await SellOnAuction(backend); break;
                 case "M": await ShowMyAuctions(backend); break;
+                case "0":
+                    await TalkToNPCAtLocation("Auction House");
+                    break;
+                default:
+                    // Try global commands (inventory, help, etc.)
+                    var (handled, shouldExit) = await TryProcessGlobalCommand(input);
+                    if (shouldExit) return;
+                    break;
             }
         }
+    }
+
+    /// <summary>
+    /// Talk to NPCs at a specific location string (for inline sub-menus like the online Auction House)
+    /// </summary>
+    private async Task TalkToNPCAtLocation(string locationString)
+    {
+        var npcsHere = (NPCSpawnSystem.Instance.ActiveNPCs ?? new List<NPC>())
+            .Where(npc => npc.IsAlive && !npc.IsDead &&
+                   npc.CurrentLocation?.Equals(locationString, StringComparison.OrdinalIgnoreCase) == true)
+            .ToList();
+
+        if (npcsHere.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("There's no one here to talk to.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                            PEOPLE NEARBY                                     ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  Who would you like to talk to?");
+        terminal.WriteLine("");
+
+        for (int i = 0; i < npcsHere.Count; i++)
+        {
+            var npc = npcsHere[i];
+            int relationLevel = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
+            var (relationColor, relationText, relationSymbol) = GetRelationshipDisplayInfo(relationLevel);
+
+            terminal.SetColor("cyan");
+            terminal.Write($"  [{i + 1}] ");
+            terminal.SetColor(relationColor);
+            terminal.Write($"{npc.Name2}");
+            terminal.SetColor("gray");
+            terminal.Write($" - Level {npc.Level} {npc.Class}");
+            terminal.Write(" [");
+            terminal.SetColor(relationColor);
+            terminal.Write(relationText);
+            if (!string.IsNullOrEmpty(relationSymbol))
+            {
+                terminal.Write($" {relationSymbol}");
+            }
+            terminal.SetColor("gray");
+            terminal.WriteLine("]");
+        }
+
+        terminal.SetColor("gray");
+        terminal.WriteLine($"\n  [0] Cancel");
+        terminal.SetColor("white");
+        string choice = await terminal.GetInput("\n  Talk to: ");
+        if (!int.TryParse(choice, out int idx) || idx < 1 || idx > npcsHere.Count) return;
+
+        await InteractWithNPC(npcsHere[idx - 1]);
     }
 
     private async Task BrowseAuctions(SqlSaveBackend backend)

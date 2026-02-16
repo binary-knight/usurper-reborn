@@ -19,11 +19,25 @@ namespace UsurperRemake.Systems
 
         private readonly Random _random = new();
 
-        // Rate limiting — transient per session, no serialization needed
-        private int _locationChangesSinceLastPetition = 0;
-        private DateTime _lastPetitionTime = DateTime.MinValue;
-        private int _petitionsThisSession = 0;
-        private readonly HashSet<string> _petitionedNPCs = new(); // NPCs who already petitioned this session
+        // Per-player rate limiting state (thread-safe for MUD mode)
+        private class PlayerPetitionState
+        {
+            public int LocationChangesSinceLastPetition;
+            public DateTime LastPetitionTime = DateTime.MinValue;
+            public int PetitionsThisSession;
+            public HashSet<string> PetitionedNPCs = new();
+        }
+        private readonly Dictionary<string, PlayerPetitionState> _playerStates = new();
+
+        private PlayerPetitionState GetPlayerState(string playerName)
+        {
+            if (!_playerStates.TryGetValue(playerName, out var state))
+            {
+                state = new PlayerPetitionState();
+                _playerStates[playerName] = state;
+            }
+            return state;
+        }
 
         // Shared cooldown with consequence encounters (v0.30.8)
         public static DateTime LastWorldEncounterTime { get; set; } = DateTime.MinValue;
@@ -46,16 +60,17 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task CheckForPetition(Character player, GameLocation location, TerminalEmulator terminal)
         {
-            _locationChangesSinceLastPetition++;
+            var state = GetPlayerState(player.Name2);
+            state.LocationChangesSinceLastPetition++;
 
-            // Rate limiting checks
-            if (_petitionsThisSession >= GameConfig.PetitionMaxPerSession)
+            // Rate limiting checks (per-player)
+            if (state.PetitionsThisSession >= GameConfig.PetitionMaxPerSession)
                 return;
 
-            if (_locationChangesSinceLastPetition < GameConfig.PetitionMinLocationChanges)
+            if (state.LocationChangesSinceLastPetition < GameConfig.PetitionMinLocationChanges)
                 return;
 
-            if ((DateTime.Now - _lastPetitionTime).TotalMinutes < GameConfig.PetitionMinRealMinutes)
+            if ((DateTime.Now - state.LastPetitionTime).TotalMinutes < GameConfig.PetitionMinRealMinutes)
                 return;
 
             // Shared cooldown with consequence encounters
@@ -77,10 +92,10 @@ namespace UsurperRemake.Systems
                 return;
 
             // Fire the petition
-            _locationChangesSinceLastPetition = 0;
-            _lastPetitionTime = DateTime.Now;
+            state.LocationChangesSinceLastPetition = 0;
+            state.LastPetitionTime = DateTime.Now;
             LastWorldEncounterTime = DateTime.Now;
-            _petitionsThisSession++;
+            state.PetitionsThisSession++;
 
             await ExecutePetition(petition.Value.type, petition.Value.npc, player, terminal);
         }
@@ -90,10 +105,13 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void ResetSession()
         {
-            _locationChangesSinceLastPetition = 0;
-            _lastPetitionTime = DateTime.MinValue;
-            _petitionsThisSession = 0;
-            _petitionedNPCs.Clear();
+            // Legacy: clear all player states (single-player mode)
+            _playerStates.Clear();
+        }
+
+        public void ResetSession(string playerName)
+        {
+            _playerStates.Remove(playerName);
         }
 
         #region Petition Selection
@@ -136,7 +154,7 @@ namespace UsurperRemake.Systems
         private bool IsEligiblePetitioner(NPC npc, Character player)
         {
             if (npc.IsDead) return false;
-            if (_petitionedNPCs.Contains(npc.Name2)) return false;
+            if (GetPlayerState(player.Name2).PetitionedNPCs.Contains(npc.Name2)) return false;
             if (npc.Memory == null) return false;
             // Must have some awareness of the player (not a total stranger)
             return true;
@@ -187,7 +205,7 @@ namespace UsurperRemake.Systems
 
                     if (spouseHasAffair || spouseHostile)
                     {
-                        _petitionedNPCs.Add(petitioner.Name2);
+                        GetPlayerState(player.Name2).PetitionedNPCs.Add(petitioner.Name2);
                         return (PetitionType.TroubledMarriage, petitioner);
                     }
                 }
@@ -223,7 +241,7 @@ namespace UsurperRemake.Systems
                     float reciprocation = crushTarget.Memory?.GetCharacterImpression(npc.Name2) ?? 0f;
                     if (reciprocation > 0.4f) continue;
 
-                    _petitionedNPCs.Add(npc.Name2);
+                    GetPlayerState(player.Name2).PetitionedNPCs.Add(npc.Name2);
                     return (PetitionType.MatchmakerRequest, npc);
                 }
             }
@@ -248,7 +266,7 @@ namespace UsurperRemake.Systems
                 // Check if NPC was recently married (has MarriedTimes > 0 but isn't married now = divorced)
                 if (npc.MarriedTimes <= 0) continue;
 
-                _petitionedNPCs.Add(npc.Name2);
+                GetPlayerState(player.Name2).PetitionedNPCs.Add(npc.Name2);
                 return (PetitionType.CustodyDispute, npc);
             }
 
@@ -286,7 +304,7 @@ namespace UsurperRemake.Systems
 
             if (factionNpc == null) return null;
 
-            _petitionedNPCs.Add(factionNpc.Name2);
+            GetPlayerState(player.Name2).PetitionedNPCs.Add(factionNpc.Name2);
             return (PetitionType.FactionMission, factionNpc);
         }
 
@@ -304,7 +322,7 @@ namespace UsurperRemake.Systems
             if (petitioners.Count == 0) return null;
 
             var petitioner = petitioners[_random.Next(petitioners.Count)];
-            _petitionedNPCs.Add(petitioner.Name2);
+            GetPlayerState(player.Name2).PetitionedNPCs.Add(petitioner.Name2);
             return (PetitionType.RoyalPetition, petitioner);
         }
 
@@ -323,7 +341,7 @@ namespace UsurperRemake.Systems
 
                 if (npc.Age < maxAge - 5) continue; // Must be within 5 years of max
 
-                _petitionedNPCs.Add(npc.Name2);
+                GetPlayerState(player.Name2).PetitionedNPCs.Add(npc.Name2);
                 return (PetitionType.DyingWish, npc);
             }
 
@@ -332,6 +350,9 @@ namespace UsurperRemake.Systems
 
         private (PetitionType, NPC)? TryMissingPerson(Character player, GameLocation location, List<NPC> npcs)
         {
+            // Get player's active quests to prevent duplicates
+            var activeQuests = QuestSystem.GetPlayerQuests(player.Name2);
+
             foreach (var npc in npcs)
             {
                 if (!IsEligiblePetitioner(npc, player)) continue;
@@ -346,7 +367,10 @@ namespace UsurperRemake.Systems
                     var spouse = NPCSpawnSystem.Instance?.GetNPCByName(spouseName, includeDead: true);
                     if (spouse != null && spouse.IsDead && !spouse.IsAgedDeath)
                     {
-                        _petitionedNPCs.Add(npc.Name2);
+                        // Skip if player already has an active quest for this missing NPC
+                        if (activeQuests.Any(q => q.TargetNPCName.Equals(spouseName, StringComparison.OrdinalIgnoreCase)))
+                            continue;
+                        GetPlayerState(player.Name2).PetitionedNPCs.Add(npc.Name2);
                         return (PetitionType.MissingPerson, npc);
                     }
                 }
@@ -361,7 +385,10 @@ namespace UsurperRemake.Systems
                         var friend = NPCSpawnSystem.Instance?.GetNPCByName(kvp.Key, includeDead: true);
                         if (friend != null && friend.IsDead && !friend.IsAgedDeath)
                         {
-                            _petitionedNPCs.Add(npc.Name2);
+                            // Skip if player already has an active quest for this missing NPC
+                            if (activeQuests.Any(q => q.TargetNPCName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase)))
+                                continue;
+                            GetPlayerState(player.Name2).PetitionedNPCs.Add(npc.Name2);
                             return (PetitionType.MissingPerson, npc);
                         }
                     }
@@ -402,7 +429,7 @@ namespace UsurperRemake.Systems
             if (!hasThreat) return null;
 
             var warner = friendlyNpcs[_random.Next(friendlyNpcs.Count)];
-            _petitionedNPCs.Add(warner.Name2);
+            GetPlayerState(player.Name2).PetitionedNPCs.Add(warner.Name2);
             return (PetitionType.RivalryReport, warner);
         }
 
@@ -1844,12 +1871,20 @@ namespace UsurperRemake.Systems
                         };
 
                         investigateQuest.Objectives.Add(new QuestObjective(
+                            QuestObjectiveType.TalkToNPC,
+                            $"Find {missingName} or learn their fate",
+                            1,
+                            missingName,
+                            missingName
+                        ));
+
+                        investigateQuest.Objectives.Add(new QuestObjective(
                             QuestObjectiveType.ReachDungeonFloor,
                             $"Search dungeon floor {investigateFloor} where {missingName} was last seen",
                             investigateFloor,
                             "",
                             $"Floor {investigateFloor}"
-                        ));
+                        ) { IsOptional = true });
 
                         investigateQuest.Objectives.Add(new QuestObjective(
                             QuestObjectiveType.KillMonsters,
@@ -1857,7 +1892,7 @@ namespace UsurperRemake.Systems
                             monstersToKill,
                             "",
                             "Monsters"
-                        ));
+                        ) { IsOptional = true });
 
                         QuestSystem.AddQuestToDatabase(investigateQuest);
                         if (player is Player p)
@@ -1868,8 +1903,8 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("bright_green");
                         terminal.WriteLine($"\n  New Quest: {investigateQuest.Title}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  — Reach dungeon floor {investigateFloor}");
-                        terminal.WriteLine($"  — Slay {monstersToKill} monsters to find clues");
+                        terminal.WriteLine($"  — Find {missingName} (talk to them if alive)");
+                        terminal.WriteLine($"  — OR search dungeon floor {investigateFloor} and slay {monstersToKill} monsters");
 
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {

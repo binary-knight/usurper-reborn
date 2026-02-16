@@ -211,8 +211,14 @@ public partial class Quest
     public bool AreAllObjectivesComplete()
     {
         if (Objectives == null || Objectives.Count == 0) return true;
-        // Only require non-optional objectives to be complete
-        return Objectives.Where(o => !o.IsOptional).All(o => o.IsComplete);
+        // Primary check: all required (non-optional) objectives are complete
+        if (Objectives.Where(o => !o.IsOptional).All(o => o.IsComplete))
+            return true;
+        // Alternative: for RescueNPC quests, completing ALL optional objectives
+        // also satisfies the quest (the NPC may be dead and untalkable)
+        if (QuestTarget == QuestTarget.RescueNPC && Objectives.Any(o => o.IsOptional))
+            return Objectives.Where(o => o.IsOptional).All(o => o.IsComplete);
+        return false;
     }
 
     /// <summary>
