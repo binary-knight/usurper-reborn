@@ -167,6 +167,10 @@ public partial class TempleLocation : BaseLocation
                         await ShowFaithRecruitment();
                         break;
 
+                    case "N": // Inner Sanctum (Faith only)
+                        await VisitInnerSanctum();
+                        break;
+
                     case GameConfig.TempleMenuReturn: // "R"
                         exitLocation = true;
                         break;
@@ -447,6 +451,30 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.SetColor("bright_green");
             terminal.WriteLine(" You are a member of The Faith.");
+        }
+
+        // Inner Sanctum (Faith only)
+        if (FactionSystem.Instance?.HasTempleAccess() == true)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("N");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("cyan");
+            terminal.Write(" Inner Sanctum");
+            int today = DailySystemManager.Instance?.CurrentDay ?? 0;
+            if (currentPlayer.InnerSanctumLastDay >= today)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  (meditated today)");
+            }
+            else
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  ({GameConfig.InnerSanctumCost}g)");
+            }
         }
 
         terminal.SetColor("darkgray");
@@ -2438,6 +2466,99 @@ public partial class TempleLocation : BaseLocation
 
         // Log to debug
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("FACTION", $"{currentPlayer.Name2} joined The Faith");
+    }
+
+    #endregion
+
+    #region Inner Sanctum
+
+    private async Task VisitInnerSanctum()
+    {
+        if (FactionSystem.Instance?.HasTempleAccess() != true)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  The Inner Sanctum is sealed to outsiders.");
+            terminal.WriteLine("  Only members of The Faith may enter.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        int today = DailySystemManager.Instance?.CurrentDay ?? 0;
+        if (currentPlayer.InnerSanctumLastDay >= today)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\n  You have already meditated today.");
+            terminal.WriteLine("  The sanctum will be ready again tomorrow.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                      THE INNER SANCTUM                            ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("  A chamber of perfect stillness. Incense hangs in the air.");
+        terminal.WriteLine("  Ancient runes pulse faintly along the walls.");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"\n  Deep meditation costs {GameConfig.InnerSanctumCost} gold.");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("  The sanctum grants a permanent +1 to a random attribute.");
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  Gold: {currentPlayer.Gold:N0}");
+        terminal.WriteLine("");
+
+        var input = await terminal.GetInput("  Enter the sanctum? (Y/N): ");
+        if (input.Trim().ToUpper() != "Y")
+            return;
+
+        if (currentPlayer.Gold < GameConfig.InnerSanctumCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  You cant afford the offering.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        currentPlayer.Gold -= GameConfig.InnerSanctumCost;
+        currentPlayer.Statistics?.RecordGoldSpent(GameConfig.InnerSanctumCost);
+        currentPlayer.InnerSanctumLastDay = today;
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("\n  You kneel on the cold stone and close your eyes...");
+        await Task.Delay(2000);
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("  Warmth floods through you. Something shifts within.");
+        await Task.Delay(1500);
+
+        // Grant +1 to a random stat
+        var rng = new Random();
+        string statName;
+        switch (rng.Next(9))
+        {
+            case 0: currentPlayer.Strength += 1; statName = "Strength"; break;
+            case 1: currentPlayer.Defence += 1; statName = "Defence"; break;
+            case 2: currentPlayer.Stamina += 1; statName = "Stamina"; break;
+            case 3: currentPlayer.Agility += 1; statName = "Agility"; break;
+            case 4: currentPlayer.Charisma += 1; statName = "Charisma"; break;
+            case 5: currentPlayer.Dexterity += 1; statName = "Dexterity"; break;
+            case 6: currentPlayer.Wisdom += 1; statName = "Wisdom"; break;
+            case 7: currentPlayer.Intelligence += 1; statName = "Intelligence"; break;
+            case 8: currentPlayer.Constitution += 1; statName = "Constitution"; break;
+            default: currentPlayer.Strength += 1; statName = "Strength"; break;
+        }
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"\n  +1 {statName}!");
+        terminal.SetColor("gray");
+        terminal.WriteLine("  The sanctum's power has left its mark on you.");
+        terminal.WriteLine("");
+
+        await terminal.PressAnyKey();
     }
 
     #endregion

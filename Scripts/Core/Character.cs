@@ -365,6 +365,12 @@ public class Character
     public int PermanentDefenseBonus { get; set; } = 0;
     public long BonusMaxHP { get; set; } = 0;
 
+    // Faction consumable properties (v0.40.2)
+    public int PoisonCoatingCombats { get; set; } = 0;  // Combats remaining with poison coating (+20% dmg)
+    public int SmokeBombs { get; set; } = 0;             // Guaranteed escape items (max 3)
+    public int InnerSanctumLastDay { get; set; } = 0;    // Last day Inner Sanctum was used
+    public bool DivineFavorTriggeredThisCombat { get; set; } = false; // Transient: reset each combat
+
     // Weapon configuration detection
     public bool IsDualWielding =>
         EquippedItems.TryGetValue(EquipmentSlot.MainHand, out var mainId) && mainId > 0 &&

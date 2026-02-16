@@ -30,15 +30,15 @@ public static class NPCDialogueGenerator
             "My love, you've returned to me!",
             "Darling! I've missed you so much.",
             "There you are, my heart.",
-            "Every moment apart feels like eternity, my love.",
+            "Dont you ever scare me like that again.",
             "Welcome home, beloved."
         },
         // Love (20) - Deeply affectionate
         [GameConfig.RelationLove] = new[]
         {
-            "My heart soars seeing you!",
+            "There you are! I was worried.",
             "I've been thinking of you...",
-            "Your presence brightens my day!",
+            "Good timing. I needed to see a friendly face.",
             "I was hoping you'd come by.",
             "It's you! I'm so happy!"
         },
@@ -48,7 +48,7 @@ public static class NPCDialogueGenerator
             "There's no one I'd rather see right now.",
             "I was just thinking about you...",
             "You always know when to appear.",
-            "My day just got significantly better.",
+            "Hey! Was hoping youd show up.",
             "Finally, a familiar face I actually want to see!"
         },
         // Friendship (40) - Close friends
@@ -155,14 +155,14 @@ public static class NPCDialogueGenerator
         ["assassin"] = new ArchetypeVocabulary
         {
             Titles = new[] { "stranger", "traveler" },
-            Phrases = new[] { "Silence is golden.", "Some questions are better left unasked.", "Death comes for us all.", "Walk carefully.", "Shadows have ears." },
+            Phrases = new[] { "Keep quiet.", "Dont ask questions you dont want answers to.", "Everybody dies eventually.", "Watch your step.", "Walls have ears." },
             Topics = new[] { "contracts", "targets", "the guild", "poisons" },
             StyleModifiers = new[] { "ominous", "measured", "cold" }
         },
         ["priest"] = new ArchetypeVocabulary
         {
             Titles = new[] { "Child", "Pilgrim", "Seeker", "Blessed one" },
-            Phrases = new[] { "Blessings upon you.", "May the gods guide you.", "The faithful are welcome here.", "Peace be with you.", "The divine light shines upon you." },
+            Phrases = new[] { "Blessings.", "May the gods watch over you.", "Welcome, friend.", "Peace be with you.", "The gods smile on you today." },
             Topics = new[] { "faith", "blessings", "the gods", "spiritual matters", "healing" },
             StyleModifiers = new[] { "serene", "pious", "compassionate" }
         },
@@ -183,14 +183,14 @@ public static class NPCDialogueGenerator
         ["citizen"] = new ArchetypeVocabulary
         {
             Titles = new[] { "Friend", "Stranger", "Traveler" },
-            Phrases = new[] { "Hard times these days.", "Have you heard about...?", "Just trying to get by.", "Nice weather, isn't it?", "The world keeps turning." },
+            Phrases = new[] { "Hard times.", "You hear about...?", "Just getting by, you know.", "Nice weather, huh?", "Same old, same old." },
             Topics = new[] { "weather", "gossip", "daily life", "local news" },
             StyleModifiers = new[] { "humble", "friendly", "simple" }
         },
         ["mystic"] = new ArchetypeVocabulary
         {
             Titles = new[] { "Seeker", "Mortal", "Curious one" },
-            Phrases = new[] { "The stars speak...", "I sense a disturbance.", "The arcane flows through all.", "Curious energies surround you.", "Fate has brought you here." },
+            Phrases = new[] { "The stars say things...", "Something feels off.", "Magic everywhere today.", "Youve got a strange aura.", "You were meant to come here." },
             Topics = new[] { "magic", "prophecy", "the cosmos", "mystical forces" },
             StyleModifiers = new[] { "enigmatic", "mystical", "otherworldly" }
         }
@@ -287,13 +287,13 @@ public static class NPCDialogueGenerator
             "Your reputation precedes you.",
             "I've heard tales of your exploits.",
             "A legendary {player_class}, if I'm not mistaken?",
-            "Your presence commands respect."
+            "You've made quite a name for yourself."
         },
         ["low_level"] = new[]
         {
             "New to these parts?",
             "Be careful out there, youngster.",
-            "The world can be dangerous for the inexperienced.",
+            "Careful out there. It's rough for necomers.",
             "Just starting your journey, I see."
         },
         ["rich"] = new[]
@@ -301,14 +301,14 @@ public static class NPCDialogueGenerator
             "Business must be good!",
             "Coin weighing you down, I see.",
             "You look prosperous today.",
-            "The glint of gold follows you."
+            "Heavy purse you got there."
         },
         ["poor"] = new[]
         {
             "Times are tough for all of us.",
             "Not much coin in your purse, eh?",
             "I'd offer gold if I had any to spare.",
-            "The economy's been hard on everyone."
+            "Nobody has coin these days."
         },
         ["is_king"] = new[]
         {
@@ -336,7 +336,7 @@ public static class NPCDialogueGenerator
             "That's quite the weapon you carry.",
             "Fine blade! Where'd you get it?",
             "I wouldn't want to be on the wrong end of that.",
-            "An impressive armament you have there."
+            "That's a nasty looking weapon."
         },
         ["morning"] = new[]
         {
@@ -347,13 +347,13 @@ public static class NPCDialogueGenerator
         ["evening"] = new[]
         {
             "Out late, aren't you?",
-            "The night beckons to you as well?",
+            "Out for a walk this late?",
             "Careful after dark."
         },
         ["night"] = new[]
         {
             "Dangerous to be wandering at this hour.",
-            "The shadows are treacherous at night.",
+            "Watch yourself. Bad things happen at night.",
             "Most sensible folk are asleep by now."
         }
     };
@@ -390,7 +390,7 @@ public static class NPCDialogueGenerator
         },
         ["high_intelligence"] = new[]
         {
-            ("Interestingly, ", ""), ("If I may observe, ", ""), ("From my perspective, ", "")
+            ("Think about it. ", ""), ("Heres the thing. ", ""), ("Way I see it, ", "")
         },
         ["high_greed"] = new[]
         {
@@ -398,7 +398,7 @@ public static class NPCDialogueGenerator
         },
         ["high_romanticism"] = new[]
         {
-            ("Ah, ", ""), ("", ", my dear."), ("", " Your presence is enchanting.")
+            ("Ah, ", ""), ("", ", my dear."), ("", " Good to see you, gorgeous.")
         },
         ["high_humor"] = new[]
         {
@@ -406,11 +406,11 @@ public static class NPCDialogueGenerator
         },
         ["high_loyalty"] = new[]
         {
-            ("", " You can count on me."), ("As always, ", ""), ("", " My word is my bond.")
+            ("", " You can count on me."), ("As always, ", ""), ("", " I dont go back on my word.")
         },
         ["high_bravery"] = new[]
         {
-            ("Fearlessly speaking, ", ""), ("", " Nothing scares me."), ("", " Let them come, I say!")
+            ("", " Im not afraid of anything."), ("", " Let em come."), ("Bring it on. ", "")
         },
         ["high_deceitfulness"] = new[]
         {
@@ -521,7 +521,7 @@ public static class NPCDialogueGenerator
     /// </summary>
     public static string GenerateSmallTalk(NPC npc, Player player)
     {
-        if (npc == null) return "Interesting times we live in.";
+        if (npc == null) return "Huh. Weird day.";
 
         // Try pre-generated dialogue database first
         var dbLine = NPCDialogueDatabase.GetBestLine("smalltalk", npc, player);
@@ -554,7 +554,7 @@ public static class NPCDialogueGenerator
     /// </summary>
     public static string GenerateReaction(NPC npc, Player player, string eventType)
     {
-        if (npc?.Personality == null) return "Interesting.";
+        if (npc?.Personality == null) return "Hm.";
 
         // Try pre-generated dialogue database first
         var dbLine = NPCDialogueDatabase.GetBestLine("reaction", npc, player, eventType);
@@ -570,7 +570,7 @@ public static class NPCDialogueGenerator
             "insult" => GenerateInsultReaction(npc.Personality),
             "compliment" => GenerateComplimentReaction(npc.Personality),
             "threat" => GenerateThreatReaction(npc.Personality),
-            _ => "Hmm, interesting."
+            _ => "Huh. Alright then."
         };
     }
 
@@ -621,13 +621,13 @@ public static class NPCDialogueGenerator
                 "Hurry back to me, my love.",
                 "Be safe, darling.",
                 "I'll be waiting for you.",
-                "Until we meet again, beloved."
+                "Come back safe. Please."
             }[_random.Next(4)],
             <= GameConfig.RelationLove => new[] {
                 "I'll miss you!",
                 "Come back soon!",
                 "Take care of yourself!",
-                "My heart goes with you."
+                "Ill be thinking about you."
             }[_random.Next(4)],
             <= GameConfig.RelationFriendship => new[] {
                 "See you around, friend!",
@@ -856,11 +856,11 @@ public static class NPCDialogueGenerator
     {
         var templates = new[]
         {
-            $"Have you heard anything about {topic} lately?",
-            $"I've been thinking about {topic} a lot.",
-            $"What's your take on {topic}?",
-            $"They say {topic} is important these days.",
-            $"Interesting developments regarding {topic}, wouldn't you say?"
+            $"Heard anything about {topic}?",
+            $"Been thinking about {topic} lately.",
+            $"What do you make of {topic}?",
+            $"Everyone keeps talking about {topic}.",
+            $"Whats the deal with {topic} these days?"
         };
 
         return templates[_random.Next(templates.Length)];
@@ -883,13 +883,13 @@ public static class NPCDialogueGenerator
             return "Get up and fight! Don't let them win!";
         if (personality.Sociability > 0.7f)
             return "Oh no! Are you alright? That was terrible!";
-        return "A defeat. It happens to the best of us.";
+        return "Tough break. Happens to everyone.";
     }
 
     private static string GenerateGiftReaction(PersonalityProfile personality, int relationship)
     {
         if (relationship <= GameConfig.RelationLove)
-            return "*blushes deeply* You... you remembered me. Thank you, my love.";
+            return "*takes it carefully* You didn't have to... thank you.";
         if (relationship <= GameConfig.RelationFriendship)
             return "For me? You're too kind! Thank you, friend!";
         if (personality.Greed > 0.7f)
@@ -935,12 +935,12 @@ public static class NPCDialogueGenerator
         if (personality.Aggression > 0.7f)
             return "*growls* Running away? We should have fought to the end!";
         if (personality.Courage > 0.7f)
-            return "A tactical retreat. Sometimes discretion is the better part of valor.";
+            return "Smart move. Live to fight another day.";
         if (personality.Loyalty > 0.7f)
             return "I'm with you, whatever you decide. Let's get out of here!";
         if (personality.Courage < 0.3f)
             return "*relieved* Thank goodness we're getting away from that!";
-        return "Probably wise. We can always come back stronger.";
+        return "Yeah, lets get out of here.";
     }
 
     private static string GenerateAllyDeathReaction(PersonalityProfile personality)

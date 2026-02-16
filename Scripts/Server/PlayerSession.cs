@@ -210,6 +210,23 @@ public class PlayerSession : IDisposable
             {
                 Console.Error.WriteLine($"[MUD] [{Username}] Emergency save failed: {ex.Message}");
             }
+            // Register as dormitory sleeper if not already sleeping
+            // This catches disconnects, crashes, and players who just close the terminal
+            try
+            {
+                var sleepInfo = await _sqlBackend.GetSleepingPlayerInfo(Username);
+                if (sleepInfo == null)
+                {
+                    // Player wasn't registered as sleeping — force dormitory
+                    await _sqlBackend.RegisterSleepingPlayer(Username, "dormitory", "[]", 0);
+                    Console.Error.WriteLine($"[MUD] [{Username}] Registered as dormitory sleeper (unclean disconnect)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MUD] [{Username}] Failed to register dormitory sleep: {ex.Message}");
+            }
+
             // Notify WizNet of logout
             try
             {

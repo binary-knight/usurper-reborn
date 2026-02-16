@@ -496,7 +496,7 @@ public class StreetEncounterSystem
         }
 
         terminal.SetColor("cyan");
-        terminal.WriteLine($"  {challenger.Name} approaches you with a confident stride.");
+        terminal.WriteLine($"  {challenger.Name} walks up to you, looking for a fight.");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  \"{GetChallengePhrase(challenger, player)}\"");
         terminal.WriteLine("");
@@ -838,7 +838,7 @@ public class StreetEncounterSystem
         terminal.SetColor("magenta");
         terminal.WriteLine($"  A {admirer} catches your eye and approaches...");
         terminal.SetColor("yellow");
-        terminal.WriteLine("  \"I've heard tales of your adventures. Join me for a drink?\"");
+        terminal.WriteLine("  \"Hey. Buy me a drink?\"");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -1086,12 +1086,26 @@ public class StreetEncounterSystem
         terminal.WriteLine("  A patrol of town guards approaches...");
 
         bool wanted = player.Darkness > 100;
+
+        // Crown faction members get a pass from the guards
+        if (wanted && (FactionSystem.Instance?.HasGuardFavor() ?? false))
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  The patrol leader squints at you, then notices your Crown insignia.");
+            terminal.WriteLine("  \"...Move along. Crown business.\"");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  The guards step aside without another word.");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
         if (wanted)
         {
             terminal.SetColor("red");
             terminal.WriteLine("  \"Halt! We've been looking for you!\"");
             terminal.SetColor("magenta");
-            terminal.WriteLine($"  (Your dark reputation precedes you — Darkness: {player.Darkness})");
+            terminal.WriteLine($"  (Theyre looking for you — Darkness: {player.Darkness})");
             terminal.WriteLine("");
 
             terminal.SetColor("white");
@@ -1606,7 +1620,7 @@ public class StreetEncounterSystem
             "Say your prayers!",
             "You picked the wrong street!",
             "I've been waiting for someone like you!",
-            "Your journey ends here!"
+            "End of the line for you!"
         };
         return phrases[_random.Next(phrases.Length)];
     }
@@ -1615,11 +1629,11 @@ public class StreetEncounterSystem
     {
         string[] phrases = {
             $"I challenge you, {player.Name2}! Let us see who is stronger!",
-            "Your reputation precedes you. Face me in honorable combat!",
-            "I've heard tales of your prowess. Prove them true!",
-            "Think you're tough? Let's find out!",
-            "My blade thirsts for a worthy opponent. Are you one?",
-            "The arena awaits! Unless you're too cowardly..."
+            "Ive heard about you. Fight me!",
+            "They say youre tough. Lets see about that!",
+            "Think youre tough? Lets find out!",
+            "My sword needs blood. Youll do.",
+            "Come on then. Unless youre scared."
         };
         return phrases[_random.Next(phrases.Length)];
     }
@@ -1798,8 +1812,9 @@ public class StreetEncounterSystem
         var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
         if (npcs == null || npcs.Count == 0) return result;
 
-        // Priority order: grudge, jealous spouse, throne challenge, city contest
-        if (_random.NextDouble() < GameConfig.GrudgeConfrontationChance)
+        // Priority order: grudge (murder=guaranteed), jealous spouse, throne challenge, city contest
+        bool hasMurderGrudge = HasMurderGrudge(player, npcs);
+        if (hasMurderGrudge || _random.NextDouble() < GameConfig.GrudgeConfrontationChance)
         {
             var grudgeNpc = FindGrudgeNPC(player, npcs);
             if (grudgeNpc != null)
@@ -1864,12 +1879,45 @@ public class StreetEncounterSystem
 
     private NPC? FindGrudgeNPC(Character player, List<NPC> npcs)
     {
+        // Prioritize murder grudges — the victim who respawned and wants revenge
+        var murderGrudge = npcs.FirstOrDefault(npc =>
+            !npc.IsDead && npc.IsAlive &&
+            npc.Memory != null &&
+            npc.Memory.HasMemoryOfEvent(MemoryType.Murdered, player.Name2, hoursAgo: 720) && // 30 days
+            Math.Abs(npc.Level - player.Level) <= 15); // Wider level range for murder revenge
+
+        if (murderGrudge != null) return murderGrudge;
+
+        // Then check witness revenge — NPCs who saw the player murder someone
+        var witnessGrudge = npcs.FirstOrDefault(npc =>
+            !npc.IsDead && npc.IsAlive &&
+            npc.Memory != null &&
+            npc.Memory.GetCharacterImpression(player.Name2) <= -0.5f &&
+            npc.Memory.HasMemoryOfEvent(MemoryType.SawDeath, player.Name2, hoursAgo: 336) && // 14 days
+            Math.Abs(npc.Level - player.Level) <= 10);
+
+        if (witnessGrudge != null) return witnessGrudge;
+
+        // Standard grudge — defeated in combat
         return npcs.FirstOrDefault(npc =>
             !npc.IsDead && npc.IsAlive &&
             npc.Memory != null &&
             npc.Memory.GetCharacterImpression(player.Name2) <= -0.5f &&
             npc.Memory.HasMemoryOfEvent(MemoryType.Defeated, player.Name2, hoursAgo: 168) && // 7 days
             Math.Abs(npc.Level - player.Level) <= 10);
+    }
+
+    /// <summary>
+    /// Check if an NPC has a murder grudge (for 100% encounter chance bypass)
+    /// </summary>
+    private bool HasMurderGrudge(Character player, List<NPC> npcs)
+    {
+        return npcs.Any(npc =>
+            !npc.IsDead && npc.IsAlive &&
+            npc.Memory != null &&
+            (npc.Memory.HasMemoryOfEvent(MemoryType.Murdered, player.Name2, hoursAgo: 720) ||
+             npc.Memory.HasMemoryOfEvent(MemoryType.SawDeath, player.Name2, hoursAgo: 336)) &&
+            Math.Abs(npc.Level - player.Level) <= 15);
     }
 
     private NPC? FindJealousSpouse(Character player, List<NPC> npcs)
@@ -1928,139 +1976,337 @@ public class StreetEncounterSystem
         result.EncounterOccurred = true;
         result.Type = EncounterType.GrudgeConfrontation;
 
-        terminal.ClearScreen();
-        UIHelper.DrawBoxTop(terminal, "GRUDGE CONFRONTATION!", "bright_red");
-        UIHelper.DrawBoxEmpty(terminal, "bright_red");
-        UIHelper.DrawBoxLine(terminal, $"  {grudgeNpc.Name2} steps into your path, eyes burning with rage.", "bright_red", "white");
-        UIHelper.DrawBoxEmpty(terminal, "bright_red");
-        UIHelper.DrawBoxLine(terminal, $"  \"You thought I'd forget what you did to me? Think again.\"", "bright_red", "bright_cyan");
-        UIHelper.DrawBoxEmpty(terminal, "bright_red");
-        UIHelper.DrawBoxLine(terminal, $"  Level {grudgeNpc.Level} {grudgeNpc.Class} — HP: {grudgeNpc.HP}/{grudgeNpc.MaxHP}", "bright_red", "yellow");
-        UIHelper.DrawBoxEmpty(terminal, "bright_red");
-        UIHelper.DrawBoxSeparator(terminal, "bright_red");
-        UIHelper.DrawMenuOption(terminal, "F", "Fight", "bright_red", "bright_yellow", "white");
-        UIHelper.DrawMenuOption(terminal, "A", "Apologize", "bright_red", "bright_yellow", "white");
-        long bribeCost = grudgeNpc.Level * 30;
-        UIHelper.DrawMenuOption(terminal, "B", $"Bribe ({bribeCost}g)", "bright_red", "bright_yellow", "yellow");
-        UIHelper.DrawMenuOption(terminal, "R", "Run", "bright_red", "bright_yellow", "gray");
-        UIHelper.DrawBoxBottom(terminal, "bright_red");
+        // Determine grudge type for different dialogue and mechanics
+        bool isMurderRevenge = grudgeNpc.Memory?.HasMemoryOfEvent(MemoryType.Murdered, player.Name2, hoursAgo: 720) == true;
+        bool isWitnessRevenge = !isMurderRevenge &&
+            grudgeNpc.Memory?.HasMemoryOfEvent(MemoryType.SawDeath, player.Name2, hoursAgo: 336) == true;
 
-        var choice = await terminal.GetInput("\n  Your response? ");
-
-        switch (choice.ToUpper())
+        // Find victim name for witness dialogue
+        string victimName = "";
+        if (isWitnessRevenge)
         {
-            case "F": // Fight
-                await FightNPC(player, grudgeNpc, result, terminal);
-                if (result.Victory)
-                {
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine($"\n  {grudgeNpc.Name2} falls. The grudge is settled.");
-                    // Clear the grudge memory
-                    grudgeNpc.Memory?.RecordEvent(new MemoryEvent
-                    {
-                        Type = MemoryType.Defeated,
-                        Description = $"Defeated again by {player.Name2} — grudge settled",
-                        InvolvedCharacter = player.Name2,
-                        Importance = 0.5f,
-                        EmotionalImpact = -0.3f
-                    });
-                    NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2} in a grudge match!");
-                }
-                else
-                {
-                    long goldTaken = player.Gold / 10;
-                    player.Gold -= goldTaken;
-                    terminal.SetColor("red");
-                    terminal.WriteLine($"\n  {grudgeNpc.Name2} takes {goldTaken} gold and walks away satisfied.");
-                    result.GoldLost = goldTaken;
-                    NewsSystem.Instance?.Newsy($"{grudgeNpc.Name2} got revenge on {player.Name2}!");
-                }
-                break;
+            var witnessMemory = grudgeNpc.Memory?.GetMemoriesOfType(MemoryType.SawDeath)
+                .FirstOrDefault(m => m.InvolvedCharacter == player.Name2);
+            if (witnessMemory != null && witnessMemory.Description.Contains("murder "))
+            {
+                // Extract victim name from "Witnessed {player} murder {victim}"
+                var parts = witnessMemory.Description.Split("murder ");
+                if (parts.Length > 1) victimName = parts[1].Trim();
+            }
+        }
 
-            case "A": // Apologize
-                int apologyChance = Math.Min(75, 30 + (int)(player.Charisma * 2));
-                if (_random.Next(100) < apologyChance)
-                {
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine($"\n  {grudgeNpc.Name2} hesitates... then lowers their fists.");
-                    terminal.SetColor("white");
-                    terminal.WriteLine($"  \"Fine. But don't cross me again.\"");
+        terminal.ClearScreen();
 
-                    // Partially clear grudge
-                    grudgeNpc.Memory?.RecordEvent(new MemoryEvent
-                    {
-                        Type = MemoryType.SocialInteraction,
-                        Description = $"{player.Name2} apologized sincerely",
-                        InvolvedCharacter = player.Name2,
-                        Importance = 0.6f,
-                        EmotionalImpact = 0.3f
-                    });
-                    player.Darkness = Math.Max(0, player.Darkness - 5);
-                }
-                else
-                {
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine($"\n  \"SORRY doesn't cut it!\"");
-                    terminal.SetColor("white");
-                    terminal.WriteLine($"  {grudgeNpc.Name2} attacks with fury! (+15% STR)");
-                    grudgeNpc.Strength = (long)(grudgeNpc.Strength * 1.15);
-                    await FightNPC(player, grudgeNpc, result, terminal);
-                }
-                break;
+        // Crown guard intervention — guards may rush to help Crown faction members
+        float interventionChance = FactionSystem.Instance?.GetGuardInterventionChance() ?? 0f;
+        if (interventionChance > 0 && _random.NextDouble() < interventionChance)
+        {
+            long guardDmg = grudgeNpc.MaxHP / 4;
+            grudgeNpc.HP = Math.Max(1, grudgeNpc.HP - guardDmg);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("  A royal guard rushes to your aid!");
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  The guard strikes {grudgeNpc.Name2} for {guardDmg} damage before being pushed back.");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {grudgeNpc.Name2} is wounded but still standing. ({grudgeNpc.HP}/{grudgeNpc.MaxHP} HP)");
+            terminal.WriteLine("");
+        }
 
-            case "B": // Bribe
-                if (player.Gold >= bribeCost)
-                {
-                    int bribeChance = Math.Min(80, 60 + (int)(player.Charisma * 2));
-                    if (_random.Next(100) < bribeChance)
-                    {
-                        player.Gold -= bribeCost;
-                        terminal.SetColor("yellow");
-                        terminal.WriteLine($"\n  {grudgeNpc.Name2} pockets the {bribeCost} gold.");
-                        terminal.SetColor("white");
-                        terminal.WriteLine($"  \"We're even. For now.\"");
-                        result.GoldLost = bribeCost;
+        if (isMurderRevenge)
+        {
+            // === MURDER REVENGE — Rage buff, no bribe/apologize ===
+            // Apply rage buff
+            grudgeNpc.Strength = (long)(grudgeNpc.Strength * (1.0f + GameConfig.MurderGrudgeRageBonusSTR));
+            grudgeNpc.HP = (long)Math.Min(grudgeNpc.MaxHP * (1.0f + GameConfig.MurderGrudgeRageBonusHP), grudgeNpc.MaxHP * 1.5f);
 
-                        grudgeNpc.Memory?.RecordEvent(new MemoryEvent
-                        {
-                            Type = MemoryType.GainedGold,
-                            Description = $"{player.Name2} paid off their debt",
-                            InvolvedCharacter = player.Name2,
-                            Importance = 0.5f,
-                            EmotionalImpact = 0.2f
-                        });
-                    }
-                    else
-                    {
-                        player.Gold -= bribeCost;
-                        terminal.SetColor("bright_red");
-                        terminal.WriteLine($"\n  {grudgeNpc.Name2} takes the gold AND attacks!");
-                        result.GoldLost = bribeCost;
-                        await FightNPC(player, grudgeNpc, result, terminal);
-                    }
-                }
-                else
-                {
-                    terminal.SetColor("red");
-                    terminal.WriteLine($"\n  You don't have enough gold! {grudgeNpc.Name2} attacks!");
-                    await FightNPC(player, grudgeNpc, result, terminal);
-                }
-                break;
+            UIHelper.DrawBoxTop(terminal, "MURDER REVENGE!", "dark_red");
+            UIHelper.DrawBoxEmpty(terminal, "dark_red");
+            UIHelper.DrawBoxLine(terminal, $"  {grudgeNpc.Name2} emerges from the shadows, burning with fury.", "dark_red", "white");
+            UIHelper.DrawBoxEmpty(terminal, "dark_red");
+            UIHelper.DrawBoxLine(terminal, $"  \"You thought you could murder me and get away with it?!\"", "dark_red", "bright_red");
+            UIHelper.DrawBoxLine(terminal, $"  \"I crawled back from death for THIS moment!\"", "dark_red", "bright_red");
+            UIHelper.DrawBoxEmpty(terminal, "dark_red");
+            UIHelper.DrawBoxLine(terminal, $"  Level {grudgeNpc.Level} {grudgeNpc.Class} — HP: {grudgeNpc.HP}/{grudgeNpc.MaxHP} (ENRAGED)", "dark_red", "bright_yellow");
+            UIHelper.DrawBoxEmpty(terminal, "dark_red");
+            UIHelper.DrawBoxSeparator(terminal, "dark_red");
+            UIHelper.DrawMenuOption(terminal, "F", "Fight", "dark_red", "bright_yellow", "white");
+            UIHelper.DrawMenuOption(terminal, "R", "Run", "dark_red", "bright_yellow", "gray");
+            UIHelper.DrawBoxBottom(terminal, "dark_red");
 
-            default: // Run
-                int fleeChance = Math.Min(75, 30 + (int)(player.Dexterity * 2));
+            var choice = await terminal.GetInput("\n  Your response? ");
+
+            if (choice.Trim().ToUpper() == "R")
+            {
+                int fleeChance = Math.Min(50, 20 + (int)(player.Dexterity * 1.5)); // Harder to flee murder revenge
                 if (_random.Next(100) < fleeChance)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"\n  You slip away before {grudgeNpc.Name2} can react!");
+                    terminal.WriteLine($"\n  You barely escape {grudgeNpc.Name2}'s wrath!");
                 }
                 else
                 {
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine($"\n  {grudgeNpc.Name2} catches you! They get the first strike!");
+                    terminal.WriteLine($"\n  {grudgeNpc.Name2} cuts off your escape! \"You're not getting away this time!\"");
                     await FightNPC(player, grudgeNpc, result, terminal);
                 }
-                break;
+            }
+            else
+            {
+                // Fight (default for any input)
+                await FightNPC(player, grudgeNpc, result, terminal);
+            }
+
+            if (result.Victory)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"\n  {grudgeNpc.Name2} goes down again. So much for revenge.");
+                grudgeNpc.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.Defeated,
+                    Description = $"Defeated again by {player.Name2} — murder revenge failed",
+                    InvolvedCharacter = player.Name2,
+                    Importance = 0.6f,
+                    EmotionalImpact = -0.5f
+                });
+                NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2}'s murder revenge attempt!");
+            }
+            else
+            {
+                long goldTaken = player.Gold / 5; // Take 20% for murder revenge (more severe)
+                player.Gold -= goldTaken;
+                terminal.SetColor("dark_red");
+                terminal.WriteLine($"\n  {grudgeNpc.Name2} stands over you, satisfied.");
+                terminal.SetColor("red");
+                terminal.WriteLine($"  \"Now we're even. But I won't forget.\"");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  They take {goldTaken:N0} gold.");
+                result.GoldLost = goldTaken;
+                NewsSystem.Instance?.Newsy($"{grudgeNpc.Name2} got bloody revenge on {player.Name2}!");
+            }
+        }
+        else if (isWitnessRevenge)
+        {
+            // === WITNESS REVENGE — Saw the player murder someone ===
+            UIHelper.DrawBoxTop(terminal, "WITNESS CONFRONTATION!", "bright_red");
+            UIHelper.DrawBoxEmpty(terminal, "bright_red");
+            UIHelper.DrawBoxLine(terminal, $"  {grudgeNpc.Name2} steps in front of you, glaring.", "bright_red", "white");
+            UIHelper.DrawBoxEmpty(terminal, "bright_red");
+            if (!string.IsNullOrEmpty(victimName))
+                UIHelper.DrawBoxLine(terminal, $"  \"I saw what you did to {victimName}. You'll answer for that.\"", "bright_red", "bright_cyan");
+            else
+                UIHelper.DrawBoxLine(terminal, $"  \"I saw what you did. Murderer. You'll answer for that.\"", "bright_red", "bright_cyan");
+            UIHelper.DrawBoxEmpty(terminal, "bright_red");
+            UIHelper.DrawBoxLine(terminal, $"  Level {grudgeNpc.Level} {grudgeNpc.Class} — HP: {grudgeNpc.HP}/{grudgeNpc.MaxHP}", "bright_red", "yellow");
+            UIHelper.DrawBoxEmpty(terminal, "bright_red");
+            UIHelper.DrawBoxSeparator(terminal, "bright_red");
+            UIHelper.DrawMenuOption(terminal, "F", "Fight", "bright_red", "bright_yellow", "white");
+            UIHelper.DrawMenuOption(terminal, "B", $"Bribe ({grudgeNpc.Level * 50}g)", "bright_red", "bright_yellow", "yellow");
+            UIHelper.DrawMenuOption(terminal, "R", "Run", "bright_red", "bright_yellow", "gray");
+            UIHelper.DrawBoxBottom(terminal, "bright_red");
+
+            var choice = await terminal.GetInput("\n  Your response? ");
+
+            switch (choice.Trim().ToUpper())
+            {
+                case "F":
+                    await FightNPC(player, grudgeNpc, result, terminal);
+                    if (result.Victory)
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} falls. One less witness.");
+                        player.Darkness += 10; // Extra darkness for silencing a witness
+                        NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2} who confronted them!");
+                    }
+                    else
+                    {
+                        long goldTaken = player.Gold / 10;
+                        player.Gold -= goldTaken;
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} takes {goldTaken:N0} gold. \"Justice is served.\"");
+                        result.GoldLost = goldTaken;
+                        NewsSystem.Instance?.Newsy($"{grudgeNpc.Name2} brought justice to {player.Name2}!");
+                    }
+                    break;
+
+                case "B":
+                    long witnessBribe = grudgeNpc.Level * 50;
+                    if (player.Gold >= witnessBribe)
+                    {
+                        int bribeChance = Math.Min(60, 30 + (int)(player.Charisma * 2)); // Harder to bribe witnesses
+                        if (_random.Next(100) < bribeChance)
+                        {
+                            player.Gold -= witnessBribe;
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"\n  {grudgeNpc.Name2} takes the {witnessBribe} gold and looks away.");
+                            terminal.SetColor("gray");
+                            terminal.WriteLine($"  \"I didn't see anything. But my memory might come back...\"");
+                            result.GoldLost = witnessBribe;
+                        }
+                        else
+                        {
+                            player.Gold -= witnessBribe;
+                            terminal.SetColor("bright_red");
+                            terminal.WriteLine($"\n  \"You think gold will buy my silence?!\" They take it AND attack!");
+                            result.GoldLost = witnessBribe;
+                            await FightNPC(player, grudgeNpc, result, terminal);
+                        }
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"\n  Not enough gold! {grudgeNpc.Name2} attacks!");
+                        await FightNPC(player, grudgeNpc, result, terminal);
+                    }
+                    break;
+
+                default: // Run
+                    int fleeChance = Math.Min(65, 25 + (int)(player.Dexterity * 2));
+                    if (_random.Next(100) < fleeChance)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"\n  You slip away from {grudgeNpc.Name2}. For now...");
+                    }
+                    else
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} catches you! \"Running makes you look guilty!\"");
+                        await FightNPC(player, grudgeNpc, result, terminal);
+                    }
+                    break;
+            }
+        }
+        else
+        {
+            // === STANDARD GRUDGE — Defeated in combat ===
+            UIHelper.DrawBoxTop(terminal, "GRUDGE CONFRONTATION!", "bright_red");
+            UIHelper.DrawBoxEmpty(terminal, "bright_red");
+            UIHelper.DrawBoxLine(terminal, $"  {grudgeNpc.Name2} is waiting for you. Doesnt look happy.", "bright_red", "white");
+            UIHelper.DrawBoxEmpty(terminal, "bright_red");
+            UIHelper.DrawBoxLine(terminal, $"  \"You thought I'd forget what you did to me? Think again.\"", "bright_red", "bright_cyan");
+            UIHelper.DrawBoxEmpty(terminal, "bright_red");
+            UIHelper.DrawBoxLine(terminal, $"  Level {grudgeNpc.Level} {grudgeNpc.Class} — HP: {grudgeNpc.HP}/{grudgeNpc.MaxHP}", "bright_red", "yellow");
+            UIHelper.DrawBoxEmpty(terminal, "bright_red");
+            UIHelper.DrawBoxSeparator(terminal, "bright_red");
+            UIHelper.DrawMenuOption(terminal, "F", "Fight", "bright_red", "bright_yellow", "white");
+            UIHelper.DrawMenuOption(terminal, "A", "Apologize", "bright_red", "bright_yellow", "white");
+            long bribeCost = grudgeNpc.Level * 30;
+            UIHelper.DrawMenuOption(terminal, "B", $"Bribe ({bribeCost}g)", "bright_red", "bright_yellow", "yellow");
+            UIHelper.DrawMenuOption(terminal, "R", "Run", "bright_red", "bright_yellow", "gray");
+            UIHelper.DrawBoxBottom(terminal, "bright_red");
+
+            var choice = await terminal.GetInput("\n  Your response? ");
+
+            switch (choice.ToUpper())
+            {
+                case "F": // Fight
+                    await FightNPC(player, grudgeNpc, result, terminal);
+                    if (result.Victory)
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} goes down. That settles that.");
+                        grudgeNpc.Memory?.RecordEvent(new MemoryEvent
+                        {
+                            Type = MemoryType.Defeated,
+                            Description = $"Defeated again by {player.Name2} — grudge settled",
+                            InvolvedCharacter = player.Name2,
+                            Importance = 0.5f,
+                            EmotionalImpact = -0.3f
+                        });
+                        NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2} in a grudge match!");
+                    }
+                    else
+                    {
+                        long goldTaken = player.Gold / 10;
+                        player.Gold -= goldTaken;
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} takes {goldTaken} gold and walks away satisfied.");
+                        result.GoldLost = goldTaken;
+                        NewsSystem.Instance?.Newsy($"{grudgeNpc.Name2} got revenge on {player.Name2}!");
+                    }
+                    break;
+
+                case "A": // Apologize
+                    int apologyChance = Math.Min(75, 30 + (int)(player.Charisma * 2));
+                    if (_random.Next(100) < apologyChance)
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} hesitates... then lowers their fists.");
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"  \"Fine. But don't cross me again.\"");
+                        grudgeNpc.Memory?.RecordEvent(new MemoryEvent
+                        {
+                            Type = MemoryType.SocialInteraction,
+                            Description = $"{player.Name2} apologized sincerely",
+                            InvolvedCharacter = player.Name2,
+                            Importance = 0.6f,
+                            EmotionalImpact = 0.3f
+                        });
+                        player.Darkness = Math.Max(0, player.Darkness - 5);
+                    }
+                    else
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"\n  \"SORRY doesn't cut it!\"");
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"  {grudgeNpc.Name2} attacks with fury! (+15% STR)");
+                        grudgeNpc.Strength = (long)(grudgeNpc.Strength * 1.15);
+                        await FightNPC(player, grudgeNpc, result, terminal);
+                    }
+                    break;
+
+                case "B": // Bribe
+                    if (player.Gold >= bribeCost)
+                    {
+                        int bribeChance = Math.Min(80, 60 + (int)(player.Charisma * 2));
+                        if (_random.Next(100) < bribeChance)
+                        {
+                            player.Gold -= bribeCost;
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"\n  {grudgeNpc.Name2} pockets the {bribeCost} gold.");
+                            terminal.SetColor("white");
+                            terminal.WriteLine($"  \"We're even. For now.\"");
+                            result.GoldLost = bribeCost;
+                            grudgeNpc.Memory?.RecordEvent(new MemoryEvent
+                            {
+                                Type = MemoryType.GainedGold,
+                                Description = $"{player.Name2} paid off their debt",
+                                InvolvedCharacter = player.Name2,
+                                Importance = 0.5f,
+                                EmotionalImpact = 0.2f
+                            });
+                        }
+                        else
+                        {
+                            player.Gold -= bribeCost;
+                            terminal.SetColor("bright_red");
+                            terminal.WriteLine($"\n  {grudgeNpc.Name2} takes the gold AND attacks!");
+                            result.GoldLost = bribeCost;
+                            await FightNPC(player, grudgeNpc, result, terminal);
+                        }
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"\n  You don't have enough gold! {grudgeNpc.Name2} attacks!");
+                        await FightNPC(player, grudgeNpc, result, terminal);
+                    }
+                    break;
+
+                default: // Run
+                    int fleeChance = Math.Min(75, 30 + (int)(player.Dexterity * 2));
+                    if (_random.Next(100) < fleeChance)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"\n  You slip away before {grudgeNpc.Name2} can react!");
+                    }
+                    else
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"\n  {grudgeNpc.Name2} catches you! They get the first strike!");
+                        await FightNPC(player, grudgeNpc, result, terminal);
+                    }
+                    break;
+            }
         }
 
         await terminal.PressAnyKey();
@@ -2078,7 +2324,7 @@ public class StreetEncounterSystem
         terminal.ClearScreen();
         UIHelper.DrawBoxTop(terminal, "JEALOUS SPOUSE!", "bright_red");
         UIHelper.DrawBoxEmpty(terminal, "bright_red");
-        UIHelper.DrawBoxLine(terminal, $"  {spouse.Name2} blocks your way, fists clenched.", "bright_red", "white");
+        UIHelper.DrawBoxLine(terminal, $"  {spouse.Name2} is standing right in front of you. Fists clenched.", "bright_red", "white");
         UIHelper.DrawBoxEmpty(terminal, "bright_red");
         UIHelper.DrawBoxLine(terminal, $"  \"I know what you've been doing with {partnerName}.\"", "bright_red", "bright_cyan");
         UIHelper.DrawBoxLine(terminal, $"  \"Did you think I wouldn't find out?\"", "bright_red", "cyan");
@@ -2195,9 +2441,9 @@ public class StreetEncounterSystem
         terminal.ClearScreen();
         UIHelper.DrawBoxTop(terminal, "THRONE CHALLENGE!", "bright_yellow");
         UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
-        UIHelper.DrawBoxLine(terminal, $"  {challenger.Name2}, a powerful Level {challenger.Level} {challenger.Class}, confronts you.", "bright_yellow", "white");
+        UIHelper.DrawBoxLine(terminal, $"  {challenger.Name2}, Level {challenger.Level} {challenger.Class}, confronts you.", "bright_yellow", "white");
         UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
-        UIHelper.DrawBoxLine(terminal, $"  \"Your reign ends today. The throne belongs to someone worthy!\"", "bright_yellow", "bright_cyan");
+        UIHelper.DrawBoxLine(terminal, $"  \"Your times up. Im taking that throne.\"", "bright_yellow", "bright_cyan");
         UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
         UIHelper.DrawBoxSeparator(terminal, "bright_yellow");
         UIHelper.DrawMenuOption(terminal, "A", "Accept the challenge", "bright_yellow", "bright_cyan", "bright_green");
@@ -2218,7 +2464,7 @@ public class StreetEncounterSystem
                 if (result.Victory)
                 {
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"\n  {challenger.Name2} falls! Your reign continues unchallenged.");
+                    terminal.WriteLine($"\n  {challenger.Name2} goes down! Still king.");
                     player.Fame += 25;
 
                     // Imprison the challenger
@@ -2368,14 +2614,14 @@ public class StreetEncounterSystem
                 if (result.Victory)
                 {
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"\n  {rival.Name2} falls! '{rivalTeam}' retreats in shame.");
+                    terminal.WriteLine($"\n  {rival.Name2} goes down! '{rivalTeam}' backs off.");
                     player.Fame += 20;
                     NewsSystem.Instance?.Newsy($"{player.Name2} defended their turf by defeating {rival.Name2} of '{rivalTeam}'!");
                 }
                 else
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine($"\n  '{rivalTeam}' cheers as their champion stands victorious.");
+                    terminal.WriteLine($"\n  '{rivalTeam}' cheers. You lost.");
                     NewsSystem.Instance?.Newsy($"'{rivalTeam}' defeated {player.Name2} in a turf war!");
                 }
                 break;
@@ -2430,6 +2676,219 @@ public class StreetEncounterSystem
     }
 
     #endregion
+
+    #endregion
+
+    #region NPC Murder System
+
+    /// <summary>
+    /// Murder an NPC — permanent death, gold theft, witness memories, faction consequences.
+    /// Called from BaseLocation.AttackNPC() after the player commits to attacking.
+    /// </summary>
+    public async Task<EncounterResult> MurderNPC(Character player, NPC npc, TerminalEmulator terminal, GameLocation location)
+    {
+        var result = new EncounterResult
+        {
+            EncounterOccurred = true,
+            Type = EncounterType.GrudgeConfrontation // Reuse closest type
+        };
+
+        // Apply backstab bonus — Assassin class gets better first strike
+        float backstabBonus = player.Class == CharacterClass.Assassin
+            ? GameConfig.AssassinBackstabBonusDamage
+            : GameConfig.GenericBackstabBonusDamage;
+
+        // Create monster from NPC (same pattern as FightNPC)
+        int effectiveHP = Math.Max(1, (int)(npc.HP * (1.0f - backstabBonus)));
+
+        var monster = Monster.CreateMonster(
+            nr: npc.Level,
+            name: npc.Name,
+            hps: effectiveHP,
+            strength: (int)npc.Strength,
+            defence: (int)npc.Defence,
+            phrase: $"You'll pay for this, {player.Name2}!",
+            grabweap: false,
+            grabarm: false,
+            weapon: GetRandomWeaponName(npc.Level),
+            armor: GetRandomArmorName(npc.Level),
+            poisoned: false,
+            disease: false,
+            punch: (int)(npc.Strength / 2),
+            armpow: (int)npc.ArmPow,
+            weappow: (int)npc.WeapPow
+        );
+
+        // Show backstab message
+        if (backstabBonus > 0.15f)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  Your assassin training grants a devastating first strike! (-{(int)(backstabBonus * 100)}% enemy HP)");
+        }
+        else
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  You catch them off guard! (-{(int)(backstabBonus * 100)}% enemy HP)");
+        }
+        terminal.WriteLine("");
+
+        // Combat
+        var combatEngine = new CombatEngine(terminal);
+        var combatResult = await combatEngine.PlayerVsMonster(player, monster);
+
+        result.Victory = combatResult.Outcome == CombatOutcome.Victory;
+
+        // Look up the real NPC in the spawn system
+        var realNpc = NPCSpawnSystem.Instance?.GetNPCByName(npc.Name2 ?? npc.Name);
+
+        if (result.Victory)
+        {
+            // === PERMANENT DEATH ===
+            npc.HP = 0;
+            if (realNpc != null)
+            {
+                realNpc.HP = 0;
+                realNpc.IsDead = true;
+            }
+
+            // === GOLD THEFT ===
+            long stolenGold = (long)(npc.Gold * GameConfig.MurderGoldTheftPercent);
+            if (stolenGold > 0)
+            {
+                player.Gold += stolenGold;
+                if (realNpc != null) realNpc.Gold -= stolenGold;
+            }
+            result.GoldGained = stolenGold;
+
+            // === XP REWARD ===
+            long expGain = npc.Level * 120 + _random.Next(50, 200);
+            player.Experience += expGain;
+            result.ExperienceGained = expGain;
+            result.Message = $"Murdered {npc.Name2 ?? npc.Name}! (+{expGain} XP, +{stolenGold} gold)";
+
+            // === RECORD MURDERED MEMORY ON VICTIM ===
+            if (realNpc?.Memory != null)
+            {
+                realNpc.Memory.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.Murdered,
+                    Description = $"Murdered by {player.Name2}",
+                    InvolvedCharacter = player.Name2,
+                    Importance = 1.0f,
+                    EmotionalImpact = -1.0f,
+                    Location = BaseLocation.GetLocationName(location)
+                });
+            }
+
+            // === WITNESS MEMORIES ===
+            var locationName = BaseLocation.GetLocationName(location);
+            var witnesses = NPCSpawnSystem.Instance?.ActiveNPCs?
+                .Where(w => !w.IsDead && w.IsAlive
+                    && w.Name != npc.Name
+                    && w.CurrentLocation == locationName)
+                .ToList() ?? new List<NPC>();
+
+            foreach (var witness in witnesses)
+            {
+                witness.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.SawDeath,
+                    Description = $"Witnessed {player.Name2} murder {npc.Name2 ?? npc.Name}",
+                    InvolvedCharacter = player.Name2,
+                    Importance = 0.9f,
+                    EmotionalImpact = -0.8f,
+                    Location = locationName
+                });
+            }
+
+            if (witnesses.Count > 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {witnesses.Count} witness{(witnesses.Count > 1 ? "es" : "")} saw the murder!");
+            }
+
+            // === QUEST COMPLETION ===
+            string npcNameForBounty = npc.Name ?? npc.Name2 ?? "";
+            long bountyReward = QuestSystem.AutoCompleteBountyForNPC(player, npcNameForBounty);
+            QuestSystem.OnNPCDefeated(player, npc);
+
+            if (bountyReward > 0)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  *** BOUNTY COLLECTED! +{bountyReward:N0} gold ***");
+                result.GoldGained += bountyReward;
+            }
+
+            // === NEWS ===
+            NewsSystem.Instance?.Newsy($"{player.Name2} murdered {npc.Name2 ?? npc.Name} in cold blood!");
+
+            // === QUEUE RESPAWN ===
+            WorldSimulator.Instance?.QueueNPCForRespawn(npc.Name);
+
+            // === FACTION STANDING PENALTY ===
+            if (realNpc?.NPCFaction != null)
+            {
+                var factionSystem = FactionSystem.Instance;
+                if (factionSystem != null)
+                {
+                    var victimFaction = realNpc.NPCFaction.Value;
+                    factionSystem.ModifyReputation(victimFaction, -GameConfig.MurderFactionStandingPenalty);
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($"  Your standing with {victimFaction} has dropped sharply!");
+                }
+            }
+
+            // === FRIEND HOSTILITY ===
+            // NPCs who liked the victim now hate the player
+            if (realNpc != null)
+            {
+                var friends = NPCSpawnSystem.Instance?.ActiveNPCs?
+                    .Where(f => !f.IsDead && f.IsAlive
+                        && f.Name != npc.Name
+                        && f.Memory != null
+                        && f.Memory.GetCharacterImpression(realNpc.Name2 ?? realNpc.Name) > 0.3f)
+                    .ToList() ?? new List<NPC>();
+
+                foreach (var friend in friends)
+                {
+                    friend.Memory?.RecordEvent(new MemoryEvent
+                    {
+                        Type = MemoryType.MadeEnemy,
+                        Description = $"Heard that {player.Name2} murdered my friend {npc.Name2 ?? npc.Name}",
+                        InvolvedCharacter = player.Name2,
+                        Importance = 0.85f,
+                        EmotionalImpact = -0.7f
+                    });
+                }
+            }
+
+            // === STATISTICS ===
+            if (player is Player p)
+            {
+                p.Statistics?.RecordMonsterKill(expGain, stolenGold, false, false);
+            }
+        }
+        else
+        {
+            // Player lost — NPC remembers the attempt
+            result.Message = $"Failed to murder {npc.Name2 ?? npc.Name}...";
+
+            if (realNpc?.Memory != null)
+            {
+                realNpc.Memory.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.Attacked,
+                    Description = $"{player.Name2} tried to murder me!",
+                    InvolvedCharacter = player.Name2,
+                    Importance = 0.95f,
+                    EmotionalImpact = -0.9f,
+                    Location = BaseLocation.GetLocationName(location)
+                });
+            }
+        }
+
+        return result;
+    }
 
     #endregion
 }

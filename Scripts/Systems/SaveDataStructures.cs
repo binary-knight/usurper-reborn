@@ -421,6 +421,11 @@ namespace UsurperRemake.Systems
         public int PermanentDefenseBonus { get; set; } = 0;
         public long BonusMaxHP { get; set; } = 0;
 
+        // Faction consumable properties (v0.40.2)
+        public int PoisonCoatingCombats { get; set; }
+        public int SmokeBombs { get; set; }
+        public int InnerSanctumLastDay { get; set; }
+
         // Recurring Duelist Rival
         public DuelistData? RecurringDuelist { get; set; }
 

@@ -1486,9 +1486,10 @@ public partial class GameEngine : Node
                 }
             }
 
-            // Show "While you were gone" summary for online players
+            // Check if player was sleeping and handle offline attacks
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend)
             {
+                await HandleSleepReport(sqlBackend);
                 await ShowWhileYouWereGone(sqlBackend);
             }
 
@@ -1552,6 +1553,154 @@ public partial class GameEngine : Node
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("ONLINE", $"Failed to load shared children/marriages/events: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Check if the player was registered as sleeping and show attack report.
+    /// If the player was killed while sleeping, apply death state (reduced HP, no mana).
+    /// Gold/item/XP losses are already applied by WorldSimulator — we just display the report.
+    /// </summary>
+    private async Task HandleSleepReport(SqlSaveBackend backend)
+    {
+        try
+        {
+            var username = UsurperRemake.BBS.DoorMode.OnlineUsername;
+            if (string.IsNullOrEmpty(username)) return;
+
+            var sleepInfo = await backend.GetSleepingPlayerInfo(username);
+            if (sleepInfo == null) return;
+
+            // Parse attack log
+            var attackLog = new List<JsonNode>();
+            try
+            {
+                var parsed = JsonNode.Parse(sleepInfo.AttackLogJson);
+                if (parsed is JsonArray arr)
+                {
+                    foreach (var entry in arr)
+                        if (entry != null) attackLog.Add(entry);
+                }
+            }
+            catch { /* empty or invalid JSON — no attacks */ }
+
+            // Show report if anything happened
+            if (attackLog.Count > 0 || sleepInfo.IsDead)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
+                terminal.SetColor("bright_red");
+                string locationLabel = sleepInfo.SleepLocation == "inn" ? "INN ROOM" : "DORMITORY";
+                terminal.WriteLine($"\u2551                     SLEEP REPORT  ({locationLabel})                         \u2551");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563");
+
+                foreach (var entry in attackLog)
+                {
+                    string attacker = entry["attacker"]?.GetValue<string>() ?? "Unknown";
+                    string result = entry["result"]?.GetValue<string>() ?? "unknown";
+                    long goldStolen = 0;
+                    try { goldStolen = entry["gold_stolen"]?.GetValue<long>() ?? 0; } catch { }
+                    string? itemStolen = entry["item_stolen"]?.GetValue<string>();
+                    long xpLost = 0;
+                    try { xpLost = entry["xp_lost"]?.GetValue<long>() ?? 0; } catch { }
+
+                    terminal.WriteLine("");
+
+                    // Show guard fights if present
+                    var guardFights = entry["guard_fights"];
+                    if (guardFights is JsonArray guardArr)
+                    {
+                        foreach (var gf in guardArr)
+                        {
+                            if (gf == null) continue;
+                            string guardName = gf["guard"]?.GetValue<string>() ?? "Guard";
+                            string guardResult = gf["result"]?.GetValue<string>() ?? "unknown";
+
+                            if (guardResult == "guard_won")
+                            {
+                                terminal.SetColor("bright_green");
+                                terminal.WriteLine($"  Your {guardName} fought off {attacker}!");
+                            }
+                            else
+                            {
+                                terminal.SetColor("red");
+                                terminal.WriteLine($"  Your {guardName} was defeated by {attacker}!");
+                            }
+                        }
+                    }
+
+                    // Show main result
+                    if (result == "attacker_won")
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"  {attacker} attacked you while you slept and won!");
+                        if (goldStolen > 0)
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"  They stole {goldStolen:N0} gold!");
+                        }
+                        if (!string.IsNullOrEmpty(itemStolen))
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"  They stole your {itemStolen}!");
+                        }
+                        if (xpLost > 0)
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"  You lost {xpLost:N0} experience!");
+                        }
+                    }
+                    else if (result == "defender_won")
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  {attacker} tried to attack you in your sleep but you fought them off!");
+                    }
+                    else if (result == "guards_repelled")
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  Your guards drove {attacker} away!");
+                    }
+                }
+
+                // Death state
+                if (sleepInfo.IsDead)
+                {
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("  ================================================");
+                    terminal.WriteLine("  You were KILLED while sleeping!");
+                    terminal.WriteLine("  You wake up at the Temple, bruised and robbed.");
+                    terminal.WriteLine("  ================================================");
+
+                    // Apply death state — respawn with reduced HP
+                    if (currentPlayer != null)
+                    {
+                        currentPlayer.HP = Math.Max(1, currentPlayer.MaxHP / 4);
+                        currentPlayer.Mana = 0;
+                    }
+                }
+                else
+                {
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine("  You survived the night.");
+                }
+
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d");
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+            }
+
+            // Unregister from sleeping_players (whether attacked or not)
+            await backend.UnregisterSleepingPlayer(username);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SLEEP", $"Failed to process sleep report: {ex.Message}");
         }
     }
 
@@ -2388,6 +2537,11 @@ public partial class GameEngine : Node
         player.PermanentDamageBonus = playerData.PermanentDamageBonus;
         player.PermanentDefenseBonus = playerData.PermanentDefenseBonus;
         player.BonusMaxHP = playerData.BonusMaxHP;
+
+        // Faction consumable properties (v0.40.2)
+        player.PoisonCoatingCombats = playerData.PoisonCoatingCombats;
+        player.SmokeBombs = playerData.SmokeBombs;
+        player.InnerSanctumLastDay = playerData.InnerSanctumLastDay;
 
         // Restore Recurring Duelist Rival
         if (playerData.RecurringDuelist != null)

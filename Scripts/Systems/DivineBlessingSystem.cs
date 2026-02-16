@@ -230,6 +230,10 @@ namespace UsurperRemake.Systems
             // Duration: 30 minutes base + more for larger sacrifices
             int durationMinutes = 30 + (int)(sacrificePower * 15);
 
+            // Faith faction members get longer blessings
+            float blessingMultiplier = FactionSystem.Instance?.GetBlessingDurationMultiplier() ?? 1.0f;
+            durationMinutes = (int)(durationMinutes * blessingMultiplier);
+
             var blessing = new TemporaryBlessing
             {
                 PlayerName = character.Name2,
@@ -290,13 +294,16 @@ namespace UsurperRemake.Systems
             float alignment = CalculateAlignment(god);
             float godPower = CalculateGodPower(god);
 
-            // Prayer blessing lasts for 2 hours (in-game session)
+            // Prayer blessing lasts for 2 hours (in-game session), longer for Faith members
+            float prayerMultiplier = FactionSystem.Instance?.GetBlessingDurationMultiplier() ?? 1.0f;
+            int prayerMinutes = (int)(120 * prayerMultiplier);
+
             var blessing = new TemporaryBlessing
             {
                 PlayerName = character.Name2,
                 GodName = godName,
                 GrantedAt = DateTime.Now,
-                ExpiresAt = DateTime.Now.AddHours(2),
+                ExpiresAt = DateTime.Now.AddMinutes(prayerMinutes),
                 Name = $"{godName}'s Daily Blessing",
                 DamageBonus = (int)(3 + godPower * 5),
                 DefenseBonus = (int)(3 + godPower * 5),

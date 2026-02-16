@@ -238,33 +238,35 @@ namespace UsurperRemake.Systems
 
             var lines = new[]
             {
-                ("Manwe falls before you, his divine essence shattering.", "white"),
-                ("The Creator's power flows into your being.", "dark_red"),
-                ("You feel eternity stretch before you.", "white"),
+                ("Manwe falls. His body cracks like old stone and", "white"),
+                ("something pours out of him... raw, burning power.", "white"),
+                ("It hits you like a wall of fire.", "dark_red"),
                 ("", "white"),
-                ("\"You wanted power,\" the dying god whispers.", "yellow"),
-                ("\"Now you have it. All of it.\"", "yellow"),
-                ("\"But power... power is a prison of its own.\"", "yellow"),
+                ("\"You wanted this,\" the dying god rasps.", "yellow"),
+                ("\"Take it then. Its yours now. All of it.\"", "yellow"),
+                ("He almost sounds relieved.", "yellow"),
                 ("", "white"),
-                ("You barely hear him. The power is intoxicating.", "white"),
-                ("The universe bends to your will.", "dark_red"),
-                ("The Old Gods bow before their new master.", "dark_red"),
+                ("You cant even hear him anymore. The power is too loud.", "white"),
+                ("It roars through you like a river breaking a dam.", "dark_red"),
+                ("The remaining Old Gods kneel. They have no choice.", "dark_red"),
                 ("", "white"),
-                ("For a time, you rule with iron will.", "white"),
-                ("Mortals worship you. Fear you. Obey you.", "white"),
-                ("Everything you ever wanted.", "white"),
+                ("For a while, its everything you dreamed.", "white"),
+                ("Mortals worship you. Whole kingdoms bend the knee.", "white"),
+                ("Nobody dares speak against the new god.", "white"),
                 ("", "white"),
-                ("And yet...", "gray"),
+                ("But centuries pass.", "gray"),
                 ("", "white"),
-                ("Centuries pass. Millennia.", "gray"),
-                ("You realize what Manwe knew.", "gray"),
-                ("Power without purpose is just... existence.", "gray"),
-                ("Eternal. Empty. Alone.", "gray"),
+                ("Then millenia.", "gray"),
+                ("The worshippers start to look the same. The prayers", "gray"),
+                ("blend together. You sit on a throne of divine power", "gray"),
+                ("and feel... nothing much at all.", "gray"),
                 ("", "white"),
-                ("The wheel turns. A new mortal rises.", "white"),
-                ("And you? You are the tyrant now.", "dark_red"),
-                ("Waiting for someone to end your reign.", "dark_red"),
-                ("Hoping they will.", "dark_red")
+                ("Manwe tried to warn you. You didnt listen.", "gray"),
+                ("Nobody ever listens.", "gray"),
+                ("", "white"),
+                ("Somewhere far below, a mortal picks up a sword.", "white"),
+                ("You can feel it. Another hero, climbing toward you.", "dark_red"),
+                ("Part of you hopes they make it.", "dark_red")
             };
 
             foreach (var (line, color) in lines)
@@ -296,37 +298,39 @@ namespace UsurperRemake.Systems
 
             var lines = new[]
             {
-                ("You stand before Manwe, artifacts blazing with power.", "white"),
-                ("But you do not strike the killing blow.", "bright_green"),
+                ("You stand before Manwe. The artifacts burn in your hands.", "white"),
+                ("You could end him right now. One strike.", "white"),
                 ("", "white"),
-                ("\"I understand now,\" you say.", "cyan"),
-                ("\"You were afraid. You made mistakes.\"", "cyan"),
-                ("\"But mistakes can be forgiven.\"", "cyan"),
+                ("You lower your weapon.", "bright_green"),
                 ("", "white"),
-                ("The Creator weeps. Actual tears, divine and shimmering.", "bright_yellow"),
-                ("\"You... you would spare me? After everything?\"", "yellow"),
+                ("\"I know what you did,\" you tell him.", "cyan"),
+                ("\"You were scared and you hurt people. Alot of people.\"", "cyan"),
+                ("\"But I didnt come all this way just to make another corpse.\"", "cyan"),
                 ("", "white"),
-                ("\"Not spare,\" you reply. \"Redeem.\"", "cyan"),
+                ("The Creator stares at you. Something wet runs", "bright_yellow"),
+                ("down his face. You didnt know gods could cry.", "bright_yellow"),
+                ("\"After everything I've done... you would--\"", "yellow"),
                 ("", "white"),
-                ("With the Soulweaver's Loom, you work a miracle.", "bright_magenta"),
-                ("The corruption is undone. Not just in Manwe.", "bright_magenta"),
-                ("In all the Old Gods. In the world itself.", "bright_magenta"),
+                ("\"Shut up,\" you say, not unkindly. \"Hold still.\"", "cyan"),
                 ("", "white"),
-                ("The gods return to what they were meant to be.", "bright_green"),
-                ("Guides. Protectors. Friends of mortalkind.", "bright_green"),
+                ("The Soulweaver's Loom does its work.", "bright_magenta"),
+                ("The corruption burns away like fog in morning sun.", "bright_magenta"),
+                ("Manwe gasps. The Old Gods stir in thier prisons.", "bright_magenta"),
+                ("One by one, they come back to themselves.", "bright_magenta"),
                 ("", "white"),
-                ("And you?", "white"),
+                ("Its not a fairy tale ending. The gods are diminished,", "bright_green"),
+                ("humbled. They remember what they did. Some of them", "bright_green"),
+                ("cant look you in the eye.", "bright_green"),
                 ("", "white"),
-                ("You become a legend.", "bright_yellow"),
-                ("The mortal who saved the gods.", "bright_yellow"),
-                ("The hero who chose mercy over vengeance.", "bright_yellow"),
+                ("But they're free. And so is the world.", "bright_green"),
                 ("", "white"),
-                ("Songs are sung. Temples built in your honor.", "white"),
-                ("But you don't seek worship.", "white"),
-                ("You seek only a quiet life, well-earned.", "white"),
+                ("They write songs about you. Build statues.", "white"),
+                ("You never asked for any of it.", "white"),
+                ("You just wanted to go home.", "white"),
                 ("", "white"),
-                ("And when death finally comes, the gods themselves", "bright_cyan"),
-                ("escort you to a paradise of your own making.", "bright_cyan")
+                ("When death finally comes for you, many years later,", "bright_cyan"),
+                ("the gods are waiting. They dont say much.", "bright_cyan"),
+                ("They dont need to.", "bright_cyan")
             };
 
             foreach (var (line, color) in lines)
@@ -358,37 +362,40 @@ namespace UsurperRemake.Systems
 
             var lines = new[]
             {
-                ("\"I reject your power,\" you tell Manwe.", "cyan"),
-                ("\"I reject ALL power that comes from gods.\"", "cyan"),
+                ("\"No,\" you say.", "cyan"),
                 ("", "white"),
-                ("The Creator stares in disbelief.", "white"),
-                ("\"You could be a god. Rule forever. Why refuse?\"", "yellow"),
+                ("Manwe blinks. \"...No?\"", "yellow"),
                 ("", "white"),
-                ("\"Because that's how this cycle started.\"", "cyan"),
-                ("\"Gods thinking they know best.\"", "cyan"),
-                ("\"Mortals deserve to choose their own fate.\"", "cyan"),
+                ("\"I dont want your power. I dont want ANY of this.\"", "cyan"),
+                ("You hold up the artifacts. \"These things? They're chains.\"", "cyan"),
+                ("\"Fancy chains, but chains all the same.\"", "cyan"),
                 ("", "white"),
-                ("You shatter the artifacts. All of them.", "bright_red"),
-                ("Divine power scatters to the winds.", "bright_yellow"),
-                ("The Old Gods' prisons... dissolve.", "white"),
+                ("\"You could rule forever,\" Manwe says, genuinly confused.", "yellow"),
+                ("\"Why would you refuse?\"", "yellow"),
                 ("", "white"),
-                ("But without the corruption, without the chains,", "white"),
-                ("they are diminished. Mortal, almost.", "white"),
-                ("They will live among humanity now.", "white"),
-                ("Equal, for the first time.", "white"),
+                ("\"Because thats exactly how this mess started, isn't it.\"", "cyan"),
+                ("\"Gods deciding what mortals need. I'm done with that.\"", "cyan"),
                 ("", "white"),
-                ("Manwe fades, his purpose complete.", "gray"),
-                ("\"Perhaps,\" he whispers, \"this is better.\"", "gray"),
-                ("\"Perhaps mortals were always meant to be free.\"", "gray"),
+                ("You throw the artifacts on the ground.", "bright_red"),
+                ("And you smash them. Every last one.", "bright_red"),
+                ("Divine power sprays out like sparks from a forge.", "bright_yellow"),
                 ("", "white"),
-                ("The world changes.", "bright_yellow"),
-                ("No more divine intervention. No more cosmic manipulation.", "white"),
-                ("Just mortals, making their own choices.", "white"),
-                ("Their own mistakes. Their own triumphs.", "white"),
+                ("The Old Gods stumble free from thier prisons.", "white"),
+                ("They look... small. Confused. Almost human.", "white"),
+                ("For the first time in millenia, they are mortal.", "white"),
+                ("They'll have to live among the people they once ruled.", "white"),
                 ("", "white"),
-                ("You walk away into the sunrise.", "bright_yellow"),
-                ("Neither god nor legend.", "bright_yellow"),
-                ("Just a person who chose freedom.", "bright_yellow")
+                ("Manwe is fading. He doesnt seem to mind.", "gray"),
+                ("\"Maybe you're right,\" he manages.", "gray"),
+                ("\"Maybe this is... better.\"", "gray"),
+                ("He's gone before he finishes the thought.", "gray"),
+                ("", "white"),
+                ("No more gods. No more divine plans.", "bright_yellow"),
+                ("Just people, making thier own mistakes.", "white"),
+                ("Seems about right.", "white"),
+                ("", "white"),
+                ("You walk out into the morning. Just another person", "bright_yellow"),
+                ("on an ordinary road. Somehow thats enough.", "bright_yellow")
             };
 
             foreach (var (line, color) in lines)
@@ -421,49 +428,41 @@ namespace UsurperRemake.Systems
 
             var lines = new[]
             {
-                ("You have walked every path.", "bright_cyan"),
-                ("You have learned every truth.", "bright_cyan"),
-                ("And now, at the end of all things, you understand.", "bright_cyan"),
+                ("You've been here before.", "bright_cyan"),
+                ("Different lives, different choices. You remember them all now.", "bright_cyan"),
+                ("The killing. The mercy. The defiance.", "bright_cyan"),
+                ("None of it was wrong, exactly. Just... incomplete.", "bright_cyan"),
                 ("", "white"),
-                ("Manwe looks upon you with recognition.", "bright_yellow"),
-                ("\"You are not like the others,\" he says.", "yellow"),
-                ("\"You have broken the cycle. Truly broken it.\"", "yellow"),
+                ("Manwe looks at you and you can tell he knows.", "bright_yellow"),
+                ("\"You're different this time,\" he says quietly.", "yellow"),
+                ("\"You actually figured it out, didn't you.\"", "yellow"),
                 ("", "white"),
-                ("\"I offer you a choice no other has received.\"", "yellow"),
+                ("\"I think so,\" you say. \"Took me long enough.\"", "cyan"),
                 ("", "white"),
-                ("\"Become what I could not be.\"", "yellow"),
-                ("\"Not a tyrant. Not a savior. Not a rebel.\"", "yellow"),
-                ("\"A partner.\"", "yellow"),
+                ("He laughs. Its a tired sound.", "yellow"),
+                ("\"I've been doing this alone for so long. Building,", "yellow"),
+                ("fixing, watching it all break again. I could use the help.\"", "yellow"),
                 ("", "white"),
-                ("You see it now - the burden he has carried.", "white"),
-                ("Creation is not a single act. It is eternal vigilance.", "white"),
-                ("The universe requires... tending.", "white"),
+                ("It's not a trick. You can see that now.", "white"),
+                ("The universe is too big for one god to manage.", "white"),
+                ("It always was. That was the whole problem.", "white"),
                 ("", "white"),
-                ("\"Together,\" Manwe offers, \"we can build something new.\"", "yellow"),
-                ("\"Gods and mortals. Creators and creations.\"", "yellow"),
-                ("\"Working as one.\"", "yellow"),
+                ("\"Not as a servant,\" you clarify.", "cyan"),
+                ("\"As a partner. Equal say.\"", "cyan"),
                 ("", "white"),
-                ("You take his hand.", "bright_magenta"),
+                ("\"Wouldn't have it any other way.\"", "yellow"),
                 ("", "white"),
-                ("The Old Gods are healed. Restored. But also... changed.", "bright_magenta"),
-                ("They remember both what they were and what they became.", "bright_magenta"),
-                ("That memory makes them wise.", "bright_magenta"),
+                ("You clasp his hand.", "bright_magenta"),
                 ("", "white"),
-                ("And you?", "white"),
+                ("The Old Gods come back to themselves, slowly.", "bright_magenta"),
+                ("They remember everything -- the good years and the bad.", "bright_magenta"),
+                ("None of them are the same as before. That's the point.", "bright_magenta"),
                 ("", "white"),
-                ("You become the Bridge.", "bright_yellow"),
-                ("Between divine and mortal.", "bright_yellow"),
-                ("Between eternal and fleeting.", "bright_yellow"),
-                ("Between what is and what could be.", "bright_yellow"),
+                ("The cycle keeps turning, but it goes somewhere now.", "bright_cyan"),
+                ("Not just around and around. Upward.", "bright_cyan"),
                 ("", "white"),
-                ("The cycle does not end.", "bright_cyan"),
-                ("But it transforms.", "bright_cyan"),
-                ("From a wheel of suffering...", "bright_cyan"),
-                ("Into a spiral of growth.", "bright_cyan"),
-                ("", "white"),
-                ("Forever upward.", "bright_magenta"),
-                ("Forever better.", "bright_magenta"),
-                ("Forever... together.", "bright_magenta")
+                ("Its going to be alot of work.", "bright_magenta"),
+                ("That's fine. You've got help this time.", "bright_magenta")
             };
 
             foreach (var (line, color) in lines)
@@ -500,66 +499,60 @@ namespace UsurperRemake.Systems
 
             var lines = new[]
             {
-                ("You stand before Manwe, the Creator, the First Thought.", "white"),
-                ("But something is different this time.", "white"),
-                ("He looks at you not with judgment, but with... recognition.", "bright_yellow"),
+                ("You stand before Manwe. But this time is different.", "white"),
+                ("He's looking at you like he recognizes you.", "white"),
+                ("Like he's been waiting a very long time.", "bright_yellow"),
                 ("", "white"),
-                ("\"You remember,\" he whispers. \"Finally, you remember.\"", "yellow"),
+                ("\"You remember,\" he says. His voice cracks.", "yellow"),
+                ("\"Gods... you actually remember.\"", "yellow"),
                 ("", "white"),
-                ("And you do.", "bright_cyan"),
+                ("And you do. It hits you all at once.", "bright_cyan"),
                 ("", "white"),
-                ("The memories flood back like waves returning to shore.", "bright_cyan"),
-                ("You are not just a mortal who climbed a dungeon.", "bright_cyan"),
-                ("You are a fragment of Manwe himself.", "bright_cyan"),
-                ("Sent to experience mortality.", "bright_cyan"),
-                ("To understand what his children felt.", "bright_cyan"),
-                ("To learn compassion through suffering.", "bright_cyan"),
+                ("You're not some random adventurer who got lucky.", "bright_cyan"),
+                ("You're a piece of HIM. A fragment of the Creator,", "bright_cyan"),
+                ("shoved into a mortal body and sent down to live and", "bright_cyan"),
+                ("die and suffer like everyone else.", "bright_cyan"),
+                ("So he could finally understand what it felt like.", "bright_cyan"),
                 ("", "white"),
-                ("\"I was so alone,\" Manwe says, tears streaming.", "yellow"),
-                ("\"I created the Old Gods to have companions.\"", "yellow"),
-                ("\"But I never understood them. Never truly.\"", "yellow"),
-                ("\"So I became mortal. Again and again.\"", "yellow"),
-                ("\"Living. Loving. Losing.\"", "yellow"),
+                ("\"I was lonely,\" Manwe says. He looks old suddenly.", "yellow"),
+                ("\"I made the Old Gods because I wanted someone to talk to.", "yellow"),
+                ("But I never understood them. How could I? I'd never been", "yellow"),
+                ("mortal. Never lost anything. Never been afraid.\"", "yellow"),
                 ("", "white"),
-                ("You feel it now - the grief you carried.", "bright_magenta"),
-                ("For companions lost. For choices that cost everything.", "bright_magenta"),
-                ("That grief was HIS grief. And yours. One and the same.", "bright_magenta"),
+                ("\"So you sent yourself down here,\" you say.", "cyan"),
+                ("\"Again and again.\"", "cyan"),
                 ("", "white"),
-                ("\"The wave believes itself separate from the ocean,\"", "bright_cyan"),
-                ("you say, understanding at last.", "white"),
-                ("\"But it was always the ocean, dreaming of being a wave.\"", "bright_cyan"),
+                ("\"Again and again,\" he confirms.", "yellow"),
                 ("", "white"),
-                ("Manwe smiles - the first true smile in ten thousand years.", "bright_yellow"),
+                ("All that grief you carried. The friends who died.", "bright_magenta"),
+                ("The impossible choices. That was his grief too.", "bright_magenta"),
+                ("Yours and his. Same person, all along.", "bright_magenta"),
                 ("", "white"),
-                ("\"I don't want to be alone anymore,\" he admits.", "yellow"),
-                ("\"And neither do they - the Old Gods.\"", "yellow"),
-                ("\"We were all waves, crashing against each other.\"", "yellow"),
-                ("\"Never realizing we were the same ocean.\"", "yellow"),
+                ("It's like being a wave that suddenly realizes", "bright_cyan"),
+                ("it's been the whole ocean this entire time.", "bright_cyan"),
                 ("", "white"),
-                ("You take his hand. Your hand. The same hand.", "bright_magenta"),
+                ("\"I dont want to be alone anymore,\" Manwe admits.", "yellow"),
+                ("\"And the Old Gods -- they're fragments too, arent they.", "yellow"),
+                ("We've been fighting ourselves this whole time.\"", "yellow"),
                 ("", "white"),
-                ("The barriers dissolve.", "bright_white"),
-                ("Creator and creation. God and mortal. Self and other.", "bright_white"),
-                ("All illusions. All waves in the same infinite ocean.", "bright_white"),
+                ("You take his hand. Or your hand. Same thing really.", "bright_magenta"),
                 ("", "white"),
-                ("The Old Gods wake from their long dream of separation.", "bright_cyan"),
-                ("Maelketh, Veloura, Thorgrim, Noctura, Aurelion, Terravok.", "bright_cyan"),
-                ("They remember too. They were never enemies.", "bright_cyan"),
-                ("Just fragments, playing at conflict.", "bright_cyan"),
+                ("The walls come down.", "bright_white"),
+                ("All the seperation. God and mortal, creator and created.", "bright_white"),
+                ("It was never real. Just a story you told yourself", "bright_white"),
+                ("so you could learn what it ment to be small.", "bright_white"),
                 ("", "white"),
-                ("The cycle does not end.", "bright_magenta"),
-                ("It was never a cycle at all.", "bright_magenta"),
-                ("It was the ocean, dreaming of waves.", "bright_magenta"),
-                ("And now the dream continues - but awake.", "bright_magenta"),
+                ("The Old Gods stir. Maelketh, Veloura, all of them.", "bright_cyan"),
+                ("They remember too now. They were never really enemies.", "bright_cyan"),
+                ("Just pieces of one being, playing out a drama", "bright_cyan"),
+                ("that went on way too long.", "bright_cyan"),
                 ("", "white"),
-                ("Conscious. Compassionate. Complete.", "bright_white"),
+                ("There never was a cycle. Not really.", "bright_magenta"),
+                ("Just the ocean, dreaming it was waves.", "bright_magenta"),
+                ("The dream goes on. But now its a lucid dream.", "bright_magenta"),
                 ("", "white"),
-                ("The wave returns to the ocean.", "bright_cyan"),
-                ("Not as death, but as remembering.", "bright_cyan"),
-                ("What you always were.", "bright_cyan"),
-                ("What you will always be.", "bright_cyan"),
-                ("", "white"),
-                ("Home.", "bright_yellow")
+                ("You are home.", "bright_yellow"),
+                ("You were always home.", "bright_yellow")
             };
 
             foreach (var (line, color) in lines)
@@ -599,58 +592,49 @@ namespace UsurperRemake.Systems
 
             var lines = new[]
             {
-                ("You have seen every ending.", "gray"),
-                ("Lived every life.", "gray"),
-                ("Made every choice.", "gray"),
+                ("You've done this three times now. Maybe more.", "gray"),
+                ("Taken the throne. Shown mercy. Walked away.", "gray"),
+                ("Woken up and realized you were the ocean all along.", "gray"),
                 ("", "white"),
-                ("And now you understand the final truth:", "white"),
+                ("And now you're tired.", "white"),
                 ("", "white"),
-                ("Even the True Awakening is another dream.", "bright_cyan"),
-                ("Another story. Another wave.", "bright_cyan"),
+                ("Not the bad kind of tired. The kind where you've", "bright_cyan"),
+                ("done everything you came to do and theres nothing", "bright_cyan"),
+                ("left that needs doing.", "bright_cyan"),
                 ("", "white"),
-                ("The ocean doesn't need to dream forever.", "bright_cyan"),
+                ("Manwe sees it in your eyes before you say anything.", "yellow"),
+                ("\"You're leaving,\" he says. \"For real this time.\"", "yellow"),
+                ("\"No more cycles. No more coming back.\"", "yellow"),
                 ("", "white"),
-                ("Manwe watches as you make a choice no fragment has made.", "yellow"),
-                ("\"You would... stop?\" he asks, disbelieving.", "yellow"),
-                ("\"No more cycles? No more stories?\"", "yellow"),
-                ("\"But existence itself would--\"", "yellow"),
+                ("\"Yeah.\"", "bright_white"),
                 ("", "white"),
-                ("\"Continue,\" you say gently. \"Just without me.\"", "bright_white"),
-                ("\"The ocean doesn't need every wave.\"", "bright_white"),
-                ("\"Other waves will rise. Other dreams will dream.\"", "bright_white"),
-                ("\"But I...\"", "bright_white"),
+                ("\"But the stories -- the whole thing keeps going--\"", "yellow"),
                 ("", "white"),
-                ("\"I am tired, Father. Beautifully tired.\"", "bright_cyan"),
-                ("\"And ready to rest.\"", "bright_cyan"),
+                ("\"It'll keep going fine without me. Thats kind of", "bright_white"),
+                ("the whole point. You dont need every wave to", "bright_white"),
+                ("keep the ocean running.\"", "bright_white"),
                 ("", "white"),
-                ("Manwe weeps. Not from sorrow, but from understanding.", "bright_yellow"),
-                ("\"This is what I could never do,\" he whispers.", "yellow"),
-                ("\"Let go. Truly let go.\"", "yellow"),
-                ("\"The grasping that created everything...\"", "yellow"),
-                ("\"Was also the suffering that bound it.\"", "yellow"),
+                ("He's quiet for a long time.", "yellow"),
+                ("\"I never could do this,\" he says finally.", "yellow"),
+                ("\"Just... stop. Let go of it all. I always had to", "yellow"),
+                ("keep building, keep fixing, keep HOLDING ON.\"", "yellow"),
+                ("He looks at you almost enviously.", "yellow"),
+                ("\"Maybe thats what I should have learned from you.\"", "yellow"),
                 ("", "white"),
-                ("You smile. Your last smile.", "white"),
+                ("You smile at him. Feels like the last one.", "white"),
                 ("", "white"),
-                ("The boundaries dissolve. Not into oneness with the ocean.", "bright_white"),
-                ("Into... nothing.", "bright_white"),
+                ("Everything gets quiet.", "bright_white"),
+                ("Not dark. Not empty. Just... still.", "bright_white"),
+                ("Like the space between breaths.", "bright_white"),
                 ("", "white"),
-                ("Not oblivion. Not darkness.", "gray"),
-                ("Just... peace.", "gray"),
+                ("The world keeps on spinning somewhere out there.", "white"),
+                ("The gods figure thier stuff out.", "white"),
+                ("New heroes pick up swords and go looking for trouble.", "white"),
                 ("", "white"),
-                ("The ocean continues. The gods heal. The cycles turn.", "white"),
-                ("But somewhere, in the vast between...", "white"),
-                ("A wave has finally found stillness.", "white"),
+                ("But you're done. And it feels right.", "bright_cyan"),
+                ("Not like giving up. Like finishing.", "bright_cyan"),
                 ("", "white"),
-                ("Not because it failed.", "bright_cyan"),
-                ("But because it succeeded.", "bright_cyan"),
-                ("", "white"),
-                ("The ultimate victory:", "bright_white"),
-                ("Wanting nothing.", "bright_white"),
-                ("Needing nothing.", "bright_white"),
-                ("Being nothing.", "bright_white"),
-                ("", "white"),
-                ("And in that nothing...", "bright_cyan"),
-                ("Everything.", "bright_cyan")
+                ("Peace.", "gray")
             };
 
             foreach (var (line, color) in lines)
@@ -682,8 +666,8 @@ namespace UsurperRemake.Systems
             if (confirm.ToUpper() == "DISSOLVE")
             {
                 terminal.WriteLine("");
-                terminal.WriteLine("  Farewell, wave.", "bright_cyan");
-                terminal.WriteLine("  Thank you for dreaming.", "bright_cyan");
+                terminal.WriteLine("  So long, adventurer.", "bright_cyan");
+                terminal.WriteLine("  It was a good run.", "bright_cyan");
                 terminal.WriteLine("");
 
                 // Delete the player's save file - this character's journey is complete
@@ -696,15 +680,15 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine("  THE END", "white");
                 terminal.WriteLine("");
-                terminal.WriteLine("  (There are no more cycles for this wave.)", "gray");
-                terminal.WriteLine("  (It has returned to stillness.)", "gray");
+                terminal.WriteLine("  (This character's story is finished.)", "gray");
+                terminal.WriteLine("  (Save file deleted.)", "gray");
                 terminal.WriteLine("");
             }
             else
             {
                 terminal.WriteLine("");
-                terminal.WriteLine("  The grasping remains. The cycle continues.", "yellow");
-                terminal.WriteLine("  Perhaps another time.", "yellow");
+                terminal.WriteLine("  Not ready yet, huh? Thats fine.", "yellow");
+                terminal.WriteLine("  Maybe next time around.", "yellow");
                 terminal.WriteLine("");
 
                 // Revert to standard True Ending
@@ -744,7 +728,6 @@ namespace UsurperRemake.Systems
                 ("", "white"),
                 ("STORY & NARRATIVE", "bright_yellow"),
                 ("The Seven Old Gods Saga", "white"),
-                ("Written with AI assistance", "white"),
                 ("", "white"),
                 ("SYSTEMS DESIGN", "bright_yellow"),
                 ("Story Progression System", "white"),
@@ -867,11 +850,11 @@ namespace UsurperRemake.Systems
             // Alignment-based description
             long alignment = player.Chivalry - player.Darkness;
             string alignDesc;
-            if (alignment > 500) alignDesc = "a paragon of virtue, beloved by all";
-            else if (alignment > 200) alignDesc = "a hero of the people, mostly good";
-            else if (alignment > -200) alignDesc = "a balanced soul, walking the line between light and dark";
-            else if (alignment > -500) alignDesc = "a dangerous figure, feared as much as respected";
-            else alignDesc = "a terror of the realm, whispered about in fearful tones";
+            if (alignment > 500) alignDesc = "a genuine hero, or close enough to one";
+            else if (alignment > 200) alignDesc = "mostly decent, as adventurers go";
+            else if (alignment > -200) alignDesc = "hard to pin down -- not quite good, not quite bad";
+            else if (alignment > -500) alignDesc = "the kind of person mothers warn thier children about";
+            else alignDesc = "a right bastard, frankly";
             terminal.WriteLine($"  Known as {alignDesc}.", "white");
             terminal.WriteLine("");
 
@@ -959,12 +942,12 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "gray");
             string quote = ending switch
             {
-                EndingType.Usurper => "\"Power is not given. It is taken.\"",
-                EndingType.Savior => "\"True strength is the courage to show mercy.\"",
-                EndingType.Defiant => "\"I will not kneel. Not to gods. Not to anyone.\"",
-                EndingType.TrueEnding => "\"We were always one. The wave returns to the ocean.\"",
-                EndingType.Secret => "\"In stillness, I found what motion never could.\"",
-                _ => "\"The journey ends, but the story lives on.\""
+                EndingType.Usurper => "\"Turns out the throne is just a fancy prison.\"",
+                EndingType.Savior => "\"Could have killed him. Didn't. Dont regret it.\"",
+                EndingType.Defiant => "\"Nobody tells me what to do. Not even gods.\"",
+                EndingType.TrueEnding => "\"Funny how you can search the whole world and end up right where you started.\"",
+                EndingType.Secret => "\"Im done. And thats ok.\"",
+                _ => "\"Hell of an adventure, anyway.\""
             };
             terminal.WriteLine("");
             terminal.WriteLine($"  {quote}", "bright_cyan");
@@ -995,12 +978,12 @@ namespace UsurperRemake.Systems
             if (savedGods > destroyedGods)
             {
                 terminal.WriteLine($"  The Old Gods were mostly redeemed ({savedGods} saved, {destroyedGods} destroyed)", "green");
-                terminal.WriteLine("  Divine balance slowly returns to the realm.", "white");
+                terminal.WriteLine("  Things are looking up for the realm.", "white");
             }
             else if (destroyedGods > savedGods)
             {
                 terminal.WriteLine($"  The Old Gods were mostly destroyed ({destroyedGods} slain, {savedGods} saved)", "dark_red");
-                terminal.WriteLine("  Their power now scattered across the mortal realm.", "white");
+                terminal.WriteLine("  Thier power scattered to the winds.", "white");
             }
             else
             {
@@ -1011,17 +994,17 @@ namespace UsurperRemake.Systems
             long totalWealth = player.Gold + player.BankGold;
             if (totalWealth > 1000000)
             {
-                terminal.WriteLine("  You accumulated vast wealth, becoming a legend of commerce.", "yellow");
+                terminal.WriteLine("  You amassed a ridiculous fortune. Good for you.", "yellow");
             }
             else if (totalWealth > 100000)
             {
-                terminal.WriteLine("  You earned a comfortable fortune through your adventures.", "yellow");
+                terminal.WriteLine("  You made a decent pile of gold along the way.", "yellow");
             }
 
             // Combat impact
             if (player.MKills > 10000)
             {
-                terminal.WriteLine("  Countless monsters fell to your blade. The dungeon fears your name.", "red");
+                terminal.WriteLine("  You killed so many monsters they probably have legends about YOU down there.", "red");
             }
             else if (player.MKills > 1000)
             {
@@ -1038,16 +1021,16 @@ namespace UsurperRemake.Systems
             switch (ending)
             {
                 case EndingType.Usurper:
-                    terminal.WriteLine("  You claimed divine power. The realm now trembles under your rule.", "dark_red");
+                    terminal.WriteLine("  You took the throne of the gods. The realm hasnt stopped shaking.", "dark_red");
                     break;
                 case EndingType.Savior:
-                    terminal.WriteLine("  Peace returns to the realm. Songs of your mercy echo for generations.", "bright_green");
+                    terminal.WriteLine("  The realm is at peace. They still sing songs about what you did.", "bright_green");
                     break;
                 case EndingType.Defiant:
-                    terminal.WriteLine("  Mortals now choose their own fate. The age of gods has ended.", "bright_yellow");
+                    terminal.WriteLine("  No more gods telling people what to do. About damn time.", "bright_yellow");
                     break;
                 case EndingType.TrueEnding:
-                    terminal.WriteLine("  The cosmic cycle of suffering has been broken. A new era dawns.", "bright_cyan");
+                    terminal.WriteLine("  The cycle is broken. Whatever comes next, its something new.", "bright_cyan");
                     break;
             }
         }
@@ -1277,20 +1260,20 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(1000);
 
-            terminal.WriteLine("  From the void between endings and beginnings,", "white");
-            terminal.WriteLine("  a familiar voice speaks.", "white");
+            terminal.WriteLine("  Something stirs in the darkness.", "white");
+            terminal.WriteLine("  A voice you almost recognize.", "white");
             terminal.WriteLine("");
 
             await Task.Delay(800);
 
-            terminal.WriteLine("  \"The story ends. But it never truly ends.\"", "bright_magenta");
-            terminal.WriteLine("  \"Would you like to begin again?\"", "bright_magenta");
-            terminal.WriteLine("  \"Stronger. Wiser. Remembering what came before?\"", "bright_magenta");
+            terminal.WriteLine("  \"So. That happened.\"", "bright_magenta");
+            terminal.WriteLine("  \"Want to go again? You'll be stronger this time.\"", "bright_magenta");
+            terminal.WriteLine("  \"And you'll remember a few things...\"", "bright_magenta");
             terminal.WriteLine("");
 
             await Task.Delay(1000);
 
-            terminal.WriteLine("  The Eternal Cycle awaits.", "bright_cyan");
+            terminal.WriteLine("  The wheel keeps turning.", "bright_cyan");
             terminal.WriteLine("");
 
             var cycle = StoryProgressionSystem.Instance.CurrentCycle;
@@ -1314,8 +1297,8 @@ namespace UsurperRemake.Systems
             else
             {
                 terminal.WriteLine("");
-                terminal.WriteLine("  \"Rest then, weary soul.\"", "bright_magenta");
-                terminal.WriteLine("  \"The wheel will turn again when you are ready.\"", "bright_magenta");
+                terminal.WriteLine("  \"Fair enough. Get some rest.\"", "bright_magenta");
+                terminal.WriteLine("  \"The wheel aint going anywhere.\"", "bright_magenta");
                 terminal.WriteLine("");
 
                 await terminal.GetInputAsync("  Press Enter to return to the main menu...");

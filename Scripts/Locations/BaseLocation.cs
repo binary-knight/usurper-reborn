@@ -2680,6 +2680,10 @@ public abstract class BaseLocation
             // Get NPC's greeting (only on first interaction)
             if (isFirstGreeting)
             {
+                // Update talk-to-NPC quest objectives
+                QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name);
+                QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name2);
+
                 string greeting = npc.GetGreeting(currentPlayer);
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {npc.Name2} says:");
@@ -2744,6 +2748,19 @@ public abstract class BaseLocation
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(" Have a deep conversation...");
 
+            // Attack option (murder/assassination)
+            if (npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("dark_red");
+                terminal.Write("6");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("dark_red");
+                terminal.WriteLine(" Attack...");
+            }
+
             terminal.WriteLine("");
             terminal.SetColor("gray");
             terminal.WriteLine("  [0] Walk away");
@@ -2776,6 +2793,13 @@ public abstract class BaseLocation
                 case "5":
                     // Full visual novel style conversation
                     await UsurperRemake.Systems.VisualNovelDialogueSystem.Instance.StartConversation(currentPlayer, npc, terminal);
+                    break;
+                case "6":
+                    if (npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King)
+                    {
+                        await AttackNPC(npc);
+                        stayInConversation = false;
+                    }
                     break;
                 case "9":
                     await ShowNPCDebugTraits(npc);
@@ -3151,6 +3175,81 @@ public abstract class BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine($"\n  {npc.Name2} got the better of you...");
             currentPlayer.PDefeats++;
+        }
+
+        await Task.Delay(2000);
+    }
+
+    /// <summary>
+    /// Attack an NPC — murder/assassination attempt. No acceptance check.
+    /// On victory: NPC is permanently killed (until respawn), player steals gold.
+    /// </summary>
+    private async Task AttackNPC(NPC npc)
+    {
+        terminal.WriteLine("");
+
+        // Check if player's teammates include this NPC (same team name)
+        if (!string.IsNullOrEmpty(currentPlayer.Team) &&
+            !string.IsNullOrEmpty(npc.Team) &&
+            currentPlayer.Team.Equals(npc.Team, StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  You can't attack your own teammate!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Warn if NPC is much higher level
+        if (npc.Level > currentPlayer.Level + 10)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {npc.Name2} is level {npc.Level}. This looks extremely dangerous.");
+            terminal.Write("  Are you sure? (Y/N): ");
+            var confirm = await terminal.GetInput("");
+            if (confirm.Trim().ToUpper() != "Y")
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  You think better of it.");
+                await Task.Delay(1000);
+                return;
+            }
+        }
+
+        terminal.SetColor("dark_red");
+        terminal.WriteLine($"  You draw your weapon and lunge at {npc.Name2}!");
+        terminal.SetColor("red");
+        terminal.WriteLine($"  \"What?! You treacherous—!\"");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Initiate murder combat through StreetEncounterSystem
+        var result = await StreetEncounterSystem.Instance.MurderNPC(currentPlayer, npc, terminal, LocationId);
+
+        if (result.Victory)
+        {
+            terminal.SetColor("dark_red");
+            terminal.WriteLine($"\n  {npc.Name2} falls to the ground, lifeless.");
+
+            if (result.GoldGained > 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  You loot {result.GoldGained:N0} gold from their body.");
+            }
+
+            currentPlayer.PKills++;
+            currentPlayer.Darkness += GameConfig.MurderDarknessGain;
+
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  (+{GameConfig.MurderDarknessGain} Darkness)");
+        }
+        else
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n  {npc.Name2} overpowered you...");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  They'll remember this.");
+            currentPlayer.PDefeats++;
+            currentPlayer.Darkness += 10; // Still get some darkness for the attempt
         }
 
         await Task.Delay(2000);

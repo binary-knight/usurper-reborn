@@ -63,7 +63,7 @@ namespace UsurperRemake.Systems
         {
             [StrangerDisguise.HoodedTraveler] = new StrangerDisguiseData(
                 "A Hooded Traveler",
-                "A cloaked figure with eyes that seem to hold starlight",
+                "A cloaked figure with strange, pale eyes",
                 new[] { "MainStreet", "Inn", "DarkAlley" },
                 1, 100
             ),
@@ -151,16 +151,16 @@ namespace UsurperRemake.Systems
                 {
                     new() { Key = "1", Text = "It was terrifying. I never want to feel that again.",
                         ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Fear of death is the first wall. Every wall can become a door.\"" } },
+                        StrangerReply = new[] { "\"Good. Fear means you learned something.\"" } },
                     new() { Key = "2", Text = "There was... a moment of peace. Before the pain.",
                         ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"You felt it. That peace -- that is what waits beneath the fear.\"", "\"Remember it.\"" } },
+                        StrangerReply = new[] { "\"Hm. You felt the quiet part. Most people only get the screaming.\"", "\"Hold onto that.\"" } },
                     new() { Key = "3", Text = "I don't remember anything. Just darkness.",
                         ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
                         StrangerReply = new[] { "\"Perhaps. Or perhaps you chose to forget. The dying often do.\"" } },
                     new() { Key = "4", Text = "Death is for the weak. I won't make the same mistake.",
                         ResponseType = StrangerResponseType.Hostile, ReceptivityChange = -10,
-                        StrangerReply = new[] { "*She smiles sadly.*", "\"The young always think death is a failure, not a teacher.\"" } },
+                        StrangerReply = new[] { "*She just looks at you.*", "\"Right. You got all the answers already, dont you.\"" } },
                     new() { Key = "5", Text = "Who are you? Why do you care about my death?",
                         ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
                         StrangerReply = new[] { "\"I care about all deaths. And all returns.\"", "\"They are... my specialty.\"" } }
@@ -171,7 +171,7 @@ namespace UsurperRemake.Systems
             {
                 Type = ScriptedEncounterType.AfterCompanionDeath,
                 Disguise = StrangerDisguise.WoundedKnight,
-                Title = "THE RIVER AND THE SEA",
+                Title = "THE EMPTY CHAIR",
                 ValidLocations = new[] { "Healer", "Temple", "MainStreet", "Inn" },
                 IntroNarration = new[]
                 {
@@ -182,9 +182,9 @@ namespace UsurperRemake.Systems
                 Dialogue = new[]
                 {
                     "\"I saw what happened. With your companion.\"",
-                    "\"Death took them. You think it was cruel.\"",
-                    "\"But tell me -- is the river cruel when it reaches the sea?\"",
-                    "\"Or does the sea welcome every river home?\""
+                    "\"Death took them. Thats... thats rough.\"",
+                    "\"I wont pretend to make it better.\"",
+                    "\"But I know a thing or two about losing people.\""
                 },
                 ClosingNarration = new[]
                 {
@@ -195,19 +195,19 @@ namespace UsurperRemake.Systems
                 {
                     new() { Key = "1", Text = "They didn't deserve to die. This world is merciless.",
                         ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Merciless? Or simply indifferent to our small ideas of fairness?\"", "\"The rain falls on saints and sinners alike.\"" } },
+                        StrangerReply = new[] { "\"Yeah. It is. Doesnt care who deserves what.\"", "\"Never has.\"" } },
                     new() { Key = "2", Text = "I think... they're at peace now. I hope so.",
                         ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "*Her eyes soften.*", "\"They are. More than you know.\"", "\"Death is not the opposite of life. It is the rest between breaths.\"" } },
+                        StrangerReply = new[] { "*Her eyes soften.*", "\"They are. Trust me on that one.\"" } },
                     new() { Key = "3", Text = "I'll honor them by growing stronger. Their sacrifice means something.",
                         ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"Yes. That is the lesson.\"", "\"The fallen become the soil from which the living grow.\"", "\"They are not gone -- they are transformed.\"" } },
+                        StrangerReply = new[] { "\"Good. Thats a good way to carry it.\"", "\"They'd want that, I think.\"" } },
                     new() { Key = "4", Text = "I don't need your philosophy. I need them back.",
                         ResponseType = StrangerResponseType.Dismissed, ReceptivityChange = -5,
-                        StrangerReply = new[] { "\"I know. Grief is its own kind of death.\"", "\"But you will survive it, as you survived your own death.\"" } },
+                        StrangerReply = new[] { "\"I know. Believe me, I know.\"", "\"You'll get through it. Eventually.\"" } },
                     new() { Key = "5", Text = "Get away from me.",
                         ResponseType = StrangerResponseType.Hostile, ReceptivityChange = -10,
-                        StrangerReply = new[] { "*She doesn't flinch.*", "\"You cannot kill what I represent. But I understand the need to try.\"" } }
+                        StrangerReply = new[] { "*She doesnt move.*", "\"Fair enough. Ill leave you alone.\"" } }
                 }
             },
 
@@ -241,16 +241,16 @@ namespace UsurperRemake.Systems
                 {
                     new() { Key = "1", Text = "I felt something change when I defeated them. What happened to me?",
                         ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"You absorbed a fragment of divinity.\"", "\"A drop returns to the ocean. A death becomes a birth.\"" } },
+                        StrangerReply = new[] { "\"You took a piece of them. Thats what happens when a god dies.\"", "\"Part of them ends up in whoever did the killing.\"" } },
                     new() { Key = "2", Text = "The gods are prisoners, not enemies. Their deaths trouble me.",
                         ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Good. Let it trouble you.\"", "\"The day death stops troubling you is the day you stop being worthy\"", "\"of the power it grants.\"" } },
+                        StrangerReply = new[] { "\"Good. It should trouble you.\"", "\"Day it stops bothering you is the day you've got a problem.\"" } },
                     new() { Key = "3", Text = "Every god I face teaches me something. Even in destruction.",
                         ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "*A genuine smile crosses her face.*", "\"Now you begin to understand my lesson.\"", "\"Destruction and creation are the same hand.\"" } },
+                        StrangerReply = new[] { "*Something like approval crosses her face.*", "\"Yeah. You're getting it.\"" } },
                     new() { Key = "4", Text = "I did what I had to. Don't make it philosophical.",
                         ResponseType = StrangerResponseType.Dismissed, ReceptivityChange = -5,
-                        StrangerReply = new[] { "\"Everything is philosophical, mortal.\"", "\"Every sword swing is an argument about power.\"", "\"Every mercy is a theorem about love.\"" } }
+                        StrangerReply = new[] { "\"Everything is philosophical whether you like it or not.\"", "\"Even pretending its not is a kind of philosophy.\"" } }
                 }
             },
 
@@ -286,16 +286,16 @@ namespace UsurperRemake.Systems
                 {
                     new() { Key = "1", Text = "I've died. I've lost friends. I'm starting to understand.",
                         ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"Yes. The pain was the lesson. The loss was the teacher.\"", "\"And the teacher was always me.\"" } },
+                        StrangerReply = new[] { "\"Took you long enough.\"", "\"But yeah. You're getting there.\"" } },
                     new() { Key = "2", Text = "You keep appearing. Who ARE you, really?",
                         ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "\"I am the one who waits at every threshold.\"", "\"The shadow between what was and what will be.\"", "\"When you are ready, I will tell you my true name.\"" } },
+                        StrangerReply = new[] { "\"You'll find out. When you're ready.\"", "\"And you're not ready yet.\"" } },
                     new() { Key = "3", Text = "Beautiful metaphor. But my friends are still dead.",
                         ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Yes. And their deaths shaped you into someone who could hear this.\"", "\"Is that not a form of immortality --\"", "\"to live on in the transformation of those you loved?\"" } },
+                        StrangerReply = new[] { "\"Yeah. They are. And you're still here because of them.\"", "\"Make it count.\"" } },
                     new() { Key = "4", Text = "I'm tired of your riddles, Stranger.",
                         ResponseType = StrangerResponseType.Dismissed, ReceptivityChange = -5,
-                        StrangerReply = new[] { "*She gazes at the ocean.*", "\"The ocean is patient. It will wait.\"" } }
+                        StrangerReply = new[] { "*She shrugs.*", "\"Suit yourself. Im not going anywhere.\"" } }
                 }
             },
 
@@ -331,9 +331,8 @@ namespace UsurperRemake.Systems
                 },
                 ClosingNarration = new[]
                 {
-                    "The darkness recedes, leaving only the memory of starlight eyes",
-                    "and a voice like silk and thunder. You know her name now.",
-                    "And she knows yours -- your true name, from before the forgetting."
+                    "The shadows pull back. Shes gone.",
+                    "But you know her name now. And you wont forget it."
                 },
                 Responses = new List<StrangerResponseOption>
                 {
@@ -348,9 +347,9 @@ namespace UsurperRemake.Systems
                     new() { Key = "2", Text = "Noctura. The Goddess of Shadows. Why me?",
                         ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
                         StrangerReply = new[] {
-                            "\"Because you are the wave that remembers it is water.\"",
-                            "\"Manwe sends fragments of himself to learn mortality.\"",
-                            "\"Most forget. You... you started to remember.\""
+                            "\"Because Manwe sent pieces of himself out to live as mortals.\"",
+                            "\"To learn what it felt like. Most of them forget everything.\"",
+                            "\"You didnt. Thats why.\""
                         } },
                     new() { Key = "3", Text = "All those disguises... you were testing me?",
                         ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
@@ -363,10 +362,9 @@ namespace UsurperRemake.Systems
                     new() { Key = "4", Text = "Stay away from me, goddess. I want nothing from the Old Gods.",
                         ResponseType = StrangerResponseType.Hostile, ReceptivityChange = -10,
                         StrangerReply = new[] {
-                            "*She sighs.*",
-                            "\"You cannot flee from shadow. It follows every light.\"",
-                            "\"We will meet again on Floor 70.\"",
-                            "\"And then you will choose.\""
+                            "*She shrugs.*",
+                            "\"You can hate me all you want. Doesnt change anything.\"",
+                            "\"Floor 70. Ill be there whether you like it or not.\""
                         } }
                 }
             },
@@ -385,13 +383,11 @@ namespace UsurperRemake.Systems
                 },
                 Dialogue = new[]
                 {
-                    "\"You are close now.\"",
-                    "\"When we meet, you will have a choice.\"",
-                    "\"You can fight me. Many have. All have suffered.\"",
-                    "\"Or you can accept what I have taught you.\"",
-                    "\"That death is not destruction. It is transformation.\"",
-                    "\"That the shadow is not the enemy of light.\"",
-                    "\"It is its other half.\""
+                    "\"Almost there now.\"",
+                    "\"When you find me, you'll have a choice.\"",
+                    "\"You can fight me. Plenty have tried. It goes badly.\"",
+                    "\"Or you can use what Ive been teaching you.\"",
+                    "\"Up to you.\""
                 },
                 ClosingNarration = new[]
                 {
@@ -402,13 +398,13 @@ namespace UsurperRemake.Systems
                 {
                     new() { Key = "1", Text = "I accept your lesson, Noctura. I am ready.",
                         ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"Then when we meet, there will be no need for violence.\"", "\"Only understanding.\"" } },
+                        StrangerReply = new[] { "\"Good. Then maybe we can skip the fighting part.\"" } },
                     new() { Key = "2", Text = "I hear your words. But I will decide when I face you.",
                         ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Wise. The moment of truth is not in preparation but in action.\"" } },
+                        StrangerReply = new[] { "\"Fair. Talk is cheap anyway.\"" } },
                     new() { Key = "3", Text = "Whatever happens, I will face you without fear.",
                         ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "\"Without fear? That is the bravest thing a mortal can say\"", "\"to Death herself.\"" } }
+                        StrangerReply = new[] { "\"Huh. Brave or stupid. Guess we'll find out.\"" } }
                 }
             }
         };
@@ -429,11 +425,11 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "That's a morbid way to look at flowers.", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Morbid? Or honest? The flower does not mourn the soil it grows from.\"" } },
+                        StrangerReply = new[] { "\"Morbid? I'd call it honest.\"" } },
                     new() { Key = "2", Text = "Death feeding life... there's a certain beauty to that.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
                         StrangerReply = new[] { "\"You see it. Most don't. Most see only the grave, never the bloom.\"" } },
                     new() { Key = "3", Text = "I'd rather not think about graveyards.", ResponseType = StrangerResponseType.Dismissed, ReceptivityChange = -5,
-                        StrangerReply = new[] { "\"And yet the graveyard thinks about you. It is patient.\"" } },
+                        StrangerReply = new[] { "\"Sure. Most people would rather not.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
                         StrangerReply = new[] { "They watch you go with an expression that might be amusement, or might be sorrow." } }
                 }
@@ -447,7 +443,7 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "I never thought of it that way.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Few do. They see the falling and call it loss. I see the burning and call it glory.\"" } },
+                        StrangerReply = new[] { "\"Most people dont. Too busy being sad about the falling part.\"" } },
                     new() { Key = "2", Text = "Are you always this philosophical?", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
                         StrangerReply = new[] { "\"Only when I meet someone worth philosophizing at.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
@@ -465,7 +461,7 @@ namespace UsurperRemake.Systems
                     new() { Key = "1", Text = "I... hadn't thought about it like that. A death before waking.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
                         StrangerReply = new[] { "\"Your first death, and you don't even remember it.\"", "\"Perhaps that is a mercy.\"" } },
                     new() { Key = "2", Text = "I'm more concerned with who I am NOW.", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "\"A practical answer. But 'now' is just the space between two deaths.\"" } },
+                        StrangerReply = new[] { "\"Fair enough. But you might want to think about it eventually.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
                         StrangerReply = new[] { "\"Think on it. When you're ready, the answer will find you.\"" } }
                 }
@@ -514,9 +510,9 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "The wave doesn't know it's the ocean.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"No. And that is the great tragedy.\"", "\"But also the great adventure. To be a wave, believing you are separate,\"", "\"and then... to remember.\"" } },
+                        StrangerReply = new[] { "\"No it doesnt. Thats kind of the whole point, isnt it.\"" } },
                     new() { Key = "2", Text = "You're talking about more than waves, aren't you?", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"I'm talking about everything. About you. About me. About death itself.\"", "\"The wave crashes. But the water never dies.\"" } },
+                        StrangerReply = new[] { "\"What do you think? Im not talking about the seaside.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
                         StrangerReply = new[] { "You walk away, but you swear you hear the sound of distant waves." } }
                 }
@@ -531,9 +527,9 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "Into me? What do you mean?", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Every god you face leaves a mark on your soul.\"", "\"Not a wound. A gift. Whether you wanted it or not.\"" } },
+                        StrangerReply = new[] { "\"You absorbed some of what they were. It changes you.\"", "\"Whether you wanted it to or not.\"" } },
                     new() { Key = "2", Text = "I can feel their power. It frightens me sometimes.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Good. Power without fear is power without wisdom.\"", "\"And wisdom is what separates a destroyer from a transformer.\"" } },
+                        StrangerReply = new[] { "\"Should be scared. Means you're paying attention.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
                         StrangerReply = new[] { "\"The gods are watching you. Even the dead ones.\"" } }
                 }
@@ -548,9 +544,9 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "A gift? It feels like a curse.", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Grief and love are the same emotion, seen from different sides.\"", "\"You cannot have one without accepting the other.\"" } },
+                        StrangerReply = new[] { "\"Feels like a curse because you cared about them. Thats not a bad thing.\"" } },
                     new() { Key = "2", Text = "You're right. I wouldn't trade the memories to stop the pain.", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"And there it is. The lesson death teaches best.\"", "\"That love is worth the price of loss.\"" } },
+                        StrangerReply = new[] { "\"Yeah. You get it then.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
                         StrangerReply = new[] { "She watches you go, carrying the weight. She has carried it too, for longer than you know." } }
                 }
@@ -565,9 +561,9 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "I've seen renewal. After every battle, after every loss.", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"You are learning faster than most.\"", "\"The flame is not the enemy. The refusal to burn is.\"" } },
+                        StrangerReply = new[] { "\"Good. You're a quick study.\"" } },
                     new() { Key = "2", Text = "Easy to say when you're not the one burning.", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "*She looks at you with ancient, weary eyes.*", "\"Child, I have burned more times than there are stars.\"" } },
+                        StrangerReply = new[] { "*She gives you a look.*", "\"You think Im just talking? Ive been through worse than you can imagine.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
                         StrangerReply = new[] { "A warmth brushes past you. Like standing near a fire that gives light but cannot burn." } }
                 }
@@ -582,7 +578,7 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "That's... oddly comforting.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"It was meant to be.\"", "\"Fear of death is fear of sleep. And no one fears sleep.\"" } },
+                        StrangerReply = new[] { "\"Good. Hold onto that.\"" } },
                     new() { Key = "2", Text = "Sleep doesn't usually involve swords.", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
                         StrangerReply = new[] { "*A flicker of amusement.*", "\"No. But the principle is the same.\"", "\"The letting go. The trust that something waits on the other side.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
@@ -601,11 +597,11 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "The wheel... is that what this is? A cycle?", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"A cycle. A spiral. A dream dreaming itself awake.\"", "\"The question is not whether the wheel turns.\"", "\"It's whether you can step off it.\"" } },
+                        StrangerReply = new[] { "\"Call it what you want. Cycle, spiral, whatever.\"", "\"Point is you keep coming back. Question is why.\"" } },
                     new() { Key = "2", Text = "I feel like I've known you for lifetimes.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"You have. In every cycle, I find you. In every cycle, I teach.\"", "\"And in every cycle... you forget. Until now.\"" } },
+                        StrangerReply = new[] { "\"You have. And every time, you forget.\"", "\"Maybe this time you wont.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"The wheel turns. But you're getting closer to the center.\"" } }
+                        StrangerReply = new[] { "\"Getting warmer.\"" } }
                 }
             },
 
@@ -619,11 +615,11 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "I've wondered that. I'm afraid of the answer.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Fear of the answer is close to the answer itself.\"", "\"You are not what you think you are.\"", "\"You are so much more.\"" } },
+                        StrangerReply = new[] { "\"Good. You should be.\"", "\"But you already know, dont you? Deep down.\"" } },
                     new() { Key = "2", Text = "Because I'm not mortal. Not really. Am I?", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "*Her eyes glisten with something that might be tears.*", "\"You're remembering. Finally, you're remembering.\"" } },
+                        StrangerReply = new[] { "She goes quiet for a long time.", "\"No. You're not.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"The answer is coming. Whether you want it or not.\"" } }
+                        StrangerReply = new[] { "\"Youll figure it out. Sooner than you think.\"" } }
                 }
             },
 
@@ -637,30 +633,29 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "The seals tell the story of the gods. And of us.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Of ALL of us. Gods, mortals, shadows.\"", "\"We are all fragments of the same shattered mirror.\"" } },
+                        StrangerReply = new[] { "\"Close. Its more like a confession.\"", "\"Keep collecting them. Youll understand when you have them all.\"" } },
                     new() { Key = "2", Text = "I'm still putting the pieces together.", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Keep going. When the last piece falls into place...\"", "\"...you will see the face in the mirror. Your true face.\"" } },
+                        StrangerReply = new[] { "\"Good. Dont rush it.\"", "\"Some things hit harder when you figure them out yourself.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"The story writes itself. You need only keep reading.\"" } }
+                        StrangerReply = new[] { "\"Keep reading. Its almost at the good part.\"" } }
                 }
             },
 
             new() { Id = "ctx_late_manwe", MinEncounters = 8, MinLevel = 50, MinAwakening = 4,
                 Dialogue = new[] {
                     "\"Manwe is tired. Can you feel it?\"",
-                    "\"He created the gods to have companions.\"",
-                    "\"But he never understood them. Never truly.\"",
-                    "\"So he became mortal. Again and again.\"",
-                    "\"Living. Loving. Losing.\"",
-                    "\"Learning what it means to die.\""
+                    "\"He made the gods because he was lonely.\"",
+                    "\"But he never understood them. Not really.\"",
+                    "\"So he sent pieces of himself out to live as mortals.\"",
+                    "\"To find out what dying feels like.\""
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "You're talking about me. I am Manwe's fragment.", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"Yes. And every death you've endured, he endured with you.\"", "\"Every lesson I taught you, I taught him.\"", "\"Through you. Always through you.\"" } },
+                        StrangerReply = new[] { "\"Yeah.\"", "\"Every time you died, he felt it. Thats the whole point.\"" } },
                     new() { Key = "2", Text = "Manwe... the Creator. Why would he choose suffering?", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Because understanding cannot come without experience.\"", "\"He needed to know what death FELT like.\"", "\"And so he died. A thousand times. Through you.\"" } },
+                        StrangerReply = new[] { "\"Because you cant understand something you never felt.\"", "\"He needed to know what death was. So he died. A thousand times. Through you.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"When you face him, remember this conversation.\"" } }
+                        StrangerReply = new[] { "\"Remember this when you meet him.\"" } }
                 }
             },
 
@@ -674,11 +669,11 @@ namespace UsurperRemake.Systems
                 },
                 Responses = new List<StrangerResponseOption> {
                     new() { Key = "1", Text = "Are you? Are you always the same person?", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Person? No. I am something older than persons.\"", "\"But yes. Every face you've seen was mine.\"", "\"Every lesson was the same lesson.\"" } },
+                        StrangerReply = new[] { "\"Every face. Every disguise. Yeah, that was me.\"", "\"Surprised it took you this long to notice.\"" } },
                     new() { Key = "2", Text = "I know what you are. You're Noctura.", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "\"Clever. But knowing my name changes nothing.\"", "\"The question is not who I am. It's what I'm teaching.\"" } },
+                        StrangerReply = new[] { "\"Took you long enough.\"", "\"Knowing my name doesnt change anything though. Pay attention to what Im telling you.\"" } },
                     new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"When you're ready to say my name, I'll be listening.\"" } }
+                        StrangerReply = new[] { "\"Go on then. Youll say it eventually.\"" } }
                 }
             }
         };
@@ -982,11 +977,11 @@ namespace UsurperRemake.Systems
             {
                 // Fallback for encounters without response options
                 options.Add(("1", "Listen carefully",
-                    "\"Good. Listening is the first step.\""));
+                    "\"Smart. Most people dont bother.\""));
                 options.Add(("2", "Ask what they mean",
-                    "\"Meaning is a luxury. Understanding comes later.\""));
+                    "\"Youll figure it out. Or you wont. Either way.\""));
                 options.Add(("0", "Say nothing and leave",
-                    "They watch you go with an expression that might be amusement, or might be sorrow."));
+                    "They watch you go. Hard to tell if theyre amused or disappointed."));
             }
 
             return options;

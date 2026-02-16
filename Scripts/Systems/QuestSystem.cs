@@ -161,6 +161,19 @@ public partial class QuestSystem : Node
             StatisticsManager.Current.RecordBountyComplete();
         }
 
+        // Faction standing boost for faction-initiated quests
+        var questFaction = GetFactionFromInitiator(quest.Initiator);
+        if (questFaction != null)
+        {
+            var factionSystem = FactionSystem.Instance;
+            if (factionSystem != null)
+            {
+                factionSystem.FactionStanding[questFaction.Value] += 50;
+                factionSystem.CompletedFactionQuests.Add(quest.Id);
+                terminal.WriteLine($"  Your standing with {quest.Initiator} has improved!", "bright_cyan");
+            }
+        }
+
         // Check quest achievements
         CheckQuestAchievements(player);
 
@@ -1631,6 +1644,133 @@ public partial class QuestSystem : Node
         }
 
         return quest;
+    }
+
+    /// <summary>
+    /// Create a faction mission quest and assign it to the player.
+    /// Crown: defeat a criminal NPC. Shadows: collect gold. Faith: talk to a lost soul.
+    /// </summary>
+    public static Quest CreateFactionMission(Character player, Faction faction, string targetNPCName, string missionDesc, int goldReward)
+    {
+        string factionInitiator = faction switch
+        {
+            Faction.TheCrown => GameConfig.FactionInitiatorCrown,
+            Faction.TheShadows => GameConfig.FactionInitiatorShadows,
+            Faction.TheFaith => GameConfig.FactionInitiatorFaith,
+            _ => "Faction"
+        };
+
+        QuestTarget questTarget;
+        QuestObjectiveType objectiveType;
+        string objectiveDesc;
+        int targetValue = 1;
+
+        switch (faction)
+        {
+            case Faction.TheCrown:
+                questTarget = QuestTarget.DefeatNPC;
+                objectiveType = QuestObjectiveType.DefeatNPC;
+                objectiveDesc = $"Defeat {targetNPCName}";
+                break;
+            case Faction.TheShadows:
+                // If targetNPCName is a real NPC name (assassination), create DefeatNPC quest
+                // Otherwise it's "a valuable contact" (retrieval), create CollectGold quest
+                if (targetNPCName != null && targetNPCName != "a valuable contact")
+                {
+                    questTarget = QuestTarget.DefeatNPC;
+                    objectiveType = QuestObjectiveType.DefeatNPC;
+                    objectiveDesc = $"Eliminate {targetNPCName}";
+                }
+                else
+                {
+                    questTarget = QuestTarget.ClaimTown;
+                    objectiveType = QuestObjectiveType.CollectGold;
+                    objectiveDesc = $"Collect {goldReward * 2} gold";
+                    targetValue = goldReward * 2;
+                }
+                break;
+            default: // Faith
+                questTarget = QuestTarget.DefeatNPC; // Reuse; objective type distinguishes
+                objectiveType = QuestObjectiveType.TalkToNPC;
+                objectiveDesc = $"Talk to {targetNPCName}";
+                break;
+        }
+
+        var quest = new Quest
+        {
+            Title = faction switch
+            {
+                Faction.TheCrown => $"{factionInitiator} Mission: Eliminate {targetNPCName}",
+                Faction.TheShadows when objectiveType == QuestObjectiveType.DefeatNPC =>
+                    $"{factionInitiator} Contract: {targetNPCName}",
+                Faction.TheShadows => $"{factionInitiator} Mission: Delicate Retrieval",
+                _ => $"{factionInitiator} Mission: Redeem {targetNPCName}"
+            },
+            Initiator = factionInitiator,
+            QuestType = QuestType.SingleQuest,
+            QuestTarget = questTarget,
+            Difficulty = (byte)Math.Min(4, Math.Max(1, player.Level / 15 + 1)),
+            Comment = missionDesc,
+            Date = DateTime.Now,
+            MinLevel = 1,
+            MaxLevel = 9999,
+            DaysToComplete = 14,
+            Reward = (byte)Math.Min(255, goldReward / 100),
+            RewardType = QuestRewardType.Money,
+            TargetNPCName = (faction == Faction.TheShadows && objectiveType != QuestObjectiveType.DefeatNPC) ? null : targetNPCName,
+            Occupier = player.Name2,
+            OccupierRace = player.Race,
+            OccupierSex = (byte)((int)player.Sex),
+            OccupiedDays = 0,
+            OfferedTo = player.Name2
+        };
+
+        quest.Objectives.Add(new QuestObjective(
+            objectiveType,
+            objectiveDesc,
+            targetValue,
+            targetNPCName ?? "",
+            targetNPCName ?? ""
+        ));
+
+        questDatabase.Add(quest);
+
+        if (player is Player p)
+        {
+            p.ActiveQuests.Add(quest);
+        }
+
+        return quest;
+    }
+
+    /// <summary>
+    /// Called when the player talks to an NPC — updates TalkToNPC quest objectives.
+    /// </summary>
+    public static void OnNPCTalkedTo(Character player, string npcName)
+    {
+        if (player == null || string.IsNullOrEmpty(npcName)) return;
+
+        var playerQuests = GetPlayerQuests(player.Name2);
+        foreach (var quest in playerQuests)
+        {
+            if (!string.IsNullOrEmpty(quest.TargetNPCName) &&
+                quest.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase))
+            {
+                quest.UpdateObjectiveProgress(QuestObjectiveType.TalkToNPC, 1, npcName);
+                quest.OccupiedDays = Math.Max(1, quest.OccupiedDays);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Check if a quest initiator is a faction name (for faction standing boost on completion).
+    /// </summary>
+    public static Faction? GetFactionFromInitiator(string initiator)
+    {
+        if (initiator == GameConfig.FactionInitiatorCrown) return Faction.TheCrown;
+        if (initiator == GameConfig.FactionInitiatorShadows) return Faction.TheShadows;
+        if (initiator == GameConfig.FactionInitiatorFaith) return Faction.TheFaith;
+        return null;
     }
 
     /// <summary>

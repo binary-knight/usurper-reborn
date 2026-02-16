@@ -172,31 +172,31 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             await Task.Delay(1000);
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"{godName} materializes before you once more...");
+            terminal.WriteLine($"{godName} appears before you again.");
             await Task.Delay(1500);
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"\"You... you actually returned. And you brought it.\"");
+            terminal.WriteLine($"\"You came back. You actually came back.\"");
             await Task.Delay(1500);
-            terminal.WriteLine($"\"The Soulweaver's Loom. I can feel its power reaching out to me.\"");
+            terminal.WriteLine($"\"And you brought it. I can feel it from here.\"");
             await Task.Delay(1500);
             terminal.WriteLine("");
 
             terminal.SetColor("bright_white");
-            terminal.WriteLine("The Loom begins to glow, threads of light weaving through the air...");
+            terminal.WriteLine("The artifact does its work. You dont really understand how.");
             await Task.Delay(2000);
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine("The corruption that has twisted this ancient being starts to unravel.");
+            terminal.WriteLine("The corruption peels away like dead bark off a tree.");
             await Task.Delay(1500);
-            terminal.WriteLine("Layer by layer, the curse falls away like old skin.");
+            terminal.WriteLine("Underneath, something old and clean starts to show through.");
             await Task.Delay(1500);
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"\"{godName} gasps as memories of who they truly were flood back.\"");
+            terminal.WriteLine($"{godName} staggers, blinking, like someone waking from a bad dream.");
             await Task.Delay(1500);
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"\"Thank you... I remember now. I remember what love truly means.\"");
+            terminal.WriteLine($"\"I remember... gods, I remember everything. What I did... what I was...\"");
             await Task.Delay(2000);
             terminal.WriteLine("");
 
@@ -342,11 +342,11 @@ namespace UsurperRemake.Systems
             {
                 // Player said nothing — the god forces combat
                 terminal.WriteLine("");
-                terminal.WriteLine($"Your silence hangs in the air.", "gray");
+                terminal.WriteLine($"You say nothing.", "gray");
                 terminal.WriteLine("");
-                terminal.WriteLine($"{boss.Name} regards you with contempt.", boss.ThemeColor);
+                terminal.WriteLine($"{boss.Name} stares at you.", boss.ThemeColor);
                 terminal.WriteLine("");
-                terminal.WriteLine($"\"{(type == OldGodType.Maelketh ? "You DARE stand before me and say NOTHING?!" : "Your silence speaks volumes, mortal.")}\"", boss.ThemeColor);
+                terminal.WriteLine($"\"{(type == OldGodType.Maelketh ? "You DARE stand there and say NOTHING to me?!" : "Fine. Have it your way.")}\"", boss.ThemeColor);
                 terminal.WriteLine("");
                 terminal.WriteLine("The god attacks!", "bright_red");
                 await Task.Delay(2000);
@@ -934,8 +934,8 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(1500);
 
-            terminal.WriteLine($"  The corruption fades from {boss.Name}.", "white");
-            terminal.WriteLine("  For the first time in millennia, they see clearly.", "white");
+            terminal.WriteLine($"  The darkness lifts from {boss.Name}.", "white");
+            terminal.WriteLine("  They look around like they're seeing the world for the first time.", "white");
             terminal.WriteLine("");
 
             foreach (var line in boss.SaveDialogue)
@@ -968,7 +968,7 @@ namespace UsurperRemake.Systems
                 player.AddMaterial(thematicMaterial.Id, 2);
                 terminal.WriteLine("");
                 terminal.SetColor(thematicMaterial.Color);
-                terminal.WriteLine($"  {boss.Name} bestows upon you {thematicMaterial.Name} x2!");
+                terminal.WriteLine($"  {boss.Name} leaves behind {thematicMaterial.Name} x2.");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  \"{thematicMaterial.Description}\"");
             }
@@ -976,7 +976,7 @@ namespace UsurperRemake.Systems
             {
                 player.AddMaterial("heart_of_the_ocean", 1);
                 terminal.SetColor("cyan");
-                terminal.WriteLine("  An iridescent pearl materializes — a Heart of the Ocean!");
+                terminal.WriteLine("  A strange pearl drops to the ground -- a Heart of the Ocean!");
             }
 
             OnBossSaved?.Invoke(boss.Type);
@@ -1019,7 +1019,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             await terminal.GetInputAsync("  Press Enter to continue...");
             terminal.WriteLine("");
-            terminal.WriteLine($"  {boss.Name}'s divine essence scatters to the winds.", "white");
+            terminal.WriteLine($"  What's left of {boss.Name} breaks apart and fades.", "white");
             terminal.WriteLine("");
 
             // Update story state
@@ -1038,7 +1038,7 @@ namespace UsurperRemake.Systems
                 player.AddMaterial(thematicMaterial.Id, 2);
                 terminal.WriteLine("");
                 terminal.SetColor(thematicMaterial.Color);
-                terminal.WriteLine($"  The essence of {boss.Name} crystallizes into {thematicMaterial.Name} x2!");
+                terminal.WriteLine($"  Something crystallizes out of the remains... {thematicMaterial.Name} x2!");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  \"{thematicMaterial.Description}\"");
             }
@@ -1046,7 +1046,7 @@ namespace UsurperRemake.Systems
             {
                 player.AddMaterial("heart_of_the_ocean", 1);
                 terminal.SetColor("cyan");
-                terminal.WriteLine("  An iridescent pearl materializes — a Heart of the Ocean!");
+                terminal.WriteLine("  A strange pearl drops to the ground -- a Heart of the Ocean!");
             }
             terminal.WriteLine("");
 
@@ -1092,20 +1092,19 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(1500);
 
-            terminal.WriteLine($"  {boss.Name} stands over your broken form.", "red");
+            terminal.WriteLine($"  You hit the ground hard. {boss.Name} looms over you.", "red");
             terminal.WriteLine("");
 
-            terminal.WriteLine($"  \"Pathetic mortal. Did you truly think", boss.ThemeColor);
-            terminal.WriteLine($"   you could challenge a god?\"", boss.ThemeColor);
+            terminal.WriteLine($"  \"Not good enough, mortal. Not even close.\"", boss.ThemeColor);
             terminal.WriteLine("");
 
             await Task.Delay(2000);
 
             // Player doesn't die permanently in boss fights - they're sent back
-            terminal.WriteLine("  As darkness claims you, a voice speaks.", "gray");
-            terminal.WriteLine("  \"Not yet. The wheel has not finished turning.\"", "bright_magenta");
+            terminal.WriteLine("  Everything goes dark. But before you're gone completely,", "gray");
+            terminal.WriteLine("  something pulls you back. Not yet.", "bright_magenta");
             terminal.WriteLine("");
-            terminal.WriteLine("  You awaken at the dungeon entrance, weakened but alive.", "white");
+            terminal.WriteLine("  You wake up at the dungeon entrance. Everything hurts.", "white");
 
             player.HP = player.MaxHP / 4;
             player.Experience = Math.Max(0, player.Experience - (boss.Level * 100));

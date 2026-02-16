@@ -129,8 +129,35 @@ public partial class CombatEngine
         // Store player reference for combat speed setting
         currentPlayer = attacker;
 
+        // Reset temporary combat flags (matches PlayerVsMonsters initialization)
         attacker.IsRaging = false;
         defender.IsRaging = false;
+        attacker.TempAttackBonus = 0;
+        attacker.TempAttackBonusDuration = 0;
+        attacker.TempDefenseBonus = 0;
+        attacker.TempDefenseBonusDuration = 0;
+        attacker.DodgeNextAttack = false;
+        attacker.HasBloodlust = false;
+        attacker.HasStatusImmunity = false;
+        attacker.StatusImmunityDuration = 0;
+        abilityCooldowns.Clear();
+
+        // Initialize combat stamina for abilities
+        attacker.InitializeCombatStamina();
+
+        // Reset per-combat faction flags
+        attacker.DivineFavorTriggeredThisCombat = false;
+        if (attacker.PoisonCoatingCombats > 0) attacker.PoisonCoatingCombats--;
+
+        // Ensure abilities are learned based on current level (fixes abilities not showing in quickbar)
+        if (!ClassAbilitySystem.IsSpellcaster(attacker.Class))
+        {
+            ClassAbilitySystem.GetAvailableAbilities(attacker);
+        }
+
+        // Initialize combat state
+        globalBegged = false;
+        globalEscape = false;
 
         var result = new CombatResult
         {
@@ -138,7 +165,7 @@ public partial class CombatEngine
             Opponent = defender,
             CombatLog = new List<string>()
         };
-        
+
         // PvP combat introduction
         await ShowPvPIntroduction(attacker, defender, result);
         
@@ -212,6 +239,11 @@ public partial class CombatEngine
 
         // Initialize combat stamina for player and teammates
         player.InitializeCombatStamina();
+
+        // Reset per-combat faction flags
+        player.DivineFavorTriggeredThisCombat = false;
+        // Decrement poison coating (per combat, not per round)
+        if (player.PoisonCoatingCombats > 0) player.PoisonCoatingCombats--;
 
         // Ensure abilities are learned based on current level (fixes abilities not showing)
         if (!ClassAbilitySystem.IsSpellcaster(player.Class))
@@ -401,11 +433,37 @@ public partial class CombatEngine
                 {
                     // Auto-combat: automatically attack random living monster
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine("[AUTO-COMBAT] Press Enter to stop...");
+                    terminal.WriteLine("[AUTO-COMBAT] Press any key to stop...");
                     terminal.WriteLine("");
 
+                    // Check for key press to stop auto-combat (poll during delay)
+                    int delayMs = GetCombatDelay(500);
+                    int elapsed = 0;
+                    bool stopRequested = false;
+                    while (elapsed < delayMs)
+                    {
+                        if (terminal.IsInputAvailable())
+                        {
+                            terminal.FlushPendingInput();
+                            stopRequested = true;
+                            break;
+                        }
+                        await Task.Delay(50); // Check every 50ms
+                        elapsed += 50;
+                    }
+
+                    if (stopRequested)
+                    {
+                        autoCombat = false;
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine("[AUTO-COMBAT] Stopped. You take manual control.");
+                        terminal.WriteLine("");
+                        var (action, enableAuto) = await GetPlayerActionMultiMonster(player, monsters, result);
+                        playerAction = action;
+                        if (enableAuto) autoCombat = true;
+                    }
                     // Smart auto-combat: use potion if HP below 50% (preemptive to survive burst)
-                    if (player.HP < player.MaxHP * 0.5 && player.Healing > 0)
+                    else if (player.HP < player.MaxHP * 0.5 && player.Healing > 0)
                     {
                         terminal.SetColor("bright_green");
                         terminal.WriteLine("[AUTO-COMBAT] HP low - using healing potion...");
@@ -422,8 +480,6 @@ public partial class CombatEngine
                             TargetIndex = null // Random target
                         };
                     }
-
-                    await Task.Delay(GetCombatDelay(500)); // Brief pause
                 }
                 else
                 {
@@ -569,9 +625,33 @@ public partial class CombatEngine
             }
             else
             {
-                result.Outcome = CombatOutcome.PlayerDied;
-                UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} has fallen in combat!");
-                await HandlePlayerDeath(result);
+                // Faith Divine Favor: chance to survive lethal damage
+                bool divineSaved = false;
+                if (!player.DivineFavorTriggeredThisCombat)
+                {
+                    float divineFavorChance = FactionSystem.Instance?.GetDivineFavorChance() ?? 0f;
+                    if (divineFavorChance > 0 && random.NextDouble() < divineFavorChance)
+                    {
+                        player.DivineFavorTriggeredThisCombat = true;
+                        player.HP = Math.Max(1, player.MaxHP / 10);
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine("");
+                        terminal.WriteLine("  A golden light flares around you!");
+                        terminal.WriteLine("  The gods arent done with you yet.");
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  You are restored to {player.HP} HP!");
+                        terminal.WriteLine("");
+                        await Task.Delay(GetCombatDelay(2000));
+                        divineSaved = true;
+                    }
+                }
+
+                if (!divineSaved)
+                {
+                    result.Outcome = CombatOutcome.PlayerDied;
+                    UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} has fallen in combat!");
+                    await HandlePlayerDeath(result);
+                }
             }
         }
         else if (!monsters.Any(m => m.IsAlive))
@@ -1527,6 +1607,13 @@ public partial class CombatEngine
             }
         }
 
+        // Poison Coating bonus damage (Black Market consumable)
+        if (attacker.PoisonCoatingCombats > 0)
+        {
+            long poisonBonus = (long)(attackPower * GameConfig.PoisonCoatingDamageBonus);
+            attackPower += poisonBonus;
+        }
+
         // Show critical hit message
         if (attackRoll.IsCriticalSuccess)
         {
@@ -1818,8 +1905,27 @@ public partial class CombatEngine
         if (player.Class == CharacterClass.Jester || player.Class == CharacterClass.Bard)
             escapeChance += 10;
 
+        // Shadows faction escape bonus
+        escapeChance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
+
         // Cap at 75% to prevent guaranteed escapes
         escapeChance = Math.Min(75, escapeChance);
+
+        // Smoke bomb: guaranteed escape from non-boss combat
+        if (player.SmokeBombs > 0 && !monster.IsBoss)
+        {
+            player.SmokeBombs--;
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("You throw a smoke bomb! The monster chokes on the haze!");
+            terminal.SetColor("green");
+            terminal.WriteLine("You escape in the confusion!");
+            globalEscape = true;
+            result.Outcome = CombatOutcome.PlayerEscaped;
+            result.CombatLog.Add("Player escaped using smoke bomb");
+            player.Statistics.TotalCombatsFled++;
+            await Task.Delay(GetCombatDelay(1500));
+            return;
+        }
 
         terminal.SetColor("gray");
         terminal.WriteLine($"(Escape chance: {escapeChance}%)");
@@ -2502,8 +2608,32 @@ public partial class CombatEngine
         }
         else if (!result.Player.IsAlive)
         {
-            result.Outcome = CombatOutcome.PlayerDied;
-            await HandlePlayerDeath(result);
+            // Faith Divine Favor: chance to survive lethal damage
+            bool divineSaved = false;
+            if (!result.Player.DivineFavorTriggeredThisCombat)
+            {
+                float divineFavorChance = FactionSystem.Instance?.GetDivineFavorChance() ?? 0f;
+                if (divineFavorChance > 0 && random.NextDouble() < divineFavorChance)
+                {
+                    result.Player.DivineFavorTriggeredThisCombat = true;
+                    result.Player.HP = Math.Max(1, result.Player.MaxHP / 10);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  A golden light flares around you!");
+                    terminal.WriteLine("  The gods arent done with you yet.");
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  You are restored to {result.Player.HP} HP!");
+                    terminal.WriteLine("");
+                    await Task.Delay(GetCombatDelay(2000));
+                    divineSaved = true;
+                }
+            }
+
+            if (!divineSaved)
+            {
+                result.Outcome = CombatOutcome.PlayerDied;
+                await HandlePlayerDeath(result);
+            }
         }
         else if (!result.Monster.IsAlive)
         {
@@ -4561,12 +4691,29 @@ public partial class CombatEngine
                     break;
                 }
 
+                // Smoke bomb: guaranteed escape from non-boss combat
+                if (player.SmokeBombs > 0 && BossContext == null)
+                {
+                    player.SmokeBombs--;
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("You throw a smoke bomb and vanish into the haze!");
+                    globalEscape = true;
+                    await Task.Delay(GetCombatDelay(1500));
+                    break;
+                }
+
                 // Boss fights have flat 20% flee chance; normal combat is dex-based
                 int retreatChance;
                 if (BossContext != null)
                     retreatChance = 20;
                 else
                     retreatChance = (int)(player.Dexterity / 2);
+
+                // Shadows faction escape bonus
+                retreatChance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
+                retreatChance = Math.Min(75, retreatChance);
+
                 int retreatRoll = random.Next(1, 101);
 
                 terminal.WriteLine("");
@@ -7931,8 +8078,11 @@ public partial class CombatEngine
         player.Experience = Math.Max(0, player.Experience - expLoss);
         terminal.WriteLine($"You lose {expLoss:N0} experience points!");
 
-        // Gold loss (drop 50-75%)
-        long goldLoss = (long)(player.Gold * (0.5 + random.NextDouble() * 0.25));
+        // Gold loss (drop 50-75%) — Crown Tax Exemption reduces by 20%
+        double goldLossRate = 0.5 + random.NextDouble() * 0.25;
+        float taxExemption = FactionSystem.Instance?.GetTaxExemptionRate() ?? 0f;
+        if (taxExemption > 0) goldLossRate *= (1.0 - taxExemption);
+        long goldLoss = (long)(player.Gold * goldLossRate);
         player.Gold = Math.Max(0, player.Gold - goldLoss);
         if (goldLoss > 0)
         {
@@ -9059,7 +9209,38 @@ public partial class CombatEngine
                 break;
 
             case CombatActionType.CastSpell:
-                await ExecutePvPSpell(attacker, defender, result);
+                await ExecutePvPSpell(attacker, defender, action, result);
+                break;
+
+            case CombatActionType.UseAbility:
+            case CombatActionType.ClassAbility:
+                await ExecutePvPAbility(attacker, defender, action, result);
+                break;
+
+            case CombatActionType.Rage:
+                await ExecuteRage(attacker, result);
+                break;
+
+            case CombatActionType.RangedAttack:
+                // Ranger ranged attack works in PvP as a basic attack with bonus
+                await ExecutePvPAttack(attacker, defender, result);
+                break;
+
+            case CombatActionType.Retreat:
+                // Flee from PvP combat
+                int fleeChance = 30 + (int)(attacker.Agility / 2) - (int)(defender.Agility / 4);
+                fleeChance = Math.Clamp(fleeChance, 10, 75);
+                if (random.Next(100) < fleeChance)
+                {
+                    terminal.WriteLine("You manage to escape!", "green");
+                    globalEscape = true;
+                    result.Outcome = CombatOutcome.PlayerEscaped;
+                }
+                else
+                {
+                    terminal.WriteLine($"{defender.DisplayName} blocks your escape!", "red");
+                }
+                await Task.Delay(GetCombatDelay(800));
                 break;
 
             case CombatActionType.Hide:
@@ -9082,7 +9263,6 @@ public partial class CombatEngine
             case CombatActionType.Smite:
             case CombatActionType.FightToDeath:
             case CombatActionType.BegForMercy:
-            case CombatActionType.Retreat:
                 terminal.WriteLine("That action is not available in PvP combat.", "yellow");
                 await Task.Delay(GetCombatDelay(500));
                 // Default to basic attack
@@ -9156,7 +9336,7 @@ public partial class CombatEngine
     /// <summary>
     /// Execute a spell in PvP combat
     /// </summary>
-    private async Task ExecutePvPSpell(Character attacker, Character defender, CombatResult result)
+    private async Task ExecutePvPSpell(Character attacker, Character defender, CombatAction action, CombatResult result)
     {
         if (attacker.Mana <= 0)
         {
@@ -9176,36 +9356,242 @@ public partial class CombatEngine
             return;
         }
 
-        // Show spell selection
-        terminal.WriteLine("Available spells:", "cyan");
-        for (int i = 0; i < spells.Count; i++)
+        SpellSystem.SpellInfo? chosen = null;
+
+        // If spell was triggered from quickbar, use it directly
+        if (action.SpellIndex > 0)
         {
-            var sp = spells[i];
-            terminal.WriteLine($"  [{i + 1}] {sp.Name} (Level {sp.Level}, Cost: {sp.ManaCost})", "white");
+            chosen = spells.FirstOrDefault(s => s.Level == action.SpellIndex);
         }
 
-        var choice = await terminal.GetInput("Cast which spell? ");
-        if (int.TryParse(choice, out int spellIndex) && spellIndex >= 1 && spellIndex <= spells.Count)
+        if (chosen == null)
         {
-            var chosen = spells[spellIndex - 1];
-            var spellResult = SpellSystem.CastSpell(attacker, chosen.Level, defender);
-            terminal.WriteLine(spellResult.Message, "magenta");
-
-            // Apply spell effects - damage spells work on Character
-            if (spellResult.Success && spellResult.Damage > 0)
+            // Show spell selection menu
+            terminal.WriteLine("Available spells:", "cyan");
+            for (int i = 0; i < spells.Count; i++)
             {
-                defender.HP = Math.Max(0, defender.HP - spellResult.Damage);
-                terminal.WriteLine($"{defender.DisplayName} takes {spellResult.Damage} magical damage!", "bright_magenta");
+                var sp = spells[i];
+                terminal.WriteLine($"  [{i + 1}] {sp.Name} (Level {sp.Level}, Cost: {sp.ManaCost})", "white");
             }
 
-            result.CombatLog.Add($"{attacker.DisplayName} casts {chosen.Name}");
+            var choice = await terminal.GetInput("Cast which spell? ");
+            if (int.TryParse(choice, out int spellIndex) && spellIndex >= 1 && spellIndex <= spells.Count)
+            {
+                chosen = spells[spellIndex - 1];
+            }
+            else
+            {
+                terminal.WriteLine("Spell cancelled.", "gray");
+                await Task.Delay(GetCombatDelay(500));
+                return;
+            }
+        }
+
+        var spellResult = SpellSystem.CastSpell(attacker, chosen.Level, defender);
+        terminal.WriteLine(spellResult.Message, "magenta");
+
+        // Apply spell effects - damage spells work on Character
+        if (spellResult.Success && spellResult.Damage > 0)
+        {
+            defender.HP = Math.Max(0, defender.HP - spellResult.Damage);
+            terminal.WriteLine($"{defender.DisplayName} takes {spellResult.Damage} magical damage!", "bright_magenta");
+        }
+
+        // Apply healing spells to self
+        if (spellResult.Success && spellResult.Healing > 0)
+        {
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + spellResult.Healing);
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"You recover {spellResult.Healing} HP!");
+        }
+
+        result.CombatLog.Add($"{attacker.DisplayName} casts {chosen.Name}");
+        await Task.Delay(GetCombatDelay(800));
+    }
+
+    /// <summary>
+    /// Execute a class ability in PvP combat (Character vs Character)
+    /// Handles both quickbar-triggered abilities (action.AbilityId set) and manual ability selection
+    /// </summary>
+    private async Task ExecutePvPAbility(Character attacker, Character defender, CombatAction action, CombatResult result)
+    {
+        ClassAbilitySystem.ClassAbility? selectedAbility = null;
+
+        // If ability was triggered from quickbar, use it directly
+        if (!string.IsNullOrEmpty(action.AbilityId))
+        {
+            selectedAbility = ClassAbilitySystem.GetAbility(action.AbilityId);
+            if (selectedAbility == null)
+            {
+                terminal.WriteLine("Unknown ability!", "red");
+                await Task.Delay(GetCombatDelay(500));
+                return;
+            }
         }
         else
         {
-            terminal.WriteLine("Spell cancelled.", "gray");
+            // Manual ability selection menu
+            var availableAbilities = ClassAbilitySystem.GetAvailableAbilities(attacker);
+
+            if (availableAbilities.Count == 0)
+            {
+                terminal.WriteLine("You haven't learned any abilities yet!", "red");
+                await Task.Delay(GetCombatDelay(1000));
+                return;
+            }
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══ COMBAT ABILITIES ═══");
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"Combat Stamina: {attacker.CurrentCombatStamina}/{attacker.MaxCombatStamina}");
+            terminal.WriteLine("");
+
+            int displayIndex = 1;
+            var selectableAbilities = new List<ClassAbilitySystem.ClassAbility>();
+
+            foreach (var ability in availableAbilities)
+            {
+                bool canUse = ClassAbilitySystem.CanUseAbility(attacker, ability.Id, abilityCooldowns);
+                bool hasStamina = attacker.HasEnoughStamina(ability.StaminaCost);
+                bool onCooldown = abilityCooldowns.TryGetValue(ability.Id, out int cooldownLeft) && cooldownLeft > 0;
+
+                string statusText = "";
+                string color = "white";
+
+                if (onCooldown)
+                {
+                    statusText = $" [Cooldown: {cooldownLeft} rounds]";
+                    color = "dark_gray";
+                }
+                else if (!hasStamina)
+                {
+                    statusText = $" [Need {ability.StaminaCost} stamina, have {attacker.CurrentCombatStamina}]";
+                    color = "dark_gray";
+                }
+
+                terminal.SetColor(color);
+                terminal.WriteLine($"  {displayIndex}. {ability.Name} - {ability.StaminaCost} stamina{statusText}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"     {ability.Description}");
+
+                selectableAbilities.Add(ability);
+                displayIndex++;
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.Write("Enter ability number (0 to cancel): ");
+            string input = terminal.GetInputSync();
+
+            if (!int.TryParse(input, out int choice) || choice < 1 || choice > selectableAbilities.Count)
+            {
+                terminal.WriteLine("Cancelled.", "gray");
+                await Task.Delay(GetCombatDelay(500));
+                return;
+            }
+
+            selectedAbility = selectableAbilities[choice - 1];
         }
 
-        await Task.Delay(GetCombatDelay(800));
+        if (!ClassAbilitySystem.CanUseAbility(attacker, selectedAbility.Id, abilityCooldowns))
+        {
+            if (abilityCooldowns.TryGetValue(selectedAbility.Id, out int cd) && cd > 0)
+                terminal.WriteLine($"{selectedAbility.Name} is on cooldown for {cd} more rounds!", "red");
+            else
+                terminal.WriteLine("Cannot use that ability right now!", "red");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+
+        if (!attacker.HasEnoughStamina(selectedAbility.StaminaCost))
+        {
+            terminal.WriteLine($"Not enough stamina! Need {selectedAbility.StaminaCost}, have {attacker.CurrentCombatStamina}.", "red");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+
+        // Deduct stamina and execute
+        attacker.SpendStamina(selectedAbility.StaminaCost);
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"(-{selectedAbility.StaminaCost} stamina, {attacker.CurrentCombatStamina}/{attacker.MaxCombatStamina} remaining)");
+
+        var abilityResult = ClassAbilitySystem.UseAbility(attacker, selectedAbility.Id, random);
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine(abilityResult.Message);
+
+        // Apply ability effects to PvP target
+        if (abilityResult.Damage > 0)
+        {
+            long actualDamage = abilityResult.Damage;
+
+            // Special effects
+            if (abilityResult.SpecialEffect == "execute" && defender.HP < defender.MaxHP * 0.3)
+            {
+                actualDamage *= 2;
+                terminal.WriteLine("EXECUTION! Double damage to wounded enemy!", "bright_red");
+            }
+            else if (abilityResult.SpecialEffect == "last_stand" && attacker.HP < attacker.MaxHP * 0.25)
+            {
+                actualDamage = (long)(actualDamage * 1.5);
+                terminal.WriteLine("LAST STAND! Desperation fuels your attack!", "bright_red");
+            }
+            else if (abilityResult.SpecialEffect == "armor_pierce")
+            {
+                terminal.WriteLine("The acid ignores armor!", "green");
+            }
+            else if (abilityResult.SpecialEffect == "backstab")
+            {
+                actualDamage = (long)(actualDamage * 1.5);
+                terminal.WriteLine("Critical strike from the shadows!", "bright_yellow");
+            }
+
+            // Apply defense (abilities partially bypass defense)
+            if (abilityResult.SpecialEffect != "armor_pierce")
+            {
+                long defense = defender.Defence / 2;
+                actualDamage = Math.Max(1, actualDamage - defense);
+            }
+
+            defender.HP = Math.Max(0, defender.HP - actualDamage);
+            attacker.Statistics?.RecordDamageDealt(actualDamage, false);
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"You deal {actualDamage} damage to {defender.DisplayName}!");
+        }
+
+        // Apply healing effects (self-heals)
+        if (abilityResult.Healing > 0)
+        {
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + abilityResult.Healing);
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"You recover {abilityResult.Healing} HP!");
+        }
+
+        // Apply temp attack/defense bonuses to attacker
+        if (abilityResult.AttackBonus > 0)
+        {
+            attacker.TempAttackBonus += abilityResult.AttackBonus;
+            attacker.TempAttackBonusDuration = Math.Max(attacker.TempAttackBonusDuration, abilityResult.Duration);
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"Attack power increased by {abilityResult.AttackBonus}!");
+        }
+        if (abilityResult.DefenseBonus > 0)
+        {
+            attacker.TempDefenseBonus += abilityResult.DefenseBonus;
+            attacker.TempDefenseBonusDuration = Math.Max(attacker.TempDefenseBonusDuration, abilityResult.Duration);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"Defense increased by {abilityResult.DefenseBonus}!");
+        }
+
+        // Set cooldown
+        if (abilityResult.CooldownApplied > 0)
+        {
+            abilityCooldowns[selectedAbility.Id] = abilityResult.CooldownApplied;
+        }
+
+        result.CombatLog.Add($"{attacker.DisplayName} uses {selectedAbility.Name}");
+        await Task.Delay(GetCombatDelay(1000));
     }
 
     /// <summary>

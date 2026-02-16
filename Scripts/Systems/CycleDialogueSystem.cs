@@ -52,22 +52,22 @@ namespace UsurperRemake.Systems
                 "Ah, a new face. Or... is it?"
             },
             [3] = new[] { // Third cycle - NPCs notice something wrong
-                "You again? No, wait... you're new. Aren't you?",
-                "*stares* For a moment, I thought... never mind.",
-                "The strangest feeling just came over me.",
-                "My grandmother used to speak of souls that return..."
+                "You again? No, wait... youre new. Arent you?",
+                "*stares* For a second I thought... never mind.",
+                "Weirdest feeling just hit me.",
+                "My gran used to talk about souls coming back..."
             },
             [4] = new[] { // Fourth cycle - growing awareness
-                "I've been waiting for you. Why do I feel that way?",
-                "Every time I see you, I forget I've seen you before.",
-                "Do you believe in fate? I'm starting to.",
-                "The pattern repeats. Even if we don't remember."
+                "I was waiting for you. Dont ask me how I knew.",
+                "I keep forgetting Ive met you. Then I remember again.",
+                "Youve been here before, havent you?",
+                "This keeps happening. You keep showing up."
             },
             [5] = new[] { // Fifth+ cycle - full acknowledgment
-                "Again. You're back again. How many times now?",
-                "I remember you. I remember ALL of you.",
-                "The cycle continues. Will it ever end?",
-                "Welcome back, Dreamer. You always return."
+                "Again. How many times now?",
+                "I remember you. All the yous.",
+                "Does this ever stop? The coming back?",
+                "Yeah. I knew youd be here. You always are."
             }
         };
 
@@ -92,14 +92,14 @@ namespace UsurperRemake.Systems
                 "Have we done this before? Be honest with me."
             },
             [4] = new[] {
-                "Of course you know. You always know. You always have.",
-                "I've stopped being surprised by what you know.",
-                "Tell me - how many times have we had this conversation?"
+                "Course you know. You always do.",
+                "Im not even surprised anymore.",
+                "How many times have we done this exact conversation?"
             },
             [5] = new[] {
-                "There's no point in explanations, is there? You remember everything.",
-                "I wonder if I'm the same person I was last time we met. Are you?",
-                "The only thing that changes is which of us remembers."
+                "No point explaining. You already know.",
+                "Am I the same me as last time? Are you?",
+                "You remember everything. I only remember pieces."
             }
         };
 
@@ -113,19 +113,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "recruit_lyris",
                 FirstCycleDialogue = new[] {
-                    "You... I've been waiting for someone like you.",
-                    "The stars told me you were coming. I didn't believe them.",
-                    "Will you let me join you? I need to find the truth."
+                    "You. Ive been waiting for someone like you.",
+                    "I had a feeling youd show up. Dont ask me how.",
+                    "Let me come with you. I need answers."
                 },
                 Cycle2Dialogue = new[] {
-                    "We've met before. In a dream, perhaps?",
-                    "My visions showed me your face long before today.",
-                    "Something tells me this isn't our first journey together."
+                    "Weve met. I know we have.",
+                    "I saw your face in a dream. Weeks ago.",
+                    "This isnt the first time, is it?"
                 },
                 Cycle3PlusDialogue = new[] {
-                    "Every cycle, I wait for you here. Every cycle, you come.",
-                    "I remember dying for you. I'd do it again.",
-                    "The stars don't just predict - they remember."
+                    "Im always here. Youre always coming. You know that.",
+                    "I died for you last time. Id do it again.",
+                    "Lets just go. We both know how this part works."
                 }
             },
 
@@ -133,19 +133,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "recruit_aldric",
                 FirstCycleDialogue = new[] {
-                    "I've failed everyone I've protected. Maybe you'll be different.",
-                    "My shield arm is still strong. Let me prove it.",
-                    "I need a purpose. You seem to have one."
+                    "Everyone Ive protected ends up dead. Maybe youll be different.",
+                    "I can still fight. Let me prove it.",
+                    "I need something to do. You look like trouble."
                 },
                 Cycle2Dialogue = new[] {
-                    "I dreamed of this moment. Of you.",
-                    "My instincts say I can trust you. I don't know why.",
-                    "It feels like I've made this oath before."
+                    "I had a dream about this. About you.",
+                    "Something tells me I can trust you. Gut feeling.",
+                    "Feel like Ive sworn this oath before."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "How many times have I sworn to protect you?",
-                    "The shield remembers, even when I forget.",
-                    "Again, then. Until we finally get it right."
+                    "How many times have I done this? Sworn to protect you?",
+                    "I dont remember but my arms do. Muscle memory.",
+                    "Alright. Lets go. Again."
                 }
             },
 
@@ -154,19 +154,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "encounter_maelketh",
                 FirstCycleDialogue = new[] {
-                    "ANOTHER CHALLENGER. THEY NEVER STOP COMING.",
-                    "DO YOU KNOW HOW MANY I'VE KILLED? I DON'T. I STOPPED COUNTING.",
-                    "FIGHT ME. DIE. IT'S ALL I REMEMBER HOW TO DO."
+                    "ANOTHER ONE. THEY NEVER STOP COMING.",
+                    "I STOPPED COUNTING THE DEAD A LONG TIME AGO.",
+                    "FIGHT ME. THATS ALL I KNOW HOW TO DO."
                 },
                 Cycle2Dialogue = new[] {
-                    "YOU. I'VE KILLED YOU BEFORE. OR DID YOU KILL ME?",
-                    "THE BLOOD ON MY BLADE... SOME OF IT IS YOURS.",
-                    "WE'VE DANCED THIS DANCE. THE STEPS ARE THE SAME."
+                    "YOU. IVE KILLED YOU BEFORE. OR YOU KILLED ME.",
+                    "THERES YOUR BLOOD ON MY BLADE. FROM LAST TIME.",
+                    "SAME FIGHT. SAME OUTCOME. LETS GET ON WITH IT."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "BROTHER. ENEMY. SELF. WHAT DOES IT MATTER?",
-                    "HOW MANY TIMES MUST WE DO THIS?",
-                    "PERHAPS THIS TIME... ONE OF US WILL FINALLY REST."
+                    "YEAH. YOU AGAIN.",
+                    "HOW MANY TIMES WE GONNA DO THIS?",
+                    "JUST KILL ME ALREADY. OR LET ME KILL YOU. IM TIRED."
                 }
             },
 
@@ -174,19 +174,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "encounter_noctura",
                 FirstCycleDialogue = new[] {
-                    "At last. I've been waiting for someone worthy.",
-                    "The shadows have shown me many futures. You appear in all of them.",
-                    "Shall we discuss what you really are?"
+                    "Finally. Took you long enough.",
+                    "I see you in every future. All of them.",
+                    "Want to know what you really are?"
                 },
                 Cycle2Dialogue = new[] {
-                    "You've returned. I wondered if you would.",
-                    "Different face. Same soul. The cycle continues.",
-                    "Do you remember me yet? Give it time."
+                    "Youre back. Thought you might be.",
+                    "Different face. Same person underneath.",
+                    "You remember me yet? No? Give it time."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "Again we meet at this junction. Again we must choose.",
-                    "I've watched you die. I've watched you transcend. Both are beautiful.",
-                    "This time, perhaps, you'll finally understand my gift."
+                    "Here we are again. Same crossroads.",
+                    "Ive seen you die. Ive seen you figure it out. Both times.",
+                    "Maybe this time youll actually listen to me."
                 }
             },
 
@@ -194,19 +194,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "encounter_manwe",
                 FirstCycleDialogue = new[] {
-                    "You've come. I've waited so long.",
-                    "Do you know what you are? No... not yet. But soon.",
-                    "I'm tired, child. So very tired."
+                    "Youre here. Took a long time.",
+                    "You dont know what you are yet. But you will.",
+                    "Im tired. Im so tired."
                 },
                 Cycle2Dialogue = new[] {
-                    "Again. You always find your way back here.",
-                    "The dream repeats. Have you learned anything?",
-                    "I send myself out, and myself returns. Forever."
+                    "Again. You always end up here.",
+                    "Did you learn anything this time?",
+                    "I keep sending myself out. I keep coming back."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "How many cycles now? I've lost count.",
-                    "Each time you come closer to remembering. Each time you hesitate.",
-                    "This time... will you finally wake up? Or do we dance again?"
+                    "Lost count of the cycles. You?",
+                    "Every time you get a little closer. Then you hesitate.",
+                    "You gonna do it this time? Or we doing this again?"
                 }
             },
 
@@ -215,19 +215,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "first_seal",
                 FirstCycleDialogue = new[] {
-                    "A seal... what is this power?",
-                    "Something ancient stirs at your touch.",
-                    "The seal recognizes you. But how?"
+                    "A seal. Whats this?",
+                    "Something old wakes up when you touch it.",
+                    "It knows you. How does it know you?"
                 },
                 Cycle2Dialogue = new[] {
-                    "The seal welcomes you back.",
-                    "You've held this before. The stone remembers.",
-                    "One of seven. Again."
+                    "Another seal. Feels familiar.",
+                    "Youve held this before. You know you have.",
+                    "One of seven. Here we go again."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "Yes, yes. The seals. Your old friends.",
-                    "They've been waiting. They always wait.",
-                    "Perhaps this time, you'll understand what they really are."
+                    "Right. The seals. You know the drill.",
+                    "Six more to go.",
+                    "You know what theyre for this time?"
                 }
             },
 
@@ -235,19 +235,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "all_seals",
                 FirstCycleDialogue = new[] {
-                    "Seven seals. Seven truths. The pattern is complete.",
-                    "The history of creation lies in your hands.",
-                    "Now you know what happened. But do you know what you ARE?"
+                    "Seven seals. The whole story.",
+                    "Now you know what happened. How it all went wrong.",
+                    "But do you know what YOU are?"
                 },
                 Cycle2Dialogue = new[] {
-                    "Again, you've gathered them all.",
-                    "The story never changes. Only your understanding of it.",
-                    "Seven seals, held by the same hands, across endless time."
+                    "All seven again.",
+                    "Same story every time. You just understand it better.",
+                    "Same seals. Same hands."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "These seals have seen more of you than you have of yourself.",
-                    "Creation. War. Corruption. Binding. Fate. Regret. Truth.",
-                    "And now, the eighth truth: There is no beginning. There is no end."
+                    "Yeah. You got em all. Again.",
+                    "You could probably recite the whole history from memory by now.",
+                    "So what are you gonna DO about it this time?"
                 }
             },
 
@@ -256,19 +256,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "ending_usurper",
                 FirstCycleDialogue = new[] {
-                    "POWER. ABSOLUTE POWER. IT'S ALL THAT MATTERS.",
-                    "I CONSUME. I BECOME. I RULE.",
-                    "LET THE CYCLE BREAK ON MY TERMS."
+                    "POWER. ALL OF IT. MINE.",
+                    "I TAKE WHAT I WANT. THATS HOW THIS WORKS.",
+                    "THE CYCLE ENDS WHEN I SAY IT ENDS."
                 },
                 Cycle2Dialogue = new[] {
-                    "I've done this before. I'll do it again.",
-                    "Power corrupts. I welcome the corruption.",
-                    "Perhaps THIS time, it will be enough."
+                    "Done this before. Doing it again.",
+                    "Corrupt? Sure. I dont care.",
+                    "Maybe this time itll stick."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "How many times have I become the monster?",
-                    "The throne awaits. It always awaits.",
-                    "Fine. If the cycle demands a tyrant, I'll BE the tyrant."
+                    "How many times have I taken the throne? Lost count.",
+                    "Its always here waiting for me.",
+                    "Fine. Ill be the bad guy. Again. Whatever."
                 }
             },
 
@@ -276,19 +276,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "ending_savior",
                 FirstCycleDialogue = new[] {
-                    "The gods can be healed. I believe it.",
-                    "Love endures. That's the only truth I need.",
-                    "I choose mercy. I choose hope."
+                    "The gods can be healed. I know it.",
+                    "Mercy. Thats the answer.",
+                    "Im doing this. No matter what it costs."
                 },
                 Cycle2Dialogue = new[] {
-                    "I saved them once. I'll save them again.",
-                    "The path of light never gets easier. Just more familiar.",
-                    "Every cycle, I choose love. Every cycle, it costs everything."
+                    "Saved em once. Ill do it again.",
+                    "Doesnt get easier. Just more familiar.",
+                    "Same choice every time. Same price."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "Salvation without end. Is that mercy or cruelty?",
-                    "I keep saving a world that keeps needing saving.",
-                    "Perhaps the real salvation... is breaking the cycle itself."
+                    "I keep saving them. They keep needing saving.",
+                    "Is this mercy or am I just stuck?",
+                    "Maybe the real answer is to stop the whole thing."
                 }
             },
 
@@ -296,19 +296,19 @@ namespace UsurperRemake.Systems
             {
                 MomentId = "ending_true",
                 FirstCycleDialogue = new[] {
-                    "I understand now. I am the wave. I am the ocean.",
-                    "Not destruction. Not salvation. Dissolution.",
+                    "I get it now. I know what I am.",
+                    "Not killing. Not saving. Just... ending it.",
                     "Time to wake up."
                 },
                 Cycle2Dialogue = new[] {
-                    "Again I reach this moment. Again I hesitate.",
-                    "Waking up means ending the dream. Am I ready?",
-                    "The ocean calls. It has always been calling."
+                    "Here again. Same moment. Same hesitation.",
+                    "Waking up means its over. Really over.",
+                    "Am I ready? I dont know."
                 },
                 Cycle3PlusDialogue = new[] {
-                    "Every cycle brings me here. To this choice.",
-                    "Perhaps THIS time, I'll have the courage to dissolve.",
-                    "The wave does not fear becoming water. Only remembering."
+                    "Same crossroads. Every time.",
+                    "Maybe this time Ill actually go through with it.",
+                    "Just let go. How hard can it be?"
                 }
             }
         };
@@ -379,15 +379,15 @@ namespace UsurperRemake.Systems
             // Give subtle hints to experienced players
             if (CurrentCycle == 2)
             {
-                return "You feel like you've been here before. The feeling fades quickly.";
+                return "Weird feeling of deja vu. Goes away fast.";
             }
             else if (CurrentCycle == 3)
             {
-                return "The paths seem familiar. The choices... you've made them before.";
+                return "You know this place. Youve made these choices before.";
             }
             else
             {
-                return "Another cycle begins. Another chance to remember.";
+                return "Here we go again.";
             }
         }
 
@@ -409,16 +409,16 @@ namespace UsurperRemake.Systems
             if (isOldGod)
             {
                 // Gods always remember
-                return $"{originalDialogue}\n\n*Their eyes hold the weight of countless cycles*";
+                return $"{originalDialogue}\n\n*They stare at you like theyve seen you a hundred times before*";
             }
 
             if (isWiseNPC && CurrentCycle >= 3)
             {
                 var additions = new[] {
-                    "\n\n*pauses* \"Wait... haven't we...?\"",
-                    "\n\n\"Forgive me. I felt a strange echo just now.\"",
-                    "\n\n\"The words I'm about to say... they feel worn, somehow.\"",
-                    "\n\n*distant look* \"Dreams within dreams within dreams...\""
+                    "\n\n*pauses* \"Wait... havent we...?\"",
+                    "\n\n\"Sorry. Got the strangest feeling just now.\"",
+                    "\n\n\"Feels like Ive said this before. Have I said this before?\"",
+                    "\n\n*stares off into the distance for a moment*"
                 };
                 return originalDialogue + additions[_random.Next(additions.Length)];
             }

@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.40.1";
-    public const string VersionName = "Procedural ASCII Art";
+    public const string Version = "0.40.2";
+    public const string VersionName = "Faction Missions, Assassination, Faction Expansion & Sleep Risk";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -357,6 +357,53 @@ public static partial class GameConfig
     public const float ThroneEncounterChance = 0.08f;       // 8% base throne challenge
     public const float CityContestChance = 0.10f;           // 10% base city contest
     public const int MinSuspicionForConfrontation = 40;     // Spouse suspicion threshold
+
+    // NPC Murder/Assassination System (v0.40.2)
+    public const float MurderGoldTheftPercent = 0.50f;       // Steal 50% of NPC's gold on murder
+    public const int MurderDarknessGain = 25;                // Darkness alignment shift for murder
+    public const float MurderGuardInterventionChance = 0.30f; // 30% chance guard joins NPC's side
+    public const float MurderGrudgeChance = 1.00f;           // 100% grudge encounter after murder (guaranteed)
+    public const float MurderGrudgeRageBonusHP = 0.20f;      // +20% HP for murder revenge NPC
+    public const float MurderGrudgeRageBonusSTR = 0.20f;     // +20% STR for murder revenge NPC
+    public const int MurderFactionStandingPenalty = 200;      // Faction standing loss for murdering a faction member
+    public const float AssassinBackstabBonusDamage = 0.25f;  // 25% bonus damage for Assassin class on murder
+    public const float GenericBackstabBonusDamage = 0.10f;   // 10% bonus damage for non-Assassin on murder
+
+    // Faction Mission System (v0.40.2)
+    public const string FactionInitiatorCrown = "The Crown";
+    public const string FactionInitiatorShadows = "The Shadows";
+    public const string FactionInitiatorFaith = "The Faith";
+
+    // Faction System Expansion (v0.40.2)
+    public const float BlackMarketRankDiscount = 0.05f;     // 5% price discount per rank at Black Market
+    public const float DivineFavorBaseChance = 0.05f;        // 5% divine favor at rank 0
+    public const float DivineFavorMaxChance = 0.25f;         // 25% divine favor at rank 8
+    public const float GuardInterventionBaseChance = 0.20f;  // 20% base guard intervention for Crown
+    public const float GuardInterventionPerRank = 0.05f;     // +5% guard intervention per Crown rank
+    public const float PoisonCoatingDamageBonus = 0.20f;     // +20% damage from poison coating
+    public const int InnerSanctumCost = 500;                 // Gold cost for Inner Sanctum meditation
+    public const int InformantCost = 100;                    // Gold cost for Shadows informant
+    public const float CrownTaxExemptionRate = 0.20f;        // 20% gold loss reduction on death for Crown
+    public const int AssassinContractMinRank = 3;             // Shadows rank 3+ for assassination contracts
+    public const float AssassinContractChance = 0.50f;        // 50% chance to get assassination vs retrieval
+    public const float AssassinClassGoldBonus = 0.50f;        // +50% gold reward for Assassin class contracts
+
+    // Offline Player Vulnerability System (v0.40.2)
+    public const int DormitorySleepCost = 10;                    // 10g to sleep in dormitory
+    public const float InnRoomCostPerLevel = 75f;                // Inn room = 75 * level gold
+    public const float SleeperGoldTheftPercent = 0.50f;          // Steal 50% of gold on hand
+    public const float SleeperAttackChancePerTick = 0.08f;       // 8% chance per world sim tick (~30s)
+    public const int MinNPCLevelForSleeperAttack = 5;            // NPC must be level 5+ to attack sleepers
+    public const float InnDefenseBoost = 0.50f;                  // 50% ATK/DEF boost when woken at Inn
+    public const int SleeperXPLossPercent = 10;                  // 10% XP loss on death while sleeping
+    public const int MaxSleepGuards = 5;                         // Max guards per sleep session
+    public const float GuardCostMultiplierPerExtra = 0.50f;      // Each additional guard costs +50% more
+    public const int GuardRookieBaseCost = 100;                  // Rookie NPC guard base cost
+    public const int GuardVeteranBaseCost = 300;                 // Veteran NPC guard base cost
+    public const int GuardEliteBaseCost = 600;                   // Elite NPC guard base cost
+    public const int GuardHoundBaseCost = 150;                   // Guard hound base cost
+    public const int GuardTrollBaseCost = 500;                   // Guard troll base cost
+    public const int GuardDrakeBaseCost = 1000;                  // Guard drake base cost
 
     // Economy Tuning (v0.30.9)
     public const int NpcRecruitmentCostPerLevel = 2000;       // Gold cost per NPC level to recruit (was hardcoded 500)

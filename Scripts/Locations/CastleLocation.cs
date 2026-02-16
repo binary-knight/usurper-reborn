@@ -475,6 +475,19 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(" You are a loyal servant of The Crown.");
         }
 
+        // Royal Armory (Crown only)
+        if (FactionSystem.Instance?.HasCastleAccess() == true)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("L");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" Royal Armory");
+        }
+
         // Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
@@ -645,6 +658,10 @@ public class CastleLocation : BaseLocation
 
             case "J": // The Crown faction recruitment
                 await ShowCrownRecruitment();
+                return false;
+
+            case "L": // Royal Armory (Crown only)
+                await VisitRoyalArmory();
                 return false;
 
             case "B": // Castle Siege (online mode, team required)
@@ -4867,6 +4884,171 @@ public class CastleLocation : BaseLocation
     /// Show The Crown faction recruitment UI
     /// Meet the Royal Chancellor and potentially join The Crown
     /// </summary>
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ROYAL ARMORY (Crown faction exclusive)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private async Task VisitRoyalArmory()
+    {
+        if (FactionSystem.Instance?.HasCastleAccess() != true)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("\n  The Royal Armory is restricted to Crown members.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("║                       THE ROYAL ARMORY                            ║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("  Racks of polished weapons and gleaming armor line the walls.");
+        terminal.WriteLine("  A Royal Quartermaster stands at attention.");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"\n  Gold: {currentPlayer.Gold:N0}");
+        terminal.WriteLine("");
+
+        int level = currentPlayer.Level;
+
+        // Define armory items with level-scaled prices and stats
+        long crownBladePrice = 50000 + level * 500;
+        long royalPlatePrice = 45000 + level * 400;
+        long crownShieldPrice = 30000 + level * 300;
+        long signetRingPrice = 25000 + level * 200;
+
+        int bladeWeapPow = 150 + level * 2;
+        int plateArmPow = 120 + level * 2;
+        int shieldArmPow = 80 + level;
+
+        terminal.SetColor("bright_white");
+        terminal.WriteLine("  #  Item                  Price        Stats");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("  ─────────────────────────────────────────────────────────");
+
+        terminal.SetColor(currentPlayer.Gold >= crownBladePrice ? "white" : "darkgray");
+        terminal.WriteLine($"  [1] Crown Blade         {crownBladePrice,10:N0}g   WeapPow {bladeWeapPow}");
+
+        terminal.SetColor(currentPlayer.Gold >= royalPlatePrice ? "white" : "darkgray");
+        terminal.WriteLine($"  [2] Royal Guard Plate   {royalPlatePrice,10:N0}g   ArmPow {plateArmPow}");
+
+        terminal.SetColor(currentPlayer.Gold >= crownShieldPrice ? "white" : "darkgray");
+        terminal.WriteLine($"  [3] Crown Shield        {crownShieldPrice,10:N0}g   ArmPow {shieldArmPow}");
+
+        terminal.SetColor(currentPlayer.Gold >= signetRingPrice ? "white" : "darkgray");
+        terminal.WriteLine($"  [4] Signet Ring         {signetRingPrice,10:N0}g   +5 CHA, +5 STR");
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"  [0] Leave");
+        terminal.WriteLine("");
+
+        var input = await terminal.GetInput("  Purchase? ");
+
+        Equipment item = null;
+        long price = 0;
+        string itemName = "";
+
+        switch (input.Trim())
+        {
+            case "1":
+                price = crownBladePrice;
+                itemName = "Crown Blade";
+                item = new Equipment
+                {
+                    Name = "Crown Blade",
+                    Slot = EquipmentSlot.MainHand,
+                    Handedness = WeaponHandedness.OneHanded,
+                    WeaponType = WeaponType.Sword,
+                    WeaponPower = bladeWeapPow,
+                    Value = price,
+                    Rarity = EquipmentRarity.Legendary,
+                    Description = "A blade forged in the royal foundry, reserved for Crown elite.",
+                    MinLevel = Math.Max(1, level - 5)
+                };
+                break;
+            case "2":
+                price = royalPlatePrice;
+                itemName = "Royal Guard Plate";
+                item = new Equipment
+                {
+                    Name = "Royal Guard Plate",
+                    Slot = EquipmentSlot.Body,
+                    ArmorType = ArmorType.Plate,
+                    ArmorClass = plateArmPow,
+                    Value = price,
+                    Rarity = EquipmentRarity.Legendary,
+                    Description = "Full plate armor bearing the royal crest.",
+                    MinLevel = Math.Max(1, level - 5)
+                };
+                break;
+            case "3":
+                price = crownShieldPrice;
+                itemName = "Crown Shield";
+                item = new Equipment
+                {
+                    Name = "Crown Shield",
+                    Slot = EquipmentSlot.OffHand,
+                    ShieldBonus = shieldArmPow,
+                    BlockChance = 20,
+                    Value = price,
+                    Rarity = EquipmentRarity.Epic,
+                    Description = "A tower shield emblazoned with the royal seal.",
+                    MinLevel = Math.Max(1, level - 5)
+                };
+                break;
+            case "4":
+                price = signetRingPrice;
+                itemName = "Signet Ring";
+                item = new Equipment
+                {
+                    Name = "Royal Signet Ring",
+                    Slot = EquipmentSlot.LFinger,
+                    CharismaBonus = 5,
+                    StrengthBonus = 5,
+                    Value = price,
+                    Rarity = EquipmentRarity.Epic,
+                    Description = "A heavy gold ring bearing the royal seal.",
+                    MinLevel = Math.Max(1, level - 5)
+                };
+                break;
+            default:
+                return;
+        }
+
+        if (currentPlayer.Gold < price)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n  You cant afford the {itemName}.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        currentPlayer.Gold -= price;
+        currentPlayer.Statistics?.RecordPurchase(price);
+        currentPlayer.Statistics?.RecordGoldSpent(price);
+
+        // Equip directly
+        if (currentPlayer.EquipItem(item, null, out string equipMsg))
+        {
+            if (!string.IsNullOrEmpty(equipMsg))
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {equipMsg}");
+            }
+        }
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"\n  The Quartermaster presents you with the {itemName}.");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  \"Wear it with honor.\"");
+        terminal.WriteLine("");
+
+        await terminal.PressAnyKey();
+    }
+
     private async Task ShowCrownRecruitment()
     {
         var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;

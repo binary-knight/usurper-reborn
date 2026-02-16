@@ -1530,6 +1530,81 @@ public class MainStreetLocation : BaseLocation
 
     private async Task QuitGame()
     {
+        // Online mode: warn about sleep vulnerability and let player choose
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("\n  ═══════════════════════════════════════════════════");
+            terminal.WriteLine("  WARNING: Logging out from the street is dangerous!");
+            terminal.WriteLine("  ═══════════════════════════════════════════════════\n");
+            terminal.SetColor("white");
+            terminal.WriteLine("  You need somewhere to sleep. Choose wisely:\n");
+
+            long dormCost = GameConfig.DormitorySleepCost;
+            long innCost = (long)(currentPlayer.Level * GameConfig.InnRoomCostPerLevel);
+            terminal.SetColor("red");
+            terminal.WriteLine($"  [D] Dormitory ({dormCost}g) — Cheap, but you're vulnerable to attack");
+            terminal.SetColor("green");
+            terminal.WriteLine($"  [I] Inn Room  ({innCost}g) — Protected, hire guards for safety");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  [C] Cancel — Stay in town\n");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Gold on hand: {currentPlayer.Gold:N0}  |  Bank: {currentPlayer.BankGold:N0}\n");
+
+            var sleepChoice = await terminal.GetInput("  Where do you rest? (D/I/C) [D]: ");
+            var ch = sleepChoice.Trim().ToUpper();
+
+            if (ch == "C")
+            {
+                terminal.WriteLine("  You decide to stay in town.", "gray");
+                await Task.Delay(1000);
+                return;
+            }
+
+            if (ch == "I")
+            {
+                // Navigate to Inn so player can rent a room with guards
+                terminal.WriteLine("  You head to the Inn...", "cyan");
+                await Task.Delay(1000);
+                await NavigateToLocation(GameLocation.TheInn);
+                return;
+            }
+
+            // Default: Dormitory
+            if (currentPlayer.Gold < dormCost)
+            {
+                terminal.WriteLine("  You can't even afford the dormitory. You collapse on the street.", "red");
+                // Register as dormitory sleeper even if broke (free for broke players)
+            }
+            else
+            {
+                currentPlayer.Gold -= dormCost;
+            }
+
+            // Restore and save
+            currentPlayer.HP = currentPlayer.MaxHP;
+            currentPlayer.Mana = currentPlayer.MaxMana;
+            currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
+            await DailySystemManager.Instance.ForceDailyReset();
+            await GameEngine.Instance.SaveCurrentGame();
+
+            // Register as sleeping in dormitory (vulnerable)
+            var backend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
+            if (backend != null)
+            {
+                var username = UsurperRemake.BBS.DoorMode.OnlineUsername ?? currentPlayer.Name2;
+                await backend.RegisterSleepingPlayer(username, "dormitory", "[]", 0);
+            }
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("\n  You stumble to the dormitory and find an empty bunk...");
+            terminal.SetColor("red");
+            terminal.WriteLine("  Sleep well. Or try to.");
+            await Task.Delay(2000);
+            throw new LocationExitException(GameLocation.NoWhere);
+        }
+
         terminal.ClearScreen();
 
         // Display session summary

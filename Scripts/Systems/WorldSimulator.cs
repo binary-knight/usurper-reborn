@@ -73,6 +73,36 @@ public class WorldSimulator
         lock (_teamLock) { return _playerTeamNames.Contains(teamName); }
     }
 
+    // NPC Sleep Cycle: tracks which NPCs are currently sleeping and where
+    // Key = NPC name, Value = location ("dormitory" or "inn")
+    private static readonly Dictionary<string, string> _sleepingNPCs = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object _sleepLock = new();
+    private int _lastSleepCycleTick = 0;
+    private const int SLEEP_CYCLE_INTERVAL = 10; // Every 10 ticks (~5 min), rotate sleepers
+    private const int MAX_SLEEPING_NPCS = 8; // Max NPCs sleeping at any time
+    private const double NPC_SLEEP_CHANCE = 0.03; // 3% chance per tick for eligible NPC to sleep
+    private const int NPC_SLEEP_DURATION_TICKS = 20; // NPCs sleep for ~10 min (20 ticks)
+    private readonly Dictionary<string, int> _npcSleepStartTick = new();
+
+    public static List<string> GetSleepingNPCsAt(string location)
+    {
+        lock (_sleepLock)
+        {
+            return _sleepingNPCs
+                .Where(kvp => kvp.Value.Equals(location, StringComparison.OrdinalIgnoreCase))
+                .Select(kvp => kvp.Key)
+                .ToList();
+        }
+    }
+
+    public static void WakeUpNPC(string npcName)
+    {
+        lock (_sleepLock)
+        {
+            _sleepingNPCs.Remove(npcName);
+        }
+    }
+
     // Gossip system - pool of recent events NPCs can spread as rumors
     private class GossipItem
     {
@@ -259,6 +289,14 @@ public class WorldSimulator
 
         // Process NPC divorces
         ProcessNPCDivorces();
+
+        // Process NPC sleep cycle (some NPCs go to sleep, others wake up)
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            ProcessNPCSleepCycle();
+
+        // Process NPC attacks on sleeping (offline) players
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            ProcessNPCAttacksOnSleepers();
 
         var worldState = new WorldState(npcs);
 
@@ -4404,6 +4442,331 @@ public class WorldSimulator
 
         return npcs.Where(n => n.Team == teamName && n.IsAlive).ToList();
     }
+
+    // =====================================================================
+    // NPC Sleep Cycle System
+    // =====================================================================
+
+    private void ProcessNPCSleepCycle()
+    {
+        try
+        {
+            _currentTick++; // reuse existing tick counter
+
+            // Wake up NPCs whose sleep duration has expired
+            List<string> toWake;
+            lock (_sleepLock)
+            {
+                toWake = _npcSleepStartTick
+                    .Where(kvp => _currentTick - kvp.Value >= NPC_SLEEP_DURATION_TICKS)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+            }
+            foreach (var name in toWake)
+            {
+                lock (_sleepLock)
+                {
+                    _sleepingNPCs.Remove(name);
+                    _npcSleepStartTick.Remove(name);
+                }
+            }
+
+            // Only rotate sleepers every SLEEP_CYCLE_INTERVAL ticks
+            if (_currentTick - _lastSleepCycleTick < SLEEP_CYCLE_INTERVAL) return;
+            _lastSleepCycleTick = _currentTick;
+
+            int currentSleeping;
+            lock (_sleepLock) { currentSleeping = _sleepingNPCs.Count; }
+            if (currentSleeping >= MAX_SLEEPING_NPCS) return;
+
+            var rng = new Random();
+
+            // Pick eligible NPCs to go to sleep
+            foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsStoryNPC && n.Level >= 3))
+            {
+                lock (_sleepLock)
+                {
+                    if (_sleepingNPCs.Count >= MAX_SLEEPING_NPCS) break;
+                    if (_sleepingNPCs.ContainsKey(npc.Name2)) continue;
+                }
+
+                if (rng.NextDouble() >= NPC_SLEEP_CHANCE) continue;
+
+                // Wealthy/high-level NPCs prefer the inn; poorer ones use dormitory
+                string location;
+                if (npc.Gold > 500 && npc.Level >= 10 && rng.NextDouble() < 0.6)
+                    location = "inn";
+                else
+                    location = "dormitory";
+
+                lock (_sleepLock)
+                {
+                    _sleepingNPCs[npc.Name2] = location;
+                    _npcSleepStartTick[npc.Name2] = _currentTick;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SLEEP_CYCLE", $"ProcessNPCSleepCycle failed: {ex.Message}");
+        }
+    }
+
+    // =====================================================================
+    // Sleeping Player Attack System
+    // =====================================================================
+
+    private void ProcessNPCAttacksOnSleepers()
+    {
+        if (SqlBackend == null) return;
+
+        try
+        {
+            var sleepers = SqlBackend.GetSleepingPlayers().GetAwaiter().GetResult();
+            if (sleepers.Count == 0) return;
+
+            foreach (var sleeper in sleepers)
+            {
+                if (sleeper.IsDead) continue;
+
+                // Roll attack chance per tick
+                if (random.NextDouble() >= GameConfig.SleeperAttackChancePerTick) continue;
+
+                // Pick a random aggressive NPC
+                var eligibleNPCs = npcs
+                    .Where(n => n.IsAlive && !n.IsDead && n.Level >= GameConfig.MinNPCLevelForSleeperAttack && !n.IsStoryNPC)
+                    .ToList();
+
+                if (eligibleNPCs.Count == 0) continue;
+
+                var attackerNPC = eligibleNPCs[random.Next(eligibleNPCs.Count)];
+
+                DebugLogger.Instance.LogInfo("SLEEP", $"NPC {attackerNPC.Name2} (Lvl {attackerNPC.Level}) attacks sleeping player {sleeper.Username}");
+
+                // Create attacker character from NPC stats
+                var attacker = new Character
+                {
+                    Name2 = attackerNPC.Name2,
+                    Level = attackerNPC.Level,
+                    HP = attackerNPC.HP,
+                    MaxHP = attackerNPC.MaxHP,
+                    Strength = attackerNPC.Strength,
+                    Defence = attackerNPC.Defence,
+                    Agility = attackerNPC.Agility,
+                    WeapPow = attackerNPC.WeapPow,
+                    ArmPow = attackerNPC.ArmPow,
+                    Dexterity = attackerNPC.Dexterity,
+                    Constitution = attackerNPC.Constitution,
+                    AI = CharacterAI.Computer
+                };
+
+                var attackLog = new List<string>();
+                bool attackRepelled = false;
+
+                // Fight through guards (gauntlet)
+                var guards = ParseGuards(sleeper.GuardsJson);
+                if (guards.Count > 0)
+                {
+                    for (int i = 0; i < guards.Count; i++)
+                    {
+                        var guard = guards[i];
+                        var guardChar = HeadlessCombatResolver.CreateGuardCharacter(
+                            guard.Type, guard.Hp, GetSleeperLevel(sleeper.Username), random);
+
+                        var guardResult = HeadlessCombatResolver.Resolve(attacker, guardChar, random);
+
+                        if (guardResult.Outcome == HeadlessCombatResolver.HeadlessOutcome.DefenderWins ||
+                            guardResult.Outcome == HeadlessCombatResolver.HeadlessOutcome.Draw)
+                        {
+                            // Guard repelled the attacker
+                            guard.Hp = Math.Max(0, guard.Hp - (int)guardResult.DamageToDefender);
+                            attackLog.Add($"Your {guard.Name} fought off {attackerNPC.Name2}!");
+                            attackRepelled = true;
+                            break;
+                        }
+                        else
+                        {
+                            // Guard defeated
+                            attackLog.Add($"Your {guard.Name} was defeated by {attackerNPC.Name2}.");
+                            guards.RemoveAt(i);
+                            i--;
+                            // Attacker HP carries over (already modified in-place)
+                        }
+                    }
+
+                    // Update guards in DB
+                    var updatedGuardsJson = SerializeGuards(guards);
+                    SqlBackend.UpdateSleeperGuards(sleeper.Username, updatedGuardsJson).GetAwaiter().GetResult();
+                }
+
+                if (attackRepelled)
+                {
+                    // Log the repelled attack
+                    var logEntry = JsonSerializer.Serialize(new
+                    {
+                        attacker = attackerNPC.Name2,
+                        type = "npc",
+                        result = "repelled",
+                        details = attackLog
+                    });
+                    SqlBackend.AppendSleepAttackLog(sleeper.Username, logEntry).GetAwaiter().GetResult();
+                    continue;
+                }
+
+                // Guards defeated (or none) — now attack the sleeping player
+                var saveData = SqlBackend.ReadGameData(sleeper.Username).GetAwaiter().GetResult();
+                if (saveData?.Player == null) continue;
+
+                var sleeperChar = PlayerCharacterLoader.CreateFromSaveData(saveData.Player, sleeper.Username);
+
+                // Apply Inn defense boost
+                if (sleeper.InnDefenseBoost)
+                {
+                    sleeperChar.Strength = (long)(sleeperChar.Strength * (1.0 + GameConfig.InnDefenseBoost));
+                    sleeperChar.Defence = (long)(sleeperChar.Defence * (1.0 + GameConfig.InnDefenseBoost));
+                    sleeperChar.WeapPow = (long)(sleeperChar.WeapPow * (1.0 + GameConfig.InnDefenseBoost));
+                    sleeperChar.ArmPow = (long)(sleeperChar.ArmPow * (1.0 + GameConfig.InnDefenseBoost));
+                }
+
+                var combatResult = HeadlessCombatResolver.Resolve(attacker, sleeperChar, random);
+
+                if (combatResult.Outcome == HeadlessCombatResolver.HeadlessOutcome.AttackerWins)
+                {
+                    // NPC won — steal gold, steal item, apply XP loss
+                    long goldOnHand = saveData.Player.Gold;
+                    long stolenGold = (long)(goldOnHand * GameConfig.SleeperGoldTheftPercent);
+
+                    if (stolenGold > 0)
+                        SqlBackend.DeductGoldFromPlayer(sleeper.Username, stolenGold).GetAwaiter().GetResult();
+
+                    // Steal 1 random item (from DynamicEquipment)
+                    string? stolenItemName = null;
+                    if (saveData.Player.DynamicEquipment != null && saveData.Player.DynamicEquipment.Count > 0)
+                    {
+                        int idx = random.Next(saveData.Player.DynamicEquipment.Count);
+                        var stolenItem = saveData.Player.DynamicEquipment[idx];
+                        stolenItemName = stolenItem.Name;
+
+                        // Remove from equipped slots
+                        if (saveData.Player.EquippedItems != null)
+                        {
+                            var slotToRemove = saveData.Player.EquippedItems
+                                .Where(kvp => kvp.Value == stolenItem.Id)
+                                .Select(kvp => kvp.Key)
+                                .FirstOrDefault(-1);
+                            if (slotToRemove >= 0)
+                                saveData.Player.EquippedItems.Remove(slotToRemove);
+                        }
+                        saveData.Player.DynamicEquipment.RemoveAt(idx);
+                    }
+
+                    // Apply XP loss
+                    long xpLoss = (long)(saveData.Player.Experience * GameConfig.SleeperXPLossPercent / 100.0);
+                    saveData.Player.Experience = Math.Max(0, saveData.Player.Experience - xpLoss);
+
+                    // Write modified save
+                    SqlBackend.WriteGameData(sleeper.Username, saveData).GetAwaiter().GetResult();
+
+                    // Mark dead
+                    SqlBackend.MarkSleepingPlayerDead(sleeper.Username).GetAwaiter().GetResult();
+
+                    attackLog.Add($"{attackerNPC.Name2} attacked you in your sleep and killed you!");
+                    if (stolenGold > 0) attackLog.Add($"They stole {stolenGold:N0} gold.");
+                    if (stolenItemName != null) attackLog.Add($"They took your {stolenItemName}.");
+                    if (xpLoss > 0) attackLog.Add($"You lost {xpLoss:N0} experience.");
+
+                    // Log + message
+                    var logEntry = JsonSerializer.Serialize(new
+                    {
+                        attacker = attackerNPC.Name2,
+                        type = "npc",
+                        result = "killed",
+                        goldStolen = stolenGold,
+                        itemStolen = stolenItemName ?? "nothing",
+                        xpLost = xpLoss,
+                        details = attackLog
+                    });
+                    SqlBackend.AppendSleepAttackLog(sleeper.Username, logEntry).GetAwaiter().GetResult();
+                    SqlBackend.SendMessage(attackerNPC.Name2, sleeper.Username, "sleep_attack",
+                        $"{attackerNPC.Name2} murdered you in your sleep! Lost {stolenGold:N0} gold{(stolenItemName != null ? $" and {stolenItemName}" : "")}.").GetAwaiter().GetResult();
+
+                    DebugLogger.Instance.LogInfo("SLEEP", $"NPC {attackerNPC.Name2} killed sleeping {sleeper.Username}, stole {stolenGold}g + {stolenItemName ?? "nothing"}");
+                }
+                else
+                {
+                    // Sleeping player fought off the attacker
+                    attackerNPC.HP = Math.Max(1, attackerNPC.HP - combatResult.DamageToAttacker);
+                    attackLog.Add($"You fought off {attackerNPC.Name2} in your sleep!");
+
+                    var logEntry = JsonSerializer.Serialize(new
+                    {
+                        attacker = attackerNPC.Name2,
+                        type = "npc",
+                        result = "repelled",
+                        details = attackLog
+                    });
+                    SqlBackend.AppendSleepAttackLog(sleeper.Username, logEntry).GetAwaiter().GetResult();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SLEEP", $"ProcessNPCAttacksOnSleepers failed: {ex.Message}");
+        }
+    }
+
+    private int GetSleeperLevel(string username)
+    {
+        try
+        {
+            var saveData = SqlBackend?.ReadGameData(username).GetAwaiter().GetResult();
+            return saveData?.Player?.Level ?? 10;
+        }
+        catch { return 10; }
+    }
+
+    private record GuardData(string Type, string Name, int Hp, int MaxHp)
+    {
+        public int Hp { get; set; } = Hp;
+    }
+
+    private List<GuardData> ParseGuards(string json)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(json) || json == "[]") return new List<GuardData>();
+            using var doc = JsonDocument.Parse(json);
+            var guards = new List<GuardData>();
+            foreach (var elem in doc.RootElement.EnumerateArray())
+            {
+                guards.Add(new GuardData(
+                    elem.GetProperty("type").GetString() ?? "rookie_npc",
+                    GetGuardName(elem.GetProperty("type").GetString() ?? "rookie_npc"),
+                    elem.GetProperty("hp").GetInt32(),
+                    elem.GetProperty("maxHp").GetInt32()
+                ));
+            }
+            return guards;
+        }
+        catch { return new List<GuardData>(); }
+    }
+
+    private string SerializeGuards(List<GuardData> guards)
+    {
+        var list = guards.Select(g => new { type = g.Type, hp = g.Hp, maxHp = g.MaxHp }).ToList();
+        return JsonSerializer.Serialize(list);
+    }
+
+    private static string GetGuardName(string type) => type switch
+    {
+        "rookie_npc" => "Rookie Guard",
+        "veteran_npc" => "Veteran Guard",
+        "elite_npc" => "Elite Guard",
+        "hound" => "Guard Hound",
+        "troll" => "Guard Troll",
+        "drake" => "Guard Drake",
+        _ => "Guard"
+    };
 }
 
 /// <summary>

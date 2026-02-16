@@ -105,14 +105,13 @@ namespace UsurperRemake.Data
 
                 DefeatDialogue = new[]
                 {
-                    "Maelketh falls to his knees, his armor crumbling to rust.",
+                    "Maelketh falls to his knees. His armor crumbles to rust around him.",
                     "",
-                    "MAELKETH: \"At last... peace. Thank you, mortal.\"",
+                    "MAELKETH: \"At last... quiet. Thank you, mortal.\"",
                     "",
-                    "His form dissolves into crimson light, flowing into you.",
-                    "",
-                    "You feel the power of WAR surge through your veins.",
-                    "A fragment of divinity is now yours."
+                    "He breaks apart into crimson light. Some of it gets into you.",
+                    "Your hands shake. Your blood runs hot.",
+                    "Somewhere deep down, you understand war now. Really understand it."
                 },
 
                 ArtifactDropped = ArtifactType.CreatorsEye,
@@ -197,14 +196,13 @@ namespace UsurperRemake.Data
 
                 DefeatDialogue = new[]
                 {
-                    "Veloura's form dissolves into pink mist.",
+                    "Veloura crumples. Pink mist rises off her like steam.",
                     "",
-                    "VELOURA: \"So... love truly dies with me...\"",
+                    "VELOURA: \"So thats it then... love dies with me...\"",
                     "",
-                    "Her power flows into you—the bittersweet ache of passion.",
-                    "",
-                    "You feel PASSION surge through your soul.",
-                    "But something feels... hollow."
+                    "The mist touches you and your chest aches.",
+                    "Every heartbreak you ever felt, all at once.",
+                    "Then its gone. You feel hollow inside, like something got scooped out."
                 },
 
                 ArtifactDropped = ArtifactType.SoulweaversLoom,
@@ -213,18 +211,18 @@ namespace UsurperRemake.Data
                 SaveRequirement = "Chivalry >= 5000 AND completed a romance questline",
                 SaveDialogue = new[]
                 {
-                    "> [SAVE] \"Love endures. Let me show you.\"",
+                    "> [SAVE] \"Love's not dead. I can prove it.\"",
                     "",
-                    "You speak of the love you've found in this realm.",
-                    "The friendships, the romance, the bonds that matter.",
+                    "You tell her about the people you care about.",
+                    "Not poetry. Just the truth. The messy, imperfect truth.",
                     "",
-                    "VELOURA: \"You... you truly believe?\"",
+                    "VELOURA: \"You actually mean it, dont you.\"",
                     "",
-                    "She reaches out, and you take her hand.",
+                    "She grabs your hand. Hers is freezing cold.",
                     "",
-                    "VELOURA: \"Then perhaps... I can believe too.\"",
+                    "VELOURA: \"Maybe... maybe it doesnt always have to hurt.\"",
                     "",
-                    "The goddess rises, restored. A new ally joins your cause."
+                    "Color creeps back into her face. She stands up."
                 },
 
                 SpecialMechanics = new Dictionary<string, string>
@@ -300,14 +298,13 @@ namespace UsurperRemake.Data
 
                 DefeatDialogue = new[]
                 {
-                    "Thorgrim's form cracks like old parchment.",
+                    "Thorgrim cracks down the middle like a dropped statue.",
                     "",
-                    "THORGRIM: \"Perhaps... true justice was always mercy.\"",
+                    "THORGRIM: \"Perhaps... mercy was the law I forgot...\"",
                     "",
-                    "His power flows into you—the weight of absolute authority.",
-                    "",
-                    "You feel ORDER surge through your mind.",
-                    "You understand now: law without wisdom is tyranny."
+                    "Cold iron certainty floods into your head.",
+                    "Rules. Structures. The way things OUGHT to be.",
+                    "Its heavy. Like carrying a library in your skull."
                 },
 
                 ArtifactDropped = ArtifactType.ScalesOfLaw,
@@ -398,14 +395,14 @@ namespace UsurperRemake.Data
 
                 DefeatDialogue = new[]
                 {
-                    "Noctura dissolves into shadow, but her voice echoes:",
+                    "Noctura melts into the shadows. You cant tell where she ends",
+                    "and the darkness begins.",
                     "",
-                    "NOCTURA: \"You chose well... or perhaps poorly. Time will tell.\"",
+                    "NOCTURA: \"Interesting choice. We'll see if it was the right one.\"",
                     "",
-                    "Her power flows into you—the gift of seeing in darkness.",
-                    "",
-                    "You feel SHADOW surge through your being.",
-                    "Some truths can only be found in darkness."
+                    "The shadows press in close and something changes in your eyes.",
+                    "The dark doesnt look so dark anymore.",
+                    "You can see things in it now. Things you wish you couldnt."
                 },
 
                 ArtifactDropped = ArtifactType.ShadowCrown,
@@ -505,14 +502,14 @@ namespace UsurperRemake.Data
 
                 DefeatDialogue = new[]
                 {
-                    "Aurelion's light fades to nothing.",
+                    "Aurelion flickers once, twice, and goes out.",
+                    "Like a candle in a draft.",
                     "",
-                    "AURELION: \"Darkness... takes... all...\"",
+                    "AURELION: \"Dark... at last...\"",
                     "",
-                    "His power flows into you—the burning clarity of truth.",
-                    "",
-                    "You feel TRUTH surge through your eyes.",
-                    "You will never be deceived again. But neither can you lie."
+                    "Something bright and painful lodges behind your eyes.",
+                    "You blink and suddenly you can see everything too clearly.",
+                    "Every lie. Every half-truth. Yours included."
                 },
 
                 ArtifactDropped = ArtifactType.SunforgedBlade,
@@ -521,17 +518,18 @@ namespace UsurperRemake.Data
                 SaveRequirement = "Chivalry >= 3000 AND no lies told in dialogue",
                 SaveDialogue = new[]
                 {
-                    "> [SAVE] \"I will be your vessel. Let truth live through me.\"",
+                    "> [SAVE] \"Give it to me. The light. I'll carry it.\"",
                     "",
-                    "Aurelion's light flares—not in attack, but in hope.",
+                    "Aurelion stares at you. For a long time.",
                     "",
-                    "AURELION: \"You would... carry my burden?\"",
+                    "AURELION: \"You know what that means? You wont be able to lie. Ever.\"",
                     "",
-                    "You nod, and his essence flows into you gently.",
+                    "\"Yeah. I know.\"",
                     "",
-                    "AURELION: \"Then I shall rest at last. But I will be with you always.\"",
+                    "The light leaves him and settles into you, warm and heavy.",
+                    "Aurelion slumps. He looks relieved.",
                     "",
-                    "The god of truth does not die. He transforms."
+                    "AURELION: \"Thank you. I was so tired of holding it alone.\""
                 },
 
                 SpecialMechanics = new Dictionary<string, string>
@@ -613,14 +611,14 @@ namespace UsurperRemake.Data
 
                 DefeatDialogue = new[]
                 {
-                    "Terravok crumbles, the dungeon groaning around you.",
+                    "Terravok crumbles. The whole dungeon groans like its about to",
+                    "come down on your head. It holds. Barely.",
                     "",
-                    "TERRAVOK: \"REST... AT LAST... TRUE REST...\"",
+                    "TERRAVOK: \"REST... AT LAST... REAL REST...\"",
                     "",
-                    "His power flows into you—the patient strength of mountains.",
-                    "",
-                    "You feel ENDURANCE surge through your bones.",
-                    "You could wait a thousand years if you had to."
+                    "Stone dust settles on your skin and sinks in.",
+                    "Your bones feel heavier. Denser. Like they could hold up a mountain.",
+                    "Maybe they can now."
                 },
 
                 ArtifactDropped = ArtifactType.Worldstone,
@@ -681,19 +679,19 @@ namespace UsurperRemake.Data
 
                 IntroDialogue = new[]
                 {
-                    "At the heart of creation, a figure sits upon a throne of stars.",
-                    "He is neither young nor old. He is simply... everything.",
+                    "At the heart of everything, a figure sits on a throne of stars.",
+                    "He looks old. He looks young. He looks like everyone you ever met.",
                     "",
-                    "MANWE: \"Ah. You've come at last.\"",
+                    "MANWE: \"Ah. Took you long enough.\"",
                     "",
-                    "His voice contains multitudes—every voice that ever was.",
+                    "His voice sounds like a thousand people talking at once.",
                     "",
-                    "MANWE: \"I have watched you since before you were born.\"",
-                    "MANWE: \"I have seen every choice you made, every path you took.\"",
+                    "MANWE: \"I've been watching you, you know. Since the beginning.\"",
+                    "MANWE: \"Every choice. Every fight. Every mistake.\"",
                     "",
-                    "He rises, and the universe trembles.",
+                    "He stands up and the stars shake.",
                     "",
-                    "MANWE: \"Now... let us see what you truly are.\""
+                    "MANWE: \"Lets find out what you're made of.\""
                 },
 
                 Phase1Threshold = 1.0f,

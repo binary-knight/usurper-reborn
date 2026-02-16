@@ -97,6 +97,7 @@ public partial class MemorySystem
             // Social events
             MemoryType.MadeEnemy => -0.7f,
             MemoryType.MadeFriend => 0.5f,
+            MemoryType.Murdered => -1.0f,
             _ => 0.0f
         };
     }
@@ -343,6 +344,7 @@ public enum MemoryType
     LeftGang,
     MadeEnemy,
     MadeFriend,
+    Murdered,
     SocialInteraction,
     
     // Economic events

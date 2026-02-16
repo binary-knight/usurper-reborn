@@ -67,8 +67,8 @@ namespace UsurperRemake.Systems
                 Title = "The Wandering Star",
                 Type = CompanionType.Romance,
 
-                Description = "A mysterious traveler with silver-streaked hair and eyes that seem to hold " +
-                             "ancient sorrow. She speaks in riddles and appears to know more than she reveals.",
+                Description = "A traveler with silver-streaked hair and a habit of staring at you like she " +
+                             "knows something you dont. Speaks in riddles. Knows too much.",
 
                 BackstoryBrief = "Lyris was once a priestess of Aurelion, the god of light. When Manwe corrupted " +
                                 "the Old Gods, she was cast out, neither fully mortal nor divine. She wanders " +
@@ -106,9 +106,9 @@ namespace UsurperRemake.Systems
 
                 DialogueHints = new[]
                 {
-                    "There is something... familiar about you.",
-                    "The stars have shown me many things. Your face was among them.",
-                    "Do you ever feel like you've forgotten something important?"
+                    "I feel like Ive seen you before. Somewhere.",
+                    "You remind me of someone. Cant place it though.",
+                    "You ever get the feeling youve forgotten something big?"
                 },
 
                 OceanPhilosophyAwareness = 4 // She senses the player's true nature early
@@ -124,8 +124,8 @@ namespace UsurperRemake.Systems
                 Title = "The Unbroken Shield",
                 Type = CompanionType.Combat,
 
-                Description = "A grizzled warrior with scars mapping decades of battle. His eyes hold " +
-                             "the weight of those he couldn't save, and the determination to never fail again.",
+                Description = "A scarred old soldier who doesnt talk much about where the scars came from. " +
+                             "Lost his whole unit once. Still hasnt forgiven himself.",
 
                 BackstoryBrief = "Once the captain of the King's Guard, Aldric lost his entire unit to a demonic " +
                                 "incursion he blames himself for. He now wanders, seeking redemption through " +
@@ -163,9 +163,9 @@ namespace UsurperRemake.Systems
 
                 DialogueHints = new[]
                 {
-                    "I've failed people before. I won't fail you.",
-                    "The measure of a warrior isn't in victories, but in who they protect.",
-                    "Sometimes I wonder... are we fighting for the right reasons?"
+                    "I let people down before. Not again.",
+                    "Winning doesnt matter if nobody survives.",
+                    "You sure we're on the right side of this?"
                 },
 
                 LoyaltyThreshold = 80, // High loyalty required for moral trigger death
@@ -222,9 +222,9 @@ namespace UsurperRemake.Systems
 
                 DialogueHints = new[]
                 {
-                    "I heal because I don't know what else to do. Is that enough?",
-                    "Sometimes the kindest thing is to let go.",
-                    "If I save you... will that mean something? Will it matter?"
+                    "I just heal people. Its all I know how to do.",
+                    "Some people cant be saved. Took me a while to learn that.",
+                    "Does it even matter? Saving one person?"
                 },
 
                 TeachesLettingGo = true // Her arc is about acceptance
@@ -240,9 +240,8 @@ namespace UsurperRemake.Systems
                 Title = "The Laughing Shadow",
                 Type = CompanionType.Utility,
 
-                Description = "A charming thief with a quick wit and quicker fingers. Vex treats everything " +
-                             "as a joke - including death. But there's a sadness behind the smile that " +
-                             "he never speaks of.",
+                Description = "A thief with fast hands and a faster mouth. Jokes about everything, " +
+                             "even dying. Hes been sick his whole life and he doesnt care who knows it.",
 
                 BackstoryBrief = "Vex was born with a wasting disease - he's been dying his whole life, one day " +
                                 "at a time. Rather than despair, he chose to laugh. He steals to survive, jokes " +
@@ -280,9 +279,9 @@ namespace UsurperRemake.Systems
 
                 DialogueHints = new[]
                 {
-                    "Life's too short to take seriously. Trust me, I know.",
-                    "Why am I doing this? Because tomorrow isn't guaranteed.",
-                    "Everyone dies. I just have a more specific schedule."
+                    "Life's too short to worry about it. Literally, in my case.",
+                    "Why not? Could be dead tomorrow. Probably will be.",
+                    "Everybody dies. I just know roughly when."
                 },
 
                 HasTimedDeath = true,
@@ -812,16 +811,16 @@ namespace UsurperRemake.Systems
         {
             return level switch
             {
-                1 => "A moment of connection",
-                2 => "Shared vulnerability",
-                3 => "Growing closer",
-                4 => "A stolen glance",
-                5 => "The first confession",
-                6 => "A promise made",
-                7 => "Hearts intertwined",
-                8 => "Inseparable",
-                9 => "True love",
-                10 => "Soulbound",
+                1 => "You caught her looking at you",
+                2 => "She told you something personal",
+                3 => "Getting comfortable around each other",
+                4 => "She smiled when she saw you",
+                5 => "One of you said it first",
+                6 => "Made a promise",
+                7 => "Cant imagine the road without her",
+                8 => "Always together",
+                9 => "The real thing",
+                10 => "Til death do you part",
                 _ => "Unknown milestone"
             };
         }
@@ -881,30 +880,30 @@ namespace UsurperRemake.Systems
             return (companion.Id, type) switch
             {
                 (CompanionId.Lyris, DeathType.Sacrifice) =>
-                    "I finally understand... what I was seeking... was always... with you...",
+                    "I knew... when I met you... I knew this is how it ends...",
 
                 (CompanionId.Lyris, DeathType.ChoiceBased) =>
-                    "Tell Aurelion... I never stopped believing...",
+                    "Tell Aurelion... I tried...",
 
                 (CompanionId.Aldric, DeathType.MoralTrigger) =>
-                    "I'm sorry... but I can't let you become... what you're becoming...",
+                    "I wont... let you... not like this...",
 
                 (CompanionId.Aldric, DeathType.Sacrifice) =>
-                    "Finally... I protected someone... this time... I didn't fail...",
+                    "Got em... this time I... got em...",
 
                 (CompanionId.Mira, DeathType.Sacrifice) =>
-                    "At last... I understand... healing was never about... the body...",
+                    "One more... let me heal... one more...",
 
                 (CompanionId.Mira, DeathType.QuestRelated) =>
-                    "I found it... the meaning... it was always... in the giving...",
+                    "It mattered... right? Tell me it mattered...",
 
                 (CompanionId.Vex, DeathType.Inevitable) =>
-                    "Heh... beat the schedule... by... a few hours... worth it...",
+                    "Heh... beat the schedule... by a few hours... not bad...",
 
                 (CompanionId.Vex, DeathType.Sacrifice) =>
-                    "Always wanted to go out... with a punchline... did I... make you laugh...?",
+                    "Always wanted... to go out... on a good joke... was it funny...?",
 
-                _ => "It was... worth it... all of it..."
+                _ => "Hey... not bad... for a... last day..."
             };
         }
 
@@ -1116,11 +1115,9 @@ namespace UsurperRemake.Systems
 
             // The moment of passing
             terminal.SetColor("gray");
-            terminal.WriteLine("  Their eyes close.");
-            await Task.Delay(800);
-            terminal.WriteLine("  Their breath stills.");
-            await Task.Delay(800);
-            terminal.WriteLine("  And then... silence.");
+            terminal.WriteLine($"  {companion.Name} goes still.");
+            await Task.Delay(1200);
+            terminal.WriteLine("  Thats it. Theyre gone.");
             terminal.WriteLine("");
 
             await Task.Delay(2000);
@@ -1132,9 +1129,8 @@ namespace UsurperRemake.Systems
 
             // Final message
             terminal.SetColor("gray");
-            terminal.WriteLine("  They are gone.");
-            terminal.WriteLine("  There is no resurrection. No second chance.");
-            terminal.WriteLine("  Death is not a door that opens twice.");
+            terminal.WriteLine($"  {companion.Name} is dead.");
+            terminal.WriteLine("  No coming back from this one.");
             terminal.WriteLine("");
 
             await Task.Delay(1500);
@@ -1143,11 +1139,11 @@ namespace UsurperRemake.Systems
             terminal.SetColor("bright_cyan");
             string memoryLine = companion.Id switch
             {
-                CompanionId.Lyris => "  But their light remains. Look up. Remember.",
-                CompanionId.Aldric => "  But what grew from their sacrifice lives on. In you.",
-                CompanionId.Mira => "  But the warmth they gave... that never fades.",
-                CompanionId.Vex => "  But the song echoes. Listen. It's still playing.",
-                _ => "  But memory persists. They live on in what they changed."
+                CompanionId.Lyris => "  You wont forget her. You know that much.",
+                CompanionId.Aldric => "  He died doing what he always did. Standing in front of someone.",
+                CompanionId.Mira => "  She healed you. More times than you can count.",
+                CompanionId.Vex => "  You can still hear him laughing. Somehow.",
+                _ => "  You wont forget them."
             };
             terminal.WriteLine(memoryLine);
             terminal.SetColor("white");
@@ -1167,98 +1163,68 @@ namespace UsurperRemake.Systems
             switch (companion.Id)
             {
                 case CompanionId.Lyris:
-                    // Lyris - STARLIGHT metaphor (love transcends death)
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine("  In her final moment, you feel it:");
-                    terminal.WriteLine("  A connection that transcended words.");
-                    terminal.WriteLine("  Love is not possession. It is recognition.");
-                    terminal.WriteLine("  Two souls seeing themselves in each other.");
+                    terminal.WriteLine("  She knew things she shouldnt have known.");
+                    terminal.WriteLine("  About you. About the gods. About all of it.");
                     terminal.WriteLine("");
                     await Task.Delay(1500);
                     terminal.SetColor("cyan");
-                    terminal.WriteLine("  She was the star that guided you.");
-                    terminal.WriteLine("  Stars die - but their light travels forever.");
-                    terminal.WriteLine("  The light you see tonight left its source");
-                    terminal.WriteLine("  a thousand years ago.");
+                    terminal.WriteLine("  You never found out how much she really knew.");
+                    terminal.WriteLine("  Now you never will.");
                     terminal.WriteLine("");
                     await Task.Delay(1000);
                     terminal.SetColor("bright_white");
-                    terminal.WriteLine("  Every time you look up, she will still be shining.");
-                    terminal.WriteLine("  That is the nature of light.");
-                    terminal.WriteLine("  It never truly stops.");
+                    terminal.WriteLine("  Funny how much you miss someone");
+                    terminal.WriteLine("  who never told you the whole truth.");
                     break;
 
                 case CompanionId.Aldric:
-                    // Aldric - SEED/TREE metaphor (sacrifice enables growth)
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("  All his life, Aldric carried the weight of those he couldn't save.");
-                    terminal.WriteLine("  The ghosts of the fallen followed him everywhere.");
+                    terminal.WriteLine("  He lost his whole unit once. Every single one of them.");
+                    terminal.WriteLine("  Carried that around for years.");
                     await Task.Delay(1000);
                     terminal.SetColor("white");
                     terminal.WriteLine("");
-                    terminal.WriteLine("  But in this final act...");
-                    terminal.WriteLine("  The ghosts released him.");
-                    terminal.WriteLine("  He did not fail this time.");
+                    terminal.WriteLine("  This time he didnt lose anyone.");
+                    terminal.WriteLine("  Just himself.");
                     terminal.WriteLine("");
                     await Task.Delay(1000);
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine("  A seed must break open to become a tree.");
-                    terminal.WriteLine("  The shell dies so the life within can grow.");
-                    terminal.WriteLine("  Aldric was a shield that shattered");
-                    terminal.WriteLine("  so that you could stand.");
-                    terminal.WriteLine("");
-                    terminal.SetColor("white");
-                    terminal.WriteLine("  His sacrifice was not an ending.");
-                    terminal.WriteLine("  It was a beginning - yours.");
+                    terminal.WriteLine("  Maybe thats what he wanted all along.");
+                    terminal.WriteLine("  One fight where he didnt have to watch someone else die.");
                     break;
 
                 case CompanionId.Mira:
-                    // Mira - CANDLE metaphor (giving light by burning)
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine("  She spent so long asking: 'Does healing matter?'");
-                    terminal.WriteLine("  Her faith was broken. Her temple, destroyed.");
-                    terminal.WriteLine("  She healed others because she didn't know what else to do.");
+                    terminal.WriteLine("  She lost her faith when the temple fell.");
+                    terminal.WriteLine("  Kept healing people anyway. Said she didnt know why.");
                     terminal.WriteLine("");
                     await Task.Delay(1500);
                     terminal.SetColor("white");
-                    terminal.WriteLine("  And now, at the end...");
-                    terminal.WriteLine("  She finally understands.");
+                    terminal.WriteLine("  Maybe she did know why.");
+                    terminal.WriteLine("  Maybe she just didnt want to admit it.");
                     terminal.WriteLine("");
                     await Task.Delay(1000);
-                    terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("  A candle gives light by burning itself.");
-                    terminal.WriteLine("  It doesn't ask if the light matters.");
-                    terminal.WriteLine("  It simply shines, because that is its nature.");
-                    terminal.WriteLine("");
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine("  Mira was a candle.");
-                    terminal.WriteLine("  The meaning was never in the result.");
-                    terminal.WriteLine("  It was in the giving itself.");
+                    terminal.WriteLine("  She healed you because she cared.");
+                    terminal.WriteLine("  Thats it. Thats the whole reason.");
                     break;
 
                 case CompanionId.Vex:
-                    // Vex - MUSIC metaphor (beauty in transience)
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("  He knew. He always knew.");
-                    terminal.WriteLine("  The disease was a clock, ticking down.");
-                    terminal.WriteLine("  Others would have despaired. He chose to laugh.");
+                    terminal.WriteLine("  He was dying the whole time you knew him.");
+                    terminal.WriteLine("  Never shut up about it either. Made jokes.");
+                    terminal.WriteLine("  Drove you crazy sometimes.");
                     terminal.WriteLine("");
                     await Task.Delay(1500);
                     terminal.SetColor("white");
-                    terminal.WriteLine("  'Life's too short to take seriously,' he said.");
-                    terminal.WriteLine("  And he was right.");
+                    terminal.WriteLine("  Turns out thats how he dealt with it.");
+                    terminal.WriteLine("  If you cant beat it, laugh at it.");
                     terminal.WriteLine("");
                     await Task.Delay(1000);
-                    terminal.SetColor("bright_magenta");
-                    terminal.WriteLine("  A song is beautiful BECAUSE it ends.");
-                    terminal.WriteLine("  If it played forever, it would become noise.");
-                    terminal.WriteLine("  The silence after is part of the music.");
-                    terminal.WriteLine("");
                     terminal.SetColor("cyan");
-                    terminal.WriteLine("  Vex didn't fight death. He danced with it.");
-                    terminal.WriteLine("  He made his life a song worth hearing.");
-                    terminal.WriteLine("  And now... the silence.");
-                    terminal.WriteLine("  Listen. Can you still hear the echo?");
+                    terminal.WriteLine("  The dungeon is quieter now.");
+                    terminal.WriteLine("  You keep expecting to hear a bad joke around the next corner.");
                     break;
             }
 

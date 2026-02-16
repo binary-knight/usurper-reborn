@@ -1,9 +1,12 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -466,6 +469,29 @@ public class InnLocation : BaseLocation
         }
         terminal.WriteLine("");
 
+        // Online mode options: Rent a Room + Attack a Sleeper
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            long roomCost = (long)(currentPlayer.Level * GameConfig.InnRoomCostPerLevel);
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_green");
+            terminal.Write("N");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_green");
+            terminal.Write($"Rent a Room & Logout ({roomCost}g, protected)    ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_red");
+            terminal.Write("K");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("red");
+            terminal.WriteLine("Attack a sleeper");
+        }
+
         terminal.SetColor("yellow");
         terminal.WriteLine("Navigation:");
 
@@ -562,6 +588,16 @@ public class InnLocation : BaseLocation
 
             case "L":
                 await HandleGamblingDen();
+                return false;
+
+            case "N":
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    await RentRoom();
+                return false;
+
+            case "K":
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    await AttackInnSleeper();
                 return false;
 
             case "Q":
@@ -3434,6 +3470,552 @@ public class InnLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.WriteLine($"Arm wrestling matches today: {_armWrestlesToday}/{GameConfig.MaxArmWrestlesPerDay}");
         await terminal.PressAnyKey();
+    }
+
+    #endregion
+
+    #region Rent a Room (Online Mode)
+
+    private static readonly (string type, string name, int baseCost, int baseHp)[] GuardOptions = new[]
+    {
+        ("rookie_npc",  "Rookie Guard",  GameConfig.GuardRookieBaseCost,  80),
+        ("veteran_npc", "Veteran Guard", GameConfig.GuardVeteranBaseCost, 150),
+        ("elite_npc",   "Elite Guard",   GameConfig.GuardEliteBaseCost,   250),
+        ("hound",       "Guard Hound",   GameConfig.GuardHoundBaseCost,   60),
+        ("troll",       "Guard Troll",   GameConfig.GuardTrollBaseCost,   200),
+        ("drake",       "Guard Drake",   GameConfig.GuardDrakeBaseCost,   300),
+    };
+
+    private async Task RentRoom()
+    {
+        long roomCost = (long)(currentPlayer.Level * GameConfig.InnRoomCostPerLevel);
+        if (currentPlayer.Gold < roomCost)
+        {
+            terminal.WriteLine($"You need {roomCost:N0} gold for a room. You have {currentPlayer.Gold:N0}.", "red");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("╔══════════════════════════════════╗");
+        terminal.WriteLine("║        Rent a Private Room       ║");
+        terminal.WriteLine("╚══════════════════════════════════╝");
+        terminal.SetColor("white");
+        terminal.WriteLine($"\n  Room cost: {roomCost:N0} gold");
+        terminal.WriteLine("  You will be healed fully and logged out safely.");
+        terminal.SetColor("green");
+        terminal.WriteLine("  Sleeping at the Inn grants +50% ATK/DEF if you're attacked.\n");
+
+        // Guard hiring loop
+        var hiredGuards = new List<(string type, string name, int hp)>();
+        float levelMultiplier = 1.0f + currentPlayer.Level / 10.0f;
+        long totalGuardCost = 0;
+
+        while (hiredGuards.Count < GameConfig.MaxSleepGuards)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Guards hired: {hiredGuards.Count}/{GameConfig.MaxSleepGuards}");
+            if (hiredGuards.Count > 0)
+            {
+                terminal.SetColor("cyan");
+                foreach (var g in hiredGuards)
+                    terminal.WriteLine($"    - {g.name} (HP: {g.hp})");
+            }
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            for (int i = 0; i < GuardOptions.Length; i++)
+            {
+                var opt = GuardOptions[i];
+                int cost = GetGuardCost(opt.baseCost, levelMultiplier, hiredGuards.Count);
+                int hp = (int)(opt.baseHp * levelMultiplier);
+                bool canAfford = currentPlayer.Gold - roomCost - totalGuardCost >= cost;
+                terminal.SetColor(canAfford ? "white" : "dark_red");
+                terminal.WriteLine($"  [{i + 1}] {opt.name,-16} {cost,6:N0}g  (HP: {hp})");
+            }
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  [D] Done hiring");
+            terminal.SetColor("white");
+            terminal.WriteLine($"\n  Your gold: {currentPlayer.Gold:N0}  |  Room: {roomCost:N0}  |  Guards: {totalGuardCost:N0}  |  Total: {roomCost + totalGuardCost:N0}");
+
+            var input = await terminal.GetInput("\n  Choice: ");
+            if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "D")
+                break;
+
+            if (int.TryParse(input.Trim(), out int guardIdx) && guardIdx >= 1 && guardIdx <= GuardOptions.Length)
+            {
+                var chosen = GuardOptions[guardIdx - 1];
+                int cost = GetGuardCost(chosen.baseCost, levelMultiplier, hiredGuards.Count);
+                int hp = (int)(chosen.baseHp * levelMultiplier);
+
+                if (currentPlayer.Gold - roomCost - totalGuardCost < cost)
+                {
+                    terminal.WriteLine("  You can't afford that guard.", "red");
+                    await Task.Delay(1000);
+                    continue;
+                }
+
+                totalGuardCost += cost;
+                hiredGuards.Add((chosen.type, chosen.name, hp));
+                terminal.WriteLine($"  Hired {chosen.name}! (HP: {hp})", "green");
+                await Task.Delay(500);
+            }
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("╔══════════════════════════════════╗");
+            terminal.WriteLine("║        Rent a Private Room       ║");
+            terminal.WriteLine("╚══════════════════════════════════╝");
+            terminal.SetColor("white");
+        }
+
+        // Confirm total cost
+        long totalCost = roomCost + totalGuardCost;
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"\n  Total cost: {totalCost:N0} gold (Room: {roomCost:N0} + Guards: {totalGuardCost:N0})");
+        var confirm = await terminal.GetInput("  Rent this room and log out? (y/N): ");
+        if (!confirm.Equals("Y", StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.WriteLine("  You decide not to rent a room.", "gray");
+            await Task.Delay(1000);
+            return;
+        }
+
+        if (currentPlayer.Gold < totalCost)
+        {
+            terminal.WriteLine("  You can't afford this!", "red");
+            await Task.Delay(1500);
+            return;
+        }
+
+        currentPlayer.Gold -= totalCost;
+
+        // Restore HP/Mana/Stamina
+        currentPlayer.HP = currentPlayer.MaxHP;
+        currentPlayer.Mana = currentPlayer.MaxMana;
+        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
+
+        await DailySystemManager.Instance.ForceDailyReset();
+
+        // Save game
+        await GameEngine.Instance.SaveCurrentGame();
+
+        // Build guards JSON
+        var guardsJson = "[]";
+        if (hiredGuards.Count > 0)
+        {
+            var guardsList = hiredGuards.Select(g => new { type = g.type, hp = g.hp, maxHp = g.hp }).ToList();
+            guardsJson = System.Text.Json.JsonSerializer.Serialize(guardsList);
+        }
+
+        // Register as sleeping at the Inn (protected)
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend != null)
+        {
+            var username = UsurperRemake.BBS.DoorMode.OnlineUsername ?? currentPlayer.Name2;
+            await backend.RegisterSleepingPlayer(username, "inn", guardsJson, 1);
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("\n  The innkeeper shows you to a private room upstairs.");
+        terminal.WriteLine("  You lock the heavy door and collapse into a real bed.");
+        if (hiredGuards.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  Your {hiredGuards.Count} guard{(hiredGuards.Count > 1 ? "s take" : " takes")} position outside your door.");
+        }
+        terminal.SetColor("gray");
+        terminal.WriteLine("\n  You drift into a deep, protected sleep... (logging out)");
+        await Task.Delay(2000);
+
+        throw new LocationExitException(GameLocation.NoWhere);
+    }
+
+    private static int GetGuardCost(int baseCost, float levelMultiplier, int guardsAlreadyHired)
+    {
+        return (int)(baseCost * levelMultiplier * (1.0f + GameConfig.GuardCostMultiplierPerExtra * guardsAlreadyHired));
+    }
+
+    private async Task AttackInnSleeper()
+    {
+        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+        if (backend == null)
+        {
+            terminal.WriteLine("Not available.", "gray");
+            await Task.Delay(1000);
+            return;
+        }
+
+        // Gather targets: sleeping NPCs at inn + offline players at inn
+        var sleepingNPCNames = WorldSimulator.GetSleepingNPCsAt("inn");
+        var offlineSleepers = await backend.GetSleepingPlayers();
+        var innPlayerSleepers = offlineSleepers
+            .Where(s => s.SleepLocation == "inn" && !s.IsDead)
+            .Where(s => !s.Username.Equals(DoorMode.OnlineUsername ?? "", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (sleepingNPCNames.Count == 0 && innPlayerSleepers.Count == 0)
+        {
+            terminal.WriteLine("No vulnerable sleepers at the Inn.", "gray");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("Inn — Sleeping Guests");
+        terminal.WriteLine("");
+
+        var targets = new List<(string name, bool isNPC)>();
+        foreach (var npcName in sleepingNPCNames)
+        {
+            var npc = NPCSpawnSystem.Instance.GetNPCByName(npcName);
+            string lvlStr = npc != null ? $" (Lvl {npc.Level})" : "";
+            terminal.WriteLine($"  {targets.Count + 1}. {npcName}{lvlStr} [SLEEPING NPC]", "yellow");
+            targets.Add((npcName, true));
+        }
+        foreach (var s in innPlayerSleepers)
+        {
+            int guardCount = 0;
+            try { guardCount = JsonSerializer.Deserialize<List<object>>(s.GuardsJson)?.Count ?? 0; } catch { }
+            string guardLabel = guardCount > 0 ? $" [{guardCount} guard{(guardCount != 1 ? "s" : "")}]" : "";
+            terminal.WriteLine($"  {targets.Count + 1}. {s.Username}{guardLabel} [SLEEPING PLAYER]", "red");
+            targets.Add((s.Username, false));
+        }
+
+        terminal.SetColor("white");
+        var input = await terminal.GetInput("\nWho do you attack? (number or name, blank to cancel): ");
+        if (string.IsNullOrWhiteSpace(input)) return;
+
+        (string name, bool isNPC) chosen = default;
+        if (int.TryParse(input, out int idx) && idx >= 1 && idx <= targets.Count)
+            chosen = targets[idx - 1];
+        else
+        {
+            var match = targets.FirstOrDefault(t => t.name.Equals(input, StringComparison.OrdinalIgnoreCase));
+            if (match.name != null)
+                chosen = match;
+        }
+
+        if (chosen.name == null)
+        {
+            terminal.WriteLine("No such sleeper.", "red");
+            await Task.Delay(1000);
+            return;
+        }
+
+        if (chosen.isNPC)
+            await AttackInnSleepingNPC(chosen.name);
+        else
+            await AttackInnSleepingPlayer(backend, chosen.name);
+    }
+
+    private async Task AttackInnSleepingNPC(string npcName)
+    {
+        var npc = NPCSpawnSystem.Instance.GetNPCByName(npcName);
+        if (npc == null || !npc.IsAlive || npc.IsDead)
+        {
+            terminal.WriteLine("They are no longer here.", "gray");
+            await Task.Delay(1000);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"\n  You pick the lock to {npcName}'s room at the Inn...\n");
+        await Task.Delay(1500);
+
+        currentPlayer.Darkness += 30; // Extra darkness for invading inn
+
+        // Inn NPCs fight with defense boost (+50% STR/DEF, better rested)
+        long origStr = npc.Strength;
+        long origDef = npc.Defence;
+        npc.Strength = (long)(npc.Strength * (1.0 + GameConfig.InnDefenseBoost));
+        npc.Defence = (long)(npc.Defence * (1.0 + GameConfig.InnDefenseBoost));
+
+        var combatEngine = new CombatEngine(terminal);
+        var result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+
+        // Restore NPC stats
+        npc.Strength = origStr;
+        npc.Defence = origDef;
+
+        if (result.Outcome == CombatOutcome.Victory)
+        {
+            long stolenGold = (long)(npc.Gold * GameConfig.SleeperGoldTheftPercent);
+            if (stolenGold > 0)
+            {
+                currentPlayer.Gold += stolenGold;
+                npc.Gold -= stolenGold;
+                terminal.WriteLine($"You rifle through their belongings and steal {stolenGold:N0} gold!", "yellow");
+            }
+
+            terminal.SetColor("dark_red");
+            terminal.WriteLine($"\nYou leave {npcName}'s body in their room.");
+
+            // Record murder memory
+            npc.Memory?.RecordEvent(new MemoryEvent
+            {
+                Type = MemoryType.Murdered,
+                Description = $"Murdered in my sleep at the Inn by {currentPlayer.Name2}",
+                InvolvedCharacter = currentPlayer.Name2,
+                Importance = 1.0f,
+                EmotionalImpact = -1.0f,
+                Location = "Inn"
+            });
+
+            // Faction standing penalty — worse at the inn (civilized place)
+            if (npc.NPCFaction.HasValue)
+            {
+                var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
+                factionSystem?.ModifyReputation(npc.NPCFaction.Value, -250);
+                terminal.SetColor("red");
+                terminal.WriteLine($"Your standing with {UsurperRemake.Systems.FactionSystem.Factions[npc.NPCFaction.Value].Name} has plummeted! (-250)");
+            }
+
+            // Witness memories for NPCs at the Inn
+            foreach (var witness in LocationManager.Instance.GetNPCsInLocation(GameLocation.TheInn)
+                .Where(n => n.IsAlive && n.Name2 != npcName))
+            {
+                witness.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.SawDeath,
+                    Description = $"Witnessed {currentPlayer.Name2} murder {npcName} at the Inn",
+                    InvolvedCharacter = currentPlayer.Name2,
+                    Importance = 0.8f,
+                    EmotionalImpact = -0.6f,
+                    Location = "Inn"
+                });
+            }
+
+            WorldSimulator.WakeUpNPC(npcName);
+
+            try { OnlineStateManager.Instance?.AddNews($"{currentPlayer.Name2} murdered {npcName} in their sleep at the Inn!", "combat"); } catch { }
+
+            await Task.Delay(2000);
+        }
+        else
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"{npcName} fought you off — the Inn's thick walls muffled the struggle!");
+            WorldSimulator.WakeUpNPC(npcName);
+            await Task.Delay(2000);
+        }
+        await terminal.WaitForKeyPress();
+    }
+
+    private async Task AttackInnSleepingPlayer(SqlSaveBackend backend, string targetUsername)
+    {
+        var rng = new Random();
+        var target = (await backend.GetSleepingPlayers())
+            .FirstOrDefault(s => s.Username.Equals(targetUsername, StringComparison.OrdinalIgnoreCase));
+        if (target == null) return;
+
+        var victimSave = await backend.ReadGameData(target.Username);
+        if (victimSave?.Player == null)
+        {
+            terminal.WriteLine("Could not load their data.", "red");
+            await Task.Delay(1000);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"\n  You sneak toward {target.Username}'s room at the Inn...\n");
+        await Task.Delay(1500);
+
+        // Fight through guards
+        bool guardsRepelled = false;
+        var guards = new List<(string type, string name, int hp, int maxHp)>();
+        try
+        {
+            var guardArray = JsonNode.Parse(target.GuardsJson) as JsonArray;
+            if (guardArray != null)
+            {
+                foreach (var g in guardArray)
+                {
+                    if (g == null) continue;
+                    string gType = g["type"]?.GetValue<string>() ?? "rookie_npc";
+                    string gName = g["name"]?.GetValue<string>() ?? "Guard";
+                    int gHp = g["hp"]?.GetValue<int>() ?? 50;
+                    int gMaxHp = g["max_hp"]?.GetValue<int>() ?? gHp;
+                    guards.Add((gType, gName, gHp, gMaxHp));
+                }
+            }
+        }
+        catch { }
+
+        int victimLevel = victimSave.Player.Level;
+
+        for (int gi = 0; gi < guards.Count; gi++)
+        {
+            var (gType, gName, gHp, gMaxHp) = guards[gi];
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"\n  A {gName} blocks your path!");
+            await Task.Delay(1000);
+
+            var guardChar = HeadlessCombatResolver.CreateGuardCharacter(gType, gHp, victimLevel, rng);
+            var guardCombat = new CombatEngine(terminal);
+            var guardResult = await guardCombat.PlayerVsPlayer(currentPlayer, guardChar);
+
+            if (guardResult.Outcome == CombatOutcome.Victory)
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine($"  You cut down the {gName}!");
+                guards.RemoveAt(gi);
+                gi--;
+                await Task.Delay(1000);
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  The {gName} drives you back! Attack failed!");
+                int remainingHp = (int)Math.Max(1, guardChar.HP);
+                guards[gi] = (gType, gName, remainingHp, gMaxHp);
+                guardsRepelled = true;
+                await Task.Delay(2000);
+                break;
+            }
+        }
+
+        // Update guards in DB
+        var updatedGuards = guards.Select(g => new { type = g.type, name = g.name, hp = g.hp, max_hp = g.maxHp });
+        await backend.UpdateSleeperGuards(target.Username, JsonSerializer.Serialize(updatedGuards));
+
+        if (guardsRepelled)
+        {
+            var failLog = JsonSerializer.Serialize(new
+            {
+                attacker = currentPlayer.Name2,
+                type = "player",
+                result = "guards_repelled"
+            });
+            await backend.AppendSleepAttackLog(target.Username, failLog);
+            await terminal.WaitForKeyPress();
+            return;
+        }
+
+        // Guards defeated — fight the sleeper with inn defense boost
+        var victim = PlayerCharacterLoader.CreateFromSaveData(victimSave.Player, target.Username);
+        long victimGold = victim.Gold;
+        victim.Gold = 0;
+
+        if (target.InnDefenseBoost)
+        {
+            victim.Strength = (long)(victim.Strength * (1.0 + GameConfig.InnDefenseBoost));
+            victim.Defence = (long)(victim.Defence * (1.0 + GameConfig.InnDefenseBoost));
+        }
+
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"\n  You reach {target.Username}...\n");
+        await Task.Delay(1000);
+
+        currentPlayer.Darkness += 30;
+
+        var combatEngine = new CombatEngine(terminal);
+        var result = await combatEngine.PlayerVsPlayer(currentPlayer, victim);
+
+        if (result.Outcome == CombatOutcome.Victory)
+        {
+            long stolenGold = (long)(victimGold * GameConfig.SleeperGoldTheftPercent);
+            if (stolenGold > 0)
+            {
+                currentPlayer.Gold += stolenGold;
+                await backend.DeductGoldFromPlayer(target.Username, stolenGold);
+                terminal.WriteLine($"You rifle through their belongings and steal {stolenGold:N0} gold!", "yellow");
+            }
+
+            string stolenItemName = await StealRandomItem(backend, target.Username, victimSave);
+            if (stolenItemName != null)
+                terminal.WriteLine($"You also take their {stolenItemName}!", "yellow");
+
+            long xpLoss = (long)(victimSave.Player.Experience * GameConfig.SleeperXPLossPercent / 100.0);
+            if (xpLoss > 0)
+                await DeductXPFromPlayer(backend, target.Username, xpLoss);
+
+            await backend.MarkSleepingPlayerDead(target.Username);
+
+            var logEntry = JsonSerializer.Serialize(new
+            {
+                attacker = currentPlayer.Name2,
+                type = "player",
+                result = "attacker_won",
+                gold_stolen = stolenGold,
+                item_stolen = stolenItemName ?? (object)null!,
+                xp_lost = xpLoss
+            });
+            await backend.AppendSleepAttackLog(target.Username, logEntry);
+
+            await backend.SendMessage(currentPlayer.Name2, target.Username, "sleep_attack",
+                $"{currentPlayer.Name2} broke into your Inn room and murdered you! They stole {stolenGold:N0} gold{(stolenItemName != null ? $" and your {stolenItemName}" : "")}.");
+
+            terminal.SetColor("dark_red");
+            terminal.WriteLine($"\nYou leave {target.Username}'s body in their room.");
+            await Task.Delay(2000);
+        }
+        else
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"{target.Username} fought you off even in their sleep!");
+            await Task.Delay(2000);
+        }
+        await terminal.WaitForKeyPress();
+    }
+
+    private async Task<string?> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
+    {
+        var rng = new Random();
+        try
+        {
+            var playerData = saveData.Player;
+            if (playerData == null) return null;
+
+            var stealable = new List<(int index, string name)>();
+            if (playerData.DynamicEquipment != null)
+            {
+                for (int i = 0; i < playerData.DynamicEquipment.Count; i++)
+                {
+                    var eq = playerData.DynamicEquipment[i];
+                    if (eq != null && !string.IsNullOrEmpty(eq.Name))
+                        stealable.Add((i, eq.Name));
+                }
+            }
+
+            if (stealable.Count == 0) return null;
+
+            var (index, name) = stealable[rng.Next(stealable.Count)];
+            var stolenEquip = playerData.DynamicEquipment![index];
+
+            if (playerData.EquippedItems != null)
+            {
+                var slotToRemove = playerData.EquippedItems
+                    .Where(kvp => kvp.Value == stolenEquip.Id)
+                    .Select(kvp => kvp.Key)
+                    .FirstOrDefault(-1);
+                if (slotToRemove >= 0)
+                    playerData.EquippedItems.Remove(slotToRemove);
+            }
+
+            playerData.DynamicEquipment.RemoveAt(index);
+            await backend.WriteGameData(username, saveData);
+            return name;
+        }
+        catch { return null; }
+    }
+
+    private async Task DeductXPFromPlayer(SqlSaveBackend backend, string username, long xpLoss)
+    {
+        try
+        {
+            var saveData = await backend.ReadGameData(username);
+            if (saveData?.Player != null)
+            {
+                saveData.Player.Experience = Math.Max(0, saveData.Player.Experience - xpLoss);
+                await backend.WriteGameData(username, saveData);
+            }
+        }
+        catch { }
     }
 
     #endregion

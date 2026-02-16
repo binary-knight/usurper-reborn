@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
@@ -77,6 +78,12 @@ namespace UsurperRemake.Locations
                     return false;
                 case "J": // The Shadows faction recruitment
                     await ShowShadowsRecruitment();
+                    return false;
+                case "M": // Black Market (Shadows only)
+                    await VisitBlackMarket();
+                    return false;
+                case "I": // Informant (Shadows only)
+                    await VisitInformant();
                     return false;
                 case "X": // Hidden easter egg - not shown in menu
                     await ExamineTheShadows();
@@ -222,6 +229,32 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(" You are a member of The Shadows.");
+            }
+
+            // Black Market (Shadows only)
+            if (FactionSystem.Instance?.HasBlackMarketAccess() == true)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_magenta");
+                terminal.Write("M");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("magenta");
+                terminal.WriteLine(" Black Market");
+            }
+
+            // Informant (Shadows only)
+            if (FactionSystem.Instance?.HasInformationNetwork() == true)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_magenta");
+                terminal.Write("I");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("magenta");
+                terminal.WriteLine("nformant");
             }
 
             // Navigation
@@ -886,5 +919,243 @@ namespace UsurperRemake.Locations
         }
 
         #endregion
+
+        #region Black Market and Informant
+
+        private async Task VisitBlackMarket()
+        {
+            if (FactionSystem.Instance?.HasBlackMarketAccess() != true)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("\n  You dont have access to the Black Market.");
+                terminal.WriteLine("  Join the Shadows first.");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                      THE BLACK MARKET                             ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("  A hooded figure beckons you behind a false wall.");
+            terminal.WriteLine("  Crates of contraband line the narrow room.");
+            terminal.WriteLine("");
+
+            float rankDiscount = FactionSystem.Instance?.GetBlackMarketDiscount() ?? 0f;
+            int level = currentPlayer.Level;
+
+            long forgedPapersPrice = (long)((1000 + level * 100) * (1.0f - rankDiscount));
+            long poisonVialPrice = (long)((300 + level * 20) * (1.0f - rankDiscount));
+            long smokeBombPrice = (long)((500 + level * 30) * (1.0f - rankDiscount));
+
+            terminal.SetColor("white");
+            terminal.WriteLine($"  [1] Forged Papers     {forgedPapersPrice,8:N0}g  — Reduce Darkness by 100");
+            terminal.SetColor(currentPlayer.PoisonCoatingCombats > 0 ? "gray" : "white");
+            terminal.WriteLine($"  [2] Poison Vial       {poisonVialPrice,8:N0}g  — +20% damage for 5 combats");
+            terminal.SetColor(currentPlayer.SmokeBombs >= 3 ? "gray" : "white");
+            terminal.WriteLine($"  [3] Smoke Bomb        {smokeBombPrice,8:N0}g  — Guaranteed escape (max 3)");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  [0] Leave");
+            terminal.WriteLine("");
+
+            if (rankDiscount > 0)
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"  Rank discount: {rankDiscount * 100:F0}% off");
+                terminal.WriteLine("");
+            }
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Gold: {currentPlayer.Gold:N0}");
+            terminal.WriteLine("");
+
+            var input = await terminal.GetInput("  Purchase? ");
+            switch (input.Trim())
+            {
+                case "1": // Forged Papers
+                    if (currentPlayer.Gold < forgedPapersPrice)
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("  Not enough gold.");
+                    }
+                    else
+                    {
+                        currentPlayer.Gold -= forgedPapersPrice;
+                        long reduction = Math.Min(100, currentPlayer.Darkness);
+                        currentPlayer.Darkness -= (int)reduction;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  The forger hands you new papers. Darkness reduced by {reduction}.");
+                        currentPlayer.Statistics?.RecordGoldSpent(forgedPapersPrice);
+                    }
+                    break;
+
+                case "2": // Poison Vial
+                    if (currentPlayer.PoisonCoatingCombats > 0)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  Your blade is already coated. Wait til it wears off.");
+                    }
+                    else if (currentPlayer.Gold < poisonVialPrice)
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("  Not enough gold.");
+                    }
+                    else
+                    {
+                        currentPlayer.Gold -= poisonVialPrice;
+                        currentPlayer.PoisonCoatingCombats = 5;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine("  You coat your weapon in a sickly green paste. +20% damage for 5 combats.");
+                        currentPlayer.Statistics?.RecordGoldSpent(poisonVialPrice);
+                    }
+                    break;
+
+                case "3": // Smoke Bomb
+                    if (currentPlayer.SmokeBombs >= 3)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  You cant carry any more. Three is the limit.");
+                    }
+                    else if (currentPlayer.Gold < smokeBombPrice)
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("  Not enough gold.");
+                    }
+                    else
+                    {
+                        currentPlayer.Gold -= smokeBombPrice;
+                        currentPlayer.SmokeBombs++;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  Smoke bomb acquired. You now carry {currentPlayer.SmokeBombs}.");
+                        currentPlayer.Statistics?.RecordGoldSpent(smokeBombPrice);
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+
+            await Task.Delay(2000);
+        }
+
+        private async Task VisitInformant()
+        {
+            if (FactionSystem.Instance?.HasInformationNetwork() != true)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("\n  You dont have access to the information network.");
+                terminal.WriteLine("  Join the Shadows first.");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                        THE INFORMANT                              ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("  A wiry figure in a dark corner taps the table impatiently.");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  \"Intel costs {GameConfig.InformantCost} gold. Take it or leave it.\"");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Gold: {currentPlayer.Gold:N0}");
+            terminal.WriteLine("");
+
+            var input = await terminal.GetInput("  Pay for intel? (Y/N): ");
+            if (input.Trim().ToUpper() != "Y")
+                return;
+
+            if (currentPlayer.Gold < GameConfig.InformantCost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  \"Come back when you can afford it.\"");
+                await Task.Delay(2000);
+                return;
+            }
+
+            currentPlayer.Gold -= GameConfig.InformantCost;
+            currentPlayer.Statistics?.RecordGoldSpent(GameConfig.InformantCost);
+
+            var activeNPCs = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (activeNPCs == null || activeNPCs.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  \"Nothing to report. Town's dead quiet.\"");
+                await Task.Delay(2000);
+                return;
+            }
+
+            // Top 5 wealthiest NPCs
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("\n  ═══ Wealthiest Marks ═══");
+            var wealthiest = activeNPCs
+                .Where(n => !n.IsDead && n.Gold > 0)
+                .OrderByDescending(n => n.Gold)
+                .Take(5)
+                .ToList();
+
+            if (wealthiest.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Nobody's carrying much right now.");
+            }
+            else
+            {
+                foreach (var npc in wealthiest)
+                {
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {npc.Name2,-20} {npc.Gold,8:N0}g  Lvl {npc.Level}");
+                }
+            }
+
+            // Wanted NPCs (high Darkness)
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("\n  ═══ Wanted (Darkness > 200) ═══");
+            var wanted = activeNPCs
+                .Where(n => !n.IsDead && n.Darkness > 200)
+                .OrderByDescending(n => n.Darkness)
+                .Take(5)
+                .ToList();
+
+            if (wanted.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Nobody on the wanted list right now.");
+            }
+            else
+            {
+                foreach (var npc in wanted)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  {npc.Name2,-20} Darkness: {npc.Darkness}  Lvl {npc.Level}");
+                }
+            }
+
+            // Active quest targets
+            var activeQuests = QuestSystem.GetActiveQuestsForPlayer(currentPlayer.Name2);
+            if (activeQuests?.Count > 0)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("\n  ═══ Your Active Targets ═══");
+                foreach (var quest in activeQuests.Take(5))
+                {
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"  {quest.Title}: {quest.GetTargetDescription()}");
+                }
+            }
+
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+        }
+
+        #endregion
     }
-} 
+}

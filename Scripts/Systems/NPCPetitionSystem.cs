@@ -526,10 +526,10 @@ namespace UsurperRemake.Systems
             if (success)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"\n  Your words resonate with {petitioner.Name2}.");
-                terminal.WriteLine($"  \"You're right. I need to talk to {spouse.Name2} honestly.\"");
+                terminal.WriteLine($"\n  {petitioner.Name2} thinks about what you said.");
+                terminal.WriteLine($"  \"Youre right. I gotta talk to {spouse.Name2}. For real this time.\"");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  The advice brings clarity. {petitioner.Name2} seems more at peace.");
+                terminal.WriteLine($"  {petitioner.Name2} looks a little better. Not great, but better.");
 
                 // Improve petitioner-spouse relationship
                 RelationshipSystem.UpdateRelationship(petitioner, spouse, 1, 3, overrideMaxFeeling: true);
@@ -603,7 +603,7 @@ namespace UsurperRemake.Systems
                 spouse.Memory?.RecordEvent(new MemoryEvent
                 {
                     Type = MemoryType.Helped,
-                    Description = $"{player.Name2} helped me see the error of my ways",
+                    Description = $"{player.Name2} talked some sense into me",
                     InvolvedCharacter = player.Name2,
                     Importance = 0.6f,
                     EmotionalImpact = 0.2f
@@ -1085,9 +1085,40 @@ namespace UsurperRemake.Systems
                     goldReward = 300 + player.Level * 25;
                     break;
                 case Faction.TheShadows:
-                    missionTarget = "a valuable contact";
-                    missionDesc = "We need someone with your skills for a delicate retrieval. Details on acceptance.";
-                    goldReward = 400 + player.Level * 30;
+                    int shadowRank = FactionSystem.Instance?.FactionRank ?? 0;
+                    bool isAssassination = shadowRank >= GameConfig.AssassinContractMinRank
+                        && _random.NextDouble() < GameConfig.AssassinContractChance;
+
+                    if (isAssassination)
+                    {
+                        var teamName = (player as Player)?.TeamName;
+                        var target = NPCSpawnSystem.Instance?.ActiveNPCs?
+                            .Where(n => !n.IsDead && n.Level >= 5 && !n.IsStoryNPC && !n.King
+                                && (string.IsNullOrEmpty(teamName) || n.TeamName != teamName))
+                            .OrderBy(_ => _random.Next())
+                            .FirstOrDefault();
+
+                        if (target != null)
+                        {
+                            missionTarget = target.Name2;
+                            missionDesc = $"We need {target.Name2} taken care of. Permanently.";
+                            goldReward = 500 + player.Level * 40;
+                            if (player.Class == CharacterClass.Assassin)
+                                goldReward = (int)(goldReward * (1.0f + GameConfig.AssassinClassGoldBonus));
+                        }
+                        else
+                        {
+                            missionTarget = "a valuable contact";
+                            missionDesc = "We need someone with your skills for a delicate retrieval. Details on acceptance.";
+                            goldReward = 400 + player.Level * 30;
+                        }
+                    }
+                    else
+                    {
+                        missionTarget = "a valuable contact";
+                        missionDesc = "We need someone with your skills for a delicate retrieval. Details on acceptance.";
+                        goldReward = 400 + player.Level * 30;
+                    }
                     break;
                 default: // Faith
                     var lostSoul = NPCSpawnSystem.Instance?.ActiveNPCs?
@@ -1107,11 +1138,11 @@ namespace UsurperRemake.Systems
             if (isRecruit)
             {
                 UIHelper.DrawBoxLine(terminal, $"  \"I represent {factionName}. We've been watching you, {player.Name2}.\"", "bright_cyan", "bright_yellow");
-                UIHelper.DrawBoxLine(terminal, $"  \"Your actions suggest you share our values.\"", "bright_cyan", "cyan");
+                UIHelper.DrawBoxLine(terminal, $"  \"Weve noticed what youve been doing. We like it.\"", "bright_cyan", "cyan");
             }
             else
             {
-                UIHelper.DrawBoxLine(terminal, $"  \"{factionName} has a task worthy of your rank, {player.Name2}.\"", "bright_cyan", "bright_yellow");
+                UIHelper.DrawBoxLine(terminal, $"  \"{factionName} has a job for you, {player.Name2}.\"", "bright_cyan", "bright_yellow");
             }
 
             UIHelper.DrawBoxLine(terminal, $"  \"{missionDesc}\"", "bright_cyan", "cyan");
@@ -1129,21 +1160,31 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"\n  \"Excellent. {factionName} won't forget this.\"");
 
-                // Give immediate reward — the "mission" is acknowledged by faction standing
-                player.Gold += goldReward;
+                // Give half the reward as advance payment
+                int advancePayment = goldReward / 2;
+                player.Gold += advancePayment;
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  You receive {goldReward} gold as advance payment.");
+                terminal.WriteLine($"  You receive {advancePayment} gold as advance payment.");
+                terminal.SetColor("white");
+                terminal.WriteLine($"  The remaining {goldReward - advancePayment} gold will be paid on completion.");
 
-                // Boost faction standing
-                var factionSystem = FactionSystem.Instance;
-                if (factionSystem != null)
+                // Create a real quest
+                var quest = QuestSystem.CreateFactionMission(player, faction, missionTarget, missionDesc, goldReward);
+                if (quest != null)
                 {
-                    factionSystem.FactionStanding[faction] += 50;
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine($"\n  New quest added: {quest.Title}");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  Complete the objective and turn in at the Quest Hall for your reward.");
+                }
 
-                    if (isRecruit && factionSystem.PlayerFaction == null)
+                if (isRecruit)
+                {
+                    var factionSystem = FactionSystem.Instance;
+                    if (factionSystem != null && factionSystem.PlayerFaction == null)
                     {
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine($"\n  \"Consider joining us formally. {factionName} could use someone like you.\"");
+                        terminal.WriteLine($"\n  \"You should think about joining {factionName}. We could use you.\"");
                         terminal.SetColor("white");
                         terminal.WriteLine($"  (Visit the faction headquarters to officially join.)");
                     }
@@ -1161,7 +1202,7 @@ namespace UsurperRemake.Systems
             else
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"\n  \"A shame. The offer stands if you change your mind.\"");
+                terminal.WriteLine($"\n  \"Suit yourself. You know where to find us.\"");
                 terminal.SetColor("white");
                 terminal.WriteLine($"  {factionNpc.Name2} nods and disappears into the crowd.");
             }
@@ -1389,7 +1430,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine($"\n  \"The crown does not approve of this union at this time.\"");
+                        terminal.WriteLine($"\n  \"No. The crown says no.\"");
                         terminal.SetColor("white");
                         terminal.WriteLine($"  {petitioner.Name2} looks crushed.");
                         player.Darkness += 3;
@@ -1423,7 +1464,7 @@ namespace UsurperRemake.Systems
             UIHelper.DrawBoxTop(terminal, "A FINAL REQUEST", "magenta");
             UIHelper.DrawBoxEmpty(terminal, "magenta");
             UIHelper.DrawBoxLine(terminal, $"  {elder.Name2}, aged {elder.Age}, approaches slowly.", "magenta", "white");
-            UIHelper.DrawBoxLine(terminal, $"  Their eyes carry the weight of a long life.", "magenta", "gray");
+            UIHelper.DrawBoxLine(terminal, $"  They look old. Really old. And tired.", "magenta", "gray");
             UIHelper.DrawBoxEmpty(terminal, "magenta");
 
             switch (wishRoll)
@@ -1433,9 +1474,9 @@ namespace UsurperRemake.Systems
                         .FirstOrDefault(n => !n.IsDead && n != elder && n.Name2 != player.Name2);
                     string recipientName = recipient?.Name2 ?? "someone special";
 
-                    UIHelper.DrawBoxLine(terminal, $"  \"I won't be here much longer, {player.Name2}.\"", "magenta", "bright_cyan");
-                    UIHelper.DrawBoxLine(terminal, $"  \"When I'm gone, please tell {recipientName} that I forgave them.\"", "magenta", "cyan");
-                    UIHelper.DrawBoxLine(terminal, $"  \"They'll know what it means.\"", "magenta", "cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  \"Im not gonna be around much longer, {player.Name2}.\"", "magenta", "bright_cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  \"When Im gone, tell {recipientName} I forgave them.\"", "magenta", "cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  \"Theyll know what its about.\"", "magenta", "cyan");
                     UIHelper.DrawBoxEmpty(terminal, "magenta");
                     UIHelper.DrawBoxSeparator(terminal, "magenta");
                     UIHelper.DrawMenuOption(terminal, "P", "Promise to deliver the message", "magenta", "bright_yellow", "bright_green");
@@ -1452,7 +1493,7 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"  {elder.Name2} presses {inheritance} gold into your hands.");
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"  \"My savings. Take them. You've earned more than gold today.\"");
+                        terminal.WriteLine($"  \"My savings. Take em. I wont need em where Im going.\"");
 
                         elder.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1477,7 +1518,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"\n  {elder.Name2} nods slowly. \"I understand. Not everyone can carry such weight.\"");
+                        terminal.WriteLine($"\n  {elder.Name2} nods slowly. \"Fair enough. Cant blame you.\"");
                     }
                     break;
 
@@ -1558,7 +1599,7 @@ namespace UsurperRemake.Systems
                     }
 
                     UIHelper.DrawBoxLine(terminal, $"  \"When I'm gone, please watch over {protectedName} for me.\"", "magenta", "bright_cyan");
-                    UIHelper.DrawBoxLine(terminal, $"  \"The world is cruel to those left behind.\"", "magenta", "cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  \"I dont want them to be alone.\"", "magenta", "cyan");
                     UIHelper.DrawBoxEmpty(terminal, "magenta");
                     UIHelper.DrawBoxSeparator(terminal, "magenta");
                     UIHelper.DrawMenuOption(terminal, "P", $"\"I'll watch over {protectedName}. You have my word.\"", "magenta", "bright_yellow", "bright_green");
@@ -1601,7 +1642,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"\n  \"I understand. Promises are heavy things.\"");
+                        terminal.WriteLine($"\n  \"Yeah. I figured youd say that.\"");
                         terminal.SetColor("white");
                         terminal.WriteLine($"  {elder.Name2} shuffles away, looking smaller than before.");
                     }
@@ -1740,7 +1781,7 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine($"\n  \"I'll find out what happened to {missingName}. I promise.\"");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  {petitioner.Name2}'s face fills with hope. \"Please, {player.Name2}. Bring me answers.\"");
+                        terminal.WriteLine($"  {petitioner.Name2} looks desperate. \"Please, {player.Name2}. Just find out what happened.\"");
 
                         long investigateReward = 300 + player.Level * 25;
                         player.Gold += investigateReward;
@@ -1774,7 +1815,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"\n  \"I'll help you look. Let's find {missingName}.\"");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {petitioner.Name2} looks grateful beyond words.");
+                    terminal.WriteLine($"  {petitioner.Name2} cant even speak. Just nods.");
 
                     petitioner.Memory?.RecordEvent(new MemoryEvent
                     {
@@ -1882,7 +1923,7 @@ namespace UsurperRemake.Systems
 
                     player.Experience += 50 + player.Level * 5;
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"\n  Knowledge is power. (+{50 + player.Level * 5} XP)");
+                    terminal.WriteLine($"\n  You learned something useful. (+{50 + player.Level * 5} XP)");
 
                     warner.Memory?.RecordEvent(new MemoryEvent
                     {

@@ -52,11 +52,11 @@ namespace UsurperRemake.Systems
                 Priority = 10,
                 Content = new[] {
                     "You dream of drowning.",
-                    "Not in water - in light. Warm, golden, all-encompassing light.",
-                    "For a moment, the drowning feels like coming home.",
-                    "Then you wake, gasping, reaching for something you can't remember."
+                    "Not in water though. In light. Bright, warm light everywhere.",
+                    "For a second it doesnt feel like drowning. It feels like home.",
+                    "Then you wake up gasping, grabbing at nothing."
                 },
-                PhilosophicalHint = "The light felt familiar. As if you'd been there before."
+                PhilosophicalHint = "That light. You know that light from somewhere."
             },
 
             new NarrativeDreamData
@@ -84,12 +84,12 @@ namespace UsurperRemake.Systems
                 MinAwakening = 0, MaxAwakening = 5,
                 Priority = 5,
                 Content = new[] {
-                    "In the dream, you hear voices. Hundreds. Thousands.",
-                    "All of them calling your name. But the name keeps changing.",
-                    "Warrior. Wanderer. Wave. Dreamer.",
-                    "You wake uncertain which name is really yours."
+                    "In the dream, you hear voices. Hundreds of them.",
+                    "All calling your name. Except the name keeps changing.",
+                    "Different name every time. None of them feel wrong.",
+                    "You wake up not sure which one is yours."
                 },
-                PhilosophicalHint = "Perhaps all names were once the same name."
+                PhilosophicalHint = "How many names have you had?"
             },
 
             // ====== MID GAME DREAMS (Levels 20-50) ======
@@ -103,11 +103,11 @@ namespace UsurperRemake.Systems
                 Priority = 20, // High priority - foreshadowing
                 Content = new[] {
                     "You dream of a warrior kneeling in a field of swords.",
-                    "Once, he fought to protect. Now he only fights to forget.",
-                    "'The cycle never ends,' he whispers. 'I've killed the same enemy a thousand times.'",
-                    "He looks up. His eyes are yours. 'You're coming. I can feel it.'"
+                    "He looks exhausted. Like hes been fighting for centuries.",
+                    "'I cant even remember why I started,' he says.",
+                    "He looks up. His eyes are yours. 'Youre coming. I know you are.'"
                 },
-                PhilosophicalHint = "Even gods grow tired of endless war."
+                PhilosophicalHint = "He looked tired. Really tired."
             },
 
             new NarrativeDreamData
@@ -124,7 +124,7 @@ namespace UsurperRemake.Systems
                     "He fades, still waiting, still wondering."
                 },
                 AwakeningGain = 1,
-                PhilosophicalHint = "Perhaps the answer matters less than the asking."
+                PhilosophicalHint = "You dont have an answer either."
             },
 
             new NarrativeDreamData
@@ -136,11 +136,11 @@ namespace UsurperRemake.Systems
                 Priority = 20,
                 Content = new[] {
                     "You dream of a garden where roses bleed.",
-                    "A woman kneels among them, trying to gather the petals.",
-                    "'They loved me once,' she weeps. 'Now they only need me.'",
-                    "'Please,' she whispers, though you haven't spoken. 'Please remember how to love.'"
+                    "A woman kneels among them, hands stained red.",
+                    "'They used to love me,' she says. 'Now they just take.'",
+                    "She looks at you like youre supposed to fix it. You dont know how."
                 },
-                PhilosophicalHint = "Love given freely heals. Love demanded only wounds."
+                PhilosophicalHint = "She was begging. But not to you."
             },
 
             new NarrativeDreamData
@@ -151,14 +151,14 @@ namespace UsurperRemake.Systems
                 MinAwakening = 2, MaxAwakening = 5,
                 Priority = 15,
                 Content = new[] {
-                    "You dream of standing at the edge of an endless sea.",
-                    "The waves whisper: 'You know what you are.'",
-                    "'No,' you answer. 'I don't.'",
-                    "The ocean laughs, gentle and ancient. 'You always say that. Every time.'"
+                    "You dream of standing at the edge of an ocean.",
+                    "Something in the waves seems to recognize you.",
+                    "'I dont know what I am,' you say to nobody.",
+                    "The sound of the waves changes. Almost like laughing. 'You always say that.'"
                 },
                 AwakeningGain = 1,
                 WaveFragment = WaveFragment.FirstSeparation,
-                PhilosophicalHint = "How can water forget it's water?"
+                PhilosophicalHint = "The ocean knew you. How?"
             },
 
             // ====== LATE GAME DREAMS (Levels 50-80) ======
@@ -171,12 +171,12 @@ namespace UsurperRemake.Systems
                 RequiredFloor = 50, MaxFloor = 54,
                 Priority = 20,
                 Content = new[] {
-                    "In the dream, you stand in a courtroom that stretches to infinity.",
-                    "A judge sits upon a throne of bones. His scales hold nothing - they tip based on whim.",
+                    "In the dream, you stand in a courtroom that goes on forever.",
+                    "A judge sits on a bone throne. Teh scales in his hand are empty.",
                     "'ORDER,' he thunders. 'WITHOUT ORDER, CHAOS.'",
-                    "'Without mercy,' you hear yourself say, 'order is just cruelty with rules.'"
+                    "You want to argue but you cant find the words."
                 },
-                PhilosophicalHint = "Law without compassion is not justice."
+                PhilosophicalHint = "You talked back to a god. In a dream. Bold."
             },
 
             new NarrativeDreamData
@@ -192,7 +192,7 @@ namespace UsurperRemake.Systems
                     "'Why?' you ask.",
                     "'Because you're the only one who might understand. When the time comes.'"
                 },
-                PhilosophicalHint = "Not all shadows are cast by evil."
+                PhilosophicalHint = "Something has been watching you. For a long time."
             },
 
             new NarrativeDreamData
@@ -203,14 +203,14 @@ namespace UsurperRemake.Systems
                 MinAwakening = 4, MaxAwakening = 7,
                 Priority = 15,
                 Content = new[] {
-                    "You dream of being alone. Utterly, cosmically alone.",
-                    "Not lonely - that requires someone to miss. Just... singular.",
-                    "And then a thought: 'What if I wasn't?'",
-                    "You wake having dreamed the creation of the universe. From the inside."
+                    "You dream of being alone. Completely alone.",
+                    "Not lonely. Theres nobody to miss. Just... nothing else exists.",
+                    "And then you think: 'What if I made something?'",
+                    "You wake up with the strangest feeling that you just remembered how the world began."
                 },
                 AwakeningGain = 2,
                 WaveFragment = WaveFragment.Origin,
-                PhilosophicalHint = "Loneliness is the first prayer. Love is its answer."
+                PhilosophicalHint = "Being alone like that. You cant even imagine it."
             },
 
             // ====== ENDGAME DREAMS (Levels 80+) ======
@@ -223,12 +223,12 @@ namespace UsurperRemake.Systems
                 RequiredFloor = 80, MaxFloor = 84,
                 Priority = 20,
                 Content = new[] {
-                    "You dream of a candle in an infinite darkness.",
-                    "It flickers. It fights. But the wind is endless.",
-                    "'I cannot die,' the light whispers. 'But I can be forgotten.'",
-                    "'Remember truth,' it begs. 'Remember that light existed. Even if I don't.'"
+                    "You dream of a single candle in total darkness.",
+                    "The flame keeps guttering. Almost going out.",
+                    "'Dont forget,' something whispers. 'Please dont forget.'",
+                    "You dont know what youre supposed to remember."
                 },
-                PhilosophicalHint = "Truth survives even when those who speak it don't."
+                PhilosophicalHint = "It was begging you to remember. Desperate."
             },
 
             new NarrativeDreamData
@@ -239,12 +239,12 @@ namespace UsurperRemake.Systems
                 RequiredFloor = 90, MaxFloor = 94,
                 Priority = 20,
                 Content = new[] {
-                    "You dream of being mountain. Of being earth.",
-                    "Unmoving. Unchanging. Enduring.",
-                    "But even mountains dream of the sea.",
-                    "'When I wake,' the mountain rumbles, 'everything will change. Is that what you want?'"
+                    "You dream of being a mountain. Heavy. Still. Ancient.",
+                    "Youve been here for so long you forgot how to move.",
+                    "Somewhere far away, you hear waves.",
+                    "'When I wake up,' you think, 'everything changes.' You cant tell if thats good or bad."
                 },
-                PhilosophicalHint = "Stability and change are not enemies. They are partners."
+                PhilosophicalHint = "Mountains dont dream. But this one did."
             },
 
             new NarrativeDreamData
@@ -256,14 +256,14 @@ namespace UsurperRemake.Systems
                 MinAwakening = 5,
                 Priority = 25, // Highest priority
                 Content = new[] {
-                    "You dream of a throne at the end of all things.",
-                    "A figure sits there. Waiting. He has been waiting for eternities.",
-                    "'You're almost here,' he says. 'I'm almost free.'",
-                    "'Father?' you hear yourself say. He smiles. 'Child. Self. Same thing, really.'"
+                    "You dream of a throne at the bottom of everything.",
+                    "Someone sits there. Hes been waiting a very long time.",
+                    "'Almost,' he says. 'Youre almost here.'",
+                    "You open your mouth and the word that comes out is 'Father.' He just nods."
                 },
                 AwakeningGain = 2,
                 WaveFragment = WaveFragment.TheTruth,
-                PhilosophicalHint = "The creator and the created are one dreaming."
+                PhilosophicalHint = "He called you Father. And Child. And Self."
             },
 
             // ====== COMPANION DEATH DREAMS ======
@@ -276,12 +276,12 @@ namespace UsurperRemake.Systems
                 Priority = 30,
                 Content = new[] {
                     "You dream of Lyris.",
-                    "She stands at the edge of an ocean, turning to face you.",
-                    "'Don't be sad,' she says. 'I was always going back to the light.'",
-                    "'The wave returns to the sea. That's not death. That's homecoming.'"
+                    "Shes standing somewhere bright. She looks peaceful.",
+                    "'Its okay,' she says. 'I knew this would happen eventually.'",
+                    "She smiles at you. Then the light takes her and shes gone."
                 },
                 AwakeningGain = 1,
-                PhilosophicalHint = "Love doesn't end. It transforms."
+                PhilosophicalHint = "She didnt seem sad. Thats the strange part."
             },
 
             new NarrativeDreamData
@@ -291,13 +291,13 @@ namespace UsurperRemake.Systems
                 RequiresCompanionDeath = "Aldric",
                 Priority = 30,
                 Content = new[] {
-                    "Aldric appears in your dreams, his shield finally lowered.",
-                    "'I spent my whole life protecting,' he says. 'Afraid to let anyone close.'",
-                    "'In the end, protecting you... that was the closest I ever felt.'",
-                    "He salutes. 'Keep going. Don't make my sacrifice meaningless.'"
+                    "Aldric shows up in your dreams. Shield down for once.",
+                    "'Shouldve ducked,' he says. Almost laughing.",
+                    "Then hes serious. 'Finish this. For both of us.'",
+                    "He salutes and fades out."
                 },
                 AwakeningGain = 1,
-                PhilosophicalHint = "True protection is not about walls. It's about trust."
+                PhilosophicalHint = "He saluted you. Even dead, still a soldier."
             },
 
             new NarrativeDreamData
@@ -307,13 +307,13 @@ namespace UsurperRemake.Systems
                 RequiresCompanionDeath = "Mira",
                 Priority = 30,
                 Content = new[] {
-                    "Mira visits your dreams, her light finally whole.",
-                    "'I spent so long asking if healing mattered,' she says.",
-                    "'Now I know. It doesn't matter if we save everyone.'",
-                    "'What matters is that we tried. That we LOVED. That's the real healing.'"
+                    "Mira visits your dreams. She looks tired but calm.",
+                    "'I couldnt save myself,' she says. 'Funny, right?'",
+                    "'But I saved you. Thats enough.'",
+                    "She touches your forehead and a warmth spreads through you."
                 },
                 AwakeningGain = 2,
-                PhilosophicalHint = "Healing isn't about success. It's about compassion."
+                PhilosophicalHint = "She was still trying to heal people. Even dead."
             },
 
             new NarrativeDreamData
@@ -329,7 +329,7 @@ namespace UsurperRemake.Systems
                     "'Besides...' he winks. 'The best jokes always have a punchline. Mine was LEGENDARY.'"
                 },
                 AwakeningGain = 1,
-                PhilosophicalHint = "Joy lived fully is never wasted, no matter how brief."
+                PhilosophicalHint = "Typical Vex. Still cracking jokes."
             },
 
             // ====== CYCLE-SPECIFIC DREAMS (NG+) ======
@@ -341,12 +341,12 @@ namespace UsurperRemake.Systems
                 MinCycle = 2,
                 Priority = 10,
                 Content = new[] {
-                    "The dream feels familiar. Too familiar.",
-                    "You've walked these paths before. Fought these battles.",
-                    "'How many times?' you ask the void.",
-                    "'As many as it takes,' the void answers. 'Until you remember.'"
+                    "The dream feels familiar. Way too familiar.",
+                    "Youve been here before. Done all this before.",
+                    "'How many times?' you mutter.",
+                    "Nobody answers. But you get the feeling its been a lot."
                 },
-                PhilosophicalHint = "Repetition without understanding is not progress."
+                PhilosophicalHint = "How many times have you done this?"
             },
 
             new NarrativeDreamData
@@ -357,13 +357,13 @@ namespace UsurperRemake.Systems
                 MinAwakening = 3,
                 Priority = 15,
                 Content = new[] {
-                    "You dream of all the times you've been here before.",
-                    "Different faces. Different names. Same journey.",
-                    "In every cycle, someone had to reach the end.",
-                    "In every cycle, someone had to choose."
+                    "You dream of all the other times.",
+                    "Different faces every time. Same road though.",
+                    "Someone always has to reach the end.",
+                    "Someone always has to make the choice. This time its you. Again."
                 },
                 AwakeningGain = 2,
-                PhilosophicalHint = "Every ending is a beginning wearing different clothes."
+                PhilosophicalHint = "Different face every time. Same ending."
             }
         };
 
@@ -379,8 +379,8 @@ namespace UsurperRemake.Systems
                 Description = "Ancient writing on the wall",
                 Content = new[] {
                     "Scratched into the stone, barely visible:",
-                    "\"THE WAVE FORGETS. THE OCEAN REMEMBERS.\"",
-                    "Below it, in different handwriting: \"I was here. I am always here.\""
+                    "\"HE FORGOT WHAT HE WAS. WE DIDN'T.\"",
+                    "Below it, in different handwriting: \"I was here before. Ill be here again.\""
                 }
             },
             new DungeonVision

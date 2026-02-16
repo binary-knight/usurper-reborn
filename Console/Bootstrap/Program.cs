@@ -251,6 +251,29 @@ namespace UsurperConsole
             }
             finally
             {
+                // Register as dormitory sleeper if not already sleeping (online mode only)
+                // Catches unclean disconnects where player didn't use Dormitory/Inn/Quit menu
+                if (DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sleepBackend)
+                {
+                    try
+                    {
+                        var username = DoorMode.OnlineUsername;
+                        if (!string.IsNullOrEmpty(username))
+                        {
+                            var sleepInfo = await sleepBackend.GetSleepingPlayerInfo(username);
+                            if (sleepInfo == null)
+                            {
+                                await sleepBackend.RegisterSleepingPlayer(username, "dormitory", "[]", 0);
+                                DoorMode.Log($"Registered '{username}' as dormitory sleeper (unclean disconnect)");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DoorMode.Log($"Failed to register dormitory sleep: {ex.Message}");
+                    }
+                }
+
                 // Shutdown chat system
                 if (OnlineChatSystem.IsActive)
                 {

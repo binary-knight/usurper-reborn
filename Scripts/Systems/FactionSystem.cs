@@ -593,38 +593,35 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Get shop price modifier for Crown faction membership
-        /// Crown members get 10% discount at legitimate shops
+        /// Rank-scaled: 5% at rank 0 -> 15% at rank 8
         /// </summary>
         public float GetShopPriceModifier()
         {
             if (PlayerFaction != Faction.TheCrown) return 1.0f;
-            var bonuses = GetCurrentBonuses();
-            if (bonuses == null || bonuses.ShopDiscount == 0) return 1.0f;
-            return 1.0f - (bonuses.ShopDiscount / 100f);  // 10% = 0.90 multiplier
+            float discount = 5f + (15f - 5f) * (FactionRank / 8.0f);
+            return 1.0f - (discount / 100f);
         }
 
         /// <summary>
         /// Get healing price modifier for Faith faction membership
-        /// Faith members get 25% discount at healers
+        /// Rank-scaled: 15% at rank 0 -> 35% at rank 8
         /// </summary>
         public float GetHealingPriceModifier()
         {
             if (PlayerFaction != Faction.TheFaith) return 1.0f;
-            var bonuses = GetCurrentBonuses();
-            if (bonuses == null || bonuses.HealingDiscount == 0) return 1.0f;
-            return 1.0f - (bonuses.HealingDiscount / 100f);  // 25% = 0.75 multiplier
+            float discount = 15f + (35f - 15f) * (FactionRank / 8.0f);
+            return 1.0f - (discount / 100f);
         }
 
         /// <summary>
         /// Get fence/sell price modifier for Shadows faction membership
-        /// Shadows members get 20% better prices when selling to fences
+        /// Rank-scaled: 10% at rank 0 -> 30% at rank 8
         /// </summary>
         public float GetFencePriceModifier()
         {
             if (PlayerFaction != Faction.TheShadows) return 1.0f;
-            var bonuses = GetCurrentBonuses();
-            if (bonuses == null || bonuses.FenceBonus == 0) return 1.0f;
-            return 1.0f + (bonuses.FenceBonus / 100f);  // 20% = 1.20 multiplier (better sell price)
+            float bonus = 10f + (30f - 10f) * (FactionRank / 8.0f);
+            return 1.0f + (bonus / 100f);
         }
 
         /// <summary>
@@ -634,6 +631,99 @@ namespace UsurperRemake.Systems
         {
             if (PlayerFaction != Faction.TheShadows) return false;
             return GetCurrentBonuses()?.BlackMarketAccess ?? false;
+        }
+
+        /// <summary>
+        /// Get escape chance bonus for Shadows members. Rank-scaled: 15 at rank 0 -> 45 at rank 8.
+        /// </summary>
+        public int GetEscapeChanceBonus()
+        {
+            if (PlayerFaction != Faction.TheShadows) return 0;
+            return (int)(15f + (45f - 15f) * (FactionRank / 8.0f));
+        }
+
+        /// <summary>
+        /// Get blessing duration multiplier for Faith members. Rank-scaled: 1.25x at rank 0 -> 1.75x at rank 8.
+        /// </summary>
+        public float GetBlessingDurationMultiplier()
+        {
+            if (PlayerFaction != Faction.TheFaith) return 1.0f;
+            return 1.25f + (1.75f - 1.25f) * (FactionRank / 8.0f);
+        }
+
+        /// <summary>
+        /// Get divine favor (last-chance save from death) chance for Faith members.
+        /// Rank-scaled: 5% at rank 0 -> 25% at rank 8.
+        /// </summary>
+        public float GetDivineFavorChance()
+        {
+            if (PlayerFaction != Faction.TheFaith) return 0f;
+            return GameConfig.DivineFavorBaseChance + (GameConfig.DivineFavorMaxChance - GameConfig.DivineFavorBaseChance) * (FactionRank / 8.0f);
+        }
+
+        /// <summary>
+        /// Check if player has guard favor (Crown members skip wanted checks)
+        /// </summary>
+        public bool HasGuardFavor()
+        {
+            if (PlayerFaction != Faction.TheCrown) return false;
+            return GetCurrentBonuses()?.GuardFavor ?? false;
+        }
+
+        /// <summary>
+        /// Check if player has castle access (Crown exclusive Royal Armory)
+        /// </summary>
+        public bool HasCastleAccess()
+        {
+            if (PlayerFaction != Faction.TheCrown) return false;
+            return GetCurrentBonuses()?.CastleAccess ?? false;
+        }
+
+        /// <summary>
+        /// Get tax exemption rate for Crown members (reduces gold loss on death)
+        /// </summary>
+        public float GetTaxExemptionRate()
+        {
+            if (PlayerFaction != Faction.TheCrown) return 0f;
+            return GameConfig.CrownTaxExemptionRate;
+        }
+
+        /// <summary>
+        /// Check if player has information network access (Shadows)
+        /// </summary>
+        public bool HasInformationNetwork()
+        {
+            if (PlayerFaction != Faction.TheShadows) return false;
+            return GetCurrentBonuses()?.InformationNetwork ?? false;
+        }
+
+        /// <summary>
+        /// Check if player has temple access (Faith exclusive Inner Sanctum)
+        /// </summary>
+        public bool HasTempleAccess()
+        {
+            if (PlayerFaction != Faction.TheFaith) return false;
+            return GetCurrentBonuses()?.TempleAccess ?? false;
+        }
+
+        /// <summary>
+        /// Get guard intervention chance during grudge encounters (Crown).
+        /// Base 20% + 5% per rank, max 60%.
+        /// </summary>
+        public float GetGuardInterventionChance()
+        {
+            if (PlayerFaction != Faction.TheCrown) return 0f;
+            float chance = GameConfig.GuardInterventionBaseChance + (GameConfig.GuardInterventionPerRank * FactionRank);
+            return Math.Min(0.60f, chance);
+        }
+
+        /// <summary>
+        /// Get Black Market price discount based on rank (5% per rank, up to 40% at rank 8)
+        /// </summary>
+        public float GetBlackMarketDiscount()
+        {
+            if (PlayerFaction != Faction.TheShadows) return 0f;
+            return GameConfig.BlackMarketRankDiscount * FactionRank;
         }
 
         /// <summary>

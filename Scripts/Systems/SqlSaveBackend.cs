@@ -244,6 +244,16 @@ namespace UsurperRemake.Systems
                         muted_at TEXT
                     );
 
+                    CREATE TABLE IF NOT EXISTS sleeping_players (
+                        username TEXT PRIMARY KEY,
+                        sleep_location TEXT NOT NULL DEFAULT 'dormitory',
+                        sleeping_since TEXT DEFAULT (datetime('now')),
+                        is_dead INTEGER DEFAULT 0,
+                        guards TEXT DEFAULT '[]',
+                        inn_defense_boost INTEGER DEFAULT 0,
+                        attack_log TEXT DEFAULT '[]'
+                    );
+
                     CREATE INDEX IF NOT EXISTS idx_news_created ON news(created_at DESC);
                     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_player, is_read);
                     CREATE INDEX IF NOT EXISTS idx_messages_to_type ON messages(to_player, message_type, is_read, created_at DESC);
@@ -3348,7 +3358,174 @@ namespace UsurperRemake.Systems
             return entries;
         }
 
+        // =====================================================================
+        // Sleeping Player Vulnerability System
+        // =====================================================================
+
+        public async Task RegisterSleepingPlayer(string username, string location, string guardsJson, int innBoost)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT OR REPLACE INTO sleeping_players (username, sleep_location, sleeping_since, is_dead, guards, inn_defense_boost, attack_log)
+                    VALUES (LOWER(@username), @location, datetime('now'), 0, @guards, @innBoost, '[]');
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@location", location);
+                cmd.Parameters.AddWithValue("@guards", guardsJson);
+                cmd.Parameters.AddWithValue("@innBoost", innBoost);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to register sleeping player {username}: {ex.Message}");
+            }
+        }
+
+        public async Task UnregisterSleepingPlayer(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM sleeping_players WHERE LOWER(username) = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to unregister sleeping player {username}: {ex.Message}");
+            }
+        }
+
+        public async Task<List<SleepingPlayerInfo>> GetSleepingPlayers()
+        {
+            var sleepers = new List<SleepingPlayerInfo>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT username, sleep_location, sleeping_since, is_dead, guards, inn_defense_boost, attack_log FROM sleeping_players WHERE is_dead = 0;";
+                using var reader = await Task.Run(() => cmd.ExecuteReader());
+                while (reader.Read())
+                {
+                    sleepers.Add(new SleepingPlayerInfo
+                    {
+                        Username = reader.GetString(0),
+                        SleepLocation = reader.GetString(1),
+                        SleepingSince = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        IsDead = reader.GetInt32(3) != 0,
+                        GuardsJson = reader.IsDBNull(4) ? "[]" : reader.GetString(4),
+                        InnDefenseBoost = reader.GetInt32(5) != 0,
+                        AttackLogJson = reader.IsDBNull(6) ? "[]" : reader.GetString(6)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get sleeping players: {ex.Message}");
+            }
+            return sleepers;
+        }
+
+        public async Task<SleepingPlayerInfo?> GetSleepingPlayerInfo(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT username, sleep_location, sleeping_since, is_dead, guards, inn_defense_boost, attack_log FROM sleeping_players WHERE LOWER(username) = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                using var reader = await Task.Run(() => cmd.ExecuteReader());
+                if (reader.Read())
+                {
+                    return new SleepingPlayerInfo
+                    {
+                        Username = reader.GetString(0),
+                        SleepLocation = reader.GetString(1),
+                        SleepingSince = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        IsDead = reader.GetInt32(3) != 0,
+                        GuardsJson = reader.IsDBNull(4) ? "[]" : reader.GetString(4),
+                        InnDefenseBoost = reader.GetInt32(5) != 0,
+                        AttackLogJson = reader.IsDBNull(6) ? "[]" : reader.GetString(6)
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get sleeping player info for {username}: {ex.Message}");
+            }
+            return null;
+        }
+
+        public async Task MarkSleepingPlayerDead(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE sleeping_players SET is_dead = 1 WHERE LOWER(username) = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to mark sleeping player dead {username}: {ex.Message}");
+            }
+        }
+
+        public async Task AppendSleepAttackLog(string username, string jsonEntry)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE sleeping_players
+                    SET attack_log = json_insert(attack_log, '$[#]', json(@entry))
+                    WHERE LOWER(username) = LOWER(@username);
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@entry", jsonEntry);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to append sleep attack log for {username}: {ex.Message}");
+            }
+        }
+
+        public async Task UpdateSleeperGuards(string username, string guardsJson)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE sleeping_players SET guards = @guards WHERE LOWER(username) = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@guards", guardsJson);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to update sleeper guards for {username}: {ex.Message}");
+            }
+        }
+
     } // end class SqlSaveBackend
+
+    public class SleepingPlayerInfo
+    {
+        public string Username { get; set; } = "";
+        public string SleepLocation { get; set; } = "dormitory";
+        public string? SleepingSince { get; set; }
+        public bool IsDead { get; set; }
+        public string GuardsJson { get; set; } = "[]";
+        public bool InnDefenseBoost { get; set; }
+        public string AttackLogJson { get; set; } = "[]";
+    }
 
     public class WizardLogEntry
     {

@@ -574,6 +574,11 @@ namespace UsurperRemake.Systems
                 PermanentDefenseBonus = player.PermanentDefenseBonus,
                 BonusMaxHP = player.BonusMaxHP,
 
+                // Faction consumable properties (v0.40.2)
+                PoisonCoatingCombats = player.PoisonCoatingCombats,
+                SmokeBombs = player.SmokeBombs,
+                InnerSanctumLastDay = player.InnerSanctumLastDay,
+
                 // Recurring Duelist Rival
                 RecurringDuelist = SerializeRecurringDuelist(player),
 

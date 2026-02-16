@@ -1213,6 +1213,67 @@ public partial class TerminalEmulator : Control
         ShowASCIIArt(artName); // Delegate to existing method
     }
     
+    /// <summary>
+    /// Non-blocking check if input is available. Used by auto-combat to detect "stop" key presses.
+    /// Returns true if there is pending input that can be read.
+    /// </summary>
+    public bool IsInputAvailable()
+    {
+        try
+        {
+            // MUD stream mode - check if the underlying stream has data
+            if (_streamReader != null)
+            {
+                return _streamReader.BaseStream.CanRead &&
+                       (_streamReader.BaseStream is System.Net.Sockets.NetworkStream ns
+                           ? ns.DataAvailable
+                           : _streamReader.Peek() != -1);
+            }
+
+            // Console mode (local, BBS stdio)
+            if (!Console.IsInputRedirected)
+            {
+                return Console.KeyAvailable;
+            }
+
+            // Redirected stdin — cannot reliably check without blocking
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Consume any pending input without blocking. Call after IsInputAvailable() returns true
+    /// to clear the buffer so the input doesn't leak into the next prompt.
+    /// </summary>
+    public void FlushPendingInput()
+    {
+        try
+        {
+            if (_streamReader != null)
+            {
+                // Read whatever is buffered
+                while (_streamReader.BaseStream is System.Net.Sockets.NetworkStream ns && ns.DataAvailable)
+                {
+                    _streamReader.Read();
+                }
+                return;
+            }
+
+            if (!Console.IsInputRedirected)
+            {
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(intercept: true);
+                }
+            }
+        }
+        catch { /* swallow */ }
+    }
+
     public async Task WaitForKey()
     {
         await GetKeyInput();
