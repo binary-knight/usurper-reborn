@@ -69,6 +69,9 @@ namespace UsurperRemake.Systems
             LoadMarriageRegistryState();
             LoadWorldEventsState();
 
+            // Load player team names so WorldSimulator can protect them from NPC AI
+            await LoadPlayerTeamNames();
+
             // Track initial versions so we can detect player modifications
             lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
             lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
@@ -867,6 +870,29 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Load all player team names from player_teams table so WorldSimulator
+        /// can protect them from NPC AI dissolution and unauthorized modification.
+        /// Critical in MUD mode where GameEngine.Instance is null on the world sim thread.
+        /// </summary>
+        private async Task LoadPlayerTeamNames()
+        {
+            try
+            {
+                var teams = await sqlBackend.GetPlayerTeams();
+                foreach (var team in teams)
+                {
+                    WorldSimulator.RegisterPlayerTeam(team.TeamName);
+                }
+                Console.Error.WriteLine($"[WORLDSIM] Registered {teams.Count} player team names for protection");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load player team names: {ex.Message}");
+                Console.Error.WriteLine($"[WORLDSIM] Player team names load error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Restore NPCs from saved data. Follows the same pattern as GameEngine.RestoreNPCs()
         /// but without requiring a GameEngine instance.
         /// </summary>
@@ -1197,7 +1223,16 @@ namespace UsurperRemake.Systems
                             Rarity = (EquipmentRarity)equipData.Rarity,
                             WeaponType = (WeaponType)equipData.WeaponType,
                             Handedness = (WeaponHandedness)equipData.Handedness,
-                            ArmorType = (ArmorType)equipData.ArmorType
+                            ArmorType = (ArmorType)equipData.ArmorType,
+                            StaminaBonus = equipData.StaminaBonus,
+                            AgilityBonus = equipData.AgilityBonus,
+                            CriticalChanceBonus = equipData.CriticalChanceBonus,
+                            CriticalDamageBonus = equipData.CriticalDamageBonus,
+                            MagicResistance = equipData.MagicResistance,
+                            PoisonDamage = equipData.PoisonDamage,
+                            LifeSteal = equipData.LifeSteal,
+                            HasFireEnchant = equipData.HasFireEnchant,
+                            HasFrostEnchant = equipData.HasFrostEnchant
                         };
 
                         int newId = EquipmentDatabase.RegisterDynamic(equipment);

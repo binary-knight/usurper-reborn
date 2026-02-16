@@ -1189,6 +1189,21 @@ public static class ClassAbilitySystem
         result.Duration = ability.Duration;
         result.SpecialEffect = ability.SpecialEffect;
 
+        // Apply proficiency multiplier from training system
+        var proficiency = TrainingSystem.GetSkillProficiency(user, abilityId);
+        float profMult = TrainingSystem.GetEffectMultiplier(proficiency);
+        if (result.Damage > 0) result.Damage = (int)(result.Damage * profMult);
+        if (result.Healing > 0) result.Healing = (int)(result.Healing * profMult);
+
+        // Training through use — small chance to improve proficiency
+        var prevLevel = proficiency;
+        if (TrainingSystem.TryImproveFromUse(user, abilityId, random))
+        {
+            var newLevel = TrainingSystem.GetSkillProficiency(user, abilityId);
+            result.SkillImproved = true;
+            result.NewProficiencyLevel = newLevel.ToString();
+        }
+
         // Generate message
         result.Message = $"{user.Name2} uses {ability.Name}!";
 
@@ -1419,4 +1434,8 @@ public class ClassAbilityResult
     public int Duration { get; set; }
     public string SpecialEffect { get; set; } = "";
     public int CooldownApplied { get; set; }
+
+    // Training through use
+    public bool SkillImproved { get; set; }
+    public string NewProficiencyLevel { get; set; } = "";
 }

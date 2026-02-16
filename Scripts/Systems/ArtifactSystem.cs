@@ -497,6 +497,17 @@ namespace UsurperRemake.Systems
             return power;
         }
 
+        // ==================== COMBAT QUERY HELPERS ====================
+
+        /// <summary>Quick checks for combat code — avoids verbose HasArtifact(ArtifactType.X) everywhere</summary>
+        public bool HasCreatorsEye() => HasArtifact(ArtifactType.CreatorsEye);
+        public bool HasSoulweaversLoom() => HasArtifact(ArtifactType.SoulweaversLoom);
+        public bool HasScalesOfLaw() => HasArtifact(ArtifactType.ScalesOfLaw);
+        public bool HasShadowCrown() => HasArtifact(ArtifactType.ShadowCrown);
+        public bool HasSunforgedBlade() => HasArtifact(ArtifactType.SunforgedBlade);
+        public bool HasWorldstone() => HasArtifact(ArtifactType.Worldstone);
+        public bool HasVoidKey() => HasArtifact(ArtifactType.VoidKey);
+
         /// <summary>
         /// Get special ability text for display
         /// </summary>

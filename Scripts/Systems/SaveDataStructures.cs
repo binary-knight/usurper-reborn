@@ -632,6 +632,17 @@ namespace UsurperRemake.Systems
         public int Handedness { get; set; }  // WeaponHandedness enum as int
         public int ArmorType { get; set; }  // ArmorType enum as int
 
+        // Secondary stats (v0.40.1)
+        public int StaminaBonus { get; set; }
+        public int AgilityBonus { get; set; }
+
+        // Special properties (v0.40.1)
+        public int CriticalChanceBonus { get; set; }
+        public int CriticalDamageBonus { get; set; }
+        public int MagicResistance { get; set; }
+        public int PoisonDamage { get; set; }
+        public int LifeSteal { get; set; }
+
         // Elemental enchant flags (v0.30.9)
         public bool HasFireEnchant { get; set; }
         public bool HasFrostEnchant { get; set; }

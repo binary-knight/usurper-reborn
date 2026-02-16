@@ -201,9 +201,7 @@ public class NPCMaintenanceEngine : Node
     private bool IsNPCOnlyGang(List<NPC> npcs, string gangName)
     {
         // Never treat the player's team as NPC-only (player isn't in the NPC list)
-        var player = GameEngine.Instance?.CurrentPlayer as Player;
-        if (player != null && !string.IsNullOrEmpty(player.Team) &&
-            player.Team.Equals(gangName, StringComparison.OrdinalIgnoreCase))
+        if (WorldSimulator.IsPlayerTeam(gangName))
             return false;
 
         var members = npcs.Where(n => n.Team == gangName);
@@ -474,14 +472,10 @@ public class NPCMaintenanceEngine : Node
     /// </summary>
     private async Task ProcessGangLoyalty(List<NPC> npcs)
     {
-        // Get the player's team name so we can protect player team members
-        var currentPlayer = GameEngine.Instance?.CurrentPlayer as Player;
-        string? playerTeam = (!string.IsNullOrEmpty(currentPlayer?.Team)) ? currentPlayer.Team : null;
-
         foreach (var npc in npcs.Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive))
         {
             // Never remove NPCs from the player's team via world simulation
-            if (playerTeam != null && npc.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase))
+            if (WorldSimulator.IsPlayerTeam(npc.Team))
                 continue;
 
             var loyalty = CalculateNPCLoyalty(npc);
@@ -500,9 +494,7 @@ public class NPCMaintenanceEngine : Node
                     GenerateGangNews($"{npc.DisplayName} has defected from {oldGang} to {betterGang}!");
 
                     // Notify player if this was their teammate
-                    var player = GameEngine.Instance?.CurrentPlayer as Player;
-                    if (player != null && !string.IsNullOrEmpty(player.Team) &&
-                        player.Team.Equals(oldGang, StringComparison.OrdinalIgnoreCase))
+                    if (WorldSimulator.IsPlayerTeam(oldGang))
                     {
                         GameEngine.AddNotification($"{npc.DisplayName} has defected to {betterGang}!");
                     }
@@ -513,9 +505,7 @@ public class NPCMaintenanceEngine : Node
                     GenerateGangNews($"{npc.DisplayName} has left {oldGang} and gone independent.");
 
                     // Notify player if this was their teammate
-                    var player = GameEngine.Instance?.CurrentPlayer as Player;
-                    if (player != null && !string.IsNullOrEmpty(player.Team) &&
-                        player.Team.Equals(oldGang, StringComparison.OrdinalIgnoreCase))
+                    if (WorldSimulator.IsPlayerTeam(oldGang))
                     {
                         GameEngine.AddNotification($"{npc.DisplayName} has left your team!");
                     }
@@ -531,7 +521,7 @@ public class NPCMaintenanceEngine : Node
             else if (loyalty > 80 && random.Next(100) < 10)
             {
                 // Don't let NPCs autonomously recruit into the player's team
-                if (playerTeam != null && npc.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase))
+                if (WorldSimulator.IsPlayerTeam(npc.Team))
                     continue;
 
                 // Try to recruit a solo NPC
@@ -589,13 +579,9 @@ public class NPCMaintenanceEngine : Node
 
     private string? FindBetterGang(NPC npc, List<NPC> allNpcs)
     {
-        // Exclude the player's team - NPCs shouldn't autonomously defect into it
-        var player = GameEngine.Instance?.CurrentPlayer as Player;
-        string? playerTeam = (!string.IsNullOrEmpty(player?.Team)) ? player.Team : null;
-
         var gangs = allNpcs
             .Where(n => !string.IsNullOrEmpty(n.Team) && n.Team != npc.Team && n.IsAlive &&
-                        !(playerTeam != null && n.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase)))
+                        !WorldSimulator.IsPlayerTeam(n.Team))
             .GroupBy(n => n.Team)
             .Where(g => g.Count() >= 2);
 

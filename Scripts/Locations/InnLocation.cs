@@ -1781,10 +1781,20 @@ public class InnLocation : BaseLocation
         await Task.Delay(2000);
 
         var healing = Math.Min(10, currentPlayer.MaxHP - currentPlayer.HP);
-        if (healing > 0)
+        var manaRecovery = Math.Min(currentPlayer.MaxMana / 4, currentPlayer.MaxMana - currentPlayer.Mana);
+
+        if (healing > 0 || manaRecovery > 0)
         {
-            currentPlayer.HP += healing;
-            terminal.WriteLine($"You feel refreshed and recover {healing} HP.", "green");
+            if (healing > 0)
+            {
+                currentPlayer.HP += healing;
+                terminal.WriteLine($"You feel refreshed and recover {healing} HP.", "green");
+            }
+            if (manaRecovery > 0)
+            {
+                currentPlayer.Mana += manaRecovery;
+                terminal.WriteLine($"Your mind clears, recovering {manaRecovery} mana.", "blue");
+            }
         }
         else
         {

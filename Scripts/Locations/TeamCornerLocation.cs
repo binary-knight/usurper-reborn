@@ -672,6 +672,9 @@ public class TeamCornerLocation : BaseLocation
         currentPlayer.CTurf = false;
         currentPlayer.TeamRec = 0;
 
+        // Register so WorldSimulator protects this team from NPC AI
+        WorldSimulator.RegisterPlayerTeam(teamName);
+
         // Online mode: register in player_teams table
         if (DoorMode.IsOnlineMode)
         {
@@ -745,6 +748,7 @@ public class TeamCornerLocation : BaseLocation
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
 
+                    WorldSimulator.RegisterPlayerTeam(teamName);
                     await backend.UpdatePlayerTeamMemberCount(teamName);
 
                     terminal.WriteLine("");
@@ -798,6 +802,8 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
 
+            WorldSimulator.RegisterPlayerTeam(teamName);
+
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
             terminal.WriteLine($"Correct! You are now a member of {teamName}!");
@@ -849,6 +855,8 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.TeamPW = "";
             currentPlayer.CTurf = false;
             currentPlayer.TeamRec = 0;
+
+            WorldSimulator.UnregisterPlayerTeam(oldTeam);
 
             // Online mode: update member count, delete team if empty
             if (DoorMode.IsOnlineMode)

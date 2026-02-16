@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Godot;
 using UsurperRemake.Utils;
 using UsurperRemake.Data;
+using UsurperRemake.UI;
 
 namespace UsurperRemake.Systems
 {
@@ -19,52 +20,13 @@ namespace UsurperRemake.Systems
 
         private Dictionary<OldGodType, OldGodBossData> bossData = new();
         private OldGodBossData? currentBoss;
-        private int currentPhase = 1;
-        private long bossCurrentHP;
         private bool bossDefeated;
-        private bool bossSaved;
 
-        // Team combat support - includes both companions and NPC teammates from dungeon
-        private List<BossFightTeammate> activeTeammates = new();
-        private List<Character>? dungeonTeammates; // Passed from DungeonLocation
-
-        // Minion support for boss phases (e.g., Maelketh's spectral soldiers)
-        private List<BossMinion> activeMinions = new();
-        private int roundsSinceLastSummon = 0;
+        // Dungeon teammates passed from DungeonLocation for boss fights
+        private List<Character>? dungeonTeammates;
 
         // Combat modifiers based on dialogue choices
         private CombatModifiers activeCombatModifiers = new();
-
-        /// <summary>
-        /// Represents any teammate fighting in the boss battle (companion or NPC)
-        /// </summary>
-        private class BossFightTeammate
-        {
-            public string Name { get; set; } = "";
-            public long CurrentHP { get; set; }
-            public long MaxHP { get; set; }
-            public long Attack { get; set; }
-            public long Defense { get; set; }
-            public string Role { get; set; } = "Fighter"; // Tank, DPS, Healer, Hybrid, Fighter
-            public string[] Abilities { get; set; } = Array.Empty<string>();
-            public bool IsCompanion { get; set; } // True if from CompanionSystem, false if NPC
-            public Companion? CompanionRef { get; set; } // Reference if this is a companion
-            public Character? CharacterRef { get; set; } // Reference if this is an NPC
-            public bool IsAlive => CurrentHP > 0;
-        }
-
-        /// <summary>
-        /// Represents a minion summoned by the boss during combat
-        /// </summary>
-        private class BossMinion
-        {
-            public string Name { get; set; } = "Minion";
-            public long CurrentHP { get; set; }
-            public long MaxHP { get; set; }
-            public long Attack { get; set; }
-            public long Defense { get; set; }
-            public bool IsAlive => CurrentHP > 0;
-        }
 
         /// <summary>
         /// Combat modifiers applied based on dialogue choices before boss fight
@@ -334,13 +296,8 @@ namespace UsurperRemake.Systems
             }
 
             currentBoss = boss;
-            currentPhase = 1;
-            bossCurrentHP = boss.HP;
             bossDefeated = false;
-            bossSaved = false;
-            dungeonTeammates = teammates; // Store for InitializeTeammates
-            activeMinions.Clear(); // Clear any minions from previous fights
-            roundsSinceLastSummon = 0;
+            dungeonTeammates = teammates;
 
             // GD.Print($"[BossSystem] Starting encounter with {boss.Name}");
 
@@ -379,15 +336,24 @@ namespace UsurperRemake.Systems
                 };
             }
 
-            // Combat time!
-            if (story.HasStoryFlag($"{type.ToString().ToLower()}_combat_start"))
+            // Combat time! Either the player chose a combat path, or said nothing
+            // (an Old God won't just let you walk away in silence)
+            if (!story.HasStoryFlag($"{type.ToString().ToLower()}_combat_start"))
             {
-                var combatResult = await RunBossCombat(player, boss, terminal);
-                return combatResult;
+                // Player said nothing — the god forces combat
+                terminal.WriteLine("");
+                terminal.WriteLine($"Your silence hangs in the air.", "gray");
+                terminal.WriteLine("");
+                terminal.WriteLine($"{boss.Name} regards you with contempt.", boss.ThemeColor);
+                terminal.WriteLine("");
+                terminal.WriteLine($"\"{(type == OldGodType.Maelketh ? "You DARE stand before me and say NOTHING?!" : "Your silence speaks volumes, mortal.")}\"", boss.ThemeColor);
+                terminal.WriteLine("");
+                terminal.WriteLine("The god attacks!", "bright_red");
+                await Task.Delay(2000);
             }
 
-            // Dialogue ended without resolution - shouldn't happen normally
-            return new BossEncounterResult { Success = false };
+            var combatResult = await RunBossCombat(player, boss, terminal);
+            return combatResult;
         }
 
         /// <summary>
@@ -416,6 +382,17 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"║                                                                ║", boss.ThemeColor);
             terminal.WriteLine($"╚════════════════════════════════════════════════════════════════╝", boss.ThemeColor);
             terminal.WriteLine("");
+
+            // Show Old God art (skip for screen readers)
+            if (player is Player pp && !pp.ScreenReaderMode)
+            {
+                var art = OldGodArtDatabase.GetArtForGod(boss.Type);
+                if (art != null)
+                {
+                    await ANSIArt.DisplayArtAnimated(terminal, art, 80);
+                    terminal.WriteLine("");
+                }
+            }
 
             await Task.Delay(2000);
 
@@ -733,680 +710,214 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Run the boss combat encounter
+        /// Run the boss combat encounter - delegates to CombatEngine with BossCombatContext
         /// </summary>
         private async Task<BossEncounterResult> RunBossCombat(
             Character player, OldGodBossData boss, TerminalEmulator terminal)
         {
-            var story = StoryProgressionSystem.Instance;
-            bool playerDead = false;
-
             // Apply combat modifiers based on dialogue choices
             ApplyDialogueModifiers(boss.Type, terminal);
             terminal.WriteLine("");
             await Task.Delay(1500);
 
-            // Initialize teammates from companions
-            InitializeTeammates();
+            // Create a Monster from boss data
+            var bossMonster = CreateBossMonster(boss);
 
-            while (bossCurrentHP > 0 && !playerDead && !bossSaved)
+            // Apply dialogue-based stat adjustments to the monster
+            ApplyModifiersToMonster(bossMonster);
+
+            // Apply player bonuses from dialogue
+            ApplyModifiersToPlayer(player);
+
+            // Set up boss context on combat engine
+            var combatEngine = new CombatEngine(terminal);
+            combatEngine.BossContext = new BossCombatContext
             {
-                terminal.Clear();
+                BossData = boss,
+                GodType = boss.Type,
+                AttacksPerRound = boss.AttacksPerRound,
+                CanSave = boss.CanBeSaved && ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom),
+                DamageMultiplier = activeCombatModifiers.DamageMultiplier,
+                DefenseMultiplier = activeCombatModifiers.DefenseMultiplier,
+                BonusDamage = activeCombatModifiers.BonusDamage,
+                BonusDefense = activeCombatModifiers.BonusDefense,
+                CriticalChance = activeCombatModifiers.CriticalChance,
+                HasRageBoost = activeCombatModifiers.HasRageBoost,
+                HasInsight = activeCombatModifiers.HasInsight,
+                BossDamageMultiplier = activeCombatModifiers.BossDamageMultiplier,
+                BossDefenseMultiplier = activeCombatModifiers.BossDefenseMultiplier,
+                BossConfused = activeCombatModifiers.BossConfused,
+                BossWeakened = activeCombatModifiers.BossWeakened,
+            };
 
-                // Display combat status (including teammates)
-                DisplayCombatStatus(player, boss, terminal);
+            // Set static flag for Void Key artifact doubling
+            CombatEngine.IsManweBattle = boss.Type == OldGodType.Manwe;
 
-                // Check for phase transitions
-                await CheckPhaseTransition(boss, terminal);
+            // Run combat through the standard engine
+            var combatResult = await combatEngine.PlayerVsMonsters(
+                player, new List<Monster> { bossMonster }, dungeonTeammates);
 
-                // Player turn
-                var action = await GetPlayerAction(player, boss, terminal);
+            // Capture boss context state before clearing
+            bool wasSaved = combatEngine.BossContext?.BossSaved ?? false;
 
-                switch (action)
-                {
-                    case BossAction.Attack:
-                        await PlayerAttack(player, boss, terminal);
-                        break;
+            // Clean up
+            CombatEngine.IsManweBattle = false;
+            combatEngine.BossContext = null;
+            ClearPlayerModifiers(player);
 
-                    case BossAction.Special:
-                        await PlayerSpecialAttack(player, boss, terminal);
-                        break;
+            // Convert CombatResult to BossEncounterResult
+            return await ConvertToBossResult(combatResult, boss, wasSaved, terminal);
+        }
 
-                    case BossAction.Heal:
-                        await PlayerHeal(player, terminal);
-                        break;
+        /// <summary>
+        /// Create a Monster object from OldGodBossData for use with CombatEngine
+        /// </summary>
+        private Monster CreateBossMonster(OldGodBossData boss)
+        {
+            // Split boss Strength into Monster Strength + WeapPow for CombatEngine's damage formula
+            long monsterStrength = boss.Strength / 2;
+            long monsterWeapPow = boss.Strength / 2;
 
-                    case BossAction.Save:
-                        if (await AttemptToSaveBoss(player, boss, terminal))
-                        {
-                            bossSaved = true;
-                            continue;
-                        }
-                        break;
+            // Split boss Defence into Monster Defence + ArmPow
+            int monsterDefence = (int)(boss.Defence / 2);
+            long monsterArmPow = boss.Defence / 2;
 
-                    case BossAction.Flee:
-                        if (new Random().NextDouble() < 0.2) // 20% flee chance
-                        {
-                            terminal.WriteLine("You manage to escape!", "green");
-                            await Task.Delay(1500);
-                            return new BossEncounterResult
-                            {
-                                Success = false,
-                                Outcome = BossOutcome.Fled,
-                                God = boss.Type
-                            };
-                        }
-                        terminal.WriteLine($"{boss.Name} blocks your escape!", "red");
-                        await Task.Delay(1000);
-                        break;
-                }
+            var monster = new Monster
+            {
+                Name = boss.Name,
+                Level = boss.Level,
+                HP = boss.HP,
+                MaxHP = boss.HP,
+                Strength = monsterStrength,
+                WeapPow = monsterWeapPow,
+                Defence = monsterDefence,
+                ArmPow = monsterArmPow,
+                MagicRes = (int)(50 + boss.Wisdom / 10),
+                MonsterColor = boss.ThemeColor,
+                FamilyName = "OldGod",
+                IsBoss = true,
+                IsActive = true,
+                CanSpeak = true,
+                Phrase = boss.IntroDialogue.Length > 0 ? boss.IntroDialogue[0] : "",
+                Experience = boss.Level * 2000,
+                Gold = boss.Level * 500,
+            };
 
-                // Teammates attack the boss
-                if (bossCurrentHP > 0 && !bossSaved)
-                {
-                    await TeammatesAttack(boss, terminal);
-                }
+            // Set special abilities from phase 1 abilities for display
+            monster.SpecialAbilities = new List<string>(boss.Phase1Abilities);
 
-                // Boss turn (if still alive)
-                if (bossCurrentHP > 0 && !bossSaved)
-                {
-                    playerDead = await BossTurn(player, boss, terminal);
-                }
+            return monster;
+        }
+
+        /// <summary>
+        /// Apply dialogue-based modifiers to the boss monster's stats
+        /// </summary>
+        private void ApplyModifiersToMonster(Monster monster)
+        {
+            if (activeCombatModifiers.BossWeakened)
+            {
+                monster.Strength = (long)(monster.Strength * 0.85);
+                monster.WeapPow = (long)(monster.WeapPow * 0.85);
             }
 
-            // Determine outcome
-            if (bossSaved)
+            if (activeCombatModifiers.BossDefenseMultiplier != 1.0)
             {
-                return await HandleBossSaved(player, boss, terminal);
+                monster.Defence = (int)(monster.Defence * activeCombatModifiers.BossDefenseMultiplier);
+                monster.ArmPow = (long)(monster.ArmPow * activeCombatModifiers.BossDefenseMultiplier);
             }
-            else if (bossCurrentHP <= 0)
+
+            if (activeCombatModifiers.BossConfused)
+            {
+                monster.IsConfused = true;
+                monster.ConfusedDuration = 999;
+            }
+        }
+
+        /// <summary>
+        /// Apply dialogue-based bonuses to the player before boss combat
+        /// </summary>
+        private void ApplyModifiersToPlayer(Character player)
+        {
+            if (activeCombatModifiers.DamageMultiplier > 1.0)
+            {
+                int bonus = (int)((activeCombatModifiers.DamageMultiplier - 1.0) * (player.Strength + player.WeapPow));
+                player.TempAttackBonus += bonus;
+                player.TempAttackBonusDuration = 999;
+            }
+
+            if (activeCombatModifiers.DefenseMultiplier > 1.0)
+            {
+                int bonus = (int)((activeCombatModifiers.DefenseMultiplier - 1.0) * (player.Defence + player.ArmPow));
+                player.TempDefenseBonus += bonus;
+                player.TempDefenseBonusDuration = 999;
+            }
+
+            if (activeCombatModifiers.HasRageBoost)
+            {
+                player.HasBloodlust = true;
+            }
+
+            if (activeCombatModifiers.HasInsight)
+            {
+                player.DodgeNextAttack = true;
+            }
+        }
+
+        /// <summary>
+        /// Clear temporary player modifiers after boss combat
+        /// </summary>
+        private void ClearPlayerModifiers(Character player)
+        {
+            // Only clear the bonuses we added — TempAttackBonus/TempDefenseBonus
+            // are reset at the start of each PlayerVsMonsters call anyway,
+            // but clear HasBloodlust and DodgeNextAttack which persist
+            player.HasBloodlust = false;
+            player.DodgeNextAttack = false;
+        }
+
+        /// <summary>
+        /// Convert CombatResult from CombatEngine to BossEncounterResult
+        /// </summary>
+        private async Task<BossEncounterResult> ConvertToBossResult(
+            CombatResult combatResult, OldGodBossData boss, bool wasSaved, TerminalEmulator terminal)
+        {
+            if (wasSaved)
+            {
+                return await HandleBossSaved(combatResult.Player, boss, terminal);
+            }
+            else if (combatResult.Outcome == CombatOutcome.Victory)
             {
                 bossDefeated = true;
-                return await HandleBossDefeated(player, boss, terminal);
+                return await HandleBossDefeated(combatResult.Player, boss, terminal);
             }
-            else
+            else if (combatResult.Outcome == CombatOutcome.PlayerEscaped)
             {
-                return await HandlePlayerDefeated(player, boss, terminal);
-            }
-        }
-
-        /// <summary>
-        /// Display combat status
-        /// </summary>
-        private void DisplayCombatStatus(Character player, OldGodBossData boss, TerminalEmulator terminal)
-        {
-            terminal.WriteLine("");
-            terminal.WriteLine($"══════════════════════════════════════════════════════════════", boss.ThemeColor);
-            terminal.WriteLine($"  {boss.Name} - Phase {currentPhase}", boss.ThemeColor);
-            terminal.WriteLine($"══════════════════════════════════════════════════════════════", boss.ThemeColor);
-            terminal.WriteLine("");
-
-            // Boss HP bar
-            var hpPercent = (double)bossCurrentHP / boss.HP;
-            var hpBar = RenderHealthBar(hpPercent, 40);
-            var hpColor = hpPercent > 0.5 ? "green" : hpPercent > 0.2 ? "yellow" : "red";
-            terminal.WriteLine($"  Boss HP: [{hpBar}] {bossCurrentHP:N0}/{boss.HP:N0}", hpColor);
-
-            // Minions HP bars (if any active)
-            var aliveMinions = activeMinions.Where(m => m.IsAlive).ToList();
-            if (aliveMinions.Count > 0)
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine($"  ═══ MINIONS ({aliveMinions.Count}) ═══", "dark_red");
-                foreach (var minion in aliveMinions)
+                return new BossEncounterResult
                 {
-                    var mPercent = (double)minion.CurrentHP / minion.MaxHP;
-                    var mBar = RenderHealthBar(mPercent, 20);
-                    var mColor = mPercent > 0.5 ? "red" : mPercent > 0.2 ? "dark_red" : "gray";
-                    terminal.WriteLine($"  {minion.Name}: [{mBar}] {minion.CurrentHP}/{minion.MaxHP}", mColor);
-                }
-            }
-
-            terminal.WriteLine("");
-
-            // Player HP bar
-            terminal.WriteLine($"  ═══ YOUR PARTY ═══", "bright_cyan");
-            var playerPercent = (double)player.HP / player.MaxHP;
-            var playerBar = RenderHealthBar(playerPercent, 30);
-            var playerColor = playerPercent > 0.5 ? "green" : playerPercent > 0.2 ? "yellow" : "red";
-            terminal.WriteLine($"  You:     [{playerBar}] {player.HP}/{player.MaxHP}", playerColor);
-
-            // Teammate HP bars
-            foreach (var teammate in activeTeammates)
-            {
-                var tmPercent = (double)teammate.CurrentHP / teammate.MaxHP;
-                var tmBar = RenderHealthBar(tmPercent, 30);
-                var tmColor = teammate.IsAlive ? (tmPercent > 0.5 ? "cyan" : tmPercent > 0.2 ? "yellow" : "red") : "dark_gray";
-                var status = teammate.IsAlive ? $"{teammate.CurrentHP}/{teammate.MaxHP}" : "FALLEN";
-                var roleTag = teammate.IsCompanion ? "" : $" ({teammate.Role})";
-                terminal.WriteLine($"  {teammate.Name,-8} [{tmBar}] {status}{roleTag}", tmColor);
-            }
-
-            terminal.WriteLine("");
-            if (player.MaxMana > 0)
-            {
-                terminal.WriteLine($"  Mana:    {player.Mana}/{player.MaxMana}", "cyan");
-            }
-            terminal.WriteLine($"  Potions: {player.Healing}", "green");
-            terminal.WriteLine("");
-        }
-
-        /// <summary>
-        /// Check and handle phase transitions
-        /// </summary>
-        private async Task CheckPhaseTransition(OldGodBossData boss, TerminalEmulator terminal)
-        {
-            var hpPercent = (double)bossCurrentHP / boss.HP;
-
-            int newPhase = currentPhase;
-            if (hpPercent <= 0.2 && currentPhase < 3)
-                newPhase = 3;
-            else if (hpPercent <= 0.5 && currentPhase < 2)
-                newPhase = 2;
-
-            if (newPhase != currentPhase)
-            {
-                currentPhase = newPhase;
-                OnPhaseChange?.Invoke(boss.Type, currentPhase);
-
-                terminal.WriteLine("");
-                terminal.WriteLine($"═══ PHASE {currentPhase} ═══", "bright_red");
-                terminal.WriteLine("");
-
-                // Play phase dialogue
-                var dialogue = currentPhase switch
-                {
-                    2 => boss.Phase2Dialogue,
-                    3 => boss.Phase3Dialogue,
-                    _ => Array.Empty<string>()
+                    Success = false,
+                    Outcome = BossOutcome.Fled,
+                    God = boss.Type
                 };
-
-                foreach (var line in dialogue)
-                {
-                    terminal.WriteLine($"  \"{line}\"", boss.ThemeColor);
-                    await Task.Delay(200);
-                }
-
-                // Spawn minions for Maelketh phase 2
-                if (boss.Type == OldGodType.Maelketh && currentPhase == 2)
-                {
-                    SpawnSpectralSoldiers(2, terminal);
-                }
-
-                terminal.WriteLine("");
-                await Task.Delay(1500);
+            }
+            else // PlayerDied
+            {
+                return await HandlePlayerDefeated(combatResult.Player, boss, terminal);
             }
         }
 
-        /// <summary>
-        /// Spawn spectral soldiers for Maelketh
-        /// </summary>
-        private void SpawnSpectralSoldiers(int count, TerminalEmulator terminal)
-        {
-            var player = GameEngine.Instance?.CurrentPlayer;
-            int playerLevel = player?.Level ?? 25;
-
-            for (int i = 0; i < count; i++)
-            {
-                var soldier = new BossMinion
-                {
-                    Name = $"Spectral Soldier",
-                    MaxHP = 50 + playerLevel * 5,
-                    CurrentHP = 50 + playerLevel * 5,
-                    Attack = 10 + playerLevel * 2,
-                    Defense = 5 + playerLevel
-                };
-                activeMinions.Add(soldier);
-            }
-
-            terminal.WriteLine("");
-            terminal.WriteLine($"  {count} Spectral Soldiers materialize from the shadows!", "bright_red");
-            roundsSinceLastSummon = 0;
-        }
-
-        /// <summary>
-        /// Get player action choice
-        /// </summary>
-        private async Task<BossAction> GetPlayerAction(
-            Character player, OldGodBossData boss, TerminalEmulator terminal)
-        {
-            terminal.WriteLine("  What do you do?", "cyan");
-            terminal.WriteLine("");
-            terminal.WriteLine("  [A] Attack", "white");
-            terminal.WriteLine("  [S] Special Attack (costs mana)", player.Mana > 0 ? "bright_cyan" : "gray");
-
-            if (boss.CanBeSaved && ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
-            {
-                terminal.WriteLine("  [R] Attempt to Save (Soulweaver's Loom)", "bright_magenta");
-            }
-
-            terminal.WriteLine("  [H] Heal (use potion)", player.Healing > 0 ? "green" : "gray");
-            terminal.WriteLine("  [F] Attempt to Flee", "yellow");
-            terminal.WriteLine("");
-
-            while (true)
-            {
-                var input = await terminal.GetInputAsync("  Choice: ");
-
-                switch (input.ToUpper())
-                {
-                    case "A":
-                        return BossAction.Attack;
-                    case "S":
-                        if (player.Mana > 0) return BossAction.Special;
-                        terminal.WriteLine("  No mana!", "red");
-                        break;
-                    case "R":
-                        if (boss.CanBeSaved && ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
-                            return BossAction.Save;
-                        terminal.WriteLine("  Cannot save this god.", "red");
-                        break;
-                    case "H":
-                        if (player.Healing > 0) return BossAction.Heal;
-                        terminal.WriteLine("  No potions!", "red");
-                        break;
-                    case "F":
-                        return BossAction.Flee;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Process player attack
-        /// </summary>
-        private async Task PlayerAttack(Character player, OldGodBossData boss, TerminalEmulator terminal)
-        {
-            var random = new Random();
-            long baseDamage = player.Strength + player.WeapPow;
-            long damage = baseDamage + random.Next((int)(baseDamage / 2));
-
-            // Artifact bonuses
-            damage += ArtifactSystem.Instance.GetTotalArtifactPower() / 10;
-
-            // Apply dialogue-based combat modifiers
-            damage = (long)(damage * activeCombatModifiers.DamageMultiplier);
-            damage += activeCombatModifiers.BonusDamage;
-
-            // Check for critical hit
-            bool isCritical = random.NextDouble() < activeCombatModifiers.CriticalChance;
-            if (isCritical)
-            {
-                damage = (long)(damage * activeCombatModifiers.CriticalMultiplier);
-            }
-
-            // Phase resistance (reduced by boss defense modifier)
-            // Multiply by BossDefenseMultiplier: lower values = weaker defense = more damage taken
-            double phaseResist = (1.0 - (currentPhase - 1) * 0.1) * activeCombatModifiers.BossDefenseMultiplier;
-            damage = (long)(damage * phaseResist);
-
-            // Artifact damage bonus: +3% per collected artifact
-            int artifactCount = StoryProgressionSystem.Instance?.CollectedArtifacts?.Count ?? 0;
-            if (artifactCount > 0)
-            {
-                double artifactBonus = 1.0 + (artifactCount * GameConfig.ArtifactBossDamageBonus);
-                damage = (long)(damage * artifactBonus);
-            }
-
-            // Divine armor: late-game gods resist unenchanted weapons
-            double divineReduction = GetDivineArmorReduction(boss.Type, player);
-            if (divineReduction > 0)
-            {
-                damage = (long)(damage * (1.0 - divineReduction));
-                terminal.WriteLine($"  Your unenchanted blade barely scratches {boss.Name}'s divine ward!", "red");
-            }
-
-            // Rage boost: chance for extra attack
-            bool extraAttack = activeCombatModifiers.HasRageBoost && random.NextDouble() < 0.3;
-
-            if (isCritical)
-            {
-                terminal.WriteLine($"  CRITICAL HIT! You strike {boss.Name} with devastating force!", "bright_yellow");
-            }
-            else
-            {
-                terminal.WriteLine($"  You strike {boss.Name}!", "bright_yellow");
-            }
-            terminal.WriteLine($"  Dealt {damage:N0} damage!", "green");
-
-            bossCurrentHP -= damage;
-
-            // Extra attack from rage
-            if (extraAttack && bossCurrentHP > 0)
-            {
-                await Task.Delay(400);
-                long bonusDamage = (long)((baseDamage / 2) * activeCombatModifiers.DamageMultiplier);
-                terminal.WriteLine($"  Your fury drives a follow-up strike!", "bright_red");
-                terminal.WriteLine($"  Dealt {bonusDamage:N0} additional damage!", "bright_green");
-                bossCurrentHP -= bonusDamage;
-            }
-
-            await Task.Delay(800);
-        }
-
-        /// <summary>
-        /// Process player special attack
-        /// </summary>
-        private async Task PlayerSpecialAttack(Character player, OldGodBossData boss, TerminalEmulator terminal)
-        {
-            var random = new Random();
-            int manaCost = 20 + player.Level;
-
-            if (player.Mana < manaCost)
-            {
-                terminal.WriteLine("  Not enough mana!", "red");
-                await Task.Delay(500);
-                return;
-            }
-
-            player.Mana -= manaCost;
-
-            long baseDamage = (player.Strength + player.WeapPow) * 2 + player.Wisdom;
-            long damage = baseDamage + random.Next((int)Math.Min(baseDamage, int.MaxValue));
-
-            // Apply dialogue-based combat modifiers
-            damage = (long)(damage * activeCombatModifiers.DamageMultiplier);
-            damage += activeCombatModifiers.BonusDamage;
-
-            // Critical check for special attacks too
-            bool isCritical = random.NextDouble() < (activeCombatModifiers.CriticalChance * 0.75); // Slightly lower crit on special
-            if (isCritical)
-            {
-                damage = (long)(damage * activeCombatModifiers.CriticalMultiplier);
-            }
-
-            // Special attack ignores some phase resistance, further reduced by boss defense modifier
-            // Multiply by BossDefenseMultiplier: lower values = weaker defense = more damage taken
-            double phaseResist = (1.0 - (currentPhase - 1) * 0.05) * activeCombatModifiers.BossDefenseMultiplier;
-            damage = (long)(damage * phaseResist);
-
-            // Artifact damage bonus: +3% per collected artifact
-            int artifactCount = StoryProgressionSystem.Instance?.CollectedArtifacts?.Count ?? 0;
-            if (artifactCount > 0)
-            {
-                double artifactBonus = 1.0 + (artifactCount * GameConfig.ArtifactBossDamageBonus);
-                damage = (long)(damage * artifactBonus);
-            }
-
-            // Divine armor: late-game gods resist unenchanted weapons
-            double divineReduction = GetDivineArmorReduction(boss.Type, player);
-            if (divineReduction > 0)
-            {
-                damage = (long)(damage * (1.0 - divineReduction));
-                terminal.WriteLine($"  Your unenchanted weapon struggles against {boss.Name}'s divine ward!", "red");
-            }
-
-            if (isCritical)
-            {
-                terminal.WriteLine($"  CRITICAL! You unleash a devastating special attack!", "bright_magenta");
-            }
-            else
-            {
-                terminal.WriteLine($"  You unleash a devastating special attack!", "bright_magenta");
-            }
-            terminal.WriteLine($"  Dealt {damage:N0} damage!", "bright_green");
-
-            bossCurrentHP -= damage;
-
-            await Task.Delay(1000);
-        }
-
-        /// <summary>
-        /// Calculate divine armor damage reduction for late-game Old Gods.
-        /// Gods with divine armor resist unenchanted weapons.
-        /// Having ANY enchantment on the main-hand weapon removes the penalty.
-        /// </summary>
-        private double GetDivineArmorReduction(OldGodType godType, Character player)
-        {
-            // Check if weapon has any enchantments
-            var weapon = player.GetEquipment(EquipmentSlot.MainHand);
-            if (weapon != null && weapon.GetEnchantmentCount() > 0)
-                return 0; // Enchanted weapon — no penalty
-
-            return godType switch
-            {
-                OldGodType.Aurelion => GameConfig.AurelionDivineShield,
-                OldGodType.Terravok => GameConfig.TerravokStoneSkin,
-                OldGodType.Manwe => GameConfig.ManweCreatorsWard,
-                _ => 0
-            };
-        }
-
-        /// <summary>
-        /// Process player healing
-        /// </summary>
-        private async Task PlayerHeal(Character player, TerminalEmulator terminal)
-        {
-            if (player.Healing <= 0)
-            {
-                terminal.WriteLine("  No healing potions!", "red");
-                return;
-            }
-
-            player.Healing--;
-            long healAmount = player.MaxHP / 3;
-            long oldHP = player.HP;
-            player.HP = Math.Min(player.HP + healAmount, player.MaxHP);
-            long actualHeal = player.HP - oldHP;
-
-            // Track statistics
-            player.Statistics.RecordPotionUsed(actualHeal);
-
-            terminal.WriteLine($"  You drink a healing potion!", "green");
-            terminal.WriteLine($"  Restored {actualHeal} HP!", "bright_green");
-
-            await Task.Delay(800);
-        }
-
-        /// <summary>
-        /// Attempt to save a god using the Soulweaver's Loom
-        /// </summary>
-        private async Task<bool> AttemptToSaveBoss(
-            Character player, OldGodBossData boss, TerminalEmulator terminal)
-        {
-            if (!boss.CanBeSaved)
-            {
-                terminal.WriteLine($"  {boss.Name} cannot be saved.", "red");
-                return false;
-            }
-
-            if (!ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
-            {
-                terminal.WriteLine("  You need the Soulweaver's Loom!", "red");
-                return false;
-            }
-
-            // Saving requires boss to be below 50% HP and player to have high alignment
-            var hpPercent = (double)bossCurrentHP / boss.HP;
-            if (hpPercent > 0.5)
-            {
-                terminal.WriteLine($"  {boss.Name} is too strong to save yet.", "yellow");
-                terminal.WriteLine("  Weaken them first.", "gray");
-                return false;
-            }
-
-            if (player.Chivalry - player.Darkness < 200)
-            {
-                terminal.WriteLine("  Your heart is too dark to use the Loom.", "dark_red");
-                return false;
-            }
-
-            terminal.WriteLine("");
-            terminal.WriteLine("  The Soulweaver's Loom glows with ancient power.", "bright_magenta");
-            await Task.Delay(800);
-
-            terminal.WriteLine($"  You reach out to {boss.Name}'s corrupted essence...", "white");
-            await Task.Delay(1000);
-
-            // Display save dialogue
-            foreach (var line in boss.SaveDialogue)
-            {
-                terminal.WriteLine($"  \"{line}\"", "bright_cyan");
-                await Task.Delay(300);
-            }
-
-            terminal.WriteLine("");
-            terminal.WriteLine($"  {boss.Name} is cleansed of corruption!", "bright_green");
-
-            return true;
-        }
-
-        /// <summary>
-        /// Process boss turn - attacks player and teammates
-        /// </summary>
-        private async Task<bool> BossTurn(Character player, OldGodBossData boss, TerminalEmulator terminal)
-        {
-            var random = new Random();
-
-            // Boss attacks multiple times based on AttacksPerRound
-            int attackCount = boss.AttacksPerRound;
-
-            terminal.WriteLine("");
-            terminal.WriteLine($"  ═══ {boss.Name.ToUpper()}'S TURN ═══", boss.ThemeColor);
-
-            for (int attack = 0; attack < attackCount; attack++)
-            {
-                if (player.HP <= 0) break;
-
-                // If boss is confused (from broken logic), 25% chance to miss
-                if (activeCombatModifiers.BossConfused && random.NextDouble() < 0.25)
-                {
-                    terminal.WriteLine("");
-                    terminal.WriteLine($"  {boss.Name} hesitates, confused by internal contradictions!", "cyan");
-                    await Task.Delay(500);
-                    continue;
-                }
-
-                // Select ability based on phase
-                var abilities = boss.Abilities.Where(a => a.Phase <= currentPhase).ToList();
-                var ability = abilities[random.Next(abilities.Count)];
-
-                terminal.WriteLine("");
-                terminal.WriteLine($"  {boss.Name} uses {ability.Name}!", boss.ThemeColor);
-
-                long damage = ability.BaseDamage + random.Next(ability.BaseDamage / 2);
-                damage = (long)(damage * (1.0 + (currentPhase - 1) * 0.15)); // Phase scaling
-
-                // Apply dialogue-based boss damage modifier
-                damage = (long)(damage * activeCombatModifiers.BossDamageMultiplier);
-
-                // If boss is weakened, reduce damage further
-                if (activeCombatModifiers.BossWeakened)
-                {
-                    damage = (long)(damage * 0.90);
-                }
-
-                // Select target: player or a teammate
-                // 60% chance to target player, 40% to target a random alive teammate
-                var aliveTeammates = activeTeammates.Where(t => t.IsAlive).ToList();
-                bool targetPlayer = aliveTeammates.Count == 0 || random.Next(100) < 60;
-
-                if (targetPlayer)
-                {
-                    // Attack player - apply player's defense modifiers
-                    long defense = player.Defence + player.ArmPow;
-                    defense = (long)(defense * activeCombatModifiers.DefenseMultiplier);
-                    defense += activeCombatModifiers.BonusDefense;
-
-                    double defenseReduction = Math.Min(0.75, defense / (double)(defense + 200));
-                    long actualDamage = (long)(damage * (1.0 - defenseReduction));
-                    actualDamage = Math.Max(10, actualDamage);
-
-                    // Insight: chance to dodge
-                    if (activeCombatModifiers.HasInsight && random.NextDouble() < 0.15)
-                    {
-                        terminal.WriteLine($"  You read the attack and dodge!", "bright_cyan");
-                        actualDamage = actualDamage / 3;
-                    }
-
-                    player.HP -= actualDamage;
-
-                    terminal.WriteLine($"  You take {actualDamage} damage!", "red");
-                }
-                else
-                {
-                    // Attack a random teammate
-                    var target = aliveTeammates[random.Next(aliveTeammates.Count)];
-
-                    // Apply teammate defense as percentage reduction
-                    double teammateDefenseReduction = Math.Min(0.50, target.Defense / (double)(target.Defense + 100));
-                    long actualDamage = (long)(damage * (1.0 - teammateDefenseReduction));
-                    actualDamage = Math.Max(15, actualDamage);
-
-                    target.CurrentHP -= actualDamage;
-
-                    // Also damage the underlying character if it's an NPC
-                    if (!target.IsCompanion && target.CharacterRef != null)
-                    {
-                        target.CharacterRef.HP = Math.Max(0, target.CharacterRef.HP - actualDamage);
-                    }
-
-                    if (target.CurrentHP <= 0)
-                    {
-                        target.CurrentHP = 0;
-                        terminal.WriteLine($"  {target.Name} takes {actualDamage} damage and falls!", "dark_red");
-                        terminal.WriteLine($"  \"{target.Name}! NO!\"", "red");
-                    }
-                    else
-                    {
-                        terminal.WriteLine($"  {target.Name} takes {actualDamage} damage!", "yellow");
-                    }
-                }
-
-                // Special effects
-                if (ability.HasSpecialEffect)
-                {
-                    terminal.WriteLine($"  {ability.EffectDescription}", "dark_red");
-                }
-
-                await Task.Delay(500);
-            }
-
-            if (attackCount > 1)
-            {
-                terminal.WriteLine($"  ({attackCount} attacks this round)", "gray");
-            }
-
-            // Minion attacks
-            var aliveMinionsForAttack = activeMinions.Where(m => m.IsAlive).ToList();
-            if (aliveMinionsForAttack.Count > 0 && player.HP > 0)
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine($"  ═══ MINION ATTACKS ═══", "dark_red");
-
-                foreach (var minion in aliveMinionsForAttack)
-                {
-                    if (player.HP <= 0) break;
-
-                    // Minions have simpler attack logic
-                    long minionDamage = minion.Attack + random.Next((int)minion.Attack / 2);
-
-                    // Apply player defense
-                    long defense = player.Defence + player.ArmPow;
-                    double defReduction = Math.Min(0.6, defense / (double)(defense + 150));
-                    minionDamage = (long)(minionDamage * (1.0 - defReduction));
-                    minionDamage = Math.Max(5, minionDamage);
-
-                    player.HP -= minionDamage;
-                    terminal.WriteLine($"  {minion.Name} strikes you for {minionDamage} damage!", "red");
-                    await Task.Delay(300);
-                }
-            }
-
-            // Maelketh summons more soldiers every 3 rounds in phase 2+
-            roundsSinceLastSummon++;
-            if (boss.Type == OldGodType.Maelketh && currentPhase >= 2 && roundsSinceLastSummon >= 3)
-            {
-                // Summon 1-2 more soldiers
-                int summonCount = 1 + random.Next(2);
-                terminal.WriteLine("");
-                SpawnSpectralSoldiers(summonCount, terminal);
-                await Task.Delay(500);
-            }
-
-            await Task.Delay(500);
-
-            return player.HP <= 0;
-        }
+        // NOTE: The following old boss combat methods have been removed as combat now routes
+        // through CombatEngine.PlayerVsMonsters() with BossCombatContext:
+        // - DisplayCombatStatus (boss version)
+        // - CheckPhaseTransition
+        // - SpawnSpectralSoldiers
+        // - GetPlayerAction
+        // - PlayerAttack
+        // - PlayerSpecialAttack
+        // - GetDivineArmorReduction
+        // - PlayerHeal
+        // - AttemptToSaveBoss
+        // - BossTurn
+        // These are now handled by CombatEngine's standard combat loop with boss-specific hooks.
 
         /// <summary>
         /// Handle boss being saved
@@ -1612,239 +1123,23 @@ namespace UsurperRemake.Systems
         #region Helper Methods
 
         /// <summary>
-        /// Initialize teammates from both active companions AND dungeon teammates (NPCs)
+        /// Calculate divine armor damage reduction for late-game Old Gods.
+        /// Gods with divine armor resist unenchanted weapons.
+        /// Having ANY enchantment on the main-hand weapon removes the penalty.
         /// </summary>
-        private void InitializeTeammates()
+        private double GetDivineArmorReduction(OldGodType godType, Character player)
         {
-            activeTeammates.Clear();
+            // Check if weapon has any enchantments
+            var weapon = player.GetEquipment(EquipmentSlot.MainHand);
+            if (weapon != null && weapon.GetEnchantmentCount() > 0)
+                return 0; // Enchanted weapon — no penalty
 
-            // Add companions from CompanionSystem
-            var companionSystem = CompanionSystem.Instance;
-            if (companionSystem != null)
+            return godType switch
             {
-                foreach (var companion in companionSystem.GetActiveCompanions())
-                {
-                    if (companion != null && !companion.IsDead)
-                    {
-                        // Scale companion HP based on their level and base stats
-                        long scaledHP = companion.BaseStats.HP * (1 + companion.Level / 10);
-
-                        // Determine role string from CombatRole
-                        string role = companion.CombatRole switch
-                        {
-                            CombatRole.Tank => "Tank",
-                            CombatRole.Damage => "DPS",
-                            CombatRole.Healer => "Healer",
-                            CombatRole.Hybrid => "Hybrid",
-                            _ => "Fighter"
-                        };
-
-                        activeTeammates.Add(new BossFightTeammate
-                        {
-                            Name = companion.Name,
-                            CurrentHP = scaledHP,
-                            MaxHP = scaledHP,
-                            Attack = companion.BaseStats.Attack + companion.Level * 2,
-                            Defense = companion.BaseStats.Defense,
-                            Role = role,
-                            Abilities = companion.Abilities ?? Array.Empty<string>(),
-                            IsCompanion = true,
-                            CompanionRef = companion
-                        });
-                    }
-                }
-            }
-
-            // Add NPC teammates from dungeon (spouses, team members, lovers, etc.)
-            if (dungeonTeammates != null)
-            {
-                foreach (var npc in dungeonTeammates)
-                {
-                    if (npc != null && npc.IsAlive)
-                    {
-                        // Skip if this is a companion Character (already added above)
-                        if (npc.IsCompanion) continue;
-
-                        // Determine role based on class
-                        string role = npc.Class switch
-                        {
-                            CharacterClass.Warrior or CharacterClass.Barbarian or CharacterClass.Paladin => "Tank",
-                            CharacterClass.Assassin or CharacterClass.Ranger => "DPS",
-                            CharacterClass.Cleric => "Healer",
-                            CharacterClass.Magician or CharacterClass.Sage => "Hybrid",
-                            _ => "Fighter"
-                        };
-
-                        // Generate abilities based on class
-                        string[] abilities = npc.Class switch
-                        {
-                            CharacterClass.Warrior => new[] { "Cleave", "Shield Bash", "Battle Cry" },
-                            CharacterClass.Barbarian => new[] { "Rage Strike", "Reckless Attack", "Intimidate" },
-                            CharacterClass.Paladin => new[] { "Holy Strike", "Lay on Hands", "Divine Shield" },
-                            CharacterClass.Assassin => new[] { "Backstab", "Poison Strike", "Shadow Step" },
-                            CharacterClass.Ranger => new[] { "Precise Shot", "Twin Strike", "Hunter's Mark" },
-                            CharacterClass.Cleric => new[] { "Divine Smite", "Heal", "Holy Light" },
-                            CharacterClass.Magician => new[] { "Fireball", "Lightning Bolt", "Arcane Blast" },
-                            CharacterClass.Sage => new[] { "Mind Blast", "Energy Drain", "Mystic Strike" },
-                            CharacterClass.Bard => new[] { "Inspiring Song", "Cutting Words", "Vicious Mockery" },
-                            CharacterClass.Alchemist => new[] { "Acid Flask", "Healing Bomb", "Explosive Mixture" },
-                            CharacterClass.Jester => new[] { "Trick Attack", "Confuse", "Lucky Strike" },
-                            _ => new[] { "Attack", "Power Strike", "Defend" }
-                        };
-
-                        activeTeammates.Add(new BossFightTeammate
-                        {
-                            Name = npc.DisplayName,
-                            CurrentHP = npc.HP,
-                            MaxHP = npc.MaxHP,
-                            Attack = npc.Strength + npc.WeapPow,
-                            Defense = npc.Defence + npc.ArmPow,
-                            Role = role,
-                            Abilities = abilities,
-                            IsCompanion = false,
-                            CharacterRef = npc
-                        });
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Process all teammates' attacks against the boss
-        /// </summary>
-        private async Task TeammatesAttack(OldGodBossData boss, TerminalEmulator terminal)
-        {
-            var aliveTeammates = activeTeammates.Where(t => t.IsAlive).ToList();
-            if (aliveTeammates.Count == 0) return;
-
-            terminal.WriteLine("");
-            terminal.WriteLine($"  ═══ YOUR ALLIES ATTACK ═══", "bright_cyan");
-
-            var random = new Random();
-
-            foreach (var teammate in aliveTeammates)
-            {
-                if (bossCurrentHP <= 0) break;
-
-                // Calculate teammate damage based on their role and stats
-                long baseDamage = teammate.Attack;
-
-                // Add role-specific bonuses
-                switch (teammate.Role)
-                {
-                    case "DPS":
-                        baseDamage = (long)(baseDamage * 1.5); // DPS does 50% more damage
-                        break;
-                    case "Hybrid":
-                        baseDamage = (long)(baseDamage * 1.2); // Hybrids do 20% more
-                        break;
-                    case "Tank":
-                        baseDamage = (long)(baseDamage * 0.8); // Tanks do less damage
-                        break;
-                    case "Healer":
-                        baseDamage = (long)(baseDamage * 0.6); // Healers do least damage
-                        break;
-                    case "Fighter":
-                    default:
-                        // Standard damage for generic fighters
-                        break;
-                }
-
-                // Add some variance
-                long damage = baseDamage + random.Next(Math.Max(1, (int)(baseDamage / 3)));
-
-                // Check if there are alive minions - 60% chance teammates focus minions instead of boss
-                var aliveMinions = activeMinions.Where(m => m.IsAlive).ToList();
-                bool attackMinion = aliveMinions.Count > 0 && random.Next(100) < 60;
-
-                if (attackMinion)
-                {
-                    // Attack a random minion
-                    var targetMinion = aliveMinions[random.Next(aliveMinions.Count)];
-                    damage = Math.Max(10, damage); // Minions take more damage from teammates
-
-                    targetMinion.CurrentHP -= damage;
-
-                    string abilityName = GetTeammateAbilityName(teammate);
-                    terminal.WriteLine($"  {teammate.Name} uses {abilityName}!", "cyan");
-
-                    if (targetMinion.CurrentHP <= 0)
-                    {
-                        targetMinion.CurrentHP = 0;
-                        terminal.WriteLine($"    Dealt {damage:N0} damage - {targetMinion.Name} destroyed!", "bright_green");
-                    }
-                    else
-                    {
-                        terminal.WriteLine($"    Dealt {damage:N0} damage to {targetMinion.Name}!", "bright_cyan");
-                    }
-                }
-                else
-                {
-                    // Attack the boss
-                    // Phase resistance affects teammates
-                    damage = (long)(damage * (1.0 - (currentPhase - 1) * 0.05));
-                    damage = Math.Max(5, damage);
-
-                    bossCurrentHP -= damage;
-
-                    // Pick an ability name
-                    string abilityName = GetTeammateAbilityName(teammate);
-
-                    terminal.WriteLine($"  {teammate.Name} uses {abilityName}!", "cyan");
-                    terminal.WriteLine($"    Dealt {damage:N0} damage to {boss.Name}!", "bright_cyan");
-                }
-
-                await Task.Delay(400);
-            }
-
-            // Healers may heal the party
-            foreach (var teammate in aliveTeammates.Where(t => t.Role == "Healer" || t.Role == "Hybrid"))
-            {
-                // 50% chance to heal
-                if (random.Next(100) < 50)
-                {
-                    long healAmount = 20 + random.Next(30);
-                    if (teammate.IsCompanion && teammate.CompanionRef != null)
-                    {
-                        healAmount = teammate.CompanionRef.BaseStats.HealingPower * 2 + random.Next(20);
-                    }
-
-                    terminal.WriteLine($"  {teammate.Name} channels healing energy!", "green");
-                    terminal.WriteLine($"    The party is healed for {healAmount} HP!", "bright_green");
-
-                    await Task.Delay(300);
-                }
-            }
-
-            await Task.Delay(500);
-        }
-
-        /// <summary>
-        /// Get a thematic ability name for a teammate based on their role and abilities
-        /// </summary>
-        private string GetTeammateAbilityName(BossFightTeammate teammate)
-        {
-            var random = new Random();
-
-            if (teammate.Abilities != null && teammate.Abilities.Length > 0)
-            {
-                // Use one of their defined abilities (skip "Sacrifice")
-                var usableAbilities = teammate.Abilities.Where(a => !a.Contains("Sacrifice")).ToArray();
-                if (usableAbilities.Length > 0)
-                {
-                    return usableAbilities[random.Next(usableAbilities.Length)];
-                }
-            }
-
-            // Fallback generic attacks by role
-            return teammate.Role switch
-            {
-                "Tank" => "Shield Bash",
-                "DPS" => "Vicious Strike",
-                "Healer" => "Divine Smite",
-                "Hybrid" => "Power Attack",
-                "Fighter" => "Heavy Blow",
-                _ => "Attack"
+                OldGodType.Aurelion => GameConfig.AurelionDivineShield,
+                OldGodType.Terravok => GameConfig.TerravokStoneSkin,
+                OldGodType.Manwe => GameConfig.ManweCreatorsWard,
+                _ => 0
             };
         }
 
@@ -1865,15 +1160,6 @@ namespace UsurperRemake.Systems
     }
 
     #region Boss System Data Classes
-
-    public enum BossAction
-    {
-        Attack,
-        Special,
-        Heal,
-        Save,
-        Flee
-    }
 
     public enum BossOutcome
     {

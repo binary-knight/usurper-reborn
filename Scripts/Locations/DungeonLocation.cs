@@ -8056,7 +8056,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine($"Buy Potions from Monk ({costPerPotion}g each)");
+            terminal.WriteLine($"Buy Potions from Monk (Healing {costPerPotion}g, Mana {Math.Max(75, player.Level * 3)}g)");
 
             // Quick heal - use potions until full
             if (player.Healing > 0 && player.HP < player.MaxHP)
@@ -8562,26 +8562,74 @@ public class DungeonLocation : BaseLocation
 
     private async Task BuyPotionsFromMonk(Character player)
     {
+        bool canBuyHealing = player.Healing < player.MaxPotions;
+        bool canBuyMana = SpellSystem.HasSpells(player) && player.ManaPotions < player.MaxManaPotions;
+
         terminal.ClearScreen();
         terminal.SetColor("cyan");
         terminal.WriteLine("");
         terminal.WriteLine("A wandering monk materializes from the shadows...");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine("\"Greetings, traveler. I sense you need healing supplies.\"");
-        terminal.WriteLine($"\"You carry {player.Healing} of {player.MaxPotions} potions.\"");
+        terminal.WriteLine("\"Greetings, traveler. I have supplies for body and mind.\"");
         terminal.WriteLine("");
 
-        // Calculate cost per potion (scales with level)
-        int costPerPotion = 50 + (player.Level * 10);
+        // Calculate costs
+        int healCost = 50 + (player.Level * 10);
+        int manaCost = Math.Max(75, player.Level * 3);
 
         terminal.SetColor("yellow");
-        terminal.WriteLine($"Price: {costPerPotion} gold per potion");
         terminal.WriteLine($"Your gold: {player.Gold:N0}");
         terminal.WriteLine("");
 
-        // Calculate max potions player can buy
-        int roomForPotions = player.MaxPotions - (int)player.Healing;
+        if (canBuyHealing)
+            terminal.WriteLine($"[H]ealing Potions - {healCost}g each ({player.Healing}/{player.MaxPotions})", "green");
+        else
+            terminal.WriteLine($"[H]ealing Potions - FULL ({player.Healing}/{player.MaxPotions})", "darkgray");
+
+        if (canBuyMana)
+            terminal.WriteLine($"[M]ana Potions - {manaCost}g each ({player.ManaPotions}/{player.MaxManaPotions})", "blue");
+        else if (SpellSystem.HasSpells(player))
+            terminal.WriteLine($"[M]ana Potions - FULL ({player.ManaPotions}/{player.MaxManaPotions})", "darkgray");
+
+        terminal.WriteLine("[C]ancel", "gray");
+        terminal.WriteLine("");
+
+        terminal.SetColor("cyan");
+        terminal.Write("Choice: ");
+        terminal.SetColor("white");
+        var choice = (await terminal.GetInput("")).Trim().ToUpper();
+
+        if (choice == "H" && canBuyHealing)
+        {
+            await MonkBuyPotionTypeInDungeon(player, "healing", healCost,
+                (int)player.Healing, player.MaxPotions,
+                bought => { player.Healing += bought; });
+        }
+        else if (choice == "M" && canBuyMana)
+        {
+            await MonkBuyPotionTypeInDungeon(player, "mana", manaCost,
+                (int)player.ManaPotions, player.MaxManaPotions,
+                bought => { player.ManaPotions += bought; });
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\"Perhaps another time, then.\"");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine("The monk bows and fades back into the shadows...");
+        await Task.Delay(2000);
+    }
+
+    private async Task MonkBuyPotionTypeInDungeon(Character player, string potionType, int costPerPotion,
+        int currentCount, int maxCount, Action<int> applyPurchase)
+    {
+        int roomForPotions = maxCount - currentCount;
         int maxAffordable = (int)(player.Gold / costPerPotion);
         int maxCanBuy = Math.Min(roomForPotions, maxAffordable);
 
@@ -8590,7 +8638,7 @@ public class DungeonLocation : BaseLocation
             if (roomForPotions <= 0)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine("\"You already carry all the potions you can hold!\"");
+                terminal.WriteLine($"\"You already carry all the {potionType} potions you can hold!\"");
             }
             else
             {
@@ -8602,7 +8650,7 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.SetColor("cyan");
-        terminal.WriteLine($"How many potions would you like? (Max: {maxCanBuy}, 0 to cancel)");
+        terminal.WriteLine($"How many {potionType} potions? (Max: {maxCanBuy}, 0 to cancel)");
         terminal.Write("> ");
         terminal.SetColor("white");
 
@@ -8619,27 +8667,22 @@ public class DungeonLocation : BaseLocation
         if (amount > maxCanBuy)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"\"I can only provide you with {maxCanBuy} potions.\"");
+            terminal.WriteLine($"\"I can only provide you with {maxCanBuy}.\"");
             amount = maxCanBuy;
         }
 
-        // Complete the purchase
         long totalCost = amount * costPerPotion;
         player.Gold -= totalCost;
-        player.Healing += amount;
+        applyPurchase(amount);
+        player.Statistics?.RecordPurchase(totalCost);
+        player.Statistics?.RecordGoldSpent(totalCost);
 
+        string color = potionType == "mana" ? "blue" : "bright_green";
         terminal.WriteLine("");
-        terminal.SetColor("bright_green");
-        terminal.WriteLine($"You purchase {amount} healing potion{(amount > 1 ? "s" : "")} for {totalCost:N0} gold.");
-        terminal.SetColor("cyan");
-        terminal.WriteLine($"Potions: {player.Healing}/{player.MaxPotions}");
+        terminal.SetColor(color);
+        terminal.WriteLine($"You purchase {amount} {potionType} potion{(amount > 1 ? "s" : "")} for {totalCost:N0} gold.");
         terminal.SetColor("yellow");
         terminal.WriteLine($"Gold remaining: {player.Gold:N0}");
-
-        terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.WriteLine("The monk bows and fades back into the shadows...");
-        await Task.Delay(2000);
     }
     
     private async Task ShowDungeonMap()

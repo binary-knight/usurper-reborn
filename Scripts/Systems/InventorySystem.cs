@@ -628,6 +628,7 @@ namespace UsurperRemake.Systems
                 MaxManaBonus = item.Mana,
                 Value = item.Value,
                 IsCursed = item.IsCursed,
+                MinLevel = item.MinLevel,
                 Rarity = EquipmentRarity.Common
             };
 

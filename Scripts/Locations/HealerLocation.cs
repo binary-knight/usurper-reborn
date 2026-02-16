@@ -106,6 +106,9 @@ public class HealerLocation : BaseLocation
             case "B":
                 await BuyPotions();
                 return false; // Stay in location
+            case "M":
+                await BuyManaPotions();
+                return false; // Stay in location
             case "P":
                 await CurePoison();
                 return false; // Stay in location
@@ -205,7 +208,16 @@ public class HealerLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.WriteLine("uy Potions");
+        terminal.Write("uy Potions     ");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_blue");
+        terminal.Write("M");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.WriteLine("ana Potions");
 
         // Row 2 - Disease services
         terminal.SetColor("darkgray");
@@ -271,6 +283,7 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine($"(H)eal HP        - Restore some HP ({FullHealCostPerHP} gold per HP)");
         terminal.WriteLine($"(F)ull Heal      - Restore all HP (costs vary)");
         terminal.WriteLine($"(B)uy Potions    - Purchase healing potions ({HealingPotionCost} gold each)");
+        terminal.WriteLine($"(M)ana Potions   - Purchase mana potions ({Math.Max(75, player.Level * 3)} gold each)");
         terminal.WriteLine($"(P)oison Cure    - Remove poison ({CalculateDiseaseCost(PoisonBaseCost, player.Level):N0} gold)");
         terminal.WriteLine("");
 
@@ -479,6 +492,13 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine("You are completely healed!", "bright_green");
         terminal.WriteLine($"HP restored to {player.HP}/{player.MaxHP}", "green");
 
+        // Full heal also restores mana
+        if (player.Mana < player.MaxMana)
+        {
+            player.Mana = player.MaxMana;
+            terminal.WriteLine($"Mana restored to {player.Mana}/{player.MaxMana}", "blue");
+        }
+
         await terminal.PressAnyKey();
     }
 
@@ -536,6 +556,73 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine($"{Manager} hands you {quantity} healing potion{(quantity > 1 ? "s" : "")}.", "gray");
         terminal.WriteLine($"You now have {player.Healing} healing potions.", "green");
+        terminal.WriteLine($"Cost: {potionTotalWithTax:N0} gold", "yellow");
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Buy mana potions
+    /// </summary>
+    private async Task BuyManaPotions()
+    {
+        var player = GetCurrentPlayer();
+
+        int potionPrice = Math.Max(75, player.Level * 3);
+        int manaRestored = 30 + player.Level * 5;
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"\"Mana potions are {potionPrice} gold each. Each restores {manaRestored} mana.\"");
+        terminal.WriteLine($", {Manager} says, pulling blue vials from a shelf.", "gray");
+        terminal.WriteLine("");
+
+        long maxAfford = player.Gold / potionPrice;
+        int maxCanCarry = player.MaxManaPotions - (int)player.ManaPotions;
+
+        terminal.WriteLine($"You currently have {player.ManaPotions} mana potions (max {player.MaxManaPotions}).", "gray");
+        terminal.WriteLine($"You can afford up to {maxAfford} potions.", "gray");
+        terminal.WriteLine("");
+
+        if (maxCanCarry <= 0)
+        {
+            terminal.WriteLine("You're carrying the maximum number of mana potions!", "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var input = await terminal.GetInput("How many potions to buy (0 to cancel)? ");
+
+        if (!int.TryParse(input, out int quantity) || quantity <= 0)
+        {
+            terminal.WriteLine("\"Come back when you need supplies.\"", "cyan");
+            await Task.Delay(1000);
+            return;
+        }
+
+        quantity = Math.Min(quantity, maxCanCarry);
+
+        long cost = quantity * potionPrice;
+        var (_, _, potionTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
+
+        if (player.Gold < potionTotalWithTax)
+        {
+            terminal.WriteLine("You can't afford that many!", "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Mana Potions", cost);
+
+        player.Gold -= potionTotalWithTax;
+        player.Statistics.RecordPurchase(potionTotalWithTax);
+        player.Statistics.RecordGoldSpent(potionTotalWithTax);
+        CityControlSystem.Instance.ProcessSaleTax(cost);
+        player.ManaPotions += quantity;
+
+        terminal.WriteLine("");
+        terminal.WriteLine($"{Manager} hands you {quantity} mana potion{(quantity > 1 ? "s" : "")}.", "gray");
+        terminal.WriteLine($"You now have {player.ManaPotions} mana potions.", "blue");
         terminal.WriteLine($"Cost: {potionTotalWithTax:N0} gold", "yellow");
 
         await terminal.PressAnyKey();

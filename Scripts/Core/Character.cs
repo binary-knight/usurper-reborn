@@ -29,7 +29,7 @@ public class Character
     public long Healing { get; set; }               // healing potions
     public long ManaPotions { get; set; }            // mana potions (bought at Magic Shop)
     public int MaxPotions => 20 + (Level - 1);      // max potions = 20 + (level - 1)
-    public int MaxManaPotions => 20;                 // max mana potions
+    public int MaxManaPotions => 20 + (Level - 1);   // max mana potions (scales with level like healing potions)
     public bool Allowed { get; set; }               // allowed to play
     public long MaxHP { get; set; }                 // max hitpoints
     public long LastOn { get; set; }                // laston, date
@@ -739,6 +739,28 @@ public class Character
         }
         return total;
     }
+
+    /// <summary>
+    /// Sum a specific special property across all equipped items.
+    /// Used for enchant bonuses like crit chance, lifesteal, magic resist that
+    /// aren't transferred to Character stats via ApplyToCharacter.
+    /// </summary>
+    private int SumEquipmentProperty(Func<Equipment, int> selector)
+    {
+        int total = 0;
+        foreach (var kvp in EquippedItems)
+        {
+            if (kvp.Value <= 0) continue;
+            var item = EquipmentDatabase.GetById(kvp.Value);
+            if (item != null) total += selector(item);
+        }
+        return total;
+    }
+
+    public int GetEquipmentCritChanceBonus() => SumEquipmentProperty(e => e.CriticalChanceBonus);
+    public int GetEquipmentCritDamageBonus() => SumEquipmentProperty(e => e.CriticalDamageBonus);
+    public int GetEquipmentLifeSteal() => SumEquipmentProperty(e => e.LifeSteal);
+    public int GetEquipmentMagicResistance() => SumEquipmentProperty(e => e.MagicResistance);
 
     /// <summary>
     /// Get equipment summary for display

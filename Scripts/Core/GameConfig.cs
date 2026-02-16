@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.40.0";
-    public const string VersionName = "The Price of Power";
+    public const string Version = "0.40.1";
+    public const string VersionName = "Procedural ASCII Art";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

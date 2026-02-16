@@ -548,9 +548,7 @@ public class EnhancedNPCBehaviorSystem : Node
     private bool IsNPCOnlyGang(List<Character> npcs, string gangName)
     {
         // Never treat the player's team as NPC-only (player isn't in the NPC list)
-        var player = GameEngine.Instance?.CurrentPlayer as Player;
-        if (player != null && !string.IsNullOrEmpty(player.Team) &&
-            player.Team.Equals(gangName, StringComparison.OrdinalIgnoreCase))
+        if (WorldSimulator.IsPlayerTeam(gangName))
             return false;
 
         var gangMembers = npcs.Where(n => n.Team == gangName);

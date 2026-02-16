@@ -1,6 +1,7 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Data;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -29,6 +30,12 @@ public partial class CombatEngine
 
     // Current teammates for healing/support actions
     private List<Character> currentTeammates;
+
+    // Boss combat context - set by OldGodBossSystem when routing boss fights through CombatEngine
+    public BossCombatContext? BossContext { get; set; }
+
+    /// <summary>True when the current combat is against Manwe (for Void Key artifact doubling)</summary>
+    public static bool IsManweBattle { get; set; }
 
     // Combat tip system - shows helpful hints occasionally
     private int combatTipCounter = 0;
@@ -251,11 +258,27 @@ public partial class CombatEngine
             }
             terminal.SetColor("white");
             terminal.WriteLine($"You are facing: {monster.GetDisplayInfo()}");
+
+            // Show monster silhouette for single monster (skip for screen readers)
+            if (player is Player pp3 && !pp3.ScreenReaderMode)
+            {
+                var art = MonsterArtDatabase.GetArtForFamily(monster.FamilyName);
+                if (art != null)
+                {
+                    terminal.WriteLine("");
+                    ANSIArt.DisplayArt(terminal, art);
+                }
+            }
         }
         else
         {
-            // Monster announcement is already shown by the calling code (dungeon, etc.)
-            // Just add an empty line for spacing
+            // Show first monster's silhouette if 3 or fewer (skip for screen readers)
+            if (monsters.Count <= 3 && player is Player pp4 && !pp4.ScreenReaderMode)
+            {
+                var art = MonsterArtDatabase.GetArtForFamily(monsters[0].FamilyName);
+                if (art != null)
+                    ANSIArt.DisplayArt(terminal, art);
+            }
             terminal.WriteLine("");
         }
 
@@ -300,6 +323,43 @@ public partial class CombatEngine
 
             // Display combat status at start of each round
             DisplayCombatStatus(monsters, player);
+
+            // Boss phase transition check
+            if (BossContext != null)
+            {
+                var bossMonster = monsters.FirstOrDefault(m => m.IsBoss && m.IsAlive);
+                if (bossMonster != null)
+                {
+                    int newPhase = BossContext.CheckPhase(bossMonster.HP, bossMonster.MaxHP);
+                    if (newPhase > BossContext.CurrentPhase)
+                    {
+                        await PlayBossPhaseTransition(BossContext, bossMonster, newPhase);
+                        BossContext.CurrentPhase = newPhase;
+
+                        // Maelketh spawns minions on phase 2
+                        if (BossContext.GodType == OldGodType.Maelketh && newPhase == 2)
+                        {
+                            var soldiers = CreateSpectralSoldiers(2, bossMonster.Level);
+                            monsters.AddRange(soldiers);
+                            result.Monsters.AddRange(soldiers);
+                        }
+                    }
+
+                    // Maelketh summons more soldiers every 3 rounds in phase 2+
+                    if (BossContext.GodType == OldGodType.Maelketh && BossContext.CurrentPhase >= 2)
+                    {
+                        BossContext.RoundsSinceLastSummon++;
+                        if (BossContext.RoundsSinceLastSummon >= 3)
+                        {
+                            BossContext.RoundsSinceLastSummon = 0;
+                            int count = 1 + random.Next(2);
+                            var soldiers = CreateSpectralSoldiers(count, bossMonster.Level);
+                            monsters.AddRange(soldiers);
+                            result.Monsters.AddRange(soldiers);
+                        }
+                    }
+                }
+            }
 
             // Process status effects for player and display messages
             var statusMessages = player.ProcessStatusEffects();
@@ -403,12 +463,41 @@ public partial class CombatEngine
                 if (!player.IsAlive)
                     break; // Stop if player died
 
-                terminal.WriteLine("");
-                terminal.SetColor("red");
-                terminal.WriteLine($"{monster.Name} attacks!");
+                int attacks = 1;
+                if (BossContext != null && monster.IsBoss)
+                    attacks = BossContext.AttacksPerRound;
 
-                await ProcessMonsterAction(monster, player, result);
-                await Task.Delay(GetCombatDelay(800));
+                for (int atk = 0; atk < attacks; atk++)
+                {
+                    if (!player.IsAlive || !monster.IsAlive) break;
+
+                    // Boss confused check (from dialogue modifiers)
+                    if (BossContext != null && monster.IsBoss && BossContext.BossConfused && random.NextDouble() < 0.25)
+                    {
+                        terminal.WriteLine("");
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"{monster.Name} hesitates, confused by internal contradictions!");
+                        await Task.Delay(GetCombatDelay(500));
+                        continue;
+                    }
+
+                    terminal.WriteLine("");
+                    terminal.SetColor("red");
+
+                    // Show boss ability name for boss attacks
+                    if (BossContext != null && monster.IsBoss)
+                    {
+                        string abilityName = SelectBossAbility(BossContext);
+                        terminal.WriteLine($"{monster.Name} uses {abilityName}!");
+                    }
+                    else
+                    {
+                        terminal.WriteLine($"{monster.Name} attacks!");
+                    }
+
+                    await ProcessMonsterAction(monster, player, result);
+                    await Task.Delay(GetCombatDelay(800));
+                }
             }
 
             // Check for player death
@@ -525,7 +614,16 @@ public partial class CombatEngine
         
         terminal.SetColor("white");
         terminal.WriteLine($"You are facing: {monster.GetDisplayInfo()}");
-        
+        terminal.WriteLine("");
+
+        // Show monster silhouette (skip for screen readers)
+        if (player is Player pp2 && !pp2.ScreenReaderMode)
+        {
+            var art = MonsterArtDatabase.GetArtForFamily(monster.FamilyName);
+            if (art != null)
+                ANSIArt.DisplayArt(terminal, art);
+        }
+
         if (result.Teammates.Count > 0)
         {
             terminal.WriteLine("Fighting alongside you:");
@@ -537,13 +635,13 @@ public partial class CombatEngine
                 }
             }
         }
-        
+
         terminal.WriteLine("");
         await Task.Delay(GetCombatDelay(2000));
-        
+
         result.CombatLog.Add($"Combat begins against {monster.Name}!");
     }
-    
+
     /// <summary>
     /// Get player action - Pascal-compatible menu
     /// Based on shared_menu from PLCOMP.PAS
@@ -1073,6 +1171,15 @@ public partial class CombatEngine
             }
         }
 
+        // Boss Save option (only when fighting saveable Old God with artifact)
+        if (BossContext?.CanSave == true)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.Write("║ [V] ");
+            terminal.SetColor("magenta");
+            terminal.WriteLine("Attempt to Save (Soulweaver's Loom)║");
+        }
+
         // Retreat and auto
         terminal.SetColor("yellow");
         terminal.Write("║ [R] ");
@@ -1277,28 +1384,38 @@ public partial class CombatEngine
         // Check for hit
         if (!attackRoll.Success && !attackRoll.IsCriticalSuccess)
         {
-            // Miss!
-            if (attackRoll.IsCriticalFailure)
+            // Sunforged Blade: attacks cannot miss (except critical failures)
+            if (!attackRoll.IsCriticalFailure && ArtifactSystem.Instance.HasSunforgedBlade())
             {
-                terminal.SetColor("dark_red");
-                terminal.WriteLine("CRITICAL MISS! You stumble badly!");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("The Sunforged Blade guides your strike true!");
+                // Fall through to damage calculation as a normal hit
             }
             else
             {
-                terminal.SetColor("gray");
-                terminal.WriteLine($"You missed the {target.Name}!");
-            }
-            result.CombatLog.Add($"Player misses {target.Name} (roll: {attackRoll.NaturalRoll})");
+                // Miss!
+                if (attackRoll.IsCriticalFailure)
+                {
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine("CRITICAL MISS! You stumble badly!");
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"You missed the {target.Name}!");
+                }
+                result.CombatLog.Add($"Player misses {target.Name} (roll: {attackRoll.NaturalRoll})");
 
-            // Still have chance to improve basic attack skill from attempting
-            if (TrainingSystem.TryImproveFromUse(attacker, "basic_attack", random))
-            {
-                var newLevel = TrainingSystem.GetSkillProficiency(attacker, "basic_attack");
-                terminal.WriteLine($"Your combat experience grows! Basic Attack is now {TrainingSystem.GetProficiencyName(newLevel)}!", "bright_yellow");
-            }
+                // Still have chance to improve basic attack skill from attempting
+                if (TrainingSystem.TryImproveFromUse(attacker, "basic_attack", random))
+                {
+                    var newLevel = TrainingSystem.GetSkillProficiency(attacker, "basic_attack");
+                    terminal.WriteLine($"Your combat experience grows! Basic Attack is now {TrainingSystem.GetProficiencyName(newLevel)}!", "bright_yellow");
+                }
 
-            await Task.Delay(GetCombatDelay(1500));
-            return;
+                await Task.Delay(GetCombatDelay(1500));
+                return;
+            }
         }
 
         // === HIT! Calculate damage ===
@@ -1353,13 +1470,22 @@ public partial class CombatEngine
         if (dexCrit)
         {
             // Apply Dexterity-based crit multiplier
-            rollMultiplier = StatEffectsSystem.GetCriticalDamageMultiplier(attacker.Dexterity);
+            rollMultiplier = StatEffectsSystem.GetCriticalDamageMultiplier(attacker.Dexterity, attacker.GetEquipmentCritDamageBonus());
         }
 
         attackPower = (long)(attackPower * rollMultiplier);
 
         // Apply difficulty modifier to player damage
         attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+
+        // Sunforged Blade artifact: +100% damage vs undead and demons (+200% during Manwe fight)
+        if (ArtifactSystem.Instance.HasSunforgedBlade() &&
+            (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
+        {
+            float holyMult = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 3.0f : 2.0f;
+            attackPower = (long)(attackPower * holyMult);
+            terminal.WriteLine("The Sunforged Blade blazes with holy fire!", "bright_yellow");
+        }
 
         // Apply grief effects - grief stage can modify damage dealt
         var griefEffects = GriefSystem.Instance.GetCurrentEffects();
@@ -1410,7 +1536,7 @@ public partial class CombatEngine
         else if (dexCrit)
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"Precision strike! ({StatEffectsSystem.GetCriticalHitChance(attacker.Dexterity)}% crit chance)");
+            terminal.WriteLine($"Precision strike! ({StatEffectsSystem.GetCriticalHitChance(attacker.Dexterity, attacker.GetEquipmentCritChanceBonus())}% crit chance)");
             await Task.Delay(GetCombatDelay(300));
         }
         else if (rollMultiplier >= 1.5f)
@@ -1469,8 +1595,37 @@ public partial class CombatEngine
             terminal.WriteLine($"Dark power drains {lifesteal} life from your enemy!", "dark_magenta");
         }
 
+        // Equipment lifesteal (Lifedrinker enchant)
+        int equipLifeSteal = attacker.GetEquipmentLifeSteal();
+        if (equipLifeSteal > 0 && actualDamage > 0)
+        {
+            long stolen = Math.Max(1, actualDamage * equipLifeSteal / 100);
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + stolen);
+            terminal.WriteLine($"Your weapon drains {stolen} life! (Lifedrinker)", "dark_green");
+        }
+
         // Elemental enchant procs (v0.30.9)
         CheckElementalEnchantProcs(attacker, target, actualDamage, result);
+
+        // Sunforged Blade: heals lowest-HP ally for 10% of damage dealt
+        if (actualDamage > 0 && ArtifactSystem.Instance.HasSunforgedBlade() && currentTeammates != null && currentTeammates.Count > 0)
+        {
+            var injuredAlly = currentTeammates
+                .Where(t => t.IsAlive && t.HP < t.MaxHP)
+                .OrderBy(t => (double)t.HP / t.MaxHP)
+                .FirstOrDefault();
+            if (injuredAlly != null)
+            {
+                long allyHeal = Math.Max(1, actualDamage / 10);
+                long oldHP = injuredAlly.HP;
+                injuredAlly.HP = Math.Min(injuredAlly.MaxHP, injuredAlly.HP + allyHeal);
+                long actualHeal = injuredAlly.HP - oldHP;
+                if (actualHeal > 0)
+                {
+                    terminal.WriteLine($"Radiant light heals {injuredAlly.DisplayName} for {actualHeal} HP!", "bright_yellow");
+                }
+            }
+        }
 
         // Chance to improve basic attack skill from successful use
         if (TrainingSystem.TryImproveFromUse(attacker, "basic_attack", random))
@@ -1966,6 +2121,20 @@ public partial class CombatEngine
             return;
         }
 
+        // Shadow Crown artifact: 30% chance to dodge any attack (60% during Manwe fight)
+        if (monsterRoll.Success && ArtifactSystem.Instance.HasShadowCrown())
+        {
+            int shadowDodge = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 60 : 30;
+            if (random.Next(100) < shadowDodge)
+            {
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine($"You slip through the shadows, evading {monster.Name}'s attack!");
+                result.CombatLog.Add($"Player shadow-dodges {monster.Name}'s attack (Shadow Crown)");
+                await Task.Delay(GetCombatDelay(800));
+                return;
+            }
+        }
+
         // Check for miss
         if (!monsterRoll.Success && !monsterRoll.IsCriticalSuccess)
         {
@@ -2060,6 +2229,18 @@ public partial class CombatEngine
 
         long actualDamage = Math.Max(1, monsterAttack - playerDefense);
 
+        // Worldstone artifact: 50% damage reduction (75% during Manwe fight)
+        if (ArtifactSystem.Instance.HasWorldstone())
+        {
+            float wsReduction = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 0.75f : 0.50f;
+            long reduced = (long)(actualDamage * wsReduction);
+            if (reduced > 0)
+            {
+                actualDamage = Math.Max(1, actualDamage - reduced);
+                terminal.WriteLine($"The Worldstone absorbs the impact! (-{reduced})", "dark_green");
+            }
+        }
+
         // Defending halves damage
         if (player.IsDefending)
         {
@@ -2129,6 +2310,19 @@ public partial class CombatEngine
         }
 
         result.CombatLog.Add($"{monster.Name} attacks player for {actualDamage} damage (roll: {monsterRoll.NaturalRoll})");
+
+        // Scales of Law artifact: reflect 15% of damage taken (30% during Manwe fight)
+        if (actualDamage > 0 && monster.IsAlive && ArtifactSystem.Instance.HasScalesOfLaw())
+        {
+            float reflectPct = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 0.30f : 0.15f;
+            long reflectedDamage = Math.Max(1, (long)(actualDamage * reflectPct));
+            monster.HP -= reflectedDamage;
+            terminal.WriteLine($"The Scales of Law reflect {reflectedDamage} damage back at {monster.Name}!", "gray");
+            if (monster.HP <= 0)
+            {
+                terminal.WriteLine($"{monster.Name} is destroyed by karmic justice!", "bright_white");
+            }
+        }
 
         // Note: Defend status is now cleared at end of round in ProcessEndOfRoundAbilityEffects
         // so it protects against ALL monster attacks in the round, not just the first one
@@ -2601,8 +2795,12 @@ public partial class CombatEngine
         }
         await CheckForEquipmentDrop(result);
 
+        // Soulweaver's Loom: heal 25% HP after each battle (50% during Manwe fight)
+        ApplySoulweaverPostBattleHeal(result.Player);
+
         // Auto-heal with potions after combat, then offer to buy replacements
         AutoHealWithPotions(result.Player);
+        AutoRestoreManaWithPotions(result.Player);
 
         // Monk potion purchase option - Pascal PLVSMON.PAS monk encounter
         await OfferMonkPotionPurchase(result.Player);
@@ -2616,54 +2814,95 @@ public partial class CombatEngine
     /// </summary>
     public async Task OfferMonkPotionPurchase(Character player)
     {
-        // Don't bother the player if they're already at max potions
-        if (player.Healing >= player.MaxPotions)
+        bool canBuyHealing = player.Healing < player.MaxPotions;
+        bool canBuyMana = SpellSystem.HasSpells(player) && player.ManaPotions < player.MaxManaPotions;
+
+        // Don't bother the player if they're already at max for everything
+        if (!canBuyHealing && !canBuyMana)
         {
             return;
         }
 
         terminal.WriteLine("");
         terminal.WriteLine("A wandering monk approaches you...", "cyan");
-        terminal.WriteLine($"\"Would you like to buy healing potions? ({player.Healing}/{player.MaxPotions})\"", "white");
+
+        // Calculate costs (scales with level)
+        int healCostPerPotion = 50 + (player.Level * 10);
+        int manaCostPerPotion = Math.Max(75, player.Level * 3);
+
+        // Show what's available
+        if (canBuyHealing && canBuyMana)
+            terminal.WriteLine($"\"I have potions for body and mind, traveler.\"", "white");
+        else if (canBuyHealing)
+            terminal.WriteLine($"\"Would you like to buy healing potions?\"", "white");
+        else
+            terminal.WriteLine($"\"I sense your arcane reserves are low. Need mana potions?\"", "white");
         terminal.WriteLine("");
 
-        // Calculate cost per potion (scales with level)
-        int costPerPotion = 50 + (player.Level * 10);
+        // --- Healing potions ---
+        if (canBuyHealing)
+        {
+            terminal.WriteLine($"[H]ealing Potions - {healCostPerPotion}g each ({player.Healing}/{player.MaxPotions})", "green");
+        }
 
-        terminal.WriteLine($"Price: {costPerPotion} gold per potion", "yellow");
+        // --- Mana potions ---
+        if (canBuyMana)
+        {
+            terminal.WriteLine($"[M]ana Potions - {manaCostPerPotion}g each ({player.ManaPotions}/{player.MaxManaPotions})", "blue");
+        }
+
+        terminal.WriteLine($"[N]o thanks", "gray");
         terminal.WriteLine($"Your gold: {player.Gold:N0}", "yellow");
         terminal.WriteLine("");
 
-        terminal.Write("Buy potions? (Y/N): ");
+        terminal.Write("Choice: ");
         var response = await terminal.GetInput("");
+        var choice = response.Trim().ToUpper();
 
-        if (response.Trim().ToUpper() != "Y")
+        if (choice == "H" && canBuyHealing)
+        {
+            await MonkBuyPotionType(player, "healing", healCostPerPotion,
+                (int)player.Healing, player.MaxPotions,
+                bought => { player.Healing += bought; },
+                cost => { player.Statistics?.RecordPurchase(cost); player.Statistics?.RecordGoldSpent(cost); });
+        }
+        else if (choice == "M" && canBuyMana)
+        {
+            await MonkBuyPotionType(player, "mana", manaCostPerPotion,
+                (int)player.ManaPotions, player.MaxManaPotions,
+                bought => { player.ManaPotions += bought; },
+                cost => { player.Statistics?.RecordPurchase(cost); player.Statistics?.RecordGoldSpent(cost); });
+        }
+        else
         {
             terminal.WriteLine("The monk nods and continues on his way.", "gray");
             await Task.Delay(GetCombatDelay(1000));
             return;
         }
 
-        // Calculate max potions player can buy
-        int roomForPotions = player.MaxPotions - (int)player.Healing;
+        terminal.WriteLine("");
+        terminal.WriteLine("The monk bows and departs.", "gray");
+        await Task.Delay(GetCombatDelay(2000));
+    }
+
+    private async Task MonkBuyPotionType(Character player, string potionType, int costPerPotion,
+        int currentCount, int maxCount, Action<int> applyPurchase, Action<long> trackStats)
+    {
+        int roomForPotions = maxCount - currentCount;
         int maxAffordable = (int)(player.Gold / costPerPotion);
         int maxCanBuy = Math.Min(roomForPotions, maxAffordable);
 
         if (maxCanBuy <= 0)
         {
             if (roomForPotions <= 0)
-            {
-                terminal.WriteLine("You already have the maximum number of potions!", "yellow");
-            }
+                terminal.WriteLine($"You already have the maximum number of {potionType} potions!", "yellow");
             else
-            {
                 terminal.WriteLine("You don't have enough gold!", "red");
-            }
             await Task.Delay(GetCombatDelay(1500));
             return;
         }
 
-        terminal.WriteLine($"How many potions? (Max: {maxCanBuy})", "cyan");
+        terminal.WriteLine($"How many {potionType} potions? (Max: {maxCanBuy})", "cyan");
         var amountInput = await terminal.GetInput("> ");
 
         if (!int.TryParse(amountInput.Trim(), out int amount) || amount < 1)
@@ -2675,23 +2914,19 @@ public partial class CombatEngine
 
         if (amount > maxCanBuy)
         {
-            terminal.WriteLine($"You can only buy {maxCanBuy} potions!", "yellow");
+            terminal.WriteLine($"You can only buy {maxCanBuy}!", "yellow");
             amount = maxCanBuy;
         }
 
-        // Complete the purchase
         long totalCost = amount * costPerPotion;
         player.Gold -= totalCost;
-        player.Healing += amount;
+        applyPurchase(amount);
+        trackStats(totalCost);
 
+        string color = potionType == "mana" ? "blue" : "green";
         terminal.WriteLine("");
-        terminal.WriteLine($"You purchase {amount} healing potion{(amount > 1 ? "s" : "")} for {totalCost:N0} gold.", "green");
-        terminal.WriteLine($"Potions: {player.Healing}/{player.MaxPotions}", "cyan");
+        terminal.WriteLine($"You purchase {amount} {potionType} potion{(amount > 1 ? "s" : "")} for {totalCost:N0} gold.", color);
         terminal.WriteLine($"Gold remaining: {player.Gold:N0}", "yellow");
-
-        terminal.WriteLine("");
-        terminal.WriteLine("The monk bows and departs.", "gray");
-        await Task.Delay(GetCombatDelay(2000));
     }
 
     /// <summary>
@@ -2749,6 +2984,26 @@ public partial class CombatEngine
     /// Automatically use healing potions to restore HP after combat.
     /// Fires before the monk purchase so players heal first, then buy replacements.
     /// </summary>
+    /// <summary>
+    /// Soulweaver's Loom artifact: heal 25% HP after each battle (50% during Manwe fight)
+    /// </summary>
+    private void ApplySoulweaverPostBattleHeal(Character player)
+    {
+        if (!ArtifactSystem.Instance.HasSoulweaversLoom()) return;
+        if (player.HP >= player.MaxHP) return;
+
+        float healPct = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 0.50f : 0.25f;
+        long healAmount = (long)(player.MaxHP * healPct);
+        long oldHP = player.HP;
+        player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
+        long actualHeal = player.HP - oldHP;
+        if (actualHeal > 0)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"The Soulweaver's Loom mends your wounds... (+{actualHeal} HP)");
+        }
+    }
+
     private void AutoHealWithPotions(Character player)
     {
         if (player.Healing <= 0 || player.HP >= player.MaxHP)
@@ -2773,6 +3028,40 @@ public partial class CombatEngine
         {
             terminal.WriteLine("");
             terminal.WriteLine($"You drink {potionsUsed} potion{(potionsUsed > 1 ? "s" : "")} and recover {totalHealed:N0} HP. ({player.HP}/{player.MaxHP} HP, {player.Healing} potions left)", "green");
+        }
+    }
+
+    /// <summary>
+    /// Automatically use mana potions to restore mana after combat.
+    /// Only triggers for spellcasters who have mana potions and are below full mana.
+    /// </summary>
+    private void AutoRestoreManaWithPotions(Character player)
+    {
+        if (player.ManaPotions <= 0 || player.Mana >= player.MaxMana)
+            return;
+
+        // Only auto-use for characters who have spells
+        if (!SpellSystem.HasSpells(player))
+            return;
+
+        long manaPerPotion = 30 + player.Level * 5;
+        long manaNeeded = player.MaxMana - player.Mana;
+        int potionsNeeded = (int)Math.Ceiling((double)manaNeeded / manaPerPotion);
+        int potionsUsed = (int)Math.Min(potionsNeeded, player.ManaPotions);
+
+        long totalRestored = 0;
+        for (int i = 0; i < potionsUsed; i++)
+        {
+            long restoreAmount = Math.Min(manaPerPotion, player.MaxMana - player.Mana);
+            player.Mana += restoreAmount;
+            totalRestored += restoreAmount;
+            player.ManaPotions--;
+            player.Statistics?.RecordManaPotionUsed(restoreAmount);
+        }
+
+        if (potionsUsed > 0)
+        {
+            terminal.WriteLine($"You drink {potionsUsed} mana potion{(potionsUsed > 1 ? "s" : "")} and recover {totalRestored:N0} MP. ({player.Mana}/{player.MaxMana} MP, {player.ManaPotions} mana potions left)", "blue");
         }
     }
 
@@ -3032,6 +3321,11 @@ public partial class CombatEngine
                         );
                     }
                 }
+
+                // Transfer the already-capped MinLevel from the loot Item
+                // (Equipment.Create* methods hardcode MinLevel by rarity, but LootGenerator
+                // already capped it to the player's level — honor that cap)
+                equipment.MinLevel = lootItem.MinLevel;
 
                 // Apply bonus stats to equipment
                 if (lootItem.Strength != 0) equipment = equipment.WithStrength(lootItem.Strength);
@@ -3347,11 +3641,29 @@ public partial class CombatEngine
             terminal.SetColor("yellow");
             terminal.Write($"║ [{i + 1}] ");
             terminal.SetColor(monster.IsBoss ? "bright_red" : "white");
-            terminal.Write($"{monster.Name,-18} ");
+            // Truncate long names to fit the status box (18 chars)
+            string displayName = monster.Name;
+            if (displayName.Length > 18)
+            {
+                // For bosses with titles like "Maelketh, The Broken Blade", use just the first name
+                int commaIdx = displayName.IndexOf(',');
+                if (commaIdx > 0 && commaIdx <= 18)
+                    displayName = displayName[..commaIdx];
+                else
+                    displayName = displayName[..18];
+            }
+            terminal.Write($"{displayName,-18} ");
             terminal.SetColor(hpPercent > 0.5 ? "green" : hpPercent > 0.25 ? "yellow" : "red");
             terminal.Write($"{hpBar} ");
             terminal.SetColor("white");
             terminal.Write($"{monster.HP,5}/{monster.MaxHP,-5}");
+
+            // Show boss phase indicator
+            if (BossContext != null && monster.IsBoss)
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.Write($" [Phase {BossContext.CurrentPhase}]");
+            }
 
             // Show monster status effects
             var monsterStatuses = GetMonsterStatusString(monster);
@@ -3784,6 +4096,18 @@ public partial class CombatEngine
             if (result.Player != null)
                 CheckElementalEnchantProcsMonster(result.Player, monster, actualDamage);
 
+            // Equipment lifesteal (Lifedrinker enchant)
+            if (result.Player != null && actualDamage > 0)
+            {
+                int equipLS = result.Player.GetEquipmentLifeSteal();
+                if (equipLS > 0)
+                {
+                    long stolen = Math.Max(1, actualDamage * equipLS / 100);
+                    result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + stolen);
+                    terminal.WriteLine($"  Your weapon drains {stolen} life! (Lifedrinker)", "dark_green");
+                }
+            }
+
             if (monster.HP <= 0)
             {
                 monster.HP = 0;
@@ -4061,6 +4385,16 @@ public partial class CombatEngine
                     // Player cancelled - loop back
                     continue;
 
+                case "V":
+                    if (BossContext?.CanSave == true)
+                    {
+                        action.Type = CombatActionType.BossSave;
+                        return (action, false);
+                    }
+                    terminal.WriteLine("Invalid action, please try again", "yellow");
+                    await Task.Delay(GetCombatDelay(1000));
+                    continue;
+
                 case "R":
                     action.Type = CombatActionType.Retreat;
                     return (action, false);
@@ -4227,8 +4561,12 @@ public partial class CombatEngine
                     break;
                 }
 
-                // Retreat chance based on dexterity
-                int retreatChance = (int)(player.Dexterity / 2);
+                // Boss fights have flat 20% flee chance; normal combat is dex-based
+                int retreatChance;
+                if (BossContext != null)
+                    retreatChance = 20;
+                else
+                    retreatChance = (int)(player.Dexterity / 2);
                 int retreatRoll = random.Next(1, 101);
 
                 terminal.WriteLine("");
@@ -4241,7 +4579,15 @@ public partial class CombatEngine
                 else
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine("You failed to retreat!");
+                    if (BossContext != null)
+                    {
+                        var bossName = monsters.FirstOrDefault(m => m.IsBoss)?.Name ?? "The Old God";
+                        terminal.WriteLine($"{bossName} blocks your escape!");
+                    }
+                    else
+                    {
+                        terminal.WriteLine("You failed to retreat!");
+                    }
                 }
                 await Task.Delay(GetCombatDelay(1500));
                 break;
@@ -4289,6 +4635,18 @@ public partial class CombatEngine
             case CombatActionType.UseAbility:
             case CombatActionType.ClassAbility:
                 await ExecuteUseAbilityMultiMonster(player, monsters, action, result);
+                break;
+
+            case CombatActionType.BossSave:
+                if (BossContext != null)
+                {
+                    var bossTarget = monsters.FirstOrDefault(m => m.IsBoss && m.IsAlive);
+                    if (bossTarget != null && await AttemptBossSave(player, bossTarget, result))
+                    {
+                        BossContext.BossSaved = true;
+                        bossTarget.HP = 0; // End combat peacefully
+                    }
+                }
                 break;
 
             case CombatActionType.None:
@@ -4595,6 +4953,14 @@ public partial class CombatEngine
                 abilityCooldowns[action.AbilityId] = abilityResult.CooldownApplied;
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  ({ability.Name} cooldown: {abilityResult.CooldownApplied} rounds)");
+            }
+
+            // Display training improvement message if ability proficiency increased
+            if (abilityResult.SkillImproved && !string.IsNullOrEmpty(abilityResult.NewProficiencyLevel))
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  Your {ability.Name} proficiency improved to {abilityResult.NewProficiencyLevel}!");
+                await Task.Delay(GetCombatDelay(800));
             }
 
             // Log the action
@@ -5477,6 +5843,14 @@ public partial class CombatEngine
                     HandleSpecialSpellEffectOnMonster(target, spellResult.SpecialEffect, spellResult.Duration, player, spellResult.Damage, result);
                 }
             }
+        }
+
+        // Display training improvement message if spell proficiency increased
+        if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Your {spellInfo.Name} proficiency improved to {spellResult.NewProficiencyLevel}!");
+            await Task.Delay(GetCombatDelay(800));
         }
     }
 
@@ -7166,8 +7540,12 @@ public partial class CombatEngine
 
         await Task.Delay(GetCombatDelay(2000));
 
+        // Soulweaver's Loom: heal 25% HP after each battle (50% during Manwe fight)
+        ApplySoulweaverPostBattleHeal(result.Player);
+
         // Auto-heal with potions after combat, then offer to buy replacements
         AutoHealWithPotions(result.Player);
+        AutoRestoreManaWithPotions(result.Player);
 
         // Monk encounter ONLY if requested
         if (offerMonkEncounter)
@@ -7264,6 +7642,13 @@ public partial class CombatEngine
         terminal.WriteLine("");
 
         await Task.Delay(GetCombatDelay(2000));
+
+        // Soulweaver's Loom: heal 25% HP after each battle (50% during Manwe fight)
+        ApplySoulweaverPostBattleHeal(result.Player);
+
+        // Auto-restore with potions after partial victory
+        AutoHealWithPotions(result.Player);
+        AutoRestoreManaWithPotions(result.Player);
 
         // No monk encounter on escape, even if some monsters were defeated
         // (to avoid the issue where monk appears mid-fight)
@@ -7849,7 +8234,7 @@ public partial class CombatEngine
             return;
         }
 
-        long manaRestore = 30 + player.Level * 2;
+        long manaRestore = 30 + player.Level * 5;
         long manaNeeded = player.MaxMana - player.Mana;
         long actualRestore = Math.Min(manaRestore, manaNeeded);
         player.Mana += actualRestore;
@@ -8002,6 +8387,14 @@ public partial class CombatEngine
         if (abilityResult.CooldownApplied > 0)
         {
             abilityCooldowns[selectedAbility.Id] = abilityResult.CooldownApplied;
+        }
+
+        // Display training improvement message if ability proficiency increased
+        if (abilityResult.SkillImproved && !string.IsNullOrEmpty(abilityResult.NewProficiencyLevel))
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Your {selectedAbility.Name} proficiency improved to {abilityResult.NewProficiencyLevel}!");
+            await Task.Delay(GetCombatDelay(800));
         }
 
         // Log the action
@@ -8563,8 +8956,7 @@ public partial class CombatEngine
         // Regenerate mana for spellcasters each round
         if (SpellSystem.HasSpells(player) && player.Mana < player.MaxMana)
         {
-            // Base mana regen: 1 + (Wisdom / 20) per round, minimum 1
-            int manaRegen = 1 + (int)(player.Wisdom / 20);
+            int manaRegen = StatEffectsSystem.GetManaRegenPerRound(player.Wisdom);
             player.Mana = Math.Min(player.MaxMana, player.Mana + manaRegen);
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"You recover {manaRegen} mana. (Mana: {player.Mana}/{player.MaxMana})");
@@ -9100,13 +9492,20 @@ public partial class CombatEngine
             // Cast the spell – the SpellSystem API expects a Character target. We pass null and
             // handle damage application ourselves against the Monster instance further below.
             var spellResult = SpellSystem.CastSpell(player, selectedSpell.Level, null);
-            
+
             terminal.WriteLine("");
             terminal.WriteLine(spellResult.Message);
-            
+
             // Apply spell effects
             ApplySpellEffects(player, monster, spellResult);
-            
+
+            // Display training improvement message if spell proficiency increased
+            if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  Your {selectedSpell.Name} proficiency improved to {spellResult.NewProficiencyLevel}!");
+            }
+
             terminal.PressAnyKey();
         }
         else if (spellChoice != 0)
@@ -9742,6 +10141,10 @@ public partial class CombatEngine
         if (StatEffectsSystem.RollExtraAttack(attacker))
             attacks += 1;
 
+        // Shadow Crown artifact: extra strike per round (+2 during Manwe fight)
+        if (ArtifactSystem.Instance.HasShadowCrown())
+            attacks += IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 2 : 1;
+
         // Drug-based extra attacks (e.g., Haste drug)
         var drugEffects = DrugSystem.GetDrugEffects(attacker);
         attacks += drugEffects.ExtraAttacks;
@@ -10269,7 +10672,168 @@ public partial class CombatEngine
             abilityCooldowns[abilityId] = abilityResult.CooldownApplied;
         }
 
+        // Display training improvement message if ability proficiency increased
+        if (abilityResult.SkillImproved && !string.IsNullOrEmpty(abilityResult.NewProficiencyLevel))
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Your {ability.Name} proficiency improved to {abilityResult.NewProficiencyLevel}!");
+        }
+
         await Task.Delay(GetCombatDelay(800));
+    }
+
+    // ==================== BOSS COMBAT HELPERS ====================
+
+    /// <summary>
+    /// Play boss phase transition dialogue when HP crosses a threshold
+    /// </summary>
+    private async Task PlayBossPhaseTransition(BossCombatContext ctx, Monster boss, int newPhase)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"═══ PHASE {newPhase} ═══");
+        terminal.WriteLine("");
+
+        var dialogue = newPhase switch
+        {
+            2 => ctx.BossData.Phase2Dialogue,
+            3 => ctx.BossData.Phase3Dialogue,
+            _ => Array.Empty<string>()
+        };
+
+        foreach (var line in dialogue)
+        {
+            terminal.SetColor(ctx.BossData.ThemeColor);
+            terminal.WriteLine($"  \"{line}\"");
+            await Task.Delay(200);
+        }
+
+        if (newPhase == 2)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {boss.Name} grows more powerful!");
+        }
+        else if (newPhase == 3)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {boss.Name} unleashes their true form!");
+        }
+
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+    }
+
+    /// <summary>
+    /// Create spectral soldier Monster objects for Maelketh's minion summons
+    /// </summary>
+    private List<Monster> CreateSpectralSoldiers(int count, int bossLevel)
+    {
+        var soldiers = new List<Monster>();
+        for (int i = 0; i < count; i++)
+        {
+            long soldierHP = 50 + bossLevel * 5;
+            var soldier = new Monster
+            {
+                Name = "Spectral Soldier",
+                Level = Math.Max(1, bossLevel - 5),
+                HP = soldierHP,
+                MaxHP = soldierHP,
+                Strength = 10 + bossLevel * 2,
+                Defence = (int)(5 + bossLevel),
+                WeapPow = 5 + bossLevel,
+                ArmPow = 3 + bossLevel / 2,
+                MonsterColor = "dark_red",
+                FamilyName = "Spectral",
+                IsBoss = false,
+                IsActive = true,
+                CanSpeak = false
+            };
+            soldiers.Add(soldier);
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"  {count} Spectral Soldiers materialize from the shadows!");
+        return soldiers;
+    }
+
+    /// <summary>
+    /// Select a random boss ability name based on current phase
+    /// </summary>
+    private string SelectBossAbility(BossCombatContext ctx)
+    {
+        var abilities = ctx.BossData.Abilities.Where(a => a.Phase <= ctx.CurrentPhase).ToList();
+        if (abilities.Count == 0) return "Divine Strike";
+        return abilities[random.Next(abilities.Count)].Name;
+    }
+
+    /// <summary>
+    /// Attempt to save an Old God boss using the Soulweaver's Loom
+    /// </summary>
+    private async Task<bool> AttemptBossSave(Character player, Monster bossMonster, CombatResult result)
+    {
+        if (BossContext == null) return false;
+
+        var boss = BossContext.BossData;
+
+        if (!boss.CanBeSaved)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {boss.Name} cannot be saved.");
+            return false;
+        }
+
+        if (!ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  You need the Soulweaver's Loom!");
+            return false;
+        }
+
+        // Saving requires boss to be below 50% HP
+        double hpPercent = (double)bossMonster.HP / Math.Max(1, bossMonster.MaxHP);
+        if (hpPercent > 0.5)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {boss.Name} is too strong to save yet.");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  Weaken them first.");
+            return false;
+        }
+
+        // Requires positive alignment
+        if (player.Chivalry - player.Darkness < 200)
+        {
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("  Your heart is too dark to use the Loom.");
+            return false;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("  The Soulweaver's Loom glows with ancient power.");
+        await Task.Delay(800);
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"  You reach out to {boss.Name}'s corrupted essence...");
+        await Task.Delay(1000);
+
+        // Display save dialogue
+        if (boss.SaveDialogue != null)
+        {
+            foreach (var line in boss.SaveDialogue)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  \"{line}\"");
+                await Task.Delay(300);
+            }
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  {boss.Name} is cleansed of corruption!");
+
+        return true;
     }
 }
 
@@ -10301,7 +10865,8 @@ public enum CombatActionType
     Taunt,
     Hide,
     RangedAttack,
-    HealAlly        // Heal a teammate with potion or spell
+    HealAlly,       // Heal a teammate with potion or spell
+    BossSave        // Attempt to save an Old God boss mid-combat
 }
 
 /// <summary>
@@ -10377,4 +10942,43 @@ public enum CombatOutcome
     PlayerEscaped,
     Stalemate,
     Interrupted
-} 
+}
+
+/// <summary>
+/// Context for Old God boss fights routed through CombatEngine.
+/// Set by OldGodBossSystem before calling PlayerVsMonsters.
+/// </summary>
+public class BossCombatContext
+{
+    public OldGodBossData BossData { get; set; }
+    public OldGodType GodType { get; set; }
+    public int CurrentPhase { get; set; } = 1;
+    public int AttacksPerRound { get; set; } = 2;
+    public bool CanSave { get; set; }
+    public bool BossSaved { get; set; }
+    public int RoundsSinceLastSummon { get; set; }
+
+    // Dialogue-based combat modifiers (set by OldGodBossSystem)
+    public double DamageMultiplier { get; set; } = 1.0;
+    public double DefenseMultiplier { get; set; } = 1.0;
+    public int BonusDamage { get; set; }
+    public int BonusDefense { get; set; }
+    public double CriticalChance { get; set; } = 0.05;
+    public bool HasRageBoost { get; set; }
+    public bool HasInsight { get; set; }
+    public double BossDamageMultiplier { get; set; } = 1.0;
+    public double BossDefenseMultiplier { get; set; } = 1.0;
+    public bool BossConfused { get; set; }
+    public bool BossWeakened { get; set; }
+
+    /// <summary>
+    /// Determine what phase the boss should be in based on HP percentage
+    /// </summary>
+    public int CheckPhase(long currentHP, long maxHP)
+    {
+        double pct = (double)currentHP / Math.Max(1, maxHP);
+        if (pct <= 0.20) return 3;
+        if (pct <= 0.50) return 2;
+        return 1;
+    }
+}

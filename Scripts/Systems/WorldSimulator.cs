@@ -46,6 +46,33 @@ public class WorldSimulator
     /// </summary>
     public string? PlayerTurfTeam { get; set; } = null;
 
+    /// <summary>
+    /// Tracks team names that belong to players. Used by world sim to protect player teams
+    /// from NPC AI dissolution, betrayal, and unauthorized recruitment.
+    /// Thread-safe because world sim runs on a background thread.
+    /// In MUD mode, multiple players may have teams simultaneously.
+    /// </summary>
+    private static readonly HashSet<string> _playerTeamNames = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object _teamLock = new();
+
+    public static void RegisterPlayerTeam(string teamName)
+    {
+        if (string.IsNullOrEmpty(teamName)) return;
+        lock (_teamLock) { _playerTeamNames.Add(teamName); }
+    }
+
+    public static void UnregisterPlayerTeam(string teamName)
+    {
+        if (string.IsNullOrEmpty(teamName)) return;
+        lock (_teamLock) { _playerTeamNames.Remove(teamName); }
+    }
+
+    public static bool IsPlayerTeam(string? teamName)
+    {
+        if (string.IsNullOrEmpty(teamName)) return false;
+        lock (_teamLock) { return _playerTeamNames.Contains(teamName); }
+    }
+
     // Gossip system - pool of recent events NPCs can spread as rumors
     private class GossipItem
     {
@@ -1621,14 +1648,11 @@ public class WorldSimulator
     /// </summary>
     private void NPCTryJoinOrFormTeam(NPC npc)
     {
-        // Exclude the player's team - NPCs shouldn't autonomously join it
-        var player = GameEngine.Instance?.CurrentPlayer as Player;
-        string? playerTeam = (!string.IsNullOrEmpty(player?.Team)) ? player.Team : null;
-
         // Look for existing NPC teams at this location to join
+        // Exclude player teams — NPCs shouldn't autonomously join them
         var teamsAtLocation = npcs
             .Where(n => n.IsAlive && !string.IsNullOrEmpty(n.Team) && n.CurrentLocation == npc.CurrentLocation &&
-                        !(playerTeam != null && n.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase)))
+                        !IsPlayerTeam(n.Team))
             .GroupBy(n => n.Team)
             .Where(g => g.Count() < MAX_TEAM_SIZE)
             .ToList();
@@ -1731,9 +1755,7 @@ public class WorldSimulator
         if (string.IsNullOrEmpty(npc.Team)) return;
 
         // Don't let NPCs autonomously recruit into the player's team
-        var player = GameEngine.Instance?.CurrentPlayer as Player;
-        if (player != null && !string.IsNullOrEmpty(player.Team) &&
-            npc.Team.Equals(player.Team, StringComparison.OrdinalIgnoreCase))
+        if (IsPlayerTeam(npc.Team))
             return;
 
         // Check current team size
@@ -3724,11 +3746,8 @@ public class WorldSimulator
     {
         var teamMembers = npcs.Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive).ToList();
 
-        // Get the player's team name so we can protect player team members
-        var player = GameEngine.Instance?.CurrentPlayer as Player;
-        string? playerTeam = (!string.IsNullOrEmpty(player?.Team)) ? player.Team : null;
-
-        // Dissolve any 1-member teams (cleanup for teams that lost members to death/departure)
+        // Dissolve any 1-member NPC-only teams (cleanup for teams that lost members to death/departure)
+        // Player teams are protected — the player counts as a member even though they're not in the NPC list
         var soloTeams = teamMembers
             .GroupBy(n => n.Team, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() == 1)
@@ -3736,8 +3755,8 @@ public class WorldSimulator
         foreach (var soloGroup in soloTeams)
         {
             var solo = soloGroup.First();
-            // Don't dissolve the player's team
-            if (playerTeam != null && solo.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase))
+            // Don't dissolve the player's team — player is a member but not in the NPC list
+            if (IsPlayerTeam(solo.Team))
                 continue;
             var oldTeam = solo.Team;
             solo.Team = "";
@@ -3754,7 +3773,7 @@ public class WorldSimulator
         {
             // Never remove NPCs from the player's team via world simulation
             // Player must manually sack them from Team Corner
-            if (playerTeam != null && member.Team.Equals(playerTeam, StringComparison.OrdinalIgnoreCase))
+            if (IsPlayerTeam(member.Team))
                 continue;
 
             // Low loyalty or betrayal-prone personality
@@ -3776,23 +3795,16 @@ public class WorldSimulator
                 NewsSystem.Instance.Newsy(true, $"{member.Name} abandoned '{oldTeam}'!");
                 // GD.Print($"[WorldSim] {member.Name} left team '{oldTeam}'");
 
-                // Notify player if this was their teammate (shouldn't reach here for player teams
-                // due to the continue above, but kept as safety net)
-                if (player != null && playerTeam != null &&
-                    playerTeam.Equals(oldTeam, StringComparison.OrdinalIgnoreCase))
-                {
-                    GameEngine.AddNotification($"{member.DisplayName} has abandoned your team!");
-                }
-
-                // Check if team is now empty or solo
+                // Check if team is now empty or solo (NPC-only teams)
                 var remainingMembers = npcs.Count(n => n.Team == oldTeam && n.IsAlive);
-                if (remainingMembers == 0)
+                if (remainingMembers == 0 && !IsPlayerTeam(oldTeam))
                 {
                     NewsSystem.Instance.Newsy(true, $"The team '{oldTeam}' has been disbanded!");
                 }
-                else if (remainingMembers == 1)
+                else if (remainingMembers == 1 && !IsPlayerTeam(oldTeam))
                 {
-                    // Dissolve single-member teams — can't be a team of one
+                    // Dissolve single-member NPC-only teams — can't be a team of one
+                    // Player teams with 1 NPC are fine (player is also a member)
                     var soloMember = npcs.FirstOrDefault(n => n.Team == oldTeam && n.IsAlive);
                     if (soloMember != null)
                     {

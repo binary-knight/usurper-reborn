@@ -391,6 +391,13 @@ namespace UsurperRemake.Systems
                     WeaponType = (int)equip.WeaponType,
                     Handedness = (int)equip.Handedness,
                     ArmorType = (int)equip.ArmorType,
+                    StaminaBonus = equip.StaminaBonus,
+                    AgilityBonus = equip.AgilityBonus,
+                    CriticalChanceBonus = equip.CriticalChanceBonus,
+                    CriticalDamageBonus = equip.CriticalDamageBonus,
+                    MagicResistance = equip.MagicResistance,
+                    PoisonDamage = equip.PoisonDamage,
+                    LifeSteal = equip.LifeSteal,
                     HasFireEnchant = equip.HasFireEnchant,
                     HasFrostEnchant = equip.HasFrostEnchant
                 }).ToList(),
@@ -833,6 +840,13 @@ namespace UsurperRemake.Systems
                             WeaponType = (int)equip.WeaponType,
                             Handedness = (int)equip.Handedness,
                             ArmorType = (int)equip.ArmorType,
+                            StaminaBonus = equip.StaminaBonus,
+                            AgilityBonus = equip.AgilityBonus,
+                            CriticalChanceBonus = equip.CriticalChanceBonus,
+                            CriticalDamageBonus = equip.CriticalDamageBonus,
+                            MagicResistance = equip.MagicResistance,
+                            PoisonDamage = equip.PoisonDamage,
+                            LifeSteal = equip.LifeSteal,
                             HasFireEnchant = equip.HasFireEnchant,
                             HasFrostEnchant = equip.HasFrostEnchant
                         }).ToList() ?? new List<DynamicEquipmentData>()

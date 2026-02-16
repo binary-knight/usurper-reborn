@@ -1,6 +1,7 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.Data;
+using UsurperRemake.UI;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -2660,6 +2661,14 @@ public abstract class BaseLocation
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
+
+            // Show NPC portrait (skip for screen readers)
+            if (!currentPlayer.ScreenReaderMode)
+            {
+                var portrait = PortraitGenerator.GeneratePortrait(npc);
+                ANSIArt.DisplayArt(terminal, portrait);
+                terminal.WriteLine("");
+            }
 
             // Show NPC info
             terminal.SetColor("gray");

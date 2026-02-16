@@ -1477,6 +1477,7 @@ public partial class GameEngine : Node
                     {
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"Your team '{currentPlayer.Team}' no longer exists. You have been removed.");
+                        WorldSimulator.UnregisterPlayerTeam(currentPlayer.Team);
                         currentPlayer.Team = "";
                         currentPlayer.TeamPW = "";
                         currentPlayer.CTurf = false;
@@ -2169,6 +2170,13 @@ public partial class GameEngine : Node
                     WeaponType = (WeaponType)equipData.WeaponType,
                     Handedness = (WeaponHandedness)equipData.Handedness,
                     ArmorType = (ArmorType)equipData.ArmorType,
+                    StaminaBonus = equipData.StaminaBonus,
+                    AgilityBonus = equipData.AgilityBonus,
+                    CriticalChanceBonus = equipData.CriticalChanceBonus,
+                    CriticalDamageBonus = equipData.CriticalDamageBonus,
+                    MagicResistance = equipData.MagicResistance,
+                    PoisonDamage = equipData.PoisonDamage,
+                    LifeSteal = equipData.LifeSteal,
                     HasFireEnchant = equipData.HasFireEnchant,
                     HasFrostEnchant = equipData.HasFrostEnchant
                 };
@@ -2436,6 +2444,13 @@ public partial class GameEngine : Node
         // Log successful restore
         DebugLogger.Instance.LogLoad(player.Name, player.Level, player.HP, player.MaxHP, player.Gold);
         DebugLogger.Instance.LogDebug("LOAD", $"Stats: STR={player.Strength} DEF={player.Defence} WeapPow={player.WeapPow} ArmPow={player.ArmPow}");
+
+        // Register player's team so WorldSimulator protects it from NPC AI dissolution
+        // This is critical in MUD mode where GameEngine.Instance is null on the world sim thread
+        if (!string.IsNullOrEmpty(player.Team))
+        {
+            WorldSimulator.RegisterPlayerTeam(player.Team);
+        }
 
         return player;
     }
@@ -2897,6 +2912,13 @@ public partial class GameEngine : Node
                         WeaponType = (WeaponType)equipData.WeaponType,
                         Handedness = (WeaponHandedness)equipData.Handedness,
                         ArmorType = (ArmorType)equipData.ArmorType,
+                        StaminaBonus = equipData.StaminaBonus,
+                        AgilityBonus = equipData.AgilityBonus,
+                        CriticalChanceBonus = equipData.CriticalChanceBonus,
+                        CriticalDamageBonus = equipData.CriticalDamageBonus,
+                        MagicResistance = equipData.MagicResistance,
+                        PoisonDamage = equipData.PoisonDamage,
+                        LifeSteal = equipData.LifeSteal,
                         HasFireEnchant = equipData.HasFireEnchant,
                         HasFrostEnchant = equipData.HasFrostEnchant
                     };

@@ -1,4 +1,5 @@
 using System;
+using UsurperRemake.Systems;
 
 /// <summary>
 /// Centralized stat effects system - defines how each attribute affects gameplay.
@@ -43,21 +44,32 @@ public static class StatEffectsSystem
     }
 
     /// <summary>
-    /// Critical hit chance from Dexterity
-    /// Base 5% + (Dexterity / 10)%, clamped to 5-50% to prevent overflow exploit
+    /// Critical hit chance from Dexterity + equipment bonuses
+    /// Base 5% + (Dexterity / 10)% + equipment crit bonus, clamped to 5-50%
+    /// Creator's Eye artifact: +50% crit chance (multiplicative), doubled during Manwe fight
     /// </summary>
-    public static int GetCriticalHitChance(long dexterity)
+    public static int GetCriticalHitChance(long dexterity, int equipmentCritBonus = 0)
     {
-        return Math.Clamp(5 + (int)(dexterity / 10), 5, 50);
+        int baseChance = 5 + (int)(dexterity / 10) + equipmentCritBonus;
+
+        // Creator's Eye: +50% critical hit chance (multiplicative)
+        if (ArtifactSystem.Instance.HasCreatorsEye())
+        {
+            float mult = ArtifactSystem.Instance.HasVoidKey() && CombatEngine.IsManweBattle ? 2.0f : 1.5f;
+            baseChance = (int)(baseChance * mult);
+        }
+
+        return Math.Clamp(baseChance, 5, 50);
     }
 
     /// <summary>
     /// Critical hit damage multiplier
     /// Base 1.5x + 0.02x per Dexterity above 10 (so 20 DEX = 1.7x)
+    /// Equipment crit damage bonus adds directly (e.g., +10% = +0.1x)
     /// </summary>
-    public static float GetCriticalDamageMultiplier(long dexterity)
+    public static float GetCriticalDamageMultiplier(long dexterity, int equipmentCritDamageBonus = 0)
     {
-        return 1.5f + Math.Max(0, (dexterity - 10) * 0.02f);
+        return 1.5f + Math.Max(0, (dexterity - 10) * 0.02f) + (equipmentCritDamageBonus / 100f);
     }
 
     /// <summary>
@@ -181,11 +193,11 @@ public static class StatEffectsSystem
 
     /// <summary>
     /// Magic resistance percentage
-    /// Formula: Wisdom / 3 percent
+    /// Formula: Wisdom / 3 + equipment magic resist bonus, capped at 50%
     /// </summary>
-    public static int GetMagicResistance(long wisdom)
+    public static int GetMagicResistance(long wisdom, int equipmentMagicResist = 0)
     {
-        return Math.Min(50, (int)(wisdom / 3));
+        return Math.Min(50, (int)(wisdom / 3) + equipmentMagicResist);
     }
 
     /// <summary>
@@ -200,16 +212,16 @@ public static class StatEffectsSystem
 
     /// <summary>
     /// Mana regeneration per round
-    /// Formula: 1 + Wisdom / 20, capped at 4 mana per round
+    /// Formula: 2 + Wisdom / 10, capped at 15 mana per round
     ///
-    /// BALANCE: Capped at 4 to prevent spellcasters from regenerating
-    /// more mana than their spells cost. Even with optimal stats,
-    /// casting should cost more than regen to require resource management.
+    /// BALANCE: Spells cost 15-135 mana, so regen should cover cheap spells
+    /// over several rounds but not keep up with sustained high-level casting.
+    /// Mana potions are needed for heavy spell use.
     /// </summary>
     public static int GetManaRegenPerRound(long wisdom)
     {
-        int regen = 1 + (int)(wisdom / 20);
-        return Math.Min(4, regen); // Cap at 4 mana per round
+        int regen = 2 + (int)(wisdom / 10);
+        return Math.Min(15, regen); // Cap at 15 mana per round
     }
 
     // =====================================================
@@ -359,7 +371,7 @@ public static class StatEffectsSystem
     /// </summary>
     public static bool RollCriticalHit(Character attacker)
     {
-        int critChance = GetCriticalHitChance(attacker.Dexterity);
+        int critChance = GetCriticalHitChance(attacker.Dexterity, attacker.GetEquipmentCritChanceBonus());
         return _random.Next(100) < critChance;
     }
 
@@ -386,7 +398,7 @@ public static class StatEffectsSystem
     /// </summary>
     public static bool RollMagicResist(Character character)
     {
-        int resist = GetMagicResistance(character.Wisdom);
+        int resist = GetMagicResistance(character.Wisdom, character.GetEquipmentMagicResistance());
         return _random.Next(100) < resist;
     }
 
@@ -412,7 +424,7 @@ public static class StatEffectsSystem
 
             "dexterity" => $"Dexterity ({character.Dexterity})\n" +
                            $"  +{GetDexterityHitBonus(character.Dexterity)}% hit chance\n" +
-                           $"  {GetCriticalHitChance(character.Dexterity)}% critical chance\n" +
+                           $"  {GetCriticalHitChance(character.Dexterity, character.GetEquipmentCritChanceBonus())}% critical chance\n" +
                            $"  Affects: Accuracy, crits, ranged attacks, escaping",
 
             "constitution" => $"Constitution ({character.Constitution})\n" +
@@ -428,7 +440,7 @@ public static class StatEffectsSystem
 
             "wisdom" => $"Wisdom ({character.Wisdom})\n" +
                         $"  -{GetManaCostReduction(character.Wisdom)}% mana costs\n" +
-                        $"  {GetMagicResistance(character.Wisdom)}% magic resist\n" +
+                        $"  {GetMagicResistance(character.Wisdom, character.GetEquipmentMagicResistance())}% magic resist\n" +
                         $"  {GetHealingMultiplier(character.Wisdom):P0} healing power\n" +
                         $"  Affects: Spell efficiency, resistance, healing",
 

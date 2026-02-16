@@ -395,8 +395,7 @@ public partial class MagicShopLocation : BaseLocation
                 await TalkToOwnerEnhanced(player);
                 return false;
             case "F":
-                await EnchantItem(player);
-                await terminal.WaitForKey();
+                await EnchantEquipment(player);
                 return false;
             case "R":
             case "Q":
@@ -486,7 +485,7 @@ public partial class MagicShopLocation : BaseLocation
         WriteMenuKey("G", "bright_magenta", " Scrying (NPC Info)");
         terminal.WriteLine("");
         terminal.WriteLine("");
-        WriteMenuRow("T", "bright_cyan", $"alk to {_ownerName}", "F", "gray", " Fortify Curio");
+        WriteMenuRow("T", "bright_cyan", $"alk to {_ownerName}", "F", "magenta", " Enchantment Forge");
         terminal.Write("  ");
         WriteMenuKey("R", "bright_red", "eturn to street");
         terminal.WriteLine("");
@@ -822,18 +821,60 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage("The item shudders. Something dark rises from it like smoke...", "magenta");
             await Task.Delay(500);
             DisplayMessage("And dissipates into nothingness.", "white");
+            await Task.Delay(300);
+            DisplayMessage("...but as the dark energy leaves, some of the item's power fades with it.", "dark_yellow");
             DisplayMessage("");
 
             // Remove the curse
             targetItem.IsCursed = false;
             targetItem.Cursed = false;
 
-            // Add a small bonus for uncursed items (they're purified)
+            // Reverse curse stat penalties (mirrors LootGenerator.ApplyCursePenalties)
+            int penalty = Math.Max(5, targetItem.Attack / 10);
+            targetItem.Strength += penalty / 2;
+            targetItem.Dexterity += penalty / 3;
+            targetItem.Wisdom += penalty / 3;
+            targetItem.HP += penalty * 2;
+
+            // Purification penalty: the curse's dark power was intertwined with the item's strength.
+            // Removing the curse costs ~20% of the item's base power ON TOP of removing the curse boost.
+            // This makes equipping a cursed item a meaningful gamble:
+            //   Equip cursed:  125% power + stat penalties + can't unequip  (high risk, high reward)
+            //   Purify:         80% power, clean stats                     (safe but weaker)
+            //   Never cursed:  100% power                                  (baseline)
+            const float purificationPenalty = 0.80f; // 20% power loss from purification
+
+            if (targetItem.Type == ObjType.Weapon)
+                targetItem.Attack = (int)(targetItem.Attack / 1.25f * purificationPenalty);
+            else if (targetItem.Type == ObjType.Body || targetItem.Type == ObjType.Shield)
+                targetItem.Armor = (int)(targetItem.Armor / 1.25f * purificationPenalty);
+            else if (targetItem.Type == ObjType.Fingers || targetItem.Type == ObjType.Neck)
+            {
+                // Accessories boosted Strength and HP by 1.3x before penalties were applied
+                targetItem.Strength = (int)(targetItem.Strength / 1.3f * purificationPenalty);
+                targetItem.HP = (int)(targetItem.HP / 1.3f * purificationPenalty);
+            }
+
+            // Value partially restored (curse halved it, purification recovers most but not all)
+            targetItem.Value = (long)(targetItem.Value * 1.6); // 80% of original value (was halved, now x1.6)
+
+            // Clean up curse-related name prefix, add "Purified" tag
+            if (targetItem.Name.StartsWith("Cursed "))
+                targetItem.Name = "Purified " + targetItem.Name.Substring(7);
+
+            // Fix curse description
+            if (targetItem.Description != null && targetItem.Description.Count > 1 &&
+                targetItem.Description[1] != null && targetItem.Description[1].Contains("CURSED"))
+                targetItem.Description[1] = "Purified — some power was lost in the cleansing.";
+
+            // Fix any negative magic resistance
             if (targetItem.MagicProperties.MagicResistance < 0)
                 targetItem.MagicProperties.MagicResistance = Math.Abs(targetItem.MagicProperties.MagicResistance) / 2;
 
             DisplayMessage($"The {targetItem.Name} is now free of its curse!", "bright_green");
-            DisplayMessage("'It is done,' the gnome says, looking tired but satisfied.", "cyan");
+            DisplayMessage("'The dark power fought hard,' the gnome says, wiping his brow.", "cyan");
+            DisplayMessage("'The item is clean, but weaker for it. The curse took some of its", "cyan");
+            DisplayMessage(" essence with it when it left.'", "cyan");
 
             player.Statistics?.RecordGoldSpent(curseTotalWithTax);
             player.Statistics?.RecordMagicShopPurchase(curseTotalWithTax);
@@ -3132,12 +3173,12 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("═══ Mana Potions ═══", "blue");
         DisplayMessage("");
 
-        int potionPrice = (int)ApplyAllPriceModifiers(player.Level * 8, player);
+        int potionPrice = (int)ApplyAllPriceModifiers(Math.Max(75, player.Level * 3), player);
         var (_, _, mpPotionUnitWithTax) = CityControlSystem.CalculateTaxedPrice(potionPrice);
         int maxCanBuy = mpPotionUnitWithTax > 0 ? (int)(player.Gold / mpPotionUnitWithTax) : 0;
         int maxCanCarry = player.MaxManaPotions - (int)player.ManaPotions;
         int maxPotions = Math.Min(maxCanBuy, maxCanCarry);
-        int manaRestored = 30 + player.Level * 2;
+        int manaRestored = 30 + player.Level * 5;
 
         DisplayMessage($"Each potion restores {manaRestored} mana.", "cyan");
         DisplayMessage($"Price: {potionPrice:N0} gold per potion", "gray");
