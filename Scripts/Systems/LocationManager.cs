@@ -134,7 +134,8 @@ public class LocationManager
             GameLocation.Healer,       // loc13
             GameLocation.AnchorRoad,   // loc14
             GameLocation.Home,         // loc15 – your personal dwelling
-            GameLocation.Arena         // loc16 – PvP arena (online only)
+            GameLocation.Arena,        // loc16 – PvP arena (online only)
+            GameLocation.Dormitory     // loc17 – lodging
         };
         
         navigationTable[GameLocation.TheInn] = new List<GameLocation>

@@ -1065,10 +1065,11 @@ public abstract class BaseLocation
                 else
                     terminal.SetColor("cyan");
 
-                // Use CurrentActivity if set, otherwise location-contextual fallback
-                var activity = !string.IsNullOrEmpty(npc.CurrentActivity)
-                    ? npc.CurrentActivity
-                    : GetLocationContextActivity(npc);
+                // Always use location-contextual flavor text.
+                // CurrentActivity is set by WorldSimulator based on what the NPC *did* (e.g. visited the Inn),
+                // but the NPC may have since moved to a different location, making the old activity text wrong
+                // (e.g. "having a drink at the bar" while standing in the Church).
+                var activity = GetLocationContextActivity(npc);
 
                 terminal.WriteLine($"  {npc.Name2} is {activity}.");
             }

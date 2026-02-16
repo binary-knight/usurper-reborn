@@ -33,9 +33,9 @@ Note: Existing "Clear Floor" quests created before this fix still use the old ki
 
 ## Bug Fix: NPCs Showing Wrong Location Flavor Text
 
-NPCs could show flavor text from a previous location — for example, Lady Morgana "having a drink at the bar" while standing in the Weapon Shop. This happened because the NPC's `CurrentActivity` was set when they performed an action (like visiting the Inn) but never cleared when they moved to a different location. The old activity text persisted and was displayed instead of the correct location-specific flavor text.
+NPCs could show flavor text from a previous location — for example, Sir Cedric "having a drink at the bar" while standing in the Church. This happened because the WorldSimulator sets `CurrentActivity` based on what the NPC *did* (e.g., visited the Inn), but the NPC could subsequently move to a completely different location while the old activity string persisted. The display code preferred `CurrentActivity` over location-aware text whenever it was set, so stale activity descriptions from previous locations were shown.
 
-`CurrentActivity` is now cleared whenever an NPC moves to a new location, allowing the location-contextual flavor text system to provide appropriate descriptions (e.g., "examining the weapons" at the Weapon Shop, "browsing potions" at the Healer).
+NPC flavor text now always uses the location-contextual system, which generates appropriate descriptions based on where the NPC currently is (e.g., "praying quietly" at the Church, "examining a blade on the wall" at the Weapon Shop). This guarantees the flavor text always matches the NPC's actual location.
 
 ## Bug Fix: NPC Talk Crash for Direct SSH Players
 
@@ -130,15 +130,126 @@ The Crystal Ball could show an NPC at "Church of Good Deeds" but visiting the Ch
 
 Players could receive the same NPC as a faction mission target multiple times from different petition NPCs. For example, getting "Redeem Grog the Destroyer" from one NPC and then the same mission from another. The Faith and Crown faction missions also always picked the same NPC (the first match) instead of randomizing. Faction missions now check your active quests and exclude NPCs you already have missions for, and targets are randomized.
 
+## Bug Fix: Faith "Redeem" Quest Hint Says Kill Instead of Talk
+
+The Faith faction's "Redeem" mission (bring a lost soul back to the light) showed the hint "Find and defeat the target in combat" — telling the player to kill the NPC they're supposed to redeem through conversation. This happened because the quest internally reused the `DefeatNPC` quest target type, and the hint system read that type instead of looking at the actual objectives.
+
+**Fixes:**
+- Quest hint now correctly says "Find the NPC in town and talk to them."
+- Defeating the NPC now also completes the quest as an alternative path (you've "purged their darkness" through combat). Previously, if the player killed the NPC following the bad hint, the quest became permanently stuck since dead NPCs can't be talked to.
+- Quest objective target matching is now case-insensitive, preventing edge-case failures.
+
+## Bug Fix: Wandering Monk Appears After Every Battle
+
+The wandering monk potion seller appeared after every single combat victory as long as the player had room for even one potion. This was extremely repetitive and slowed down dungeon exploration. The monk now has a 25% chance of appearing after combat (matching the original Usurper frequency), so most fights end without interruption. The monk is still always available via the [B] Buy Potions option in the dungeon menu for when you actually want to restock.
+
+## Bug Fix: Potion Healing Inconsistent Between Combat and Town
+
+Healing potions used different formulas depending on where and how they were used:
+- **In-combat item use**: flat 100 HP per potion (regardless of level)
+- **Auto-heal after combat**: MaxHP / 4 per potion (wildly varying)
+- **Teammate/NPC potions**: 30 + level\*3 + random (weaker scaling)
+- **Computer player potions**: flat 25 HP max (nearly useless)
+- **Out of combat / quick heal**: 30 + level\*5 + random(10-30) (the correct formula)
+
+All potion healing now uses the same scaling formula: `30 + level*5 + random(10-30)`. At level 10 this gives ~100 HP per potion, at level 20 ~150 HP, scaling consistently whether used in combat, out of combat, by teammates, or by AI opponents.
+
+## Improvement: Auction House Atmosphere Overhaul
+
+The Auction House display was bare — just a menu with no personality. It now features:
+
+- **Grimjaw the half-orc auctioneer** — a gruff shopkeeper character who reacts to current market activity (empty stalls, a few listings, busy day)
+- **Dynamic atmospheric text** — the hall description changes based on how many items are listed (buzzing crowds vs. empty counters)
+- **Listing summary on the main screen** — player and NPC listing counts with total market value displayed at a glance
+- **Formatted bulletin board** — listings now display in clean columns with item name, price, seller, and age. NPC sellers shown in cyan, player sellers in green.
+- **Styled status screen** — your active listings and market overview are presented with proper headers, separators, and color-coded stats
+
+## Bug Fix: Dormitory Menu Missing Sleep/Attack Options
+
+Pressing [D] Dormitory from Anchor Road showed a simplified placeholder menu with only "Rest and recover", "View stats", and "Leave" — missing the actual Dormitory features: sleep & logout, attack sleeping players, list/examine sleepers, and wake guests. This happened because Anchor Road had its own inline `NavigateToDormitory()` sub-menu that never navigated to the real DormitoryLocation. Anchor Road now properly navigates to the full Dormitory location with all its features. The Dormitory display has also been updated with the standard box header, atmospheric description, and styled menu matching other locations.
+
 ## Bug Fix: Animals and Mindless Creatures "Saying" Dialogue
 
 Non-speaking monsters (wolves, spiders, golems, water creatures, aberrations, elementals) were shown as `The Wolf says: "*Snarls and growls*"` — wrapping their sounds in quotation marks as if they were speech. These creature families now show their actions as narration instead: `The Wolf snarls and growls menacingly.` Speaking creatures (goblins, orcs, demons, dragons, fey, giants, undead, celestials, shadows) still use proper dialogue with `says:` and quotes.
+
+## Anchor Road Challenges Overhaul
+
+The Anchor Road "Challenges" menu has been completely overhauled. Most options were broken — redirecting to other locations already accessible from Main Street, or using fake stat-comparison combat instead of the real combat engine. The entire menu has been stripped down and rebuilt with three real challenges that use proper CombatEngine fights.
+
+### What Was Removed
+
+- **[Q] Quests** — Redirect to Quest Hall (already accessible from Main Street as [2])
+- **[A] Temple** — Redirect to Temple (already accessible as [T])
+- **[K] Castle** — Redirect to Castle (already accessible as [K])
+- **[O] Online War** — Fake PvP that duplicated the Arena with stat-comparison combat instead of real fights
+- **[D] Dormitory** — Moved to Main Street (see below)
+
+### What Was Fixed
+
+**[B] Bounty Board** — Previously redirected to Quest Hall. Now wired to the existing (but orphaned) bounty hunting system. Targets evil NPCs with Darkness > 200, with fallback to level-appropriate NPCs. **Combat now uses the real CombatEngine** (`PlayerVsPlayer`) instead of the old fake stat comparison. Victory awards bounty gold, XP, and increments your player kills.
+
+**[G] Gang War** — Previously used a stat-comparison formula that compared team power numbers with no actual combat. Now runs **sequential 1v1 fights** against enemy team members using CombatEngine. Enemies are sorted weakest-first, your HP carries over between fights (with 15% healing between rounds), and you earn partial rewards even if you lose partway through. Full victory earns gold (sum of enemy levels × 50), XP (sum of enemy levels × 25), and turf control transfer.
+
+### New Feature: [T] The Gauntlet
+
+A 10-wave solo monster endurance challenge. Fight increasingly tough monsters in sequence — your HP and Mana carry over between waves with small restoration between fights.
+
+- **Entry requirements**: Level 5+, 1 Player Fight, entry fee of 100 × your level in gold
+- **Wave difficulty scaling**:
+  - Waves 1-3: Normal monsters (your level -2 to your level)
+  - Waves 4-6: Tougher monsters (your level +2 to +4)
+  - Waves 7-9: Minibosses (your level +8 to +10)
+  - Wave 10: Boss monster (your level +10)
+- **Between waves**: Heal 20% of max HP and restore 15% of max Mana
+- **Per-wave rewards**: 50 × level gold + 25 × wave × level XP
+- **Wave 10 champion bonus**: 500 × level gold + 250 × level XP
+- **Achievement**: "Gauntlet Champion" (250g reward) for surviving all 10 waves
+
+### Dormitory Moved to Main Street
+
+The Dormitory exit has been moved from Anchor Road to Main Street as **[L] Lodging**. The Dormitory is a rest/logout location that doesn't belong thematically in the combat challenges menu. It's now accessible alongside the other town services.
+
+### New Menu Layout
+
+The Anchor Road menu is now organized into three clean sections:
+- **Challenges**: [B] Bounty Board, [G] Gang War, [T] The Gauntlet
+- **Town Control**: [C] Claim Town, [F] Flee Town Control
+- **Other**: [P] Prison Grounds, [S] Status, [R] Return to Town
+
+## Bug Fix: Monk Potion Seller Dismissed by Invalid Input
+
+Accidentally pressing Enter, X, or any key other than the valid options (H/M/N) during the wandering monk encounter would dismiss him without buying anything. The monk now only accepts valid choices — [H]ealing potions, [M]ana potions, or [N]o thanks — and reprompts on invalid input.
+
+## Improvement: Quest Board Cleaned Up
+
+The Quest Hall was showing an excessive number of quests (20+), including many duplicates of the same quest type. Available quests are now deduplicated by name and capped at 10, making the board much easier to read and choose from.
+
+## Balance: Melee Hit Chance Rebalanced
+
+Players could never miss melee attacks against same-level or lower-level monsters. The player's attack modifier scaled so much faster than monster AC that by level ~10, even a natural 1 on the d20 would hit. Spells had a proper fizzle/failure system throughout the game, but melee was a guaranteed hit every time.
+
+**Root cause**: Player STR grows +2-5 per level, and the attack modifier used `(STR-10)/2` (a D&D formula designed for stats capped at 20). A level 20 Warrior with STR 94 had a +42 stat modifier alone — far exceeding any monster AC on the d20. Meanwhile, monster AC was `10 + level/5 + defence/20`, which barely moved (AC 12 at level 10, AC 14 at level 20).
+
+**Changes:**
+- **Player attack modifier** now has diminishing returns: full value up to +6, half rate above that. This compresses the +4 to +45 raw range into +4 to +25 effective range.
+- **Monster AC** scaling increased from `level/5 + defence/20` to `level/3 + defence/15`.
+
+**Expected miss rates against same-level monsters:**
+
+| Level | Old Miss% | New Miss% |
+|-------|-----------|-----------|
+| 1 | 35% | 30% |
+| 10 | 0% | 25% |
+| 20 | 0% | 15% |
+| 50 | 0% | 15% |
+
+Players will still auto-hit monsters 10+ levels below them. Bosses and higher-level monsters are noticeably harder to hit. The Sunforged Blade artifact (attacks cannot miss) is now a meaningful power instead of redundant.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `Scripts/Core/GameConfig.cs` | Version 0.40.3 |
+| `Scripts/Core/GameConfig.cs` | Version 0.40.3; added 9 Gauntlet constants (min level, wave count, entry fee, reward scaling, heal/mana restoration rates); added `MaxAvailableQuestsShown` quest cap constant |
 | `Scripts/Systems/CombatEngine.cs` | Full combat initialization in `PlayerVsPlayer()` (stamina, abilities, cooldowns, temp bonuses); added `ClassAbility`, `Rage`, `RangedAttack`, `Retreat` handlers to `ProcessPlayerVsPlayerAction()`; new `ExecutePvPAbility()` method for abilities against Character targets; `ExecutePvPSpell()` now accepts quickbar-triggered spells directly and handles healing; flee mechanic with AGI-based success chance |
 | `Scripts/Systems/QuestSystem.cs` | Changed `ClearFloor` objective from arbitrary kill count to binary floor-cleared check (`RequiredProgress = 1`); removed per-kill `ClearDungeonFloor` increment from `OnMonsterKilled()`; added `OnDungeonFloorCleared()` method |
 | `Scripts/Locations/DungeonLocation.cs` | Wired `QuestSystem.OnDungeonFloorCleared()` into `SaveFloorState()` when `EverCleared` is first set |
@@ -155,7 +266,7 @@ Non-speaking monsters (wolves, spiders, golems, water creatures, aberrations, el
 | `Scripts/Core/GameEngine.cs` | Per-session daily state (`SessionCurrentDay`, `SessionLastResetTime`, `SessionDailyCycleMode`) to prevent cross-contamination between concurrent MUD sessions |
 | `Scripts/Systems/DailySystemManager.cs` | Sync per-session day state on daily reset |
 | `Scripts/Systems/SaveSystem.cs` | Use per-session day state in online mode instead of shared singleton |
-| `Scripts/Systems/QuestSystem.cs` | Added `MergePlayerQuests()` for per-player quest merge without clearing shared database |
+| `Scripts/Systems/QuestSystem.cs` | Added `MergePlayerQuests()` for per-player quest merge without clearing shared database; `GetAvailableQuests()` now deduplicates by quest name and caps at 10 shown |
 | `Scripts/Core/GameEngine.cs` | Restore dungeon floor states from save data instead of resetting; merge player quests in MUD mode; restore `player.ActiveQuests` from quest database on load |
 | `Scripts/Locations/MagicShopLocation.cs` | Sell check accepts accessory types (`Fingers`, `Neck`, `Waist`) in addition to `Magic` type |
 | `Scripts/Core/GameConfig.cs` | Reduced dormitory attack rate (8% → 2%); added separate inn attack rate (0.5%) |
@@ -165,13 +276,15 @@ Non-speaking monsters (wolves, spiders, golems, water creatures, aberrations, el
 | `Scripts/Core/GameEngine.cs` | Set `IsInGame = true` after character load/creation completes |
 | `Console/Bootstrap/Program.cs` | Handle `--version` / `-v` / `-V` flag: print version and exit immediately |
 | `Scripts/Core/GameConfig.cs` | Renamed `Marketplace` enum to `AuctionHouse` |
-| `Scripts/Locations/BaseLocation.cs` | Fixed Church NPC location string; updated AuctionHouse display names and NPC activity descriptions |
-| `Scripts/Locations/MainStreetLocation.cs` | Menu text `Marketplace` → `Auction House`; removed `Z - Team Area` from screen reader menu |
+| `Scripts/Locations/AnchorRoadLocation.cs` | Major rewrite — stripped dead redirect code (QuestHall, Temple, Castle, Online War, Dormitory), fixed Bounty Hunting with real CombatEngine PvP, rewrote Gang War with sequential 1v1 CombatEngine fights, added The Gauntlet 10-wave endurance challenge, updated menu to 3-section layout |
+| `Scripts/Locations/DormitoryLocation.cs` | New box header, atmospheric description, styled menu with all options visible (sleep/attack/list/examine/wake) |
+| `Scripts/Locations/BaseLocation.cs` | Fixed Church NPC location string; updated AuctionHouse display names; NPC flavor text always uses location-contextual system instead of stale CurrentActivity |
+| `Scripts/Locations/MainStreetLocation.cs` | Menu text `Marketplace` → `Auction House`; removed `Z - Team Area` from screen reader menu; added `[L]odging` to classic and screen reader menus with ProcessChoice handler |
 | `Scripts/Core/GameEngine.cs` | Updated NPC location strings and location lookup aliases for Auction House |
 | `Scripts/Core/NPC.cs` | Merchant default location and guard patrol updated to "Auction House"; added "auctionhouse" lookup alias |
 | `Scripts/Systems/StreetEncounterSystem.cs` | Updated encounter location key to AuctionHouse |
-| `Scripts/Systems\LocationManager.cs` | Updated location registration and navigation table for AuctionHouse |
-| `Scripts/Locations/MarketplaceLocation.cs` | Updated display name and description to "Auction House" |
+| `Scripts/Systems/LocationManager.cs` | Updated location registration and navigation table for AuctionHouse; added Dormitory to MainStreet navigation table |
+| `Scripts/Locations/MarketplaceLocation.cs` | Updated display name and description to "Auction House"; added Grimjaw auctioneer NPC, dynamic atmosphere text, listing summary, formatted bulletin board with columns, styled status screen |
 | `Scripts/Server/WizardCommandSystem.cs` | Added "auction"/"auctionhouse" aliases for teleport command |
 | `Scripts/Systems/WorldSimulator.cs` | Updated NPC location strings, social locations, news messages to "Auction House" |
 | `Scripts/Systems/NPCMaintenanceEngine.cs` | Updated territory location strings |
@@ -183,4 +296,9 @@ Non-speaking monsters (wolves, spiders, golems, water creatures, aberrations, el
 | `Scripts/Systems/OpeningStorySystem.cs` | Updated narrative text |
 | `Scripts/Systems/MarketplaceSystem.cs` | Updated news messages to "Auction House" |
 | `Scripts/Systems/NPCPetitionSystem.cs` | Added duplicate target prevention and randomization for faction missions |
-| `Scripts/Systems/CombatEngine.cs` | Added `V - Attempt to Save` to dungeon combat screen reader menu |
+| `Scripts/Systems/CombatEngine.cs` | Added `V - Attempt to Save` to dungeon combat screen reader menu; monk encounter now 25% chance instead of 100%; monk input validation loop (only accepts H/M/N); unified all potion healing formulas to `30 + level*5 + random(10,30)` across `ExecuteUseItem`, `AutoHealWithPotions`, `TeammateHealWithPotion`, and `ProcessComputerPlayerAction`; monster AC bumped from `level/5 + defence/20` to `level/3 + defence/15` |
+| `Scripts/Locations/QuestHallLocation.cs` | Faith "Redeem" quests now show correct hint ("talk to NPC" instead of "defeat in combat") |
+| `Scripts/Core/Quest.cs` | `UpdateObjectiveProgress` TargetId matching now case-insensitive |
+| `Scripts/Systems/QuestSystem.cs` | Defeating a quest target NPC now also satisfies TalkToNPC objectives (Faith redeem quests completable via combat) |
+| `Scripts/Systems/AchievementSystem.cs` | Added `gauntlet_champion` achievement (Gold tier, 250g reward) for surviving all 10 Gauntlet waves |
+| `Scripts/Systems/TrainingSystem.cs` | Diminishing returns on player attack modifier (full up to +6, half rate above) to prevent auto-hit at high levels |

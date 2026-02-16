@@ -233,7 +233,8 @@ public partial class Quest
         {
             // If both caller and objective specify targetIds, they must match.
             // Empty objective TargetId means "match any target of this type".
-            if (!string.IsNullOrEmpty(targetId) && !string.IsNullOrEmpty(objective.TargetId) && objective.TargetId != targetId) continue;
+            if (!string.IsNullOrEmpty(targetId) && !string.IsNullOrEmpty(objective.TargetId)
+                && !objective.TargetId.Equals(targetId, StringComparison.OrdinalIgnoreCase)) continue;
 
             objective.CurrentProgress += amount;
             if (objective.CurrentProgress >= objective.RequiredProgress)

@@ -7,10 +7,8 @@ using System.Linq;
 using System.Threading.Tasks;
 
 /// <summary>
-/// Anchor Road Location - Complete implementation based on Pascal CHALLENG.PAS
-/// Central challenge hub providing access to various adventure activities including tournaments, gang wars,
-/// bounty hunting, quests, and gym competitions
-/// Direct Pascal compatibility with exact function preservation
+/// Anchor Road Location - Challenge hub with bounty hunting, gang wars, the gauntlet,
+/// town control, and prison grounds.
 /// </summary>
 public class AnchorRoadLocation : BaseLocation
 {
@@ -24,22 +22,17 @@ public class AnchorRoadLocation : BaseLocation
     {
         PossibleExits = new List<GameLocation>
         {
-            GameLocation.MainStreet,
-            GameLocation.Castle
+            GameLocation.MainStreet
         };
 
         LocationActions = new List<string>
         {
-            "Dormitory",
             "Bounty Hunting",
-            "Quests",
             "Gang War",
-            "Online War",
-            "Altar of the Gods",
+            "The Gauntlet",
             "Claim Town",
             "Flee Town Control",
             "Status",
-            "Kings Castle",
             "Prison Grounds"
         };
     }
@@ -48,7 +41,7 @@ public class AnchorRoadLocation : BaseLocation
     {
         terminal.ClearScreen();
 
-        // Header with proper coloring
+        // Header
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
         terminal.WriteLine("║                    ANCHOR ROAD - Conjunction of Destinies                  ║");
@@ -57,39 +50,34 @@ public class AnchorRoadLocation : BaseLocation
 
         // Atmospheric description
         terminal.SetColor("white");
-        terminal.WriteLine("To the north you can see the Castle in all its might.");
-        terminal.WriteLine("The Dormitory lies to the west.");
-        terminal.WriteLine("The Red Fields are to the east.");
+        terminal.WriteLine("The Red Fields stretch east, where warriors test their mettle.");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine("It's time to be brave.");
+        terminal.WriteLine("Blood and glory await those brave enough to enter.");
         terminal.WriteLine("");
+
+        // Show NPCs in location
+        ShowNPCsInLocation();
 
         // Show current status
         ShowChallengeStatus();
         terminal.WriteLine("");
 
-        // Menu options with proper coloring
+        // Menu - Challenges
         terminal.SetColor("cyan");
         terminal.WriteLine("Challenges:");
-        terminal.SetColor("white");
-        WriteMenuRow("D", "Dormitory", "B", "Bounty Board", "Q", "Quest Hall");
-        WriteMenuRow("G", "Gang War", "O", "Online War", "A", "Altar of the Gods");
+        WriteMenuRow("B", "Bounty Board", "G", "Gang War", "T", "The Gauntlet");
         terminal.WriteLine("");
 
+        // Menu - Town Control
         terminal.SetColor("cyan");
         terminal.WriteLine("Town Control:");
-        terminal.SetColor("white");
         WriteMenuRow("C", "Claim Town", "F", "Flee Town Control", "", "");
         terminal.WriteLine("");
 
+        // Menu - Other
         terminal.SetColor("cyan");
-        terminal.WriteLine("Navigation:");
-        terminal.SetColor("white");
-        WriteMenuRow("S", "Status", "K", "Kings Castle", "", "");
-        terminal.SetColor("white");
-        WriteMenuOption("P", "Prison Grounds (attempt a jailbreak)");
-        terminal.WriteLine("");
-        WriteMenuOption("R", "Return to town");
+        terminal.WriteLine("Other:");
+        WriteMenuRow("P", "Prison Grounds", "S", "Status", "R", "Return to Town");
         terminal.WriteLine("");
     }
 
@@ -223,31 +211,17 @@ public class AnchorRoadLocation : BaseLocation
 
         switch (ch)
         {
-            case 'D':
-                await NavigateToDormitory();
-                return false;
-
             case 'B':
-                // Redirect to Quest Hall for bounty board
-                await NavigateToLocation(GameLocation.QuestHall);
-                return true;
-
-            case 'Q':
-                // Redirect to Quest Hall for proper quest management
-                await NavigateToLocation(GameLocation.QuestHall);
-                return true;
+                await StartBountyHunting();
+                return false;
 
             case 'G':
                 await StartGangWar();
                 return false;
 
-            case 'O':
-                await StartOnlineWar();
+            case 'T':
+                await StartGauntlet();
                 return false;
-
-            case 'A':
-                await NavigateToLocation(GameLocation.Temple);
-                return true;
 
             case 'C':
                 await ClaimTown();
@@ -260,10 +234,6 @@ public class AnchorRoadLocation : BaseLocation
             case 'S':
                 await ShowStatus();
                 return false;
-
-            case 'K':
-                await NavigateToLocation(GameLocation.Castle);
-                return true;
 
             case 'P':
                 await NavigateToPrisonGrounds();
@@ -287,63 +257,7 @@ public class AnchorRoadLocation : BaseLocation
     #region Challenge Implementations
 
     /// <summary>
-    /// Navigate to dormitory (character rest/management area)
-    /// </summary>
-    private async Task NavigateToDormitory()
-    {
-        terminal.ClearScreen();
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                              THE DORMITORY                                  ║");
-        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
-        terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("A quiet place where adventurers rest between battles.");
-        terminal.WriteLine("You find a comfortable bed and consider your options...");
-        terminal.WriteLine("");
-
-        terminal.SetColor("cyan");
-        terminal.WriteLine("Would you like to:");
-        terminal.SetColor("white");
-        WriteMenuOption("R", "Rest and recover (costs 1 turn)");
-        WriteMenuOption("V", "View your stats");
-        WriteMenuOption("L", "Leave");
-        terminal.WriteLine("");
-
-        terminal.SetColor("cyan");
-        terminal.Write("Choice: ");
-        terminal.SetColor("white");
-        string input = await terminal.ReadLineAsync();
-
-        if (!string.IsNullOrEmpty(input))
-        {
-            char dormChoice = char.ToUpperInvariant(input[0]);
-            switch (dormChoice)
-            {
-                case 'R':
-                    // Rest to recover HP
-                    long healAmount = currentPlayer.MaxHP / 4;
-                    currentPlayer.HP = Math.Min(currentPlayer.HP + healAmount, currentPlayer.MaxHP);
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine($"You rest peacefully and recover {healAmount} HP.");
-                    terminal.WriteLine($"HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
-                    break;
-
-                case 'V':
-                    await ShowStatus();
-                    break;
-            }
-        }
-
-        terminal.SetColor("darkgray");
-        terminal.WriteLine("");
-        terminal.WriteLine("Press Enter to continue...");
-        await terminal.ReadKeyAsync();
-    }
-
-    /// <summary>
-    /// Start bounty hunting - hunt for criminals/NPCs with bounties
+    /// Bounty hunting - hunt for criminal NPCs using real combat
     /// </summary>
     private async Task StartBountyHunting()
     {
@@ -368,21 +282,22 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.SetColor("white");
         terminal.WriteLine("You scan the bounty board for wanted criminals...");
+        terminal.WriteLine($"Player Fights Remaining: {currentPlayer.PFights}");
         terminal.WriteLine("");
 
         // Get NPCs with high darkness (evil NPCs) as bounty targets
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
         var bountyTargets = allNPCs
-            .Where(n => n.IsAlive && n.Darkness > 200)
+            .Where(n => n.IsAlive && !n.IsDead && n.Darkness > 200)
             .OrderByDescending(n => n.Darkness * 10)
             .Take(5)
             .ToList();
 
         if (bountyTargets.Count == 0)
         {
-            // Generate some random bounty targets
+            // Fallback to random level-appropriate NPCs
             bountyTargets = allNPCs
-                .Where(n => n.IsAlive && n.Level <= currentPlayer.Level + 5)
+                .Where(n => n.IsAlive && !n.IsDead && n.Level <= currentPlayer.Level + 5)
                 .OrderBy(_ => random.Next())
                 .Take(3)
                 .ToList();
@@ -411,7 +326,6 @@ public class AnchorRoadLocation : BaseLocation
         for (int i = 0; i < bountyTargets.Count; i++)
         {
             var target = bountyTargets[i];
-            // Calculate bounty based on level and darkness (evil) rating
             long bounty = target.Level * 100 + (long)target.Darkness;
             string crime = target.Darkness > 500 ? "Murder" :
                           target.Darkness > 200 ? "Assault" : "Troublemaker";
@@ -436,12 +350,12 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine($"You track down {target.DisplayName}...");
             await Task.Delay(1000);
 
-            // Simple combat simulation
-            bool playerWon = SimulateBountyHuntCombat(currentPlayer, target);
+            // Real combat using CombatEngine
+            var combatEngine = new CombatEngine(terminal);
+            var result = await combatEngine.PlayerVsPlayer(currentPlayer, target);
 
-            if (playerWon)
+            if (result.Outcome == CombatOutcome.Victory)
             {
-                // Calculate bounty based on level and darkness (evil) rating
                 long bounty = target.Level * 100 + (long)target.Darkness;
                 long expGain = target.Level * 50;
 
@@ -450,26 +364,27 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.WriteLine("═══════════════════════════════════════");
                 terminal.WriteLine("           BOUNTY COLLECTED!");
                 terminal.WriteLine("═══════════════════════════════════════");
-                terminal.WriteLine($"You defeated {target.DisplayName}!");
                 terminal.WriteLine($"Bounty Reward: {bounty:N0} gold");
                 terminal.WriteLine($"Experience: {expGain:N0}");
 
                 currentPlayer.Gold += bounty;
                 currentPlayer.Experience += expGain;
-                target.HP = 0; // Target is dead
+                currentPlayer.PKills++;
+                target.HP = 0;
 
-                // News
                 NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} collected the bounty on {target.DisplayName}!");
+            }
+            else if (result.Outcome == CombatOutcome.PlayerEscaped)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("");
+                terminal.WriteLine("You fled the fight. The bounty remains uncollected.");
             }
             else
             {
-                long hpLost = currentPlayer.MaxHP / 4;
-                currentPlayer.HP = Math.Max(1, currentPlayer.HP - hpLost);
-
                 terminal.SetColor("red");
                 terminal.WriteLine("");
-                terminal.WriteLine($"{target.DisplayName} escaped!");
-                terminal.WriteLine($"You lost {hpLost} HP in the fight.");
+                terminal.WriteLine($"{target.DisplayName} bested you! The bounty remains uncollected.");
             }
         }
 
@@ -480,120 +395,7 @@ public class AnchorRoadLocation : BaseLocation
     }
 
     /// <summary>
-    /// Simple bounty hunt combat simulation
-    /// </summary>
-    private bool SimulateBountyHuntCombat(Character hunter, NPC target)
-    {
-        long hunterPower = hunter.Strength + hunter.WeapPow + hunter.Level * 5;
-        long targetPower = target.Strength + target.WeapPow + target.Level * 5;
-
-        // Add randomness
-        hunterPower += random.Next(-20, 21);
-        targetPower += random.Next(-20, 21);
-
-        return hunterPower > targetPower;
-    }
-
-    /// <summary>
-    /// Start quests - view and accept available quests
-    /// </summary>
-    private async Task StartQuests()
-    {
-        terminal.ClearScreen();
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                               ROYAL QUESTS                                  ║");
-        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
-        terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("The royal quest board displays available missions...");
-        terminal.WriteLine("");
-
-        // Get available quests
-        var availableQuests = QuestSystem.GetAvailableQuests(currentPlayer);
-
-        if (availableQuests.Count == 0)
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("No quests are currently available.");
-            terminal.WriteLine("Check back later or visit the King's Castle.");
-            terminal.WriteLine("");
-
-            // Show player's active quests
-            var playerQuests = QuestSystem.GetPlayerQuests(currentPlayer.Name2);
-            if (playerQuests.Count > 0)
-            {
-                terminal.SetColor("cyan");
-                terminal.WriteLine("Your Active Quests:");
-                terminal.SetColor("darkgray");
-                terminal.WriteLine(new string('─', 50));
-
-                foreach (var quest in playerQuests)
-                {
-                    terminal.SetColor("white");
-                    terminal.WriteLine($"  - {quest.Title ?? quest.GetTargetDescription()}");
-                    terminal.SetColor("darkgray");
-                    terminal.WriteLine($"    Days remaining: {quest.DaysToComplete - quest.OccupiedDays}");
-                }
-            }
-        }
-        else
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine("Available Quests:");
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(new string('─', 60));
-            terminal.SetColor("white");
-            terminal.WriteLine($"{"#",-3} {"Quest",-30} {"Difficulty",-12} {"Reward",-10}");
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(new string('─', 60));
-
-            for (int i = 0; i < Math.Min(availableQuests.Count, 5); i++)
-            {
-                var quest = availableQuests[i];
-                string difficulty = quest.GetDifficultyString();
-                string rewardType = quest.RewardType.ToString();
-
-                terminal.SetColor("white");
-                terminal.WriteLine($"{i + 1,-3} {quest.GetTargetDescription(),-30} {difficulty,-12} {rewardType,-10}");
-            }
-
-            terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.Write("Accept which quest? (0 to cancel): ");
-            terminal.SetColor("white");
-            string input = await terminal.ReadLineAsync();
-
-            if (int.TryParse(input, out int choice) && choice >= 1 && choice <= availableQuests.Count)
-            {
-                var selectedQuest = availableQuests[choice - 1];
-                var playerObj = currentPlayer as Player ?? new Player { Name2 = currentPlayer.Name2, Level = currentPlayer.Level };
-                var result = QuestSystem.ClaimQuest(playerObj, selectedQuest);
-
-                if (result == QuestClaimResult.CanClaim)
-                {
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine("");
-                    terminal.WriteLine($"Quest accepted: {selectedQuest.GetTargetDescription()}");
-                    terminal.WriteLine($"You have {selectedQuest.DaysToComplete} days to complete it.");
-                }
-                else
-                {
-                    terminal.SetColor("red");
-                    terminal.WriteLine($"Could not accept quest: {result}");
-                }
-            }
-        }
-
-        terminal.WriteLine("");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine("Press Enter to continue...");
-        await terminal.ReadKeyAsync();
-    }
-
-    /// <summary>
-    /// Start gang war - team vs team combat
+    /// Gang war - sequential 1v1 fights against rival team members using real combat
     /// </summary>
     private async Task StartGangWar()
     {
@@ -630,7 +432,7 @@ public class AnchorRoadLocation : BaseLocation
         // Get all active teams
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
         var teams = allNPCs
-            .Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive && n.Team != currentPlayer.Team)
+            .Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive && !n.IsDead && n.Team != currentPlayer.Team)
             .GroupBy(n => n.Team)
             .Select(g => new
             {
@@ -694,54 +496,81 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
             terminal.WriteLine($"Your team challenges {targetTeam.TeamName}!");
+            terminal.WriteLine($"You must defeat their members one by one!");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Task.Delay(1500);
 
-            // Get team members for battle
+            // Get player's NPC team members for turf transfer
             var playerTeamMembers = allNPCs
                 .Where(n => n.Team == currentPlayer.Team && n.IsAlive)
                 .ToList();
 
+            // Get enemy team members sorted by level (weakest first)
             var enemyTeamMembers = allNPCs
-                .Where(n => n.Team == targetTeam.TeamName && n.IsAlive)
+                .Where(n => n.Team == targetTeam.TeamName && n.IsAlive && !n.IsDead)
+                .OrderBy(n => n.Level)
                 .ToList();
 
-            // Calculate team powers
-            long playerTeamPower = (long)currentPlayer.Strength + currentPlayer.WeapPow + currentPlayer.Level * 10;
-            playerTeamPower += playerTeamMembers.Sum(m => m.Level + (int)m.Strength + (int)m.Defence);
+            bool playerWon = true;
+            int enemiesDefeated = 0;
+            long totalGoldReward = 0;
+            long totalXPReward = 0;
 
-            long enemyTeamPower = enemyTeamMembers.Sum(m => m.Level + (int)m.Strength + (int)m.Defence);
+            for (int f = 0; f < enemyTeamMembers.Count; f++)
+            {
+                var enemy = enemyTeamMembers[f];
 
-            // Add randomness
-            playerTeamPower += random.Next(-50, 51);
-            enemyTeamPower += random.Next(-50, 51);
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"═══ FIGHT {f + 1}/{enemyTeamMembers.Count} ═══");
+                terminal.SetColor("white");
+                terminal.WriteLine($"You face {enemy.DisplayName} (Level {enemy.Level} {enemy.Class})!");
+                terminal.WriteLine("");
+                await Task.Delay(1000);
 
-            bool playerWon = playerTeamPower > enemyTeamPower;
+                var combatEngine = new CombatEngine(terminal);
+                var result = await combatEngine.PlayerVsPlayer(currentPlayer, enemy);
 
-            // Display battle
-            terminal.SetColor("white");
-            terminal.WriteLine("The battle rages...");
-            await Task.Delay(500);
-            terminal.WriteLine($"Your team power: {playerTeamPower}");
-            terminal.WriteLine($"Enemy team power: {enemyTeamPower}");
-            await Task.Delay(1000);
+                if (result.Outcome == CombatOutcome.Victory)
+                {
+                    enemiesDefeated++;
+                    totalGoldReward += enemy.Level * 50;
+                    totalXPReward += enemy.Level * 25;
+
+                    if (f < enemyTeamMembers.Count - 1)
+                    {
+                        // Heal between fights
+                        long healAmount = currentPlayer.MaxHP / 7;
+                        currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
+
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"You catch your breath and recover {healAmount} HP.");
+                        terminal.WriteLine($"HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
+                        terminal.WriteLine("");
+                        await Task.Delay(1000);
+                    }
+                }
+                else
+                {
+                    // Player lost or fled — gang war over
+                    playerWon = false;
+                    break;
+                }
+            }
+
+            terminal.WriteLine("");
 
             if (playerWon)
             {
-                long goldGain = targetTeam.TotalPower * 10;
-                long expGain = targetTeam.TotalPower * 5;
-
-                terminal.WriteLine("");
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("═══════════════════════════════════════");
-                terminal.WriteLine("              VICTORY!");
+                terminal.WriteLine("        GANG WAR VICTORY!");
                 terminal.WriteLine("═══════════════════════════════════════");
-                terminal.WriteLine($"Your team defeated {targetTeam.TeamName}!");
-                terminal.WriteLine($"Gold Plundered: {goldGain:N0}");
-                terminal.WriteLine($"Experience: {expGain:N0}");
+                terminal.WriteLine($"You defeated all {enemiesDefeated} members of {targetTeam.TeamName}!");
+                terminal.WriteLine($"Gold Plundered: {totalGoldReward:N0}");
+                terminal.WriteLine($"Experience: {totalXPReward:N0}");
 
-                currentPlayer.Gold += goldGain;
-                currentPlayer.Experience += expGain;
+                currentPlayer.Gold += totalGoldReward;
+                currentPlayer.Experience += totalXPReward;
 
                 // Handle turf transfer
                 if (targetTeam.ControlsTurf)
@@ -750,7 +579,6 @@ public class AnchorRoadLocation : BaseLocation
                     terminal.WriteLine("");
                     terminal.WriteLine("* YOUR TEAM NOW CONTROLS THE TOWN! *");
 
-                    // Transfer turf control
                     foreach (var enemy in enemyTeamMembers)
                     {
                         enemy.CTurf = false;
@@ -766,16 +594,22 @@ public class AnchorRoadLocation : BaseLocation
             }
             else
             {
-                long hpLost = currentPlayer.MaxHP / 3;
-                currentPlayer.HP = Math.Max(1, currentPlayer.HP - hpLost);
-
-                terminal.WriteLine("");
                 terminal.SetColor("red");
                 terminal.WriteLine("═══════════════════════════════════════");
-                terminal.WriteLine("              DEFEAT!");
+                terminal.WriteLine("        GANG WAR DEFEAT!");
                 terminal.WriteLine("═══════════════════════════════════════");
-                terminal.WriteLine($"Your team was defeated by {targetTeam.TeamName}!");
-                terminal.WriteLine($"You lost {hpLost} HP.");
+                terminal.WriteLine($"You were defeated after taking down {enemiesDefeated} opponent{(enemiesDefeated != 1 ? "s" : "")}.");
+
+                if (enemiesDefeated > 0)
+                {
+                    // Give partial rewards for enemies defeated before losing
+                    long partialGold = totalGoldReward / 2;
+                    long partialXP = totalXPReward / 2;
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"Partial Rewards: {partialGold:N0} gold, {partialXP:N0} XP");
+                    currentPlayer.Gold += partialGold;
+                    currentPlayer.Experience += partialXP;
+                }
 
                 NewsSystem.Instance.Newsy(true, $"Gang War! {targetTeam.TeamName} repelled {currentPlayer.Team}!");
             }
@@ -788,16 +622,33 @@ public class AnchorRoadLocation : BaseLocation
     }
 
     /// <summary>
-    /// Start online war - PvP combat against other players/NPCs
+    /// The Gauntlet - solo 10-wave endurance challenge against increasingly tough monsters
     /// </summary>
-    private async Task StartOnlineWar()
+    private async Task StartGauntlet()
     {
         terminal.ClearScreen();
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                               ONLINE WAR                                    ║");
+        terminal.WriteLine("║                             THE GAUNTLET                                    ║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("Face 10 waves of increasingly dangerous monsters.");
+        terminal.WriteLine("Your health and mana carry over between waves.");
+        terminal.WriteLine("Survive all 10 to earn the title of Gauntlet Champion!");
+        terminal.WriteLine("");
+
+        if (currentPlayer.Level < GameConfig.GauntletMinLevel)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"You must be at least level {GameConfig.GauntletMinLevel} to enter The Gauntlet.");
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("Press Enter to continue...");
+            await terminal.ReadKeyAsync();
+            return;
+        }
 
         if (currentPlayer.PFights <= 0)
         {
@@ -810,25 +661,32 @@ public class AnchorRoadLocation : BaseLocation
             return;
         }
 
+        long entryFee = GameConfig.GauntletEntryFeePerLevel * currentPlayer.Level;
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("Gauntlet Details:");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("─────────────────────────────────────────");
         terminal.SetColor("white");
-        terminal.WriteLine("You seek worthy opponents for combat...");
-        terminal.WriteLine($"Player Fights Remaining: {currentPlayer.PFights}");
+        terminal.Write("Entry Fee: ");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"{entryFee:N0} gold");
+        terminal.SetColor("white");
+        terminal.Write("Your Gold: ");
+        terminal.SetColor(currentPlayer.Gold >= entryFee ? "bright_green" : "red");
+        terminal.WriteLine($"{currentPlayer.Gold:N0}");
+        terminal.SetColor("white");
+        terminal.Write("Your HP: ");
+        terminal.SetColor(currentPlayer.HP > currentPlayer.MaxHP / 2 ? "bright_green" : "red");
+        terminal.WriteLine($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("─────────────────────────────────────────");
         terminal.WriteLine("");
 
-        // Get potential opponents (NPCs around player's level)
-        var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
-        var opponents = allNPCs
-            .Where(n => n.IsAlive &&
-                   n.Level >= currentPlayer.Level - 5 &&
-                   n.Level <= currentPlayer.Level + 10)
-            .OrderBy(n => Math.Abs(n.Level - currentPlayer.Level))
-            .Take(8)
-            .ToList();
-
-        if (opponents.Count == 0)
+        if (currentPlayer.Gold < entryFee)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("No worthy opponents found at this time.");
+            terminal.SetColor("red");
+            terminal.WriteLine($"You need {entryFee:N0} gold to enter. You only have {currentPlayer.Gold:N0}.");
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.WriteLine("Press Enter to continue...");
@@ -837,148 +695,180 @@ public class AnchorRoadLocation : BaseLocation
         }
 
         terminal.SetColor("cyan");
-        terminal.WriteLine("Available Opponents:");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine(new string('─', 65));
+        terminal.Write($"Enter The Gauntlet for {entryFee:N0} gold? (Y/N): ");
         terminal.SetColor("white");
-        terminal.WriteLine($"{"#",-3} {"Name",-20} {"Class",-12} {"Level",-6} {"Team",-15}");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine(new string('─', 65));
+        string response = await terminal.ReadLineAsync();
 
-        for (int i = 0; i < opponents.Count; i++)
+        if (response?.ToUpper().StartsWith("Y") != true)
         {
-            var opp = opponents[i];
-            string team = string.IsNullOrEmpty(opp.Team) ? "-" : opp.Team;
-            if (team.Length > 14) team = team.Substring(0, 14);
-
             terminal.SetColor("white");
-            terminal.WriteLine($"{i + 1,-3} {opp.DisplayName,-20} {opp.Class,-12} {opp.Level,-6} {team,-15}");
+            terminal.WriteLine("You decide to come back another time.");
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("Press Enter to continue...");
+            await terminal.ReadKeyAsync();
+            return;
         }
+
+        // Deduct entry fee and fight
+        currentPlayer.Gold -= entryFee;
+        currentPlayer.PFights--;
 
         terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write("Challenge which opponent? (0 to cancel): ");
-        terminal.SetColor("white");
-        string input = await terminal.ReadLineAsync();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("The iron gates slam shut behind you.");
+        terminal.WriteLine("The crowd roars as you enter the arena...");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
 
-        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= opponents.Count)
+        int wavesCompleted = 0;
+        long totalGoldEarned = 0;
+        long totalXPEarned = 0;
+
+        for (int wave = 1; wave <= GameConfig.GauntletWaveCount; wave++)
         {
-            var opponent = opponents[choice - 1];
-            currentPlayer.PFights--;
+            // Determine monster level and type
+            int monsterLevel;
+            bool isBoss = false;
+            bool isMiniBoss = false;
 
-            terminal.WriteLine("");
-            terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"You challenge {opponent.DisplayName} to combat!");
+            if (wave <= 3)
+            {
+                monsterLevel = Math.Max(1, currentPlayer.Level - 3 + wave);
+            }
+            else if (wave <= 6)
+            {
+                monsterLevel = currentPlayer.Level + wave - 2;
+            }
+            else if (wave <= 9)
+            {
+                monsterLevel = currentPlayer.Level + wave;
+                isMiniBoss = true;
+            }
+            else
+            {
+                monsterLevel = currentPlayer.Level + 10;
+                isBoss = true;
+            }
+
+            monsterLevel = Math.Max(1, Math.Min(100, monsterLevel));
+
+            var monster = MonsterGenerator.GenerateMonster(monsterLevel, isBoss, isMiniBoss, random);
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"═══════════════════ WAVE {wave}/{GameConfig.GauntletWaveCount} ═══════════════════");
             terminal.WriteLine("");
 
-            // Combat simulation
-            await SimulatePvPCombat(currentPlayer, opponent);
+            terminal.SetColor("white");
+            terminal.Write("Opponent: ");
+            if (isBoss)
+                terminal.SetColor("bright_red");
+            else if (isMiniBoss)
+                terminal.SetColor("bright_magenta");
+            else
+                terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"{monster.Name} (Level {monster.Level})");
+
+            terminal.SetColor("white");
+            terminal.Write("Your HP: ");
+            terminal.SetColor(currentPlayer.HP > currentPlayer.MaxHP / 2 ? "bright_green" : "red");
+            terminal.WriteLine($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
+            terminal.WriteLine("");
+            await Task.Delay(1000);
+
+            // Real combat
+            var combatEngine = new CombatEngine(terminal);
+            var result = await combatEngine.PlayerVsMonster(currentPlayer, monster, null, false);
+
+            if (result.Outcome == CombatOutcome.Victory)
+            {
+                wavesCompleted++;
+
+                // Wave rewards
+                long waveGold = GameConfig.GauntletGoldPerWavePerLevel * currentPlayer.Level;
+                long waveXP = GameConfig.GauntletXPPerWave * wave * currentPlayer.Level;
+                totalGoldEarned += waveGold;
+                totalXPEarned += waveXP;
+                currentPlayer.Gold += waveGold;
+                currentPlayer.Experience += waveXP;
+
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"Wave {wave} complete! +{waveGold:N0} gold, +{waveXP:N0} XP");
+
+                // Wave 10 champion bonus
+                if (wave == GameConfig.GauntletWaveCount)
+                {
+                    long championGold = GameConfig.GauntletChampionGoldPerLevel * currentPlayer.Level;
+                    long championXP = GameConfig.GauntletChampionXPPerLevel * currentPlayer.Level;
+                    totalGoldEarned += championGold;
+                    totalXPEarned += championXP;
+                    currentPlayer.Gold += championGold;
+                    currentPlayer.Experience += championXP;
+
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("═══════════════════════════════════════");
+                    terminal.WriteLine("        GAUNTLET CHAMPION!");
+                    terminal.WriteLine("═══════════════════════════════════════");
+                    terminal.WriteLine($"Champion Bonus: +{championGold:N0} gold, +{championXP:N0} XP!");
+
+                    AchievementSystem.TryUnlock(currentPlayer, "gauntlet_champion");
+                    NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} conquered The Gauntlet!");
+                }
+                else
+                {
+                    // Heal between waves
+                    long healAmount = (long)(currentPlayer.MaxHP * GameConfig.GauntletHealBetweenWaves);
+                    long manaRestore = (long)(currentPlayer.MaxMana * GameConfig.GauntletManaRestoreBetweenWaves);
+                    currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
+                    currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + manaRestore);
+
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"You catch your breath... +{healAmount} HP, +{manaRestore} Mana");
+                    terminal.WriteLine($"HP: {currentPlayer.HP}/{currentPlayer.MaxHP}  Mana: {currentPlayer.Mana}/{currentPlayer.MaxMana}");
+                    terminal.WriteLine("");
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine("Press Enter for next wave...");
+                    await terminal.ReadKeyAsync();
+                }
+            }
+            else
+            {
+                // Player died or fled — gauntlet over
+                terminal.SetColor("red");
+                terminal.WriteLine("");
+                if (result.Outcome == CombatOutcome.PlayerEscaped)
+                    terminal.WriteLine("You flee the arena in disgrace!");
+                else
+                    terminal.WriteLine("You collapse in the arena...");
+                break;
+            }
         }
+
+        // Final summary
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════════════════════");
+        terminal.WriteLine("         GAUNTLET SUMMARY");
+        terminal.WriteLine("═══════════════════════════════════════");
+        terminal.SetColor("white");
+        terminal.Write("Waves Survived: ");
+        if (wavesCompleted >= GameConfig.GauntletWaveCount)
+            terminal.SetColor("bright_yellow");
+        else if (wavesCompleted >= 5)
+            terminal.SetColor("bright_green");
+        else
+            terminal.SetColor("yellow");
+        terminal.WriteLine($"{wavesCompleted}/{GameConfig.GauntletWaveCount}");
+        terminal.SetColor("white");
+        terminal.WriteLine($"Gold Earned: {totalGoldEarned:N0}");
+        terminal.WriteLine($"XP Earned: {totalXPEarned:N0}");
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
         terminal.WriteLine("Press Enter to continue...");
         await terminal.ReadKeyAsync();
-    }
-
-    /// <summary>
-    /// Simulate PvP combat with display
-    /// </summary>
-    private async Task SimulatePvPCombat(Character player, NPC opponent)
-    {
-        long playerHP = player.HP;
-        long opponentHP = opponent.HP;
-        int round = 0;
-
-        terminal.SetColor("white");
-        terminal.WriteLine($"Your HP: {playerHP}/{player.MaxHP}");
-        terminal.WriteLine($"{opponent.DisplayName}'s HP: {opponentHP}/{opponent.MaxHP}");
-        terminal.WriteLine("");
-
-        while (playerHP > 0 && opponentHP > 0 && round < 10)
-        {
-            round++;
-            terminal.SetColor("darkgray");
-            terminal.WriteLine($"--- Round {round} ---");
-
-            // Player attacks
-            long playerDamage = Math.Max(1, player.Strength + player.WeapPow - opponent.Defence);
-            playerDamage += random.Next(1, (int)Math.Max(2, player.WeapPow / 3));
-            opponentHP -= playerDamage;
-
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"You deal {playerDamage} damage!");
-
-            if (opponentHP <= 0)
-            {
-                opponentHP = 0;
-                break;
-            }
-
-            // Opponent attacks
-            long oppDamage = Math.Max(1, opponent.Strength + opponent.WeapPow - player.Defence - player.ArmPow);
-            oppDamage += random.Next(1, (int)Math.Max(2, opponent.WeapPow / 3));
-            playerHP -= oppDamage;
-
-            terminal.SetColor("red");
-            terminal.WriteLine($"{opponent.DisplayName} deals {oppDamage} damage!");
-
-            terminal.SetColor("white");
-            terminal.WriteLine($"HP: You {Math.Max(0, playerHP)} | {opponent.DisplayName} {Math.Max(0, opponentHP)}");
-
-            await Task.Delay(300);
-        }
-
-        terminal.WriteLine("");
-
-        if (opponentHP <= 0)
-        {
-            // Player won
-            long expGain = opponent.Level * 100;
-            long goldGain = opponent.Gold / 4;
-
-            player.HP = playerHP;
-            opponent.HP = 0;
-
-            terminal.SetColor("bright_green");
-            terminal.WriteLine("═══════════════════════════════════════");
-            terminal.WriteLine("              VICTORY!");
-            terminal.WriteLine("═══════════════════════════════════════");
-            terminal.WriteLine($"You defeated {opponent.DisplayName}!");
-            terminal.WriteLine($"Experience: {expGain:N0}");
-            terminal.WriteLine($"Gold Looted: {goldGain:N0}");
-
-            player.Experience += expGain;
-            player.Gold += goldGain;
-            player.PKills++;
-
-            NewsSystem.Instance.Newsy(true, $"{player.DisplayName} defeated {opponent.DisplayName} in combat!");
-        }
-        else if (playerHP <= 0)
-        {
-            // Player lost
-            player.HP = 1; // Don't actually kill player
-
-            terminal.SetColor("red");
-            terminal.WriteLine("═══════════════════════════════════════");
-            terminal.WriteLine("              DEFEAT!");
-            terminal.WriteLine("═══════════════════════════════════════");
-            terminal.WriteLine($"You were defeated by {opponent.DisplayName}!");
-            terminal.WriteLine("You barely escaped with your life...");
-
-            NewsSystem.Instance.Newsy(true, $"{opponent.DisplayName} defeated {player.DisplayName} in combat!");
-        }
-        else
-        {
-            // Draw
-            player.HP = playerHP;
-
-            terminal.SetColor("yellow");
-            terminal.WriteLine("═══════════════════════════════════════");
-            terminal.WriteLine("                DRAW!");
-            terminal.WriteLine("═══════════════════════════════════════");
-            terminal.WriteLine("Neither combatant could claim victory.");
-        }
     }
 
     /// <summary>
@@ -1027,9 +917,9 @@ public class AnchorRoadLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.Write("Claim the town for your team? (Y/N): ");
             terminal.SetColor("white");
-            string response = await terminal.ReadLineAsync();
+            string claimResponse = await terminal.ReadLineAsync();
 
-            if (response?.ToUpper().StartsWith("Y") == true)
+            if (claimResponse?.ToUpper().StartsWith("Y") == true)
             {
                 currentPlayer.CTurf = true;
                 currentPlayer.TeamRec = 0;

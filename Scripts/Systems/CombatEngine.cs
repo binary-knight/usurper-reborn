@@ -1443,7 +1443,7 @@ public partial class CombatEngine
     {
         // === D20 ROLL SYSTEM FOR HIT DETERMINATION ===
         // Calculate monster AC based on level and defense
-        int monsterAC = 10 + (target.Level / 5) + (int)(target.Defence / 20);
+        int monsterAC = 10 + (target.Level / 3) + (int)(target.Defence / 15);
 
         // Apply modifiers that affect hit chance
         if (attacker.IsRaging)
@@ -2963,6 +2963,12 @@ public partial class CombatEngine
             return;
         }
 
+        // Monk only appears ~25% of the time (like original Usurper PLVSMON.PAS)
+        if (random.Next(100) >= 25)
+        {
+            return;
+        }
+
         terminal.WriteLine("");
         terminal.WriteLine("A wandering monk approaches you...", "cyan");
 
@@ -2995,18 +3001,27 @@ public partial class CombatEngine
         terminal.WriteLine($"Your gold: {player.Gold:N0}", "yellow");
         terminal.WriteLine("");
 
-        terminal.Write("Choice: ");
-        var response = await terminal.GetInput("");
-        var choice = response.Trim().ToUpper();
+        string choice;
+        while (true)
+        {
+            terminal.Write("Choice: ");
+            var response = await terminal.GetInput("");
+            choice = response.Trim().ToUpper();
 
-        if (choice == "H" && canBuyHealing)
+            if (choice == "N" || (choice == "H" && canBuyHealing) || (choice == "M" && canBuyMana))
+                break;
+
+            terminal.WriteLine("Please choose a valid option.", "gray");
+        }
+
+        if (choice == "H")
         {
             await MonkBuyPotionType(player, "healing", healCostPerPotion,
                 (int)player.Healing, player.MaxPotions,
                 bought => { player.Healing += bought; },
                 cost => { player.Statistics?.RecordPurchase(cost); player.Statistics?.RecordGoldSpent(cost); });
         }
-        else if (choice == "M" && canBuyMana)
+        else if (choice == "M")
         {
             await MonkBuyPotionType(player, "mana", manaCostPerPotion,
                 (int)player.ManaPotions, player.MaxManaPotions,
@@ -3149,18 +3164,16 @@ public partial class CombatEngine
         if (player.Healing <= 0 || player.HP >= player.MaxHP)
             return;
 
-        int healPerPotion = Math.Max(1, (int)(player.MaxHP / 4));
-        long hpNeeded = player.MaxHP - player.HP;
-        int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
-        int potionsUsed = (int)Math.Min(potionsNeeded, player.Healing);
-
         long totalHealed = 0;
-        for (int i = 0; i < potionsUsed; i++)
+        int potionsUsed = 0;
+        while (player.Healing > 0 && player.HP < player.MaxHP)
         {
-            long healAmount = Math.Min(healPerPotion, player.MaxHP - player.HP);
+            long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+            healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
             totalHealed += healAmount;
             player.Healing--;
+            potionsUsed++;
             player.Statistics?.RecordPotionUsed((int)healAmount);
         }
 
@@ -6750,8 +6763,8 @@ public partial class CombatEngine
 
         teammate.Healing--;
 
-        // Potion heals a fixed amount plus some randomness
-        int healAmount = 30 + teammate.Level * 3 + random.Next(10, 25);
+        // Potion heals a fixed amount plus some randomness (same formula as player potions)
+        int healAmount = 30 + teammate.Level * 5 + random.Next(10, 30);
         long oldHP = target.HP;
         target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         long actualHeal = target.HP - oldHP;
@@ -8370,10 +8383,10 @@ public partial class CombatEngine
         }
 
         long hpNeeded = player.MaxHP - player.HP;
-        const int PotionHealAmount = 100;
-        int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / PotionHealAmount);
+        int healPerPotion = 30 + player.Level * 5 + random.Next(10, 30);
+        int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
-        long actualHealing = Math.Min(potionsNeeded * PotionHealAmount, hpNeeded);
+        long actualHealing = Math.Min((long)potionsNeeded * healPerPotion, hpNeeded);
         player.HP += actualHealing;
         player.HP = Math.Min(player.HP, player.MaxHP);
         player.Healing -= potionsNeeded;
@@ -9646,7 +9659,8 @@ public partial class CombatEngine
         if (computer.HP < computer.MaxHP / 3 && computer.Healing > 0)
         {
             computer.Healing--;
-            long heal = Math.Min(25, computer.MaxHP - computer.HP);
+            long heal = 30 + computer.Level * 5 + random.Next(10, 30);
+            heal = Math.Min(heal, computer.MaxHP - computer.HP);
             computer.HP += heal;
             terminal.WriteLine($"{computer.DisplayName} quaffs a potion and heals {heal} HP!", "green");
             result.CombatLog.Add($"{computer.DisplayName} heals {heal}");

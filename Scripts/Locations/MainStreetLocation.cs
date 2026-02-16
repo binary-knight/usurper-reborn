@@ -318,7 +318,16 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.WriteLine("hallenges");
+        terminal.Write("hallenges   ");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_cyan");
+        terminal.Write("L");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.WriteLine("odging");
 
         terminal.WriteLine("");
 
@@ -514,6 +523,7 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("  O - Old Church");
         terminal.WriteLine("  K - Castle");
         terminal.WriteLine("  H - Home");
+        terminal.WriteLine("  L - Lodging (Dormitory)");
         terminal.WriteLine("");
 
         terminal.WriteLine("Shops:");
@@ -599,7 +609,11 @@ public class MainStreetLocation : BaseLocation
             case "C":
                 await NavigateToLocation(GameLocation.AnchorRoad); // Challenges
                 return true;
-                
+
+            case "L":
+                await NavigateToLocation(GameLocation.Dormitory); // Lodging
+                return true;
+
             case "A":
                 await NavigateToLocation(GameLocation.ArmorShop);
                 return true;

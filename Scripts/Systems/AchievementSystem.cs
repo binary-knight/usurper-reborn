@@ -347,6 +347,17 @@ public static class AchievementSystem
             GoldReward = 5000
         });
 
+        Register(new Achievement
+        {
+            Id = "gauntlet_champion",
+            Name = "Gauntlet Champion",
+            Description = "Survived all 10 waves of The Gauntlet",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Gold,
+            PointValue = 50,
+            GoldReward = 250
+        });
+
         // ============ PROGRESSION ACHIEVEMENTS ============
 
         Register(new Achievement

@@ -431,6 +431,13 @@ public class QuestHallLocation : BaseLocation
                  quest.QuestTarget == QuestTarget.BuyAccessory || quest.QuestTarget == QuestTarget.BuyShield)
             terminal.WriteLine("  Hint: Purchase the item from the appropriate shop in town.");
         else if (quest.QuestTarget == QuestTarget.DefeatNPC)
-            terminal.WriteLine("  Hint: Find and defeat the target in combat.");
+        {
+            // Faith faction "Redeem" quests use DefeatNPC target but TalkToNPC objective
+            bool isTalkQuest = quest.Objectives.Any(o => o.ObjectiveType == QuestObjectiveType.TalkToNPC);
+            if (isTalkQuest)
+                terminal.WriteLine("  Hint: Find the NPC in town and talk to them.");
+            else
+                terminal.WriteLine("  Hint: Find and defeat the target in combat.");
+        }
     }
 }

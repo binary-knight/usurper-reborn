@@ -354,7 +354,12 @@ public static class TrainingSystem
         // Equipment bonus (weapon quality)
         int equipMod = (int)(attacker.WeapPow / 20);
 
-        int totalMod = statMod + profMod + levelMod + equipMod;
+        int rawMod = statMod + profMod + levelMod + equipMod;
+
+        // Diminishing returns: full value up to +6, half rate above that.
+        // Prevents high-level players from auto-hitting everything on the d20.
+        // Raw +4 → +4, Raw +11 → +8, Raw +22 → +14, Raw +45 → +25
+        int totalMod = rawMod <= 6 ? rawMod : 6 + (rawMod - 6) / 2;
 
         return RollD20(totalMod, targetAC, random);
     }

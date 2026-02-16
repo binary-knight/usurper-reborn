@@ -35,22 +35,167 @@ public class DormitoryLocation : BaseLocation
     protected override void DisplayLocation()
     {
         terminal.ClearScreen();
+
+        // Header
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine("-*- Dormitory -*-");
-        terminal.SetColor("white");
-        terminal.WriteLine("The warm, stale air is thick with the smell of sweat and cheap ale.");
+        terminal.WriteLine("║                              THE DORMITORY                                  ║");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
+
+        // Atmosphere
+        terminal.SetColor("white");
+        terminal.Write("Rows of creaky wooden bunks line the walls. The warm, stale air is thick ");
+        terminal.WriteLine("with");
+        terminal.Write("the smell of sweat and cheap ale. ");
+        terminal.SetColor("gray");
+        terminal.WriteLine("A few snoring lumps stir under thin blankets.");
+        terminal.WriteLine("");
+
+        ShowNPCsInLocation();
+
+        // Menu
+        terminal.SetColor("cyan");
+        terminal.WriteLine("What would you like to do?");
+        terminal.WriteLine("");
+
         if (DoorMode.IsOnlineMode)
         {
-            terminal.WriteLine($"(L) List sleepers    (E) Examine    (G) Go to sleep & logout ({GameConfig.DormitorySleepCost}g)");
-            terminal.WriteLine("(K) Attack a sleeper (W) Wake guests (S) Status     (R) Return");
+            // Row 1
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("L");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("ist sleepers       ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("E");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("xamine          ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_green");
+            terminal.Write("G");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine($"o to sleep ({GameConfig.DormitorySleepCost}g, logout)");
+
+            // Row 2
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_red");
+            terminal.Write("K");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("ill a sleeper      ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("W");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("ake guests      ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("S");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("tatus");
+
+            // Row 3
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_red");
+            terminal.Write("R");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("eturn to Anchor Road");
         }
         else
         {
-            terminal.WriteLine("(L) List sleepers    (E) Examine    (G) Go to sleep");
-            terminal.WriteLine("(W) Wake the guests  (S) Status     (R) Return");
+            // Row 1
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("L");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("ist sleepers       ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("E");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("xamine          ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_green");
+            terminal.Write("G");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("o to sleep");
+
+            // Row 2
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("W");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("ake the guests     ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("S");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("tatus           ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_red");
+            terminal.Write("R");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("eturn");
         }
         terminal.WriteLine("");
+
+        if (DoorMode.IsOnlineMode)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  WARNING: Sleeping here leaves you vulnerable to attack!");
+            terminal.WriteLine("");
+        }
+
         ShowStatusLine();
     }
 

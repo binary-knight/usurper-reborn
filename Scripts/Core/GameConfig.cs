@@ -971,6 +971,17 @@ Alchemist - Potion makers and researchers. Requires intellect and patience.
     public const int DefaultBardSongs = 5;                // Daily bard songs reset
     public const int AssassinThiefBonus = 2;              // Extra thief attempts for assassins
     
+    // Gauntlet Challenge (v0.40.3)
+    public const int GauntletMinLevel = 5;
+    public const int GauntletWaveCount = 10;
+    public const int GauntletEntryFeePerLevel = 100;        // Entry fee = 100 * level
+    public const int GauntletGoldPerWavePerLevel = 50;       // Per-wave reward = 50 * level
+    public const int GauntletXPPerWave = 25;                 // Base XP multiplier per wave
+    public const int GauntletChampionGoldPerLevel = 500;     // Wave 10 bonus = 500 * level
+    public const int GauntletChampionXPPerLevel = 250;       // Wave 10 XP bonus
+    public const float GauntletHealBetweenWaves = 0.20f;     // 20% MaxHP heal between waves
+    public const float GauntletManaRestoreBetweenWaves = 0.15f; // 15% MaxMana between waves
+
     // PvP Arena Configuration
     public const int MaxPvPAttacksPerDay = 5;           // Maximum PvP attacks per day
     public const int MinPvPLevel = 5;                   // Minimum level to enter the arena
@@ -1087,6 +1098,7 @@ Alchemist - Potion makers and researchers. Requires intellect and patience.
     public const int MaxActiveQuests = 5;                  // Maximum active quests per player
     public const int MaxCompletedQuests = 3;               // Maximum quest completions per day
     public const int MaxQuestsPerDay = 3;                  // Maximum quests claimable per day
+    public const int MaxAvailableQuestsShown = 10;          // Maximum quests shown in Quest Hall (deduplicated)
     
     // Quest Creation Limits (Pascal royal quest limits)
     public const int QuestMaxNewQuests = 5;              // Daily new quest limit for kings

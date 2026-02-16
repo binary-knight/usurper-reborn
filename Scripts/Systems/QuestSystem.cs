@@ -210,14 +210,18 @@ public partial class QuestSystem : Node
     /// </summary>
     public static List<Quest> GetAvailableQuests(Character player)
     {
-        return questDatabase.Where(q => 
-            !q.Deleted && 
+        return questDatabase.Where(q =>
+            !q.Deleted &&
             string.IsNullOrEmpty(q.Occupier) &&
             !player.King &&
             q.Initiator != player.Name2 &&
             player.Level >= q.MinLevel &&
             player.Level <= q.MaxLevel
-        ).ToList();
+        )
+        .GroupBy(q => q.Comment)     // Deduplicate by quest name
+        .Select(g => g.First())
+        .Take(GameConfig.MaxAvailableQuestsShown) // Cap displayed quests
+        .ToList();
     }
     
     /// <summary>
@@ -1078,6 +1082,10 @@ public partial class QuestSystem : Node
                 {
                     // Mark the DefeatNPC objective as complete
                     quest.UpdateObjectiveProgress(QuestObjectiveType.DefeatNPC, 1, npcName);
+
+                    // Faith "Redeem" quests use TalkToNPC objective — defeating the NPC also counts
+                    // (you've "brought them to the light" through combat, purging their darkness)
+                    quest.UpdateObjectiveProgress(QuestObjectiveType.TalkToNPC, 1, npcName);
 
                     // Also mark the quest as having activity (for legacy validation)
                     quest.OccupiedDays = Math.Max(1, quest.OccupiedDays);
