@@ -282,10 +282,13 @@ public partial class CombatEngine
         if (monsters.Count == 1)
         {
             var monster = monsters[0];
-            if (!string.IsNullOrEmpty(monster.Phrase) && monster.CanSpeak)
+            if (!string.IsNullOrEmpty(monster.Phrase))
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"The {monster.Name} says: \"{monster.Phrase}\"");
+                if (monster.CanSpeak)
+                    terminal.WriteLine($"The {monster.Name} says: \"{monster.Phrase}\"");
+                else
+                    terminal.WriteLine($"The {monster.Name} {monster.Phrase}");
                 terminal.WriteLine("");
             }
             terminal.SetColor("white");
@@ -685,10 +688,13 @@ public partial class CombatEngine
         terminal.WriteLine("");
         
         // Monster appearance
-        if (!string.IsNullOrEmpty(monster.Phrase) && monster.CanSpeak)
+        if (!string.IsNullOrEmpty(monster.Phrase))
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"The {monster.Name} says: \"{monster.Phrase}\"");
+            if (monster.CanSpeak)
+                terminal.WriteLine($"The {monster.Name} says: \"{monster.Phrase}\"");
+            else
+                terminal.WriteLine($"The {monster.Name} {monster.Phrase}");
             terminal.WriteLine("");
         }
         
@@ -1161,6 +1167,10 @@ public partial class CombatEngine
                     terminal.WriteLine($"  {key} - {name} (unavailable)");
             }
         }
+
+        // Boss Save option (only when fighting saveable Old God with artifact)
+        if (BossContext?.CanSave == true)
+            terminal.WriteLine("  V - Attempt to Save, uses Soulweaver's Loom");
 
         // Retreat and auto
         terminal.WriteLine("  R - Retreat, attempt to flee");
@@ -3397,11 +3407,16 @@ public partial class CombatEngine
                 Equipment equipment;
                 if (lootItem.Type == global::ObjType.Weapon)
                 {
+                    // Look up in equipment database to get correct handedness and weapon type
+                    var knownEquip = EquipmentDatabase.GetByName(lootItem.Name);
+                    var lootHandedness = knownEquip?.Handedness ?? WeaponHandedness.OneHanded;
+                    var lootWeaponType = knownEquip?.WeaponType ?? WeaponType.Sword;
+
                     equipment = Equipment.CreateWeapon(
                         id: 10000 + random.Next(10000),
                         name: lootItem.Name,
-                        handedness: WeaponHandedness.OneHanded,
-                        weaponType: WeaponType.Sword,
+                        handedness: lootHandedness,
+                        weaponType: lootWeaponType,
                         power: lootItem.Attack,
                         value: lootItem.Value,
                         rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))

@@ -927,7 +927,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
 
         // Find NPCs that are not in any team and are in town locations
-        var townLocations = new[] { "Main Street", "Market", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+        var townLocations = new[] { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
         var availableNPCs = allNPCs
             .Where(n => n.IsAlive &&
                    string.IsNullOrEmpty(n.Team) &&

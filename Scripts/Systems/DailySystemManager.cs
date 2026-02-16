@@ -122,6 +122,14 @@ public class DailySystemManager
         currentDay++;
         lastResetTime = DateTime.Now;
 
+        // Also update the per-session day on the GameEngine (safe from MUD cross-contamination)
+        var engine = GameEngine.Instance;
+        if (engine != null)
+        {
+            engine.SessionCurrentDay = currentDay;
+            engine.SessionLastResetTime = lastResetTime;
+        }
+
         // Sync StoryProgressionSystem's game day counter (used for Vex death tracking, etc.)
         try
         {

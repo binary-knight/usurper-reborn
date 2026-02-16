@@ -322,7 +322,7 @@ public partial class NPC : Character
                 break;
 
             case "merchant":
-                CurrentLocation = "Market";
+                CurrentLocation = "Auction House";
                 Race = CharacterRace.Human;
                 Sex = (CharacterSex)GD.RandRange(1, 2);
                 break;
@@ -641,7 +641,7 @@ public partial class NPC : Character
                 
             case "guard":
                 // Guards patrol
-                var locations = new[] { "Main Street", "Castle", "Market" };
+                var locations = new[] { "Main Street", "Castle", "Auction House" };
                 CurrentLocation = locations[GD.RandRange(0, locations.Length - 1)];
                 break;
                 
@@ -874,6 +874,9 @@ public partial class NPC : Character
             // Update internal field
             CurrentLocation = newLocation;
 
+            // Clear activity so location-contextual flavor text takes over
+            CurrentActivity = "";
+
             // Add to new location list
             if (newLocId != GameLocation.NoWhere)
             {
@@ -912,7 +915,9 @@ public partial class NPC : Character
 
             case "market":
             case "marketplace":
-                return GameLocation.Marketplace;
+            case "auction house":
+            case "auctionhouse":
+                return GameLocation.AuctionHouse;
 
             case "castle":
                 return GameLocation.Castle;

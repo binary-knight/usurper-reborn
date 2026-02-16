@@ -670,7 +670,7 @@ namespace UsurperRemake.Systems
             {
                 "Main Street",
                 "Main Street",   // More NPCs on Main Street (high traffic)
-                "Market",
+                "Auction House",
                 "Inn",
                 "Inn",           // More NPCs at the Inn
                 "Temple",

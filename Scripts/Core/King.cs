@@ -87,7 +87,7 @@ public class King
         EstablishmentStatus["Bank"] = true;
         EstablishmentStatus["MagicShop"] = true;
         EstablishmentStatus["Healer"] = true;
-        EstablishmentStatus["Marketplace"] = true;
+        EstablishmentStatus["AuctionHouse"] = true;
         EstablishmentStatus["Church"] = true;
     }
     

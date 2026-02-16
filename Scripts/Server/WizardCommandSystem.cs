@@ -676,7 +676,7 @@ public static class WizardCommandSystem
             "bank" or "treasury" => GameLocation.Bank,
             "prison" or "jail" => GameLocation.Prison,
             "alley" or "darkalley" => GameLocation.DarkAlley,
-            "market" or "marketplace" => GameLocation.Marketplace,
+            "market" or "marketplace" or "auction" or "auctionhouse" => GameLocation.AuctionHouse,
             "team" or "teamcorner" => GameLocation.TeamCorner,
             "quest" or "questhall" => GameLocation.QuestHall,
             "bounty" or "bountyroom" => GameLocation.BountyRoom,

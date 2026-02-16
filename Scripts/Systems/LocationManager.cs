@@ -73,7 +73,7 @@ public class LocationManager
         locations[GameLocation.Bank] = new BankLocation();
         locations[GameLocation.WeaponShop] = new WeaponShopLocation();
         locations[GameLocation.ArmorShop] = new ArmorShopLocation();
-        locations[GameLocation.Marketplace] = new UsurperRemake.Locations.MarketplaceLocation();
+        locations[GameLocation.AuctionHouse] = new UsurperRemake.Locations.MarketplaceLocation();
         locations[GameLocation.Castle] = new CastleLocation();
         locations[GameLocation.Healer] = new HealerLocation();
         locations[GameLocation.MagicShop] = new MagicShopLocation();
@@ -128,7 +128,7 @@ public class LocationManager
             GameLocation.WeaponShop,   // loc7
             GameLocation.ArmorShop,    // loc8
             GameLocation.Bank,         // loc9
-            GameLocation.Marketplace,  // loc10
+            GameLocation.AuctionHouse,  // loc10
             GameLocation.DarkAlley,    // loc11
             GameLocation.ReportRoom,   // loc12
             GameLocation.Healer,       // loc13
@@ -173,7 +173,7 @@ public class LocationManager
             GameLocation.MainStreet   // loc1
         };
         
-        navigationTable[GameLocation.Marketplace] = new List<GameLocation>
+        navigationTable[GameLocation.AuctionHouse] = new List<GameLocation>
         {
             GameLocation.MainStreet,  // loc1
             GameLocation.FoodStore,   // loc2

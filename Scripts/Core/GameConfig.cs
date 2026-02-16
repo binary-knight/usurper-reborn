@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.40.2";
-    public const string VersionName = "Faction Missions, Assassination, Faction Expansion & Sleep Risk";
+    public const string Version = "0.40.3";
+    public const string VersionName = "PvP Combat & Quest Fixes";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -392,7 +392,8 @@ public static partial class GameConfig
     public const int DormitorySleepCost = 10;                    // 10g to sleep in dormitory
     public const float InnRoomCostPerLevel = 75f;                // Inn room = 75 * level gold
     public const float SleeperGoldTheftPercent = 0.50f;          // Steal 50% of gold on hand
-    public const float SleeperAttackChancePerTick = 0.08f;       // 8% chance per world sim tick (~30s)
+    public const float SleeperAttackChancePerTick = 0.02f;       // 2% chance per world sim tick (~30s) for dormitory
+    public const float InnSleeperAttackChancePerTick = 0.005f;   // 0.5% chance per tick for inn sleepers (rare)
     public const int MinNPCLevelForSleeperAttack = 5;            // NPC must be level 5+ to attack sleepers
     public const float InnDefenseBoost = 0.50f;                  // 50% ATK/DEF boost when woken at Inn
     public const int SleeperXPLossPercent = 10;                  // 10% XP loss on death while sleeping
@@ -1359,7 +1360,7 @@ public enum GameLocation
     Bank = 19,           // onloc_bank
     ReportRoom = 20,     // onloc_reportroom
     Healer = 21,         // onloc_healer
-    Marketplace = 22,    // onloc_marketplace
+    AuctionHouse = 22,   // onloc_auctionhouse (was Marketplace)
     FoodStore = 23,      // onloc_foodstore
     PlayerMarket = 24,   // onloc_plymarket
     Recruit = 25,        // onloc_recruit (hall of recruitment)

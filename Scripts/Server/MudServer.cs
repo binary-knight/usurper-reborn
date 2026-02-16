@@ -493,6 +493,10 @@ public class MudServer
             if (excludeUsername != null && kvp.Key == excludeUsername.ToLowerInvariant())
                 continue;
 
+            // Don't send broadcasts to players still in login/character creation
+            if (!kvp.Value.IsInGame)
+                continue;
+
             kvp.Value.EnqueueMessage(message);
         }
     }

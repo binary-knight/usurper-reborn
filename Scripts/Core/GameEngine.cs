@@ -239,6 +239,11 @@ public partial class GameEngine : Node
     // Online system
     private List<OnlinePlayer> onlinePlayers;
     
+    // Per-session daily state (avoids shared singleton cross-contamination in MUD mode)
+    public int SessionCurrentDay { get; set; } = 1;
+    public DateTime SessionLastResetTime { get; set; } = DateTime.Now;
+    public DailyCycleMode SessionDailyCycleMode { get; set; } = DailyCycleMode.Endless;
+
     // Auto-save timer
     private DateTime lastPeriodicCheck;
     
@@ -690,7 +695,7 @@ public partial class GameEngine : Node
     {
         var locations = new[]
         {
-            "Main Street", "Market", "Inn", "Temple", "Church",
+            "Main Street", "Auction House", "Inn", "Temple", "Church",
             "Weapon Shop", "Armor Shop", "Magic Shop", "Castle",
             "Bank", "Healer", "Dark Alley"
         };
@@ -1426,6 +1431,11 @@ public partial class GameEngine : Node
                 dailyManager.LoadFromSaveData(saveData);
             }
 
+            // Store per-session daily state (safe from shared singleton cross-contamination in MUD mode)
+            SessionCurrentDay = saveData.CurrentDay;
+            SessionLastResetTime = saveData.LastDailyReset;
+            SessionDailyCycleMode = saveData.DailyCycleMode;
+
             // Restore world state
             await RestoreWorldState(saveData.WorldState);
 
@@ -1446,6 +1456,15 @@ public partial class GameEngine : Node
 
                 // Load current royal court from world_state
                 await OnlineStateManager.Instance.LoadRoyalCourtFromWorldState();
+            }
+
+            // In online mode, merge this player's quests into the shared database
+            // without clearing other players' quests (which RestoreFromSaveData would do)
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && saveData.Player?.ActiveQuests != null)
+            {
+                var playerName = saveData.Player.Name2 ?? saveData.Player.Name1 ?? fileName;
+                QuestSystem.MergePlayerQuests(playerName, saveData.Player.ActiveQuests);
+                DebugLogger.Instance.LogInfo("ONLINE", $"Merged {saveData.Player.ActiveQuests.Count} quests for player {playerName}");
             }
 
             // Restore story systems (companions, children, seals, etc.)
@@ -1495,6 +1514,15 @@ public partial class GameEngine : Node
 
             // Ensure quests are regenerated with corrected data
             QuestSystem.EnsureQuestsExist(currentPlayer?.Level ?? 10);
+
+            // Mark session as in-game so broadcasts (gossip, shouts) are delivered
+            var mudServer = UsurperRemake.Server.MudServer.Instance;
+            var sessionKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? "";
+            if (mudServer != null && sessionKey.Length > 0 &&
+                mudServer.ActiveSessions.TryGetValue(sessionKey, out var playerSession))
+            {
+                playerSession.IsInGame = true;
+            }
 
             // Start game at saved location
             await locationManager.EnterLocation(GameLocation.MainStreet, currentPlayer);
@@ -1996,6 +2024,11 @@ public partial class GameEngine : Node
             NPCMarriageRegistry.Instance.Reset();
             NPCDialogueDatabase.ClearAllTracking();
         }
+
+        // Initialize per-session daily state for new character
+        SessionCurrentDay = 1;
+        SessionLastResetTime = DateTime.Now;
+        SessionDailyCycleMode = DailyCycleMode.Endless;
 
         // Clear dungeon party from previous saves
         ClearDungeonParty();
@@ -2564,11 +2597,33 @@ public partial class GameEngine : Node
             player.ClearedSpecialFloors = playerData.ClearedSpecialFloors;
         }
 
-        // RESET dungeon floor states on every load - dungeons regenerate fresh each session
-        // This prevents stale room states (like boss rooms showing [CLEARED] incorrectly)
-        // Note: ClearedSpecialFloors (seals, Old Gods) is still preserved above for permanent progress
-        player.DungeonFloorStates = new Dictionary<int, UsurperRemake.Systems.DungeonFloorState>();
-        DebugLogger.Instance.LogDebug("LOAD", "Dungeon floor states reset - dungeons will regenerate fresh");
+        // Restore dungeon floor states from save data (room exploration, cleared rooms, etc.)
+        // The original boss-room-showing-cleared bug has been properly fixed via the BossDefeated flag,
+        // so we no longer need to nuke all floor state on every load.
+        if (playerData.DungeonFloorStates != null && playerData.DungeonFloorStates.Count > 0)
+        {
+            player.DungeonFloorStates = RestoreDungeonFloorStates(playerData.DungeonFloorStates);
+            DebugLogger.Instance.LogDebug("LOAD", $"Restored dungeon floor states for {playerData.DungeonFloorStates.Count} floors");
+        }
+        else
+        {
+            player.DungeonFloorStates = new Dictionary<int, UsurperRemake.Systems.DungeonFloorState>();
+            DebugLogger.Instance.LogDebug("LOAD", "No dungeon floor states in save data - starting fresh");
+        }
+
+        // Restore player's active quest references from the quest database
+        if (playerData.ActiveQuests != null && playerData.ActiveQuests.Count > 0)
+        {
+            player.ActiveQuests.Clear();
+            var playerName = player.Name2 ?? player.Name1;
+            var dbQuests = QuestSystem.GetPlayerQuests(playerName);
+            foreach (var q in dbQuests)
+            {
+                if (!player.ActiveQuests.Contains(q))
+                    player.ActiveQuests.Add(q);
+            }
+            DebugLogger.Instance.LogDebug("LOAD", $"Restored {player.ActiveQuests.Count} active quests for {playerName}");
+        }
 
         // Restore hint system (which hints have been shown to this player)
         if (playerData.HintsShown != null)
@@ -2721,9 +2776,15 @@ public partial class GameEngine : Node
         WorldEventSystem.Instance.RestoreFromSaveData(worldState.ActiveEvents, currentDay);
 
         // Restore active quests from save data
-        if (worldState.ActiveQuests != null && worldState.ActiveQuests.Count > 0)
+        // In MUD/online mode, DON'T use RestoreFromSaveData (which clears the entire shared
+        // questDatabase, wiping other concurrent players' quests). Instead, merge is done
+        // per-player in LoadSaveByFileName using MergePlayerQuests.
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
-            QuestSystem.RestoreFromSaveData(worldState.ActiveQuests);
+            if (worldState.ActiveQuests != null && worldState.ActiveQuests.Count > 0)
+            {
+                QuestSystem.RestoreFromSaveData(worldState.ActiveQuests);
+            }
         }
 
         // Restore marketplace listings from save data
@@ -4095,7 +4156,7 @@ public partial class GameEngine : Node
         return loc.ToLower() switch
         {
             "tavern" or "inn" => GameLocation.TheInn,
-            "market" or "marketplace" => GameLocation.Marketplace,
+            "market" or "marketplace" or "auction house" or "auctionhouse" => GameLocation.AuctionHouse,
             "town_square" or "main_street" => GameLocation.MainStreet,
             "castle" => GameLocation.Castle,
             "temple" or "church" => GameLocation.Temple,

@@ -1831,8 +1831,8 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("  [1] Trigger World Simulation Tick");
         terminal.WriteLine("  [2] Clear All News");
         terminal.WriteLine("  [3] Generate Random News");
-        terminal.WriteLine("  [4] View Marketplace Stats");
-        terminal.WriteLine("  [5] Clear Marketplace");
+        terminal.WriteLine("  [4] View Auction House Stats");
+        terminal.WriteLine("  [5] Clear Auction House");
         terminal.WriteLine("  [6] Force Save Game");
         terminal.WriteLine("");
         terminal.WriteLine("  [0] Back");
@@ -1859,7 +1859,7 @@ public class DevMenuLocation : BaseLocation
                 break;
             case "4":
                 var stats = MarketplaceSystem.Instance.GetStatistics();
-                terminal.WriteLine($"\n  Marketplace Statistics:", "white");
+                terminal.WriteLine($"\n  Auction House Statistics:", "white");
                 terminal.WriteLine($"  Total Listings: {stats.TotalListings}");
                 terminal.WriteLine($"  NPC Listings: {stats.NPCListings}");
                 terminal.WriteLine($"  Player Listings: {stats.PlayerListings}");
@@ -1868,7 +1868,7 @@ public class DevMenuLocation : BaseLocation
                 return;
             case "5":
                 MarketplaceSystem.Instance.ClearAllListings();
-                terminal.WriteLine("Marketplace cleared!", "green");
+                terminal.WriteLine("Auction House cleared!", "green");
                 break;
             case "6":
                 await SaveSystem.Instance.SaveGame(currentPlayer.Name, currentPlayer);

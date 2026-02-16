@@ -220,7 +220,7 @@ public class WorldSimulator
     private static readonly string[] GameLocations = new[]
     {
         "Main Street", "Dungeon", "Weapon Shop", "Armor Shop", "Magic Shop",
-        "Healer", "Inn", "Temple", "Church", "Market", "Castle", "Love Street", "Bank"
+        "Healer", "Inn", "Temple", "Church", "Auction House", "Castle", "Love Street", "Bank"
     };
     
     public void StartSimulation(List<NPC>? worldNPCs = null)
@@ -1291,7 +1291,7 @@ public class WorldSimulator
         {
             "Dungeon" => "dungeon",
             "Weapon Shop" or "Armor Shop" or "Magic Shop" => "shop",
-            "Market" => "marketplace",
+            "Auction House" => "marketplace",
             "Inn" => "inn",
             "Temple" or "Church" => "temple",
             "Castle" => "castle",
@@ -2756,7 +2756,7 @@ public class WorldSimulator
     /// </summary>
     private void NPCVisitMarketplace(NPC npc)
     {
-        npc.UpdateLocation("Market");
+        npc.UpdateLocation("Auction House");
 
         if (SqlBackend != null)
         {
@@ -2781,7 +2781,7 @@ public class WorldSimulator
 
         // Meet other NPCs at marketplace for relationship building
         var otherNPCs = npcs
-            .Where(n => n.IsAlive && n.ID != npc.ID && n.CurrentLocation == "Market")
+            .Where(n => n.IsAlive && n.ID != npc.ID && n.CurrentLocation == "Auction House")
             .ToList();
 
         if (otherNPCs.Any() && random.NextDouble() < 0.2)
@@ -2812,7 +2812,7 @@ public class WorldSimulator
                 try
                 {
                     await backend.CreateAuctionListing(npc.Name, item.Name, itemJson, price, hoursToExpire: 48);
-                    NewsSystem.Instance?.Newsy(false, $"{npc.Name} put {item.Name} up for sale at the marketplace.");
+                    NewsSystem.Instance?.Newsy(false, $"{npc.Name} put {item.Name} up for sale at the Auction House.");
                 }
                 catch (Exception ex)
                 {
@@ -2864,7 +2864,7 @@ public class WorldSimulator
                     MarketplaceSystem.Instance.EquipOrStoreItem(npc, item);
 
                     NewsSystem.Instance?.Newsy(false,
-                        $"{npc.Name} bought {item.Name} from {chosen.Seller} at the marketplace.");
+                        $"{npc.Name} bought {item.Name} from {chosen.Seller} at the Auction House.");
 
                     // Notify seller
                     await backend.SendMessage("Auction House", chosen.Seller, "auction",
@@ -3377,7 +3377,7 @@ public class WorldSimulator
         if (random.NextDouble() > 0.10) return; // 10% chance per tick
 
         // Find a sociable NPC at a social location
-        var socialLocations = new[] { "Inn", "Love Street", "Main Street", "Market", "Temple" };
+        var socialLocations = new[] { "Inn", "Love Street", "Main Street", "Auction House", "Temple" };
         var gossiper = npcs
             .Where(n => n.IsAlive && !n.IsDead &&
                         n.Brain?.Personality?.Sociability > 0.4f &&
@@ -4529,12 +4529,19 @@ public class WorldSimulator
             {
                 if (sleeper.IsDead) continue;
 
-                // Roll attack chance per tick
-                if (random.NextDouble() >= GameConfig.SleeperAttackChancePerTick) continue;
+                // Roll attack chance per tick — inn sleepers are much safer than dormitory
+                float attackChance = sleeper.InnDefenseBoost
+                    ? GameConfig.InnSleeperAttackChancePerTick
+                    : GameConfig.SleeperAttackChancePerTick;
+                if (random.NextDouble() >= attackChance) continue;
 
-                // Pick a random aggressive NPC
+                // Pick a random aggressive NPC — only Dark or Evil alignment NPCs will attack sleepers
+                // (Good/Holy/Neutral NPCs don't murder people in their sleep)
+                var alignmentSystem = new UsurperRemake.Systems.AlignmentSystem();
                 var eligibleNPCs = npcs
-                    .Where(n => n.IsAlive && !n.IsDead && n.Level >= GameConfig.MinNPCLevelForSleeperAttack && !n.IsStoryNPC)
+                    .Where(n => n.IsAlive && !n.IsDead && n.Level >= GameConfig.MinNPCLevelForSleeperAttack && !n.IsStoryNPC
+                        && (alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Dark
+                         || alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil))
                     .ToList();
 
                 if (eligibleNPCs.Count == 0) continue;

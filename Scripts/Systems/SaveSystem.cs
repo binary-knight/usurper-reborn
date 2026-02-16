@@ -70,13 +70,17 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogSave(playerName, player.Level, player.HP, player.MaxHP, player.Gold);
                 DebugLogger.Instance.LogDebug("SAVE", $"BaseMaxHP={player.BaseMaxHP}, BaseMaxMana={player.BaseMaxMana}");
 
+                // In online/MUD mode, use per-session day state to avoid shared singleton cross-contamination
+                var engine = GameEngine.Instance;
+                bool useSessionDay = UsurperRemake.BBS.DoorMode.IsOnlineMode && engine != null;
+
                 var saveData = new SaveGameData
                 {
                     Version = GameConfig.SaveVersion,
                     SaveTime = DateTime.Now,
-                    LastDailyReset = DailySystemManager.Instance.LastResetTime,
-                    CurrentDay = DailySystemManager.Instance.CurrentDay,
-                    DailyCycleMode = DailySystemManager.Instance.CurrentMode,
+                    LastDailyReset = useSessionDay ? engine.SessionLastResetTime : DailySystemManager.Instance.LastResetTime,
+                    CurrentDay = useSessionDay ? engine.SessionCurrentDay : DailySystemManager.Instance.CurrentDay,
+                    DailyCycleMode = useSessionDay ? engine.SessionDailyCycleMode : DailySystemManager.Instance.CurrentMode,
                     Player = SerializePlayer(player),
                     NPCs = await SerializeNPCs(),
                     WorldState = SerializeWorldState(),
@@ -166,14 +170,18 @@ namespace UsurperRemake.Systems
 
             var playerName = player.Name2 ?? player.Name1;
 
+            // In online/MUD mode, use per-session day state to avoid shared singleton cross-contamination
+            var engine2 = GameEngine.Instance;
+            bool useSessionDay2 = UsurperRemake.BBS.DoorMode.IsOnlineMode && engine2 != null;
+
             // Serialize game state
             var saveData = new SaveGameData
             {
                 Version = GameConfig.SaveVersion,
                 SaveTime = DateTime.Now,
-                LastDailyReset = DailySystemManager.Instance.LastResetTime,
-                CurrentDay = DailySystemManager.Instance.CurrentDay,
-                DailyCycleMode = DailySystemManager.Instance.CurrentMode,
+                LastDailyReset = useSessionDay2 ? engine2.SessionLastResetTime : DailySystemManager.Instance.LastResetTime,
+                CurrentDay = useSessionDay2 ? engine2.SessionCurrentDay : DailySystemManager.Instance.CurrentDay,
+                DailyCycleMode = useSessionDay2 ? engine2.SessionDailyCycleMode : DailySystemManager.Instance.CurrentMode,
                 Player = SerializePlayer(player),
                 NPCs = await SerializeNPCs(),
                 WorldState = SerializeWorldState(),

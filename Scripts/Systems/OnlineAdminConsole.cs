@@ -505,8 +505,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             terminal.SetColor("white");
-            terminal.Write("Enter new password (min 4 chars): ");
-            var newPassword = await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true));
+            var newPassword = await ReadInput("Enter new password (min 4 chars): ");
             if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
             {
                 terminal.SetColor("red");

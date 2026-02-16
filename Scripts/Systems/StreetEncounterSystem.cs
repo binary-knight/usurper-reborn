@@ -24,7 +24,7 @@ public class StreetEncounterSystem
     {
         { GameLocation.MainStreet, 0.05f },      // 5% base chance
         { GameLocation.DarkAlley, 0.25f },       // 25% - Very dangerous
-        { GameLocation.Marketplace, 0.08f },     // 8% - Pickpockets
+        { GameLocation.AuctionHouse, 0.08f },     // 8% - Pickpockets
         { GameLocation.TheInn, 0.10f },          // 10% - Brawlers
         { GameLocation.AnchorRoad, 0.15f },      // 15% - Dueling grounds
         { GameLocation.Dungeons, 0.0f },         // 0% - Handled by dungeon system
@@ -143,7 +143,7 @@ public class StreetEncounterSystem
                 _ => EncounterType.HostileNPC
             },
 
-            GameLocation.Marketplace => roll switch
+            GameLocation.AuctionHouse => roll switch
             {
                 < 40 => EncounterType.Pickpocket,
                 < 60 => EncounterType.MerchantEncounter,

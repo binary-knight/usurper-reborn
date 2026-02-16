@@ -3930,6 +3930,13 @@ public class DungeonLocation : BaseLocation
             {
                 floorState.IsPermanentlyClear = true;
             }
+
+            // Notify quest system that floor is cleared
+            var questPlayer = GetCurrentPlayer();
+            if (questPlayer != null)
+            {
+                QuestSystem.OnDungeonFloorCleared(questPlayer, floorLevel);
+            }
         }
 
         // Save room states

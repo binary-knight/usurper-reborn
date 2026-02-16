@@ -39,6 +39,10 @@ public class PlayerSession : IDisposable
     /// <summary>Last time the player sent any input. Used for idle timeout detection.</summary>
     public DateTime LastActivityTime { get; set; } = DateTime.UtcNow;
 
+    /// <summary>True once the player has loaded/created a character and entered the game world.
+    /// While false, broadcast messages (gossip, shouts, etc.) are suppressed.</summary>
+    public bool IsInGame { get; set; }
+
     /// <summary>True if this player has admin privileges. Computed from WizardLevel.</summary>
     public bool IsAdmin => WizardLevel >= WizardLevel.Archwizard;
 

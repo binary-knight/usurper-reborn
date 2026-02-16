@@ -61,6 +61,13 @@ public static class MonsterGenerator
         monster.IsBoss = isBoss;
         monster.IsMiniBoss = isMiniBoss;
 
+        // Animals, insects, constructs, and mindless creatures can't speak
+        monster.CanSpeak = family.FamilyName switch
+        {
+            "Beast" or "Insectoid" or "Construct" or "Aquatic" or "Aberration" or "Elemental" => false,
+            _ => true
+        };
+
         // Add special abilities
         foreach (var ability in tier.SpecialAbilities)
         {
@@ -121,13 +128,13 @@ public static class MonsterGenerator
             "Draconic" => "Foolish mortal! You face the might of dragonkind!",
             "Demonic" => "Your pathetic soul is MINE!",
             "Giant" => "I'll grind your bones to make my bread!",
-            "Beast" => "*Roars with primal fury*",
-            "Elemental" => "Feel the wrath of the elements unleashed!",
-            "Aberration" => "*Reality warps and screams around the creature*",
-            "Insectoid" => "*Chittering echoes through your mind*",
-            "Construct" => "*Mechanical grinding intensifies* TARGET ACQUIRED.",
+            "Beast" => "roars with primal fury, the ground trembling beneath its massive form.",
+            "Elemental" => "surges with unleashed elemental wrath.",
+            "Aberration" => "warps the air around it as reality itself screams.",
+            "Insectoid" => "fills the air with a deafening, mind-piercing chittering.",
+            "Construct" => "locks onto you with glowing eyes, gears grinding to full power.",
             "Fey" => "You've wandered into my domain, little mortal...",
-            "Aquatic" => "*The creature's roar creates a shockwave*",
+            "Aquatic" => "unleashes a roar that sends shockwaves through the air.",
             "Celestial" => "You have been judged UNWORTHY!",
             "Shadow" => "Darkness shall consume all...",
             _ => "You face a champion! Prepare yourself!"
@@ -336,13 +343,13 @@ public static class MonsterGenerator
             },
             "Demonic" => "Your soul is mine!",
             "Giant" => "Fe Fi Fo Fum!",
-            "Beast" => "*Snarls and growls*",
-            "Elemental" => "Burn! BURN!",
-            "Aberration" => "*Wet squelching sounds*",
-            "Insectoid" => "*Chittering and hissing*",
-            "Construct" => "*Mechanical grinding noises*",
+            "Beast" => "snarls and growls menacingly.",
+            "Elemental" => "crackles with raw elemental fury.",
+            "Aberration" => "writhes and pulses with unnatural movement.",
+            "Insectoid" => "clicks and hisses aggressively.",
+            "Construct" => "grinds to life with a mechanical whir.",
             "Fey" => "Let's play a game...",
-            "Aquatic" => "*Gurgling roar*",
+            "Aquatic" => "lets out a deep, gurgling roar.",
             "Celestial" => "You have been judged and found wanting.",
             "Shadow" => "Embrace the darkness...",
             _ => "Prepare for battle!"
@@ -414,6 +421,11 @@ public static class MonsterGenerator
                 monster.MonsterColor = tier.Color;
                 monster.AttackType = family.AttackType;
                 monster.Level = dungeonLevel;
+                monster.CanSpeak = family.FamilyName switch
+                {
+                    "Beast" or "Insectoid" or "Construct" or "Aquatic" or "Aberration" or "Elemental" => false,
+                    _ => true
+                };
 
                 foreach (var ability in tier.SpecialAbilities)
                 {

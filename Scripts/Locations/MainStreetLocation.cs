@@ -33,7 +33,7 @@ public class MainStreetLocation : BaseLocation
             GameLocation.WeaponShop,   // loc7
             GameLocation.ArmorShop,    // loc8
             GameLocation.Bank,         // loc9
-            GameLocation.Marketplace,  // loc10
+            GameLocation.AuctionHouse,  // loc10
             GameLocation.DarkAlley,    // loc11
             GameLocation.ReportRoom,   // loc12
             GameLocation.Healer,       // loc13
@@ -253,7 +253,7 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.WriteLine("Marketplace");
+        terminal.WriteLine("Auction House");
 
         // Row 3 - Services
         terminal.SetColor("darkgray");
@@ -520,7 +520,7 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("  W - Weapon Shop");
         terminal.WriteLine("  A - Armor Shop");
         terminal.WriteLine("  M - Magic Shop");
-        terminal.WriteLine("  J - Marketplace");
+        terminal.WriteLine("  J - Auction House");
         terminal.WriteLine("  B - Bank");
         terminal.WriteLine("  1 - Healer");
         terminal.WriteLine("");
@@ -529,7 +529,6 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("  V - Visit Master");
         terminal.WriteLine("  2 - Quest Hall");
         terminal.WriteLine("  C - Challenges");
-        terminal.WriteLine("  Z - Team Area");
         terminal.WriteLine("");
 
         terminal.WriteLine("Information:");
@@ -626,8 +625,7 @@ public class MainStreetLocation : BaseLocation
                 return true;
 
             case "Q":
-                await QuitGame();
-                return true;
+                return await QuitGame();
                 
             case "G":
                 await ShowGoodDeeds();
@@ -679,7 +677,7 @@ public class MainStreetLocation : BaseLocation
                 }
                 else
                 {
-                    await NavigateToLocation(GameLocation.Marketplace);
+                    await NavigateToLocation(GameLocation.AuctionHouse);
                     return true;
                 }
                 
@@ -1528,7 +1526,7 @@ public class MainStreetLocation : BaseLocation
         await Task.Delay(1500);
     }
 
-    private async Task QuitGame()
+    private async Task<bool> QuitGame()
     {
         // Online mode: warn about sleep vulnerability and let player choose
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
@@ -1559,7 +1557,7 @@ public class MainStreetLocation : BaseLocation
             {
                 terminal.WriteLine("  You decide to stay in town.", "gray");
                 await Task.Delay(1000);
-                return;
+                return false;
             }
 
             if (ch == "I")
@@ -1568,7 +1566,7 @@ public class MainStreetLocation : BaseLocation
                 terminal.WriteLine("  You head to the Inn...", "cyan");
                 await Task.Delay(1000);
                 await NavigateToLocation(GameLocation.TheInn);
-                return;
+                return false;
             }
 
             // Default: Dormitory
@@ -2513,7 +2511,7 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("  [C] Castle        - Visit the royal court");
         terminal.WriteLine("  [Y] Your Home     - Rest and manage your belongings");
         terminal.WriteLine("  [*] Level Master  - Train to increase your level");
-        terminal.WriteLine("  [J] Marketplace   - Buy and sell items with other players");
+        terminal.WriteLine("  [J] Auction House  - Buy and sell items with other players");
         terminal.WriteLine("  [X] Dark Alley    - Shady dealings and criminal activity");
         terminal.WriteLine("");
 

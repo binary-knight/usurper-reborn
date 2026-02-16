@@ -248,13 +248,14 @@ namespace UsurperRemake.Data
         /// </summary>
         private static string SubstitutePlaceholders(string text, NPC npc, Player player)
         {
+            if (text == null) return "";
             var result = text;
-            result = result.Replace("{player_name}", player.Name2 ?? player.Name1 ?? "stranger");
-            result = result.Replace("{player_class}", player.Class.ToString());
-            result = result.Replace("{npc_name}", npc.Name2 ?? npc.Name1 ?? "someone");
+            result = result.Replace("{player_name}", player?.Name2 ?? player?.Name1 ?? "stranger");
+            result = result.Replace("{player_class}", player?.Class.ToString() ?? "adventurer");
+            result = result.Replace("{npc_name}", npc?.Name2 ?? npc?.Name1 ?? "someone");
 
             // Player title
-            if (player.King)
+            if (player != null && player.King)
                 result = result.Replace("{player_title}", "Your Majesty");
             else
                 result = result.Replace("{player_title}", "adventurer");

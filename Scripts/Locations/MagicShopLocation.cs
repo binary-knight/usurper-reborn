@@ -555,7 +555,9 @@ public partial class MagicShopLocation : BaseLocation
             long sellPrice = (long)((item.Value / 2) * fenceModifier); // Apply faction bonus
 
             // Check if shop wants this item type
-            if (item.Type == ObjType.Magic || item.MagicType != MagicItemType.None)
+            // Accept: Magic items, items with MagicType set, and accessory types (rings, amulets, belts)
+            if (item.Type == ObjType.Magic || item.MagicType != MagicItemType.None ||
+                item.Type == ObjType.Fingers || item.Type == ObjType.Neck || item.Type == ObjType.Waist)
             {
                 DisplayMessage($"Sell {item.Name} for {sellPrice:N0} gold? (Y/N): ", "yellow", false);
                 var confirm = terminal.GetInputSync("").ToUpper();

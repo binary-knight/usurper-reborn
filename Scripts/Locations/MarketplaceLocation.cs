@@ -17,8 +17,8 @@ public class MarketplaceLocation : BaseLocation
 {
     private const int MaxListingAgeDays = 30; // Auto-expire after 30 days
 
-    public MarketplaceLocation() : base(GameLocation.Marketplace, "Marketplace",
-        "Wooden stalls creak under the weight of exotic wares. A bulletin board stands nearby, covered in notes.")
+    public MarketplaceLocation() : base(GameLocation.AuctionHouse, "Auction House",
+        "A grand hall echoes with the cries of auctioneers. Bidders crowd around display cases, inspecting goods with practiced eyes.")
     {
     }
 
@@ -329,7 +329,7 @@ public class MarketplaceLocation : BaseLocation
 
         // Show marketplace statistics
         var stats = MarketplaceSystem.Instance.GetStatistics();
-        terminal.WriteLine($"\nMarketplace totals:");
+        terminal.WriteLine($"\nAuction House totals:");
         terminal.WriteLine($"  Total listings: {stats.TotalListings}");
         terminal.WriteLine($"  NPC listings: {stats.NPCListings}");
         terminal.WriteLine($"  Player listings: {stats.PlayerListings}");

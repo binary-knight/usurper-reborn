@@ -1075,11 +1075,25 @@ namespace UsurperRemake.Systems
             string missionTarget;
             int goldReward;
 
+            // Collect NPC names already targeted by the player's active quests to avoid duplicates
+            var existingTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (player is Player p2)
+            {
+                foreach (var q in p2.ActiveQuests)
+                {
+                    if (!string.IsNullOrEmpty(q.TargetNPCName))
+                        existingTargets.Add(q.TargetNPCName);
+                }
+            }
+
             switch (faction)
             {
                 case Faction.TheCrown:
                     var criminal = NPCSpawnSystem.Instance?.ActiveNPCs?
-                        .FirstOrDefault(n => !n.IsDead && n.Darkness > 100 && n.Level >= 5);
+                        .Where(n => !n.IsDead && n.Darkness > 100 && n.Level >= 5
+                            && !existingTargets.Contains(n.Name2))
+                        .OrderBy(_ => _random.Next())
+                        .FirstOrDefault();
                     missionTarget = criminal?.Name2 ?? "a known criminal";
                     missionDesc = $"A villain named {missionTarget} has been terrorizing honest citizens. Bring them to justice.";
                     goldReward = 300 + player.Level * 25;
@@ -1094,7 +1108,8 @@ namespace UsurperRemake.Systems
                         var teamName = (player as Player)?.TeamName;
                         var target = NPCSpawnSystem.Instance?.ActiveNPCs?
                             .Where(n => !n.IsDead && n.Level >= 5 && !n.IsStoryNPC && !n.King
-                                && (string.IsNullOrEmpty(teamName) || n.TeamName != teamName))
+                                && (string.IsNullOrEmpty(teamName) || n.TeamName != teamName)
+                                && !existingTargets.Contains(n.Name2))
                             .OrderBy(_ => _random.Next())
                             .FirstOrDefault();
 
@@ -1122,7 +1137,10 @@ namespace UsurperRemake.Systems
                     break;
                 default: // Faith
                     var lostSoul = NPCSpawnSystem.Instance?.ActiveNPCs?
-                        .FirstOrDefault(n => !n.IsDead && n.Darkness > 50 && n.Level >= 3);
+                        .Where(n => !n.IsDead && n.Darkness > 50 && n.Level >= 3
+                            && !existingTargets.Contains(n.Name2))
+                        .OrderBy(_ => _random.Next())
+                        .FirstOrDefault();
                     missionTarget = lostSoul?.Name2 ?? "a lost soul";
                     missionDesc = $"{missionTarget} has strayed from the path. Bring them back to the light.";
                     goldReward = 250 + player.Level * 20;
@@ -1778,16 +1796,80 @@ namespace UsurperRemake.Systems
                         break;
 
                     case "I": // Investigate
+                        // Check if player already has max quests
+                        if (player is Player investigator && investigator.ActiveQuests.Count >= GameConfig.MaxActiveQuests)
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"\n  You already have too many active quests to take this on.");
+                            terminal.SetColor("gray");
+                            terminal.WriteLine($"  Complete or abandon a quest first.");
+                            break;
+                        }
+
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine($"\n  \"I'll find out what happened to {missingName}. I promise.\"");
                         terminal.SetColor("white");
                         terminal.WriteLine($"  {petitioner.Name2} looks desperate. \"Please, {player.Name2}. Just find out what happened.\"");
 
-                        long investigateReward = 300 + player.Level * 25;
-                        player.Gold += investigateReward;
-                        player.Experience += 50 + player.Level * 5;
+                        // Small gold advance for expenses (real reward comes from quest completion)
+                        long expenseGold = 50 + player.Level * 10;
+                        player.Gold += expenseGold;
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"\n  {petitioner.Name2} presses {investigateReward} gold into your hands for expenses.");
+                        terminal.WriteLine($"\n  {petitioner.Name2} presses {expenseGold} gold into your hands for expenses.");
+
+                        // Create investigation quest — reach the dungeon floor where they went missing, kill monsters there
+                        int investigateFloor = Math.Max(1, Math.Min(player.Level + 5, 100));
+                        int monstersToKill = 3 + player.Level / 10; // 3-13 monsters
+
+                        var investigateQuest = new Quest
+                        {
+                            Title = $"Investigate {missingName}'s Disappearance",
+                            Initiator = petitioner.Name2,
+                            QuestType = QuestType.SingleQuest,
+                            QuestTarget = QuestTarget.RescueNPC,
+                            Difficulty = (byte)Math.Min(4, Math.Max(1, player.Level / 15 + 1)),
+                            Comment = $"{petitioner.Name2} begged you to find out what happened to {missingName}.",
+                            Date = DateTime.Now,
+                            MinLevel = 1,
+                            MaxLevel = 9999,
+                            DaysToComplete = 14,
+                            Reward = 3,
+                            RewardType = QuestRewardType.Money,
+                            TargetNPCName = missingName,
+                            Occupier = player.Name2,
+                            OccupierRace = player.Race,
+                            OccupierSex = (byte)((int)player.Sex),
+                            OccupiedDays = 0,
+                            OfferedTo = player.Name2
+                        };
+
+                        investigateQuest.Objectives.Add(new QuestObjective(
+                            QuestObjectiveType.ReachDungeonFloor,
+                            $"Search dungeon floor {investigateFloor} where {missingName} was last seen",
+                            investigateFloor,
+                            "",
+                            $"Floor {investigateFloor}"
+                        ));
+
+                        investigateQuest.Objectives.Add(new QuestObjective(
+                            QuestObjectiveType.KillMonsters,
+                            $"Slay {monstersToKill} monsters to uncover what happened",
+                            monstersToKill,
+                            "",
+                            "Monsters"
+                        ));
+
+                        QuestSystem.AddQuestToDatabase(investigateQuest);
+                        if (player is Player p)
+                        {
+                            p.ActiveQuests.Add(investigateQuest);
+                        }
+
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"\n  New Quest: {investigateQuest.Title}");
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"  — Reach dungeon floor {investigateFloor}");
+                        terminal.WriteLine($"  — Slay {monstersToKill} monsters to find clues");
 
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {

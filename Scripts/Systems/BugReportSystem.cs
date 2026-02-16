@@ -117,11 +117,10 @@ public static class BugReportSystem
             sb.AppendLine($"Date: {info.Timestamp}");
             sb.AppendLine($"Version: {info.GameVersion} ({info.VersionName})");
             sb.AppendLine($"Platform: {info.Platform}");
-            sb.AppendLine($"Build: {(info.IsSteamBuild ? "Steam" : info.IsBBSDoor ? "BBS Door" : "Standard")}");
+            sb.AppendLine($"Build: {(GetBuildTypeString(info))}");
             if (info.IsBBSDoor)
             {
                 sb.AppendLine($"BBS: {info.BBSName}");
-                sb.AppendLine($"User: {info.PlayerName}");
             }
             sb.AppendLine();
             sb.AppendLine("=== DESCRIPTION ===");
@@ -130,6 +129,7 @@ public static class BugReportSystem
             if (info.PlayerLevel > 0)
             {
                 sb.AppendLine("=== CHARACTER ===");
+                sb.AppendLine($"Name: {info.PlayerName}");
                 sb.AppendLine($"Level {info.PlayerLevel} {info.PlayerRace} {info.PlayerClass}");
                 sb.AppendLine($"HP: {info.CurrentHP}/{info.MaxHP}");
                 sb.AppendLine($"Location: {info.CurrentLocation}");
@@ -169,15 +169,14 @@ public static class BugReportSystem
             sb.AppendLine("```");
             sb.AppendLine($"Version:  {info.GameVersion}");
             sb.AppendLine($"Platform: {info.Platform}");
-            sb.AppendLine($"Build:    {(info.IsSteamBuild ? "Steam" : info.IsBBSDoor ? "BBS Door" : "Standard")}");
+            sb.AppendLine($"Build:    {(GetBuildTypeString(info))}");
             if (info.IsBBSDoor)
             {
                 sb.AppendLine($"BBS:      {info.BBSName}");
-                sb.AppendLine($"User:     {info.PlayerName}");
             }
             if (info.PlayerLevel > 0)
             {
-                sb.AppendLine($"Player:   Lv.{info.PlayerLevel} {info.PlayerRace} {info.PlayerClass}");
+                sb.AppendLine($"Player:   {info.PlayerName} — Lv.{info.PlayerLevel} {info.PlayerRace} {info.PlayerClass}");
                 sb.AppendLine($"Location: {info.CurrentLocation}{(info.DungeonFloor > 0 ? $" (Floor {info.DungeonFloor})" : "")}");
             }
             sb.AppendLine("```");
@@ -242,6 +241,7 @@ public static class BugReportSystem
             Is64Bit = Environment.Is64BitProcess,
             Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
             IsSteamBuild = IsSteamBuild(),
+            IsOnlineMode = DoorMode.IsOnlineMode,
             IsBBSDoor = DoorMode.IsInDoorMode,
             BBSName = DoorMode.SessionInfo?.BBSName ?? "",
             PlayerName = DoorMode.IsInDoorMode
@@ -295,17 +295,16 @@ public static class BugReportSystem
         sb.AppendLine("| Property | Value |");
         sb.AppendLine("|----------|-------|");
         sb.AppendLine($"| Version | {info.GameVersion} ({info.VersionName}) |");
-        sb.AppendLine($"| Build Type | {(info.IsSteamBuild ? "Steam" : info.IsBBSDoor ? "BBS Door" : "Standard")} |");
+        sb.AppendLine($"| Build Type | {(GetBuildTypeString(info))} |");
         sb.AppendLine($"| Platform | {info.Platform} |");
         sb.AppendLine($"| OS | {info.OSVersion} |");
         if (info.IsBBSDoor)
         {
             sb.AppendLine($"| BBS | {info.BBSName} |");
-            sb.AppendLine($"| BBS User | {info.PlayerName} |");
         }
         if (info.PlayerLevel > 0)
         {
-            sb.AppendLine($"| Character | Level {info.PlayerLevel} {info.PlayerRace} {info.PlayerClass} |");
+            sb.AppendLine($"| Character | {info.PlayerName} — Level {info.PlayerLevel} {info.PlayerRace} {info.PlayerClass} |");
             sb.AppendLine($"| HP | {info.CurrentHP}/{info.MaxHP} |");
             sb.AppendLine($"| Location | {info.CurrentLocation} |");
             if (info.DungeonFloor > 0)
@@ -518,6 +517,14 @@ public static class BugReportSystem
         return "";
     }
 
+    private static string GetBuildTypeString(DiagnosticInfo info)
+    {
+        if (info.IsSteamBuild) return "Steam";
+        if (info.IsBBSDoor) return "BBS Door";
+        if (info.IsOnlineMode) return "Online";
+        return "Local";
+    }
+
     private static string TruncateForTitle(string text)
     {
         var cleaned = text.Replace("\n", " ").Replace("\r", " ").Trim();
@@ -537,6 +544,7 @@ public static class BugReportSystem
         public string DotNetVersion { get; set; } = "";
         public bool Is64Bit { get; set; }
         public bool IsSteamBuild { get; set; }
+        public bool IsOnlineMode { get; set; }
         public bool IsBBSDoor { get; set; }
         public string BBSName { get; set; } = "";
         public string PlayerName { get; set; } = "";

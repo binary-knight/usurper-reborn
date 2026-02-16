@@ -885,12 +885,12 @@ public abstract class BaseLocation
         {
             GameLocation.MainStreet => "Main Street",
             GameLocation.TheInn => "Inn",
-            GameLocation.Church => "Temple",
+            GameLocation.Church => "Church",
             GameLocation.Temple => "Temple",
             GameLocation.WeaponShop => "Weapon Shop",
             GameLocation.ArmorShop => "Armor Shop",
             GameLocation.MagicShop => "Magic Shop",
-            GameLocation.Marketplace => "Market",
+            GameLocation.AuctionHouse => "Auction House",
             GameLocation.Steroids => "Level Master",
             GameLocation.DarkAlley => "Dark Alley",
             GameLocation.Castle => "Castle",
@@ -1124,11 +1124,11 @@ public abstract class BaseLocation
                 1 => "peering into a crystal ball",
                 _ => "sniffing a suspicious potion"
             },
-            GameLocation.Marketplace => _npcRandom.Next(3) switch
+            GameLocation.AuctionHouse => _npcRandom.Next(3) switch
             {
-                0 => "haggling with a merchant",
-                1 => "browsing the market stalls",
-                _ => "comparing prices"
+                0 => "bidding on an auction",
+                1 => "browsing the auction listings",
+                _ => "appraising items for sale"
             },
             GameLocation.Healer => _npcRandom.Next(2) switch
             {
@@ -2831,7 +2831,8 @@ public abstract class BaseLocation
         terminal.WriteLine("");
 
         // Use the dynamic dialogue system for small talk
-        string smallTalk = npc.GetSmallTalk(currentPlayer as Player);
+        var player = currentPlayer as Player;
+        string smallTalk = npc.GetSmallTalk(player);
 
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {npc.Name2} says:");
@@ -2843,7 +2844,7 @@ public abstract class BaseLocation
         if (new Random().NextDouble() < 0.5)
         {
             await Task.Delay(600);
-            string moreTalk = npc.GetSmallTalk(currentPlayer as Player);
+            string moreTalk = npc.GetSmallTalk(player);
             if (moreTalk != smallTalk) // Avoid repetition
             {
                 terminal.WriteLine($"  \"{moreTalk}\"");
@@ -4192,7 +4193,7 @@ public abstract class BaseLocation
             GameLocation.WeaponShop => "Weapon Shop",
             GameLocation.ArmorShop => "Armor Shop",
             GameLocation.Bank => "Bank",
-            GameLocation.Marketplace => "Marketplace",
+            GameLocation.AuctionHouse => "Auction House",
             GameLocation.Dungeons => "Dungeons",
             GameLocation.Castle => "Royal Castle",
             GameLocation.Dormitory => "Dormitory",
@@ -4220,7 +4221,7 @@ public abstract class BaseLocation
             GameLocation.WeaponShop => "W",
             GameLocation.ArmorShop => "A",
             GameLocation.Bank => "B",
-            GameLocation.Marketplace => "K",
+            GameLocation.AuctionHouse => "K",
             GameLocation.Dungeons => "U",
             GameLocation.Castle => "S",
             GameLocation.Dormitory => "O",
@@ -4274,7 +4275,7 @@ public abstract class BaseLocation
             GameLocation.ArmorShop => "Armor shop",
             GameLocation.Bank => "Bank",
             GameLocation.Healer => "Healer",
-            GameLocation.Marketplace => "Market Place",
+            GameLocation.AuctionHouse => "Auction House",
             GameLocation.Dormitory => "Dormitory",
             GameLocation.AnchorRoad => "Anchor road",
             GameLocation.BobsBeer => "Bobs Beer",

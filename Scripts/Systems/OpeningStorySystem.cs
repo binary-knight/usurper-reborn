@@ -303,7 +303,7 @@ namespace UsurperRemake.Systems
                 ("You step out of the dormitory into the morning light.", "white"),
                 ("", ""),
                 ("The town of Dorashire spreads before you.", "gray"),
-                ("An Inn. A Marketplace. A Temple to gods you don't remember.", "gray"),
+                ("An Inn. An Auction House. A Temple to gods you don't remember.", "gray"),
                 ("And beyond the walls - the entrance to the Dungeons.", "bright_red"),
                 ("", ""),
                 ("Somewhere down there, in the darkness:", "white"),

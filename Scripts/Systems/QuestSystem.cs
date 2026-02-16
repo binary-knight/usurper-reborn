@@ -15,7 +15,15 @@ public partial class QuestSystem : Node
 {
     private static List<Quest> questDatabase = new List<Quest>();
     private static Random random = new Random();
-    
+
+    /// <summary>
+    /// Add a pre-built quest to the database (for systems that create quests externally).
+    /// </summary>
+    public static void AddQuestToDatabase(Quest quest)
+    {
+        questDatabase.Add(quest);
+    }
+
     /// <summary>
     /// Create new quest (Pascal: Royal quest initiation from RQUESTS.PAS)
     /// </summary>
@@ -407,15 +415,14 @@ public partial class QuestSystem : Node
             case QuestTarget.ClearFloor:
                 // Clear all monsters on a specific floor - capped to accessible range
                 var clearFloor = CapFloor(playerLevel + quest.Difficulty + random.Next(-1, 3));
-                var monstersOnFloor = 5 + (quest.Difficulty * 3);
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ReachDungeonFloor,
                     $"Descend to floor {clearFloor}",
                     clearFloor, "", $"Floor {clearFloor}"));
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ClearDungeonFloor,
-                    $"Clear all {monstersOnFloor} monsters on floor {clearFloor}",
-                    monstersOnFloor, clearFloor.ToString(), $"Floor {clearFloor}"));
+                    $"Clear all monsters on floor {clearFloor}",
+                    1, clearFloor.ToString(), $"Floor {clearFloor}"));
                 quest.Title = $"Clear Floor {clearFloor}";
                 break;
 
@@ -877,6 +884,77 @@ public partial class QuestSystem : Node
     }
 
     /// <summary>
+    /// Merge a player's quests into the shared database without clearing other players' quests.
+    /// Used in MUD/online mode where multiple players share the static questDatabase.
+    /// Removes any existing quests for this player, then adds back from save data.
+    /// </summary>
+    public static void MergePlayerQuests(string playerName, List<QuestData> savedQuests)
+    {
+        // Remove only THIS player's quests from the shared database
+        questDatabase.RemoveAll(q =>
+            string.Equals(q.Occupier, playerName, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(q.OfferedTo, playerName, StringComparison.OrdinalIgnoreCase));
+
+        if (savedQuests == null || savedQuests.Count == 0)
+            return;
+
+        // Add back this player's quests from their save data
+        foreach (var questData in savedQuests)
+        {
+            var quest = new Quest
+            {
+                Id = questData.Id,
+                Title = questData.Title,
+                Initiator = questData.Initiator,
+                Comment = questData.Comment,
+                Date = questData.StartTime,
+                QuestType = (QuestType)questData.QuestType,
+                QuestTarget = (QuestTarget)questData.QuestTarget,
+                Difficulty = (byte)questData.Difficulty,
+                Occupier = questData.Occupier,
+                OccupiedDays = questData.OccupiedDays,
+                DaysToComplete = questData.DaysToComplete,
+                MinLevel = questData.MinLevel,
+                MaxLevel = questData.MaxLevel,
+                Reward = (byte)questData.Reward,
+                RewardType = (QuestRewardType)questData.RewardType,
+                Penalty = (byte)questData.Penalty,
+                PenaltyType = (QuestRewardType)questData.PenaltyType,
+                OfferedTo = questData.OfferedTo,
+                Forced = questData.Forced,
+                Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed
+            };
+
+            foreach (var objData in questData.Objectives)
+            {
+                quest.Objectives.Add(new QuestObjective
+                {
+                    Id = objData.Id,
+                    Description = objData.Description,
+                    ObjectiveType = (QuestObjectiveType)objData.ObjectiveType,
+                    TargetId = objData.TargetId,
+                    TargetName = objData.TargetName,
+                    RequiredProgress = objData.RequiredProgress,
+                    CurrentProgress = objData.CurrentProgress,
+                    IsOptional = objData.IsOptional,
+                    BonusReward = objData.BonusReward
+                });
+            }
+
+            foreach (var monsterData in questData.Monsters)
+            {
+                quest.Monsters.Add(new QuestMonster(
+                    monsterData.MonsterType,
+                    monsterData.Count,
+                    monsterData.MonsterName
+                ));
+            }
+
+            questDatabase.Add(quest);
+        }
+    }
+
+    /// <summary>
     /// Clear all quests (for testing or new game)
     /// </summary>
     public static void ClearAllQuests()
@@ -906,9 +984,6 @@ public partial class QuestSystem : Node
             {
                 quest.UpdateObjectiveProgress(QuestObjectiveType.KillBoss, 1, monsterName.ToLower().Replace(" ", "_"));
             }
-
-            // Check for floor clear objective
-            quest.UpdateObjectiveProgress(QuestObjectiveType.ClearDungeonFloor, 1);
         }
     }
 
@@ -935,6 +1010,20 @@ public partial class QuestSystem : Node
                     objective.CurrentProgress = floorNumber;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Update quest progress when a dungeon floor is fully cleared (all monsters defeated)
+    /// Call this from DungeonLocation when IsFloorCleared() becomes true
+    /// </summary>
+    public static void OnDungeonFloorCleared(Character player, int floorNumber)
+    {
+        var playerQuests = GetPlayerQuests(player.Name2);
+
+        foreach (var quest in playerQuests)
+        {
+            quest.UpdateObjectiveProgress(QuestObjectiveType.ClearDungeonFloor, 1, floorNumber.ToString());
         }
     }
 

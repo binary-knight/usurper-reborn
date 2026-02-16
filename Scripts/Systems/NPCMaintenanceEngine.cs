@@ -421,7 +421,7 @@ public class NPCMaintenanceEngine : Node
             .ToList();
 
         // Territory locations that can be controlled
-        var territories = new[] { "Dark Alley", "Inn", "Market", "Love Street", "Prison", "Castle" };
+        var territories = new[] { "Dark Alley", "Inn", "Auction House", "Love Street", "Prison", "Castle" };
 
         foreach (var gang in gangs)
         {
@@ -618,7 +618,7 @@ public class NPCMaintenanceEngine : Node
         {
             "Dark Alley" => 50,
             "Inn" => 100,
-            "Market" => 200,
+            "Auction House" => 200,
             "Love Street" => 150,
             "Prison" => 30,
             "Castle" => 120,

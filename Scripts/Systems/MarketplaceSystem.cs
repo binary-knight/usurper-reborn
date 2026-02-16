@@ -93,7 +93,7 @@ namespace UsurperRemake.Systems
             Listings.Add(listing);
 
             // Generate news about the listing
-            NewsSystem.Instance?.Newsy(false, $"{npc.Name} put {item.Name} up for sale at the marketplace.");
+            NewsSystem.Instance?.Newsy(false, $"{npc.Name} put {item.Name} up for sale at the Auction House.");
             // GD.Print($"[Marketplace] NPC {npc.Name} listed {item.Name} for {price} gold");
         }
 
@@ -187,7 +187,7 @@ namespace UsurperRemake.Systems
                 sellerNPC?.GainGold(listing.Price);
 
                 NewsSystem.Instance?.Newsy(false,
-                    $"{npc.Name} bought {listing.Item.Name} from {listing.Seller} at the marketplace.");
+                    $"{npc.Name} bought {listing.Item.Name} from {listing.Seller} at the Auction House.");
             }
 
             // Equip or store the item

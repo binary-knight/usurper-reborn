@@ -564,21 +564,35 @@ namespace UsurperRemake.Systems
 
             // Determine handedness for weapons (default to None for non-weapons like armor)
             WeaponHandedness handedness = WeaponHandedness.None;
+            WeaponType weaponType = WeaponType.None;
             if (item.Type == ObjType.Weapon)
             {
-                // Check if it's a two-handed weapon based on name
-                string nameLower = item.Name.ToLower();
-                if (nameLower.Contains("two-hand") || nameLower.Contains("2h") ||
-                    nameLower.Contains("greatsword") || nameLower.Contains("greataxe") ||
-                    nameLower.Contains("halberd") || nameLower.Contains("pike") ||
-                    nameLower.Contains("longbow") || nameLower.Contains("crossbow") ||
-                    nameLower.Contains("staff") || nameLower.Contains("quarterstaff"))
+                // First, look up in the equipment database by name to get correct handedness
+                var knownEquip = EquipmentDatabase.GetByName(item.Name);
+                if (knownEquip != null && (knownEquip.Handedness == WeaponHandedness.OneHanded || knownEquip.Handedness == WeaponHandedness.TwoHanded))
                 {
-                    handedness = WeaponHandedness.TwoHanded;
+                    handedness = knownEquip.Handedness;
+                    weaponType = knownEquip.WeaponType;
                 }
                 else
                 {
-                    handedness = WeaponHandedness.OneHanded;
+                    // Fallback: guess from name
+                    string nameLower = item.Name.ToLower();
+                    if (nameLower.Contains("two-hand") || nameLower.Contains("2h") ||
+                        nameLower.Contains("greatsword") || nameLower.Contains("greataxe") ||
+                        nameLower.Contains("halberd") || nameLower.Contains("pike") ||
+                        nameLower.Contains("longbow") || nameLower.Contains("crossbow") ||
+                        nameLower.Contains("staff") || nameLower.Contains("quarterstaff") ||
+                        nameLower.Contains("maul") || nameLower.Contains("spear") ||
+                        nameLower.Contains("glaive") || nameLower.Contains("bardiche") ||
+                        nameLower.Contains("lance") || nameLower.Contains("voulge"))
+                    {
+                        handedness = WeaponHandedness.TwoHanded;
+                    }
+                    else
+                    {
+                        handedness = WeaponHandedness.OneHanded;
+                    }
                 }
             }
             else if (item.Type == ObjType.Shield)
@@ -616,6 +630,7 @@ namespace UsurperRemake.Systems
                 Name = item.Name,
                 Slot = targetSlot,
                 Handedness = handedness,
+                WeaponType = weaponType,
                 WeaponPower = item.Attack,
                 ArmorClass = item.Armor,
                 ShieldBonus = item.Type == ObjType.Shield ? item.Armor : 0,

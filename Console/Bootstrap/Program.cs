@@ -45,6 +45,13 @@ namespace UsurperConsole
             // Set up global exception handlers FIRST so we catch everything
             SetupGlobalExceptionHandlers();
 
+            // Handle --version flag: print version and exit immediately
+            if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v" || args[0] == "-V"))
+            {
+                Console.WriteLine($"Usurper Reborn v{GameConfig.Version}");
+                return;
+            }
+
             // Check for BBS door mode arguments
             if (args.Length > 0)
             {

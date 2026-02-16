@@ -82,7 +82,7 @@ namespace UsurperRemake.Systems
             [StrangerDisguise.MysteriousMerchant] = new StrangerDisguiseData(
                 "A Mysterious Merchant",
                 "A seller of curiosities with wares that seem to shift when you look away",
-                new[] { "Marketplace", "MagicShop", "DarkAlley" },
+                new[] { "AuctionHouse", "MagicShop", "DarkAlley" },
                 10, 100
             ),
             [StrangerDisguise.WoundedKnight] = new StrangerDisguiseData(
