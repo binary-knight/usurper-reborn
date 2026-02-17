@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
@@ -47,7 +48,50 @@ namespace UsurperRemake.Locations
                 throw new LocationExitException(GameLocation.MainStreet);
             }
 
+            // Check for loan enforcer encounter (overdue loan)
+            if (player.LoanDaysRemaining <= 0 && player.LoanAmount > 0)
+            {
+                await HandleEnforcerEncounter(player, term);
+            }
+            // Random shady encounter (15% chance)
+            else if (GD.RandRange(1, 100) <= 15)
+            {
+                await HandleShadyEncounter(player, term);
+            }
+
             await base.EnterLocation(player, term);
+        }
+
+        /// <summary>
+        /// Check if the Shadows trust the player enough for underground services.
+        /// Standing must be >= -50 (not Hostile or Hated).
+        /// </summary>
+        private bool IsUndergroundAccessAllowed()
+        {
+            var standing = FactionSystem.Instance?.FactionStanding[Faction.TheShadows] ?? 0;
+            return standing >= -50;
+        }
+
+        /// <summary>
+        /// Show rejection message when underground services are locked due to poor Shadows standing.
+        /// </summary>
+        private async Task ShowUndergroundRejection()
+        {
+            var standing = FactionSystem.Instance?.FactionStanding[Faction.TheShadows] ?? 0;
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("");
+            terminal.WriteLine("A heavy hand lands on your shoulder. You turn to find cold eyes staring you down.");
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine("\"We don't serve your kind here. The Shadows have long memories,");
+            terminal.WriteLine(" and you've made too many enemies in this alley.\"");
+            terminal.SetColor("gray");
+            terminal.WriteLine("");
+            terminal.WriteLine($"  Shadows standing: {standing:N0} — you need at least -50 to access underground services.");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  Try paying [W]tribute to improve your standing.");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
         }
 
         protected override async Task<bool> ProcessChoice(string choice)
@@ -59,31 +103,82 @@ namespace UsurperRemake.Locations
             switch (choice.ToUpperInvariant())
             {
                 case "D":
+                {
+                    long goldBefore = currentPlayer.Gold;
                     await VisitDrugPalace();
+                    if (currentPlayer.Gold < goldBefore) GiveSmallShadowsStandingBoost();
                     return false;
+                }
                 case "S":
+                {
+                    long goldBefore = currentPlayer.Gold;
                     await VisitSteroidShop();
+                    if (currentPlayer.Gold < goldBefore) GiveSmallShadowsStandingBoost();
                     return false;
+                }
                 case "O":
+                {
+                    long goldBefore = currentPlayer.Gold;
                     await VisitOrbsHealthClub();
+                    if (currentPlayer.Gold < goldBefore) GiveSmallShadowsStandingBoost();
                     return false;
+                }
                 case "G":
+                {
+                    long goldBefore = currentPlayer.Gold;
                     await VisitGroggoMagic();
+                    if (currentPlayer.Gold < goldBefore) GiveSmallShadowsStandingBoost();
                     return false;
+                }
                 case "B":
+                {
+                    long goldBefore = currentPlayer.Gold;
                     await VisitBeerHut();
+                    if (currentPlayer.Gold < goldBefore) GiveSmallShadowsStandingBoost();
                     return false;
+                }
                 case "A":
+                {
+                    long goldBefore = currentPlayer.Gold;
                     await VisitAlchemistHeaven();
+                    if (currentPlayer.Gold < goldBefore) GiveSmallShadowsStandingBoost();
                     return false;
+                }
                 case "J": // The Shadows faction recruitment
                     await ShowShadowsRecruitment();
+                    return false;
+                case "W": // Pay tribute to improve Shadows standing
+                    await PayShadowsTribute();
                     return false;
                 case "M": // Black Market (Shadows only)
                     await VisitBlackMarket();
                     return false;
                 case "I": // Informant (Shadows only)
                     await VisitInformant();
+                    return false;
+                case "P": // Pickpocket
+                    if (!IsUndergroundAccessAllowed()) { await ShowUndergroundRejection(); return false; }
+                    await VisitPickpocket();
+                    return false;
+                case "F": // Fence stolen goods
+                    if (!IsUndergroundAccessAllowed()) { await ShowUndergroundRejection(); return false; }
+                    await VisitFence();
+                    return false;
+                case "C": // Gambling Den
+                    if (!IsUndergroundAccessAllowed()) { await ShowUndergroundRejection(); return false; }
+                    await VisitGamblingDen();
+                    return false;
+                case "T": // The Pit (Arena)
+                    if (!IsUndergroundAccessAllowed()) { await ShowUndergroundRejection(); return false; }
+                    await VisitThePit();
+                    return false;
+                case "L": // Loan Shark
+                    if (!IsUndergroundAccessAllowed()) { await ShowUndergroundRejection(); return false; }
+                    await VisitLoanShark();
+                    return false;
+                case "N": // Safe House
+                    if (!IsUndergroundAccessAllowed()) { await ShowUndergroundRejection(); return false; }
+                    await VisitSafeHouse();
                     return false;
                 case "X": // Hidden easter egg - not shown in menu
                     await ExamineTheShadows();
@@ -201,6 +296,94 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("lchemist's Heaven");
 
             terminal.WriteLine("");
+
+            // Underground Services section
+            bool undergroundLocked = !IsUndergroundAccessAllowed();
+            var shadowsStanding = FactionSystem.Instance?.FactionStanding[Faction.TheShadows] ?? 0;
+
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("Underground Services:");
+            if (undergroundLocked)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  The Shadows don't trust you. (Standing: {shadowsStanding:N0}, need -50+)");
+            }
+            terminal.WriteLine("");
+
+            string keyColor = undergroundLocked ? "darkgray" : "red";
+            string labelColor = undergroundLocked ? "darkgray" : "white";
+
+            // Row 1
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor(keyColor);
+            terminal.Write("P");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor(labelColor);
+            terminal.Write("ickpocket              ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor(keyColor);
+            terminal.Write("F");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor(labelColor);
+            terminal.WriteLine("ence Stolen Goods");
+
+            // Row 2
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor(keyColor);
+            terminal.Write("C");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor(labelColor);
+            terminal.Write(" Gambling Den           ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor(keyColor);
+            terminal.Write("T");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor(labelColor);
+            terminal.WriteLine(" The Pit (Arena)");
+
+            // Row 3
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor(keyColor);
+            terminal.Write("L");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor(labelColor);
+            terminal.Write("oan Shark               ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor(keyColor);
+            terminal.Write("N");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor(labelColor);
+            terminal.WriteLine(" Safe House");
+
+            terminal.WriteLine("");
+
+            // Pay Tribute option (always visible when standing is negative)
+            if (shadowsStanding < 0)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("yellow");
+                terminal.Write("W");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("yellow");
+                terminal.WriteLine(" Pay Tribute to the Shadows");
+            }
 
             // The Shadows faction option
             var factionSystem = FactionSystem.Instance;
@@ -426,8 +609,21 @@ namespace UsurperRemake.Locations
         {
             terminal.WriteLine("");
             terminal.WriteLine("A muscular dwarf guards crates of suspicious vials.", "white");
+
+            if (currentPlayer.SteroidShopPurchases >= GameConfig.MaxSteroidShopPurchases)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("The dwarf shakes his head. \"Your body can't handle any more, friend.\"");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"(Maximum {GameConfig.MaxSteroidShopPurchases} lifetime purchases reached)");
+                await Task.Delay(2000);
+                return;
+            }
+
             long price = GetAdjustedPrice(1000);
             terminal.WriteLine($"Bulk-up serum costs {price:N0} {GameConfig.MoneyType}.", "cyan");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"(Purchases: {currentPlayer.SteroidShopPurchases}/{GameConfig.MaxSteroidShopPurchases})");
             var ans = await terminal.GetInput("Inject? (Y/N): ");
             if (ans.ToUpper() != "Y") return;
 
@@ -442,8 +638,11 @@ namespace UsurperRemake.Locations
             currentPlayer.Strength += 5;
             currentPlayer.Stamina += 3;
             currentPlayer.Darkness += 3;
+            currentPlayer.SteroidShopPurchases++;
 
             terminal.WriteLine("Your muscles swell unnaturally!", "bright_green");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"({GameConfig.MaxSteroidShopPurchases - currentPlayer.SteroidShopPurchases} purchases remaining)");
             await Task.Delay(2000);
         }
 
@@ -532,7 +731,15 @@ namespace UsurperRemake.Locations
                         break;
                     }
                     currentPlayer.Gold -= blessPrice;
-                    currentPlayer.Dexterity += 3; // Temporary-ish bonus (persists until rest)
+                    if (currentPlayer.GroggoShadowBlessingDex > 0)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine("You already have the Blessing of Shadows active!");
+                        currentPlayer.Gold += blessPrice; // Refund
+                        break;
+                    }
+                    currentPlayer.GroggoShadowBlessingDex = 3;
+                    currentPlayer.Dexterity += 3;
                     terminal.WriteLine("");
                     terminal.WriteLine("Groggo traces arcane symbols in the air...", "bright_magenta");
                     terminal.WriteLine("Shadows wrap around you like a cloak!", "white");
@@ -608,8 +815,16 @@ namespace UsurperRemake.Locations
             switch (effect)
             {
                 case 1:
-                    currentPlayer.Intelligence += 2;
-                    terminal.WriteLine("Your mind feels sharper! (+2 INT)", "bright_green");
+                    if (currentPlayer.AlchemistINTBoosts >= GameConfig.MaxAlchemistINTBoosts)
+                    {
+                        terminal.WriteLine("Your mind has been enhanced to its limit by alchemy.", "yellow");
+                    }
+                    else
+                    {
+                        currentPlayer.Intelligence += 2;
+                        currentPlayer.AlchemistINTBoosts++;
+                        terminal.WriteLine($"Your mind feels sharper! (+2 INT, {GameConfig.MaxAlchemistINTBoosts - currentPlayer.AlchemistINTBoosts} boosts remaining)", "bright_green");
+                    }
                     break;
                 case 2:
                     currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + 20);
@@ -1154,6 +1369,1436 @@ namespace UsurperRemake.Locations
 
             terminal.WriteLine("");
             await terminal.PressAnyKey();
+        }
+
+        #endregion
+
+        #region Underground Services
+
+        /// <summary>
+        /// Gambling Den - Three street-hustle games with daily limits.
+        /// Loaded Dice, Three Card Monte, Skull & Bones.
+        /// </summary>
+        private async Task VisitGamblingDen()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                       THE GAMBLING DEN                            ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("Smoke curls through the low-ceilinged room. A scarred half-orc");
+            terminal.WriteLine("runs the tables while nervous eyes watch from every corner.");
+            terminal.WriteLine("");
+
+            if (currentPlayer.GamblingRoundsToday >= 10)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("The half-orc waves you off. \"You've had enough action for today.\"");
+                terminal.SetColor("gray");
+                terminal.WriteLine("(10/10 daily rounds used)");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Rounds remaining today: {10 - currentPlayer.GamblingRoundsToday}/10");
+            terminal.WriteLine($"Gold on hand: {currentPlayer.Gold:N0}");
+            terminal.WriteLine("");
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("[1] Loaded Dice       - Guess over/under 7. Win = 1.8x bet");
+            terminal.WriteLine("[2] Three Card Monte  - Pick the right card. Win = 2.5x bet");
+            terminal.WriteLine("[3] Skull & Bones     - Choose your risk. 2x/3x/5x payout");
+            terminal.WriteLine("[0] Leave");
+            terminal.WriteLine("");
+
+            var choice = await terminal.GetInput("Your game: ");
+            if (choice != "1" && choice != "2" && choice != "3") return;
+
+            // Get bet amount
+            long minBet = 10;
+            long maxBet = Math.Max(minBet, currentPlayer.Gold / 10);
+            if (currentPlayer.Gold < minBet)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("\"You need at least 10 gold to play, rat.\"");
+                await Task.Delay(1500);
+                return;
+            }
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Place your bet (min {minBet}, max {maxBet:N0}): ");
+            var betInput = await terminal.GetInput("> ");
+            if (!long.TryParse(betInput, out long bet) || bet < minBet || bet > maxBet)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("\"That ain't a proper wager.\"");
+                await Task.Delay(1500);
+                return;
+            }
+
+            if (bet > currentPlayer.Gold)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("\"You ain't got that kind of coin.\"");
+                await Task.Delay(1500);
+                return;
+            }
+
+            currentPlayer.Gold -= bet;
+            currentPlayer.GamblingRoundsToday++;
+            currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 1);
+            bool won = false;
+            long winnings = 0;
+
+            switch (choice)
+            {
+                case "1": // Loaded Dice
+                    (won, winnings) = await PlayLoadedDice(bet);
+                    break;
+                case "2": // Three Card Monte
+                    (won, winnings) = await PlayThreeCardMonte(bet);
+                    break;
+                case "3": // Skull & Bones
+                    (won, winnings) = await PlaySkullAndBones(bet);
+                    break;
+            }
+
+            if (won)
+            {
+                currentPlayer.Gold += winnings;
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"You pocket {winnings:N0} gold!");
+                currentPlayer.Statistics?.RecordGamblingWin(winnings - bet);
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"You lost {bet:N0} gold. The house always wins... eventually.");
+                currentPlayer.Statistics?.RecordGamblingLoss(bet);
+            }
+
+            // Check achievement
+            if ((currentPlayer.Statistics?.TotalGoldFromGambling ?? 0) >= 1000)
+            {
+                AchievementSystem.TryUnlock(currentPlayer, "dark_alley_gambler");
+                await AchievementSystem.ShowPendingNotifications(terminal);
+            }
+
+            terminal.SetColor("gray");
+            terminal.WriteLine($"Rounds remaining: {10 - currentPlayer.GamblingRoundsToday}/10");
+            await Task.Delay(2000);
+        }
+
+        private async Task<(bool won, long winnings)> PlayLoadedDice(long bet)
+        {
+            bool won = false;
+            long winnings = 0;
+
+            terminal.SetColor("white");
+            terminal.WriteLine("");
+            terminal.WriteLine("The half-orc rattles two dice in a leather cup.");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("[1] Over 7    [2] Under 7");
+            var guess = await terminal.GetInput("> ");
+            bool guessOver = guess != "2"; // Default to over
+
+            await Task.Delay(1000);
+            int die1 = GD.RandRange(1, 6);
+            int die2 = GD.RandRange(1, 6);
+            int total = die1 + die2;
+
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"The dice tumble... {die1} + {die2} = {total}!");
+            await Task.Delay(500);
+
+            // ~45% base win + CHA/200 bonus
+            float chaBonus = currentPlayer.Charisma / 200f;
+            float baseChance = 0.45f + chaBonus;
+
+            // Determine actual outcome based on chance (not the dice -- the dice are loaded!)
+            float roll = (float)new Random().NextDouble();
+            if (roll < baseChance)
+            {
+                // Player wins - adjust displayed result to match their guess
+                if ((guessOver && total <= 7) || (!guessOver && total >= 7))
+                {
+                    total = guessOver ? GD.RandRange(8, 12) : GD.RandRange(2, 6);
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine($"Wait... actually it's {total}!");
+                }
+                won = true;
+                winnings = (long)(bet * 1.8);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"You called it! The dice favor you.");
+            }
+            else
+            {
+                if ((guessOver && total > 7) || (!guessOver && total < 7))
+                {
+                    total = guessOver ? GD.RandRange(2, 7) : GD.RandRange(7, 12);
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine($"Wait... actually it's {total}!");
+                }
+                terminal.SetColor("red");
+                terminal.WriteLine("The dice betray you.");
+            }
+
+            return (won, winnings);
+        }
+
+        private async Task<(bool won, long winnings)> PlayThreeCardMonte(long bet)
+        {
+            bool won = false;
+            long winnings = 0;
+
+            terminal.SetColor("white");
+            terminal.WriteLine("");
+            terminal.WriteLine("Three cards face-down. One is the Queen of Shadows.");
+            terminal.WriteLine("The dealer's hands blur as he shuffles them.");
+            terminal.WriteLine("");
+            await Task.Delay(1000);
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine("[1] Left card    [2] Middle card    [3] Right card");
+            var pick = await terminal.GetInput("> ");
+
+            await Task.Delay(1500);
+            terminal.SetColor("white");
+            terminal.WriteLine("The dealer flips the cards...");
+            await Task.Delay(500);
+
+            // 33% base + DEX/500 bonus
+            float dexBonus = currentPlayer.Dexterity / 500f;
+            float chance = 0.33f + dexBonus;
+            float roll = (float)new Random().NextDouble();
+
+            int queenPosition = GD.RandRange(1, 3);
+            if (roll < chance)
+            {
+                queenPosition = int.TryParse(pick, out int p) && p >= 1 && p <= 3 ? p : 1;
+                won = true;
+                winnings = (long)(bet * 2.5);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"The Queen smiles at you from card {queenPosition}. Sharp eyes!");
+            }
+            else
+            {
+                // Ensure queen is NOT where player picked
+                if (int.TryParse(pick, out int pp) && pp >= 1 && pp <= 3)
+                    queenPosition = pp == 1 ? 2 : pp == 2 ? 3 : 1;
+                terminal.SetColor("red");
+                terminal.WriteLine($"The Queen was hiding on card {queenPosition}. Better luck next time.");
+            }
+
+            return (won, winnings);
+        }
+
+        private async Task<(bool won, long winnings)> PlaySkullAndBones(long bet)
+        {
+            bool won = false;
+            long winnings = 0;
+
+            terminal.SetColor("white");
+            terminal.WriteLine("");
+            terminal.WriteLine("A grinning skull sits on the table. Choose your risk.");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("[1] Safe bet   - 2x payout (45% win)");
+            terminal.WriteLine("[2] Risky bet  - 3x payout (30% win)");
+            terminal.WriteLine("[3] All or nothing - 5x payout (15% win)");
+            var riskChoice = await terminal.GetInput("> ");
+
+            float winChance;
+            float multiplier;
+            switch (riskChoice)
+            {
+                case "2":
+                    winChance = 0.30f;
+                    multiplier = 3.0f;
+                    break;
+                case "3":
+                    winChance = 0.15f;
+                    multiplier = 5.0f;
+                    break;
+                default:
+                    winChance = 0.45f;
+                    multiplier = 2.0f;
+                    break;
+            }
+
+            await Task.Delay(1500);
+            terminal.SetColor("white");
+            terminal.WriteLine("The skull's jaw drops open...");
+            await Task.Delay(1000);
+
+            float roll = (float)new Random().NextDouble();
+            if (roll < winChance)
+            {
+                won = true;
+                winnings = (long)(bet * multiplier);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("A golden tooth gleams inside! Fortune favors the bold!");
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Empty. The skull laughs silently at your misfortune.");
+            }
+
+            return (won, winnings);
+        }
+
+        /// <summary>
+        /// Pickpocket - Uses Thiefs daily counter. DEX-based success chance.
+        /// Critical fail: prison. Failure: NPC combat. Success: steal gold.
+        /// </summary>
+        private async Task VisitPickpocket()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                        PICKPOCKETING                              ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            if (currentPlayer.Thiefs <= 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("You've used up all your thievery attempts for the day.");
+                terminal.SetColor("gray");
+                terminal.WriteLine("The streets are too hot right now. Come back tomorrow.");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("You pull your hood low and scan the crowd for marks...");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Thievery attempts remaining: {currentPlayer.Thiefs}");
+            terminal.WriteLine("");
+
+            // Show 3-5 random NPCs as targets
+            var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs?
+                .Where(n => !n.IsDead && n.Gold > 0)
+                .OrderBy(_ => GD.RandRange(0, 1000))
+                .Take(GD.RandRange(3, 5))
+                .ToList();
+
+            if (allNPCs == null || allNPCs.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("The streets are empty. No marks to be found.");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Potential marks:");
+            terminal.WriteLine("");
+            for (int i = 0; i < allNPCs.Count; i++)
+            {
+                var npc = allNPCs[i];
+                string goldHint = npc.Gold > 1000 ? "heavy purse" : npc.Gold > 200 ? "decent coin" : "light pockets";
+                terminal.SetColor("white");
+                terminal.Write($"  [{i + 1}] ");
+                terminal.SetColor("yellow");
+                terminal.Write($"{npc.Name2,-20}");
+                terminal.SetColor("gray");
+                terminal.Write($" Lvl {npc.Level,-4}");
+                terminal.SetColor(npc.Gold > 1000 ? "bright_green" : npc.Gold > 200 ? "yellow" : "gray");
+                terminal.WriteLine($" ({goldHint})");
+            }
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("[0] Changed my mind");
+            terminal.WriteLine("");
+
+            var choice = await terminal.GetInput("Target: ");
+            if (!int.TryParse(choice, out int sel) || sel < 1 || sel > allNPCs.Count)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("You slip back into the shadows.");
+                await Task.Delay(1000);
+                return;
+            }
+
+            var target = allNPCs[sel - 1];
+            currentPlayer.Thiefs--;
+
+            terminal.SetColor("gray");
+            terminal.WriteLine($"You approach {target.Name2} from behind...");
+            await Task.Delay(1500);
+
+            // DEX check
+            float chance = Math.Min(0.75f, 0.40f + currentPlayer.Dexterity * 0.005f +
+                (currentPlayer.Class == CharacterClass.Assassin ? 0.15f : 0f));
+
+            float roll = (float)new Random().NextDouble();
+
+            if (roll < 0.10f)
+            {
+                // Critical fail — guards catch you
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("\"STOP! THIEF!\"");
+                terminal.WriteLine("");
+                terminal.WriteLine("Guards materialize from every alley. There's no escape.");
+                terminal.SetColor("red");
+                terminal.WriteLine("You are dragged to the prison!");
+                terminal.WriteLine("");
+                currentPlayer.DaysInPrison = 1;
+                currentPlayer.Statistics?.RecordPickpocketAttempt(false);
+                await Task.Delay(2500);
+                throw new LocationExitException(GameLocation.Prison);
+            }
+            else if (roll >= (1.0f - chance))
+            {
+                // Success — steal gold
+                float stealPercent = GD.RandRange(5, 15) / 100f;
+                long stolen = Math.Max(1, (long)(target.Gold * stealPercent));
+                target.Gold -= stolen;
+                currentPlayer.Gold += stolen;
+                currentPlayer.Darkness += 3;
+                currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 2);
+
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"Your fingers find the purse... got it!");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"Stolen: {stolen:N0} gold from {target.Name2}");
+                terminal.SetColor("magenta");
+                terminal.WriteLine("+3 Darkness, +2 Reputation");
+
+                currentPlayer.Statistics?.RecordPickpocketAttempt(true, stolen);
+
+                // Check achievement
+                if ((currentPlayer.Statistics?.TotalPickpocketSuccesses ?? 0) >= 20)
+                {
+                    AchievementSystem.TryUnlock(currentPlayer, "dark_alley_pickpocket");
+                    await AchievementSystem.ShowPendingNotifications(terminal);
+                }
+            }
+            else
+            {
+                // Failure — NPC attacks
+                terminal.SetColor("red");
+                terminal.WriteLine($"{target.Name2} catches your hand!");
+                terminal.SetColor("white");
+                terminal.WriteLine($"\"You think you can rob ME?!\"");
+                terminal.WriteLine("");
+                await Task.Delay(1500);
+
+                currentPlayer.Statistics?.RecordPickpocketAttempt(false);
+
+                // Combat with NPC
+                var combatEngine = new CombatEngine(terminal);
+                var result = await combatEngine.PlayerVsPlayer(currentPlayer, target);
+
+                if (!currentPlayer.IsAlive)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"{target.Name2} leaves you bleeding in the gutter.");
+                    await Task.Delay(2000);
+                }
+            }
+
+            await Task.Delay(2000);
+        }
+
+        /// <summary>
+        /// The Pit - Underground arena for bare-knuckle fights.
+        /// 3 fights/day. Monster or NPC fights with spectator betting.
+        /// </summary>
+        private async Task VisitThePit()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                          THE PIT                                  ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("A roaring crowd surrounds a blood-stained fighting pit.");
+            terminal.WriteLine("The air reeks of sweat, ale, and desperation.");
+            terminal.WriteLine("");
+
+            if (currentPlayer.PitFightsToday >= 3)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("The pit boss shakes his head. \"Three fights is the limit. Rules are rules.\"");
+                terminal.SetColor("gray");
+                terminal.WriteLine("(3/3 daily fights used)");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Fights remaining today: {3 - currentPlayer.PitFightsToday}/3");
+            terminal.SetColor("gray");
+            terminal.WriteLine("All pit fights are bare-knuckle — no armor allowed!");
+            terminal.WriteLine("");
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("[1] Fight a monster  (generated at your level, 2x gold)");
+            terminal.WriteLine("[2] Fight an NPC     (winner takes 20% of loser's gold)");
+            terminal.WriteLine("[0] Leave the pit");
+            terminal.WriteLine("");
+
+            var choice = await terminal.GetInput("Your choice: ");
+
+            if (choice == "1")
+            {
+                await PitFightMonster();
+            }
+            else if (choice == "2")
+            {
+                await PitFightNPC();
+            }
+        }
+
+        private async Task PitFightMonster()
+        {
+            // Spectator bet
+            var (spectatorBet, betMultiplier) = await OfferSpectatorBet();
+
+            // Generate monster at player level
+            var monster = MonsterGenerator.GenerateMonster(currentPlayer.Level);
+            monster.Name = "Pit " + monster.Name;
+            monster.Gold *= 2; // 2x gold reward
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("");
+            terminal.WriteLine($"A {monster.Name} is released into the pit!");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"Level {monster.Level} — HP: {monster.HP}");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            // Save armor, zero it for bare-knuckle fight
+            long savedArmPow = currentPlayer.ArmPow;
+            try
+            {
+                currentPlayer.ArmPow = 0;
+
+                var combatEngine = new CombatEngine(terminal);
+                var result = await combatEngine.PlayerVsMonster(currentPlayer, monster, null, false);
+
+                currentPlayer.PitFightsToday++;
+                currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 5);
+                currentPlayer.Darkness += 2;
+
+                if (result.Outcome == CombatOutcome.Victory)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine("The crowd roars! You are victorious!");
+
+                    // Handle spectator bet win
+                    if (spectatorBet > 0)
+                    {
+                        long betWinnings = (long)(spectatorBet * betMultiplier);
+                        currentPlayer.Gold += betWinnings;
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"Spectator bet pays out: +{betWinnings:N0} gold!");
+                    }
+
+                    currentPlayer.Statistics?.RecordPitFight(true, result.GoldGained);
+
+                    if ((currentPlayer.Statistics?.TotalPitFightsWon ?? 0) >= 10)
+                    {
+                        AchievementSystem.TryUnlock(currentPlayer, "dark_alley_pit_champion");
+                        await AchievementSystem.ShowPendingNotifications(terminal);
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("You fall to the dirt. The crowd jeers.");
+
+                    if (spectatorBet > 0)
+                    {
+                        terminal.SetColor("dark_red");
+                        terminal.WriteLine($"Lost your spectator bet of {spectatorBet:N0} gold.");
+                    }
+
+                    currentPlayer.Statistics?.RecordPitFight(false);
+                }
+            }
+            finally
+            {
+                currentPlayer.ArmPow = savedArmPow;
+            }
+
+            await Task.Delay(2000);
+        }
+
+        private async Task PitFightNPC()
+        {
+            // Show 3-5 NPCs within +-5 levels
+            int minLevel = Math.Max(1, currentPlayer.Level - 5);
+            int maxLevel = currentPlayer.Level + 5;
+            var candidates = NPCSpawnSystem.Instance?.ActiveNPCs?
+                .Where(n => !n.IsDead && n.Level >= minLevel && n.Level <= maxLevel)
+                .OrderBy(_ => GD.RandRange(0, 1000))
+                .Take(GD.RandRange(3, 5))
+                .ToList();
+
+            if (candidates == null || candidates.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("No fighters are stepping up to the pit tonight.");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Fighters in the pit tonight:");
+            terminal.WriteLine("");
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var npc = candidates[i];
+                terminal.SetColor("white");
+                terminal.Write($"  [{i + 1}] ");
+                terminal.SetColor("yellow");
+                terminal.Write($"{npc.Name2,-20}");
+                terminal.SetColor("gray");
+                terminal.Write($" Lvl {npc.Level,-4}");
+                terminal.SetColor("cyan");
+                terminal.WriteLine($" Gold: {npc.Gold:N0}");
+            }
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("[0] Back out");
+            terminal.WriteLine("");
+
+            var pick = await terminal.GetInput("Challenge: ");
+            if (!int.TryParse(pick, out int sel) || sel < 1 || sel > candidates.Count)
+                return;
+
+            var opponent = candidates[sel - 1];
+
+            // Spectator bet
+            var (spectatorBet, betMultiplier) = await OfferSpectatorBet();
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("");
+            terminal.WriteLine($"You square off against {opponent.Name2}!");
+            terminal.SetColor("gray");
+            terminal.WriteLine("No armor. No mercy.");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            // Save armor, zero it
+            long savedArmPow = currentPlayer.ArmPow;
+            long savedOpponentArmPow = opponent.ArmPow;
+            try
+            {
+                currentPlayer.ArmPow = 0;
+                opponent.ArmPow = 0;
+
+                var combatEngine = new CombatEngine(terminal);
+                var result = await combatEngine.PlayerVsPlayer(currentPlayer, opponent);
+
+                currentPlayer.PitFightsToday++;
+                currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 5);
+                currentPlayer.Darkness += 2;
+
+                if (result.Outcome == CombatOutcome.Victory)
+                {
+                    long goldTaken = (long)(opponent.Gold * 0.20);
+                    opponent.Gold -= goldTaken;
+                    currentPlayer.Gold += goldTaken;
+
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"The crowd goes wild! You claim {goldTaken:N0} gold from {opponent.Name2}!");
+
+                    if (spectatorBet > 0)
+                    {
+                        long betWinnings = (long)(spectatorBet * betMultiplier);
+                        currentPlayer.Gold += betWinnings;
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"Spectator bet pays out: +{betWinnings:N0} gold!");
+                    }
+
+                    currentPlayer.Statistics?.RecordPitFight(true, goldTaken);
+
+                    if ((currentPlayer.Statistics?.TotalPitFightsWon ?? 0) >= 10)
+                    {
+                        AchievementSystem.TryUnlock(currentPlayer, "dark_alley_pit_champion");
+                        await AchievementSystem.ShowPendingNotifications(terminal);
+                    }
+                }
+                else
+                {
+                    long goldLost = (long)(currentPlayer.Gold * 0.20);
+                    currentPlayer.Gold -= goldLost;
+                    opponent.Gold += goldLost;
+
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"You stumble out of the pit, {goldLost:N0} gold poorer.");
+
+                    if (spectatorBet > 0)
+                    {
+                        terminal.SetColor("dark_red");
+                        terminal.WriteLine($"Lost your spectator bet of {spectatorBet:N0} gold.");
+                    }
+
+                    currentPlayer.Statistics?.RecordPitFight(false);
+                }
+            }
+            finally
+            {
+                currentPlayer.ArmPow = savedArmPow;
+                opponent.ArmPow = savedOpponentArmPow;
+            }
+
+            await Task.Delay(2000);
+        }
+
+        private async Task<(long betAmount, float multiplier)> OfferSpectatorBet()
+        {
+            long betAmount = 0;
+            float multiplier = 1.0f;
+
+            if (currentPlayer.Gold <= 0) return (0, 1.0f);
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine("Place a side bet on the fight?");
+            terminal.WriteLine("[1] 1.5x (safe)  [2] 2x (risky)  [3] 3x (reckless)  [0] No bet");
+            var betChoice = await terminal.GetInput("> ");
+
+            if (betChoice != "1" && betChoice != "2" && betChoice != "3") return (0, 1.0f);
+
+            multiplier = betChoice == "1" ? 1.5f : betChoice == "2" ? 2.0f : 3.0f;
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"How much to wager? (max {currentPlayer.Gold:N0}): ");
+            var amountStr = await terminal.GetInput("> ");
+            if (long.TryParse(amountStr, out long amt) && amt > 0 && amt <= currentPlayer.Gold)
+            {
+                betAmount = amt;
+                currentPlayer.Gold -= amt;
+                terminal.SetColor("magenta");
+                terminal.WriteLine($"Bet placed: {amt:N0} gold at {multiplier}x");
+            }
+
+            return (betAmount, multiplier);
+        }
+
+        /// <summary>
+        /// Loan Shark - Borrow gold with a 5-day repayment window.
+        /// Overdue loans trigger enforcer encounters.
+        /// </summary>
+        private async Task VisitLoanShark()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                        THE LOAN SHARK                             ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("A gaunt man with golden teeth sits behind a reinforced desk.");
+            terminal.WriteLine("Two massive enforcers flank the doorway.");
+            terminal.WriteLine("");
+
+            if (currentPlayer.LoanAmount > 0)
+            {
+                // Active loan — show balance and repayment options
+                long totalOwed = currentPlayer.LoanAmount + currentPlayer.LoanInterestAccrued;
+                terminal.SetColor("yellow");
+                terminal.WriteLine("═══ Outstanding Loan ═══");
+                terminal.SetColor("white");
+                terminal.WriteLine($"  Principal:  {currentPlayer.LoanAmount:N0} gold");
+                terminal.SetColor("red");
+                terminal.WriteLine($"  Interest:   {currentPlayer.LoanInterestAccrued:N0} gold");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  Total owed: {totalOwed:N0} gold");
+                terminal.SetColor(currentPlayer.LoanDaysRemaining > 0 ? "yellow" : "bright_red");
+                terminal.WriteLine($"  Days remaining: {currentPlayer.LoanDaysRemaining}");
+                if (currentPlayer.LoanDaysRemaining <= 0)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("  ** OVERDUE — Enforcers are looking for you! **");
+                }
+                terminal.WriteLine("");
+
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"Gold on hand: {currentPlayer.Gold:N0}");
+                terminal.WriteLine("");
+
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"[1] Repay in full ({totalOwed:N0} gold)");
+                terminal.WriteLine("[2] Make partial payment");
+                terminal.WriteLine("[0] Leave");
+                terminal.WriteLine("");
+
+                var choice = await terminal.GetInput("Your choice: ");
+
+                if (choice == "1")
+                {
+                    if (currentPlayer.Gold >= totalOwed)
+                    {
+                        currentPlayer.Gold -= totalOwed;
+                        currentPlayer.LoanAmount = 0;
+                        currentPlayer.LoanDaysRemaining = 0;
+                        currentPlayer.LoanInterestAccrued = 0;
+                        currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 3);
+
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine("The loan shark counts the gold and nods.");
+                        terminal.WriteLine("\"Pleasure doing business. You're clean.\"");
+                        currentPlayer.Statistics?.RecordGoldSpent(totalOwed);
+
+                        AchievementSystem.TryUnlock(currentPlayer, "dark_alley_debt_free");
+                        await AchievementSystem.ShowPendingNotifications(terminal);
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("\"You don't have enough. Don't waste my time.\"");
+                    }
+                }
+                else if (choice == "2")
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"How much? (max {Math.Min(currentPlayer.Gold, totalOwed):N0}): ");
+                    var amtStr = await terminal.GetInput("> ");
+                    if (long.TryParse(amtStr, out long payment) && payment > 0 && payment <= currentPlayer.Gold)
+                    {
+                        if (payment > totalOwed) payment = totalOwed;
+                        currentPlayer.Gold -= payment;
+                        currentPlayer.Statistics?.RecordGoldSpent(payment);
+
+                        // Apply payment to interest first, then principal
+                        if (payment >= currentPlayer.LoanInterestAccrued)
+                        {
+                            payment -= currentPlayer.LoanInterestAccrued;
+                            currentPlayer.LoanInterestAccrued = 0;
+                            currentPlayer.LoanAmount -= payment;
+                        }
+                        else
+                        {
+                            currentPlayer.LoanInterestAccrued -= payment;
+                        }
+
+                        if (currentPlayer.LoanAmount <= 0)
+                        {
+                            currentPlayer.LoanAmount = 0;
+                            currentPlayer.LoanDaysRemaining = 0;
+                            currentPlayer.LoanInterestAccrued = 0;
+                            currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 3);
+                            terminal.SetColor("bright_green");
+                            terminal.WriteLine("Debt fully paid! \"You're clean.\"");
+
+                            AchievementSystem.TryUnlock(currentPlayer, "dark_alley_debt_free");
+                            await AchievementSystem.ShowPendingNotifications(terminal);
+                        }
+                        else
+                        {
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"Payment accepted. Remaining: {currentPlayer.LoanAmount + currentPlayer.LoanInterestAccrued:N0} gold.");
+                        }
+                    }
+                    else
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("\"Changed your mind? Don't keep me waiting too long.\"");
+                    }
+                }
+            }
+            else
+            {
+                // No active loan — offer new loan
+                long maxLoan = currentPlayer.Level * 500;
+                terminal.SetColor("white");
+                terminal.WriteLine("The loan shark leans forward with a predatory grin.");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"\"Need some coin? I can offer up to {maxLoan:N0} gold.\"");
+                terminal.SetColor("gray");
+                terminal.WriteLine("\"Five days to pay it back. Interest accrues daily.\"");
+                terminal.SetColor("red");
+                terminal.WriteLine("\"Miss the deadline... and my boys will collect in other ways.\"");
+                terminal.WriteLine("");
+
+                terminal.SetColor("cyan");
+                terminal.WriteLine("[1] Take out a loan");
+                terminal.WriteLine("[0] Leave");
+                terminal.WriteLine("");
+
+                var choice = await terminal.GetInput("Your choice: ");
+                if (choice == "1")
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"How much? (max {maxLoan:N0}): ");
+                    var amtStr = await terminal.GetInput("> ");
+                    if (long.TryParse(amtStr, out long amount) && amount > 0 && amount <= maxLoan)
+                    {
+                        currentPlayer.LoanAmount = amount;
+                        currentPlayer.LoanDaysRemaining = 5;
+                        currentPlayer.LoanInterestAccrued = 0;
+                        currentPlayer.Gold += amount;
+
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"The loan shark counts out {amount:N0} gold.");
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"\"Five days. Don't forget.\"");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("(Interest accrues 10% daily. Repay at the Loan Shark.)");
+                    }
+                    else
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("\"Wasting my time? Get out.\"");
+                    }
+                }
+            }
+
+            await Task.Delay(2000);
+        }
+
+        /// <summary>
+        /// Fence Stolen Goods - Sell items from backpack at 70% value (80% for Shadows members).
+        /// Accepts cursed items.
+        /// </summary>
+        private async Task VisitFence()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                      FENCE STOLEN GOODS                           ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("A weasel-faced man examines goods through a cracked magnifying glass.");
+            terminal.WriteLine("\"I buy anything. No questions asked.\"");
+            terminal.WriteLine("");
+
+            bool isShadows = FactionSystem.Instance?.PlayerFaction == Faction.TheShadows;
+            float fenceRate = isShadows ? 0.80f : 0.70f;
+            if (isShadows)
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("(Shadows member: 80% value instead of 70%)");
+                terminal.WriteLine("");
+            }
+
+            // Gather items from player's Item/ItemType lists
+            var itemsForSale = new List<(int index, string name, long value, bool cursed)>();
+            if (currentPlayer.Item != null && currentPlayer.ItemType != null)
+            {
+                for (int i = 0; i < currentPlayer.Item.Count && i < currentPlayer.ItemType.Count; i++)
+                {
+                    int itemId = currentPlayer.Item[i];
+                    if (itemId <= 0) continue;
+                    var item = ItemManager.GetItem(itemId);
+                    if (item == null) continue;
+
+                    long fenceValue = Math.Max(1, (long)(item.Value * fenceRate));
+                    itemsForSale.Add((i, item.Name, fenceValue, item.Cursed || item.IsCursed));
+                }
+            }
+
+            if (itemsForSale.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("\"You got nothing worth my time. Beat it.\"");
+                await Task.Delay(2000);
+                return;
+            }
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Items you can fence:");
+            terminal.WriteLine("");
+            for (int i = 0; i < itemsForSale.Count; i++)
+            {
+                var (_, name, value, cursed) = itemsForSale[i];
+                terminal.SetColor(cursed ? "red" : "white");
+                terminal.Write($"  [{i + 1}] {name,-30}");
+                terminal.SetColor("yellow");
+                terminal.Write($" {value:N0}g");
+                if (cursed)
+                {
+                    terminal.SetColor("red");
+                    terminal.Write("  [CURSED]");
+                }
+                terminal.WriteLine("");
+            }
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("[0] Leave");
+            terminal.WriteLine("");
+
+            var choice = await terminal.GetInput("Sell which item? ");
+            if (!int.TryParse(choice, out int sel) || sel < 1 || sel > itemsForSale.Count)
+                return;
+
+            var selected = itemsForSale[sel - 1];
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Sell {selected.name} for {selected.value:N0} gold? (Y/N)");
+            var confirm = await terminal.GetInput("> ");
+            if (confirm.ToUpper() != "Y") return;
+
+            // Remove item from inventory
+            currentPlayer.Item.RemoveAt(selected.index);
+            currentPlayer.ItemType.RemoveAt(selected.index);
+            currentPlayer.Gold += selected.value;
+            currentPlayer.Statistics?.RecordSale(selected.value);
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"The fence pockets {selected.name} and slides you {selected.value:N0} gold.");
+            if (selected.cursed)
+            {
+                terminal.SetColor("magenta");
+                terminal.WriteLine("\"Cursed, eh? I know a buyer for everything.\"");
+            }
+
+            await Task.Delay(2000);
+        }
+
+        /// <summary>
+        /// Safe House - Rest and heal in the underground. Requires Darkness >= 50.
+        /// Small robbery risk. Shadows members exempt from robbery.
+        /// </summary>
+        private async Task VisitSafeHouse()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                         THE SAFE HOUSE                            ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            if (currentPlayer.Darkness < 50)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("A heavy door blocks your way. A slot opens and eyes peer out.");
+                terminal.SetColor("red");
+                terminal.WriteLine("\"You don't belong here, clean-skin. Come back when you've");
+                terminal.WriteLine(" got some real darkness in your soul.\"");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"(Requires Darkness 50+. Yours: {currentPlayer.Darkness})");
+                await Task.Delay(2000);
+                return;
+            }
+
+            long cost = 50;
+            terminal.SetColor("gray");
+            terminal.WriteLine("A cramped room with a filthy cot and a locked door.");
+            terminal.WriteLine("At least nobody will find you here... probably.");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Rest here for {cost} gold? (restores 50% HP)");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"Current HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Gold: {currentPlayer.Gold:N0}");
+            terminal.WriteLine("");
+
+            var ans = await terminal.GetInput("Rest? (Y/N): ");
+            if (ans.ToUpper() != "Y") return;
+
+            if (currentPlayer.Gold < cost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("\"No gold, no bed. Sleep in the gutter.\"");
+                await Task.Delay(1500);
+                return;
+            }
+
+            currentPlayer.Gold -= cost;
+            currentPlayer.Statistics?.RecordGoldSpent(cost);
+
+            // Restore 50% HP
+            long healAmount = currentPlayer.MaxHP / 2;
+            currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"You catch some rest. (+{healAmount} HP)");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
+
+            currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 1);
+
+            // 10% robbery chance (Shadows members exempt)
+            bool isShadows = FactionSystem.Instance?.PlayerFaction == Faction.TheShadows;
+            if (!isShadows && GD.RandRange(1, 100) <= 10)
+            {
+                float lossPercent = GD.RandRange(5, 10) / 100f;
+                long goldLost = Math.Max(1, (long)(currentPlayer.Gold * lossPercent));
+                currentPlayer.Gold -= goldLost;
+
+                terminal.SetColor("red");
+                terminal.WriteLine("");
+                terminal.WriteLine($"You wake to find your purse lighter. Someone picked your pocket!");
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"Lost {goldLost:N0} gold while sleeping.");
+            }
+            else if (isShadows)
+            {
+                terminal.SetColor("magenta");
+                terminal.WriteLine("Your Shadow coin keeps the thieves at bay.");
+            }
+
+            // Shadows members who rest here are hidden from PvP attacks while offline
+            if (isShadows)
+            {
+                currentPlayer.SafeHouseResting = true;
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine("");
+                terminal.WriteLine("The Shadows watch over you. No one will find you here.");
+            }
+
+            await Task.Delay(2000);
+        }
+
+        /// <summary>
+        /// Pay gold tribute to improve Shadows faction standing.
+        /// Always available — this is the primary way to recover from negative standing.
+        /// Cost scales with how hated you are. Each payment gives a fixed standing boost.
+        /// </summary>
+        private async Task PayShadowsTribute()
+        {
+            var factionSystem = FactionSystem.Instance;
+            var standing = factionSystem?.FactionStanding[Faction.TheShadows] ?? 0;
+
+            terminal.ClearScreen();
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                       PAY TRIBUTE                                 ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            if (standing >= 0)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("The Shadows already tolerate you. No tribute needed.");
+                await terminal.PressAnyKey();
+                return;
+            }
+
+            // Cost: 100 gold base + 2 gold per point of negative standing
+            // So at -2000, it costs 100 + 4000 = 4100 gold per tribute
+            // Each tribute gives +50 standing
+            long tributeCost = 100 + Math.Abs(standing) * 2;
+            int standingGain = 50;
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("A cloaked figure emerges from the shadows.");
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("");
+            terminal.WriteLine("\"Word is you want back in our good graces. That can be arranged...\"");
+            terminal.WriteLine("\"...for the right price.\"");
+            terminal.WriteLine("");
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Current Shadows standing: {standing:N0}");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Tribute cost: {tributeCost:N0} gold  (+{standingGain} standing)");
+            terminal.SetColor("gray");
+            int tributesNeeded = standing < -50 ? (int)Math.Ceiling((-50.0 - standing) / standingGain) : 0;
+            if (tributesNeeded > 0)
+                terminal.WriteLine($"  ~{tributesNeeded} tributes to unlock underground services");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Your gold: {currentPlayer.Gold:N0}");
+            terminal.WriteLine("");
+
+            var ans = await terminal.GetInput("Pay tribute? (Y/N): ");
+            if (ans?.Trim().ToUpper() != "Y") return;
+
+            if (currentPlayer.Gold < tributeCost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("\"Come back when you can afford it. We don't do charity.\"");
+                await Task.Delay(1500);
+                return;
+            }
+
+            currentPlayer.Gold -= tributeCost;
+            currentPlayer.Statistics?.RecordGoldSpent(tributeCost);
+            factionSystem?.ModifyReputation(Faction.TheShadows, standingGain);
+
+            var newStanding = factionSystem?.FactionStanding[Faction.TheShadows] ?? 0;
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("");
+            terminal.WriteLine($"The figure pockets your gold and nods.");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Shadows standing: {standing:N0} → {newStanding:N0} (+{standingGain})");
+
+            if (newStanding >= -50 && standing < -50)
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("");
+                terminal.WriteLine("  \"The underground is open to you again. Don't make us regret it.\"");
+            }
+
+            currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 5);
+            await Task.Delay(2000);
+        }
+
+        /// <summary>
+        /// Small passive Shadows standing boost when the player spends gold at shady establishments.
+        /// Helps players slowly rebuild standing through regular patronage.
+        /// </summary>
+        private void GiveSmallShadowsStandingBoost()
+        {
+            var factionSystem = FactionSystem.Instance;
+            if (factionSystem == null) return;
+
+            var standing = factionSystem.FactionStanding[Faction.TheShadows];
+            // Only boost if standing is below Friendly (50) — no free rep for allies
+            if (standing >= 50) return;
+
+            factionSystem.ModifyReputation(Faction.TheShadows, 3);
+            currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 1);
+        }
+
+        #endregion
+
+        #region Shady Encounters
+
+        /// <summary>
+        /// Random encounter when entering the Dark Alley (15% chance).
+        /// Four types: Mugger, Beggar tip, Undercover guard, Shady merchant.
+        /// </summary>
+        private async Task HandleShadyEncounter(Character player, TerminalEmulator term)
+        {
+            int encounterType = GD.RandRange(1, 100);
+
+            if (encounterType <= 30)
+            {
+                // Mugger (30%)
+                term.SetColor("bright_red");
+                term.WriteLine("");
+                term.WriteLine("A figure steps from the shadows, blade gleaming!");
+                term.SetColor("red");
+                term.WriteLine("\"Hand over 50 gold or I'll gut you like a fish!\"");
+                term.WriteLine("");
+                term.SetColor("yellow");
+                term.WriteLine("[1] Pay 50 gold    [2] Fight!");
+                var choice = await term.GetInput("> ");
+
+                if (choice == "1" && player.Gold >= 50)
+                {
+                    player.Gold -= 50;
+                    term.SetColor("gray");
+                    term.WriteLine("You hand over the gold. The mugger vanishes into the dark.");
+                    player.Statistics?.RecordGoldSpent(50);
+                }
+                else
+                {
+                    term.SetColor("bright_red");
+                    term.WriteLine("\"Wrong answer!\"");
+                    term.WriteLine("");
+                    await Task.Delay(1000);
+
+                    // Create a mugger monster at player's level
+                    var mugger = MonsterGenerator.GenerateMonster(player.Level);
+                    mugger.Name = "Dark Alley Mugger";
+
+                    var combatEngine = new CombatEngine(term);
+                    await combatEngine.PlayerVsMonster(player, mugger, null, false);
+                }
+            }
+            else if (encounterType <= 60)
+            {
+                // Beggar tip (30%)
+                term.SetColor("gray");
+                term.WriteLine("");
+                term.WriteLine("A ragged beggar tugs at your sleeve.");
+                term.SetColor("yellow");
+
+                var tips = new[]
+                {
+                    "\"The monsters on the deeper floors carry enchanted weapons, they do...\"",
+                    "\"Watch out for the loan shark's enforcers. They break kneecaps for fun.\"",
+                    "\"I heard the guards are planning a raid on the alley tomorrow...\"",
+                    "\"There's a secret path in the dungeon. Look for the cracked wall.\"",
+                    "\"The fence pays more for cursed items than regular ones, if you know how to ask.\"",
+                    "\"The pit fights are rigged, but if yer strong enough it don't matter.\"",
+                };
+                term.WriteLine(tips[GD.RandRange(0, tips.Length - 1)]);
+                term.SetColor("gray");
+                term.WriteLine("The beggar shuffles away.");
+            }
+            else if (encounterType <= 80)
+            {
+                // Undercover guard (20%)
+                if (player.Darkness > 300)
+                {
+                    float arrestChance = 0.50f;
+                    if ((float)new Random().NextDouble() < arrestChance)
+                    {
+                        term.SetColor("bright_red");
+                        term.WriteLine("");
+                        term.WriteLine("\"HALT! City Watch! You're under arrest!\"");
+                        term.SetColor("red");
+                        term.WriteLine("An undercover guard reveals a badge. More guards swarm in.");
+                        term.SetColor("bright_red");
+                        term.WriteLine("You are dragged to the prison!");
+                        player.DaysInPrison = 1;
+                        await Task.Delay(2500);
+                        throw new LocationExitException(GameLocation.Prison);
+                    }
+                    else
+                    {
+                        term.SetColor("yellow");
+                        term.WriteLine("");
+                        term.WriteLine("You notice someone watching you a bit too intently...");
+                        term.SetColor("gray");
+                        term.WriteLine("Undercover guard? You slip away before they can act.");
+                    }
+                }
+                else
+                {
+                    term.SetColor("gray");
+                    term.WriteLine("");
+                    term.WriteLine("A well-dressed man bumps into you, mutters an apology, and moves on.");
+                    term.WriteLine("Something about him seemed... official.");
+                }
+            }
+            else
+            {
+                // Shady merchant (20%)
+                term.SetColor("magenta");
+                term.WriteLine("");
+                term.WriteLine("A cloaked figure sidles up to you.");
+                term.SetColor("yellow");
+
+                int offer = GD.RandRange(1, 2);
+                if (offer == 1)
+                {
+                    // Healing potion at half price
+                    long potionPrice = GetAdjustedPrice(50);
+                    term.WriteLine($"\"Psst... healing potion. Real good stuff. Only {potionPrice} gold.\"");
+                    term.SetColor("cyan");
+                    term.WriteLine("[Y] Buy    [N] Pass");
+                    var ans = await term.GetInput("> ");
+                    if (ans.ToUpper() == "Y" && player.Gold >= potionPrice)
+                    {
+                        player.Gold -= potionPrice;
+                        player.Healing = Math.Min(player.MaxPotions, player.Healing + 1);
+                        term.SetColor("bright_green");
+                        term.WriteLine("You pocket the potion. It smells alright... probably.");
+                    }
+                    else if (ans.ToUpper() == "Y")
+                    {
+                        term.SetColor("red");
+                        term.WriteLine("\"No gold? Scram.\"");
+                    }
+                }
+                else
+                {
+                    // Random stat boost (small)
+                    long price = GetAdjustedPrice(100);
+                    term.WriteLine($"\"Special elixir. Makes you... better. {price} gold.\"");
+                    term.SetColor("cyan");
+                    term.WriteLine("[Y] Buy    [N] Pass");
+                    var ans = await term.GetInput("> ");
+                    if (ans.ToUpper() == "Y" && player.Gold >= price)
+                    {
+                        player.Gold -= price;
+                        int stat = GD.RandRange(1, 3);
+                        switch (stat)
+                        {
+                            case 1:
+                                player.Strength += 1;
+                                term.SetColor("bright_green");
+                                term.WriteLine("A warm rush of power. (+1 STR)");
+                                break;
+                            case 2:
+                                player.Dexterity += 1;
+                                term.SetColor("bright_green");
+                                term.WriteLine("Your fingers feel nimbler. (+1 DEX)");
+                                break;
+                            default:
+                                player.Constitution += 1;
+                                term.SetColor("bright_green");
+                                term.WriteLine("You feel hardier. (+1 CON)");
+                                break;
+                        }
+                    }
+                    else if (ans.ToUpper() == "Y")
+                    {
+                        term.SetColor("red");
+                        term.WriteLine("\"No gold? Don't waste my time.\"");
+                    }
+                }
+            }
+
+            term.WriteLine("");
+            await Task.Delay(1500);
+        }
+
+        /// <summary>
+        /// Enforcer encounter - triggered when loan is overdue (LoanDaysRemaining <= 0 && LoanAmount > 0).
+        /// Win: loan forgiven. Lose: all gold taken, 25% HP damage, loan extended by 3 days.
+        /// </summary>
+        private async Task HandleEnforcerEncounter(Character player, TerminalEmulator term)
+        {
+            term.SetColor("bright_red");
+            term.WriteLine("");
+            term.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
+            term.WriteLine("║              THE ENFORCER HAS FOUND YOU                           ║");
+            term.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+            term.WriteLine("");
+            term.SetColor("red");
+            term.WriteLine("A massive figure blocks your path. Scarred knuckles crack.");
+            term.SetColor("bright_red");
+            term.WriteLine("\"You owe the boss. Time to pay up... one way or another.\"");
+            term.WriteLine("");
+            await Task.Delay(2000);
+
+            // Generate enforcer at playerLevel + 5
+            var enforcer = MonsterGenerator.GenerateMonster(player.Level + 5);
+            enforcer.Name = "Loan Shark Enforcer";
+            enforcer.Gold = 0; // No gold reward — this is punishment
+
+            var combatEngine = new CombatEngine(term);
+            var result = await combatEngine.PlayerVsMonster(player, enforcer, null, false);
+
+            if (result.Outcome == CombatOutcome.Victory)
+            {
+                // Loan forgiven
+                player.LoanAmount = 0;
+                player.LoanDaysRemaining = 0;
+                player.LoanInterestAccrued = 0;
+
+                term.SetColor("bright_green");
+                term.WriteLine("");
+                term.WriteLine("The enforcer crumples to the ground.");
+                term.SetColor("yellow");
+                term.WriteLine("Word on the street is the loan shark considers the debt settled.");
+                term.SetColor("bright_green");
+                term.WriteLine("Your loan has been forgiven!");
+            }
+            else if (player.IsAlive)
+            {
+                // Player lost but survived — take all gold, 25% HP, extend loan
+                long goldTaken = player.Gold;
+                player.Gold = 0;
+                long hpDamage = player.MaxHP / 4;
+                player.HP = Math.Max(1, player.HP - hpDamage);
+                player.LoanDaysRemaining = 3; // Extension
+
+                term.SetColor("bright_red");
+                term.WriteLine("");
+                term.WriteLine("The enforcer beats you senseless and takes everything.");
+                term.SetColor("red");
+                term.WriteLine($"Lost all gold ({goldTaken:N0}). Took {hpDamage} HP damage.");
+                term.SetColor("yellow");
+                term.WriteLine("\"The boss is giving you 3 more days. Don't waste them.\"");
+            }
+
+            term.WriteLine("");
+            await Task.Delay(2500);
         }
 
         #endregion

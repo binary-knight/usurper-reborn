@@ -853,6 +853,68 @@ public static class AchievementSystem
             GoldReward = 500,
             UnlockMessage = "You sparkle with magical accessories!"
         });
+
+        // ============ DARK ALLEY ACHIEVEMENTS ============
+
+        Register(new Achievement
+        {
+            Id = "dark_alley_gambler",
+            Name = "High Roller",
+            Description = "Win 1,000 gold gambling in the Dark Alley",
+            Category = AchievementCategory.Economy,
+            Tier = AchievementTier.Silver,
+            PointValue = 25,
+            GoldReward = 500,
+            UnlockMessage = "Lady Luck favors the bold!"
+        });
+
+        Register(new Achievement
+        {
+            Id = "dark_alley_pit_champion",
+            Name = "Pit Champion",
+            Description = "Win 10 fights in The Pit",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Gold,
+            PointValue = 50,
+            GoldReward = 1000,
+            UnlockMessage = "The crowd roars your name!"
+        });
+
+        Register(new Achievement
+        {
+            Id = "dark_alley_pickpocket",
+            Name = "Light Fingers",
+            Description = "Successfully pickpocket 20 times",
+            Category = AchievementCategory.Challenge,
+            Tier = AchievementTier.Silver,
+            PointValue = 25,
+            GoldReward = 500,
+            UnlockMessage = "Your fingers are quicker than the eye!"
+        });
+
+        Register(new Achievement
+        {
+            Id = "dark_alley_debt_free",
+            Name = "Debt Free",
+            Description = "Pay off a loan from the Loan Shark",
+            Category = AchievementCategory.Economy,
+            Tier = AchievementTier.Bronze,
+            PointValue = 10,
+            GoldReward = 200,
+            UnlockMessage = "Freedom from debt is the sweetest reward."
+        });
+
+        Register(new Achievement
+        {
+            Id = "dark_alley_king",
+            Name = "King of the Alley",
+            Description = "Reach 1,000 Dark Alley reputation",
+            Category = AchievementCategory.Social,
+            Tier = AchievementTier.Platinum,
+            PointValue = 100,
+            GoldReward = 2000,
+            UnlockMessage = "The underground bows to your authority!"
+        });
     }
 
     /// <summary>
@@ -1032,6 +1094,12 @@ public static class AchievementSystem
         if (stats.CurrentStreak >= 30) TryUnlock(player, "dedicated");
         if (player.Level >= 10 && stats.TotalMonsterDeaths == 0 && stats.TotalPlayerDeaths == 0)
             TryUnlock(player, "no_death_10");
+
+        // Dark Alley achievements
+        if (stats.TotalGoldFromGambling >= 1000) TryUnlock(player, "dark_alley_gambler");
+        if (stats.TotalPitFightsWon >= 10) TryUnlock(player, "dark_alley_pit_champion");
+        if (stats.TotalPickpocketSuccesses >= 20) TryUnlock(player, "dark_alley_pickpocket");
+        if (player.DarkAlleyReputation >= 1000) TryUnlock(player, "dark_alley_king");
 
         // Check for completionist (all non-secret achievements)
         var nonSecretCount = _achievements.Values.Count(a => !a.IsSecret && a.Id != "completionist");

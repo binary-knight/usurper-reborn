@@ -24,6 +24,16 @@ namespace UsurperRemake.Systems
         private DateTime lastSaveTime = DateTime.MinValue;
         private long lastNpcVersion = 0;  // Track world_state NPC version to detect player changes
         private long lastRoyalCourtVersion = 0;  // Track royal_court version to detect player changes (treasury, taxes, etc.)
+        private string? _lastNpcJsonHash;  // Dirty-check: skip NPC save when nothing changed
+
+        // Heartbeat support for embedded worldsim (database-level leader election)
+        private string? _heartbeatOwnerId;
+
+        /// <summary>
+        /// Signals when initialization (systems + world state load) is complete.
+        /// Used by embedded mode so the player session waits until NPCs are ready.
+        /// </summary>
+        public TaskCompletionSource<bool> InitializationComplete { get; } = new();
 
         private readonly JsonSerializerOptions jsonOptions = new()
         {
@@ -36,12 +46,14 @@ namespace UsurperRemake.Systems
             SqlSaveBackend backend,
             int simIntervalSeconds = 60,
             float npcXpMultiplier = 0.25f,
-            int saveIntervalMinutes = 5)
+            int saveIntervalMinutes = 5,
+            string? heartbeatOwnerId = null)
         {
             this.sqlBackend = backend;
             this.simIntervalSeconds = simIntervalSeconds;
             this.npcXpMultiplier = npcXpMultiplier;
             this.saveIntervalMinutes = saveIntervalMinutes;
+            this._heartbeatOwnerId = heartbeatOwnerId;
         }
 
         /// <summary>
@@ -87,6 +99,9 @@ namespace UsurperRemake.Systems
             var aliveCount = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
             Console.Error.WriteLine($"[WORLDSIM] Simulation running. NPCs: {aliveCount} alive / {NPCSpawnSystem.Instance.ActiveNPCs.Count} total");
 
+            // Signal that initialization is complete (for embedded mode)
+            InitializationComplete.TrySetResult(true);
+
             try
             {
                 int tickCount = 0;
@@ -97,6 +112,12 @@ namespace UsurperRemake.Systems
                         // Run one simulation tick
                         worldSimulator?.SimulateStep();
                         tickCount++;
+
+                        // Update heartbeat (embedded mode leader election)
+                        if (_heartbeatOwnerId != null)
+                        {
+                            sqlBackend.UpdateWorldSimHeartbeat(_heartbeatOwnerId);
+                        }
 
                         // Log status every 10 ticks
                         if (tickCount % 10 == 0)
@@ -132,8 +153,18 @@ namespace UsurperRemake.Systems
                 Console.Error.WriteLine("[WORLDSIM] Shutting down - saving final state...");
                 await SaveWorldState();
 
+                // Release worldsim lock (embedded mode)
+                if (_heartbeatOwnerId != null)
+                {
+                    sqlBackend.ReleaseWorldSimLock(_heartbeatOwnerId);
+                    Console.Error.WriteLine("[WORLDSIM] Released worldsim lock");
+                }
+
                 // Clear database callback
                 NewsSystem.DatabaseCallback = null;
+
+                // Signal initialization complete in case we're shutting down before init finished
+                InitializationComplete.TrySetResult(false);
 
                 Console.Error.WriteLine("[WORLDSIM] Final state saved. Goodbye.");
             }
@@ -250,6 +281,7 @@ namespace UsurperRemake.Systems
                     }
 
                     await LoadWorldState();
+                    _lastNpcJsonHash = null; // Invalidate hash so next save always writes after reload+merge
 
                     // Merge back pregnancies that the player session overwrote with stale data
                     if (activePregnancies.Count > 0)
@@ -291,16 +323,36 @@ namespace UsurperRemake.Systems
                 }
 
                 // Save our NPC state (either fresh from reload or accumulated simulation changes)
+                // Dirty-check: hash the serialized JSON and skip the DB write if nothing changed.
+                // The NPC blob is ~18 MB, so avoiding unnecessary writes saves significant I/O.
                 var npcData = OnlineStateManager.SerializeCurrentNPCs();
                 var json = JsonSerializer.Serialize(npcData, jsonOptions);
-                await sqlBackend.SaveWorldState(OnlineStateManager.KEY_NPCS, json);
 
-                // Track our save's version for the next cycle's comparison
-                lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+                // Use a fast hash to detect changes (SHA256 of the JSON string)
+                string jsonHash;
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                {
+                    var hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(json));
+                    jsonHash = Convert.ToHexString(hashBytes);
+                }
 
                 var aliveCount = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
-                Console.Error.WriteLine($"[WORLDSIM] State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
-                DebugLogger.Instance.LogInfo("WORLDSIM", $"State persisted: {npcData.Count} NPCs ({aliveCount} alive) v{lastNpcVersion}");
+
+                if (jsonHash != _lastNpcJsonHash)
+                {
+                    await sqlBackend.SaveWorldState(OnlineStateManager.KEY_NPCS, json);
+                    _lastNpcJsonHash = jsonHash;
+
+                    // Track our save's version for the next cycle's comparison
+                    lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+
+                    Console.Error.WriteLine($"[WORLDSIM] State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"State persisted: {npcData.Count} NPCs ({aliveCount} alive) v{lastNpcVersion}");
+                }
+                else
+                {
+                    Console.Error.WriteLine($"[WORLDSIM] NPC state unchanged, skipping write: {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
+                }
 
                 // Save royal court to world_state (authoritative - world sim maintains this)
                 await SaveRoyalCourtToWorldState();
@@ -318,8 +370,8 @@ namespace UsurperRemake.Systems
                 // Save world events (plagues, festivals, wars, etc.)
                 await SaveWorldEventsState();
 
-                // Prune old NPC activity entries (keep last 24 hours)
-                await sqlBackend.PruneOldNews("npc", 24);
+                // Prune old news across ALL categories (48-hour window, 500 entry global cap)
+                await sqlBackend.PruneAllNews(hoursToKeep: 48, maxTotal: 500);
             }
             catch (Exception ex)
             {

@@ -24,6 +24,7 @@ namespace UsurperRemake.BBS
 
         // World simulator mode (headless 24/7 NPC simulation)
         private static bool _worldSimMode = false;
+        private static bool _noAutoWorldSim = false; // Disable embedded worldsim in BBS online mode
         private static int _simIntervalSeconds = 60;
         private static float _npcXpMultiplier = 0.25f;
         private static int _saveIntervalMinutes = 5;
@@ -121,6 +122,12 @@ namespace UsurperRemake.BBS
         /// </summary>
         public static bool IsWorldSimMode => _worldSimMode;
 
+        /// <summary>
+        /// True when the embedded auto-worldsim is disabled (--no-worldsim flag).
+        /// SysOps use this when running a separate --worldsim process for 24/7 simulation.
+        /// </summary>
+        public static bool NoAutoWorldSim => _noAutoWorldSim;
+
         /// <summary>Simulation tick interval in seconds (default: 60).</summary>
         public static int SimIntervalSeconds => _simIntervalSeconds;
 
@@ -197,6 +204,12 @@ namespace UsurperRemake.BBS
                 {
                     _onlineDatabasePath = args[i + 1];
                     i++; // skip next arg (the path value)
+                }
+                // --no-worldsim disables the embedded auto-worldsim in BBS online mode
+                else if (arg == "--no-worldsim")
+                {
+                    _noAutoWorldSim = true;
+                    Console.Error.WriteLine("[ONLINE] Auto world simulator disabled (use --worldsim separately for 24/7 simulation)");
                 }
                 // --worldsim enables headless world simulator mode (24/7 NPC simulation)
                 else if (arg == "--worldsim")
@@ -823,6 +836,7 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  --db <path>          SQLite database path (default: usurper_online.db next to exe)");
             Console.WriteLine("");
             Console.WriteLine("World Simulator Options:");
+            Console.WriteLine("  --no-worldsim        Disable auto world sim (use with separate --worldsim process)");
             Console.WriteLine("  --worldsim           Run headless 24/7 world simulator (no terminal/auth)");
             Console.WriteLine("  --sim-interval <sec> Simulation tick interval in seconds (default: 60)");
             Console.WriteLine("  --npc-xp <mult>      NPC XP gain multiplier, 0.01-2.0 (default: 0.25)");
@@ -836,9 +850,9 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  UsurperReborn --online --db /var/usurper/game.db");
             Console.WriteLine("");
             Console.WriteLine("BBS Online Mode (shared world for all callers):");
-            Console.WriteLine("  UsurperReborn --online --door32 %f");
-            Console.WriteLine("  (Also run world sim): UsurperReborn --worldsim");
-            Console.WriteLine("  (Custom db path):     UsurperReborn --online --db /path/to/game.db --door32 %f");
+            Console.WriteLine("  UsurperReborn --online --door32 %f          (world sim runs automatically)");
+            Console.WriteLine("  UsurperReborn --online --no-worldsim --door32 %f  (disable auto world sim)");
+            Console.WriteLine("  UsurperReborn --worldsim                    (optional: 24/7 standalone sim)");
             Console.WriteLine("");
             Console.WriteLine("Drop File Support:");
             Console.WriteLine("  DOOR32.SYS - Modern format with socket handle (recommended)");

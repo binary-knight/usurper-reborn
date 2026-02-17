@@ -728,6 +728,213 @@ namespace UsurperRemake.Systems
             }
         }
 
+        // --- World Sim Lock ---
+        // Database-level leader election for embedded world simulator.
+        // Only one process runs the worldsim at a time. Uses a heartbeat
+        // in the world_state table to detect stale locks.
+
+        private const string WORLDSIM_LOCK_KEY = "worldsim_lock";
+        private const int WORLDSIM_LOCK_STALE_SECONDS = 90;
+
+        /// <summary>
+        /// Try to acquire the world sim lock. Returns true if this process is now the world sim host.
+        /// Lock is granted if: no lock exists, lock is stale (heartbeat > 90s old), or we already own it.
+        /// Uses an atomic transaction to prevent race conditions between concurrent door sessions.
+        /// </summary>
+        public bool TryAcquireWorldSimLock(string ownerId)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var transaction = connection.BeginTransaction();
+
+                string? currentValue = null;
+                using (var readCmd = connection.CreateCommand())
+                {
+                    readCmd.Transaction = transaction;
+                    readCmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                    readCmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
+                    currentValue = readCmd.ExecuteScalar() as string;
+                }
+
+                bool canAcquire = true;
+
+                if (!string.IsNullOrEmpty(currentValue))
+                {
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(currentValue);
+                        var root = doc.RootElement;
+
+                        // Check if we already own it
+                        if (root.TryGetProperty("owner", out var ownerEl) &&
+                            ownerEl.GetString() == ownerId)
+                        {
+                            canAcquire = true; // Re-acquire our own lock
+                        }
+                        // Check if heartbeat is stale
+                        else if (root.TryGetProperty("heartbeat", out var hbEl))
+                        {
+                            var heartbeat = DateTime.Parse(hbEl.GetString()!, System.Globalization.CultureInfo.InvariantCulture,
+                                System.Globalization.DateTimeStyles.RoundtripKind);
+                            var age = (DateTime.UtcNow - heartbeat).TotalSeconds;
+                            canAcquire = age > WORLDSIM_LOCK_STALE_SECONDS;
+
+                            if (!canAcquire)
+                            {
+                                var existingOwner = root.TryGetProperty("owner", out var eo) ? eo.GetString() : "unknown";
+                                DebugLogger.Instance.LogDebug("SQL", $"WorldSim lock held by '{existingOwner}' (age: {age:F0}s)");
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        canAcquire = true; // Corrupt lock data — take over
+                    }
+                }
+
+                if (canAcquire)
+                {
+                    var lockJson = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        owner = ownerId,
+                        heartbeat = DateTime.UtcNow.ToString("o"),
+                        pid = Environment.ProcessId,
+                        acquired = DateTime.UtcNow.ToString("o")
+                    });
+
+                    using var writeCmd = connection.CreateCommand();
+                    writeCmd.Transaction = transaction;
+                    writeCmd.CommandText = @"
+                        INSERT INTO world_state (key, value, version, updated_at)
+                        VALUES (@key, @value, 1, datetime('now'))
+                        ON CONFLICT(key) DO UPDATE SET
+                            value = @value,
+                            version = version + 1,
+                            updated_at = datetime('now');
+                    ";
+                    writeCmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
+                    writeCmd.Parameters.AddWithValue("@value", lockJson);
+                    writeCmd.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                return canAcquire;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to acquire worldsim lock: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Update the world sim heartbeat. Called after each simulation tick.
+        /// Other processes check this to determine if the lock is stale.
+        /// </summary>
+        public void UpdateWorldSimHeartbeat(string ownerId)
+        {
+            try
+            {
+                var lockJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    owner = ownerId,
+                    heartbeat = DateTime.UtcNow.ToString("o"),
+                    pid = Environment.ProcessId,
+                    acquired = DateTime.UtcNow.ToString("o")
+                });
+
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE world_state SET value = @value, updated_at = datetime('now')
+                    WHERE key = @key;
+                ";
+                cmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
+                cmd.Parameters.AddWithValue("@value", lockJson);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to update worldsim heartbeat: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Release the world sim lock. Called on graceful shutdown.
+        /// Only releases if we own the lock (prevents stealing another process's lock).
+        /// </summary>
+        public void ReleaseWorldSimLock(string ownerId)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+
+                // Verify we own the lock before deleting
+                using var readCmd = connection.CreateCommand();
+                readCmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                readCmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
+                var currentValue = readCmd.ExecuteScalar() as string;
+
+                if (!string.IsNullOrEmpty(currentValue))
+                {
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(currentValue);
+                        if (doc.RootElement.TryGetProperty("owner", out var ownerEl) &&
+                            ownerEl.GetString() != ownerId)
+                        {
+                            return; // Not our lock
+                        }
+                    }
+                    catch { /* corrupt data, safe to delete */ }
+                }
+
+                using var deleteCmd = connection.CreateCommand();
+                deleteCmd.CommandText = "DELETE FROM world_state WHERE key = @key;";
+                deleteCmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
+                deleteCmd.ExecuteNonQuery();
+
+                DebugLogger.Instance.LogInfo("SQL", $"WorldSim lock released by '{ownerId}'");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to release worldsim lock: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Check if the world sim lock is currently held and active (not stale).
+        /// Used to determine if another process is already running the world sim.
+        /// </summary>
+        public bool IsWorldSimLockActive()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
+                var value = cmd.ExecuteScalar() as string;
+
+                if (string.IsNullOrEmpty(value)) return false;
+
+                using var doc = System.Text.Json.JsonDocument.Parse(value);
+                if (doc.RootElement.TryGetProperty("heartbeat", out var hbEl))
+                {
+                    var heartbeat = DateTime.Parse(hbEl.GetString()!, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind);
+                    return (DateTime.UtcNow - heartbeat).TotalSeconds <= WORLDSIM_LOCK_STALE_SECONDS;
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         // --- News ---
 
         public async Task AddNews(string message, string category, string playerName)
@@ -766,6 +973,44 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to prune old news: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Prune all news categories by age, then enforce a global row cap.
+        /// Keeps the most recent maxTotal entries regardless of category.
+        /// </summary>
+        public async Task PruneAllNews(int hoursToKeep = 48, int maxTotal = 500)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+
+                // 1. Delete all entries older than the time cutoff (across all categories)
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        DELETE FROM news WHERE created_at < datetime('now', @cutoff);
+                    ";
+                    cmd.Parameters.AddWithValue("@cutoff", $"-{hoursToKeep} hours");
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                // 2. Enforce global row cap — keep only the newest maxTotal entries
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        DELETE FROM news WHERE id NOT IN (
+                            SELECT id FROM news ORDER BY created_at DESC LIMIT @maxTotal
+                        );
+                    ";
+                    cmd.Parameters.AddWithValue("@maxTotal", maxTotal);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to prune all news: {ex.Message}");
             }
         }
 

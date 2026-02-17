@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using UsurperRemake;
 using UsurperRemake.Systems;
@@ -131,6 +132,12 @@ namespace UsurperConsole
         /// </summary>
         private static async Task RunDoorModeAsync()
         {
+            // Declare variables used across try/finally before the try block
+            SqlSaveBackend? sqlBackend = null;
+            CancellationTokenSource? embeddedWorldSimCts = null;
+            Task? embeddedWorldSimTask = null;
+            string? worldSimOwnerId = null;
+
             try
             {
                 // World sim mode: bypass all terminal/auth/player logic
@@ -155,8 +162,6 @@ namespace UsurperConsole
                 }
 
                 DoorMode.Log("Initializing BBS door mode...");
-
-                SqlSaveBackend? sqlBackend = null;
 
                 // If online mode is active, initialize SqlSaveBackend early (before auth)
                 if (DoorMode.IsOnlineMode)
@@ -246,6 +251,49 @@ namespace UsurperConsole
                     DoorMode.Log("Online presence tracking started");
                 }
 
+                // BBS Online mode: start embedded world simulator if no other is running
+                if (DoorMode.IsOnlineMode && DoorMode.IsInDoorMode && !DoorMode.NoAutoWorldSim && sqlBackend != null)
+                {
+                    worldSimOwnerId = $"bbs_{Environment.ProcessId}_{DateTime.UtcNow.Ticks}";
+
+                    if (sqlBackend.TryAcquireWorldSimLock(worldSimOwnerId))
+                    {
+                        DoorMode.Log($"Acquired worldsim lock — this session will host the world simulator");
+
+                        embeddedWorldSimCts = new CancellationTokenSource();
+                        var worldSimService = new WorldSimService(
+                            sqlBackend,
+                            simIntervalSeconds: DoorMode.SimIntervalSeconds,
+                            npcXpMultiplier: DoorMode.NpcXpMultiplier,
+                            saveIntervalMinutes: DoorMode.SaveIntervalMinutes,
+                            heartbeatOwnerId: worldSimOwnerId
+                        );
+
+                        // Start worldsim on background thread
+                        embeddedWorldSimTask = Task.Run(() => worldSimService.RunAsync(embeddedWorldSimCts.Token));
+
+                        // Wait for initialization to complete (NPCs loaded, systems ready)
+                        // Timeout after 30 seconds to prevent hanging if something goes wrong
+                        var initTask = worldSimService.InitializationComplete.Task;
+                        if (await Task.WhenAny(initTask, Task.Delay(30000)) == initTask)
+                        {
+                            var success = await initTask;
+                            if (success)
+                                DoorMode.Log("Embedded world simulator initialized successfully");
+                            else
+                                DoorMode.Log("Embedded world simulator initialization failed");
+                        }
+                        else
+                        {
+                            DoorMode.Log("WARNING: World simulator initialization timed out (30s)");
+                        }
+                    }
+                    else
+                    {
+                        DoorMode.Log("Another session is hosting the world simulator — skipping");
+                    }
+                }
+
                 var sessionInfo = DoorMode.SessionInfo;
                 if (sessionInfo != null)
                 {
@@ -267,6 +315,29 @@ namespace UsurperConsole
             }
             finally
             {
+                // Shut down embedded world simulator if this session was hosting it
+                if (embeddedWorldSimCts != null && embeddedWorldSimTask != null)
+                {
+                    DoorMode.Log("Shutting down embedded world simulator...");
+                    embeddedWorldSimCts.Cancel();
+                    try
+                    {
+                        // Give it up to 10 seconds to save final state and release lock
+                        await Task.WhenAny(embeddedWorldSimTask, Task.Delay(10000));
+                    }
+                    catch (Exception ex)
+                    {
+                        DoorMode.Log($"Error during worldsim shutdown: {ex.Message}");
+                    }
+                    embeddedWorldSimCts.Dispose();
+                    DoorMode.Log("Embedded world simulator stopped");
+                }
+                // Release lock as a safety net (in case worldsim didn't release it)
+                else if (worldSimOwnerId != null && sqlBackend != null)
+                {
+                    sqlBackend.ReleaseWorldSimLock(worldSimOwnerId);
+                }
+
                 // Register as dormitory sleeper if not already sleeping (online mode only)
                 // Catches unclean disconnects where player didn't use Dormitory/Inn/Quit menu
                 if (DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sleepBackend)

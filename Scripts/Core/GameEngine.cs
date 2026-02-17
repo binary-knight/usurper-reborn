@@ -2606,6 +2606,20 @@ public partial class GameEngine : Node
         player.SmokeBombs = playerData.SmokeBombs;
         player.InnerSanctumLastDay = playerData.InnerSanctumLastDay;
 
+        // Dark Alley Overhaul (v0.41.0)
+        player.GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex;
+        player.SteroidShopPurchases = playerData.SteroidShopPurchases;
+        player.AlchemistINTBoosts = playerData.AlchemistINTBoosts;
+        player.GamblingRoundsToday = playerData.GamblingRoundsToday;
+        player.PitFightsToday = playerData.PitFightsToday;
+        player.LoanAmount = playerData.LoanAmount;
+        player.LoanDaysRemaining = playerData.LoanDaysRemaining;
+        player.LoanInterestAccrued = playerData.LoanInterestAccrued;
+        player.DarkAlleyReputation = playerData.DarkAlleyReputation;
+        player.DrugTolerance = playerData.DrugTolerance ?? new Dictionary<int, int>();
+        // SafeHouseResting is cleared on login — player is no longer hiding
+        player.SafeHouseResting = false;
+
         // Restore Recurring Duelist Rival
         if (playerData.RecurringDuelist != null)
         {

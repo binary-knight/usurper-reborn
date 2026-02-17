@@ -33,6 +33,13 @@ namespace UsurperRemake.Systems
         private readonly ISaveBackend backend;
 
         /// <summary>
+        /// Throttle autosaves in online/MUD mode to avoid serializing ~23 MB of JSON on every location change.
+        /// Local/single-player mode is unthrottled (saves are fast to disk).
+        /// </summary>
+        private DateTime _lastAutoSaveTime = DateTime.MinValue;
+        private const int AutoSaveIntervalSeconds = 60;
+
+        /// <summary>
         /// The active save backend (FileSaveBackend for local, SqlSaveBackend for online)
         /// </summary>
         public ISaveBackend Backend => backend;
@@ -168,6 +175,16 @@ namespace UsurperRemake.Systems
         {
             if (player == null) return false;
 
+            // Throttle autosaves in online/MUD mode — the full save serializes ~5 MB of player data
+            // plus ~18 MB of NPC data and writes to SQLite, taking several seconds.
+            // Only save every 60 seconds instead of on every location redraw.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                var elapsed = (DateTime.UtcNow - _lastAutoSaveTime).TotalSeconds;
+                if (elapsed < AutoSaveIntervalSeconds)
+                    return true; // Pretend success, save will happen soon
+            }
+
             var playerName = player.Name2 ?? player.Name1;
 
             // In online/MUD mode, use per-session day state to avoid shared singleton cross-contamination
@@ -199,17 +216,12 @@ namespace UsurperRemake.Systems
             }
 
             // In online mode, push NPC changes to shared world_state
-            if (success && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive && OnlineStateManager.Instance != null)
-            {
-                try
-                {
-                    var sharedNpcData = OnlineStateManager.SerializeCurrentNPCs();
-                    await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData);
-                    await OnlineStateManager.Instance.SaveRoyalCourtToWorldState();
-                    await OnlineStateManager.Instance.SaveEconomyToWorldState();
-                }
-                catch { /* don't fail autosave for world_state sync */ }
-            }
+            // Skip this — the WorldSimService already saves NPC state every 5 minutes
+            // with dirty-checking. Player sessions don't need to duplicate this work.
+            // The world sim is the authority for NPC state in online mode.
+
+            if (success)
+                _lastAutoSaveTime = DateTime.UtcNow;
 
             return success;
         }
@@ -510,8 +522,8 @@ namespace UsurperRemake.Systems
                 // Romance Tracker Data
                 RomanceData = RomanceTracker.Instance.ToSaveData(),
 
-                // Quests
-                ActiveQuests = SerializeActiveQuests(player),
+                // Quests (only this player's claimed quests, not the entire database)
+                ActiveQuests = SerializePlayerQuests(player),
                 
                 // Achievements (for Player type)
                 Achievements = (player as Player)?.Achievements ?? new Dictionary<string, bool>(),
@@ -595,6 +607,19 @@ namespace UsurperRemake.Systems
                 PoisonCoatingCombats = player.PoisonCoatingCombats,
                 SmokeBombs = player.SmokeBombs,
                 InnerSanctumLastDay = player.InnerSanctumLastDay,
+
+                // Dark Alley Overhaul (v0.41.0)
+                GroggoShadowBlessingDex = player.GroggoShadowBlessingDex,
+                SteroidShopPurchases = player.SteroidShopPurchases,
+                AlchemistINTBoosts = player.AlchemistINTBoosts,
+                GamblingRoundsToday = player.GamblingRoundsToday,
+                PitFightsToday = player.PitFightsToday,
+                LoanAmount = player.LoanAmount,
+                LoanDaysRemaining = player.LoanDaysRemaining,
+                LoanInterestAccrued = player.LoanInterestAccrued,
+                DarkAlleyReputation = player.DarkAlleyReputation,
+                DrugTolerance = player.DrugTolerance?.Count > 0 ? new Dictionary<int, int>(player.DrugTolerance) : null,
+                SafeHouseResting = player.SafeHouseResting,
 
                 // Recurring Duelist Rival
                 RecurringDuelist = SerializeRecurringDuelist(player),
@@ -912,8 +937,8 @@ namespace UsurperRemake.Systems
                 // World events
                 ActiveEvents = SerializeActiveEvents(),
 
-                // Active quests
-                ActiveQuests = SerializeActiveQuests(GameEngine.Instance?.CurrentPlayer),
+                // Active quests (only unclaimed board quests, not per-player claimed quests)
+                ActiveQuests = SerializeWorldQuests(),
 
                 // Shop inventories
                 ShopInventories = SerializeShopInventories(),
@@ -947,14 +972,50 @@ namespace UsurperRemake.Systems
             return new Dictionary<string, float>();
         }
         
-        private List<QuestData> SerializeActiveQuests(Character? player)
+        /// <summary>
+        /// Serialize only quests belonging to a specific player (claimed by them).
+        /// Used for PlayerData — each player only needs their own quests in their save.
+        /// </summary>
+        private List<QuestData> SerializePlayerQuests(Character? player)
+        {
+            if (player == null) return new List<QuestData>();
+
+            var playerName = player.Name2 ?? player.Name1 ?? "";
+            var allQuests = QuestSystem.GetAllQuests(includeCompleted: false);
+
+            // Only serialize quests claimed by or offered to this player
+            var playerQuests = allQuests.Where(q =>
+                (!string.IsNullOrEmpty(q.Occupier) && string.Equals(q.Occupier, playerName, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(q.OfferedTo) && string.Equals(q.OfferedTo, playerName, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+
+            var result = SerializeQuestList(playerQuests);
+            GD.Print($"[SaveSystem] Serialized {result.Count} quests for player {playerName} (from {allQuests.Count} total)");
+            return result;
+        }
+
+        /// <summary>
+        /// Serialize unclaimed/board quests for WorldStateData.
+        /// In single-player mode, this preserves the quest board between sessions.
+        /// In online mode, quests are managed by the shared database so this is minimal.
+        /// </summary>
+        private List<QuestData> SerializeWorldQuests()
+        {
+            var allQuests = QuestSystem.GetAllQuests(includeCompleted: false);
+
+            // Only serialize unclaimed board quests (no occupier) — not per-player claimed quests
+            var worldQuests = allQuests.Where(q => string.IsNullOrEmpty(q.Occupier)).ToList();
+
+            var result = SerializeQuestList(worldQuests);
+            GD.Print($"[SaveSystem] Serialized {result.Count} world quests (from {allQuests.Count} total)");
+            return result;
+        }
+
+        private List<QuestData> SerializeQuestList(List<Quest> quests)
         {
             var questDataList = new List<QuestData>();
 
-            // Get all active quests from the quest system
-            var allQuests = QuestSystem.GetAllQuests(includeCompleted: false);
-
-            foreach (var quest in allQuests)
+            foreach (var quest in quests)
             {
                 var questData = new QuestData
                 {
@@ -1014,7 +1075,6 @@ namespace UsurperRemake.Systems
                 questDataList.Add(questData);
             }
 
-            GD.Print($"[SaveSystem] Serialized {questDataList.Count} active quests");
             return questDataList;
         }
         

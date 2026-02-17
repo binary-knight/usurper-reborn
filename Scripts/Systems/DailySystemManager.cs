@@ -264,7 +264,11 @@ public class DailySystemManager
             
             // Reset haggling attempts
             HagglingEngine.ResetDailyHaggling(player);
-            
+
+            // Reset Dark Alley daily counters (v0.41.0)
+            player.GamblingRoundsToday = 0;
+            player.PitFightsToday = 0;
+
             terminal?.WriteLine($"Your daily limits have been restored! ({turnsToRestore} turns)", "bright_green");
         }
         else
@@ -499,6 +503,51 @@ public class DailySystemManager
             }
         }
         catch { /* Grief system not initialized */ }
+
+        // Process drug effects - duration, expiration, withdrawal, addiction recovery (v0.41.0)
+        try
+        {
+            var drugPlayer = GameEngine.Instance?.CurrentPlayer;
+            if (drugPlayer != null && (drugPlayer.OnDrugs || drugPlayer.IsAddicted))
+            {
+                string drugMessage = DrugSystem.ProcessDailyDrugEffects(drugPlayer);
+                if (!string.IsNullOrEmpty(drugMessage) && terminal != null)
+                {
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine(drugMessage);
+                }
+            }
+        }
+        catch { /* Drug system error */ }
+
+        // Process Loan Shark interest (v0.41.0)
+        try
+        {
+            var loanPlayer = GameEngine.Instance?.CurrentPlayer;
+            if (loanPlayer != null && loanPlayer.LoanAmount > 0)
+            {
+                long interest = (long)(loanPlayer.LoanAmount * GameConfig.LoanSharkDailyInterest);
+                loanPlayer.LoanInterestAccrued += interest;
+                loanPlayer.LoanAmount += interest;
+                loanPlayer.LoanDaysRemaining--;
+
+                if (terminal != null)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"Loan Shark: Interest of {interest:N0}g accrued. You owe {loanPlayer.LoanAmount:N0}g ({Math.Max(0, loanPlayer.LoanDaysRemaining)} day{(loanPlayer.LoanDaysRemaining == 1 ? "" : "s")} remaining).");
+                }
+
+                if (loanPlayer.LoanDaysRemaining <= 0)
+                {
+                    if (terminal != null)
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine("WARNING: The Loan Shark's enforcers are looking for you!");
+                    }
+                }
+            }
+        }
+        catch { /* Loan system error */ }
 
         // Process royal finances - guard salaries, monster feeding, tax collection
         try

@@ -609,12 +609,11 @@ function getStats() {
       }
     } catch (e) { /* children data may not exist yet */ }
 
-    // Marriage count (from world_state NPC data - divide by 2 since each marriage has 2 entries)
+    // Marriage count (reuse cached NPC data to avoid re-parsing 19MB blob)
     let marriageCount = 0;
     try {
-      const npcRow = db.prepare("SELECT value FROM world_state WHERE key = 'npcs'").get();
-      if (npcRow && npcRow.value) {
-        const npcs = JSON.parse(npcRow.value);
+      const npcs = getDashNpcs();
+      if (npcs && npcs.length > 0) {
         const marriedCount = npcs.filter(n => n.isMarried || n.IsMarried).length;
         marriageCount = Math.floor(marriedCount / 2);
       }

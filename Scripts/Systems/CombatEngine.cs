@@ -211,7 +211,8 @@ public partial class CombatEngine
         Character player,
         List<Monster> monsters,
         List<Character>? teammates = null,
-        bool offerMonkEncounter = true)
+        bool offerMonkEncounter = true,
+        bool isAmbush = false)
     {
         // Wizard godmode: save HP/Mana before combat to restore after
         bool isGodMode = UsurperRemake.Server.SessionContext.IsActive
@@ -348,6 +349,29 @@ public partial class CombatEngine
         int floorEstimate = monsters.Max(m => m.Level);
         DebugLogger.Instance.LogCombatStart(player.Name, player.Level, monsterNames, floorEstimate);
 
+        // Ambush: monsters get a free attack round before the player can act
+        if (isAmbush && player.IsAlive && monsters.Any(m => m.IsAlive))
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("*** AMBUSH! The monsters strike before you can react! ***");
+            terminal.WriteLine("");
+            result.CombatLog.Add("Ambush! Monsters attack first!");
+
+            foreach (var ambushMonster in monsters.Where(m => m.IsAlive))
+            {
+                if (!player.IsAlive) break;
+                await ProcessMonsterAction(ambushMonster, player, result);
+            }
+
+            if (!player.IsAlive)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("You were slain in the ambush!");
+            }
+
+            await Task.Delay(GetCombatDelay(1500));
+        }
+
         // Main combat loop
         int roundNumber = 0;
         bool autoCombat = false; // Auto-combat toggle
@@ -413,10 +437,31 @@ public partial class CombatEngine
             if (player.Race == CharacterRace.Troll && player.HP < player.MaxHP && player.IsAlive)
             {
                 int regenAmount = Math.Min(1 + (int)(player.Level / 20), 3);
+
+                // Drug ConstitutionBonus boosts Troll regeneration (e.g., Ironhide: +25 CON = +2 regen)
+                var conDrugEffects = DrugSystem.GetDrugEffects(player);
+                if (conDrugEffects.ConstitutionBonus > 0)
+                    regenAmount += conDrugEffects.ConstitutionBonus / 10;
+
                 long actualRegen = Math.Min(regenAmount, player.MaxHP - player.HP);
                 player.HP += actualRegen;
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"[Troll Regeneration] You regenerate {actualRegen} HP!");
+            }
+
+            // Drug HPDrain: some drugs cost HP each round (e.g., Haste: -5 HP/round)
+            {
+                var drugEffects = DrugSystem.GetDrugEffects(player);
+                if (drugEffects.HPDrain > 0 && player.IsAlive)
+                {
+                    long drainAmount = Math.Min(drugEffects.HPDrain, player.HP - 1); // Don't kill from drain (min 1 HP)
+                    if (drainAmount > 0)
+                    {
+                        player.HP -= drainAmount;
+                        terminal.SetColor("dark_red");
+                        terminal.WriteLine($"[Drug Side Effect] The drugs drain {drainAmount} HP from your body!");
+                    }
+                }
             }
 
             // Check if player died from status effects or plague
@@ -1836,10 +1881,13 @@ public partial class CombatEngine
         // Backstab calculation (Pascal-compatible)
         long backstabPower = player.Strength + player.WeapPow;
         backstabPower = (long)(backstabPower * GameConfig.BackstabMultiplier); // 3x damage
-        
+
         // Backstab success chance based on dexterity
         // Formula: DEX * 2, but capped at 75% to prevent guaranteed success exploit
-        int successChance = Math.Min(75, (int)(player.Dexterity * 2));
+        // Drug DexterityBonus adds to effective DEX (e.g., QuickSilver: +20)
+        var drugEffects = DrugSystem.GetDrugEffects(player);
+        long effectiveDex = player.Dexterity + drugEffects.DexterityBonus;
+        int successChance = Math.Min(75, (int)(effectiveDex * 2));
         if (random.Next(100) < successChance)
         {
             terminal.SetColor("bright_red");
@@ -2514,6 +2562,12 @@ public partial class CombatEngine
             else
             {
                 long actualDamage = Math.Max(1, abilityResult.DirectDamage - (player.Defence / 3));
+
+                // Drug MagicResistBonus reduces monster ability damage (e.g., ThirdEye: +25%)
+                var drugEffects = DrugSystem.GetDrugEffects(player);
+                if (drugEffects.MagicResistBonus > 0)
+                    actualDamage = Math.Max(1, (long)(actualDamage * (1.0 - drugEffects.MagicResistBonus / 100.0)));
+
                 player.HP -= actualDamage;
                 terminal.WriteLine($"You take {actualDamage} damage!", "red");
                 result.CombatLog.Add($"{monster.Name} uses {abilityName} for {actualDamage} damage");
@@ -5168,7 +5222,10 @@ public partial class CombatEngine
         await Task.Delay(GetCombatDelay(500));
 
         // Backstab: 3x damage, dexterity-based success
-        int successChance = Math.Min(95, 50 + (int)(player.Dexterity / 2));
+        // Drug DexterityBonus adds to effective DEX (e.g., QuickSilver: +20)
+        var drugEffects = DrugSystem.GetDrugEffects(player);
+        long effectiveDex = player.Dexterity + drugEffects.DexterityBonus;
+        int successChance = Math.Min(95, 50 + (int)(effectiveDex / 2));
         if (random.Next(100) < successChance)
         {
             long backstabDamage = (player.Strength + player.WeapPow) * 3;
@@ -11066,7 +11123,18 @@ public partial class CombatEngine
     /// </summary>
     private (long bonusDamage, string description) GetAlignmentBonusDamage(Character attacker, Monster target, long baseDamage)
     {
+        // Drug DarknessBonus temporarily boosts effective Darkness for alignment combat modifiers
+        // (e.g., DemonBlood: +10 Darkness, pushing alignment toward Dark/Evil bonuses)
+        var drugEffects = DrugSystem.GetDrugEffects(attacker);
+        long savedDarkness = attacker.Darkness;
+        if (drugEffects.DarknessBonus > 0)
+            attacker.Darkness = Math.Min(1000, attacker.Darkness + drugEffects.DarknessBonus);
+
         var alignment = AlignmentSystem.Instance.GetAlignment(attacker);
+
+        // Restore original Darkness after alignment check
+        attacker.Darkness = savedDarkness;
+
         bool targetIsEvil = target.Level > 5 && (target.Name.Contains("Demon") || target.Name.Contains("Undead") ||
                             target.Name.Contains("Vampire") || target.Name.Contains("Lich") ||
                             target.Name.Contains("Devil") || target.Name.Contains("Skeleton") ||

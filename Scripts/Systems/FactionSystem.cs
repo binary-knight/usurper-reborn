@@ -236,6 +236,19 @@ namespace UsurperRemake.Systems
             if (player.Level < 10)
                 return (false, "You must reach Level 10 before joining any faction.");
 
+            // No faction will accept someone they despise
+            var standing = FactionStanding[faction];
+            if (standing < 0)
+            {
+                string standingLabel = standing switch
+                {
+                    <= -100 => "Hated",
+                    <= -50 => "Hostile",
+                    _ => "Unfriendly"
+                };
+                return (false, $"{Factions[faction].Name} won't accept you. Your standing is {standingLabel} ({standing:N0}). Improve your reputation first.");
+            }
+
             // Check if player has a criminal record (high Darkness indicates criminal activity)
             bool isCriminal = player.Darkness > 500;
 

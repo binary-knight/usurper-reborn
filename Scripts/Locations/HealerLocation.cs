@@ -121,6 +121,9 @@ public class HealerLocation : BaseLocation
             case "S":
                 await DisplayPlayerStatus();
                 return false; // Stay in location
+            case "A":
+                await CureAddiction();
+                return false; // Stay in location
             case "R":
                 await NavigateToLocation(GameLocation.MainStreet);
                 return true; // Exit location (navigating away)
@@ -138,7 +141,7 @@ public class HealerLocation : BaseLocation
     protected override async Task<string> GetUserChoice()
     {
         var prompt = GetCurrentPlayer().Expert ?
-            "Healing Hut (H,F,B,P,C,D,S,R,?) :" :
+            "Healing Hut (H,F,B,M,P,C,D,A,S,R,?) :" :
             "Healing Hut (? for menu) :";
 
         terminal.SetColor("yellow");
@@ -247,9 +250,18 @@ public class HealerLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("ecurse Item");
 
-        // Row 3 - Navigation
+        // Row 3 - Addiction & Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
+        terminal.SetColor("bright_magenta");
+        terminal.Write("A");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.Write("ddiction Rehab ");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
         terminal.SetColor("bright_cyan");
         terminal.Write("S");
         terminal.SetColor("darkgray");
@@ -266,6 +278,8 @@ public class HealerLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("eturn to street");
         terminal.WriteLine("");
+
+        ShowStatusLine();
     }
 
     private void ShowFullMenu()
@@ -303,6 +317,8 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine("═══ Other Services ═══");
         terminal.SetColor("white");
         terminal.WriteLine($"(D)ecurse Item   - Remove curse from equipment ({CalculateDiseaseCost(CursedItemBaseCost, player.Level):N0} gold)");
+        long rehabCost = GameConfig.RehabBaseCost + (player.Addict * GameConfig.RehabPerAddictionCost);
+        terminal.WriteLine($"(A)ddiction Rehab- Cure drug addiction ({rehabCost:N0} gold)");
         terminal.WriteLine("(S)tatus         - View your current health status");
         terminal.WriteLine("(R)eturn         - Return to Main Street");
         terminal.WriteLine("");
@@ -1075,8 +1091,156 @@ public class HealerLocation : BaseLocation
             terminal.WriteLine("Stay healthy!", "green");
         }
 
+        // Drug & addiction status
+        terminal.WriteLine("");
+        terminal.SetColor("magenta");
+        terminal.WriteLine("Drug Status:");
+        terminal.WriteLine("=-=-=-=-=-=");
+
+        if (player.OnDrugs && player.ActiveDrug != DrugType.None)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"Active Drug: {player.ActiveDrug} ({player.DrugEffectDays} days remaining)");
+        }
+        else
+        {
+            terminal.SetColor("green");
+            terminal.WriteLine("No active drug effects.");
+        }
+
+        if (player.IsAddicted)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"*ADDICTED* - Addiction level: {player.Addict}%");
+            long rehabCost = GameConfig.RehabBaseCost + (player.Addict * GameConfig.RehabPerAddictionCost);
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Rehab treatment available for {rehabCost:N0} gold.");
+        }
+
         terminal.WriteLine("");
         terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Addiction rehabilitation - cures addiction, clears tolerance, clears active drug
+    /// </summary>
+    private async Task CureAddiction()
+    {
+        var player = GetCurrentPlayer();
+
+        terminal.WriteLine("");
+
+        if (!player.IsAddicted && !player.OnDrugs)
+        {
+            terminal.WriteLine($"\"{player.Name2}, you show no signs of substance dependency.\"", "cyan");
+            terminal.WriteLine($", {Manager} says after examining you.", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        long baseCost = GameConfig.RehabBaseCost;
+        long addictionCost = player.Addict * GameConfig.RehabPerAddictionCost;
+        long totalCost = baseCost + addictionCost;
+        var (_, _, totalWithTax) = CityControlSystem.CalculateTaxedPrice(totalCost);
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("═══ Addiction Rehabilitation Program ═══");
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"\"{player.Name2}, I can see the substance has taken hold of you.\"");
+        terminal.WriteLine($", {Manager} says gravely.", "gray");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        if (player.OnDrugs)
+            terminal.WriteLine($"  Active Drug: {player.ActiveDrug} ({player.DrugEffectDays} days remaining)");
+        if (player.IsAddicted)
+            terminal.WriteLine($"  Addiction Level: {player.Addict}%");
+        if (player.DrugTolerance != null && player.DrugTolerance.Count > 0)
+            terminal.WriteLine($"  Drug Tolerances: {player.DrugTolerance.Count} substance(s)");
+        terminal.WriteLine("");
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"\"The rehabilitation treatment will cost {totalCost:N0} gold.\"");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  Base cost: {baseCost:N0} gold");
+        if (addictionCost > 0)
+            terminal.WriteLine($"  Addiction severity surcharge: {addictionCost:N0} gold");
+        terminal.WriteLine("");
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("This treatment will:");
+        terminal.WriteLine("  - Purge all active drug effects immediately");
+        terminal.WriteLine("  - Cure your addiction completely");
+        terminal.WriteLine("  - Reset all drug tolerances");
+        terminal.WriteLine("");
+
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Rehab Treatment", totalCost);
+
+        var confirm = await terminal.GetInput("Proceed with rehabilitation (Y/N)? ");
+
+        if (confirm.ToUpper() != "Y")
+        {
+            terminal.WriteLine($"\"The door is always open when you're ready, {player.Name2}.\"", "cyan");
+            await Task.Delay(1000);
+            return;
+        }
+
+        if (player.Gold < totalWithTax)
+        {
+            terminal.WriteLine("You can't afford the treatment!", "red");
+            terminal.WriteLine($"\"Perhaps you can find the gold somehow... I'll be here.\"", "cyan");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Perform rehabilitation
+        player.Gold -= totalWithTax;
+        player.Statistics.RecordGoldSpent(totalWithTax);
+        CityControlSystem.Instance.ProcessSaleTax(totalCost);
+
+        // Clear active drug (OnDrugs is computed from ActiveDrug != None)
+        player.ActiveDrug = DrugType.None;
+        player.DrugEffectDays = 0;
+
+        // Cure addiction
+        player.Addict = 0;
+
+        // Clear tolerance
+        if (player.DrugTolerance != null)
+            player.DrugTolerance.Clear();
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"{Manager} leads you to a private room in the back...");
+        await Task.Delay(1000);
+        terminal.WriteLine("He prepares a complex mixture of purifying herbs...");
+        await Task.Delay(1000);
+        terminal.Write("The treatment begins");
+        for (int i = 0; i < 4; i++)
+        {
+            await Task.Delay(800);
+            terminal.Write("...");
+        }
+        terminal.WriteLine("");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("After hours of painful but effective treatment...");
+        await Task.Delay(1000);
+        terminal.WriteLine("Your body is cleansed of all substances!", "green");
+        terminal.WriteLine("Your addiction has been cured!", "green");
+        terminal.WriteLine("All drug tolerances have been reset!", "green");
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"\"{player.Name2}, you are free from the chains of addiction.\"");
+        terminal.WriteLine($"\"{Manager} smiles warmly. \"Stay clean, my friend.\"", "gray");
+
+        // Track telemetry
+        TelemetrySystem.Instance.TrackShopTransaction(
+            "healer", "rehab", "addiction_rehab", totalWithTax, player.Level, player.Gold
+        );
+
         await terminal.PressAnyKey();
     }
 }

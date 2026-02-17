@@ -204,6 +204,8 @@ public class ArmorShopLocation : BaseLocation
         terminal.WriteLine("eturn to street");
         terminal.WriteLine("");
 
+        ShowStatusLine();
+
         // Show first shop hint for new players
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_SHOP, terminal, currentPlayer.HintsShown);
     }

@@ -64,6 +64,10 @@ public abstract class BaseLocation
         // Update player location
         player.Location = (int)LocationId;
 
+        // Clear Safe House protection when player moves to any location
+        if (player.SafeHouseResting)
+            player.SafeHouseResting = false;
+
         // Update online presence with current location
         if (UsurperRemake.Systems.OnlineStateManager.IsActive)
             UsurperRemake.Systems.OnlineStateManager.Instance!.UpdateLocation(Name);

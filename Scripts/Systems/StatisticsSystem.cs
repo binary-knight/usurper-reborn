@@ -40,6 +40,13 @@ public class PlayerStatistics
     public long TotalItemsSold { get; set; }
     public long MostExpensivePurchase { get; set; }
 
+    // === DARK ALLEY STATISTICS (v0.41.0) ===
+    public long TotalGamblingRounds { get; set; }
+    public long TotalPickpocketAttempts { get; set; }
+    public long TotalPickpocketSuccesses { get; set; }
+    public long TotalPitFightsWon { get; set; }
+    public long TotalPitFightsLost { get; set; }
+
     // === EXPERIENCE STATISTICS ===
     public long TotalExperienceEarned { get; set; }
     public long ExperienceFromMonsters { get; set; }
@@ -510,6 +517,46 @@ public class PlayerStatistics
         TotalTrapsDisarmed++;
     }
 
+    // === DARK ALLEY TRACKING (v0.41.0) ===
+
+    public void RecordGamblingWin(long amount)
+    {
+        TotalGoldFromGambling += amount;
+        TotalGoldEarned += amount;
+        TotalGamblingRounds++;
+    }
+
+    public void RecordGamblingLoss(long amount)
+    {
+        TotalGoldLostGambling += amount;
+        TotalGoldSpent += amount;
+        TotalGamblingRounds++;
+    }
+
+    public void RecordPickpocketAttempt(bool success, long goldStolen = 0)
+    {
+        TotalPickpocketAttempts++;
+        if (success)
+        {
+            TotalPickpocketSuccesses++;
+            TotalGoldStolen += goldStolen;
+            TotalGoldEarned += goldStolen;
+        }
+    }
+
+    public void RecordPitFight(bool won, long goldChange = 0)
+    {
+        if (won)
+        {
+            TotalPitFightsWon++;
+            TotalGoldEarned += goldChange;
+        }
+        else
+        {
+            TotalPitFightsLost++;
+        }
+    }
+
     /// <summary>
     /// Calculate combat win rate
     /// </summary>
@@ -578,6 +625,11 @@ public class PlayerStatistics
         TotalGoldLostToThieves = 0;
         HighestGoldHeld = 0;
         TotalItemsBought = 0;
+        TotalGamblingRounds = 0;
+        TotalPickpocketAttempts = 0;
+        TotalPickpocketSuccesses = 0;
+        TotalPitFightsWon = 0;
+        TotalPitFightsLost = 0;
         TotalItemsSold = 0;
         MostExpensivePurchase = 0;
 

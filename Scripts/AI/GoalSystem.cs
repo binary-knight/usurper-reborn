@@ -8,6 +8,7 @@ public partial class GoalSystem
 {
     private List<Goal> goals = new List<Goal>();
     private PersonalityProfile personality;
+    private const int MaxGoals = 30;
 
     // Public accessor for serialization
     public List<Goal> AllGoals => goals;
@@ -19,8 +20,28 @@ public partial class GoalSystem
     
     public void AddGoal(Goal goal)
     {
+        // Skip if an active goal with the same name already exists
+        if (goals.Any(g => g.Name == goal.Name && g.IsActive))
+            return;
+
+        // Hard cap: prune before adding
+        if (goals.Count >= MaxGoals)
+        {
+            // Remove completed/inactive goals first
+            goals.RemoveAll(g => g.IsCompleted || !g.IsActive);
+
+            // If still over cap, remove lowest priority goals
+            while (goals.Count >= MaxGoals)
+            {
+                var lowest = goals.OrderBy(g => g.GetEffectivePriority()).FirstOrDefault();
+                if (lowest != null)
+                    goals.Remove(lowest);
+                else
+                    break;
+            }
+        }
+
         goals.Add(goal);
-        // GD.Print($"[Goals] Added goal: {goal.Name} (Priority: {goal.Priority:F2})");
     }
     
     public void RemoveGoal(string goalName)
@@ -43,12 +64,8 @@ public partial class GoalSystem
     
     public void UpdateGoals(NPC owner, WorldState world, MemorySystem memory, EmotionalState emotions)
     {
-        // Prune old completed/inactive goals to prevent unbounded list growth
-        if (goals.Count > 30)
-        {
-            goals.RemoveAll(g => (g.IsCompleted || !g.IsActive)
-                && (DateTime.Now - g.CreatedTime).TotalHours > 24);
-        }
+        // Prune completed/inactive goals to prevent unbounded list growth
+        goals.RemoveAll(g => g.IsCompleted || !g.IsActive);
 
         // Decay goal priorities over time
         foreach (var goal in goals)

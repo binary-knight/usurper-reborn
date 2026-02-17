@@ -923,8 +923,12 @@ namespace UsurperRemake.Systems
                     CurrentGoals = SerializeGoalsStatic(npc.Brain?.Goals),
                     EmotionalState = SerializeEmotionalStateForDashboard(npc),
                     // Scale from internal -1..1 to dashboard-expected -100..100
-                    Relationships = npc.Brain?.Memory?.CharacterImpressions?.ToDictionary(
-                        kvp => kvp.Key, kvp => kvp.Value * 100f) ?? new Dictionary<string, float>(),
+                    // Cap at 20 most significant relationships to limit serialization size
+                    Relationships = npc.Brain?.Memory?.CharacterImpressions?
+                        .OrderByDescending(kvp => Math.Abs(kvp.Value))
+                        .Take(20)
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value * 100f)
+                        ?? new Dictionary<string, float>(),
 
                     // Enemies
                     Enemies = npc.Enemies?.ToList() ?? new List<string>(),
@@ -996,16 +1000,21 @@ namespace UsurperRemake.Systems
         private static List<GoalData> SerializeGoalsStatic(GoalSystem? goals)
         {
             if (goals == null) return new List<GoalData>();
-            return goals.AllGoals.Select(g => new GoalData
-            {
-                Name = g.Name,
-                Type = g.Type.ToString(),
-                Priority = g.Priority,
-                Progress = g.Progress,
-                IsActive = g.IsActive,
-                TargetValue = g.TargetValue,
-                CurrentValue = g.CurrentValue
-            }).ToList();
+            // Only serialize active goals, capped at 30, to prevent unbounded growth
+            return goals.AllGoals
+                .Where(g => g.IsActive && !g.IsCompleted)
+                .OrderByDescending(g => g.GetEffectivePriority())
+                .Take(30)
+                .Select(g => new GoalData
+                {
+                    Name = g.Name,
+                    Type = g.Type.ToString(),
+                    Priority = g.Priority,
+                    Progress = g.Progress,
+                    IsActive = g.IsActive,
+                    TargetValue = g.TargetValue,
+                    CurrentValue = g.CurrentValue
+                }).ToList();
         }
 
         /// <summary>

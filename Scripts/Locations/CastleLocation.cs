@@ -314,6 +314,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("eturn to Town");
         terminal.WriteLine("");
+
+        ShowStatusLine();
     }
 
     /// <summary>
@@ -498,6 +500,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("eturn to Town");
         terminal.WriteLine("");
+
+        ShowStatusLine();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

@@ -426,6 +426,19 @@ namespace UsurperRemake.Systems
         public int SmokeBombs { get; set; }
         public int InnerSanctumLastDay { get; set; }
 
+        // Dark Alley Overhaul (v0.41.0)
+        public int GroggoShadowBlessingDex { get; set; }
+        public int SteroidShopPurchases { get; set; }
+        public int AlchemistINTBoosts { get; set; }
+        public int GamblingRoundsToday { get; set; }
+        public int PitFightsToday { get; set; }
+        public long LoanAmount { get; set; }
+        public int LoanDaysRemaining { get; set; }
+        public long LoanInterestAccrued { get; set; }
+        public int DarkAlleyReputation { get; set; }
+        public Dictionary<int, int>? DrugTolerance { get; set; }
+        public bool SafeHouseResting { get; set; }
+
         // Recurring Duelist Rival
         public DuelistData? RecurringDuelist { get; set; }
 

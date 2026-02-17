@@ -785,12 +785,36 @@ public partial class QuestSystem : Node
     /// </summary>
     private static void CleanupOldQuests()
     {
-        var cutoffDate = DateTime.Now.AddDays(-30); // Keep quests for 30 days
-        var removedCount = questDatabase.RemoveAll(q => q.Deleted && q.Date < cutoffDate);
-        
-        if (removedCount > 0)
+        int totalRemoved = 0;
+
+        // Remove deleted quests older than 30 days
+        totalRemoved += questDatabase.RemoveAll(q => q.Deleted && q.Date < DateTime.Now.AddDays(-30));
+
+        // Remove unclaimed quests older than 7 days (stale board quests)
+        totalRemoved += questDatabase.RemoveAll(q =>
+            !q.Deleted &&
+            string.IsNullOrEmpty(q.Occupier) &&
+            q.Date < DateTime.Now.AddDays(-7));
+
+        // Hard cap: if database still exceeds 200 quests, remove oldest unclaimed first
+        if (questDatabase.Count > 200)
         {
-            // GD.Print($"[QuestSystem] Cleaned up {removedCount} old quests");
+            var unclaimed = questDatabase
+                .Where(q => string.IsNullOrEmpty(q.Occupier) && !q.Deleted)
+                .OrderBy(q => q.Date)
+                .ToList();
+
+            int toRemove = questDatabase.Count - 200;
+            foreach (var q in unclaimed.Take(toRemove))
+            {
+                questDatabase.Remove(q);
+                totalRemoved++;
+            }
+        }
+
+        if (totalRemoved > 0)
+        {
+            GD.Print($"[QuestSystem] Cleaned up {totalRemoved} stale quests, {questDatabase.Count} remaining");
         }
     }
     

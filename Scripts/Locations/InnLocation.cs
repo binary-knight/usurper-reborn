@@ -1816,6 +1816,14 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("You find a quiet corner and rest for a while...", "green");
         await Task.Delay(2000);
 
+        // Remove Groggo's Shadow Blessing on rest (v0.41.0)
+        if (currentPlayer.GroggoShadowBlessingDex > 0)
+        {
+            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
+            terminal.WriteLine("The Blessing of Shadows fades as you rest...", "gray");
+            currentPlayer.GroggoShadowBlessingDex = 0;
+        }
+
         var healing = Math.Min(10, currentPlayer.MaxHP - currentPlayer.HP);
         var manaRecovery = Math.Min(currentPlayer.MaxMana / 4, currentPlayer.MaxMana - currentPlayer.Mana);
 
@@ -3589,6 +3597,14 @@ public class InnLocation : BaseLocation
         }
 
         currentPlayer.Gold -= totalCost;
+
+        // Remove Groggo's Shadow Blessing on rest (v0.41.0)
+        if (currentPlayer.GroggoShadowBlessingDex > 0)
+        {
+            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
+            terminal.WriteLine("  The Blessing of Shadows fades as you rest...", "gray");
+            currentPlayer.GroggoShadowBlessingDex = 0;
+        }
 
         // Restore HP/Mana/Stamina
         currentPlayer.HP = currentPlayer.MaxHP;

@@ -387,7 +387,12 @@ public static class SpellSystem
         if (info == null) return false;
 
         var manaCost = CalculateManaCost(info, character);
-        return character.Mana >= manaCost;
+
+        // Drug ManaBonus adds to effective mana for casting checks (e.g., ManaBoost: +50)
+        var drugEffects = DrugSystem.GetDrugEffects(character);
+        long effectiveMana = character.Mana + drugEffects.ManaBonus;
+
+        return effectiveMana >= manaCost;
     }
     
     /// <summary>
@@ -552,8 +557,12 @@ public static class SpellSystem
             proficiencyMult *= 1.5f; // 50% bonus on spell crit
         }
 
+        // Apply drug SpellPowerBonus (e.g., ManaBoost: +20% spell power)
+        var drugEffects = DrugSystem.GetDrugEffects(caster);
+        double drugSpellMult = 1.0 + drugEffects.SpellPowerBonus / 100.0;
+
         // Calculate final effect including proficiency bonus
-        double scaledEffect = baseEffect * levelMultiplier * statBonus * variance * proficiencyMult;
+        double scaledEffect = baseEffect * levelMultiplier * statBonus * variance * proficiencyMult * drugSpellMult;
 
         return Math.Max(1, (int)scaledEffect);
     }
@@ -571,7 +580,10 @@ public static class SpellSystem
         double levelMultiplier = 1.0 + (caster.Level * 0.025);
 
         // Use StatEffectsSystem for Wisdom-based healing multiplier
-        double wisdomBonus = StatEffectsSystem.GetHealingMultiplier(caster.Wisdom);
+        // Drug WisdomBonus adds to effective Wisdom for healing (e.g., ThirdEye: +15)
+        var drugEffects = DrugSystem.GetDrugEffects(caster);
+        long effectiveWisdom = caster.Wisdom + drugEffects.WisdomBonus;
+        double wisdomBonus = StatEffectsSystem.GetHealingMultiplier(effectiveWisdom);
 
         double variance = 0.95 + (random.NextDouble() * 0.1);
 

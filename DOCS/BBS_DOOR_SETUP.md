@@ -441,11 +441,13 @@ By default, each BBS caller plays in isolation — separate save files, separate
 
 ### How It Works
 
-Instead of file-based saves, BBS Online mode uses a shared SQLite database. All callers read/write to the same database, so changes one player makes (killing an NPC, becoming king, posting chat) are immediately visible to others. A background **world simulator** process keeps the world alive 24/7 — NPCs level up, form relationships, get married, have children, and age even when no players are connected.
+Instead of file-based saves, BBS Online mode uses a shared SQLite database. All callers read/write to the same database, so changes one player makes (killing an NPC, becoming king, posting chat) are immediately visible to others.
+
+The **world simulator** runs automatically inside player sessions — no separate process needed. When the first player connects, their session starts the world sim. When they disconnect, the next player's session takes over. NPCs level up, form relationships, get married, have children, and age while players are connected. When nobody's online, the world pauses (just like the original 1993 Usurper).
 
 ### Quick Setup
 
-**1. Add `--online` to your door command** — that's it:
+**Add `--online` to your door command** — that's it:
 
 | BBS Software | Door Command |
 |--------------|-------------|
@@ -456,21 +458,9 @@ Instead of file-based saves, BBS Online mode uses a shared SQLite database. All 
 | GameSrv | `UsurperReborn --online --door32 door32.sys` |
 | ENiGMA | `"--online", "--door32", "{dropFilePath}"` |
 
-The database (`usurper_online.db`) is created automatically in the game directory. No `--db` flag needed unless you want a custom location.
+The database (`usurper_online.db`) is created automatically in the game directory. The world simulator starts automatically in the first player's session. **No background processes, no database setup, no services to configure.**
 
-**2. Start the world simulator** as a background service:
-
-```bash
-# Linux (systemd service recommended — see below)
-UsurperReborn --worldsim
-
-# Windows (run in a separate console, or as a Windows service)
-UsurperReborn.exe --worldsim
-```
-
-That's it. All callers now share the same game world.
-
-> **Custom database path:** Use `--db <path>` on BOTH the door command and worldsim if you want the database somewhere other than the game directory. Both must point to the same file.
+> **Custom database path:** Use `--db <path>` if you want the database somewhere other than the game directory.
 
 ### What Players Get in Online Mode
 
@@ -485,15 +475,36 @@ All multiplayer features activate automatically:
 | **News Feed** | Real-time events: level ups, boss kills, marriages, deaths, births |
 | **While You Were Gone** | Login summary of what happened since last session |
 | **Dormitory Sleep** | Players who disconnect are registered as sleeping (protects their state) |
-| **Living World** | NPCs age, marry, have children, die of old age — the world evolves 24/7 |
+| **Living World** | NPCs age, marry, have children, die of old age — the world evolves while players are online |
 
 ### Authentication
 
 **No extra passwords needed.** BBS Online mode trusts your BBS's authentication. The player name from DOOR32.SYS/DOOR.SYS becomes their online identity automatically. Players do NOT see an in-game login screen — they go straight to their character.
 
-### World Simulator Setup
+### How the Auto World Simulator Works
 
-The world simulator must run continuously for the living world to function. Without it, NPCs won't age, relationships won't develop, and children won't be born.
+The world simulator uses database-level leader election to ensure only one session runs it at a time:
+
+1. When a player connects, their session checks for a worldsim lock in the database
+2. If no lock exists (or the lock is stale — heartbeat > 90 seconds old), this session becomes the worldsim host
+3. The worldsim runs as a background thread in the host session, sharing NPCs and game state directly
+4. The host updates a heartbeat in the database every tick so other sessions know it's active
+5. When the host disconnects, the lock is released and the next session to connect takes over
+6. When nobody is playing, the world pauses until someone connects
+
+This means the first player to connect gets slightly more responsive NPC behavior (real-time updates from the worldsim), while other concurrent sessions get periodic updates from the database.
+
+### Optional: 24/7 World Simulator
+
+If you want the world to continue evolving even when nobody is playing, you can run a standalone world simulator process. This is **entirely optional** — the auto worldsim handles everything for most setups.
+
+When a standalone worldsim is running, player sessions detect its active heartbeat and skip the auto worldsim.
+
+**Add `--no-worldsim` to your door command to disable auto worldsim when running standalone:**
+
+```
+UsurperReborn --online --no-worldsim --door32 %f
+```
 
 #### Linux (systemd)
 
@@ -524,7 +535,7 @@ sudo systemctl start usurper-worldsim
 
 #### Windows
 
-Run in a separate console window, or use a tool like [NSSM](https://nssm.cc/) to install it as a Windows service:
+Run in a separate console window, or use [NSSM](https://nssm.cc/) as a Windows service:
 
 ```cmd
 nssm install UsurperWorldSim "C:\BBS\Doors\Usurper\UsurperReborn.exe" "--worldsim --sim-interval 30 --npc-xp 1.0"
@@ -544,7 +555,7 @@ nssm start UsurperWorldSim
 
 By default, the database is created as `usurper_online.db` in the same directory as the executable. This happens automatically on first run — no manual setup needed.
 
-If you use `--db <path>` to put the database elsewhere, use the **same path** on both the door command and the world simulator. Ensure the directory exists and the game process has write permissions.
+If you use `--db <path>` to put the database elsewhere, use the **same path** on both the door command and any standalone world simulator. Ensure the directory exists and the game process has write permissions.
 
 For multi-node BBSes, all nodes use the same database file — SQLite handles concurrent access via WAL mode.
 
@@ -555,19 +566,19 @@ Existing single-player BBS saves (JSON files in `Saves/`) are **not** automatica
 ### Troubleshooting BBS Online Mode
 
 #### Players can't see each other's changes
-- Verify all nodes use the exact same `--db` path
-- Check that the world simulator is running: `systemctl status usurper-worldsim`
+- Verify all nodes use the exact same `--db` path (or both use the default)
+- Check stderr/logs for `[WORLDSIM]` messages confirming the world sim is running
 
 #### "This character is already logged in"
-- The previous session didn't disconnect cleanly. Wait 2-3 minutes for the heartbeat to expire, or restart the world simulator.
+- The previous session didn't disconnect cleanly. Wait 2-3 minutes for the heartbeat to expire.
 
 #### World seems dead (no NPC activity)
-- The world simulator isn't running. Start it as described above.
-- Check logs: `journalctl -u usurper-worldsim -n 50`
+- Check stderr for `[WORLDSIM]` messages — one session should show "Acquired worldsim lock"
+- If using standalone `--worldsim`, check it's running: `systemctl status usurper-worldsim`
 
 #### Database locked errors
-- Ensure only one world simulator instance is running per database
 - SQLite WAL mode handles multiple readers, but only one writer at a time
+- If using standalone `--worldsim`, ensure only one instance is running per database
 
 ---
 

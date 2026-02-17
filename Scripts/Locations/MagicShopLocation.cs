@@ -490,6 +490,8 @@ public partial class MagicShopLocation : BaseLocation
         WriteMenuKey("R", "bright_red", "eturn to street");
         terminal.WriteLine("");
         terminal.WriteLine("");
+
+        ShowStatusLine();
     }
     
     private string GetRaceGreeting(CharacterRace race)

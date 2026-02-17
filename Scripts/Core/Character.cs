@@ -371,6 +371,19 @@ public class Character
     public int InnerSanctumLastDay { get; set; } = 0;    // Last day Inner Sanctum was used
     public bool DivineFavorTriggeredThisCombat { get; set; } = false; // Transient: reset each combat
 
+    // Dark Alley Overhaul (v0.41.0)
+    public int GroggoShadowBlessingDex { get; set; } = 0;      // Active Groggo DEX buff (removed on rest)
+    public int SteroidShopPurchases { get; set; } = 0;          // Lifetime steroid purchases (cap 3)
+    public int AlchemistINTBoosts { get; set; } = 0;            // Lifetime alchemist INT boosts (cap 3)
+    public int GamblingRoundsToday { get; set; } = 0;           // Daily gambling counter (max 10)
+    public int PitFightsToday { get; set; } = 0;                // Daily pit fight counter (max 3)
+    public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
+    public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack
+    public long LoanInterestAccrued { get; set; } = 0;          // Total interest accrued
+    public int DarkAlleyReputation { get; set; } = 0;           // Underground reputation (0-1000)
+    public Dictionary<int, int> DrugTolerance { get; set; } = new(); // DrugType(int) -> tolerance level
+    public bool SafeHouseResting { get; set; } = false;        // Shadows members resting here are hidden from PvP
+
     // Weapon configuration detection
     public bool IsDualWielding =>
         EquippedItems.TryGetValue(EquipmentSlot.MainHand, out var mainId) && mainId > 0 &&
@@ -1547,7 +1560,17 @@ public static class DrugSystem
     {
         if (character.OnDrugs && character.ActiveDrug != DrugType.None)
         {
-            return (false, "You're already under the influence of another substance!");
+            // Overdose risk when stacking drugs (v0.41.0)
+            if (_random.NextDouble() < GameConfig.DrugOverdoseChance)
+            {
+                long hpLoss = (long)(character.MaxHP * GameConfig.DrugOverdoseHPLoss);
+                character.HP = Math.Max(1, character.HP - hpLoss);
+                character.Addict = Math.Min(100, (int)(character.Addict * GameConfig.DrugOverdoseAddictionMultiplier) + 10);
+                return (false, $"OVERDOSE! The substances react violently! You lose {hpLoss} HP and your addiction worsens!");
+            }
+            // No overdose — replace current drug
+            character.ActiveDrug = DrugType.None;
+            character.DrugEffectDays = 0;
         }
 
         character.ActiveDrug = drug;
@@ -1567,6 +1590,16 @@ public static class DrugSystem
             DrugType.DemonBlood => 2,
             _ => 1
         };
+
+        // Drug tolerance — reduces duration with repeated use (v0.41.0)
+        int drugKey = (int)drug;
+        if (character.DrugTolerance == null)
+            character.DrugTolerance = new Dictionary<int, int>();
+        if (!character.DrugTolerance.ContainsKey(drugKey))
+            character.DrugTolerance[drugKey] = 0;
+        character.DrugTolerance[drugKey]++;
+        int tolerancePenalty = Math.Min(character.DrugEffectDays - 1, character.DrugTolerance[drugKey] - 1);
+        character.DrugEffectDays = Math.Max(1, character.DrugEffectDays - tolerancePenalty);
 
         // Steroids use separate tracking
         if (drug == DrugType.Steroids)

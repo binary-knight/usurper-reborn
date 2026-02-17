@@ -2942,7 +2942,7 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine("AMBUSH! The monsters attack!");
                 await Task.Delay(1000);
-                await FightRoomMonsters(targetRoom);
+                await FightRoomMonsters(targetRoom, isAmbush: true);
             }
         }
         else
@@ -3143,7 +3143,7 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Fight the monsters in a room
     /// </summary>
-    private async Task FightRoomMonsters(DungeonRoom room)
+    private async Task FightRoomMonsters(DungeonRoom room, bool isAmbush = false)
     {
         var player = GetCurrentPlayer();
 
@@ -3300,7 +3300,7 @@ public class DungeonLocation : BaseLocation
 
         // Combat
         var combatEngine = new CombatEngine(terminal);
-        var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true);
+        var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true, isAmbush: isAmbush);
 
         // Restore original temp bonuses after combat
         if (punishmentApplied)

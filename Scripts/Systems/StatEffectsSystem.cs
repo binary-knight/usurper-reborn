@@ -371,7 +371,15 @@ public static class StatEffectsSystem
     /// </summary>
     public static bool RollCriticalHit(Character attacker)
     {
-        int critChance = GetCriticalHitChance(attacker.Dexterity, attacker.GetEquipmentCritChanceBonus());
+        // Apply drug DexterityBonus to effective DEX for crit calculation
+        var drugEffects = DrugSystem.GetDrugEffects(attacker);
+        long effectiveDex = attacker.Dexterity + drugEffects.DexterityBonus;
+        int critChance = GetCriticalHitChance(effectiveDex, attacker.GetEquipmentCritChanceBonus());
+
+        // Apply drug CritBonus directly to crit chance (e.g., QuickSilver: +15)
+        if (drugEffects.CritBonus > 0)
+            critChance = Math.Clamp(critChance + drugEffects.CritBonus, 5, 50);
+
         return _random.Next(100) < critChance;
     }
 
@@ -380,7 +388,11 @@ public static class StatEffectsSystem
     /// </summary>
     public static bool RollDodge(Character defender)
     {
-        int dodgeChance = GetDodgeChance(defender.Agility);
+        // Apply drug AgilityBonus/AgilityPenalty to effective agility for dodge
+        var drugEffects = DrugSystem.GetDrugEffects(defender);
+        long effectiveAgility = defender.Agility + drugEffects.AgilityBonus - drugEffects.AgilityPenalty;
+        effectiveAgility = Math.Max(0, effectiveAgility);
+        int dodgeChance = GetDodgeChance(effectiveAgility);
         return _random.Next(100) < dodgeChance;
     }
 
@@ -389,7 +401,10 @@ public static class StatEffectsSystem
     /// </summary>
     public static bool RollPoisonResist(Character character)
     {
-        int resist = GetPoisonResistance(character.Constitution);
+        // Drug ConstitutionBonus adds to effective constitution for poison resistance (e.g., Ironhide: +25)
+        var drugEffects = DrugSystem.GetDrugEffects(character);
+        long effectiveCon = character.Constitution + drugEffects.ConstitutionBonus;
+        int resist = GetPoisonResistance(effectiveCon);
         return _random.Next(100) < resist;
     }
 

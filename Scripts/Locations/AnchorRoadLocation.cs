@@ -79,6 +79,8 @@ public class AnchorRoadLocation : BaseLocation
         terminal.WriteLine("Other:");
         WriteMenuRow("P", "Prison Grounds", "S", "Status", "R", "Return to Town");
         terminal.WriteLine("");
+
+        ShowStatusLine();
     }
 
     private void WriteMenuRow(string key1, string label1, string key2, string label2, string key3, string label3)

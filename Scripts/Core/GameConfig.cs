@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.40.4";
-    public const string VersionName = "Enchantments, BBS Online & Dashboard";
+    public const string Version = "0.41.0";
+    public const string VersionName = "Dark Alley Overhaul";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -387,6 +387,60 @@ public static partial class GameConfig
     public const int AssassinContractMinRank = 3;             // Shadows rank 3+ for assassination contracts
     public const float AssassinContractChance = 0.50f;        // 50% chance to get assassination vs retrieval
     public const float AssassinClassGoldBonus = 0.50f;        // +50% gold reward for Assassin class contracts
+
+    // Dark Alley Overhaul (v0.41.0)
+    // Shop Caps
+    public const int MaxSteroidShopPurchases = 3;                // Lifetime steroid purchases cap
+    public const int MaxAlchemistINTBoosts = 3;                  // Lifetime alchemist INT boosts cap
+
+    // Gambling Den
+    public const int DarkAlleyGamblingMaxRounds = 10;            // Max gambling rounds per day
+    public const int DarkAlleyGamblingMinBet = 10;               // Minimum bet
+    public const float DarkAlleyGamblingMaxBetPercent = 0.10f;   // Max bet = 10% of gold on hand
+    public const float DarkAlleyBaseWinRate = 0.45f;             // ~45% base win rate (house edge)
+
+    // Pickpocket
+    public const float PickpocketBaseChance = 0.40f;             // 40% base success
+    public const float PickpocketDexScaling = 0.005f;            // +0.5% per DEX point
+    public const float PickpocketMaxChance = 0.75f;              // 75% success cap
+    public const float PickpocketAssassinBonus = 0.15f;          // Assassin class +15%
+    public const float PickpocketCriticalFailThreshold = 0.10f;  // Roll < 10% = critical fail (prison)
+    public const float PickpocketGoldStealMin = 0.05f;           // Steal 5-15% of NPC gold
+    public const float PickpocketGoldStealMax = 0.15f;
+
+    // Underground Arena (The Pit)
+    public const int DarkAlleyPitFightsPerDay = 3;               // Max pit fights per day
+    public const float PitFightGoldMultiplier = 2.0f;            // Monster fight: 2x gold reward
+    public const float PitFightNPCGoldStake = 0.20f;             // NPC fight: winner takes 20% of loser's gold
+
+    // Loan Shark
+    public const int LoanSharkMaxMultiplier = 500;               // Max loan = level * 500
+    public const float LoanSharkDailyInterest = 0.20f;           // 20% daily interest
+    public const int LoanSharkMaxDays = 5;                       // Days before enforcers
+    public const int LoanEnforcerLevelBonus = 5;                 // Enforcer is player level + 5
+    public const float LoanEnforcerHPPenalty = 0.25f;            // 25% max HP damage on loss
+    public const int LoanEnforcerExtensionDays = 3;              // Days added after enforcer loss
+
+    // Safe House
+    public const int DarkAlleySafeHouseCost = 50;                // Rest cost
+    public const float SafeHouseHealPercent = 0.50f;             // Restores 50% HP
+    public const float SafeHouseRobberyChance = 0.10f;           // 10% robbery chance
+    public const int SafeHouseMinDarkness = 50;                  // Min Darkness to use
+
+    // Fence
+    public const int FenceBaseSellPercent = 70;                  // 70% value (vs 50% at normal shops)
+    public const int FenceShadowsBonusPercent = 10;              // Shadows members: 80% total
+
+    // Shady Encounters
+    public const float DarkAlleyEntryEncounterChance = 0.15f;    // 15% chance on entry
+    public const int DarkAlleyMuggerDemand = 50;                 // Mugger demands 50g
+
+    // Drug System Enhancements
+    public const float DrugOverdoseChance = 0.30f;               // 30% overdose when stacking
+    public const float DrugOverdoseHPLoss = 0.25f;               // 25% max HP loss on overdose
+    public const float DrugOverdoseAddictionMultiplier = 2.0f;   // Double addiction on overdose
+    public const int RehabBaseCost = 2000;                       // Rehab base cost at Healer
+    public const int RehabPerAddictionCost = 50;                 // Additional cost per addiction point
 
     // Offline Player Vulnerability System (v0.40.2)
     public const int DormitorySleepCost = 10;                    // 10g to sleep in dormitory

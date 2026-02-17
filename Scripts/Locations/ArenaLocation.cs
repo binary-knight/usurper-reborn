@@ -275,6 +275,17 @@ public class ArenaLocation : BaseLocation
             return;
         }
 
+        // Shadows members resting at the Safe House are hidden from PvP attacks
+        if (opponentSave.Player.SafeHouseResting)
+        {
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine($"  {target.DisplayName} is hiding in the Dark Alley Safe House.");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  The Shadows protect their own. You cannot find them.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
         var opponent = CreateCombatCharacterFromSave(opponentSave.Player, target.DisplayName);
 
         // Save defender's actual gold for 10% steal calculation, then zero
