@@ -50,6 +50,8 @@ public class TeamCornerLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
+
         terminal.ClearScreen();
 
         // Header
@@ -147,6 +149,50 @@ public class TeamCornerLocation : BaseLocation
             terminal.Write(label2);
         }
         terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals.
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+        ShowBBSHeader("ADVENTURERS TEAM CORNER");
+
+        // 1-line team status
+        if (!string.IsNullOrEmpty(currentPlayer.Team))
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.Write($" Team: {currentPlayer.Team}");
+            if (currentPlayer.CTurf)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write(" *CONTROLS TOWN*");
+            }
+            terminal.WriteLine("");
+        }
+        else
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" You are not in a team. Create or join one!");
+        }
+        terminal.WriteLine("");
+
+        // Menu rows (3 rows for all options)
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Info:");
+        ShowBBSMenuRow(("T", "cyan", "Rankings"), ("P", "cyan", "Password"), ("I", "cyan", "Info"), ("E", "cyan", "Examine"), ("Y", "cyan", "YourTeam"));
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Actions:");
+        ShowBBSMenuRow(("C", "green", "Create"), ("J", "green", "Join"), ("Q", "red", "QuitTeam"), ("A", "green", "Apply"), ("N", "green", "RecruitNPC"));
+        ShowBBSMenuRow(("2", "red", "SackMember"), ("G", "yellow", "EquipMbr"), ("M", "cyan", "Message"), ("!", "magenta", "Resurrect"));
+        if (DoorMode.IsOnlineMode)
+        {
+            ShowBBSMenuRow(("W", "green", "RecruitAlly"), ("B", "red", "TeamBattle"), ("H", "cyan", "HQ"));
+        }
+        ShowBBSMenuRow(("R", "red", "ReturnInn"));
+
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

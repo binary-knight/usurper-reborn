@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 
 namespace UsurperRemake.Locations;
 
@@ -107,6 +108,12 @@ public class LevelMasterLocation : BaseLocation
     protected override void DisplayLocation()
     {
         terminal.ClearScreen();
+
+        if (DoorMode.IsInDoorMode)
+        {
+            DisplayLocationBBS();
+            return;
+        }
 
         // Header - standardized format
         terminal.SetColor("bright_cyan");
@@ -255,6 +262,52 @@ public class LevelMasterLocation : BaseLocation
             }
         }
         terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// BBS compact display for 80x25 terminal
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        ShowBBSHeader("LEVEL MASTER'S SANCTUM");
+        // 1-line master + XP status
+        terminal.SetColor(currentMaster.Color);
+        terminal.Write($" {currentMaster.Name}");
+        terminal.SetColor("gray");
+        terminal.Write("  XP:");
+        terminal.SetColor("cyan");
+        terminal.Write($"{currentPlayer.Experience:N0}");
+        if (currentPlayer.Level >= GameConfig.MaxLevel)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.Write(" MAX LEVEL!");
+        }
+        else
+        {
+            long nextXP = GetExperienceForLevel(currentPlayer.Level + 1);
+            long xpNeeded = nextXP - currentPlayer.Experience;
+            if (xpNeeded <= 0)
+            {
+                terminal.SetColor("bright_green");
+                terminal.Write(" *READY TO ADVANCE!*");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.Write($"  Need:");
+                terminal.SetColor("white");
+                terminal.Write($"{xpNeeded:N0}");
+            }
+        }
+        terminal.Write($"  Train:");
+        terminal.SetColor("yellow");
+        terminal.Write($"{currentPlayer.TrainingPoints}pts");
+        terminal.WriteLine("");
+        ShowBBSNPCs();
+        // Menu rows
+        ShowBBSMenuRow(("L", "bright_green", "Level Raise"), ("A", "bright_yellow", "Abilities"), ("T", "bright_yellow", "Training"));
+        ShowBBSMenuRow(("C", "bright_cyan", "Crystal Ball"), ("H", "bright_cyan", "Help Team"), ("R", "bright_red", "Return"));
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

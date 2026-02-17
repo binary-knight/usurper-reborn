@@ -253,12 +253,13 @@ public class MudServer
                         username = displayName;
                 }
 
-                // Check for duplicate sessions
-                if (ActiveSessions.ContainsKey(usernameKey))
+                // Kick existing session if duplicate (reconnect takes priority)
+                if (ActiveSessions.TryGetValue(usernameKey, out var existingSession))
                 {
-                    await WriteLineAsync(stream, "ERR:Already logged in from another session");
-                    client.Close();
-                    return;
+                    Console.Error.WriteLine($"[MUD] Kicking stale session for '{username}' (reconnect)");
+                    await existingSession.DisconnectAsync("Disconnected: logged in from another session");
+                    ActiveSessions.TryRemove(usernameKey, out _);
+                    await Task.Delay(500); // Brief delay for cleanup
                 }
 
                 // Send OK to signal auth success
@@ -268,8 +269,7 @@ public class MudServer
             // Create and start the player session
             var sessionUsernameKey = username.ToLowerInvariant();
 
-            // Check for duplicate sessions (also for interactive mode)
-            if (!isInteractive || !ActiveSessions.ContainsKey(sessionUsernameKey))
+            // Create and start the player session
             {
                 var session = new PlayerSession(
                     username: username,
@@ -281,22 +281,26 @@ public class MudServer
                     cancellationToken: ct
                 );
 
-                // Wizard level is loaded from DB in PlayerSession.RunAsync()
-
+                // If TryAdd fails (race condition), kick stale session and retry
                 if (!ActiveSessions.TryAdd(sessionUsernameKey, session))
                 {
-                    await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Already logged in from another session.\u001b[0m\r\n");
-                    client.Close();
-                    return;
+                    if (ActiveSessions.TryGetValue(sessionUsernameKey, out var staleSession))
+                    {
+                        Console.Error.WriteLine($"[MUD] Kicking stale session for '{username}' (race condition)");
+                        await staleSession.DisconnectAsync("Disconnected: logged in from another session");
+                        ActiveSessions.TryRemove(sessionUsernameKey, out _);
+                        await Task.Delay(500);
+                    }
+                    if (!ActiveSessions.TryAdd(sessionUsernameKey, session))
+                    {
+                        await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Could not start session. Try again.\u001b[0m\r\n");
+                        client.Close();
+                        return;
+                    }
                 }
 
                 Console.Error.WriteLine($"[MUD] Session started for '{username}' ({connectionType}). Active sessions: {ActiveSessions.Count}");
                 await session.RunAsync();
-            }
-            else
-            {
-                await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Already logged in from another session.\u001b[0m\r\n");
-                client.Close();
             }
         }
         catch (OperationCanceledException)
@@ -434,11 +438,15 @@ public class MudServer
             if (!string.IsNullOrEmpty(displayName))
                 username = displayName;
 
-            // Check for duplicate sessions
-            if (ActiveSessions.ContainsKey(username!.ToLowerInvariant()))
+            // Kick existing session if duplicate (reconnect takes priority)
+            var interactiveKey = username!.ToLowerInvariant();
+            if (ActiveSessions.TryGetValue(interactiveKey, out var existingInteractive))
             {
-                await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Already logged in from another session.\u001b[0m\r\n\r\n");
-                continue;
+                Console.Error.WriteLine($"[MUD] Kicking stale session for '{username}' (reconnect)");
+                await existingInteractive.DisconnectAsync("Disconnected: logged in from another session");
+                ActiveSessions.TryRemove(interactiveKey, out _);
+                await Task.Delay(500);
+                await WriteAnsiAsync(stream, "\r\n\u001b[1;33m  Previous session disconnected.\u001b[0m\r\n");
             }
 
             await WriteAnsiAsync(stream, $"\r\n\u001b[1;32m  Welcome, {username}!\u001b[0m\r\n\r\n");

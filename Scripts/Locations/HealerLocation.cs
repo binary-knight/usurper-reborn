@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 
 /// <summary>
 /// The Golden Bow, Healing Hut - run by Jadu The Fat
@@ -71,6 +72,12 @@ public class HealerLocation : BaseLocation
     {
         terminal.ClearScreen();
 
+        if (DoorMode.IsInDoorMode)
+        {
+            DisplayLocationBBS();
+            return;
+        }
+
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
         terminal.SetColor("bright_yellow");
@@ -87,6 +94,50 @@ public class HealerLocation : BaseLocation
 
         ShowMenu();
         ShowPlayerHealthStatus();
+    }
+
+    /// <summary>
+    /// BBS compact display for 80x25 terminal
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        var player = GetCurrentPlayer();
+        ShowBBSHeader("THE GOLDEN BOW - HEALING HUT");
+        // 1-line health status
+        terminal.SetColor("gray");
+        terminal.Write(" HP:");
+        var hpPct = (float)player.HP / player.MaxHP;
+        terminal.SetColor(hpPct >= 0.7f ? "bright_green" : hpPct >= 0.3f ? "yellow" : "bright_red");
+        terminal.Write($"{player.HP}/{player.MaxHP}");
+        terminal.SetColor("gray");
+        terminal.Write("  Gold:");
+        terminal.SetColor("yellow");
+        terminal.Write($"{player.Gold:N0}");
+        terminal.SetColor("gray");
+        terminal.Write("  Potions:");
+        terminal.SetColor("green");
+        terminal.Write($"{player.Healing}");
+        // Show afflictions inline
+        var afflictions = new List<string>();
+        if (player.Poisoned) afflictions.Add("Poison");
+        if (player.Blind) afflictions.Add("Blind");
+        if (player.Plague) afflictions.Add("Plague");
+        if (player.Smallpox) afflictions.Add("Smallpox");
+        if (player.Measles) afflictions.Add("Measles");
+        if (player.Leprosy) afflictions.Add("Leprosy");
+        if (player.LoversBane) afflictions.Add("Bane");
+        if (afflictions.Count > 0)
+        {
+            terminal.SetColor("bright_red");
+            terminal.Write($"  [{string.Join(",", afflictions)}]");
+        }
+        terminal.WriteLine("");
+        ShowBBSNPCs();
+        // Menu rows
+        ShowBBSMenuRow(("H", "bright_green", "Heal HP"), ("F", "bright_green", "Full Heal"), ("B", "bright_green", "Buy Potions"), ("M", "bright_blue", "Mana Pots"));
+        ShowBBSMenuRow(("P", "bright_yellow", "Poison Cure"), ("C", "bright_yellow", "Cure Disease"), ("D", "bright_yellow", "Decurse"));
+        ShowBBSMenuRow(("A", "bright_magenta", "Addiction"), ("S", "bright_cyan", "Status"), ("R", "bright_red", "Return"));
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

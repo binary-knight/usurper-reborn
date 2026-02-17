@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UsurperRemake.BBS;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 
@@ -194,6 +195,8 @@ namespace UsurperRemake.Locations
 
         protected override void DisplayLocation()
         {
+            if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
+
             terminal.ClearScreen();
 
             // Header - standardized format
@@ -452,6 +455,61 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             ShowStatusLine();
+        }
+
+        /// <summary>
+        /// Compact BBS display for 80x25 terminals.
+        /// </summary>
+        private void DisplayLocationBBS()
+        {
+            terminal.ClearScreen();
+            ShowBBSHeader("THE DARK ALLEY");
+
+            // 1-line description
+            terminal.SetColor("gray");
+            terminal.WriteLine(" Torches sputter in the moist air. Whispers of illicit trade echo in the dark.");
+
+            ShowBBSNPCs();
+            terminal.WriteLine("");
+
+            // Shady establishments (2 rows)
+            terminal.SetColor("dark_red");
+            terminal.WriteLine(" Shady Establishments:");
+            ShowBBSMenuRow(("D", "magenta", "DrugPalace"), ("S", "magenta", "Steroids"), ("O", "magenta", "OrbsClub"), ("G", "magenta", "Groggo"));
+            ShowBBSMenuRow(("B", "magenta", "BeerHut"), ("A", "magenta", "Alchemist"));
+
+            // Underground services (2 rows)
+            bool locked = !IsUndergroundAccessAllowed();
+            string kc = locked ? "darkgray" : "red";
+            terminal.SetColor("dark_red");
+            terminal.Write(" Underground");
+            if (locked)
+            {
+                terminal.SetColor("red");
+                terminal.Write(" [LOCKED]");
+            }
+            terminal.WriteLine(":");
+            ShowBBSMenuRow(("P", kc, "Pickpocket"), ("F", kc, "Fence"), ("C", kc, "Gamble"), ("T", kc, "ThePit"));
+            ShowBBSMenuRow(("L", kc, "LoanShark"), ("N", kc, "SafeHouse"));
+
+            // Faction/special options (1 row)
+            var factionSystem = FactionSystem.Instance;
+            var shadowsStanding = FactionSystem.Instance?.FactionStanding[Faction.TheShadows] ?? 0;
+            var specialItems = new List<(string key, string color, string label)>();
+            if (shadowsStanding < 0)
+                specialItems.Add(("W", "yellow", "Tribute"));
+            if (factionSystem.PlayerFaction != Faction.TheShadows)
+                specialItems.Add(("J", "magenta", "JoinShadows"));
+            if (FactionSystem.Instance?.HasBlackMarketAccess() == true)
+                specialItems.Add(("M", "magenta", "BlackMkt"));
+            if (FactionSystem.Instance?.HasInformationNetwork() == true)
+                specialItems.Add(("I", "magenta", "Informant"));
+            if (specialItems.Count > 0)
+                ShowBBSMenuRow(specialItems.ToArray());
+
+            ShowBBSMenuRow(("Q", "red", "Return"));
+
+            ShowBBSFooter();
         }
 
         #region Individual shop handlers

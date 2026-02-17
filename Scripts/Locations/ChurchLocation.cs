@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Godot;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 
 namespace UsurperRemake.Locations
 {
@@ -147,7 +148,13 @@ namespace UsurperRemake.Locations
         protected override void DisplayLocation()
         {
             terminal.ClearScreen();
-            
+
+            if (DoorMode.IsInDoorMode)
+            {
+                DisplayLocationBBS();
+                return;
+            }
+
             // Church header - standardized format
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
@@ -272,7 +279,33 @@ namespace UsurperRemake.Locations
             // Status line (basic)
             ShowStatusLine();
         }
-        
+
+        /// <summary>
+        /// BBS compact display for 80x25 terminal
+        /// </summary>
+        private void DisplayLocationBBS()
+        {
+            ShowBBSHeader("CHURCH OF GOOD DEEDS");
+            // 1-line alignment info
+            terminal.SetColor("gray");
+            terminal.Write($" Alignment: ");
+            terminal.SetColor("cyan");
+            terminal.Write(GetAlignmentDescription(currentPlayer));
+            terminal.SetColor("gray");
+            terminal.Write($"  Chivalry:");
+            terminal.SetColor("bright_green");
+            terminal.Write($"{currentPlayer.Chivalry}");
+            terminal.SetColor("gray");
+            terminal.Write($"  Darkness:");
+            terminal.SetColor("red");
+            terminal.WriteLine($"{currentPlayer.Darkness}");
+            ShowBBSNPCs();
+            // Menu rows
+            ShowBBSMenuRow(("C", "bright_green", "Donate"), ("B", "bright_yellow", "Blessing"), ("H", "bright_cyan", "Heal"), ("M", "bright_magenta", "Marriage"));
+            ShowBBSMenuRow(("F", "cyan", "Confess"), ("R", "yellow", "Records"), ("S", "magenta", "Bishop"), ("Q", "bright_red", "Return"));
+            ShowBBSFooter();
+        }
+
         /// <summary>
         /// Process church donation - Pascal GOODC.PAS collection functionality
         /// </summary>

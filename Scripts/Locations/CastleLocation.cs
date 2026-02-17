@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -39,6 +40,15 @@ public class CastleLocation : BaseLocation
     protected override void DisplayLocation()
     {
         terminal.ClearScreen();
+
+        if (DoorMode.IsInDoorMode)
+        {
+            if (playerIsKing)
+                DisplayRoyalCastleInteriorBBS();
+            else
+                DisplayCastleExteriorBBS();
+            return;
+        }
 
         if (playerIsKing)
         {
@@ -502,6 +512,89 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
 
         ShowStatusLine();
+    }
+
+    /// <summary>
+    /// BBS compact display for the reigning monarch (80x25 terminal)
+    /// </summary>
+    private void DisplayRoyalCastleInteriorBBS()
+    {
+        ShowBBSHeader("THE ROYAL CASTLE");
+        // 1-line greeting + treasury
+        terminal.SetColor("white");
+        terminal.Write(" Your Majesty! Treasury: ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write($"{currentKing.Treasury:N0}g");
+        terminal.SetColor("gray");
+        terminal.Write($"  Guards: {currentKing.Guards.Count}/{GameConfig.MaxRoyalGuards}");
+        terminal.Write($"  Prisoners: {currentKing.Prisoners.Count}");
+        terminal.WriteLine("");
+        int unreadMail = royalMail.Count(m => !m.IsRead);
+        if (unreadMail > 0)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($" You have {unreadMail} unread messages!");
+        }
+        ShowBBSNPCs();
+        // Menu rows
+        ShowBBSMenuRow(("P", "bright_yellow", "Prison"), ("O", "bright_yellow", "Orders"), ("1", "bright_cyan", "Mail"), ("G", "bright_green", "Sleep"));
+        ShowBBSMenuRow(("C", "bright_green", "Security"), ("H", "bright_cyan", "History"), ("A", "bright_red", "Abdicate"), ("M", "bright_magenta", "Magic"));
+        ShowBBSMenuRow(("F", "bright_yellow", "Fiscal"), ("Q", "bright_magenta", "Quests"), ("T", "bright_yellow", "Orphanage"), ("W", "bright_magenta", "Wedding"));
+        ShowBBSMenuRow(("U", "bright_cyan", "Court"), ("E", "bright_green", "Succession"), ("R", "bright_red", "Return"));
+        ShowBBSFooter();
+    }
+
+    /// <summary>
+    /// BBS compact display for non-monarchs (80x25 terminal)
+    /// </summary>
+    private void DisplayCastleExteriorBBS()
+    {
+        ShowBBSHeader("OUTSIDE THE ROYAL CASTLE");
+        // 1-line king status
+        if (currentKing != null && currentKing.IsActive)
+        {
+            terminal.SetColor("white");
+            terminal.Write($" {currentKing.GetTitle()} ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write(currentKing.Name);
+            terminal.SetColor("gray");
+            terminal.WriteLine($" rules. Reign: {currentKing.TotalReign}d | Treasury: {currentKing.Treasury:N0}g");
+        }
+        else
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(" No monarch sits upon the throne...");
+        }
+        ShowBBSNPCs();
+        // Menu rows
+        ShowBBSMenuRow(("T", "bright_yellow", "Royal Guard"), ("P", "bright_yellow", "Prison"), ("D", "bright_green", "Donate"));
+        ShowBBSMenuRow(("H", "bright_cyan", "History"), ("S", "bright_magenta", "Audience"), ("A", "bright_green", "Apply Guard"));
+        // Throne challenge / claim
+        if (currentKing != null && currentKing.IsActive)
+        {
+            if (CanChallengeThrone())
+                ShowBBSMenuRow(("I", "bright_red", "Infiltrate (Challenge Throne)"));
+            else
+                ShowBBSMenuRow(("I", "gray", $"Infiltrate (Lv{GameConfig.MinLevelKing}+)"));
+        }
+        else
+        {
+            if (currentPlayer.Level >= GameConfig.MinLevelKing)
+                ShowBBSMenuRow(("C", "bright_yellow", "Claim Empty Throne"));
+            else
+                ShowBBSMenuRow(("C", "gray", $"Claim Throne (Lv{GameConfig.MinLevelKing}+)"));
+        }
+        // Siege option
+        if (DoorMode.IsOnlineMode && !string.IsNullOrEmpty(currentPlayer.Team))
+            ShowBBSMenuRow(("B", "bright_red", "Besiege Castle"));
+        // Faction
+        var factionSystem = FactionSystem.Instance;
+        if (factionSystem.PlayerFaction != Faction.TheCrown)
+            ShowBBSMenuRow(("J", "bright_yellow", "Join Crown"));
+        if (FactionSystem.Instance?.HasCastleAccess() == true)
+            ShowBBSMenuRow(("L", "bright_yellow", "Royal Armory"));
+        ShowBBSMenuRow(("R", "bright_red", "Return"));
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)
@@ -5033,6 +5126,9 @@ public class CastleLocation : BaseLocation
         currentPlayer.Gold -= price;
         currentPlayer.Statistics?.RecordPurchase(price);
         currentPlayer.Statistics?.RecordGoldSpent(price);
+
+        // Register as dynamic equipment so it gets a valid ID for EquippedItems lookup
+        EquipmentDatabase.RegisterDynamic(item);
 
         // Equip directly
         if (currentPlayer.EquipItem(item, null, out string equipMsg))

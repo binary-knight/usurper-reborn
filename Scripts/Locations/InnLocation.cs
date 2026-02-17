@@ -271,8 +271,10 @@ public class InnLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
+
         terminal.ClearScreen();
-        
+
         // Inn header - standardized format
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
@@ -523,7 +525,73 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("Help");
         terminal.WriteLine("");
     }
-    
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals.
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+
+        // Header
+        ShowBBSHeader("THE INN - 'The Drunken Dragon'");
+
+        // 1-line description
+        terminal.SetColor("white");
+        terminal.WriteLine(" Smoky tavern. Ale flows freely. Seth Able eyes you from the corner.");
+
+        // NPCs
+        ShowBBSNPCs();
+
+        // Companions hint
+        var recruitableCompanions = CompanionSystem.Instance.GetRecruitableCompanions(currentPlayer?.Level ?? 1).ToList();
+        var recruitedCompanions = CompanionSystem.Instance.GetAllCompanions()
+            .Where(c => c.IsRecruited && !c.IsDead).ToList();
+        if (recruitableCompanions.Any())
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine(" A mysterious stranger catches your eye from a shadowy corner...");
+        }
+        if (recruitedCompanions.Any())
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($" Your companions ({recruitedCompanions.Count}) rest at a nearby table.");
+        }
+
+        terminal.WriteLine("");
+
+        // Menu rows
+        terminal.SetColor("yellow");
+        terminal.WriteLine(" Inn Activities:");
+        ShowBBSMenuRow(("D", "bright_yellow", "rink(5g)"), ("F", "bright_red", "ight Seth"), ("T", "bright_cyan", "alk"), ("G", "bright_magenta", "ame"));
+        ShowBBSMenuRow(("R", "cyan", "umors"), ("B", "yellow", "ulletin"), ("E", "green", "at/Rest"), ("O", "bright_green", "rder(10g)"));
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Areas:");
+        ShowBBSMenuRow(("C", "bright_cyan", "Team Corner"), ("W", "bright_yellow", "Train"), ("L", "bright_red", "Gamble"));
+        if (recruitableCompanions.Any() || recruitedCompanions.Any())
+        {
+            var items = new List<(string, string, string)>();
+            if (recruitableCompanions.Any())
+                items.Add(("A", "bright_magenta", $"Stranger({recruitableCompanions.Count})"));
+            if (recruitedCompanions.Any())
+                items.Add(("P", "bright_cyan", $"Party({recruitedCompanions.Count})"));
+            ShowBBSMenuRow(items.ToArray());
+        }
+
+        // Online-mode options
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            long roomCost = (long)(currentPlayer.Level * GameConfig.InnRoomCostPerLevel);
+            ShowBBSMenuRow(("N", "bright_green", $"Room({roomCost}g)"), ("K", "bright_red", "Attack Sleeper"));
+        }
+
+        ShowBBSMenuRow(("Q", "red", "Return"));
+
+        // Footer: status + quick commands
+        ShowBBSFooter();
+    }
+
     protected override async Task<bool> ProcessChoice(string choice)
     {
         // Handle global quick commands first

@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -40,6 +41,11 @@ public class WeaponShopLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode && currentPlayer != null && currentPlayer.WeapHag >= 1)
+        {
+            if (currentCategory == null) { DisplayLocationBBS(); return; }
+        }
+
         terminal.ClearScreen();
 
         if (currentPlayer == null) return;
@@ -205,6 +211,46 @@ public class WeaponShopLocation : BaseLocation
 
         // Show first shop hint for new players
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_SHOP, terminal, currentPlayer.HintsShown);
+    }
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals (main menu only).
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+
+        // Header
+        ShowBBSHeader("WEAPON SHOP");
+
+        // 1-line description
+        terminal.SetColor("gray");
+        terminal.WriteLine($" Run by {shopkeeperName} the troll. You have {FormatNumber(currentPlayer.Gold)} gold.");
+
+        // Current weapons summary
+        var mainHand = currentPlayer.GetEquipment(EquipmentSlot.MainHand);
+        var offHand = currentPlayer.GetEquipment(EquipmentSlot.OffHand);
+        terminal.SetColor("gray");
+        terminal.Write(" Main:");
+        terminal.SetColor("white");
+        terminal.Write(mainHand != null ? $"{mainHand.Name}" : "Empty");
+        terminal.SetColor("gray");
+        terminal.Write("  Off:");
+        terminal.SetColor("white");
+        terminal.WriteLine(offHand != null ? $"{offHand.Name}" : "Empty");
+
+        // NPCs
+        ShowBBSNPCs();
+        terminal.WriteLine("");
+
+        // Menu
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Categories:");
+        ShowBBSMenuRow(("1", "bright_yellow", "One-Hand"), ("2", "bright_yellow", "Two-Hand"), ("3", "bright_yellow", "Shields"), ("D", "bright_magenta", "ual-Wield"));
+        ShowBBSMenuRow(("S", "bright_green", "ell"), ("A", "bright_cyan", "uto-Buy"), ("R", "bright_red", "eturn"));
+
+        // Footer
+        ShowBBSFooter();
     }
 
     private void ShowCurrentWeapons()

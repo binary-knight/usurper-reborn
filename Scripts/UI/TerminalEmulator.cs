@@ -22,6 +22,42 @@ public partial class TerminalEmulator : Control
     private int cursorX = 0, cursorY = 0;
     private string currentColor = "white";
 
+    // BBS 80x25 pagination — tracks lines written since last screen clear or user input
+    private int _bbsLineCount = 0;
+    private const int BBS_PAGE_LIMIT = 23; // Leave 2 rows for "-- More --" prompt
+
+    /// <summary>
+    /// Show "-- More --" prompt and wait for keypress in BBS door mode.
+    /// Resets the line counter so the next page of output can begin.
+    /// </summary>
+    private void ShowBBSMorePrompt()
+    {
+        if (ShouldUseBBSAdapter())
+        {
+            BBSTerminalAdapter.Instance!.Write("-- More --", "bright_yellow");
+            BBSTerminalAdapter.Instance!.GetInput("").GetAwaiter().GetResult();
+        }
+        else
+        {
+            // Console/stdio BBS mode
+            if (DoorMode.ShouldUseAnsiOutput)
+                Console.Write($"\x1b[{GetAnsiColorCode("bright_yellow")}m-- More --\x1b[0m");
+            else
+            {
+                var old = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write("-- More --");
+                Console.ForegroundColor = old;
+            }
+
+            if (Console.IsInputRedirected)
+                Console.In.ReadLine();
+            else
+                Console.ReadLine();
+        }
+        _bbsLineCount = 0;
+    }
+
     // Stream-based I/O for MUD server mode (each session gets its own reader/writer)
     private StreamReader? _streamReader;
     private StreamWriter? _streamWriter;
@@ -174,6 +210,12 @@ public partial class TerminalEmulator : Control
     
     public void WriteLine(string text, string color = "white")
     {
+        // BBS 80x25 pagination — pause before overflow (only in BBS door mode, not MUD stream or Godot)
+        if (_streamWriter == null && display == null && DoorMode.IsInDoorMode && _bbsLineCount >= BBS_PAGE_LIMIT)
+        {
+            ShowBBSMorePrompt();
+        }
+
         if (_streamWriter != null)
         {
             // MUD stream mode — write ANSI-colored output to TCP stream
@@ -190,11 +232,13 @@ public partial class TerminalEmulator : Control
         {
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
             BBSTerminalAdapter.Instance!.WriteLine(text, color);
+            _bbsLineCount++;
         }
         else
         {
             // Console fallback - parse and render inline color tags
             WriteLineWithColors(text, color);
+            _bbsLineCount++;
         }
     }
 
@@ -593,8 +637,9 @@ public partial class TerminalEmulator : Control
         }
         cursorX = 0;
         cursorY = 0;
+        _bbsLineCount = 0; // Reset BBS pagination counter
     }
-    
+
     public void SetCursorPosition(int x, int y)
     {
         cursorX = x;
@@ -646,6 +691,7 @@ public partial class TerminalEmulator : Control
         // BBS socket mode - delegate entirely to BBSTerminalAdapter which reads from socket
         if (ShouldUseBBSAdapter())
         {
+            _bbsLineCount = 0; // Reset BBS pagination counter on input
             return await BBSTerminalAdapter.Instance!.GetInput(prompt);
         }
 
@@ -680,6 +726,7 @@ public partial class TerminalEmulator : Control
             {
                 result = Console.ReadLine() ?? string.Empty;
             }
+            _bbsLineCount = 0; // Reset BBS pagination counter on input
             return result;
         }
     }
@@ -695,6 +742,14 @@ public partial class TerminalEmulator : Control
 
         if (Console.IsInputRedirected)
         {
+            // In BBS door mode, the BBS software (e.g. Synchronet) echoes characters back
+            // to the user through the telnet session. If the game also echoes, the user sees
+            // every character twice (e.g. "dd" instead of "d").
+            // However, the BBS echoes backspace (0x7F) as the raw byte, which renders as ⌂
+            // in CP437 terminals like SyncTERM. So for backspace we must send erase sequences
+            // to clean up both the echoed glyph AND the previous character.
+            bool bbsEchoes = DoorMode.IsInDoorMode;
+
             // Redirected stdin (pipe) - read raw bytes, handle 0x7F/0x08 manually
             while (true)
             {
@@ -703,8 +758,11 @@ public partial class TerminalEmulator : Control
                 {
                     if (ch == '\r' && Console.In.Peek() == '\n')
                         Console.In.Read();
-                    Console.Out.Write("\r\n");
-                    Console.Out.Flush();
+                    if (!bbsEchoes)
+                    {
+                        Console.Out.Write("\r\n");
+                        Console.Out.Flush();
+                    }
                     break;
                 }
                 else if (ch == 0x7F || ch == 0x08) // DEL or BS
@@ -712,6 +770,22 @@ public partial class TerminalEmulator : Control
                     if (buffer.Length > 0)
                     {
                         buffer.Remove(buffer.Length - 1, 1);
+                        if (bbsEchoes)
+                        {
+                            // BBS echoed the raw 0x7F/0x08 byte as a visible glyph (⌂).
+                            // Erase the echoed glyph, then erase the previous character.
+                            Console.Out.Write("\b \b\b \b");
+                            Console.Out.Flush();
+                        }
+                        else
+                        {
+                            Console.Out.Write("\b \b");
+                            Console.Out.Flush();
+                        }
+                    }
+                    else if (bbsEchoes)
+                    {
+                        // Buffer empty but BBS still echoed the glyph — erase just the ⌂
                         Console.Out.Write("\b \b");
                         Console.Out.Flush();
                     }
@@ -734,8 +808,11 @@ public partial class TerminalEmulator : Control
                 else if (ch >= 32) // Printable characters only
                 {
                     buffer.Append((char)ch);
-                    Console.Out.Write(maskPassword ? '*' : (char)ch);
-                    Console.Out.Flush();
+                    if (!bbsEchoes)
+                    {
+                        Console.Out.Write(maskPassword ? '*' : (char)ch);
+                        Console.Out.Flush();
+                    }
                 }
             }
         }
@@ -1310,7 +1387,12 @@ public partial class TerminalEmulator : Control
     }
 
     // Synchronous helper for legacy code paths
-    public string GetInputSync(string prompt = "> ") => GetInput(prompt).GetAwaiter().GetResult();
+    public string GetInputSync(string prompt = "> ")
+    {
+        var result = GetInput(prompt).GetAwaiter().GetResult();
+        _bbsLineCount = 0; // Reset BBS pagination counter on input
+        return result;
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     // REAL-TIME MESSAGE PUMP (MUD mode only)

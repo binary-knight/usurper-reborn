@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using ModelItem = global::Item;
+using UsurperRemake.BBS;
 using UsurperRemake.Systems;
 using UsurperRemake.Utils;
 
@@ -59,6 +60,8 @@ public class HomeLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
+
         terminal.ClearScreen();
 
         // Header
@@ -321,6 +324,72 @@ terminal.SetColor("darkgray");
         terminal.WriteLine("uit to Main Street");
 
         terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals.
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+        ShowBBSHeader("YOUR HOME");
+
+        // 1-line description
+        terminal.SetColor("white");
+        terminal.WriteLine(" A crackling fire warms your cozy home. Your belongings are arranged neatly.");
+
+        // Compact storage info
+        terminal.SetColor("gray");
+        terminal.Write(" Chest:");
+        terminal.SetColor("cyan");
+        terminal.Write($"{Chest.Count}");
+        terminal.SetColor("gray");
+        terminal.Write(" items  Inv:");
+        terminal.SetColor("cyan");
+        terminal.Write($"{currentPlayer.Inventory.Count}");
+        terminal.SetColor("gray");
+        terminal.Write(" items  Potions:");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"{currentPlayer.Healing}");
+
+        // Compact family status (1 line)
+        var romance = RomanceTracker.Instance;
+        var children = FamilySystem.Instance.GetChildrenOf(currentPlayer);
+        var partnersAtHome = new List<string>();
+        foreach (var spouse in romance.Spouses)
+        {
+            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+            if (npc != null && npc.IsAlive == true && (npc.CurrentLocation == "Home" || npc.CurrentLocation == "Your Home"))
+                partnersAtHome.Add(npc.Name ?? spouse.NPCName);
+        }
+        foreach (var lover in romance.CurrentLovers)
+        {
+            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+            if (npc != null && npc.IsAlive == true && (npc.CurrentLocation == "Home" || npc.CurrentLocation == "Your Home"))
+                partnersAtHome.Add(npc.Name ?? lover.NPCName);
+        }
+        if (partnersAtHome.Count > 0 || children.Count > 0)
+        {
+            terminal.SetColor("bright_magenta");
+            if (partnersAtHome.Count > 0)
+                terminal.Write($" {string.Join(", ", partnersAtHome)} here");
+            if (children.Count > 0)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write($" {children.Count} child{(children.Count != 1 ? "ren" : "")}");
+            }
+            terminal.WriteLine("");
+        }
+
+        terminal.WriteLine("");
+
+        // Menu rows
+        ShowBBSMenuRow(("R", "bright_green", "Rest"), ("D", "cyan", "Deposit"), ("W", "cyan", "Withdraw"), ("L", "yellow", "List Chest"));
+        ShowBBSMenuRow(("T", "yellow", "Trophies"), ("F", "yellow", "Family"), ("P", "magenta", "Partner"), ("B", "magenta", "Bedroom"));
+        ShowBBSMenuRow(("I", "cyan", "Inventory"), ("G", "yellow", "GearPartner"), ("H", "green", "Heal(Pot)"), ("!", "magenta", "Resurrect"));
+        ShowBBSMenuRow(("Q", "red", "Return"));
+
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

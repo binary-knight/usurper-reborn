@@ -133,16 +133,14 @@ namespace UsurperRemake.Systems
 
             if (success)
             {
-                // Check if this player is already logged in elsewhere
+                // If player appears online from a stale/crashed session, clear it and continue
                 if (await backend.IsPlayerOnline(username.Trim()))
                 {
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine("  This character is already logged in from another session.");
+                    await backend.UnregisterOnline(username.Trim());
                     terminal.SetColor("yellow");
-                    terminal.WriteLine("  Please disconnect the other session first, or wait a few minutes.");
+                    terminal.WriteLine("  Previous session disconnected.");
+                    terminal.SetColor("white");
                     terminal.WriteLine("");
-                    await Task.Delay(2000);
-                    return null;
                 }
 
                 terminal.SetColor("bright_green");

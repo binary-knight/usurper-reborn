@@ -1,6 +1,7 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.Data;
+using UsurperRemake.BBS;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1454,6 +1455,8 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private void DisplayRoomView(DungeonRoom room)
     {
+        if (DoorMode.IsInDoorMode) { DisplayRoomViewBBS(room); return; }
+
         var player = GetCurrentPlayer();
 
         // Room header with theme color
@@ -1491,6 +1494,264 @@ public class DungeonLocation : BaseLocation
 
         // Show level eligibility notification
         ShowLevelEligibilityMessage();
+    }
+
+    /// <summary>
+    /// BBS compact room view - fits within 25 rows on an 80x25 terminal
+    /// </summary>
+    private void DisplayRoomViewBBS(DungeonRoom room)
+    {
+        var player = GetCurrentPlayer();
+
+        // Line 1: Header with floor + room name
+        string dangerStars = new string('*', room.DangerRating) + new string('.', 3 - room.DangerRating);
+        string roomStatus = room.IsCleared ? "[CLEARED]" : room.HasMonsters ? "[DANGER]" : "";
+        string bossTag = room.IsBossRoom ? " [BOSS]" : "";
+        ShowBBSHeader($"Floor {currentDungeonLevel} - {room.Name} {dangerStars}{bossTag} {roomStatus}");
+
+        // Line 2: Theme
+        terminal.SetColor(GetThemeColor(currentFloor.Theme));
+        terminal.Write($" {currentFloor.Theme}");
+        terminal.SetColor("gray");
+        terminal.WriteLine($" | {room.Description}");
+
+        // Lines 3-6: Room contents (compact, 1 line each)
+        if (room.HasMonsters && !room.IsCleared)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(room.IsBossRoom
+                ? " >> A powerful presence dominates this room! <<"
+                : " >> Hostile creatures lurk in the shadows! <<");
+        }
+        if (room.HasTreasure && !room.TreasureLooted)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" >> Something valuable glints in the darkness! <<");
+        }
+        if (room.HasEvent && !room.EventCompleted)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($" >> {GetEventHint(room.EventType).TrimStart('>', ' ').TrimEnd('<', '>', ' ')} <<");
+        }
+        if (room.HasStairsDown)
+        {
+            terminal.SetColor("blue");
+            terminal.WriteLine(" >> Stairs lead down <<");
+        }
+
+        // Features (1 line)
+        var uninteractedFeatures = room.Features.Where(f => !f.IsInteracted).ToList();
+        if (uninteractedFeatures.Any())
+        {
+            terminal.SetColor("cyan");
+            terminal.Write(" Notice: ");
+            terminal.SetColor("white");
+            terminal.WriteLine(string.Join(", ", uninteractedFeatures.Select(f => f.Name)));
+        }
+
+        // Exits (1 line)
+        terminal.SetColor("white");
+        terminal.Write(" Exits:");
+        foreach (var exit in room.Exits)
+        {
+            var targetRoom = currentFloor.GetRoom(exit.Value.TargetRoomId);
+            var dirKey = GetDirectionKey(exit.Key);
+            string status = targetRoom == null ? "" : targetRoom.IsCleared ? "(clr)" : targetRoom.IsExplored ? "(exp)" : "(?)";
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write(dirKey);
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("gray");
+            terminal.Write(status);
+        }
+        terminal.WriteLine("");
+
+        // Party info (1 line)
+        if (teammates.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.Write($" Party({1 + teammates.Count}): ");
+            terminal.SetColor("white");
+            terminal.WriteLine(string.Join(", ", teammates.Select(t => t.Name2)));
+        }
+
+        terminal.WriteLine("");
+
+        // Actions - context-sensitive rows
+        var row1 = new List<(string key, string color, string label)>();
+        if (room.HasMonsters && !room.IsCleared)
+            row1.Add(("F", "red", "Fight"));
+        if (room.HasTreasure && !room.TreasureLooted && (room.IsCleared || !room.HasMonsters))
+            row1.Add(("T", "yellow", "Treasure"));
+        if (room.HasEvent && !room.EventCompleted)
+            row1.Add(("V", "cyan", "Investigate"));
+        if (uninteractedFeatures.Any())
+            row1.Add(("X", "magenta", "Examine"));
+        if (room.HasStairsDown && (room.IsCleared || !room.HasMonsters))
+            row1.Add(("D", "blue", "Descend"));
+        if ((room.IsCleared || !room.HasMonsters) && !hasRestThisFloor)
+            row1.Add(("R", "green", "Rest"));
+
+        if (row1.Count > 0)
+            ShowBBSMenuRow(row1.ToArray());
+
+        ShowBBSMenuRow(
+            ("M", "cyan", "Map"),
+            ("I", "cyan", "Inv"),
+            ("P", "cyan", "Potions"),
+            ("=", "cyan", "Status"),
+            ("Q", "red", "Leave")
+        );
+
+        // Status line
+        terminal.SetColor("darkgray");
+        terminal.Write(" HP:");
+        float hpPct = player.MaxHP > 0 ? (float)player.HP / player.MaxHP : 0;
+        terminal.SetColor(hpPct > 0.5f ? "bright_green" : hpPct > 0.25f ? "yellow" : "bright_red");
+        terminal.Write($"{player.HP}/{player.MaxHP}");
+        terminal.SetColor("gray");
+        terminal.Write($" Potions:");
+        terminal.SetColor("green");
+        terminal.Write($"{player.Healing}/{player.MaxPotions}");
+        terminal.SetColor("gray");
+        terminal.Write(" Gold:");
+        terminal.SetColor("yellow");
+        terminal.Write($"{player.Gold:N0}");
+        if (player.MaxMana > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write(" Mana:");
+            terminal.SetColor("blue");
+            terminal.Write($"{player.Mana}/{player.MaxMana}");
+        }
+        terminal.SetColor("gray");
+        terminal.Write(" Lv:");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"{player.Level}");
+
+        // Level eligibility (1 line if applicable)
+        if (player.Level < GameConfig.MaxLevel)
+        {
+            long experienceNeeded = GetExperienceForLevel(player.Level + 1);
+            if (player.Experience >= experienceNeeded)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(" * Level raise available! Visit your Master! *");
+            }
+        }
+    }
+
+    /// <summary>
+    /// BBS compact floor overview - fits within 25 rows on an 80x25 terminal
+    /// </summary>
+    private void DisplayFloorOverviewBBS()
+    {
+        var player = GetCurrentPlayer();
+
+        // Line 1: Header
+        ShowBBSHeader($"DUNGEON LEVEL {currentDungeonLevel} - {currentFloor.Theme}");
+
+        // Line 2: Floor stats
+        int explored = currentFloor.Rooms.Count(r => r.IsExplored);
+        int cleared = currentFloor.Rooms.Count(r => r.IsCleared);
+        terminal.SetColor("white");
+        terminal.Write($" Rooms:{currentFloor.Rooms.Count}");
+        terminal.SetColor("gray");
+        terminal.Write($" Explored:");
+        terminal.SetColor(explored == currentFloor.Rooms.Count ? "bright_green" : "yellow");
+        terminal.Write($"{explored}/{currentFloor.Rooms.Count}");
+        terminal.SetColor("gray");
+        terminal.Write($" Cleared:");
+        terminal.SetColor(cleared == currentFloor.Rooms.Count ? "bright_green" : "yellow");
+        terminal.Write($"{cleared}/{currentFloor.Rooms.Count}");
+        terminal.SetColor("gray");
+        terminal.Write($" Danger:");
+        terminal.SetColor(currentFloor.DangerLevel >= 7 ? "red" : currentFloor.DangerLevel >= 4 ? "yellow" : "green");
+        terminal.WriteLine($"{currentFloor.DangerLevel}/10");
+
+        // Line 3: Party
+        terminal.SetColor("cyan");
+        terminal.Write($" Party: {1 + teammates.Count} member{(teammates.Count > 0 ? "s" : "")}");
+        if (teammates.Count > 0)
+        {
+            terminal.SetColor("white");
+            terminal.Write($" ({string.Join(", ", teammates.Select(t => t.Name2))})");
+        }
+        terminal.WriteLine("");
+
+        // Line 4: Seal hint (if applicable)
+        if (currentFloor.HasUncollectedSeal && !currentFloor.SealCollected)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(" >> A Seal of the Old Gods is hidden on this floor! <<");
+        }
+
+        // Line 5: Floor guidance hint (reuse the existing logic in compact form)
+        ShowFloorGuidanceBBS(currentDungeonLevel);
+
+        // Line 6: Level eligibility
+        if (player != null && player.Level < GameConfig.MaxLevel)
+        {
+            long experienceNeeded = GetExperienceForLevel(player.Level + 1);
+            if (player.Experience >= experienceNeeded)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(" * Level raise available! Visit your Master! *");
+            }
+        }
+
+        terminal.WriteLine("");
+
+        // Menu rows
+        ShowBBSMenuRow(
+            ("E", "bright_green", "Enter"),
+            ("J", "bright_cyan", "Journal"),
+            ("T", "bright_yellow", "Party"),
+            ("S", "bright_cyan", "Status")
+        );
+        ShowBBSMenuRow(
+            ("L", "bright_yellow", "Level(+/-10)"),
+            ("Q", "bright_red", "Quit to town")
+        );
+
+        // Footer status
+        ShowBBSFooter();
+    }
+
+    /// <summary>
+    /// Compact floor guidance for BBS mode (1 line max)
+    /// </summary>
+    private void ShowFloorGuidanceBBS(int floor)
+    {
+        var story = StoryProgressionSystem.Instance;
+        string hint = null;
+        string color = "gray";
+
+        // Seal floors
+        if (floor == 15 && !story.CollectedSeals.Contains(SealType.FirstWar))
+        { hint = "LORE: Second Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 25 && !story.HasStoryFlag("maelketh_encountered"))
+        { hint = "BOSS: Maelketh, God of War awaits!"; color = "bright_red"; }
+        else if (floor == 30 && !story.CollectedSeals.Contains(SealType.Corruption))
+        { hint = "LORE: Third Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 45 && !story.CollectedSeals.Contains(SealType.Imprisonment))
+        { hint = "LORE: Fourth Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 60 && !story.CollectedSeals.Contains(SealType.Prophecy))
+        { hint = "LORE: Fifth Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 80 && !story.CollectedSeals.Contains(SealType.Regret))
+        { hint = "LORE: Sixth Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 99 && !story.CollectedSeals.Contains(SealType.Truth))
+        { hint = "LORE: Final Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 100)
+        { hint = "FINALE: Manwe awaits. Your choices determine the ending."; color = "bright_white"; }
+
+        if (hint != null)
+        {
+            terminal.SetColor(color);
+            terminal.WriteLine($" {hint}");
+        }
     }
 
     private void ShowDangerIndicators(DungeonRoom room)
@@ -1889,6 +2150,8 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private void DisplayFloorOverview()
     {
+        if (DoorMode.IsInDoorMode) { DisplayFloorOverviewBBS(); return; }
+
         ShowBreadcrumb();
 
         // Header - standardized format
@@ -8702,11 +8965,6 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.ClearScreen();
-        terminal.SetColor(GetThemeColor(currentFloor.Theme));
-        terminal.WriteLine($"╔═══════════════════════════════════════════════════════╗");
-        terminal.WriteLine($"║  DUNGEON MAP - Level {currentDungeonLevel} ({currentFloor.Theme})".PadRight(56) + "║");
-        terminal.WriteLine($"╚═══════════════════════════════════════════════════════╝");
-        terminal.WriteLine("");
 
         // Build spatial map from room connections
         var roomPositions = BuildRoomPositionMap();
@@ -8733,170 +8991,226 @@ public class DungeonLocation : BaseLocation
                 posToRoom[kvp.Value] = room;
         }
 
-        // Render map (each room is 5 chars wide, 3 chars tall)
-        // Row format: corridor row, then room row, then corridor row
-        for (int y = minY; y <= maxY; y++)
-        {
-            // Top corridor row (vertical connections from above)
-            var topLine = new System.Text.StringBuilder();
-            for (int x = minX; x <= maxX; x++)
-            {
-                if (posToRoom.TryGetValue((x, y), out var room))
-                {
-                    // Check if room has north exit and it's explored
-                    bool hasNorth = room.Exits.ContainsKey(Direction.North);
-                    bool northExplored = hasNorth && room.IsExplored;
+        // Map dimensions for the grid (each room = 4 chars wide, 2 rows tall)
+        int mapWidth = (maxX - minX + 1) * 4 + 1;
 
-                    if (northExplored)
-                    {
-                        topLine.Append("  |  ");
-                    }
-                    else
-                    {
-                        topLine.Append("     ");
-                    }
-                }
-                else
-                {
-                    topLine.Append("     ");
-                }
-            }
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(topLine.ToString());
-
-            // Room row
-            var roomLine = new System.Text.StringBuilder();
-            for (int x = minX; x <= maxX; x++)
-            {
-                // West corridor
-                if (posToRoom.TryGetValue((x, y), out var room))
-                {
-                    bool hasWest = room.Exits.ContainsKey(Direction.West);
-                    bool westExplored = hasWest && room.IsExplored;
-
-                    if (westExplored)
-                    {
-                        terminal.SetColor("darkgray");
-                        roomLine.Append("-");
-                    }
-                    else
-                    {
-                        roomLine.Append(" ");
-                    }
-
-                    // Room symbol
-                    string roomSymbol = GetRoomMapSymbol(room);
-                    roomLine.Append(roomSymbol);
-
-                    // East corridor
-                    bool hasEast = room.Exits.ContainsKey(Direction.East);
-                    bool eastExplored = hasEast && room.IsExplored;
-
-                    if (eastExplored)
-                    {
-                        roomLine.Append("-");
-                    }
-                    else
-                    {
-                        roomLine.Append(" ");
-                    }
-                }
-                else
-                {
-                    roomLine.Append("     ");
-                }
-            }
-
-            // Render room line with colors
-            RenderColoredMapLine(roomLine.ToString(), posToRoom, minX, maxX, y);
-
-            // Bottom corridor row (vertical connections below)
-            var bottomLine = new System.Text.StringBuilder();
-            for (int x = minX; x <= maxX; x++)
-            {
-                if (posToRoom.TryGetValue((x, y), out var room))
-                {
-                    bool hasSouth = room.Exits.ContainsKey(Direction.South);
-                    bool southExplored = hasSouth && room.IsExplored;
-
-                    if (southExplored)
-                    {
-                        bottomLine.Append("  |  ");
-                    }
-                    else
-                    {
-                        bottomLine.Append("     ");
-                    }
-                }
-                else
-                {
-                    bottomLine.Append("     ");
-                }
-            }
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(bottomLine.ToString());
-        }
-
-        terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.Write("Legend: ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[@]");
-        terminal.SetColor("gray");
-        terminal.Write("=You ");
-        terminal.SetColor("bright_red");
-        terminal.Write("[B]");
-        terminal.SetColor("gray");
-        terminal.Write("=Boss ");
-        terminal.SetColor("blue");
-        terminal.Write("[>]");
-        terminal.SetColor("gray");
-        terminal.Write("=Stairs ");
-        terminal.SetColor("green");
-        terminal.Write("[#]");
-        terminal.SetColor("gray");
-        terminal.Write("=Cleared ");
-        terminal.SetColor("red");
-        terminal.Write("[!]");
-        terminal.SetColor("gray");
-        terminal.WriteLine("=Danger");
-        terminal.Write("        ");
-        terminal.SetColor("cyan");
-        terminal.Write("[.]");
-        terminal.SetColor("gray");
-        terminal.Write("=Safe ");
-        terminal.SetColor("darkgray");
-        terminal.Write("[?]");
-        terminal.SetColor("gray");
-        terminal.Write("=Unknown  ");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine("- | = Passages");
-        terminal.WriteLine("");
-
-        // Floor stats
+        // Header line
+        string themeColor = GetThemeColor(currentFloor.Theme);
+        terminal.SetColor(themeColor);
         int explored = currentFloor.Rooms.Count(r => r.IsExplored);
         int cleared = currentFloor.Rooms.Count(r => r.IsCleared);
-        terminal.SetColor("white");
-        terminal.WriteLine($"Explored: {explored}/{currentFloor.Rooms.Count}  Cleared: {cleared}/{currentFloor.Rooms.Count}");
+        int total = currentFloor.Rooms.Count;
+        terminal.WriteLine($" DUNGEON MAP ── Level {currentDungeonLevel} ({currentFloor.Theme})  [{explored}/{total} explored, {cleared}/{total} cleared]");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(new string('─', 78));
 
-        // Current room info
-        var currentRoom = currentFloor.GetCurrentRoom();
-        if (currentRoom != null)
+        // Render compact roguelike map
+        // Each room: 1 char symbol, connections: ─ (horizontal), │ (vertical)
+        // Layout: 4 chars per room column (room + padding), 2 rows per room row (room + vertical connector)
+        int legendRow = 0;
+        string[] legend = {
+            "",
+            "  Legend:",
+            "",
+            "  \u001b[93m@\u001b[0m You",      // placeholder, rendered manually
+            "  \u001b[92m#\u001b[0m Cleared",
+            "  \u001b[91m█\u001b[0m Monsters",
+            "  \u001b[94m>\u001b[0m Stairs",
+            "  \u001b[91mB\u001b[0m Boss",
+            "  \u001b[96m·\u001b[0m Safe",
+            "  \u001b[90m?\u001b[0m Unknown",
+            "",
+        };
+
+        for (int y = minY; y <= maxY; y++)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"Location: {currentRoom.Name}");
+            // === Room row ===
+            // Left padding for centering (map area is left ~50 chars, legend on right)
+            terminal.Write("  ");
+            for (int x = minX; x <= maxX; x++)
+            {
+                if (posToRoom.TryGetValue((x, y), out var room))
+                {
+                    // West connector
+                    bool hasWest = room.Exits.ContainsKey(Direction.West);
+                    if (hasWest && room.IsExplored)
+                    {
+                        terminal.SetColor("darkgray");
+                        terminal.Write("───");
+                    }
+                    else if (x > minX)
+                    {
+                        terminal.Write("   ");
+                    }
+                    else
+                    {
+                        terminal.Write("  ");
+                    }
+
+                    // Room symbol (1 char, colored)
+                    char sym = GetRoomMapChar(room);
+                    string color = GetRoomMapColor(room);
+                    terminal.SetColor(color);
+                    terminal.Write(sym.ToString());
+                }
+                else
+                {
+                    // Empty cell
+                    terminal.Write(x > minX ? "    " : "   ");
+                }
+            }
+
+            // Right-side legend
+            if (legendRow < legend.Length)
+                RenderLegendEntry(legendRow, 50);
+            legendRow++;
+            terminal.WriteLine("");
+
+            // === Vertical connector row ===
+            if (y < maxY)
+            {
+                terminal.Write("  ");
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (posToRoom.TryGetValue((x, y), out var room))
+                    {
+                        bool hasSouth = room.Exits.ContainsKey(Direction.South);
+                        if (hasSouth && room.IsExplored)
+                        {
+                            terminal.SetColor("darkgray");
+                            if (x == minX)
+                                terminal.Write("  │");
+                            else
+                                terminal.Write("   │");
+                        }
+                        else
+                        {
+                            terminal.Write(x == minX ? "   " : "    ");
+                        }
+                    }
+                    else
+                    {
+                        terminal.Write(x == minX ? "   " : "    ");
+                    }
+                }
+
+                if (legendRow < legend.Length)
+                    RenderLegendEntry(legendRow, 50);
+                legendRow++;
+                terminal.WriteLine("");
+            }
         }
 
+        // Print remaining legend entries if map was small
+        while (legendRow < legend.Length)
+        {
+            terminal.Write(new string(' ', 50));
+            RenderLegendEntry(legendRow, 0);
+            legendRow++;
+            terminal.WriteLine("");
+        }
+
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(new string('─', 78));
+
+        // Current room info + boss status on one line
+        var currentRoom = currentFloor.GetCurrentRoom();
+        terminal.SetColor("white");
+        terminal.Write(" Location: ");
+        terminal.SetColor("yellow");
+        terminal.Write(currentRoom?.Name ?? "Unknown");
         if (currentFloor.BossDefeated)
         {
-            terminal.SetColor("green");
-            terminal.WriteLine("BOSS DEFEATED!");
+            terminal.SetColor("bright_green");
+            terminal.Write("  ★ BOSS DEFEATED");
         }
+        terminal.WriteLine("");
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine("Press Enter to continue...");
+        terminal.WriteLine(" Press Enter to continue...");
         await terminal.GetInput("");
+    }
+
+    /// <summary>
+    /// Get single-character map symbol for a room (roguelike style)
+    /// </summary>
+    private char GetRoomMapChar(DungeonRoom room)
+    {
+        bool isCurrentRoom = room.Id == currentFloor?.CurrentRoomId;
+
+        if (isCurrentRoom)
+            return '@';
+        if (!room.IsExplored)
+            return '?';
+        if (room.IsBossRoom && !room.IsCleared)
+            return 'B';
+        if (room.HasStairsDown)
+            return '>';
+        if (room.IsCleared)
+            return '#';
+        if (room.HasMonsters)
+            return '\u2588'; // █ solid block
+        if (room.IsSafeRoom)
+            return '~';
+        return '\u00B7'; // · middle dot (explored, safe)
+    }
+
+    /// <summary>
+    /// Render a legend entry at the right side of the map
+    /// </summary>
+    private void RenderLegendEntry(int index, int padTo)
+    {
+        // Legend entries rendered manually with terminal colors
+        switch (index)
+        {
+            case 1:
+                terminal.SetColor("white");
+                terminal.Write("  Legend:");
+                break;
+            case 3:
+                terminal.SetColor("bright_yellow");
+                terminal.Write("  @ ");
+                terminal.SetColor("gray");
+                terminal.Write("You");
+                break;
+            case 4:
+                terminal.SetColor("green");
+                terminal.Write("  # ");
+                terminal.SetColor("gray");
+                terminal.Write("Cleared");
+                break;
+            case 5:
+                terminal.SetColor("red");
+                terminal.Write("  \u2588 ");
+                terminal.SetColor("gray");
+                terminal.Write("Monsters");
+                break;
+            case 6:
+                terminal.SetColor("blue");
+                terminal.Write("  > ");
+                terminal.SetColor("gray");
+                terminal.Write("Stairs");
+                break;
+            case 7:
+                terminal.SetColor("bright_red");
+                terminal.Write("  B ");
+                terminal.SetColor("gray");
+                terminal.Write("Boss");
+                break;
+            case 8:
+                terminal.SetColor("cyan");
+                terminal.Write("  \u00B7 ");
+                terminal.SetColor("gray");
+                terminal.Write("Safe");
+                break;
+            case 9:
+                terminal.SetColor("darkgray");
+                terminal.Write("  ? ");
+                terminal.SetColor("gray");
+                terminal.Write("Unknown");
+                break;
+        }
     }
 
     /// <summary>

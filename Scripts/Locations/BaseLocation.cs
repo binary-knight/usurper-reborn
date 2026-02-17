@@ -2,6 +2,7 @@ using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.Data;
 using UsurperRemake.UI;
+using UsurperRemake.BBS;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -654,7 +655,11 @@ public abstract class BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine($"║                    {npc.Name.ToUpper()} - {npc.Title.ToUpper(),-42}    ║");
+        string npcHeader = $"{npc.Name.ToUpper()} - {npc.Title.ToUpper()}";
+        int padding = 78 - npcHeader.Length;
+        int leftPad = padding / 2;
+        int rightPad = padding - leftPad;
+        terminal.WriteLine($"║{new string(' ', leftPad)}{npcHeader}{new string(' ', rightPad)}║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1451,6 +1456,136 @@ public abstract class BaseLocation
 
         terminal.WriteLine("");
         terminal.WriteLine("");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // BBS 80x25 compact display helpers
+    // Used by location-specific DisplayLocationBBS() methods
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// BBS: 1-line header with title centered in a decorative line
+    /// </summary>
+    protected void ShowBBSHeader(string title)
+    {
+        int padLen = Math.Max(0, (76 - title.Length) / 2);
+        string padL = new string('═', padLen);
+        string padR = new string('═', 76 - title.Length - padLen);
+        terminal.SetColor("bright_blue");
+        terminal.Write("╔" + padL + " ");
+        terminal.SetColor("bright_white");
+        terminal.Write(title);
+        terminal.SetColor("bright_blue");
+        terminal.WriteLine(" " + padR + "╗");
+    }
+
+    /// <summary>
+    /// BBS: 1-line NPC summary (up to 2 names + "and N others")
+    /// </summary>
+    protected void ShowBBSNPCs()
+    {
+        var liveNPCs = GetLiveNPCsAtLocation();
+        if (liveNPCs.Count > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write(" You notice: ");
+            terminal.SetColor("cyan");
+            var names = liveNPCs.Take(2).Select(n => n.Name2).ToList();
+            terminal.Write(string.Join(", ", names));
+            if (liveNPCs.Count > 2)
+            {
+                terminal.SetColor("gray");
+                terminal.Write($", +{liveNPCs.Count - 2} more");
+            }
+            terminal.WriteLine("");
+        }
+    }
+
+    /// <summary>
+    /// BBS: 1-line compact status (HP/Gold/Mana/Level with XP%)
+    /// </summary>
+    protected void ShowBBSStatusLine()
+    {
+        terminal.SetColor("gray");
+        terminal.Write(" HP:");
+        float hpPct = currentPlayer.MaxHP > 0 ? (float)currentPlayer.HP / currentPlayer.MaxHP : 0;
+        terminal.SetColor(hpPct > 0.5f ? "bright_green" : hpPct > 0.25f ? "yellow" : "bright_red");
+        terminal.Write($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
+        terminal.SetColor("gray");
+        terminal.Write(" Gold:");
+        terminal.SetColor("yellow");
+        terminal.Write($"{currentPlayer.Gold:N0}");
+        if (currentPlayer.MaxMana > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write(" Mana:");
+            terminal.SetColor("blue");
+            terminal.Write($"{currentPlayer.Mana}/{currentPlayer.MaxMana}");
+        }
+        terminal.SetColor("gray");
+        terminal.Write(" Lv:");
+        terminal.SetColor("cyan");
+        terminal.Write($"{currentPlayer.Level}");
+        if (currentPlayer.Level < GameConfig.MaxLevel)
+        {
+            long curXP = currentPlayer.Experience;
+            long nextXP = GetExperienceForLevel(currentPlayer.Level + 1);
+            long prevXP = GetExperienceForLevel(currentPlayer.Level);
+            long xpInto = curXP - prevXP;
+            long xpNeed = nextXP - prevXP;
+            int pct = xpNeed > 0 ? (int)((xpInto * 100) / xpNeed) : 0;
+            terminal.SetColor("gray");
+            terminal.Write($"({Math.Clamp(pct, 0, 100)}%)");
+        }
+        terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// BBS: 1-line compact quick command bar
+    /// </summary>
+    protected void ShowBBSQuickCommands()
+    {
+        var npcsHere = GetLiveNPCsAtLocation();
+        terminal.SetColor("darkgray");
+        terminal.Write(" ["); terminal.SetColor("cyan"); terminal.Write("S"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("tatus ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("*"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Inv ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("?"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Help ");
+        if (npcsHere.Count > 0)
+        {
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("0"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write($"Talk({npcsHere.Count}) ");
+        }
+        terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// BBS: Render a row of menu items. Each tuple is (key, keyColor, label).
+    /// </summary>
+    protected void ShowBBSMenuRow(params (string key, string color, string label)[] items)
+    {
+        terminal.Write(" ");
+        foreach (var (key, color, label) in items)
+        {
+            terminal.SetColor("darkgray"); terminal.Write("[");
+            terminal.SetColor(color); terminal.Write(key);
+            terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write(label + " ");
+        }
+        terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// BBS: Full compact display wrapper - header, description, NPCs, then caller adds menu, then status+commands.
+    /// Intended to be used as: ShowBBSHeader → description → ShowBBSNPCs → menu → ShowBBSFooter
+    /// </summary>
+    protected void ShowBBSFooter()
+    {
+        terminal.WriteLine("");
+        ShowBBSStatusLine();
+        ShowBBSQuickCommands();
     }
 
     /// <summary>

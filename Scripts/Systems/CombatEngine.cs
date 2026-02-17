@@ -2,6 +2,7 @@ using UsurperRemake.Utils;
 using UsurperRemake.Data;
 using UsurperRemake.Systems;
 using UsurperRemake.UI;
+using UsurperRemake.BBS;
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -295,8 +296,8 @@ public partial class CombatEngine
             terminal.SetColor("white");
             terminal.WriteLine($"You are facing: {monster.GetDisplayInfo()}");
 
-            // Show monster silhouette for single monster (skip for screen readers)
-            if (player is Player pp3 && !pp3.ScreenReaderMode)
+            // Show monster silhouette for single monster (skip for screen readers and BBS mode)
+            if (player is Player pp3 && !pp3.ScreenReaderMode && !DoorMode.IsInDoorMode)
             {
                 var art = MonsterArtDatabase.GetArtForFamily(monster.FamilyName);
                 if (art != null)
@@ -308,8 +309,8 @@ public partial class CombatEngine
         }
         else
         {
-            // Show first monster's silhouette if 3 or fewer (skip for screen readers)
-            if (monsters.Count <= 3 && player is Player pp4 && !pp4.ScreenReaderMode)
+            // Show first monster's silhouette if 3 or fewer (skip for screen readers and BBS mode)
+            if (monsters.Count <= 3 && player is Player pp4 && !pp4.ScreenReaderMode && !DoorMode.IsInDoorMode)
             {
                 var art = MonsterArtDatabase.GetArtForFamily(monsters[0].FamilyName);
                 if (art != null)
@@ -379,6 +380,10 @@ public partial class CombatEngine
         while (player.IsAlive && monsters.Any(m => m.IsAlive) && !globalEscape)
         {
             roundNumber++;
+
+            // BBS 80x25 — clear screen at start of each round so combat fits one page
+            if (DoorMode.IsInDoorMode)
+                terminal.ClearScreen();
 
             // Display combat status at start of each round
             DisplayCombatStatus(monsters, player);
@@ -747,8 +752,8 @@ public partial class CombatEngine
         terminal.WriteLine($"You are facing: {monster.GetDisplayInfo()}");
         terminal.WriteLine("");
 
-        // Show monster silhouette (skip for screen readers)
-        if (player is Player pp2 && !pp2.ScreenReaderMode)
+        // Show monster silhouette (skip for screen readers and BBS mode)
+        if (player is Player pp2 && !pp2.ScreenReaderMode && !DoorMode.IsInDoorMode)
         {
             var art = MonsterArtDatabase.GetArtForFamily(monster.FamilyName);
             if (art != null)
@@ -805,8 +810,12 @@ public partial class CombatEngine
                 return new CombatAction { Type = CombatActionType.Status };
             }
 
-            // Display combat menu (screen reader compatible or standard)
-            if (player.ScreenReaderMode)
+            // Display combat menu
+            if (DoorMode.IsInDoorMode)
+            {
+                ShowCombatMenuBBS(player, monster, pvpOpponent, isPvP);
+            }
+            else if (player.ScreenReaderMode)
             {
                 ShowCombatMenuScreenReader(player, monster, pvpOpponent, isPvP);
             }
@@ -815,8 +824,9 @@ public partial class CombatEngine
                 ShowCombatMenuStandard(player, monster, pvpOpponent, isPvP);
             }
 
-            // Show combat tip occasionally
-            ShowCombatTipIfNeeded(player);
+            // Show combat tip occasionally (skip in BBS mode to save lines)
+            if (!DoorMode.IsInDoorMode)
+                ShowCombatTipIfNeeded(player);
 
             terminal.SetColor("white");
             terminal.Write("Choose action: ");
@@ -971,6 +981,176 @@ public partial class CombatEngine
             _ => "Normal"
         };
         terminal.WriteLine($"  SPD - Combat Speed, currently {speedLabel}");
+        terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// Compact combat action menu for BBS 80x25 terminals (single monster combat).
+    /// Fits on 2-3 lines. Quickbar skills shown as "[1-9]Skills" shortcut.
+    /// </summary>
+    private void ShowCombatMenuBBS(Character player, Monster? monster, Character? pvpOpponent, bool isPvP)
+    {
+        // Row 1: Core actions
+        terminal.SetColor("bright_green");
+        terminal.Write(" [A]");
+        terminal.SetColor("green");
+        terminal.Write("ttack ");
+        terminal.SetColor("bright_cyan");
+        terminal.Write("[D]");
+        terminal.SetColor("cyan");
+        terminal.Write("efend ");
+
+        // Potions (healing and/or mana)
+        if (player.Healing > 0 || player.ManaPotions > 0)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.Write("[H]");
+            terminal.SetColor("magenta");
+            string potLabel = "";
+            if (player.Healing > 0) potLabel += $"HP:{player.Healing}";
+            if (player.ManaPotions > 0) potLabel += (potLabel.Length > 0 ? "/" : "") + $"MP:{player.ManaPotions}";
+            terminal.Write($"Pot({potLabel}) ");
+        }
+
+        // Quickbar skills summary
+        var quickbarActions = GetQuickbarActions(player);
+        if (quickbarActions.Count > 0)
+        {
+            var available = quickbarActions.Where(q => q.available).ToList();
+            if (available.Count > 0)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[1-9]");
+                terminal.SetColor("yellow");
+                terminal.Write($"Skills({available.Count}) ");
+            }
+        }
+
+        if (monster != null)
+        {
+            terminal.SetColor("yellow");
+            terminal.Write("[R]");
+            terminal.SetColor("white");
+            terminal.Write("etreat ");
+        }
+        else if (isPvP)
+        {
+            terminal.SetColor("yellow");
+            terminal.Write("[R]");
+            terminal.SetColor("white");
+            terminal.Write("Flee ");
+        }
+        terminal.WriteLine("");
+
+        // Row 2: Tactical + utility
+        if (monster != null)
+        {
+            terminal.SetColor("yellow");
+            terminal.Write(" [P]");
+            terminal.SetColor("darkgray");
+            terminal.Write("ower ");
+            terminal.SetColor("yellow");
+            terminal.Write("[E]");
+            terminal.SetColor("darkgray");
+            terminal.Write("xact ");
+        }
+        terminal.SetColor("cyan");
+        terminal.Write("[I]");
+        terminal.SetColor("darkgray");
+        terminal.Write("Disarm ");
+        terminal.SetColor("cyan");
+        terminal.Write("[T]");
+        terminal.SetColor("darkgray");
+        terminal.Write("aunt ");
+
+        string speedLabel = player.CombatSpeed switch
+        {
+            CombatSpeed.Instant => "Inst",
+            CombatSpeed.Fast => "Fast",
+            _ => "Nrml"
+        };
+        terminal.SetColor("gray");
+        terminal.Write("[AUTO] ");
+        terminal.Write($"[SPD]{speedLabel} ");
+        terminal.Write("[S]tats");
+        terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// Compact dungeon combat action menu for BBS 80x25 terminals (multi-monster combat).
+    /// Fits on 2-3 lines. Quickbar skills shown as "[1-9]Skills" shortcut.
+    /// </summary>
+    private void ShowDungeonCombatMenuBBS(Character player, bool hasInjuredTeammates, bool canHealAlly, List<(string key, string name, bool available)> classInfo)
+    {
+        // Row 1: Core actions
+        terminal.SetColor("bright_green");
+        terminal.Write(" [A]");
+        terminal.SetColor("green");
+        terminal.Write("ttack ");
+        terminal.SetColor("bright_cyan");
+        terminal.Write("[D]");
+        terminal.SetColor("cyan");
+        terminal.Write("efend ");
+
+        // Potions (healing and/or mana)
+        if (player.Healing > 0 || player.ManaPotions > 0)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.Write("[I]");
+            terminal.SetColor("magenta");
+            string potLabel = "";
+            if (player.Healing > 0) potLabel += $"HP:{player.Healing}";
+            if (player.ManaPotions > 0) potLabel += (potLabel.Length > 0 ? "/" : "") + $"MP:{player.ManaPotions}";
+            terminal.Write($"Pot({potLabel}) ");
+        }
+
+        // Heal ally
+        if (hasInjuredTeammates && canHealAlly)
+        {
+            terminal.SetColor("bright_green");
+            terminal.Write("[H]");
+            terminal.SetColor("green");
+            terminal.Write("ealAlly ");
+        }
+
+        // Quickbar skills summary
+        if (classInfo.Count > 0)
+        {
+            var available = classInfo.Where(c => c.available).ToList();
+            if (available.Count > 0)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[1-9]");
+                terminal.SetColor("yellow");
+                terminal.Write($"Skills({available.Count}) ");
+            }
+        }
+
+        terminal.SetColor("yellow");
+        terminal.Write("[R]");
+        terminal.SetColor("white");
+        terminal.Write("etreat");
+        terminal.WriteLine("");
+
+        // Row 2: Utility
+        terminal.SetColor("gray");
+        terminal.Write(" [AUTO] ");
+        string speedLabel = player.CombatSpeed switch
+        {
+            CombatSpeed.Instant => "Inst",
+            CombatSpeed.Fast => "Fast",
+            _ => "Nrml"
+        };
+        terminal.Write($"[SPD]{speedLabel}");
+
+        // Boss save option
+        if (BossContext?.CanSave == true)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.Write(" [V]");
+            terminal.SetColor("magenta");
+            terminal.Write("Save");
+        }
         terminal.WriteLine("");
     }
 
@@ -1795,6 +1975,16 @@ public partial class CombatEngine
     /// </summary>
     private async Task ExecuteHeal(Character player, CombatResult result, bool quick)
     {
+        bool hasHealing = player.Healing > 0 && player.HP < player.MaxHP;
+        bool hasMana = player.ManaPotions > 0 && player.Mana < player.MaxMana;
+
+        // If player has mana potions, route through the item submenu for choice
+        if (hasMana && !quick)
+        {
+            await ExecuteUseItem(player, result);
+            return;
+        }
+
         if (player.HP >= player.MaxHP)
         {
             terminal.WriteLine("You are already at full health!", "yellow");
@@ -4144,6 +4334,13 @@ public partial class CombatEngine
             return;
         }
 
+        // BBS 80x25 — compact status that leaves room for action menu on same page
+        if (DoorMode.IsInDoorMode)
+        {
+            DisplayCombatStatusBBS(monsters, player);
+            return;
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
@@ -4341,6 +4538,161 @@ public partial class CombatEngine
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// Compact combat status for BBS 80x25 terminals.
+    /// Displays monsters and player on minimal lines to leave room for the action menu.
+    /// </summary>
+    private void DisplayCombatStatusBBS(List<Monster> monsters, Character player)
+    {
+        // Line 1: Header
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("═══════════════════════════════ COMBAT ═══════════════════════════════════════");
+
+        // Lines 2+: Monsters (two per line to save space)
+        var aliveMonsters = monsters.Where(m => m.IsAlive).ToList();
+        for (int i = 0; i < aliveMonsters.Count; i += 2)
+        {
+            var m1 = aliveMonsters[i];
+            double hp1Pct = (double)m1.HP / Math.Max(1, m1.MaxHP);
+            int filled1 = (int)(hp1Pct * 8);
+            string bar1 = new string('█', filled1) + new string('░', 8 - filled1);
+            string col1 = hp1Pct > 0.5 ? "green" : hp1Pct > 0.25 ? "yellow" : "red";
+
+            terminal.SetColor("yellow");
+            terminal.Write($" [{monsters.IndexOf(m1) + 1}]");
+            terminal.SetColor("white");
+            string name1 = m1.Name.Length > 14 ? m1.Name[..14] : m1.Name;
+            terminal.Write($"{name1,-14} ");
+            terminal.SetColor(col1);
+            terminal.Write($"{bar1} ");
+            terminal.SetColor("white");
+            terminal.Write($"{m1.HP,4}/{m1.MaxHP,-4}");
+
+            if (i + 1 < aliveMonsters.Count)
+            {
+                var m2 = aliveMonsters[i + 1];
+                double hp2Pct = (double)m2.HP / Math.Max(1, m2.MaxHP);
+                int filled2 = (int)(hp2Pct * 8);
+                string bar2 = new string('█', filled2) + new string('░', 8 - filled2);
+                string col2 = hp2Pct > 0.5 ? "green" : hp2Pct > 0.25 ? "yellow" : "red";
+
+                terminal.Write("  ");
+                terminal.SetColor("yellow");
+                terminal.Write($"[{monsters.IndexOf(m2) + 1}]");
+                terminal.SetColor("white");
+                string name2 = m2.Name.Length > 14 ? m2.Name[..14] : m2.Name;
+                terminal.Write($"{name2,-14} ");
+                terminal.SetColor(col2);
+                terminal.Write($"{bar2} ");
+                terminal.SetColor("white");
+                terminal.Write($"{m2.HP,4}/{m2.MaxHP,-4}");
+            }
+            terminal.WriteLine("");
+        }
+
+        // Separator
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("──────────────────────────────────────────────────────────────────────────────");
+
+        // Player line 1: Name + HP + MP + Potions
+        double playerHpPct = (double)player.HP / Math.Max(1, player.MaxHP);
+        int pFilled = (int)(playerHpPct * 10);
+        string pBar = new string('█', pFilled) + new string('░', 10 - pFilled);
+        string pCol = playerHpPct > 0.5 ? "bright_green" : playerHpPct > 0.25 ? "yellow" : "bright_red";
+
+        terminal.SetColor("bright_white");
+        terminal.Write($" {(player.Name2 ?? player.Name1)}  ");
+        terminal.SetColor("gray");
+        terminal.Write("HP:");
+        terminal.SetColor(pCol);
+        terminal.Write($"{pBar} {player.HP}/{player.MaxHP}");
+        if (player.MaxMana > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write("  MP:");
+            terminal.SetColor("bright_blue");
+            terminal.Write($"{player.Mana}/{player.MaxMana}");
+        }
+        terminal.SetColor("gray");
+        terminal.Write("  Pot:");
+        terminal.SetColor("magenta");
+        terminal.Write($"{player.Healing}/{player.MaxPotions}");
+        terminal.WriteLine("");
+
+        // Player line 2: ST + ATK + DEF + status effects
+        terminal.SetColor("gray");
+        terminal.Write($" ST:");
+        terminal.SetColor("yellow");
+        terminal.Write($"{player.CurrentCombatStamina}/{player.MaxCombatStamina}");
+        terminal.SetColor("gray");
+        terminal.Write($"  ATK:");
+        terminal.SetColor("bright_yellow");
+        terminal.Write($"{player.Strength + player.WeapPow}");
+        terminal.SetColor("gray");
+        terminal.Write($"  DEF:");
+        terminal.SetColor("bright_cyan");
+        terminal.Write($"{player.Defence + player.ArmPow + player.MagicACBonus}");
+        if (player.DamageAbsorptionPool > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write($"  Shield:");
+            terminal.SetColor("bright_magenta");
+            terminal.Write($"{player.DamageAbsorptionPool}");
+        }
+        // Inline status effects
+        if (player.ActiveStatuses.Count > 0 || player.IsRaging)
+        {
+            var statuses = new List<string>();
+            foreach (var kv in player.ActiveStatuses)
+                statuses.Add(kv.Value > 0 ? $"{kv.Key}({kv.Value})" : kv.Key.ToString());
+            if (player.IsRaging && !statuses.Any(s => s.StartsWith("Raging")))
+                statuses.Add("Raging");
+            terminal.SetColor("gray");
+            terminal.Write("  ");
+            terminal.SetColor("yellow");
+            terminal.Write(string.Join(",", statuses));
+        }
+        terminal.WriteLine("");
+
+        // Show teammate status (one line each, compact)
+        if (currentTeammates != null && currentTeammates.Count > 0)
+        {
+            var aliveTeammates = currentTeammates.Where(t => t.IsAlive).ToList();
+            if (aliveTeammates.Count > 0)
+            {
+                terminal.SetColor("gray");
+                terminal.Write(" Allies: ");
+                for (int i = 0; i < aliveTeammates.Count; i++)
+                {
+                    var tm = aliveTeammates[i];
+                    double tmPct = (double)tm.HP / Math.Max(1, tm.MaxHP);
+                    string tmCol = tmPct > 0.5 ? "green" : tmPct > 0.25 ? "yellow" : "red";
+                    if (i > 0) terminal.Write("  ");
+                    terminal.SetColor("white");
+                    string tmName = tm.DisplayName.Length > 10 ? tm.DisplayName[..10] : tm.DisplayName;
+                    terminal.Write($"{tmName} ");
+                    terminal.SetColor(tmCol);
+                    terminal.Write($"{tm.HP}/{tm.MaxHP}");
+                }
+                terminal.WriteLine("");
+            }
+        }
+
+        // Boss phase indicator
+        if (BossContext != null)
+        {
+            var bossMonster = aliveMonsters.FirstOrDefault(m => m.IsBoss);
+            if (bossMonster != null)
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($" Boss Phase {BossContext.CurrentPhase}");
+            }
+        }
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("──────────────────────────────────────────────────────────────────────────────");
     }
 
     /// <summary>
@@ -4869,7 +5221,11 @@ public partial class CombatEngine
             bool canHealAlly = hasInjuredTeammates && (player.Healing > 0 || (ClassAbilitySystem.IsSpellcaster(player.Class) && player.Mana > 0));
             var classInfo = GetClassSpecificActions(player);
 
-            if (player.ScreenReaderMode)
+            if (DoorMode.IsInDoorMode)
+            {
+                ShowDungeonCombatMenuBBS(player, hasInjuredTeammates, canHealAlly, classInfo);
+            }
+            else if (player.ScreenReaderMode)
             {
                 ShowDungeonCombatMenuScreenReader(player, hasInjuredTeammates, canHealAlly, classInfo);
             }
@@ -4878,8 +5234,9 @@ public partial class CombatEngine
                 ShowDungeonCombatMenuStandard(player, hasInjuredTeammates, canHealAlly, classInfo);
             }
 
-            // Show combat tip occasionally
-            ShowCombatTipIfNeeded(player);
+            // Show combat tip occasionally (skip in BBS mode to save lines)
+            if (!DoorMode.IsInDoorMode)
+                ShowCombatTipIfNeeded(player);
 
             terminal.SetColor("white");
             terminal.Write("Choose action: ");

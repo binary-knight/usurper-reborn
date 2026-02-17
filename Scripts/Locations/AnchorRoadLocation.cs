@@ -1,3 +1,4 @@
+using UsurperRemake.BBS;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using Godot;
@@ -39,6 +40,8 @@ public class AnchorRoadLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
+
         terminal.ClearScreen();
 
         // Header
@@ -198,6 +201,63 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.WriteLine("─────────────────────────────────────────");
+    }
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals.
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+        ShowBBSHeader("ANCHOR ROAD - Conjunction of Destinies");
+
+        // 1-line description
+        terminal.SetColor("white");
+        terminal.WriteLine(" The Red Fields stretch east. Blood and glory await the brave.");
+
+        ShowBBSNPCs();
+
+        // Compact challenge status (1-2 lines)
+        terminal.SetColor("gray");
+        terminal.Write(" Fights:");
+        terminal.SetColor(currentPlayer.PFights > 0 ? "bright_green" : "red");
+        terminal.Write($"{currentPlayer.PFights}");
+        if (!string.IsNullOrEmpty(currentPlayer.Team))
+        {
+            terminal.SetColor("gray");
+            terminal.Write(" Team:");
+            terminal.SetColor("cyan");
+            terminal.Write($"{currentPlayer.Team}");
+            terminal.SetColor("gray");
+            terminal.Write(" TFights:");
+            terminal.SetColor(currentPlayer.TFights > 0 ? "bright_green" : "red");
+            terminal.Write($"{currentPlayer.TFights}");
+            if (currentPlayer.CTurf)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write(" *TURF*");
+            }
+        }
+        var turfController = GetTurfControllerName();
+        if (!string.IsNullOrEmpty(turfController))
+        {
+            terminal.SetColor("gray");
+            terminal.Write(" Town:");
+            terminal.SetColor("bright_yellow");
+            terminal.Write(turfController);
+        }
+        terminal.WriteLine("");
+        terminal.WriteLine("");
+
+        // Menu rows
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Challenges:");
+        ShowBBSMenuRow(("B", "bright_cyan", "Bounty"), ("G", "bright_cyan", "GangWar"), ("T", "bright_cyan", "Gauntlet"));
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Town Control:");
+        ShowBBSMenuRow(("C", "bright_cyan", "ClaimTown"), ("F", "bright_cyan", "FleeTown"), ("P", "bright_cyan", "Prison"), ("R", "red", "Return"));
+
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

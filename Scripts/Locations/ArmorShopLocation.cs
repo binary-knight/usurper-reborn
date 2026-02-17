@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using UsurperRemake;
 using Godot;
 using System;
@@ -49,6 +50,11 @@ public class ArmorShopLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode && currentPlayer != null && currentPlayer.ArmHag >= 1)
+        {
+            if (currentSlotCategory == null) { DisplayLocationBBS(); return; }
+        }
+
         terminal.ClearScreen();
 
         if (currentPlayer == null) return;
@@ -208,6 +214,54 @@ public class ArmorShopLocation : BaseLocation
 
         // Show first shop hint for new players
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_SHOP, terminal, currentPlayer.HintsShown);
+    }
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals (main menu only).
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+
+        // Header
+        ShowBBSHeader("ARMOR SHOP");
+
+        // 1-line description + gold
+        terminal.SetColor("gray");
+        terminal.Write($" Run by {shopkeeperName} the elf. You have ");
+        terminal.SetColor("yellow");
+        terminal.Write(FormatNumber(currentPlayer.Gold));
+        terminal.SetColor("gray");
+        terminal.WriteLine(" gold.");
+
+        // Total AC summary
+        long totalAC = 0;
+        foreach (var slot in ArmorSlots)
+        {
+            var item = currentPlayer.GetEquipment(slot);
+            if (item != null) totalAC += item.ArmorClass;
+        }
+        terminal.SetColor("gray");
+        terminal.Write(" Total Armor Class: ");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"{totalAC}");
+
+        // NPCs
+        ShowBBSNPCs();
+        terminal.WriteLine("");
+
+        // Slot categories in compact rows (3 per row for 12 slots)
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Armor Slots:");
+        ShowBBSMenuRow(("1", "bright_yellow", "Head"), ("2", "bright_yellow", "Body"), ("3", "bright_yellow", "Arms"), ("4", "bright_yellow", "Hands"));
+        ShowBBSMenuRow(("5", "bright_yellow", "Legs"), ("6", "bright_yellow", "Feet"), ("7", "bright_yellow", "Waist"), ("8", "bright_yellow", "Face"));
+        ShowBBSMenuRow(("9", "bright_yellow", "Cloak"), ("10", "bright_yellow", "Neck"), ("11", "bright_yellow", "LRing"), ("12", "bright_yellow", "RRing"));
+
+        // Actions
+        ShowBBSMenuRow(("S", "bright_green", "ell"), ("A", "bright_magenta", "uto-Buy"), ("R", "bright_red", "eturn"));
+
+        // Footer
+        ShowBBSFooter();
     }
 
     private void ShowEquippedArmor()

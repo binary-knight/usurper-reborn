@@ -59,14 +59,20 @@ public class MainStreetLocation : BaseLocation
     protected override void DisplayLocation()
     {
         terminal.ClearScreen();
-        
+
+        if (DoorMode.IsInDoorMode)
+        {
+            DisplayLocationBBS();
+            return;
+        }
+
         // ASCII art header (simplified version)
         terminal.SetColor("bright_blue");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                              MAIN STREET                                    ║");
+        terminal.WriteLine("║                              MAIN STREET                                     ║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
-        
+
         // Online status bar (only in online mode)
         if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
         {
@@ -92,13 +98,13 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine($"You are standing on the main street of {GetTownName()}.");
         terminal.WriteLine($"The {GetTimeOfDay()} air is {GetWeather()}.");
         terminal.WriteLine("");
-        
+
         // Show NPCs in location
         ShowNPCsInLocation();
-        
+
         // Main Street menu (Pascal-style layout)
         ShowMainStreetMenu();
-        
+
         // Check for level eligibility message
         ShowLevelEligibilityMessage();
 
@@ -113,6 +119,203 @@ public class MainStreetLocation : BaseLocation
         {
             HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer.HintsShown);
         }
+    }
+
+    /// <summary>
+    /// Compact Main Street display for BBS 80x25 terminals.
+    /// Fits header, description, NPCs, menu, status, and prompt within 25 rows.
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        // Line 1: Header
+        terminal.SetColor("bright_blue");
+        terminal.Write("╔════════════════════════════════ ");
+        terminal.SetColor("bright_white");
+        terminal.Write("MAIN STREET");
+        terminal.SetColor("bright_blue");
+        terminal.WriteLine(" ════════════════════════════════╗");
+
+        // Line 2: Description (one line)
+        terminal.SetColor("white");
+        terminal.WriteLine($" The {GetTimeOfDay()} streets of {GetTownName()}. The air is {GetWeather()}.");
+
+        // Line 3: NPCs (compressed to one line)
+        var liveNPCs = GetLiveNPCsAtLocation();
+        if (liveNPCs.Count > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write(" You notice: ");
+            terminal.SetColor("cyan");
+            var names = liveNPCs.Take(2).Select(n => n.Name2).ToList();
+            terminal.Write(string.Join(", ", names));
+            if (liveNPCs.Count > 2)
+            {
+                terminal.SetColor("gray");
+                terminal.Write($", and {liveNPCs.Count - 2} other{(liveNPCs.Count - 2 == 1 ? "" : "s")}");
+            }
+            terminal.WriteLine("");
+        }
+
+        // Line 4: blank
+        terminal.WriteLine("");
+
+        // Lines 5-8: Location menu (4 rows of 4)
+        terminal.SetColor("darkgray");
+        terminal.Write(" ["); terminal.SetColor("bright_green"); terminal.Write("D"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("ungeons    ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("I"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("nn         ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("T"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("emple      ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("O"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.WriteLine("ld Church");
+
+        terminal.SetColor("darkgray");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("W"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("eapon Shop ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("A"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("rmor Shop  ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("M"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("agic Shop  ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("J"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.WriteLine("Auction");
+
+        terminal.SetColor("darkgray");
+        terminal.Write(" ["); terminal.SetColor("bright_cyan"); terminal.Write("B"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("ank        ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("1"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Healer     ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("2"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Quest Hall ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("V"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.WriteLine("Master");
+
+        terminal.SetColor("darkgray");
+        terminal.Write(" ["); terminal.SetColor("bright_magenta"); terminal.Write("K"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Castle     ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("H"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("ome        ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("C"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("hallenges  ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("L"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.WriteLine("odging");
+
+        // Line 9: blank
+        terminal.WriteLine("");
+
+        // Line 10: Shady + info row
+        terminal.SetColor("darkgray");
+        terminal.Write(" ["); terminal.SetColor("bright_red"); terminal.Write("Y"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("gray"); terminal.Write("Dark Alley ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("X"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("magenta"); terminal.Write("Love St    ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("N"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("ews        ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("F"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.WriteLine("ame");
+
+        // Line 11: Info + quit row
+        terminal.SetColor("darkgray");
+        terminal.Write(" ["); terminal.SetColor("bright_cyan"); terminal.Write("="); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Stats      ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("P"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("rogress    ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("magenta"); terminal.Write("R"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("elations   ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("red"); terminal.Write("Q"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("gray"); terminal.WriteLine("uit");
+
+        // Online multiplayer row (only in online mode)
+        if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
+        {
+            int onlineCount = OnlineStateManager.Instance?.CachedOnlinePlayerCount ?? 0;
+            terminal.SetColor("bright_green");
+            terminal.Write(" ── Online ── ");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("3"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write($"Who({onlineCount}) ");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("4"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write("Chat ");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("5"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write("News ");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_red"); terminal.Write("6"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write("Arena ");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("7"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.WriteLine("Boss");
+        }
+
+        // Blank line
+        terminal.WriteLine("");
+
+        // Level eligibility (if applicable)
+        if (currentPlayer.Level < GameConfig.MaxLevel)
+        {
+            long experienceNeeded = GetExperienceForLevel(currentPlayer.Level + 1);
+            if (currentPlayer.Experience >= experienceNeeded)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write(" >>> ");
+                terminal.SetColor("bright_green");
+                terminal.Write("You are eligible for a level raise! Visit your Master!");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine(" <<<");
+            }
+        }
+
+        // Line 14: Status line (compact)
+        terminal.SetColor("gray");
+        terminal.Write(" HP:");
+        float hpPct = currentPlayer.MaxHP > 0 ? (float)currentPlayer.HP / currentPlayer.MaxHP : 0;
+        terminal.SetColor(hpPct > 0.5f ? "bright_green" : hpPct > 0.25f ? "yellow" : "bright_red");
+        terminal.Write($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
+        terminal.SetColor("gray");
+        terminal.Write(" Gold:");
+        terminal.SetColor("yellow");
+        terminal.Write($"{currentPlayer.Gold:N0}");
+        if (currentPlayer.MaxMana > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write(" Mana:");
+            terminal.SetColor("blue");
+            terminal.Write($"{currentPlayer.Mana}/{currentPlayer.MaxMana}");
+        }
+        terminal.SetColor("gray");
+        terminal.Write(" Lv:");
+        terminal.SetColor("cyan");
+        terminal.Write($"{currentPlayer.Level}");
+        if (currentPlayer.Level < GameConfig.MaxLevel)
+        {
+            long curXP = currentPlayer.Experience;
+            long nextXP = GetExperienceForLevel(currentPlayer.Level + 1);
+            long prevXP = GetExperienceForLevel(currentPlayer.Level);
+            long xpInto = curXP - prevXP;
+            long xpNeed = nextXP - prevXP;
+            int pct = xpNeed > 0 ? (int)((xpInto * 100) / xpNeed) : 0;
+            pct = Math.Clamp(pct, 0, 100);
+            terminal.SetColor("gray");
+            terminal.Write($"({pct}%)");
+        }
+        terminal.WriteLine("");
+
+        // Line 15: Quick commands (compact)
+        terminal.SetColor("darkgray");
+        terminal.Write(" ["); terminal.SetColor("cyan"); terminal.Write("S"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("tatus ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("*"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Inv ");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("?"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Help ");
+        if (liveNPCs.Count > 0)
+        {
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("0"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write($"Talk({liveNPCs.Count}) ");
+        }
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("red"); terminal.Write("!"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Bug");
+        terminal.WriteLine("");
+
+        // Line 16: Bottom border
+        terminal.SetColor("bright_blue");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
     }
 
     /// <summary>
@@ -173,12 +376,6 @@ public class MainStreetLocation : BaseLocation
     /// </summary>
     private void ShowClassicMenu()
     {
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                          -= MAIN STREET =-                                  ║");
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
         // Row 1 - Primary locations

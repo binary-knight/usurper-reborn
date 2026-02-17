@@ -1,4 +1,5 @@
 using Godot;
+using UsurperRemake.BBS;
 using UsurperRemake.Systems;
 using GlobalItem = global::Item;
 using System;
@@ -29,6 +30,8 @@ public class MarketplaceLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
+
         terminal.ClearScreen();
 
         // Header
@@ -181,6 +184,46 @@ public class MarketplaceLocation : BaseLocation
         terminal.WriteLine("");
 
         ShowStatusLine();
+    }
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals.
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+        ShowBBSHeader("AUCTION HOUSE");
+
+        // 1-line description with listing count
+        var stats = MarketplaceSystem.Instance.GetStatistics();
+        terminal.SetColor("white");
+        if (stats.TotalListings > 0)
+        {
+            terminal.Write(" Grimjaw's auction hall. ");
+            terminal.SetColor("cyan");
+            terminal.Write($"{stats.TotalListings}");
+            terminal.SetColor("gray");
+            terminal.Write(" listings");
+            if (stats.TotalValue > 0)
+            {
+                terminal.Write(" worth ");
+                terminal.SetColor("yellow");
+                terminal.Write($"{stats.TotalValue:N0}g");
+            }
+            terminal.WriteLine("");
+        }
+        else
+        {
+            terminal.WriteLine(" Grimjaw's auction hall stands mostly empty. \"Slow day.\"");
+        }
+
+        ShowBBSNPCs();
+        terminal.WriteLine("");
+
+        // Menu rows
+        ShowBBSMenuRow(("C", "cyan", "Browse"), ("B", "green", "Buy"), ("A", "green", "AddItem"), ("S", "cyan", "Status"), ("R", "red", "Return"));
+
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

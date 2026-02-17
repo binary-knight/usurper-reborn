@@ -6,6 +6,7 @@ using Godot;
 using UsurperRemake.Utils;
 using UsurperRemake.Data;
 using UsurperRemake.UI;
+using UsurperRemake.BBS;
 
 namespace UsurperRemake.Systems
 {
@@ -383,8 +384,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"╚════════════════════════════════════════════════════════════════╝", boss.ThemeColor);
             terminal.WriteLine("");
 
-            // Show Old God art (skip for screen readers)
-            if (player is Player pp && !pp.ScreenReaderMode)
+            // Show Old God art (skip for screen readers and BBS mode)
+            if (player is Player pp && !pp.ScreenReaderMode && !DoorMode.IsInDoorMode)
             {
                 var art = OldGodArtDatabase.GetArtForGod(boss.Type);
                 if (art != null)

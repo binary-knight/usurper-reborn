@@ -742,14 +742,12 @@ public class WorldSimulator
                     FamilySystem.Instance?.CreateNPCChild(npc, father);
                     UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
                         $"Child born to {npc.Name2} and {father.Name2}!");
-                    Console.Error.WriteLine($"[WORLDSIM] Birth: {npc.Name2} and {father.Name2} had a child!");
                 }
                 else
                 {
                     // Father completely gone from the game - create child with mother only
                     UsurperRemake.Systems.DebugLogger.Instance.LogWarning("LIFECYCLE",
                         $"Birth: father '{fatherName}' not found for {npc.Name2}'s pregnancy. Creating child anyway.");
-                    Console.Error.WriteLine($"[WORLDSIM] Birth: father '{fatherName}' not found, creating child with mother only");
                     FamilySystem.Instance?.CreateNPCChild(npc, npc); // Use mother as both parents
                 }
                 npc.PregnancyDueDate = null;

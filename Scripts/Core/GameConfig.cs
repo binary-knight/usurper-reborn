@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.41.0";
-    public const string VersionName = "Dark Alley Overhaul";
+    public const string Version = "0.41.1";
+    public const string VersionName = "BBS Terminal Overhaul";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

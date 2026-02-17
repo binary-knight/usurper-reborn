@@ -1,6 +1,7 @@
 using UsurperRemake;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,7 +54,53 @@ public partial class MagicShopLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
         DisplayMagicShopMenu(currentPlayer);
+    }
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals.
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+
+        // Header
+        ShowBBSHeader("MAGIC SHOP");
+
+        // 1-line description + gold
+        terminal.SetColor("gray");
+        terminal.Write($" Run by {_ownerName} the gnome. You have ");
+        terminal.SetColor("yellow");
+        terminal.Write($"{currentPlayer.Gold:N0}");
+        terminal.SetColor("gray");
+        terminal.WriteLine(" gold.");
+
+        // NPCs
+        ShowBBSNPCs();
+        terminal.WriteLine("");
+
+        // Menu rows - Shopping
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Shopping:");
+        ShowBBSMenuRow(("A", "bright_green", "ccessories"), ("S", "bright_green", "ell"), ("I", "bright_green", "dentify"));
+
+        // Potions & Scrolls
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Potions & Scrolls:");
+        ShowBBSMenuRow(("H", "bright_green", "ealing Pots"), ("M", "bright_green", "ana Pots"), ("D", "bright_green", "ungeon Reset"));
+
+        // Enchanting & Arcane
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" Enchanting / Arcane:");
+        ShowBBSMenuRow(("E", "bright_yellow", "nchant"), ("W", "bright_yellow", "Remove Ench"), ("C", "bright_yellow", "urse Removal"), ("F", "magenta", "orge"));
+        ShowBBSMenuRow(("V", "bright_magenta", "Love Spells"), ("K", "bright_magenta", "Dark Arts"), ("Y", "bright_magenta", "Study"), ("G", "bright_magenta", "Scry"));
+
+        // Talk & Return
+        ShowBBSMenuRow(("T", "bright_cyan", $"alk to {_ownerName}"), ("R", "bright_red", "eturn"));
+
+        // Footer
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

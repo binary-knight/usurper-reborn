@@ -699,8 +699,8 @@ public class MaintenanceSystem
     /// </summary>
     private void LoadMaintenanceDate()
     {
-        var datePath = Path.Combine(GameEngine.DataPath, GameConfig.DateFile);
-        
+        var datePath = Path.Combine(GameEngine.DataPath, GameConfig.MaintenanceDateFile);
+
         try
         {
             if (File.Exists(datePath))
@@ -717,18 +717,18 @@ public class MaintenanceSystem
         {
             GD.PrintErr($"Failed to load maintenance date: {ex.Message}");
         }
-        
+
         // Default to yesterday to trigger maintenance
         lastMaintenanceDate = DateTime.Now.AddDays(-1);
     }
-    
+
     /// <summary>
     /// Save maintenance completion date
     /// Pascal: Date file update
     /// </summary>
     private void SaveMaintenanceDate()
     {
-        var datePath = Path.Combine(GameEngine.DataPath, GameConfig.DateFile);
+        var datePath = Path.Combine(GameEngine.DataPath, GameConfig.MaintenanceDateFile);
         
         try
         {

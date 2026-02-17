@@ -1,3 +1,4 @@
+using UsurperRemake.BBS;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using Godot;
@@ -86,6 +87,8 @@ public class LoveStreetLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
+
         terminal.ClearScreen();
 
         terminal.SetColor("bright_magenta");
@@ -199,6 +202,34 @@ public class LoveStreetLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine($" Gold: {currentPlayer.Gold:N0}");
         terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// Compact BBS display for 80x25 terminals.
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        terminal.ClearScreen();
+        ShowBBSHeader("LOVE STREET");
+
+        // 1-line description
+        terminal.SetColor("magenta");
+        terminal.WriteLine(" Perfume and promise fill the air. Beautiful creatures beckon from doorways.");
+
+        ShowBBSNPCs();
+        terminal.WriteLine("");
+
+        // Menu rows
+        ShowBBSMenuRow(("1", "bright_red", "BeautyNest"), ("2", "bright_blue", "HallDreams"), ("N", "yellow", "MeetNPCs"), ("D", "green", "Date"));
+        ShowBBSMenuRow(("G", "cyan", "GiftShop"), ("V", "magenta", "Gossip"), ("S", "cyan", "RomanceStats"), ("R", "red", "Return"));
+
+        // Gold
+        terminal.SetColor("gray");
+        terminal.Write(" Gold:");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"{currentPlayer.Gold:N0}");
+
+        ShowBBSFooter();
     }
 
     protected override async Task<bool> ProcessChoice(string choice)

@@ -217,19 +217,15 @@ namespace UsurperConsole
                 {
                     var onlineUsername = DoorMode.OnlineUsername ?? "anonymous";
 
-                    // Prevent duplicate logins - check if this player already has an active session
+                    // If player appears online from a stale/crashed session, clear it and continue
                     if (await sqlBackend.IsPlayerOnline(onlineUsername))
                     {
-                        DoorMode.Log($"Player '{onlineUsername}' is already logged in - rejecting duplicate session");
-                        terminal.SetColor("bright_red");
-                        terminal.WriteLine("");
-                        terminal.WriteLine("  This character is already logged in from another session.");
+                        DoorMode.Log($"Player '{onlineUsername}' has stale session - clearing for reconnect");
+                        await sqlBackend.UnregisterOnline(onlineUsername);
                         terminal.SetColor("yellow");
-                        terminal.WriteLine("  Please disconnect the other session first, or wait a few minutes.");
+                        terminal.WriteLine("  Previous session disconnected.");
+                        terminal.SetColor("white");
                         terminal.WriteLine("");
-                        await Task.Delay(3000);
-                        Environment.Exit(0);
-                        return;
                     }
 
                     OnlineStateManager.Initialize(sqlBackend, onlineUsername);

@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,6 +75,12 @@ public class BankLocation : BaseLocation
             return;
         }
 
+        if (DoorMode.IsInDoorMode)
+        {
+            DisplayLocationBBS();
+            return;
+        }
+
         // Standardized bank header
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
@@ -100,6 +107,47 @@ public class BankLocation : BaseLocation
 
         // Status line
         ShowStatusLine();
+    }
+
+    /// <summary>
+    /// BBS compact display for 80x25 terminal
+    /// </summary>
+    private void DisplayLocationBBS()
+    {
+        ShowBBSHeader("THE IRONVAULT BANK");
+        // 1-line account summary
+        terminal.SetColor("gray");
+        terminal.Write(" On Hand:");
+        terminal.SetColor("bright_yellow");
+        terminal.Write($"{currentPlayer.Gold:N0}");
+        terminal.SetColor("gray");
+        terminal.Write("  Bank:");
+        terminal.SetColor("yellow");
+        terminal.Write($"{currentPlayer.BankGold:N0}");
+        terminal.SetColor("gray");
+        terminal.Write("  Total:");
+        terminal.SetColor("bright_green");
+        terminal.Write($"{(currentPlayer.Gold + currentPlayer.BankGold):N0}");
+        if (currentPlayer.Loan > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.Write("  Loan:");
+            terminal.SetColor("red");
+            terminal.Write($"{currentPlayer.Loan:N0}");
+        }
+        if (currentPlayer.BankGuard)
+        {
+            terminal.SetColor("cyan");
+            terminal.Write($"  Guard:ON");
+        }
+        terminal.WriteLine("");
+        ShowBBSNPCs();
+        // Menu rows
+        ShowBBSMenuRow(("D", "bright_green", "Deposit"), ("W", "bright_green", "Withdraw"), ("T", "bright_green", "Transfer"));
+        ShowBBSMenuRow(("L", "bright_cyan", "Loan"), ("I", "bright_cyan", "Interest"), ("A", "bright_cyan", "History"));
+        ShowBBSMenuRow(("G", "yellow", "Guard Duty"), ("*", "yellow", "Resign Guard"), ("R", "bright_red", "Rob Bank!"));
+        ShowBBSMenuRow(("Q", "gray", "Return"));
+        ShowBBSFooter();
     }
 
     private void DisplayBannedMessage()
