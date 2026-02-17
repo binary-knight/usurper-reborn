@@ -2360,7 +2360,16 @@ public partial class GameEngine : Node
                     PoisonDamage = equipData.PoisonDamage,
                     LifeSteal = equipData.LifeSteal,
                     HasFireEnchant = equipData.HasFireEnchant,
-                    HasFrostEnchant = equipData.HasFrostEnchant
+                    HasFrostEnchant = equipData.HasFrostEnchant,
+                    HasLightningEnchant = equipData.HasLightningEnchant,
+                    HasPoisonEnchant = equipData.HasPoisonEnchant,
+                    HasHolyEnchant = equipData.HasHolyEnchant,
+                    HasShadowEnchant = equipData.HasShadowEnchant,
+                    ManaSteal = equipData.ManaSteal,
+                    ArmorPiercing = equipData.ArmorPiercing,
+                    Thorns = equipData.Thorns,
+                    HPRegen = equipData.HPRegen,
+                    ManaRegen = equipData.ManaRegen
                 };
                 // Register with the original ID so EquippedItems references still work
                 EquipmentDatabase.RegisterDynamicWithId(equipment, equipData.Id);
@@ -2375,6 +2384,27 @@ public partial class GameEngine : Node
                 kvp => (EquipmentSlot)kvp.Key,
                 kvp => kvp.Value
             );
+        }
+
+        // Enforce power-based MinLevel on all equipped items and unequip any that
+        // exceed the player's level (prevents overpowered gear from old saves/trades)
+        var slotsToUnequip = new List<EquipmentSlot>();
+        foreach (var kvp in player.EquippedItems)
+        {
+            var equip = EquipmentDatabase.GetById(kvp.Value);
+            if (equip != null)
+            {
+                equip.EnforceMinLevelFromPower();
+                if (player.Level < equip.MinLevel)
+                {
+                    slotsToUnequip.Add(kvp.Key);
+                    DebugLogger.Instance?.LogInfo("EQUIP", $"Unequipping {equip.Name} from {kvp.Key} - requires level {equip.MinLevel}, player is {player.Level}");
+                }
+            }
+        }
+        foreach (var slot in slotsToUnequip)
+        {
+            player.EquippedItems.Remove(slot);
         }
 
         // Restore curse status for equipped items
@@ -3135,7 +3165,16 @@ public partial class GameEngine : Node
                         PoisonDamage = equipData.PoisonDamage,
                         LifeSteal = equipData.LifeSteal,
                         HasFireEnchant = equipData.HasFireEnchant,
-                        HasFrostEnchant = equipData.HasFrostEnchant
+                        HasFrostEnchant = equipData.HasFrostEnchant,
+                        HasLightningEnchant = equipData.HasLightningEnchant,
+                        HasPoisonEnchant = equipData.HasPoisonEnchant,
+                        HasHolyEnchant = equipData.HasHolyEnchant,
+                        HasShadowEnchant = equipData.HasShadowEnchant,
+                        ManaSteal = equipData.ManaSteal,
+                        ArmorPiercing = equipData.ArmorPiercing,
+                        Thorns = equipData.Thorns,
+                        HPRegen = equipData.HPRegen,
+                        ManaRegen = equipData.ManaRegen
                     };
 
                     // Register and get the new ID (may differ from saved ID)

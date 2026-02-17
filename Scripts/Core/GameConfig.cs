@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.40.3";
-    public const string VersionName = "PvP Combat & Quest Fixes";
+    public const string Version = "0.40.4";
+    public const string VersionName = "Enchantments, BBS Online & Dashboard";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -432,6 +432,13 @@ public static partial class GameConfig
     public const float FrostEnchantProcChance = 0.15f;        // 15% chance for frost slow per attack
     public const int FrostEnchantAgiReduction = 3;            // AGI reduction from frost slow
     public const int FrostEnchantDuration = 2;                // Frost slow lasts 2 turns
+    public const float LightningEnchantProcChance = 0.15f;    // 15% chance to stun per attack
+    public const float LightningEnchantDamageMultiplier = 0.12f; // Lightning damage = weapon damage * 12%
+    public const float PoisonEnchantProcChance = 0.20f;       // 20% chance to poison per attack
+    public const float HolyEnchantProcChance = 0.25f;         // 25% chance for holy damage (bonus vs undead)
+    public const float HolyEnchantDamageMultiplier = 0.20f;   // Holy damage = weapon damage * 20%
+    public const float ShadowEnchantProcChance = 0.20f;       // 20% chance for shadow damage
+    public const float ShadowEnchantDamageMultiplier = 0.15f; // Shadow damage = weapon damage * 15%
 
     // Crafting Materials (v0.30.9) - Rare dungeon drops for high-tier enchantments and training
     public const double MaterialDropChanceRegular = 0.03;      // 3% from regular monsters in floor range

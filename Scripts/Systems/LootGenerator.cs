@@ -910,6 +910,12 @@ public static class LootGenerator
 
         private static void ApplyEffectsToItem(Item item, List<(SpecialEffect effect, int value)> effects, bool isWeapon)
         {
+            // Store effects for transfer to Equipment during loot-to-equipment conversion (v0.40.5)
+            foreach (var (effect, value) in effects)
+            {
+                item.LootEffects.Add(((int)effect, value));
+            }
+
             foreach (var (effect, value) in effects)
             {
                 switch (effect)

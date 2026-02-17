@@ -2711,6 +2711,22 @@ namespace UsurperRemake.Systems
         return listings;
     }
 
+    public async Task<bool> CollectExpiredAuctionListing(int listingId, string seller)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE auction_listings SET status = 'collected'
+                                WHERE id = @id AND LOWER(seller) = LOWER(@seller) AND status = 'expired';";
+            cmd.Parameters.AddWithValue("@id", listingId);
+            cmd.Parameters.AddWithValue("@seller", seller);
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected > 0;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to collect expired auction: {ex.Message}"); return false; }
+    }
+
     public async Task CleanupExpiredAuctions()
     {
         try

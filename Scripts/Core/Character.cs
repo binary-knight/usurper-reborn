@@ -782,6 +782,11 @@ public class Character
     public int GetEquipmentCritDamageBonus() => SumEquipmentProperty(e => e.CriticalDamageBonus);
     public int GetEquipmentLifeSteal() => SumEquipmentProperty(e => e.LifeSteal);
     public int GetEquipmentMagicResistance() => SumEquipmentProperty(e => e.MagicResistance);
+    public int GetEquipmentManaSteal() => SumEquipmentProperty(e => e.ManaSteal);
+    public int GetEquipmentArmorPiercing() => SumEquipmentProperty(e => e.ArmorPiercing);
+    public int GetEquipmentThorns() => SumEquipmentProperty(e => e.Thorns);
+    public int GetEquipmentHPRegen() => SumEquipmentProperty(e => e.HPRegen);
+    public int GetEquipmentManaRegen() => SumEquipmentProperty(e => e.ManaRegen);
 
     /// <summary>
     /// Get equipment summary for display

@@ -60,6 +60,10 @@ public class Item
     public bool IsCursed { get; set; } = false;
     public bool OnlyForGood { get; set; } = false; // Good alignment required
     public bool OnlyForEvil { get; set; } = false; // Evil alignment required
+
+    // Loot enchantment effects (v0.40.5) - tracks actual enchantment types from LootGenerator
+    // Each entry is (SpecialEffect enum as int, value)
+    public List<(int EffectType, int Value)> LootEffects { get; set; } = new();
     
     /// <summary>
     /// Constructor for creating items
@@ -726,9 +730,20 @@ public class Equipment
     public bool IsIdentified { get; set; } = true;
     public bool IsUnique { get; set; }              // Only one can exist
 
-    // Elemental enchant flags (v0.30.9)
+    // Elemental enchant flags (v0.30.9+)
     public bool HasFireEnchant { get; set; }
     public bool HasFrostEnchant { get; set; }
+    public bool HasLightningEnchant { get; set; }  // Chance to stun
+    public bool HasPoisonEnchant { get; set; }     // Poison DoT
+    public bool HasHolyEnchant { get; set; }       // Bonus vs undead
+    public bool HasShadowEnchant { get; set; }     // Bonus vs living
+
+    // Proc-based enchantments (v0.40.5) - from loot effects
+    public int ManaSteal { get; set; }             // % mana restore on hit
+    public int ArmorPiercing { get; set; }         // % armor ignore
+    public int Thorns { get; set; }                // % damage reflected to attacker
+    public int HPRegen { get; set; }               // HP restored per combat round
+    public int ManaRegen { get; set; }             // Mana restored per combat round
 
     /// <summary>
     /// Create a new equipment item
@@ -838,6 +853,29 @@ public class Equipment
             EquipmentRarity.Legendary => 65,
             _ => 1  // Common, Uncommon, Rare have no level requirement
         };
+    }
+
+    /// <summary>
+    /// Calculate a minimum level requirement based on item power.
+    /// Prevents low-level players from equipping absurdly powerful gear
+    /// regardless of how they acquired it (auction house, trading, etc.)
+    /// Formula: MinLevel = max(1, power / 10) where power = max(WeaponPower, ArmorClass)
+    /// </summary>
+    public static int CalculateMinLevelFromPower(Equipment equip)
+    {
+        int power = Math.Max(equip.WeaponPower, equip.ArmorClass);
+        if (power <= 15) return 1; // Starter gear has no restriction
+        return Math.Min(100, Math.Max(1, power / 10));
+    }
+
+    /// <summary>
+    /// Ensure MinLevel is at least as high as the power-based floor.
+    /// Call this after creating Equipment to prevent overpowered gear at low levels.
+    /// </summary>
+    public void EnforceMinLevelFromPower()
+    {
+        int powerMinLevel = CalculateMinLevelFromPower(this);
+        MinLevel = Math.Max(MinLevel, powerMinLevel);
     }
 
     /// <summary>

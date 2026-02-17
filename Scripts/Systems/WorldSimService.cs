@@ -1232,7 +1232,16 @@ namespace UsurperRemake.Systems
                             PoisonDamage = equipData.PoisonDamage,
                             LifeSteal = equipData.LifeSteal,
                             HasFireEnchant = equipData.HasFireEnchant,
-                            HasFrostEnchant = equipData.HasFrostEnchant
+                            HasFrostEnchant = equipData.HasFrostEnchant,
+                            HasLightningEnchant = equipData.HasLightningEnchant,
+                            HasPoisonEnchant = equipData.HasPoisonEnchant,
+                            HasHolyEnchant = equipData.HasHolyEnchant,
+                            HasShadowEnchant = equipData.HasShadowEnchant,
+                            ManaSteal = equipData.ManaSteal,
+                            ArmorPiercing = equipData.ArmorPiercing,
+                            Thorns = equipData.Thorns,
+                            HPRegen = equipData.HPRegen,
+                            ManaRegen = equipData.ManaRegen
                         };
 
                         int newId = EquipmentDatabase.RegisterDynamic(equipment);

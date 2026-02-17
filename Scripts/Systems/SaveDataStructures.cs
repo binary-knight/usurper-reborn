@@ -648,9 +648,20 @@ namespace UsurperRemake.Systems
         public int PoisonDamage { get; set; }
         public int LifeSteal { get; set; }
 
-        // Elemental enchant flags (v0.30.9)
+        // Elemental enchant flags (v0.30.9+)
         public bool HasFireEnchant { get; set; }
         public bool HasFrostEnchant { get; set; }
+        public bool HasLightningEnchant { get; set; }
+        public bool HasPoisonEnchant { get; set; }
+        public bool HasHolyEnchant { get; set; }
+        public bool HasShadowEnchant { get; set; }
+
+        // Proc-based enchantments (v0.40.5)
+        public int ManaSteal { get; set; }
+        public int ArmorPiercing { get; set; }
+        public int Thorns { get; set; }
+        public int HPRegen { get; set; }
+        public int ManaRegen { get; set; }
     }
 
     /// <summary>

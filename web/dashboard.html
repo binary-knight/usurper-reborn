@@ -305,9 +305,20 @@
         .chart-wrap { position: relative; height: 220px; }
 
         /* --- Relationship Network --- */
-        .network-card { min-height: 350px; margin-bottom: 16px; }
-        #network-svg { width: 100%; height: 340px; }
-        #network-svg text { fill: var(--text-dim); font-size: 9px; pointer-events: none; }
+        .network-card { min-height: 520px; margin-bottom: 16px; }
+        #network-svg { width: 100%; height: 500px; }
+        #network-svg text { fill: var(--text-dim); font-size: 8px; pointer-events: none; }
+        #network-svg text.label-ego { font-size: 10px; fill: var(--text); font-weight: 600; }
+        .net-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; align-items: center; }
+        .net-legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-dim); }
+        .net-legend-line { width: 18px; height: 2px; border-radius: 1px; }
+        .net-legend-line.dashed { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px); height: 2px; }
+        .net-search { padding: 2px 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font-size: 10px; width: 120px; outline: none; font-family: inherit; }
+        .net-search:focus { border-color: var(--cyan); }
+        .net-search::placeholder { color: var(--text-dim); }
+        .net-ego-btn { display: none; padding: 2px 8px; background: rgba(255,170,0,0.15); border: 1px solid var(--gold); border-radius: 3px; color: var(--gold); font-size: 10px; cursor: pointer; }
+        .net-ego-btn:hover { background: rgba(255,170,0,0.25); }
+        .net-link-label { fill: var(--text-dim); font-size: 7px; pointer-events: none; }
 
         /* --- Timeline --- */
         .timeline-card { margin-bottom: 16px; }
@@ -684,8 +695,9 @@
         .net-filter-row {
             display: flex;
             gap: 6px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             flex-wrap: wrap;
+            align-items: center;
         }
         .net-filter-btn {
             padding: 2px 8px;
@@ -1054,6 +1066,17 @@
                 <button class="net-filter-btn" data-filter="team" onclick="setNetFilter(this,'team')">Teams</button>
                 <button class="net-filter-btn" data-filter="ally" onclick="setNetFilter(this,'ally')">Allies</button>
                 <button class="net-filter-btn" data-filter="rival" onclick="setNetFilter(this,'rival')">Rivals</button>
+                <button class="net-filter-btn" data-filter="family" onclick="setNetFilter(this,'family')">Family</button>
+                <input type="text" class="net-search" id="net-search" placeholder="Find NPC..." oninput="onNetSearch(this.value)">
+                <button class="net-ego-btn" id="net-ego-btn" onclick="exitEgoMode()">Show All</button>
+            </div>
+            <div class="net-legend">
+                <span class="net-legend-item"><span class="net-legend-line" style="background:#ff3355"></span>Marriage</span>
+                <span class="net-legend-item"><span class="net-legend-line" style="background:#00e5ff"></span>Team</span>
+                <span class="net-legend-item"><span class="net-legend-line" style="background:#00ff88"></span>Ally</span>
+                <span class="net-legend-item"><span class="net-legend-line dashed" style="color:#ff8844"></span>Rival</span>
+                <span class="net-legend-item"><span class="net-legend-line dashed" style="color:#ffaa00"></span>Family</span>
+                <span class="net-legend-item" style="margin-left:8px;color:var(--text-dim)">Node color = faction</span>
             </div>
             <svg id="network-svg"></svg>
         </div>
@@ -2793,16 +2816,52 @@ function drawCompareRadar(n, canvasId, side) {
 }
 
 // ==========================================
-// Network Filter (#6)
+// Network Filter & Ego Mode
 // ==========================================
 let networkFilter = 'all';
 let networkHighlightNode = null;
+let networkEgoMode = false;
+let networkEgoNode = null;
+let networkZoom = null;
+let _netSearchTimer = null;
 
 function setNetFilter(btn, filter) {
     networkFilter = filter;
+    networkEgoMode = false;
+    networkEgoNode = null;
+    document.getElementById('net-ego-btn').style.display = 'none';
     document.querySelectorAll('.net-filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     updateNetwork();
+}
+
+function exitEgoMode() {
+    networkEgoMode = false;
+    networkEgoNode = null;
+    document.getElementById('net-ego-btn').style.display = 'none';
+    updateNetwork();
+}
+
+function onNetSearch(val) {
+    clearTimeout(_netSearchTimer);
+    _netSearchTimer = setTimeout(() => {
+        if (!val || !val.trim()) {
+            networkEgoMode = false;
+            networkEgoNode = null;
+            document.getElementById('net-ego-btn').style.display = 'none';
+            updateNetwork();
+            return;
+        }
+        const q = val.trim().toLowerCase();
+        const match = allNpcs?.find(n => (n.name || n.Name || '').toLowerCase().includes(q));
+        if (match) {
+            const name = match.name || match.Name;
+            networkEgoMode = true;
+            networkEgoNode = name;
+            document.getElementById('net-ego-btn').style.display = '';
+            updateNetwork();
+        }
+    }, 300);
 }
 
 // ==========================================
@@ -3229,7 +3288,7 @@ showNpcDetail = function(n) {
 };
 
 // ==========================================
-// Enhanced Network with filter + highlight (#6)
+// Enhanced Network — full overhaul
 // ==========================================
 const _origUpdateNetwork = updateNetwork;
 
@@ -3239,8 +3298,12 @@ updateNetwork = function() {
     svg.selectAll('*').remove();
 
     const width = svg.node().getBoundingClientRect().width;
-    const height = 340;
+    const height = 500;
 
+    const CLASS_NAMES_ARR = ['Alchemist','Assassin','Barbarian','Bard','Cleric','Jester','Magician','Paladin','Ranger','Sage','Warrior'];
+    const RACE_NAMES_ARR = ['Human','Hobbit','Elf','Half-Elf','Dwarf','Troll','Orc','Gnome','Gnoll','Mutant'];
+
+    // Build nodes from NPCs
     const nodes = [];
     const nodeMap = {};
     const links = [];
@@ -3253,10 +3316,25 @@ updateNetwork = function() {
         const married = n.isMarried || n.IsMarried;
         const spouse = n.spouseName || n.SpouseName || '';
         const team = n.team || n.Team || '';
-        nodes.push({ id: name, level: lvl, faction: fid, dead, married, spouse, team, index: i });
+        const cls = CLASS_NAMES_ARR[n.class !== undefined ? n.class : (n.Class !== undefined ? n.Class : -1)] || 'Unknown';
+        const race = RACE_NAMES_ARR[n.race !== undefined ? n.race : (n.Race !== undefined ? n.Race : -1)] || 'Unknown';
+        const rels = n.relationships || n.Relationships || {};
+        const relCount = Object.keys(rels).length;
+        nodes.push({ id: name, level: lvl, faction: fid, dead, married, spouse, team, index: i, cls, race, relCount, isChild: false });
         nodeMap[name] = nodes.length - 1;
     });
 
+    // Add children as nodes
+    const childData = summary?.children?.children || [];
+    childData.forEach(c => {
+        const name = c.name || '?';
+        if (nodeMap[name] === undefined) {
+            nodes.push({ id: name, level: 0, faction: '-1', dead: false, married: false, spouse: '', team: '', index: -1, cls: 'Child', race: '', relCount: 0, isChild: true, childAge: c.age || 0 });
+            nodeMap[name] = nodes.length - 1;
+        }
+    });
+
+    // Marriage links
     const marriageAdded = new Set();
     nodes.forEach(n => {
         if (n.married && n.spouse && nodeMap[n.spouse] !== undefined) {
@@ -3268,58 +3346,138 @@ updateNetwork = function() {
         }
     });
 
-    const teamMembers = {};
-    nodes.forEach(n => { if (n.team) { if (!teamMembers[n.team]) teamMembers[n.team] = []; teamMembers[n.team].push(n.id); } });
-    Object.values(teamMembers).forEach(members => { for (let i = 0; i < members.length - 1; i++) links.push({ source: members[i], target: members[i + 1], type: 'team' }); });
+    // Team links — star pattern (all link to highest-level member)
+    const teamGroups = {};
+    nodes.forEach(n => { if (n.team && !n.isChild) { if (!teamGroups[n.team]) teamGroups[n.team] = []; teamGroups[n.team].push(n); } });
+    Object.values(teamGroups).forEach(members => {
+        if (members.length < 2) return;
+        const leader = members.reduce((a, b) => a.level >= b.level ? a : b);
+        members.forEach(m => {
+            if (m.id !== leader.id) links.push({ source: leader.id, target: m.id, type: 'team' });
+        });
+    });
 
+    // Relationship links (ally/rival from impressions)
+    const relAdded = new Set();
     allNpcs.forEach(n => {
         const name = n.name || n.Name;
         const rels = n.relationships || n.Relationships;
         if (rels) {
             Object.entries(rels).forEach(([target, val]) => {
-                if (nodeMap[target] !== undefined && Math.abs(val) > 30) {
-                    links.push({ source: name, target, type: val > 0 ? 'ally' : 'rival', strength: Math.abs(val) });
+                if (nodeMap[target] !== undefined && Math.abs(val) > 20) {
+                    const key = [name, target].sort().join('|');
+                    if (!relAdded.has(key)) {
+                        relAdded.add(key);
+                        links.push({ source: name, target, type: val > 0 ? 'ally' : 'rival', strength: Math.abs(val) });
+                    }
                 }
             });
         }
     });
 
-    // Apply filter (#6)
-    const filteredLinks = networkFilter === 'all' ? links : links.filter(l => l.type === networkFilter);
+    // Family links (from children data)
+    childData.forEach(c => {
+        const childName = c.name;
+        if (!childName || nodeMap[childName] === undefined) return;
+        if (c.mother && nodeMap[c.mother] !== undefined) {
+            links.push({ source: c.mother, target: childName, type: 'family' });
+        }
+        if (c.father && nodeMap[c.father] !== undefined) {
+            links.push({ source: c.father, target: childName, type: 'family' });
+        }
+    });
 
-    // Find connected nodes if filtering
-    const connectedNodes = new Set();
-    if (networkFilter !== 'all') {
-        filteredLinks.forEach(l => { connectedNodes.add(typeof l.source === 'object' ? l.source.id : l.source); connectedNodes.add(typeof l.target === 'object' ? l.target.id : l.target); });
+    // Apply filter
+    let filteredLinks = networkFilter === 'all' ? links : links.filter(l => l.type === networkFilter);
+
+    // Ego mode: only show ego node + 1-hop neighbors
+    let egoConnected = null;
+    if (networkEgoMode && networkEgoNode && nodeMap[networkEgoNode] !== undefined) {
+        egoConnected = new Set([networkEgoNode]);
+        filteredLinks.forEach(l => {
+            const s = typeof l.source === 'object' ? l.source.id : l.source;
+            const t = typeof l.target === 'object' ? l.target.id : l.target;
+            if (s === networkEgoNode) egoConnected.add(t);
+            if (t === networkEgoNode) egoConnected.add(s);
+        });
+        filteredLinks = filteredLinks.filter(l => {
+            const s = typeof l.source === 'object' ? l.source.id : l.source;
+            const t = typeof l.target === 'object' ? l.target.id : l.target;
+            return s === networkEgoNode || t === networkEgoNode;
+        });
     }
 
-    const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(filteredLinks).id(d => d.id).distance(60))
-        .force('charge', d3.forceManyBody().strength(-40))
+    // Connected nodes for non-all filters
+    const connectedNodes = new Set();
+    if (networkFilter !== 'all' && !egoConnected) {
+        filteredLinks.forEach(l => {
+            connectedNodes.add(typeof l.source === 'object' ? l.source.id : l.source);
+            connectedNodes.add(typeof l.target === 'object' ? l.target.id : l.target);
+        });
+    }
+
+    // Filter nodes in ego mode
+    const visibleNodes = egoConnected ? nodes.filter(n => egoConnected.has(n.id)) : nodes;
+
+    const simulation = d3.forceSimulation(visibleNodes)
+        .force('link', d3.forceLink(filteredLinks).id(d => d.id).distance(egoConnected ? 100 : 80))
+        .force('charge', d3.forceManyBody().strength(egoConnected ? -120 : -60))
         .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(d => 4 + d.level / 5));
+        .force('collision', d3.forceCollide().radius(d => (d.isChild ? 4 : 5 + d.level / 4)));
 
     if (networkSim) networkSim.stop();
     networkSim = simulation;
 
     const g = svg.append('g');
-    svg.call(d3.zoom().scaleExtent([0.3, 4]).on('zoom', (event) => g.attr('transform', event.transform)));
+    const zoom = d3.zoom().scaleExtent([0.3, 5]).on('zoom', (event) => g.attr('transform', event.transform));
+    svg.call(zoom);
+    networkZoom = zoom;
 
+    // Links
     const link = g.selectAll('.link').data(filteredLinks).join('line').attr('class', 'link')
-        .attr('stroke', d => ({ marriage: '#ff4444', team: '#00e5ff', ally: '#00ff88', rival: '#ff8844' }[d.type] || '#666'))
-        .attr('stroke-opacity', d => d.type === 'marriage' ? 0.7 : d.type === 'team' ? 0.6 : Math.min(0.5, (d.strength || 30) / 100))
-        .attr('stroke-width', d => d.type === 'marriage' ? 2 : 1);
+        .attr('stroke', d => ({ marriage: '#ff3355', team: '#00e5ff', ally: '#00ff88', rival: '#ff8844', family: '#ffaa00' }[d.type] || '#666'))
+        .attr('stroke-opacity', d => {
+            if (d.type === 'marriage') return 0.8;
+            if (d.type === 'team') return 0.6;
+            if (d.type === 'family') return 0.7;
+            return 0.3 + Math.min(0.5, (d.strength || 30) / 100);
+        })
+        .attr('stroke-width', d => {
+            if (d.type === 'marriage') return 2.5;
+            if (d.type === 'team') return 1.5;
+            if (d.type === 'family') return 1.5;
+            return 1.5;
+        })
+        .attr('stroke-dasharray', d => {
+            if (d.type === 'rival') return '5,3';
+            if (d.type === 'family') return '4,3';
+            return null;
+        });
 
-    const node = g.selectAll('.node').data(nodes).join('circle').attr('class', 'node')
-        .attr('r', d => 3 + d.level / 6)
-        .attr('fill', d => FACTION_COLORS[d.faction] || '#666677')
+    // Link labels in ego mode
+    if (egoConnected) {
+        g.selectAll('.link-label').data(filteredLinks.filter(l => l.strength)).join('text')
+            .attr('class', 'net-link-label')
+            .text(d => (d.type === 'ally' ? '+' : d.type === 'rival' ? '-' : '') + (d.strength || ''));
+    }
+
+    // Nodes
+    const node = g.selectAll('.node').data(visibleNodes).join('circle').attr('class', 'node')
+        .attr('r', d => d.isChild ? 3 : 4 + d.level / 4)
+        .attr('fill', d => {
+            if (d.dead) return '#444';
+            if (d.isChild) return '#cc8800';
+            return FACTION_COLORS[d.faction] || '#666677';
+        })
         .attr('opacity', d => {
             if (d.dead) return 0.15;
-            if (networkFilter !== 'all' && !connectedNodes.has(d.id)) return 0.15;
+            if (egoConnected) return 0.95;
+            if (networkFilter !== 'all' && !connectedNodes.has(d.id)) return 0.12;
+            if (d.isChild) return 0.6;
             return 0.9;
         })
-        .attr('stroke', d => d.married ? '#ff66aa' : 'none')
-        .attr('stroke-width', d => d.married ? 1.5 : 0)
+        .attr('stroke', d => d.married ? '#ff66aa' : d.isChild ? '#ffaa00' : 'none')
+        .attr('stroke-width', d => d.married ? 1.5 : d.isChild ? 0.5 : 0)
         .style('cursor', 'pointer')
         .call(d3.drag()
             .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
@@ -3327,47 +3485,77 @@ updateNetwork = function() {
             .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
         )
         .on('click', (event, d) => {
-            // Highlight this node's connections (#6)
-            networkHighlightNode = networkHighlightNode === d.id ? null : d.id;
-            if (networkHighlightNode) {
-                const connected = new Set([d.id]);
-                filteredLinks.forEach(l => {
-                    const s = typeof l.source === 'object' ? l.source.id : l.source;
-                    const t = typeof l.target === 'object' ? l.target.id : l.target;
-                    if (s === d.id) connected.add(t);
-                    if (t === d.id) connected.add(s);
-                });
-                node.attr('opacity', dd => connected.has(dd.id) ? 1 : 0.1);
-                link.attr('stroke-opacity', ll => {
-                    const s = typeof ll.source === 'object' ? ll.source.id : ll.source;
-                    const t = typeof ll.target === 'object' ? ll.target.id : ll.target;
-                    return (s === d.id || t === d.id) ? 0.8 : 0.05;
-                });
-            } else {
-                node.attr('opacity', dd => dd.dead ? 0.15 : 0.9);
-                link.attr('stroke-opacity', ll => ll.type === 'marriage' ? 0.7 : Math.min(0.5, (ll.strength || 30) / 100));
+            event.stopPropagation();
+            if (d.isChild) return;
+            // Toggle ego mode on click
+            if (networkEgoMode && networkEgoNode === d.id) {
+                exitEgoMode();
+                return;
             }
-
+            networkEgoMode = true;
+            networkEgoNode = d.id;
+            document.getElementById('net-ego-btn').style.display = '';
+            updateNetwork();
             const npc = allNpcs.find(nn => (nn.name || nn.Name) === d.id);
             if (npc) { selectedNpc = d.id; showNpcDetail(npc); filterNpcList(); }
         });
 
-    const label = g.selectAll('.label').data(nodes.filter(d => d.level >= 15 || d.married || d.faction !== '-1')).join('text')
-        .attr('class', 'label').text(d => d.id).attr('dx', 8).attr('dy', 3);
+    // Labels — all nodes in ego mode, all non-dead otherwise
+    const labelData = egoConnected ? visibleNodes : visibleNodes.filter(d => !d.dead);
+    const label = g.selectAll('.label').data(labelData).join('text')
+        .attr('class', d => egoConnected ? 'label label-ego' : 'label')
+        .text(d => d.id)
+        .attr('dx', d => (d.isChild ? 5 : 4 + d.level / 4) + 3)
+        .attr('dy', 3)
+        .style('font-size', d => egoConnected ? '10px' : (d.isChild ? '7px' : '8px'));
 
+    // Enhanced tooltip
     const tooltip = document.getElementById('tooltip');
     node.on('mouseenter', (event, d) => {
         tooltip.style.display = 'block';
-        tooltip.style.left = (event.clientX + 10) + 'px';
-        tooltip.style.top = (event.clientY - 10) + 'px';
-        tooltip.innerHTML = '<strong>' + escapeHtml(d.id) + '</strong><br>Level ' + d.level + '<br>Faction: ' + (FACTION_NAMES[d.faction] || 'None')
-            + (d.dead ? '<br><span style="color:var(--red)">DEAD</span>' : '') + (d.married ? '<br>Married to ' + escapeHtml(d.spouse) : '');
+        tooltip.style.left = (event.clientX + 12) + 'px';
+        tooltip.style.top = (event.clientY - 12) + 'px';
+        tooltip.style.maxWidth = '260px';
+
+        let html = '<strong>' + escapeHtml(d.id) + '</strong>';
+        if (d.isChild) {
+            html += '<br><span style="color:#cc8800">Child, age ' + (d.childAge || '?') + '</span>';
+        } else {
+            html += '<br>Level ' + d.level + ' ' + d.cls + ' (' + d.race + ')';
+            html += '<br>Faction: ' + (FACTION_NAMES[d.faction] || 'None');
+            if (d.team) html += '<br>Team: ' + escapeHtml(d.team);
+            if (d.dead) html += '<br><span style="color:var(--red)">DEAD</span>';
+            if (d.married) html += '<br>Married to ' + escapeHtml(d.spouse);
+            if (d.relCount > 0) html += '<br>Relationships: ' + d.relCount;
+
+            // Top relationships
+            const npc = allNpcs[d.index];
+            if (npc) {
+                const rels = npc.relationships || npc.Relationships || {};
+                const sorted = Object.entries(rels).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3);
+                if (sorted.length > 0) {
+                    html += '<br><span style="color:var(--text-dim);font-size:10px">';
+                    sorted.forEach(([name, val]) => {
+                        const color = val > 0 ? '#00ff88' : '#ff8844';
+                        html += '<br><span style="color:' + color + '">' + (val > 0 ? '+' : '') + val + '</span> ' + escapeHtml(name);
+                    });
+                    html += '</span>';
+                }
+            }
+        }
+        tooltip.innerHTML = html;
     }).on('mouseleave', () => { tooltip.style.display = 'none'; });
 
     simulation.on('tick', () => {
         link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
         node.attr('cx', d => d.x).attr('cy', d => d.y);
         label.attr('x', d => d.x).attr('y', d => d.y);
+        // Link labels positioning
+        if (egoConnected) {
+            g.selectAll('.net-link-label')
+                .attr('x', d => (d.source.x + d.target.x) / 2)
+                .attr('y', d => (d.source.y + d.target.y) / 2 - 4);
+        }
     });
 };
 

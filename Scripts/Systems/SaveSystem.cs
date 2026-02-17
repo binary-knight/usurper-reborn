@@ -407,7 +407,16 @@ namespace UsurperRemake.Systems
                     PoisonDamage = equip.PoisonDamage,
                     LifeSteal = equip.LifeSteal,
                     HasFireEnchant = equip.HasFireEnchant,
-                    HasFrostEnchant = equip.HasFrostEnchant
+                    HasFrostEnchant = equip.HasFrostEnchant,
+                    HasLightningEnchant = equip.HasLightningEnchant,
+                    HasPoisonEnchant = equip.HasPoisonEnchant,
+                    HasHolyEnchant = equip.HasHolyEnchant,
+                    HasShadowEnchant = equip.HasShadowEnchant,
+                    ManaSteal = equip.ManaSteal,
+                    ArmorPiercing = equip.ArmorPiercing,
+                    Thorns = equip.Thorns,
+                    HPRegen = equip.HPRegen,
+                    ManaRegen = equip.ManaRegen
                 }).ToList(),
 
                 // Base stats
@@ -861,7 +870,16 @@ namespace UsurperRemake.Systems
                             PoisonDamage = equip.PoisonDamage,
                             LifeSteal = equip.LifeSteal,
                             HasFireEnchant = equip.HasFireEnchant,
-                            HasFrostEnchant = equip.HasFrostEnchant
+                            HasFrostEnchant = equip.HasFrostEnchant,
+                            HasLightningEnchant = equip.HasLightningEnchant,
+                            HasPoisonEnchant = equip.HasPoisonEnchant,
+                            HasHolyEnchant = equip.HasHolyEnchant,
+                            HasShadowEnchant = equip.HasShadowEnchant,
+                            ManaSteal = equip.ManaSteal,
+                            ArmorPiercing = equip.ArmorPiercing,
+                            Thorns = equip.Thorns,
+                            HPRegen = equip.HPRegen,
+                            ManaRegen = equip.ManaRegen
                         }).ToList() ?? new List<DynamicEquipmentData>()
                 });
             }

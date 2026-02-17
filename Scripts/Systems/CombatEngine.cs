@@ -1661,12 +1661,23 @@ public partial class CombatEngine
             defense += random.Next(0, armPowMax + 1);
         }
 
+        // Armor piercing enchantment reduces effective defense
+        int armorPiercePct = attacker.GetEquipmentArmorPiercing();
+        if (armorPiercePct > 0)
+        {
+            long pierced = defense * armorPiercePct / 100;
+            defense = Math.Max(0, defense - pierced);
+        }
+
         long actualDamage = Math.Max(1, attackPower - defense);
 
         if (defense > 0 && defense < attackPower)
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"{target.Name}'s armor absorbed {defense} points!");
+            if (armorPiercePct > 0)
+                terminal.WriteLine($"{target.Name}'s armor absorbed {defense} points! (Pierced {armorPiercePct}%)");
+            else
+                terminal.WriteLine($"{target.Name}'s armor absorbed {defense} points!");
         }
 
         // Apply damage
@@ -2440,6 +2451,20 @@ public partial class CombatEngine
             }
         }
 
+        // Equipment thorns: reflect damage based on Thorns enchantment
+        int thornsPct = player.GetEquipmentThorns();
+        if (thornsPct > 0 && actualDamage > 0 && monster.IsAlive)
+        {
+            long thornsDamage = Math.Max(1, actualDamage * thornsPct / 100);
+            monster.HP -= thornsDamage;
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Thorns reflect {thornsDamage} damage back at {monster.Name}! (Retaliation)");
+            if (monster.HP <= 0)
+            {
+                terminal.WriteLine($"{monster.Name} falls to your thorns!", "bright_yellow");
+            }
+        }
+
         // Note: Defend status is now cleared at end of round in ProcessEndOfRoundAbilityEffects
         // so it protects against ALL monster attacks in the round, not just the first one
 
@@ -3108,6 +3133,64 @@ public partial class CombatEngine
             terminal.SetColor("bright_cyan");
             terminal.WriteLine($"Frost spreads from the impact! {target.Name}'s defence reduced! (Frostbite)");
         }
+
+        if (weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
+        {
+            long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
+            target.HP = Math.Max(0, target.HP - lightningDamage);
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"Lightning arcs from your strike! {lightningDamage} shock damage! {target.Name} is stunned! (Thunderstrike)");
+            result.TotalDamageDealt += lightningDamage;
+            attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
+        }
+
+        if (weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
+        {
+            int poisonValue = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : (int)(damage * 0.10);
+            long poisonDamage = Math.Max(1, poisonValue);
+            target.HP = Math.Max(0, target.HP - poisonDamage);
+            terminal.SetColor("green");
+            terminal.WriteLine($"Venom seeps into the wound! {poisonDamage} poison damage! (Venomstrike)");
+            result.TotalDamageDealt += poisonDamage;
+            attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
+        }
+
+        if (weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
+        {
+            bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
+                            target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
+                            target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
+                            target.Name.Contains("Undead") || target.Name.Contains("Revenant");
+            float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
+            long holyDamage = Math.Max(1, (long)(damage * holyMult));
+            target.HP = Math.Max(0, target.HP - holyDamage);
+            terminal.SetColor("bright_white");
+            terminal.WriteLine(isUndead
+                ? $"Holy light sears the undead! {holyDamage} radiant damage! (Smite)"
+                : $"Divine light strikes true! {holyDamage} holy damage! (Radiance)");
+            result.TotalDamageDealt += holyDamage;
+            attacker.Statistics?.RecordDamageDealt(holyDamage, false);
+        }
+
+        if (weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
+        {
+            long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
+            target.HP = Math.Max(0, target.HP - shadowDamage);
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine($"Shadows coil from the blade! {shadowDamage} shadow damage! (Darkstrike)");
+            result.TotalDamageDealt += shadowDamage;
+            attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
+        }
+
+        // Mana steal proc
+        int manaStealPct = attacker.GetEquipmentManaSteal();
+        if (manaStealPct > 0 && damage > 0)
+        {
+            long manaRestored = Math.Max(1, damage * manaStealPct / 100);
+            attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
+            terminal.SetColor("blue");
+            terminal.WriteLine($"Your weapon siphons {manaRestored} mana! (Siphon)");
+        }
     }
 
     /// <summary>
@@ -3132,6 +3215,60 @@ public partial class CombatEngine
             target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine($"  Frost spreads! {target.Name}'s defence reduced! (Frostbite)");
+        }
+
+        if (weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
+        {
+            long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
+            target.HP -= lightningDamage;
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Lightning arcs! {lightningDamage} shock damage to {target.Name}! Stunned! (Thunderstrike)");
+            attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
+        }
+
+        if (weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
+        {
+            int poisonValue = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : (int)(damage * 0.10);
+            long poisonDamage = Math.Max(1, poisonValue);
+            target.HP -= poisonDamage;
+            terminal.SetColor("green");
+            terminal.WriteLine($"  Venom seeps in! {poisonDamage} poison damage to {target.Name}! (Venomstrike)");
+            attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
+        }
+
+        if (weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
+        {
+            bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
+                            target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
+                            target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
+                            target.Name.Contains("Undead") || target.Name.Contains("Revenant");
+            float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
+            long holyDamage = Math.Max(1, (long)(damage * holyMult));
+            target.HP -= holyDamage;
+            terminal.SetColor("bright_white");
+            terminal.WriteLine(isUndead
+                ? $"  Holy light sears! {holyDamage} radiant damage to {target.Name}! (Smite)"
+                : $"  Divine strike! {holyDamage} holy damage to {target.Name}! (Radiance)");
+            attacker.Statistics?.RecordDamageDealt(holyDamage, false);
+        }
+
+        if (weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
+        {
+            long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
+            target.HP -= shadowDamage;
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine($"  Shadows coil! {shadowDamage} shadow damage to {target.Name}! (Darkstrike)");
+            attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
+        }
+
+        // Mana steal proc
+        int manaStealPct = attacker.GetEquipmentManaSteal();
+        if (manaStealPct > 0 && damage > 0)
+        {
+            long manaRestored = Math.Max(1, damage * manaStealPct / 100);
+            attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
+            terminal.SetColor("blue");
+            terminal.WriteLine($"  Weapon siphons {manaRestored} mana! (Siphon)");
         }
     }
 
@@ -3499,6 +3636,68 @@ public partial class CombatEngine
                 if (lootItem.Mana != 0) equipment = equipment.WithMaxMana(lootItem.Mana);
                 if (lootItem.Defence != 0) equipment = equipment.WithDefence(lootItem.Defence);
                 if (lootItem.IsCursed) equipment.IsCursed = true;
+
+                // Transfer loot enchantment effects to Equipment properties (v0.40.5)
+                if (lootItem.LootEffects != null && lootItem.LootEffects.Count > 0)
+                {
+                    foreach (var (effectType, value) in lootItem.LootEffects)
+                    {
+                        var effect = (LootGenerator.SpecialEffect)effectType;
+                        switch (effect)
+                        {
+                            case LootGenerator.SpecialEffect.FireDamage:
+                                equipment.HasFireEnchant = true;
+                                break;
+                            case LootGenerator.SpecialEffect.IceDamage:
+                                equipment.HasFrostEnchant = true;
+                                break;
+                            case LootGenerator.SpecialEffect.LightningDamage:
+                                equipment.HasLightningEnchant = true;
+                                break;
+                            case LootGenerator.SpecialEffect.PoisonDamage:
+                                equipment.HasPoisonEnchant = true;
+                                equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
+                                break;
+                            case LootGenerator.SpecialEffect.HolyDamage:
+                                equipment.HasHolyEnchant = true;
+                                break;
+                            case LootGenerator.SpecialEffect.ShadowDamage:
+                                equipment.HasShadowEnchant = true;
+                                break;
+                            case LootGenerator.SpecialEffect.LifeSteal:
+                                equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2));
+                                break;
+                            case LootGenerator.SpecialEffect.ManaSteal:
+                                equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2));
+                                break;
+                            case LootGenerator.SpecialEffect.CriticalStrike:
+                                equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value);
+                                break;
+                            case LootGenerator.SpecialEffect.CriticalDamage:
+                                equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value);
+                                break;
+                            case LootGenerator.SpecialEffect.ArmorPiercing:
+                                equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value);
+                                break;
+                            case LootGenerator.SpecialEffect.Thorns:
+                                equipment.Thorns = Math.Max(equipment.Thorns, value);
+                                break;
+                            case LootGenerator.SpecialEffect.Regeneration:
+                                equipment.HPRegen = Math.Max(equipment.HPRegen, value);
+                                break;
+                            case LootGenerator.SpecialEffect.ManaRegen:
+                                equipment.ManaRegen = Math.Max(equipment.ManaRegen, value);
+                                break;
+                            case LootGenerator.SpecialEffect.MagicResist:
+                                equipment.MagicResistance = Math.Max(equipment.MagicResistance, value);
+                                break;
+                        }
+                    }
+                }
+
+                // Enforce power-based MinLevel floor (prevents low-level players
+                // from equipping absurdly powerful gear regardless of source)
+                equipment.EnforceMinLevelFromPower();
 
                 // Register the equipment in the database so it can be looked up later
                 EquipmentDatabase.RegisterDynamic(equipment);
@@ -4415,7 +4614,17 @@ public partial class CombatEngine
     {
         if (target == null || !target.IsAlive) return;
 
-        long actualDamage = Math.Max(1, damage - target.ArmPow);
+        // Armor piercing enchantment reduces effective monster armor
+        long effectiveArmor = target.ArmPow;
+        if (attacker != null)
+        {
+            int armorPiercePct = attacker.GetEquipmentArmorPiercing();
+            if (armorPiercePct > 0)
+            {
+                effectiveArmor = Math.Max(0, effectiveArmor - effectiveArmor * armorPiercePct / 100);
+            }
+        }
+        long actualDamage = Math.Max(1, damage - effectiveArmor);
 
         // Marked target takes 30% bonus damage
         if (target.IsMarked)
@@ -9316,6 +9525,34 @@ public partial class CombatEngine
             player.Mana = Math.Min(player.MaxMana, player.Mana + manaRegen);
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"You recover {manaRegen} mana. (Mana: {player.Mana}/{player.MaxMana})");
+        }
+
+        // Equipment HP regeneration enchantment
+        int equipHPRegen = player.GetEquipmentHPRegen();
+        if (equipHPRegen > 0 && player.HP < player.MaxHP)
+        {
+            long oldHP = player.HP;
+            player.HP = Math.Min(player.MaxHP, player.HP + equipHPRegen);
+            long healed = player.HP - oldHP;
+            if (healed > 0)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"Your equipment regenerates {healed} HP! (Regeneration)");
+            }
+        }
+
+        // Equipment Mana regeneration enchantment
+        int equipManaRegen = player.GetEquipmentManaRegen();
+        if (equipManaRegen > 0 && player.Mana < player.MaxMana)
+        {
+            long oldMana = player.Mana;
+            player.Mana = Math.Min(player.MaxMana, player.Mana + equipManaRegen);
+            long restored = player.Mana - oldMana;
+            if (restored > 0)
+            {
+                terminal.SetColor("bright_blue");
+                terminal.WriteLine($"Your equipment restores {restored} mana! (Arcane Regen)");
+            }
         }
 
         // Decrement ability cooldowns

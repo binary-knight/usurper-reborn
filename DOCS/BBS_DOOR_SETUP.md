@@ -435,17 +435,155 @@ All game configuration changes made through the SysOp Console are automatically 
 
 ---
 
+## BBS Online Mode (Shared World)
+
+By default, each BBS caller plays in isolation — separate save files, separate NPCs, no interaction between players. **BBS Online mode** turns your BBS into a shared multiplayer world where all callers share the same NPCs, economy, king, chat, PvP arena, and news feed.
+
+### How It Works
+
+Instead of file-based saves, BBS Online mode uses a shared SQLite database. All callers read/write to the same database, so changes one player makes (killing an NPC, becoming king, posting chat) are immediately visible to others. A background **world simulator** process keeps the world alive 24/7 — NPCs level up, form relationships, get married, have children, and age even when no players are connected.
+
+### Quick Setup
+
+**1. Add `--online` to your door command** — that's it:
+
+| BBS Software | Door Command |
+|--------------|-------------|
+| Synchronet | `UsurperReborn --online --door32 %f` |
+| EleBBS | `UsurperReborn --online --door32 *N\door32.sys` |
+| Mystic | `UsurperReborn --online --door32 /mystic/temp%3/door32.sys` |
+| WWIV | `UsurperReborn --online --door32 %T\door32.sys` |
+| GameSrv | `UsurperReborn --online --door32 door32.sys` |
+| ENiGMA | `"--online", "--door32", "{dropFilePath}"` |
+
+The database (`usurper_online.db`) is created automatically in the game directory. No `--db` flag needed unless you want a custom location.
+
+**2. Start the world simulator** as a background service:
+
+```bash
+# Linux (systemd service recommended — see below)
+UsurperReborn --worldsim
+
+# Windows (run in a separate console, or as a Windows service)
+UsurperReborn.exe --worldsim
+```
+
+That's it. All callers now share the same game world.
+
+> **Custom database path:** Use `--db <path>` on BOTH the door command and worldsim if you want the database somewhere other than the game directory. Both must point to the same file.
+
+### What Players Get in Online Mode
+
+All multiplayer features activate automatically:
+
+| Feature | Description |
+|---------|-------------|
+| **Shared NPCs** | All 60 NPCs are shared — relationships, marriages, deaths persist across all players |
+| **Shared Economy** | King, treasury, taxes, shops affect everyone |
+| **Chat** | `/say` (broadcast), `/tell <name>` (private), `/who` (online players), `/news` (world events) |
+| **PvP Arena** | Challenge other players to combat (level 5+, max 5 fights/day) |
+| **News Feed** | Real-time events: level ups, boss kills, marriages, deaths, births |
+| **While You Were Gone** | Login summary of what happened since last session |
+| **Dormitory Sleep** | Players who disconnect are registered as sleeping (protects their state) |
+| **Living World** | NPCs age, marry, have children, die of old age — the world evolves 24/7 |
+
+### Authentication
+
+**No extra passwords needed.** BBS Online mode trusts your BBS's authentication. The player name from DOOR32.SYS/DOOR.SYS becomes their online identity automatically. Players do NOT see an in-game login screen — they go straight to their character.
+
+### World Simulator Setup
+
+The world simulator must run continuously for the living world to function. Without it, NPCs won't age, relationships won't develop, and children won't be born.
+
+#### Linux (systemd)
+
+Create `/etc/systemd/system/usurper-worldsim.service`:
+
+```ini
+[Unit]
+Description=Usurper Reborn World Simulator
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+WorkingDirectory=/path/to/usurper
+ExecStart=/path/to/usurper/UsurperReborn --worldsim --sim-interval 30 --npc-xp 1.0
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable usurper-worldsim
+sudo systemctl start usurper-worldsim
+```
+
+#### Windows
+
+Run in a separate console window, or use a tool like [NSSM](https://nssm.cc/) to install it as a Windows service:
+
+```cmd
+nssm install UsurperWorldSim "C:\BBS\Doors\Usurper\UsurperReborn.exe" "--worldsim --sim-interval 30 --npc-xp 1.0"
+nssm set UsurperWorldSim AppDirectory "C:\BBS\Doors\Usurper"
+nssm start UsurperWorldSim
+```
+
+#### World Simulator Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--sim-interval <sec>` | 60 | How often the world ticks (seconds). Lower = more active world. |
+| `--npc-xp <mult>` | 0.25 | NPC XP gain rate. 1.0 = same as players, 0.25 = quarter speed. |
+| `--save-interval <min>` | 5 | How often world state is saved to database. |
+
+### Database Location
+
+By default, the database is created as `usurper_online.db` in the same directory as the executable. This happens automatically on first run — no manual setup needed.
+
+If you use `--db <path>` to put the database elsewhere, use the **same path** on both the door command and the world simulator. Ensure the directory exists and the game process has write permissions.
+
+For multi-node BBSes, all nodes use the same database file — SQLite handles concurrent access via WAL mode.
+
+### Migrating from Single-Player to Online
+
+Existing single-player BBS saves (JSON files in `Saves/`) are **not** automatically migrated. When a player first connects in online mode, they'll create a new character. If you need to preserve player progress, contact the community for migration assistance.
+
+### Troubleshooting BBS Online Mode
+
+#### Players can't see each other's changes
+- Verify all nodes use the exact same `--db` path
+- Check that the world simulator is running: `systemctl status usurper-worldsim`
+
+#### "This character is already logged in"
+- The previous session didn't disconnect cleanly. Wait 2-3 minutes for the heartbeat to expire, or restart the world simulator.
+
+#### World seems dead (no NPC activity)
+- The world simulator isn't running. Start it as described above.
+- Check logs: `journalctl -u usurper-worldsim -n 50`
+
+#### Database locked errors
+- Ensure only one world simulator instance is running per database
+- SQLite WAL mode handles multiple readers, but only one writer at a time
+
+---
+
 ## Multi-Node Support
 
 Each node automatically gets its own:
 - Drop file (handled by BBS)
-- Save isolation (by BBS name + username)
+- Save isolation (by BBS name + username in single-player mode, or shared database in online mode)
 
 ---
 
 ## Save File Location
 
-Saves are stored in `<game directory>/Saves/<BBS Name>/` and are keyed by the username from the drop file.
+**Single-player BBS mode:** Saves are stored in `<game directory>/Saves/<BBS Name>/` and are keyed by the username from the drop file.
+
+**BBS Online mode:** All player data is stored in the shared SQLite database specified by `--db`.
 
 ---
 

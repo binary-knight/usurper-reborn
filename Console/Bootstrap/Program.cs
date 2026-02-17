@@ -175,7 +175,16 @@ namespace UsurperConsole
                     return;
                 }
 
-                // If online mode with no --user flag, show in-game auth screen
+                // BBS Online mode: use BBS-authenticated username directly (skip in-game auth)
+                // The BBS has already verified the user's identity via its own login system.
+                if (DoorMode.IsOnlineMode && DoorMode.IsInDoorMode && string.IsNullOrEmpty(DoorMode.OnlineUsername))
+                {
+                    var bbsUsername = DoorMode.GetPlayerName();
+                    DoorMode.SetOnlineUsername(bbsUsername);
+                    DoorMode.Log($"BBS Online mode: using BBS-authenticated username '{bbsUsername}'");
+                }
+
+                // If online mode with no --user flag (and not BBS-authenticated), show in-game auth screen
                 if (DoorMode.IsOnlineMode && string.IsNullOrEmpty(DoorMode.OnlineUsername) && sqlBackend != null)
                 {
                     DoorMode.Log("No --user flag, showing in-game auth screen...");
@@ -467,6 +476,10 @@ namespace UsurperConsole
         /// </summary>
         private static string DetectConnectionType()
         {
+            // BBS Online mode: report as BBS connection (BBS handles the transport)
+            if (DoorMode.IsOnlineMode && DoorMode.IsInDoorMode)
+                return "BBS";
+
             // Online mode: distinguish Web proxy vs direct SSH
             if (DoorMode.IsOnlineMode)
             {

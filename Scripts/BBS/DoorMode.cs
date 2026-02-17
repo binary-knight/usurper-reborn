@@ -20,7 +20,7 @@ namespace UsurperRemake.BBS
         // Online multiplayer mode
         private static bool _onlineMode = false;
         private static string? _onlineUsername = null;
-        private static string _onlineDatabasePath = "/var/usurper/usurper_online.db";
+        private static string? _onlineDatabasePath = null; // null = auto-detect (next to executable)
 
         // World simulator mode (headless 24/7 NPC simulation)
         private static bool _worldSimMode = false;
@@ -104,9 +104,16 @@ namespace UsurperRemake.BBS
 
         /// <summary>
         /// Path to the SQLite database for online mode.
-        /// Default: /var/usurper/usurper_online.db (configurable via --db flag)
+        /// If --db is not specified, defaults to usurper_online.db next to the executable.
         /// </summary>
-        public static string OnlineDatabasePath => _onlineDatabasePath;
+        public static string OnlineDatabasePath => _onlineDatabasePath ?? GetDefaultDatabasePath();
+
+        private static string GetDefaultDatabasePath()
+        {
+            // Default: usurper_online.db in the same directory as the executable
+            var exeDir = AppContext.BaseDirectory;
+            return Path.Combine(exeDir, "usurper_online.db");
+        }
 
         /// <summary>
         /// True when running in headless world simulator mode (--worldsim flag).
@@ -327,7 +334,30 @@ namespace UsurperRemake.BBS
                 // --online (handled in first pass for flag, trigger entry here)
                 if (arg == "--online")
                 {
-                    // Online mode uses stdio - create a local session for the online user
+                    // If a door flag is also present, let it handle session creation.
+                    // _onlineMode is already true from first pass — the door flag will
+                    // create a real BBS session instead of a local one.
+                    bool hasDoorFlag = false;
+                    foreach (var a in args)
+                    {
+                        var lower = a.ToLowerInvariant();
+                        if (lower == "--door" || lower == "-d" || lower == "--door32" ||
+                            lower == "--doorsys" || lower == "--node" || lower == "-n")
+                        {
+                            hasDoorFlag = true;
+                            break;
+                        }
+                    }
+
+                    if (hasDoorFlag)
+                    {
+                        // BBS Online mode: skip local session creation, let door flag handle it
+                        Console.Error.WriteLine("[ONLINE] BBS Online mode — session will be created from drop file");
+                        Console.Error.WriteLine($"[ONLINE] Database: {_onlineDatabasePath}");
+                        continue;
+                    }
+
+                    // No door flag — create a local session for standalone online mode
                     _forceStdio = true;
                     _sessionInfo = DropFileParser.CreateLocalSession();
 
@@ -788,8 +818,9 @@ namespace UsurperRemake.BBS
             Console.WriteLine("");
             Console.WriteLine("Online Multiplayer Options:");
             Console.WriteLine("  --online             Run in online multiplayer mode (SQLite backend)");
+            Console.WriteLine("  --online --door32 <path>  BBS Online mode (shared world for all callers)");
             Console.WriteLine("  --user <name>        Set player username (for SSH ForceCommand)");
-            Console.WriteLine("  --db <path>          SQLite database path (default: /var/usurper/usurper_online.db)");
+            Console.WriteLine("  --db <path>          SQLite database path (default: usurper_online.db next to exe)");
             Console.WriteLine("");
             Console.WriteLine("World Simulator Options:");
             Console.WriteLine("  --worldsim           Run headless 24/7 world simulator (no terminal/auth)");
@@ -803,6 +834,11 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  UsurperReborn -d C:\\SBBS\\NODE1\\");
             Console.WriteLine("  UsurperReborn --online --user PlayerName --stdio");
             Console.WriteLine("  UsurperReborn --online --db /var/usurper/game.db");
+            Console.WriteLine("");
+            Console.WriteLine("BBS Online Mode (shared world for all callers):");
+            Console.WriteLine("  UsurperReborn --online --door32 %f");
+            Console.WriteLine("  (Also run world sim): UsurperReborn --worldsim");
+            Console.WriteLine("  (Custom db path):     UsurperReborn --online --db /path/to/game.db --door32 %f");
             Console.WriteLine("");
             Console.WriteLine("Drop File Support:");
             Console.WriteLine("  DOOR32.SYS - Modern format with socket handle (recommended)");

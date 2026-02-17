@@ -5797,6 +5797,23 @@ public abstract class BaseLocation
             return;
         }
 
+        // Check level requirement (both stored MinLevel and power-based floor)
+        if (item != null)
+        {
+            int powerLevel = Math.Max(item.Attack, item.Armor);
+            int requiredLevel = item.MinLevel;
+            if (powerLevel > 15)
+                requiredLevel = Math.Max(requiredLevel, Math.Min(100, powerLevel / 10));
+            if (currentPlayer.Level < requiredLevel)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"\n  You must be level {requiredLevel}+ to use this item. (You are level {currentPlayer.Level})");
+                terminal.Write("  Press Enter to go back.");
+                await terminal.ReadLineAsync();
+                return;
+            }
+        }
+
         if (currentPlayer.Gold < listing.Price)
         {
             terminal.SetColor("red");
@@ -6003,9 +6020,10 @@ public abstract class BaseLocation
             return;
         }
 
-        // Calculate uncollected gold
+        // Calculate uncollected gold and expired items
         long uncollectedGold = 0;
         var soldUncollected = new List<int>(); // indices of sold+uncollected listings
+        var expiredUncollected = new List<int>(); // indices of expired listings
         for (int i = 0; i < listings.Count; i++)
         {
             var l = listings[i];
@@ -6013,6 +6031,10 @@ public abstract class BaseLocation
             {
                 uncollectedGold += l.Price;
                 soldUncollected.Add(i);
+            }
+            else if (l.Status == "expired")
+            {
+                expiredUncollected.Add(i);
             }
         }
 
@@ -6024,7 +6046,8 @@ public abstract class BaseLocation
             {
                 "active" => "bright_green",
                 "sold" => l.GoldCollected ? "gray" : "bright_yellow",
-                "expired" => "red",
+                "expired" => "bright_red",
+                "collected" => "gray",
                 "cancelled" => "gray",
                 _ => "white"
             };
@@ -6033,6 +6056,10 @@ public abstract class BaseLocation
                 statusText = "SOLD - COLLECT GOLD";
             else if (l.Status == "sold" && l.GoldCollected)
                 statusText = "SOLD - COLLECTED";
+            else if (l.Status == "expired")
+                statusText = "EXPIRED - COLLECT ITEM";
+            else if (l.Status == "collected")
+                statusText = "EXPIRED - COLLECTED";
 
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1,-4} ");
@@ -6052,12 +6079,21 @@ public abstract class BaseLocation
             terminal.WriteLine($"\n  Gold awaiting collection: {uncollectedGold:N0}g ({soldUncollected.Count} item{(soldUncollected.Count != 1 ? "s" : "")})");
         }
 
+        // Show expired items summary
+        if (expiredUncollected.Count > 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  Expired items to collect: {expiredUncollected.Count} item{(expiredUncollected.Count != 1 ? "s" : "")}");
+        }
+
         terminal.SetColor("white");
         terminal.WriteLine("");
-        if (uncollectedGold > 0)
-            terminal.WriteLine("  [C] Collect all gold    [#] Cancel active listing    [Enter] Back");
-        else
-            terminal.WriteLine("  [#] Cancel active listing    [Enter] Back");
+        var menuParts = new List<string>();
+        if (uncollectedGold > 0) menuParts.Add("[C] Collect all gold");
+        if (expiredUncollected.Count > 0) menuParts.Add("[E] Collect expired items");
+        menuParts.Add("[#] Cancel/collect listing");
+        menuParts.Add("[Enter] Back");
+        terminal.WriteLine("  " + string.Join("    ", menuParts));
 
         terminal.Write("\n  Choice: ");
         string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
@@ -6089,10 +6125,67 @@ public abstract class BaseLocation
             return;
         }
 
-        // Cancel a listing
+        // Collect all expired items
+        if (input == "E" && expiredUncollected.Count > 0)
+        {
+            int collected = 0;
+            foreach (int idx in expiredUncollected)
+            {
+                var l = listings[idx];
+                bool ok = await backend.CollectExpiredAuctionListing(l.Id, currentPlayer.DisplayName.ToLower());
+                if (ok)
+                {
+                    try
+                    {
+                        var item = System.Text.Json.JsonSerializer.Deserialize<Item>(l.ItemJson);
+                        if (item != null) { currentPlayer.Inventory.Add(item); collected++; }
+                    }
+                    catch { }
+                }
+            }
+            if (collected > 0)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"\n  Collected {collected} expired item{(collected != 1 ? "s" : "")} back to your inventory.");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("\n  No expired items to collect.");
+            }
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Select a listing by number
         if (!int.TryParse(input, out int choice) || choice < 1 || choice > listings.Count) return;
 
         var listing = listings[choice - 1];
+
+        // Collect expired item by number
+        if (listing.Status == "expired")
+        {
+            bool ok = await backend.CollectExpiredAuctionListing(listing.Id, currentPlayer.DisplayName.ToLower());
+            if (ok)
+            {
+                try
+                {
+                    var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson);
+                    if (item != null) currentPlayer.Inventory.Add(item);
+                }
+                catch { }
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  Collected {listing.ItemName} back to your inventory.");
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  Failed to collect item.");
+            }
+            await Task.Delay(1500);
+            return;
+        }
+
         if (listing.Status != "active")
         {
             terminal.SetColor("red");
