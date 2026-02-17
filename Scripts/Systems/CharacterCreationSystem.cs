@@ -41,16 +41,23 @@ public class CharacterCreationSystem
 
         try
         {
-            // Step 1: Choose character name (used for both Name1 and Name2)
-            // Name may already be provided from save slot selection, or locked in BBS mode
+            // Step 1: Choose character name
+            // Name1 = internal key (BBS username in door mode), Name2 = display name
             string characterName;
             if (DoorMode.IsInDoorMode)
             {
-                characterName = DoorMode.GetPlayerName();
-                terminal.WriteLine($"Your character will be named: {characterName}", "cyan");
-                terminal.WriteLine("(Name is set by your BBS login)", "gray");
+                // BBS username is the save key
+                character.Name1 = DoorMode.GetPlayerName();
+
+                // Let player choose a display name
+                terminal.WriteLine($"BBS Login: {character.Name1}", "gray");
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                characterName = await SelectCharacterName();
+                if (string.IsNullOrEmpty(characterName))
+                {
+                    return null; // User aborted
+                }
+                character.Name2 = characterName;
             }
             else if (!string.IsNullOrWhiteSpace(playerName))
             {
@@ -58,6 +65,8 @@ public class CharacterCreationSystem
                 characterName = playerName;
                 terminal.WriteLine($"Creating character: {characterName}", "cyan");
                 terminal.WriteLine("");
+                character.Name1 = characterName;
+                character.Name2 = characterName;
             }
             else
             {
@@ -66,9 +75,9 @@ public class CharacterCreationSystem
                 {
                     return null; // User aborted
                 }
+                character.Name1 = characterName;
+                character.Name2 = characterName;
             }
-            character.Name1 = characterName;
-            character.Name2 = characterName;
             
             // Step 2: Select gender (Pascal gender selection)
             character.Sex = await SelectGender();
@@ -103,8 +112,8 @@ public class CharacterCreationSystem
             // Step 9: Show character summary and confirm
             await ShowCharacterSummary(character);
             
-            var confirm = await terminal.GetInputAsync("Create this character? (Y/N): ");
-            if (confirm.ToUpper() != "Y")
+            var confirm = await terminal.GetInputAsync("Create this character? (Y/n): ");
+            if (!string.IsNullOrEmpty(confirm) && confirm.ToUpper() != "Y")
             {
                 terminal.WriteLine("Character creation aborted.", "red");
                 return null;
@@ -292,14 +301,22 @@ public class CharacterCreationSystem
                 continue;
             }
 
-            // TODO: Check against existing players and NPCs
-            // For now, we'll skip this validation in the prototype
+            // Check for duplicate display names in online mode
+            if (DoorMode.IsOnlineMode)
+            {
+                var existingNames = SaveSystem.Instance.GetAllPlayerNames();
+                if (existingNames.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    terminal.WriteLine("That name is already taken! Choose another.", "red");
+                    continue;
+                }
+            }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"{name} is what you want? (Y/N)", "yellow");
+            terminal.WriteLine($"{name} is what you want? (Y/n)", "yellow");
             var confirm = await terminal.GetInputAsync("");
 
-            if (confirm.ToUpper() == "Y")
+            if (string.IsNullOrEmpty(confirm) || confirm.ToUpper() == "Y")
             {
                 validName = true;
             }
@@ -391,7 +408,7 @@ public class CharacterCreationSystem
                 case "!":
                     terminal.WriteLine("");
                     terminal.WriteLine("NIGHTMARE MODE - You dare to walk the path of pain?", DifficultySystem.GetColor(DifficultyMode.Nightmare));
-                    var confirm = await terminal.GetInputAsync("Are you SURE? (Y/N): ");
+                    var confirm = await terminal.GetInputAsync("Are you SURE? (y/N): ");
                     if (confirm.ToUpper() == "Y")
                     {
                         terminal.WriteLine("Your fate is sealed. May the gods have mercy.", "bright_red");
@@ -1087,7 +1104,8 @@ public class CharacterCreationSystem
     /// </summary>
     private async Task<bool> ConfirmChoice(string message, bool defaultYes)
     {
-        var response = await terminal.GetInputAsync($"{message}? (Y/N): ");
+        var hint = defaultYes ? "Y/n" : "y/N";
+        var response = await terminal.GetInputAsync($"{message}? ({hint}): ");
 
         if (string.IsNullOrEmpty(response))
         {

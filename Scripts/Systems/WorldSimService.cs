@@ -61,10 +61,8 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task RunAsync(CancellationToken cancellationToken)
         {
-            Console.Error.WriteLine($"[WORLDSIM] Starting persistent world simulator");
-            Console.Error.WriteLine($"[WORLDSIM] Sim interval: {simIntervalSeconds}s");
-            Console.Error.WriteLine($"[WORLDSIM] NPC XP multiplier: {npcXpMultiplier:F2}x");
-            Console.Error.WriteLine($"[WORLDSIM] State save interval: {saveIntervalMinutes} minutes");
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Starting persistent world simulator");
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Sim interval: {simIntervalSeconds}s, NPC XP: {npcXpMultiplier:F2}x, Save interval: {saveIntervalMinutes}min");
 
             // Phase 1: Initialize minimal systems
             InitializeSystems();
@@ -87,8 +85,7 @@ namespace UsurperRemake.Systems
             // Track initial versions so we can detect player modifications
             lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
             lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
-            Console.Error.WriteLine($"[WORLDSIM] Initial NPC data version: {lastNpcVersion}");
-            Console.Error.WriteLine($"[WORLDSIM] Initial royal court version: {lastRoyalCourtVersion}");
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Initial versions - NPC: {lastNpcVersion}, Royal court: {lastRoyalCourtVersion}");
 
             // Phase 3: Set the NPC XP multiplier
             WorldSimulator.NpcXpMultiplier = npcXpMultiplier;
@@ -97,7 +94,7 @@ namespace UsurperRemake.Systems
             lastSaveTime = DateTime.UtcNow;
 
             var aliveCount = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
-            Console.Error.WriteLine($"[WORLDSIM] Simulation running. NPCs: {aliveCount} alive / {NPCSpawnSystem.Instance.ActiveNPCs.Count} total");
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Simulation running. NPCs: {aliveCount} alive / {NPCSpawnSystem.Instance.ActiveNPCs.Count} total");
 
             // Signal that initialization is complete (for embedded mode)
             InitializationComplete.TrySetResult(true);
@@ -124,7 +121,7 @@ namespace UsurperRemake.Systems
                         {
                             var alive = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
                             var dead = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => !n.IsAlive || n.IsDead);
-                            Console.Error.WriteLine($"[WORLDSIM] Tick {tickCount}: {alive} alive, {dead} dead NPCs");
+                            DebugLogger.Instance.LogDebug("WORLDSIM", $"Tick {tickCount}: {alive} alive, {dead} dead NPCs");
                         }
 
                         // Check if it's time to persist state
@@ -137,7 +134,6 @@ namespace UsurperRemake.Systems
                     catch (Exception ex)
                     {
                         DebugLogger.Instance.LogError("WORLDSIM", $"Simulation step error: {ex.Message}\n{ex.StackTrace}");
-                        Console.Error.WriteLine($"[WORLDSIM] Error in simulation step: {ex.Message}");
                     }
 
                     await Task.Delay(TimeSpan.FromSeconds(simIntervalSeconds), cancellationToken);
@@ -150,14 +146,14 @@ namespace UsurperRemake.Systems
             finally
             {
                 // Graceful shutdown: save state one final time
-                Console.Error.WriteLine("[WORLDSIM] Shutting down - saving final state...");
+                DebugLogger.Instance.LogInfo("WORLDSIM", "Shutting down - saving final state...");
                 await SaveWorldState();
 
                 // Release worldsim lock (embedded mode)
                 if (_heartbeatOwnerId != null)
                 {
                     sqlBackend.ReleaseWorldSimLock(_heartbeatOwnerId);
-                    Console.Error.WriteLine("[WORLDSIM] Released worldsim lock");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", "Released worldsim lock");
                 }
 
                 // Clear database callback
@@ -166,7 +162,7 @@ namespace UsurperRemake.Systems
                 // Signal initialization complete in case we're shutting down before init finished
                 InitializationComplete.TrySetResult(false);
 
-                Console.Error.WriteLine("[WORLDSIM] Final state saved. Goodbye.");
+                DebugLogger.Instance.LogInfo("WORLDSIM", "Final state saved. Goodbye.");
             }
         }
 
@@ -176,7 +172,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void InitializeSystems()
         {
-            Console.Error.WriteLine("[WORLDSIM] Initializing minimal systems...");
+            DebugLogger.Instance.LogInfo("WORLDSIM", "Initializing minimal systems...");
 
             // Initialize save system with SQL backend
             SaveSystem.InitializeWithBackend(sqlBackend);
@@ -199,7 +195,7 @@ namespace UsurperRemake.Systems
                 }
                 catch { /* fail silently - don't crash sim for logging */ }
             };
-            Console.Error.WriteLine("[WORLDSIM] NPC activity feed wired to database");
+            DebugLogger.Instance.LogInfo("WORLDSIM", "NPC activity feed wired to database");
 
             // Create WorldSimulator but do NOT start its internal background loop.
             // We drive SimulateStep() directly in our controlled loop.
@@ -209,7 +205,6 @@ namespace UsurperRemake.Systems
             // Give the world sim access to the SQL backend for online marketplace operations
             WorldSimulator.SqlBackend = sqlBackend;
 
-            Console.Error.WriteLine("[WORLDSIM] Minimal systems initialized");
             DebugLogger.Instance.LogInfo("WORLDSIM", "Minimal systems initialized for headless simulation");
         }
 
@@ -228,7 +223,7 @@ namespace UsurperRemake.Systems
                     if (npcData != null && npcData.Count > 0)
                     {
                         RestoreNPCsFromData(npcData);
-                        Console.Error.WriteLine($"[WORLDSIM] Loaded {npcData.Count} NPCs from database");
+                        DebugLogger.Instance.LogInfo("WORLDSIM", $"Loaded {npcData.Count} NPCs from database");
 
                         // Process dead NPCs for respawn
                         worldSimulator?.ProcessDeadNPCsOnLoad();
@@ -237,14 +232,13 @@ namespace UsurperRemake.Systems
                 }
 
                 // No existing state -- initialize fresh NPCs from templates
-                Console.Error.WriteLine("[WORLDSIM] No existing NPC state found. Initializing fresh NPCs...");
+                DebugLogger.Instance.LogInfo("WORLDSIM", "No existing NPC state found. Initializing fresh NPCs...");
                 await NPCSpawnSystem.Instance.InitializeClassicNPCs();
-                Console.Error.WriteLine($"[WORLDSIM] Initialized {NPCSpawnSystem.Instance.ActiveNPCs.Count} fresh NPCs");
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"Initialized {NPCSpawnSystem.Instance.ActiveNPCs.Count} fresh NPCs");
             }
             catch (Exception ex)
             {
-                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load world state: {ex.Message}");
-                Console.Error.WriteLine($"[WORLDSIM] Error loading state: {ex.Message}. Initializing fresh.");
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load world state: {ex.Message}. Initializing fresh.");
                 await NPCSpawnSystem.Instance.ForceReinitializeNPCs();
             }
         }
@@ -264,8 +258,7 @@ namespace UsurperRemake.Systems
                 long currentNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
                 if (currentNpcVersion > lastNpcVersion && lastNpcVersion > 0)
                 {
-                    Console.Error.WriteLine($"[WORLDSIM] NPC data modified by game server (v{lastNpcVersion} → v{currentNpcVersion}). Reloading to pick up player changes...");
-                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Reloading NPC state: version {lastNpcVersion} → {currentNpcVersion}");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"NPC data modified by game server (v{lastNpcVersion} → v{currentNpcVersion}). Reloading to pick up player changes...");
 
                     // Capture world-sim-managed state BEFORE reloading from DB.
                     // Player sessions write stale NPC data that may overwrite active pregnancies,
@@ -300,7 +293,6 @@ namespace UsurperRemake.Systems
                         }
                         if (restored > 0)
                         {
-                            Console.Error.WriteLine($"[WORLDSIM] Restored {restored} active pregnancies that were overwritten by player save");
                             DebugLogger.Instance.LogInfo("WORLDSIM", $"Restored {restored} pregnancies after player-triggered reload");
                         }
                     }
@@ -316,8 +308,7 @@ namespace UsurperRemake.Systems
                 long currentRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
                 if (currentRoyalCourtVersion > lastRoyalCourtVersion && lastRoyalCourtVersion > 0)
                 {
-                    Console.Error.WriteLine($"[WORLDSIM] Royal court modified by player (v{lastRoyalCourtVersion} → v{currentRoyalCourtVersion}). Reloading to pick up changes...");
-                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Reloading royal court: version {lastRoyalCourtVersion} → {currentRoyalCourtVersion}");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Royal court modified by player (v{lastRoyalCourtVersion} → v{currentRoyalCourtVersion}). Reloading...");
                     LoadRoyalCourtFromWorldState();
                     lastRoyalCourtVersion = currentRoyalCourtVersion;
                 }
@@ -346,12 +337,11 @@ namespace UsurperRemake.Systems
                     // Track our save's version for the next cycle's comparison
                     lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
 
-                    Console.Error.WriteLine($"[WORLDSIM] State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
-                    DebugLogger.Instance.LogInfo("WORLDSIM", $"State persisted: {npcData.Count} NPCs ({aliveCount} alive) v{lastNpcVersion}");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
                 }
                 else
                 {
-                    Console.Error.WriteLine($"[WORLDSIM] NPC state unchanged, skipping write: {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
+                    DebugLogger.Instance.LogDebug("WORLDSIM", $"NPC state unchanged, skipping write: {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
                 }
 
                 // Save royal court to world_state (authoritative - world sim maintains this)
@@ -376,7 +366,6 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save world state: {ex.Message}");
-                Console.Error.WriteLine($"[WORLDSIM] Error saving state: {ex.Message}");
             }
         }
 
@@ -408,11 +397,11 @@ namespace UsurperRemake.Systems
                     {
                         CastleLocation.SetCurrentKing(kingNpc);
                         king = CastleLocation.GetCurrentKing();
-                        Console.Error.WriteLine($"[WORLDSIM] King loaded from world_state: {royalCourt.KingName}");
+                        DebugLogger.Instance.LogInfo("WORLDSIM", $"King loaded from world_state: {royalCourt.KingName}");
                     }
                     else
                     {
-                        Console.Error.WriteLine($"[WORLDSIM] King '{royalCourt.KingName}' from world_state not found in NPCs");
+                        DebugLogger.Instance.LogWarning("WORLDSIM", $"King '{royalCourt.KingName}' from world_state not found in NPCs");
                         return;
                     }
                 }
@@ -486,7 +475,6 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load royal court from world_state: {ex.Message}");
-                Console.Error.WriteLine($"[WORLDSIM] Royal court load error: {ex.Message}");
             }
         }
 
@@ -717,7 +705,7 @@ namespace UsurperRemake.Systems
 
                 if (!root.TryGetProperty("childrenRaw", out var rawElement))
                 {
-                    Console.Error.WriteLine("[WORLDSIM] No childrenRaw in world_state (legacy format). Children will start empty.");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", "No childrenRaw in world_state (legacy format). Children will start empty.");
                     return;
                 }
 
@@ -726,13 +714,12 @@ namespace UsurperRemake.Systems
                 {
                     // Empty list is valid — means all children aged out or were converted to NPCs
                     FamilySystem.Instance.DeserializeChildren(childDataList);
-                    Console.Error.WriteLine($"[WORLDSIM] Loaded {childDataList.Count} children from world_state");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Loaded {childDataList.Count} children from world_state");
                 }
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load children from world_state: {ex.Message}");
-                Console.Error.WriteLine($"[WORLDSIM] Children load error: {ex.Message}");
             }
         }
 
@@ -788,7 +775,7 @@ namespace UsurperRemake.Systems
                 {
                     var marriageData = JsonSerializer.Deserialize<List<NPCMarriageData>>(marriagesEl.GetRawText(), jsonOptions);
                     NPCMarriageRegistry.Instance.RestoreMarriages(marriageData);
-                    Console.Error.WriteLine($"[WORLDSIM] Loaded {marriageData?.Count ?? 0} NPC marriages from world_state");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Loaded {marriageData?.Count ?? 0} NPC marriages from world_state");
                 }
 
                 // Restore affairs
@@ -796,13 +783,12 @@ namespace UsurperRemake.Systems
                 {
                     var affairData = JsonSerializer.Deserialize<List<AffairState>>(affairsEl.GetRawText(), jsonOptions);
                     NPCMarriageRegistry.Instance.RestoreAffairs(affairData);
-                    Console.Error.WriteLine($"[WORLDSIM] Loaded {affairData?.Count ?? 0} affairs from world_state");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Loaded {affairData?.Count ?? 0} affairs from world_state");
                 }
             }
             catch (Exception ex)
             {
-                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load marriage registry from world_state: {ex.Message}");
-                Console.Error.WriteLine($"[WORLDSIM] Marriage registry load error: {ex.Message}. Rebuilding from NPCs.");
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load marriage registry from world_state: {ex.Message}. Rebuilding from NPCs.");
                 RebuildMarriageRegistryFromNPCs();
             }
         }
@@ -830,7 +816,7 @@ namespace UsurperRemake.Systems
             }
 
             if (rebuilt > 0)
-                Console.Error.WriteLine($"[WORLDSIM] Rebuilt {rebuilt} marriages from NPC fields (fallback)");
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"Rebuilt {rebuilt} marriages from NPC fields (fallback)");
         }
 
         /// <summary>
@@ -911,13 +897,12 @@ namespace UsurperRemake.Systems
                     // Use current day = 0 as placeholder; RestoreFromSaveData reads each event's own StartDay
                     WorldEventSystem.Instance.RestoreFromSaveData(eventDataList, 0);
                     var activeCount = WorldEventSystem.Instance.GetActiveEvents().Count;
-                    Console.Error.WriteLine($"[WORLDSIM] Loaded {activeCount} active world events from world_state");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Loaded {activeCount} active world events from world_state");
                 }
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load world events: {ex.Message}");
-                Console.Error.WriteLine($"[WORLDSIM] World events load error: {ex.Message}");
             }
         }
 
@@ -935,12 +920,11 @@ namespace UsurperRemake.Systems
                 {
                     WorldSimulator.RegisterPlayerTeam(team.TeamName);
                 }
-                Console.Error.WriteLine($"[WORLDSIM] Registered {teams.Count} player team names for protection");
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"Registered {teams.Count} player team names for protection");
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load player team names: {ex.Message}");
-                Console.Error.WriteLine($"[WORLDSIM] Player team names load error: {ex.Message}");
             }
         }
 
@@ -1342,7 +1326,7 @@ namespace UsurperRemake.Systems
             if (kingNpc != null)
             {
                 global::CastleLocation.SetCurrentKing(kingNpc);
-                Console.Error.WriteLine($"[WORLDSIM] Restored king: {kingNpc.Name}");
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"Restored king: {kingNpc.Name}");
             }
 
             NPCSpawnSystem.Instance.MarkAsInitialized();

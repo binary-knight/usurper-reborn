@@ -1102,6 +1102,26 @@ namespace UsurperRemake.Systems
             }
         }
 
+        public async Task UpdateOnlineDisplayName(string username, string displayName)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE online_players SET display_name = @displayName
+                    WHERE LOWER(username) = LOWER(@username);
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@displayName", displayName);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to update online display name: {ex.Message}");
+            }
+        }
+
         public async Task UpdateHeartbeat(string username, string location)
         {
             try
@@ -1511,46 +1531,200 @@ namespace UsurperRemake.Systems
                     await cmd.ExecuteNonQueryAsync();
                 }
 
-                // Clear world state
+                // Clear all game data tables in a single batch
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
-                    cmd.CommandText = "DELETE FROM world_state;";
-                    await cmd.ExecuteNonQueryAsync();
-                }
-
-                // Clear news
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.Transaction = transaction;
-                    cmd.CommandText = "DELETE FROM news;";
-                    await cmd.ExecuteNonQueryAsync();
-                }
-
-                // Clear messages
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.Transaction = transaction;
-                    cmd.CommandText = "DELETE FROM messages;";
-                    await cmd.ExecuteNonQueryAsync();
-                }
-
-                // Clear online players (they'll re-register on next heartbeat)
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.Transaction = transaction;
-                    cmd.CommandText = "DELETE FROM online_players;";
+                    cmd.CommandText = @"
+                        DELETE FROM world_state;
+                        DELETE FROM news;
+                        DELETE FROM messages;
+                        DELETE FROM online_players;
+                        DELETE FROM pvp_log;
+                        DELETE FROM player_teams;
+                        DELETE FROM team_vault;
+                        DELETE FROM team_upgrades;
+                        DELETE FROM team_wars;
+                        DELETE FROM trade_offers;
+                        DELETE FROM bounties;
+                        DELETE FROM auction_listings;
+                        DELETE FROM world_bosses;
+                        DELETE FROM world_boss_damage;
+                        DELETE FROM castle_sieges;
+                        DELETE FROM wizard_flags;
+                        DELETE FROM sleeping_players;
+                    ";
                     await cmd.ExecuteNonQueryAsync();
                 }
 
                 transaction.Commit();
-                DebugLogger.Instance.LogWarning("SQL", "Full game reset performed by admin");
+                DebugLogger.Instance.LogWarning("SQL", "Full game reset performed by admin (all 18 tables wiped)");
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to perform full game reset: {ex.Message}");
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Get comprehensive game statistics for the SysOp console
+        /// </summary>
+        public async Task<SysOpGameStats> GetGameStatistics()
+        {
+            var stats = new SysOpGameStats();
+            try
+            {
+                using var connection = OpenConnection();
+
+                // Player stats + aggregate economy/combat in one query
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT
+                            COUNT(*) as total_players,
+                            SUM(CASE WHEN p.is_banned = 1 THEN 1 ELSE 0 END) as banned_count,
+                            SUM(CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END) as online_count,
+                            SUM(CASE WHEN p.player_data != '{}' AND p.player_data IS NOT NULL THEN 1 ELSE 0 END) as active_count,
+                            MAX(COALESCE(json_extract(p.player_data, '$.player.level'), 0)) as max_level,
+                            AVG(CASE WHEN json_extract(p.player_data, '$.player.level') > 0
+                                THEN json_extract(p.player_data, '$.player.level') END) as avg_level,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.gold'), 0)) as total_gold,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.bankGold'), 0)) as total_bank_gold,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalMonstersKilled'), 0)) as total_monsters_killed,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalBossesKilled'), 0)) as total_bosses_killed,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalPlayerKills'), 0)) as total_pvp_kills,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalMonsterDeaths'), 0)) as total_pve_deaths,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalDamageDealt'), 0)) as total_damage_dealt,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalGoldEarned'), 0)) as total_gold_earned,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalGoldSpent'), 0)) as total_gold_spent,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalItemsBought'), 0)) as total_items_bought,
+                            SUM(COALESCE(json_extract(p.player_data, '$.player.statistics.totalItemsSold'), 0)) as total_items_sold,
+                            MAX(COALESCE(json_extract(p.player_data, '$.player.statistics.deepestDungeonLevel'), 0)) as deepest_dungeon,
+                            SUM(p.total_playtime_minutes) as total_playtime
+                        FROM players p
+                        LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
+                            AND op.last_heartbeat >= datetime('now', '-120 seconds');
+                    ";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        stats.TotalPlayers = reader.IsDBNull(0) ? 0 : reader.GetInt32(0);
+                        stats.BannedPlayers = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1));
+                        stats.OnlinePlayers = reader.IsDBNull(2) ? 0 : Convert.ToInt32(reader.GetValue(2));
+                        stats.ActivePlayers = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3));
+                        stats.HighestLevel = reader.IsDBNull(4) ? 0 : Convert.ToInt32(reader.GetValue(4));
+                        stats.AverageLevel = reader.IsDBNull(5) ? 0 : Convert.ToDouble(reader.GetValue(5));
+                        stats.TotalGoldOnHand = reader.IsDBNull(6) ? 0 : Convert.ToInt64(reader.GetValue(6));
+                        stats.TotalBankGold = reader.IsDBNull(7) ? 0 : Convert.ToInt64(reader.GetValue(7));
+                        stats.TotalMonstersKilled = reader.IsDBNull(8) ? 0 : Convert.ToInt64(reader.GetValue(8));
+                        stats.TotalBossesKilled = reader.IsDBNull(9) ? 0 : Convert.ToInt64(reader.GetValue(9));
+                        stats.TotalPvPKills = reader.IsDBNull(10) ? 0 : Convert.ToInt64(reader.GetValue(10));
+                        stats.TotalPvEDeaths = reader.IsDBNull(11) ? 0 : Convert.ToInt64(reader.GetValue(11));
+                        stats.TotalDamageDealt = reader.IsDBNull(12) ? 0 : Convert.ToInt64(reader.GetValue(12));
+                        stats.TotalGoldEarned = reader.IsDBNull(13) ? 0 : Convert.ToInt64(reader.GetValue(13));
+                        stats.TotalGoldSpent = reader.IsDBNull(14) ? 0 : Convert.ToInt64(reader.GetValue(14));
+                        stats.TotalItemsBought = reader.IsDBNull(15) ? 0 : Convert.ToInt64(reader.GetValue(15));
+                        stats.TotalItemsSold = reader.IsDBNull(16) ? 0 : Convert.ToInt64(reader.GetValue(16));
+                        stats.DeepestDungeon = reader.IsDBNull(17) ? 0 : Convert.ToInt32(reader.GetValue(17));
+                        stats.TotalPlaytimeMinutes = reader.IsDBNull(18) ? 0 : Convert.ToInt64(reader.GetValue(18));
+                    }
+                }
+
+                // Top player by level
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT p.display_name,
+                               json_extract(p.player_data, '$.player.level') as level,
+                               json_extract(p.player_data, '$.player.class') as class_id
+                        FROM players p
+                        WHERE p.player_data != '{}' AND p.player_data IS NOT NULL
+                        ORDER BY COALESCE(json_extract(p.player_data, '$.player.level'), 0) DESC
+                        LIMIT 1;
+                    ";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        stats.TopPlayerName = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                        stats.TopPlayerLevel = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1));
+                        stats.TopPlayerClassId = reader.IsDBNull(2) ? 0 : Convert.ToInt32(reader.GetValue(2));
+                    }
+                }
+
+                // Most popular class
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT json_extract(p.player_data, '$.player.class') as class_id, COUNT(*) as cnt
+                        FROM players p
+                        WHERE p.player_data != '{}' AND p.player_data IS NOT NULL
+                          AND json_extract(p.player_data, '$.player.class') IS NOT NULL
+                        GROUP BY class_id ORDER BY cnt DESC LIMIT 1;
+                    ";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        stats.MostPopularClassId = reader.IsDBNull(0) ? -1 : Convert.ToInt32(reader.GetValue(0));
+                        stats.MostPopularClassCount = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+                    }
+                }
+
+                // Table counts for server health
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT
+                            (SELECT COUNT(*) FROM news) as news_count,
+                            (SELECT COUNT(*) FROM messages) as msg_count,
+                            (SELECT COUNT(*) FROM pvp_log) as pvp_count,
+                            (SELECT COUNT(*) FROM player_teams) as team_count,
+                            (SELECT COUNT(*) FROM bounties WHERE status = 'active') as bounty_count,
+                            (SELECT COUNT(*) FROM auction_listings WHERE status = 'active') as auction_count;
+                    ";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        stats.NewsEntries = reader.IsDBNull(0) ? 0 : reader.GetInt32(0);
+                        stats.TotalMessages = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+                        stats.TotalPvPFights = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
+                        stats.ActiveTeams = reader.IsDBNull(3) ? 0 : reader.GetInt32(3);
+                        stats.ActiveBounties = reader.IsDBNull(4) ? 0 : reader.GetInt32(4);
+                        stats.ActiveAuctions = reader.IsDBNull(5) ? 0 : reader.GetInt32(5);
+                    }
+                }
+
+                // Newest player
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT display_name, created_at FROM players
+                        ORDER BY created_at DESC LIMIT 1;
+                    ";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        stats.NewestPlayerName = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                        stats.NewestPlayerDate = reader.IsDBNull(1) ? null : reader.GetString(1);
+                    }
+                }
+
+                // Database file size
+                try
+                {
+                    var dbPath = connectionString.Replace("Data Source=", "").Trim();
+                    if (File.Exists(dbPath))
+                    {
+                        stats.DatabaseSizeBytes = new FileInfo(dbPath).Length;
+                    }
+                }
+                catch { /* ignore */ }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get game statistics: {ex.Message}");
+            }
+            return stats;
         }
 
         public async Task UpdatePlayerSession(string username, bool isLogin)
@@ -3811,5 +3985,53 @@ namespace UsurperRemake.Systems
         public long Gold { get; set; }
         public long Experience { get; set; }
         public bool IsOnline { get; set; }
+    }
+
+    public class SysOpGameStats
+    {
+        // Player counts
+        public int TotalPlayers { get; set; }
+        public int ActivePlayers { get; set; }
+        public int OnlinePlayers { get; set; }
+        public int BannedPlayers { get; set; }
+
+        // Player stats
+        public int HighestLevel { get; set; }
+        public double AverageLevel { get; set; }
+        public string TopPlayerName { get; set; } = "";
+        public int TopPlayerLevel { get; set; }
+        public int TopPlayerClassId { get; set; }
+        public int MostPopularClassId { get; set; } = -1;
+        public int MostPopularClassCount { get; set; }
+        public string NewestPlayerName { get; set; } = "";
+        public string? NewestPlayerDate { get; set; }
+
+        // Economy
+        public long TotalGoldOnHand { get; set; }
+        public long TotalBankGold { get; set; }
+        public long TotalGoldEarned { get; set; }
+        public long TotalGoldSpent { get; set; }
+        public long TotalItemsBought { get; set; }
+        public long TotalItemsSold { get; set; }
+
+        // Combat
+        public long TotalMonstersKilled { get; set; }
+        public long TotalBossesKilled { get; set; }
+        public long TotalPvPKills { get; set; }
+        public long TotalPvEDeaths { get; set; }
+        public long TotalDamageDealt { get; set; }
+        public int TotalPvPFights { get; set; }
+        public int DeepestDungeon { get; set; }
+
+        // World
+        public int ActiveTeams { get; set; }
+        public int ActiveBounties { get; set; }
+        public int ActiveAuctions { get; set; }
+
+        // Server
+        public int NewsEntries { get; set; }
+        public int TotalMessages { get; set; }
+        public long TotalPlaytimeMinutes { get; set; }
+        public long DatabaseSizeBytes { get; set; }
     }
 }

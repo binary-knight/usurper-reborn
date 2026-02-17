@@ -167,7 +167,8 @@ namespace Godot
         
         public static void PrintErr(params object[] args)
         {
-            Console.Error.WriteLine(string.Join(" ", args));
+            var message = string.Join(" ", args);
+            UsurperRemake.Systems.DebugLogger.Instance.LogError("GAME", message);
         }
         
         public static int RandRange(int min, int max)

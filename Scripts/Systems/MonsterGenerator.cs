@@ -202,6 +202,9 @@ public static class MonsterGenerator
         long baseArmorPower = (long)((0.5 * level) + Math.Pow(level, 1.02) * 0.3);
         long armorPower = (long)(baseArmorPower * totalMultiplier * 0.4f);
 
+        // Apply server-wide SysOp HP multiplier
+        hp = (long)(hp * GameConfig.MonsterHPMultiplier);
+
         return new MonsterStats
         {
             HP = Math.Max(15, hp),

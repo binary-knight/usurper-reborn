@@ -291,26 +291,29 @@ public static class DifficultySystem
 
     /// <summary>
     /// Apply experience multiplier to a base XP value
+    /// Stacks per-character difficulty with server-wide SysOp multiplier
     /// </summary>
     public static long ApplyExperienceMultiplier(long baseXP)
     {
-        return (long)(baseXP * GetExperienceMultiplier());
+        return (long)(baseXP * GetExperienceMultiplier() * GameConfig.XPMultiplier);
     }
 
     /// <summary>
     /// Apply gold multiplier to a base gold value
+    /// Stacks per-character difficulty with server-wide SysOp multiplier
     /// </summary>
     public static long ApplyGoldMultiplier(long baseGold)
     {
-        return (long)(baseGold * GetGoldMultiplier());
+        return (long)(baseGold * GetGoldMultiplier() * GameConfig.GoldMultiplier);
     }
 
     /// <summary>
     /// Apply monster damage multiplier to damage
+    /// Stacks per-character difficulty with server-wide SysOp multiplier
     /// </summary>
     public static long ApplyMonsterDamageMultiplier(long baseDamage)
     {
-        return (long)(baseDamage * GetMonsterDamageMultiplier());
+        return (long)(baseDamage * GetMonsterDamageMultiplier() * GameConfig.MonsterDamageMultiplier);
     }
 
     /// <summary>

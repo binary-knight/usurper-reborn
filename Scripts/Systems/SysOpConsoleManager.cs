@@ -21,16 +21,27 @@ namespace UsurperRemake.Systems
         private bool _updateCheckComplete = false;
         private bool _updateAvailable = false;
         private string _latestVersion = "";
+        private bool _isOnlineMode;
+        private OnlineAdminConsole? _onlineAdmin;
 
         public SysOpConsoleManager(TerminalEmulator term)
         {
             terminal = term;
         }
 
+        private OnlineAdminConsole? GetOnlineAdmin()
+        {
+            if (_onlineAdmin != null) return _onlineAdmin;
+            var sqlBackend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (sqlBackend == null) return null;
+            _onlineAdmin = new OnlineAdminConsole(terminal, sqlBackend);
+            return _onlineAdmin;
+        }
+
         public async Task Run()
         {
-            // Verify SysOp access
-            if (!DoorMode.IsInDoorMode || !DoorMode.IsSysOp)
+            // Verify SysOp access - allow BBS sysops (security level) or online admins in BBS mode
+            if (!DoorMode.IsInDoorMode || (!DoorMode.IsSysOp && !DoorMode.IsOnlineMode))
             {
                 terminal.SetColor("red");
                 terminal.WriteLine("ACCESS DENIED: SysOp privileges required.");
@@ -38,60 +49,151 @@ namespace UsurperRemake.Systems
                 return;
             }
 
+            _isOnlineMode = DoorMode.IsOnlineMode;
+
             // Start background update check
             StartBackgroundUpdateCheck();
 
             bool done = false;
             while (!done)
             {
-                DisplayConsole();
-
-                terminal.SetColor("gray");
-                terminal.Write("Choice: ");
-                var choice = await terminal.GetInputAsync("");
-
-                switch (choice.ToUpper())
+                if (_isOnlineMode)
                 {
-                    case "1":
-                        await ViewAllPlayers();
-                        break;
-                    case "2":
-                        await DeletePlayer();
-                        break;
-                    case "3":
-                        await ResetGame();
-                        break;
-                    case "4":
-                        await ViewEditConfig();
-                        break;
-                    case "5":
-                        await SetMOTD();
-                        break;
-                    case "6":
-                        await ViewGameStatistics();
-                        break;
-                    case "7":
-                        await ViewDebugLog();
-                        break;
-                    case "8":
-                        await ViewActiveNPCs();
-                        break;
-                    case "9":
-                        await CheckForUpdates();
-                        break;
-                    case "P":
-                        await PardonPlayer();
-                        break;
-                    case "Q":
-                        done = true;
-                        break;
+                    DisplayOnlineConsole();
+
+                    terminal.SetColor("gray");
+                    terminal.Write("Choice: ");
+                    var choice = await terminal.GetInputAsync("");
+                    done = await ProcessOnlineChoice(choice);
+                }
+                else
+                {
+                    DisplayConsole();
+
+                    terminal.SetColor("gray");
+                    terminal.Write("Choice: ");
+                    var choice = await terminal.GetInputAsync("");
+                    done = await ProcessLocalChoice(choice);
                 }
             }
         }
 
+        private async Task<bool> ProcessLocalChoice(string choice)
+        {
+            switch (choice.ToUpper())
+            {
+                case "1":
+                    await ViewAllPlayers();
+                    break;
+                case "2":
+                    await DeletePlayer();
+                    break;
+                case "3":
+                    await ResetGame();
+                    break;
+                case "4":
+                    await ViewEditConfig();
+                    break;
+                case "5":
+                    await SetMOTD();
+                    break;
+                case "6":
+                    await ViewGameStatistics();
+                    break;
+                case "7":
+                    await ViewDebugLog();
+                    break;
+                case "8":
+                    await ViewActiveNPCs();
+                    break;
+                case "9":
+                    await CheckForUpdates();
+                    break;
+                case "P":
+                    await PardonPlayer();
+                    break;
+                case "Q":
+                    return true;
+            }
+            return false;
+        }
+
+        private async Task<bool> ProcessOnlineChoice(string choice)
+        {
+            var admin = GetOnlineAdmin();
+            if (admin == null)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Error: SQL backend not available for online mode.");
+                await terminal.GetInputAsync("Press Enter to continue...");
+                return false;
+            }
+
+            var sqlBackend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (sqlBackend == null) return false;
+
+            switch (choice.ToUpper())
+            {
+                case "1":
+                    await ListAndEditPlayers(admin);
+                    break;
+                case "2":
+                    await BanPlayerOnline(sqlBackend);
+                    break;
+                case "3":
+                    await UnbanPlayerOnline(sqlBackend);
+                    break;
+                case "4":
+                    await DeletePlayerOnline(sqlBackend);
+                    break;
+                case "P":
+                    await PardonPlayerOnline(sqlBackend);
+                    break;
+                case "5":
+                    await admin.EditDifficultySettings();
+                    break;
+                case "6":
+                    await admin.SetMOTD();
+                    break;
+                case "7":
+                    await admin.ViewOnlinePlayers();
+                    break;
+                case "8":
+                    await ViewGameStatistics();
+                    break;
+                case "D":
+                    await ViewDebugLog();
+                    break;
+                case "N":
+                    await ViewActiveNPCs();
+                    break;
+                case "K":
+                    await KickOnlinePlayer(sqlBackend);
+                    break;
+                case "V":
+                    await ViewRecentNews(sqlBackend);
+                    break;
+                case "C":
+                    await admin.ClearNews();
+                    break;
+                case "B":
+                    await admin.BroadcastMessage();
+                    break;
+                case "U":
+                    await CheckForUpdates();
+                    break;
+                case "W":
+                    await admin.FullGameReset();
+                    break;
+                case "Q":
+                    return true;
+            }
+            return false;
+        }
+
         private void StartBackgroundUpdateCheck()
         {
-            if (_updateCheckTask != null || VersionChecker.Instance.IsSteamBuild || DoorMode.IsOnlineMode)
+            if (_updateCheckTask != null || VersionChecker.Instance.IsSteamBuild)
                 return;
 
             _updateCheckComplete = false;
@@ -124,85 +226,484 @@ namespace UsurperRemake.Systems
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_red");
-            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                        S Y S O P   C O N S O L E                             ║");
-            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
-            terminal.WriteLine("");
-
-            // Show session info
+            terminal.WriteLine(" ═══ SysOp Console ═══");
             terminal.SetColor("yellow");
             if (DoorMode.SessionInfo != null)
             {
-                terminal.WriteLine($"  Logged in as: {DoorMode.SessionInfo.UserName} (Security Level: {DoorMode.SessionInfo.SecurityLevel})");
-                terminal.WriteLine($"  BBS: {DoorMode.SessionInfo.BBSName}");
-            }
-            terminal.WriteLine("");
-
-            // Show update notification if available
-            if (_updateCheckComplete && _updateAvailable)
-            {
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-                terminal.Write("║  ");
-                terminal.SetColor("white");
-                terminal.Write("UPDATE AVAILABLE: ");
-                terminal.SetColor("bright_green");
-                terminal.Write($"v{_latestVersion}");
-                terminal.SetColor("white");
-                terminal.Write($" (current: {GameConfig.Version})");
-                terminal.SetColor("bright_yellow");
-                int contentLen = 18 + _latestVersion.Length + 11 + GameConfig.Version.Length + 1;
-                terminal.WriteLine(new string(' ', Math.Max(0, 74 - contentLen)) + "║");
-                terminal.WriteLine("║  Press [9] to download and install the update                               ║");
-                terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
-                terminal.WriteLine("");
+                terminal.WriteLine($" {DoorMode.SessionInfo.UserName} (Lv {DoorMode.SessionInfo.SecurityLevel})  BBS: {DoorMode.SessionInfo.BBSName}");
             }
 
-            // Menu
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("═══ GAME MANAGEMENT ═══");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [1] View All Players");
-            terminal.WriteLine("  [2] Delete Player");
-            terminal.WriteLine("  [3] Reset Game (Wipe All Data)");
-            terminal.WriteLine("  [P] Pardon Player (Release from Prison / Clear Darkness)");
-            terminal.WriteLine("");
-
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("═══ GAME SETTINGS ═══");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [4] View/Edit Game Configuration");
-            terminal.WriteLine("  [5] Set Message of the Day (MOTD)");
-            terminal.WriteLine("");
-
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("═══ MONITORING ═══");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [6] View Game Statistics");
-            terminal.WriteLine("  [7] View Debug Log");
-            terminal.WriteLine("  [8] View Active NPCs");
-            terminal.WriteLine("");
-
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("═══ SYSTEM MAINTENANCE ═══");
             if (_updateCheckComplete && _updateAvailable)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine("  [9] Check for Updates  ★ UPDATE AVAILABLE ★");
+                terminal.WriteLine($" ★ UPDATE: v{_latestVersion} available (current: {GameConfig.Version})");
+            }
+
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" Players");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [1] View All Players   [2] Delete Player");
+            terminal.WriteLine("  [3] Reset Game         [P] Pardon Player");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" Settings");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [4] Difficulty          [5] Set MOTD");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" Monitoring");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [6] Statistics          [7] Debug Log");
+            terminal.WriteLine("  [8] Active NPCs");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            if (_updateCheckComplete && _updateAvailable)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("  [9] Updates ★ NEW       [Q] Quit");
             }
             else
             {
                 terminal.SetColor("white");
-                terminal.WriteLine("  [9] Check for Updates");
+                terminal.WriteLine("  [9] Check for Updates   [Q] Quit");
             }
             terminal.WriteLine("");
+        }
 
+        private void DisplayOnlineConsole()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(" ═══ SysOp Console (Online) ═══");
+            terminal.SetColor("yellow");
+            if (DoorMode.SessionInfo != null)
+            {
+                terminal.WriteLine($" {DoorMode.SessionInfo.UserName} (Lv {DoorMode.SessionInfo.SecurityLevel})  BBS: {DoorMode.SessionInfo.BBSName}");
+            }
+
+            if (_updateCheckComplete && _updateAvailable)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($" ★ UPDATE: v{_latestVersion} available (current: {GameConfig.Version})");
+            }
+
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" Players");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [1] List/Edit Players  [2] Ban Player");
+            terminal.WriteLine("  [3] Unban Player       [4] Delete Player");
+            terminal.WriteLine("  [P] Pardon Player");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" Settings");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [5] Difficulty          [6] Set MOTD");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" Monitoring");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [7] Online Players      [8] Statistics");
+            terminal.WriteLine("  [K] Kick Player         [D] Debug Log");
+            terminal.WriteLine("  [N] Active NPCs");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" World");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [V] View News           [C] Clear News");
+            terminal.WriteLine("  [B] Broadcast");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" ──────────────────────────────────────");
+            if (_updateCheckComplete && _updateAvailable)
+            {
+                terminal.SetColor("bright_green");
+                terminal.Write("  [U] Updates ★ NEW");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.Write("  [U] Updates");
+            }
+            terminal.SetColor("red");
+            terminal.Write("             [W] Wipe");
             terminal.SetColor("gray");
-            terminal.WriteLine("  [Q] Return to Main Menu");
+            terminal.WriteLine("   [Q] Quit");
             terminal.WriteLine("");
         }
 
         #region Player Management
+
+        private static readonly string[] ClassNames = {
+            "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",
+            "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior"
+        };
+
+        private async Task ListAndEditPlayers(OnlineAdminConsole admin)
+        {
+            var sqlBackend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (sqlBackend == null) return;
+
+            var players = await sqlBackend.GetAllPlayersDetailed();
+
+            if (players.Count == 0)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("yellow");
+                terminal.WriteLine("No players found.");
+                await terminal.GetInputAsync("Press Enter to continue...");
+                return;
+            }
+
+            int pageSize = 15;
+            int page = 0;
+            int totalPages = (players.Count + pageSize - 1) / pageSize;
+
+            while (true)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($" ═══ Players ({page + 1}/{totalPages}, {players.Count} total) ═══");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($" {"#",-4}{"Name",-16}{"Lvl",4} {"Class",-11}{"Gold",10} {"Status",-8}");
+                terminal.SetColor("dark_gray");
+                terminal.WriteLine(" " + new string('─', 55));
+
+                var pageItems = players.Skip(page * pageSize).Take(pageSize).ToList();
+                for (int i = 0; i < pageItems.Count; i++)
+                {
+                    var p = pageItems[i];
+                    int num = page * pageSize + i + 1;
+                    string status = p.IsBanned ? "BANNED" : p.IsOnline ? "ONLINE" : "Off";
+                    string cls = p.ClassId >= 0 && p.ClassId < ClassNames.Length ? ClassNames[p.ClassId] : "Unknown";
+                    string color = p.IsBanned ? "red" : p.IsOnline ? "bright_green" : "gray";
+
+                    terminal.SetColor(color);
+                    terminal.WriteLine($" {num,-4}{p.DisplayName,-16}{p.Level,4} {cls,-11}{p.Gold,10:N0} {status,-8}");
+                }
+
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                string nav = "#=Edit  ";
+                if (totalPages > 1)
+                {
+                    if (page > 0) nav += "[P]rev  ";
+                    if (page < totalPages - 1) nav += "[N]ext  ";
+                }
+                nav += "[Q]uit";
+                terminal.WriteLine($" {nav}");
+
+                terminal.SetColor("gray");
+                var choice = await terminal.GetInputAsync(" Choice: ");
+                switch (choice.ToUpper())
+                {
+                    case "N":
+                        if (page < totalPages - 1) page++;
+                        break;
+                    case "P":
+                        if (page > 0) page--;
+                        break;
+                    case "Q":
+                    case "":
+                        return;
+                    default:
+                        // Try to parse as a player number
+                        if (int.TryParse(choice, out int playerNum) && playerNum >= 1 && playerNum <= players.Count)
+                        {
+                            var selected = players[playerNum - 1];
+                            await admin.EditPlayer(selected.Username);
+                            // Refresh list after edit
+                            players = await sqlBackend.GetAllPlayersDetailed();
+                            totalPages = (players.Count + pageSize - 1) / pageSize;
+                            if (page >= totalPages) page = Math.Max(0, totalPages - 1);
+                        }
+                        break;
+                }
+            }
+        }
+
+        private async Task BanPlayerOnline(SqlSaveBackend sqlBackend)
+        {
+            var players = (await sqlBackend.GetAllPlayersDetailed())
+                .Where(p => !p.IsBanned)
+                .OrderBy(p => p.DisplayName)
+                .ToList();
+
+            if (players.Count == 0)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("green");
+                terminal.WriteLine("No players available to ban.");
+                await terminal.GetInputAsync("Press Enter...");
+                return;
+            }
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(" ═══ Ban Player ═══");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($" {"#",-4}{"Name",-16}{"Lvl",4} {"Class",-11}{"Status",-8}");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" " + new string('─', 45));
+
+            for (int i = 0; i < players.Count; i++)
+            {
+                var p = players[i];
+                string cls = p.ClassId >= 0 && p.ClassId < ClassNames.Length ? ClassNames[p.ClassId] : "Unknown";
+                terminal.SetColor(p.IsOnline ? "bright_green" : "gray");
+                terminal.WriteLine($" {i + 1,-4}{p.DisplayName,-16}{p.Level,4} {cls,-11}{(p.IsOnline ? "ONLINE" : "Off"),-8}");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Enter # to ban, [Q]uit");
+            terminal.SetColor("gray");
+            var input = await terminal.GetInputAsync(" Choice: ");
+
+            if (string.IsNullOrWhiteSpace(input) || input.ToUpper() == "Q") return;
+            if (!int.TryParse(input, out int sel) || sel < 1 || sel > players.Count) return;
+
+            var target = players[sel - 1];
+            if (string.Equals(target.Username, DoorMode.OnlineUsername, StringComparison.OrdinalIgnoreCase))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(" You cannot ban yourself!");
+                await terminal.GetInputAsync(" Press Enter...");
+                return;
+            }
+
+            terminal.SetColor("white");
+            var reason = await terminal.GetInputAsync(" Ban reason: ");
+            if (string.IsNullOrWhiteSpace(reason)) reason = "No reason given";
+
+            terminal.SetColor("bright_red");
+            var confirm = await terminal.GetInputAsync($" Ban '{target.DisplayName}'? (Y/N): ");
+            if (confirm.ToUpper() != "Y") return;
+
+            await sqlBackend.BanPlayer(target.Username, reason);
+            terminal.SetColor("green");
+            terminal.WriteLine($" {target.DisplayName} has been banned.");
+            DebugLogger.Instance.LogInfo("SYSOP", $"Banned '{target.DisplayName}': {reason}");
+            await terminal.GetInputAsync(" Press Enter...");
+        }
+
+        private async Task UnbanPlayerOnline(SqlSaveBackend sqlBackend)
+        {
+            var banned = await sqlBackend.GetBannedPlayers();
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" ═══ Unban Player ═══");
+
+            if (banned.Count == 0)
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine(" No banned players.");
+                await terminal.GetInputAsync(" Press Enter...");
+                return;
+            }
+
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" " + new string('─', 50));
+            for (int i = 0; i < banned.Count; i++)
+            {
+                var (username, displayName, banReason) = banned[i];
+                terminal.SetColor("red");
+                terminal.Write($" {i + 1,-4}{displayName,-16}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($" {banReason ?? "No reason"}");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Enter # to unban, [Q]uit");
+            terminal.SetColor("gray");
+            var input = await terminal.GetInputAsync(" Choice: ");
+
+            if (string.IsNullOrWhiteSpace(input) || input.ToUpper() == "Q") return;
+            if (!int.TryParse(input, out int sel) || sel < 1 || sel > banned.Count) return;
+
+            var target = banned[sel - 1];
+            terminal.SetColor("yellow");
+            var confirm = await terminal.GetInputAsync($" Unban '{target.displayName}'? (Y/N): ");
+            if (confirm.ToUpper() != "Y") return;
+
+            await sqlBackend.UnbanPlayer(target.username);
+            terminal.SetColor("green");
+            terminal.WriteLine($" {target.displayName} has been unbanned.");
+            DebugLogger.Instance.LogInfo("SYSOP", $"Unbanned '{target.displayName}'");
+            await terminal.GetInputAsync(" Press Enter...");
+        }
+
+        private async Task DeletePlayerOnline(SqlSaveBackend sqlBackend)
+        {
+            var players = (await sqlBackend.GetAllPlayersDetailed())
+                .OrderBy(p => p.DisplayName)
+                .ToList();
+
+            if (players.Count == 0)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("yellow");
+                terminal.WriteLine("No players found.");
+                await terminal.GetInputAsync("Press Enter...");
+                return;
+            }
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(" ═══ Delete Player ═══");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($" {"#",-4}{"Name",-16}{"Lvl",4} {"Class",-11}{"Status",-8}");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" " + new string('─', 45));
+
+            for (int i = 0; i < players.Count; i++)
+            {
+                var p = players[i];
+                string cls = p.ClassId >= 0 && p.ClassId < ClassNames.Length ? ClassNames[p.ClassId] : "Unknown";
+                string color = p.IsBanned ? "red" : p.IsOnline ? "bright_green" : "gray";
+                string status = p.IsBanned ? "BANNED" : p.IsOnline ? "ONLINE" : "Off";
+                terminal.SetColor(color);
+                terminal.WriteLine($" {i + 1,-4}{p.DisplayName,-16}{p.Level,4} {cls,-11}{status,-8}");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Enter # to delete, [Q]uit");
+            terminal.SetColor("gray");
+            var input = await terminal.GetInputAsync(" Choice: ");
+
+            if (string.IsNullOrWhiteSpace(input) || input.ToUpper() == "Q") return;
+            if (!int.TryParse(input, out int sel) || sel < 1 || sel > players.Count) return;
+
+            var target = players[sel - 1];
+            if (string.Equals(target.Username, DoorMode.OnlineUsername, StringComparison.OrdinalIgnoreCase))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(" You cannot delete your own account!");
+                await terminal.GetInputAsync(" Press Enter...");
+                return;
+            }
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($" Player: {target.DisplayName} (Lv {target.Level}, {target.Gold:N0} gold)");
+            var confirm1 = await terminal.GetInputAsync(" Type DELETE to confirm: ");
+            if (confirm1 != "DELETE") { terminal.SetColor("gray"); terminal.WriteLine(" Cancelled."); await terminal.GetInputAsync(" Press Enter..."); return; }
+
+            var confirm2 = await terminal.GetInputAsync(" Type YES for final confirmation: ");
+            if (confirm2 != "YES") { terminal.SetColor("gray"); terminal.WriteLine(" Cancelled."); await terminal.GetInputAsync(" Press Enter..."); return; }
+
+            sqlBackend.DeleteGameData(target.Username);
+            terminal.SetColor("green");
+            terminal.WriteLine($" {target.DisplayName} has been permanently deleted.");
+            DebugLogger.Instance.LogWarning("SYSOP", $"Deleted player '{target.DisplayName}'");
+            await terminal.GetInputAsync(" Press Enter...");
+        }
+
+        private async Task PardonPlayerOnline(SqlSaveBackend sqlBackend)
+        {
+            var allPlayers = await sqlBackend.GetAllPlayersDetailed();
+            var imprisoned = new List<(AdminPlayerInfo info, int daysInPrison, long darkness)>();
+
+            foreach (var p in allPlayers)
+            {
+                var saveData = await sqlBackend.ReadGameData(p.Username);
+                if (saveData?.Player == null) continue;
+                if (saveData.Player.DaysInPrison > 0 || saveData.Player.Darkness > 100)
+                {
+                    imprisoned.Add((p, saveData.Player.DaysInPrison, saveData.Player.Darkness));
+                }
+            }
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(" ═══ Pardon Player ═══");
+
+            if (imprisoned.Count == 0)
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine(" No players in prison or wanted.");
+                await terminal.GetInputAsync(" Press Enter...");
+                return;
+            }
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($" {"#",-4}{"Name",-16}{"Lvl",4}  {"Prison",-10}{"Darkness",-10}");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(" " + new string('─', 48));
+
+            for (int i = 0; i < imprisoned.Count; i++)
+            {
+                var (info, days, dark) = imprisoned[i];
+                terminal.SetColor(days > 0 ? "red" : "yellow");
+                string prison = days > 0 ? $"{days} day(s)" : "-";
+                string darkness = dark > 100 ? $"{dark} WANTED" : $"{dark}";
+                terminal.WriteLine($" {i + 1,-4}{info.DisplayName,-16}{info.Level,4}  {prison,-10}{darkness,-10}");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Enter # to pardon, [Q]uit");
+            terminal.SetColor("gray");
+            var input = await terminal.GetInputAsync(" Choice: ");
+
+            if (string.IsNullOrWhiteSpace(input) || input.ToUpper() == "Q") return;
+            if (!int.TryParse(input, out int sel) || sel < 1 || sel > imprisoned.Count) return;
+
+            var target = imprisoned[sel - 1];
+            terminal.SetColor("white");
+            terminal.WriteLine($" {target.info.DisplayName}: Prison={target.daysInPrison}d, Darkness={target.darkness}");
+            terminal.WriteLine("  [1] Release from prison");
+            terminal.WriteLine("  [2] Clear Darkness");
+            terminal.WriteLine("  [3] Full pardon (both)");
+            terminal.WriteLine("  [Q] Cancel");
+            var action = await terminal.GetInputAsync(" Choice: ");
+
+            var saveData2 = await sqlBackend.ReadGameData(target.info.Username);
+            if (saveData2?.Player == null) return;
+
+            bool modified = false;
+            switch (action)
+            {
+                case "1":
+                    saveData2.Player.DaysInPrison = 0;
+                    modified = true;
+                    terminal.SetColor("green");
+                    terminal.WriteLine(" Prison sentence cleared.");
+                    break;
+                case "2":
+                    saveData2.Player.Darkness = 0;
+                    modified = true;
+                    terminal.SetColor("green");
+                    terminal.WriteLine(" Darkness cleared.");
+                    break;
+                case "3":
+                    saveData2.Player.DaysInPrison = 0;
+                    saveData2.Player.Darkness = 0;
+                    modified = true;
+                    terminal.SetColor("green");
+                    terminal.WriteLine(" Full pardon — prison and Darkness cleared.");
+                    break;
+                default:
+                    return;
+            }
+
+            if (modified)
+            {
+                await sqlBackend.WriteGameData(target.info.Username, saveData2);
+                DebugLogger.Instance.LogWarning("SYSOP", $"Pardoned '{target.info.DisplayName}' (Prison={saveData2.Player.DaysInPrison}, Darkness={saveData2.Player.Darkness})");
+            }
+
+            await terminal.GetInputAsync(" Press Enter...");
+        }
 
         private async Task ViewAllPlayers()
         {
@@ -755,60 +1256,294 @@ namespace UsurperRemake.Systems
 
         #region Monitoring
 
+        private async Task ViewRecentNews(SqlSaveBackend sqlBackend)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══ RECENT NEWS ═══");
+            terminal.WriteLine("");
+
+            try
+            {
+                var news = await sqlBackend.GetRecentNews(50);
+                if (news.Count == 0)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("  No news entries.");
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  Showing {news.Count} most recent entries");
+                    terminal.WriteLine("");
+
+                    int page = 0;
+                    int perPage = 15;
+                    int totalPages = (news.Count + perPage - 1) / perPage;
+
+                    while (true)
+                    {
+                        if (page > 0)
+                        {
+                            terminal.ClearScreen();
+                            terminal.SetColor("bright_yellow");
+                            terminal.WriteLine("═══ RECENT NEWS ═══");
+                            terminal.WriteLine("");
+                        }
+
+                        int start = page * perPage;
+                        int end = Math.Min(start + perPage, news.Count);
+
+                        for (int i = start; i < end; i++)
+                        {
+                            var entry = news[i];
+                            string timeAgo = FormatTimeAgo(entry.CreatedAt);
+                            string cat = !string.IsNullOrEmpty(entry.Category) ? $"[{entry.Category}]" : "";
+                            terminal.SetColor("dark_gray");
+                            terminal.Write($"  {timeAgo} ");
+                            terminal.SetColor("cyan");
+                            terminal.Write(cat);
+                            terminal.SetColor("white");
+                            terminal.WriteLine($" {entry.Message}");
+                        }
+
+                        terminal.WriteLine("");
+                        terminal.SetColor("gray");
+                        if (totalPages > 1)
+                        {
+                            terminal.WriteLine($"  Page {page + 1}/{totalPages}");
+                            string prompt = page < totalPages - 1 ? "[N]ext  [Q]uit: " : "[P]rev  [Q]uit: ";
+                            if (page > 0 && page < totalPages - 1)
+                                prompt = "[N]ext  [P]rev  [Q]uit: ";
+                            var nav = await terminal.GetInputAsync(prompt);
+                            if (nav.Equals("N", StringComparison.OrdinalIgnoreCase) && page < totalPages - 1)
+                            {
+                                page++;
+                                continue;
+                            }
+                            else if (nav.Equals("P", StringComparison.OrdinalIgnoreCase) && page > 0)
+                            {
+                                page--;
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            await terminal.GetInputAsync("Press Enter to continue...");
+                        }
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"Error: {ex.Message}");
+                await terminal.GetInputAsync("Press Enter to continue...");
+            }
+        }
+
+        private static string FormatTimeAgo(DateTime dt)
+        {
+            var span = DateTime.UtcNow - dt.ToUniversalTime();
+            if (span.TotalMinutes < 1) return "just now";
+            if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+            if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+            if (span.TotalDays < 7) return $"{(int)span.TotalDays}d ago";
+            return dt.ToString("MM/dd");
+        }
+
+        private async Task KickOnlinePlayer(SqlSaveBackend sqlBackend)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══ KICK ONLINE PLAYER ═══");
+            terminal.WriteLine("");
+
+            try
+            {
+                var onlinePlayers = await sqlBackend.GetOnlinePlayers();
+                if (onlinePlayers.Count == 0)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("  No players currently online.");
+                    terminal.WriteLine("");
+                    await terminal.GetInputAsync("Press Enter to continue...");
+                    return;
+                }
+
+                // Filter out self
+                var myName = UsurperRemake.BBS.DoorMode.OnlineUsername ?? "";
+                var kickable = onlinePlayers.Where(p =>
+                    !p.Username.Equals(myName, StringComparison.OrdinalIgnoreCase)).ToList();
+
+                if (kickable.Count == 0)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("  No other players online to kick.");
+                    terminal.WriteLine("");
+                    await terminal.GetInputAsync("Press Enter to continue...");
+                    return;
+                }
+
+                terminal.SetColor("white");
+                for (int i = 0; i < kickable.Count; i++)
+                {
+                    var p = kickable[i];
+                    string connTime = (DateTime.UtcNow - p.ConnectedAt.ToUniversalTime()).TotalMinutes < 60
+                        ? $"{(int)(DateTime.UtcNow - p.ConnectedAt.ToUniversalTime()).TotalMinutes}m"
+                        : $"{(int)(DateTime.UtcNow - p.ConnectedAt.ToUniversalTime()).TotalHours}h";
+                    terminal.WriteLine($"  [{i + 1}] {p.DisplayName,-20} {p.Location,-15} {p.ConnectionType,-5} {connTime}");
+                }
+
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                var input = await terminal.GetInputAsync("Player # to kick (Q to cancel): ");
+                if (input.Equals("Q", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(input))
+                    return;
+
+                if (int.TryParse(input, out int idx) && idx >= 1 && idx <= kickable.Count)
+                {
+                    var target = kickable[idx - 1];
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"  Kick {target.DisplayName}?");
+                    var confirm = await terminal.GetInputAsync("  Type Y to confirm: ");
+                    if (confirm.Equals("Y", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await sqlBackend.UnregisterOnline(target.Username);
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  {target.DisplayName} has been kicked.");
+                        DebugLogger.Instance.LogInfo("SYSOP", $"Kicked player: {target.DisplayName}");
+                    }
+                    else
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  Cancelled.");
+                    }
+                }
+
+                terminal.WriteLine("");
+                await terminal.GetInputAsync("Press Enter to continue...");
+            }
+            catch (Exception ex)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"Error: {ex.Message}");
+                await terminal.GetInputAsync("Press Enter to continue...");
+            }
+        }
+
         private async Task ViewGameStatistics()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("═══ GAME STATISTICS ═══");
-            terminal.WriteLine("");
 
             try
             {
-                var saveDir = SaveSystem.Instance.GetSaveDirectory();
-                int playerCount = 0;
-
-                if (Directory.Exists(saveDir))
+                if (_isOnlineMode)
                 {
-                    var saveFiles = Directory.GetFiles(saveDir, "*.json")
-                        .Where(f => !Path.GetFileName(f).Contains("state") &&
-                                   !Path.GetFileName(f).Equals("sysop_config.json", StringComparison.OrdinalIgnoreCase))
-                        .ToList();
-                    playerCount = saveFiles.Count;
+                    var sqlBackend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                    if (sqlBackend != null)
+                    {
+                        await ViewOnlineStatistics(sqlBackend);
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("  SQL backend not available.");
+                    }
                 }
-
-                terminal.SetColor("white");
-                terminal.WriteLine($"Total Players: {playerCount}");
-                terminal.WriteLine("");
-
-                terminal.SetColor("cyan");
-                terminal.WriteLine("NPC Statistics:");
-                terminal.SetColor("white");
-                var activeNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
-                terminal.WriteLine($"  Active NPCs: {activeNPCs.Count}");
-                terminal.WriteLine($"  Dead NPCs: {activeNPCs.Count(n => n.IsDead)}");
-                terminal.WriteLine($"  Married NPCs: {activeNPCs.Count(n => n.IsMarried)}");
-                terminal.WriteLine("");
-
-                terminal.SetColor("cyan");
-                terminal.WriteLine("Story Statistics:");
-                terminal.SetColor("white");
-                var story = StoryProgressionSystem.Instance;
-                terminal.WriteLine($"  Collected Seals: {story.CollectedSeals.Count}/7");
-                terminal.WriteLine($"  Current Chapter: {story.CurrentChapter}");
-
-                var ocean = OceanPhilosophySystem.Instance;
-                terminal.WriteLine($"  Awakening Level: {ocean.AwakeningLevel}/7");
-                terminal.WriteLine($"  Wave Fragments: {ocean.CollectedFragments.Count}/10");
+                else
+                {
+                    await ViewLocalStatistics();
+                }
             }
             catch (Exception ex)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine($"Error gathering statistics: {ex.Message}");
+                terminal.WriteLine($"Error: {ex.Message}");
             }
 
-            terminal.WriteLine("");
             terminal.SetColor("gray");
             await terminal.GetInputAsync("Press Enter to continue...");
+        }
+
+        private async Task ViewOnlineStatistics(SqlSaveBackend sqlBackend)
+        {
+            var s = await sqlBackend.GetGameStatistics();
+            string className(int id) => id >= 0 && id <= 10 ? ((CharacterClass)id).ToString() : "?";
+
+            // Players section
+            terminal.SetColor("cyan");
+            terminal.WriteLine("── Players ──");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Total: {s.TotalPlayers}    Active: {s.ActivePlayers}    Online: {s.OnlinePlayers}    Banned: {s.BannedPlayers}");
+            terminal.WriteLine($"  Avg Level: {s.AverageLevel:F1}    Highest: {s.TopPlayerName} (Lv {s.TopPlayerLevel} {className(s.TopPlayerClassId)})");
+            string popClass = s.MostPopularClassId >= 0 ? $"{className(s.MostPopularClassId)} ({s.MostPopularClassCount})" : "N/A";
+            string newest = !string.IsNullOrEmpty(s.NewestPlayerName) ? s.NewestPlayerName : "N/A";
+            terminal.WriteLine($"  Popular Class: {popClass}    Newest: {newest}");
+
+            // Economy section
+            terminal.SetColor("cyan");
+            terminal.WriteLine("── Economy ──");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Gold in Circulation: {s.TotalGoldOnHand:N0}    Bank: {s.TotalBankGold:N0}");
+            terminal.WriteLine($"  Total Earned: {s.TotalGoldEarned:N0}    Spent: {s.TotalGoldSpent:N0}");
+            terminal.WriteLine($"  Items Bought: {s.TotalItemsBought:N0}    Sold: {s.TotalItemsSold:N0}");
+            terminal.WriteLine($"  Bounties: {s.ActiveBounties}    Auctions: {s.ActiveAuctions}");
+
+            // Combat section
+            terminal.SetColor("cyan");
+            terminal.WriteLine("── Combat ──");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Monsters Killed: {s.TotalMonstersKilled:N0}    Bosses: {s.TotalBossesKilled:N0}");
+            terminal.WriteLine($"  PvP Fights: {s.TotalPvPFights}    PvP Kills: {s.TotalPvPKills}    PvE Deaths: {s.TotalPvEDeaths}");
+            terminal.WriteLine($"  Total Damage Dealt: {s.TotalDamageDealt:N0}    Deepest Floor: {s.DeepestDungeon}");
+
+            // World section
+            terminal.SetColor("cyan");
+            terminal.WriteLine("── World ──");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Active Teams: {s.ActiveTeams}    News: {s.NewsEntries}    Messages: {s.TotalMessages}");
+            long hours = s.TotalPlaytimeMinutes / 60;
+            string dbSize = s.DatabaseSizeBytes > 0 ? $"{s.DatabaseSizeBytes / 1024.0 / 1024.0:F1} MB" : "N/A";
+            terminal.WriteLine($"  Total Playtime: {hours:N0}h    Database: {dbSize}");
+            terminal.WriteLine("");
+        }
+
+        private async Task ViewLocalStatistics()
+        {
+            int playerCount = 0;
+            var saveDir = SaveSystem.Instance.GetSaveDirectory();
+            if (Directory.Exists(saveDir))
+            {
+                var saveFiles = Directory.GetFiles(saveDir, "*.json")
+                    .Where(f => !Path.GetFileName(f).Contains("state") &&
+                                !Path.GetFileName(f).Equals("sysop_config.json", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                playerCount = saveFiles.Count;
+            }
+
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Total Players: {playerCount}");
+            terminal.WriteLine("");
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("── NPCs ──");
+            terminal.SetColor("white");
+            var activeNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
+            terminal.WriteLine($"  Active: {activeNPCs.Count}    Dead: {activeNPCs.Count(n => n.IsDead)}    Married: {activeNPCs.Count(n => n.IsMarried)}");
+            terminal.WriteLine("");
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("── Story ──");
+            terminal.SetColor("white");
+            var story = StoryProgressionSystem.Instance;
+            terminal.WriteLine($"  Seals: {story.CollectedSeals.Count}/7    Chapter: {story.CurrentChapter}");
+            var ocean = OceanPhilosophySystem.Instance;
+            terminal.WriteLine($"  Awakening: {ocean.AwakeningLevel}/7    Wave Fragments: {ocean.CollectedFragments.Count}/10");
+            terminal.WriteLine("");
         }
 
         private async Task ViewDebugLog()

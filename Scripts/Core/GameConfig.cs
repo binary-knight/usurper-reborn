@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.41.1";
-    public const string VersionName = "BBS Terminal Overhaul";
+    public const string Version = "0.41.2";
+    public const string VersionName = "BBS Polish";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -76,7 +76,7 @@ public static partial class GameConfig
     /// <summary>
     /// Message of the Day - displayed to players on login
     /// </summary>
-    public static string MessageOfTheDay { get; set; } = "";
+    public static string MessageOfTheDay { get; set; } = "Thanks for playing Usurper Reborn! Report bugs with the in-game ! command.";
 
     /// <summary>
     /// Default daily turns for new characters (default: 325 to match TurnsPerDay)

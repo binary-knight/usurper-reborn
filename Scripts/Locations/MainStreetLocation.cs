@@ -557,14 +557,6 @@ public class MainStreetLocation : BaseLocation
         terminal.Write("ame         ");
 
         // List Citizens removed - merged into Fame (F) which now shows locations
-        // terminal.SetColor("darkgray");
-        // terminal.Write("[");
-        // terminal.SetColor("cyan");
-        // terminal.Write("L");
-        // terminal.SetColor("darkgray");
-        // terminal.Write("]");
-        // terminal.SetColor("white");
-        // terminal.WriteLine("ist Citizens");
         terminal.WriteLine(""); // Blank space where List Citizens was
 
         // Row 6 - Stats & Progress

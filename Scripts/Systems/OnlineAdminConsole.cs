@@ -213,7 +213,7 @@ namespace UsurperRemake.Systems
         // Player Management
         // =====================================================================
 
-        private async Task ListAllPlayers()
+        internal async Task ListAllPlayers()
         {
             var players = await backend.GetAllPlayersDetailed();
 
@@ -283,7 +283,7 @@ namespace UsurperRemake.Systems
             }
         }
 
-        private async Task BanPlayer()
+        internal async Task BanPlayer()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_red");
@@ -358,7 +358,7 @@ namespace UsurperRemake.Systems
             await ReadInput("Press Enter to continue...");
         }
 
-        private async Task UnbanPlayer()
+        internal async Task UnbanPlayer()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
@@ -418,7 +418,7 @@ namespace UsurperRemake.Systems
             await ReadInput("Press Enter to continue...");
         }
 
-        private async Task DeletePlayer()
+        internal async Task DeletePlayer()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_red");
@@ -487,7 +487,7 @@ namespace UsurperRemake.Systems
             await ReadInput("Press Enter to continue...");
         }
 
-        private async Task ResetPlayerPassword()
+        internal async Task ResetPlayerPassword()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
@@ -524,7 +524,7 @@ namespace UsurperRemake.Systems
             await ReadInput("Press Enter to continue...");
         }
 
-        private async Task EditPlayer()
+        internal async Task EditPlayer()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
@@ -536,6 +536,11 @@ namespace UsurperRemake.Systems
             if (string.IsNullOrWhiteSpace(username))
                 return;
 
+            await EditPlayer(username);
+        }
+
+        internal async Task EditPlayer(string username)
+        {
             // Load the save data
             var saveData = await backend.ReadGameData(username);
             if (saveData?.Player == null)
@@ -724,7 +729,7 @@ namespace UsurperRemake.Systems
         // Game Settings
         // =====================================================================
 
-        private async Task EditDifficultySettings()
+        internal async Task EditDifficultySettings()
         {
             while (true)
             {
@@ -808,7 +813,7 @@ namespace UsurperRemake.Systems
             }
         }
 
-        private async Task SetMOTD()
+        internal async Task SetMOTD()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
@@ -852,7 +857,7 @@ namespace UsurperRemake.Systems
         // World Management
         // =====================================================================
 
-        private async Task ViewOnlinePlayers()
+        internal async Task ViewOnlinePlayers()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
@@ -892,7 +897,7 @@ namespace UsurperRemake.Systems
             await ReadInput("Press Enter to continue...");
         }
 
-        private async Task ClearNews()
+        internal async Task ClearNews()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
@@ -920,7 +925,7 @@ namespace UsurperRemake.Systems
             await ReadInput("Press Enter to continue...");
         }
 
-        private async Task BroadcastMessage()
+        internal async Task BroadcastMessage()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
@@ -957,7 +962,7 @@ namespace UsurperRemake.Systems
         // Game Reset
         // =====================================================================
 
-        private async Task FullGameReset()
+        internal async Task FullGameReset()
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_red");

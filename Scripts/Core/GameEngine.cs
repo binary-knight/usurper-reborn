@@ -329,6 +329,15 @@ public partial class GameEngine : Node
         terminal.SetColor("gray");
         terminal.WriteLine($"  v{GameConfig.Version}");
         terminal.WriteLine("");
+
+        // Show MOTD if set
+        if (!string.IsNullOrEmpty(GameConfig.MessageOfTheDay))
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  {GameConfig.MessageOfTheDay}");
+            terminal.WriteLine("");
+        }
+
         terminal.SetColor("white");
         terminal.WriteLine($"Welcome, {playerName}!");
         terminal.WriteLine("");
@@ -345,31 +354,30 @@ public partial class GameEngine : Node
         {
             // Existing character found - offer to load or create new
             terminal.SetColor("green");
-            terminal.WriteLine($"Found existing character: Level {existingSave.Level}, Day {existingSave.CurrentDay}");
+            terminal.WriteLine($"Found existing character: {existingSave.PlayerName} — Level {existingSave.Level} {existingSave.ClassName}");
             terminal.WriteLine($"Last played: {existingSave.SaveTime:yyyy-MM-dd HH:mm}");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_white");
             terminal.WriteLine("[L] Load existing character");
             terminal.WriteLine("[N] Create new character (WARNING: Overwrites existing!)");
-            if (isSysOp)
+            if (isSysOp || isOnlineAdmin)
             {
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("[%] SysOp Administration Console");
                 terminal.SetColor("bright_white");
             }
-            if (isOnlineAdmin)
-            {
-                terminal.SetColor("bright_red");
-                terminal.WriteLine("[%] Admin Console");
-                terminal.SetColor("bright_white");
-            }
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine("[C] Change Password");
                 terminal.SetColor("bright_white");
             }
+#if !STEAM_BUILD
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("[@] Support the Developer");
+            terminal.SetColor("bright_white");
+#endif
             terminal.WriteLine("[Q] Quit");
             terminal.WriteLine("");
 
@@ -421,15 +429,15 @@ public partial class GameEngine : Node
                     break;
 
                 case "%":
-                    if (isOnlineAdmin)
+                    if (isSysOp || (isOnlineAdmin && UsurperRemake.BBS.DoorMode.IsInDoorMode))
                     {
-                        await ShowOnlineAdminConsole();
+                        await ShowSysOpConsole();
                         await RunBBSDoorMode();
                         return;
                     }
-                    else if (isSysOp)
+                    else if (isOnlineAdmin)
                     {
-                        await ShowSysOpConsole();
+                        await ShowOnlineAdminConsole();
                         await RunBBSDoorMode();
                         return;
                     }
@@ -445,6 +453,13 @@ public partial class GameEngine : Node
                     await Task.Delay(1000);
                     break;
 
+#if !STEAM_BUILD
+                case "@":
+                    await ShowSupportPage();
+                    await RunBBSDoorMode();
+                    return;
+#endif
+
                 default:
                     // Default to loading existing character
                     await LoadSaveByFileName(existingSave.FileName);
@@ -456,24 +471,23 @@ public partial class GameEngine : Node
             // No existing character - create new one
             terminal.SetColor("bright_white");
             terminal.WriteLine("[N] Create new character");
-            if (isSysOp)
+            if (isSysOp || isOnlineAdmin)
             {
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("[%] SysOp Administration Console");
                 terminal.SetColor("bright_white");
             }
-            if (isOnlineAdmin)
-            {
-                terminal.SetColor("bright_red");
-                terminal.WriteLine("[%] Admin Console");
-                terminal.SetColor("bright_white");
-            }
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine("[C] Change Password");
                 terminal.SetColor("bright_white");
             }
+#if !STEAM_BUILD
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("[@] Support the Developer");
+            terminal.SetColor("bright_white");
+#endif
             terminal.WriteLine("[Q] Quit");
             terminal.WriteLine("");
 
@@ -495,15 +509,15 @@ public partial class GameEngine : Node
                     break;
 
                 case "%":
-                    if (isOnlineAdmin)
+                    if (isSysOp || (isOnlineAdmin && UsurperRemake.BBS.DoorMode.IsInDoorMode))
                     {
-                        await ShowOnlineAdminConsole();
+                        await ShowSysOpConsole();
                         await RunBBSDoorMode();
                         return;
                     }
-                    else if (isSysOp)
+                    else if (isOnlineAdmin)
                     {
-                        await ShowSysOpConsole();
+                        await ShowOnlineAdminConsole();
                         await RunBBSDoorMode();
                         return;
                     }
@@ -512,6 +526,13 @@ public partial class GameEngine : Node
                         await CreateNewGame(playerName);
                     }
                     break;
+
+#if !STEAM_BUILD
+                case "@":
+                    await ShowSupportPage();
+                    await RunBBSDoorMode();
+                    return;
+#endif
 
                 case "Q":
                     IsIntentionalExit = true;
@@ -949,6 +970,18 @@ public partial class GameEngine : Node
             terminal.SetColor("gray");
             terminal.WriteLine("Credits");
 
+
+#if !STEAM_BUILD
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("@");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("Support the Developer");
+#endif
+
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -1012,6 +1045,11 @@ public partial class GameEngine : Node
                         await ShowSysOpConsole();
                     }
                     break;
+#if !STEAM_BUILD
+                case "@":
+                    await ShowSupportPage();
+                    break;
+#endif
             }
         }
     }
@@ -1483,6 +1521,16 @@ public partial class GameEngine : Node
 
             terminal.WriteLine("Save loaded successfully!", "bright_green");
             await Task.Delay(1000);
+
+            // Update online display name to character's Name2 (custom display name)
+            if (OnlineStateManager.IsActive && currentPlayer != null)
+            {
+                var displayName = currentPlayer.Name2 ?? currentPlayer.Name1;
+                if (!string.IsNullOrEmpty(displayName))
+                {
+                    await OnlineStateManager.Instance!.UpdateDisplayName(displayName);
+                }
+            }
 
             // Online mode: validate player's team still exists
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !string.IsNullOrEmpty(currentPlayer.Team))
@@ -2063,13 +2111,15 @@ public partial class GameEngine : Node
 
         await Task.Delay(1500);
 
-        // Online news: announce new adventurer
+        // Online news: announce new adventurer and update display name
         if (UsurperRemake.Systems.OnlineStateManager.IsActive)
         {
             var displayName = currentPlayer.Name2 ?? currentPlayer.Name1;
             var className = currentPlayer.Class.ToString();
             _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
                 $"A new adventurer arrives! {displayName} the {className} begins their journey.", "quest");
+            // Update online_players display_name from BBS username to character name
+            await OnlineStateManager.Instance!.UpdateDisplayName(displayName);
         }
 
         // Play the opening story sequence
@@ -3851,6 +3901,70 @@ public partial class GameEngine : Node
     private async Task ShowTeams() => await ShowInfoScreen("Teams", "Team information will be here...");
     private async Task ShowGameSettings() => await ShowInfoScreen("Game Settings", "Game settings will be here...");
     private async Task ShowStatus() => await ShowInfoScreen("Status", $"Player: {currentPlayer?.DisplayName}\nLevel: {currentPlayer?.Level}\nHP: {currentPlayer?.HP}/{currentPlayer?.MaxHP}");
+
+#if !STEAM_BUILD
+    private async Task ShowSupportPage()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.Write("║");
+        terminal.SetColor("bright_white");
+        terminal.Write("                         SUPPORT USURPER REBORN                              ");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("║");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  Usurper Reborn is a free, open-source game released under the GPL v2");
+        terminal.WriteLine("  license. It is developed by a solo developer in his spare time as a");
+        terminal.WriteLine("  love letter to the classic BBS door games of the early 1990s.");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("  ─── How You Can Help ───");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  Sponsor the Developer");
+        terminal.SetColor("white");
+        terminal.WriteLine("  If you enjoy the game and want to support its");
+        terminal.WriteLine("  continued development, consider sponsoring on GitHub:");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("  https://github.com/sponsors/binary-knight");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  Star the Repository");
+        terminal.SetColor("white");
+        terminal.WriteLine("   If you don't want to donate, that's totally fine!");
+        terminal.WriteLine("  A star on the GitHub repo goes a long way and helps others");
+        terminal.WriteLine("  discover the game:");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("  https://github.com/binary-knight/usurper-reborn");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  Buy on Steam");
+        terminal.SetColor("white");
+        terminal.WriteLine("           When the game launches on Steam in March 2026,");
+        terminal.WriteLine("  purchasing a copy is another great way to show your support.");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("  ─────────────────────────");
+        terminal.WriteLine("");
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("  Thank you for playing. Every bit of support — whether a sponsorship,");
+        terminal.WriteLine("  a star, a bug report, or just playing the game — means the world.");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        await terminal.PressAnyKey();
+    }
+#endif
 
     /// <summary>
     /// Display the credits screen

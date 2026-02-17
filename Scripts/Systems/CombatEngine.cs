@@ -2960,9 +2960,9 @@ public partial class CombatEngine
         long expReward = WorldEventSystem.Instance.GetAdjustedXP(baseExpReward);
         long goldReward = WorldEventSystem.Instance.GetAdjustedGold(baseGoldReward);
 
-        // Apply difficulty modifiers
-        float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty);
-        float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty);
+        // Apply difficulty modifiers (per-character difficulty + server-wide SysOp multiplier)
+        float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
+        float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.GoldMultiplier;
         expReward = (long)(expReward * xpMult);
         goldReward = (long)(goldReward * goldMult);
 
@@ -8388,9 +8388,9 @@ public partial class CombatEngine
         long adjustedExp = WorldEventSystem.Instance.GetAdjustedXP(totalExp);
         long adjustedGold = WorldEventSystem.Instance.GetAdjustedGold(totalGold);
 
-        // Apply difficulty modifiers
-        float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty);
-        float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty);
+        // Apply difficulty modifiers (per-character difficulty + server-wide SysOp multiplier)
+        float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
+        float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.GoldMultiplier;
         adjustedExp = (long)(adjustedExp * xpMult);
         adjustedGold = (long)(adjustedGold * goldMult);
 
@@ -8565,9 +8565,9 @@ public partial class CombatEngine
         long adjustedExp = WorldEventSystem.Instance.GetAdjustedXP(totalExp);
         long adjustedGold = WorldEventSystem.Instance.GetAdjustedGold(totalGold);
 
-        // Apply difficulty modifiers
-        float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty);
-        float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty);
+        // Apply difficulty modifiers (per-character difficulty + server-wide SysOp multiplier)
+        float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
+        float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.GoldMultiplier;
         adjustedExp = (long)(adjustedExp * xpMult);
         adjustedGold = (long)(adjustedGold * goldMult);
 
@@ -10589,8 +10589,8 @@ public partial class CombatEngine
             long xpReward = (long)(baseXP * levelMultiplier);
             xpReward = Math.Max(10, xpReward);
 
-            // Apply difficulty modifier
-            float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty);
+            // Apply difficulty modifier (per-character difficulty + server-wide SysOp multiplier)
+            float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
             xpReward = (long)(xpReward * xpMult);
 
             // Calculate gold reward - take some of opponent's gold + level-based bonus
@@ -10599,8 +10599,8 @@ public partial class CombatEngine
             long bonusGold = random.Next(10, 30) * opponentLevel; // Level-based bonus
             long goldReward = goldFromOpponent + bonusGold;
 
-            // Apply difficulty modifier
-            float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty);
+            // Apply difficulty modifier (per-character difficulty + server-wide SysOp multiplier)
+            float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.GoldMultiplier;
             goldReward = (long)(goldReward * goldMult);
 
             // Remove gold from opponent

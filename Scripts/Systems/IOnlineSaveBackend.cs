@@ -57,6 +57,11 @@ namespace UsurperRemake.Systems
         Task UpdateHeartbeat(string username, string location);
 
         /// <summary>
+        /// Update display name in online_players (called when character loads with custom Name2).
+        /// </summary>
+        Task UpdateOnlineDisplayName(string username, string displayName);
+
+        /// <summary>
         /// Unregister this player (called on disconnect/logout).
         /// </summary>
         Task UnregisterOnline(string username);

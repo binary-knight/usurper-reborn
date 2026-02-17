@@ -712,6 +712,21 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Update display name in online_players table (called when character loads with custom Name2).
+        /// </summary>
+        public async Task UpdateDisplayName(string displayName)
+        {
+            try
+            {
+                await backend.UpdateOnlineDisplayName(username, displayName);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"Failed to update display name: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Update current location (called when player changes game location).
         /// </summary>
         public void UpdateLocation(string location)

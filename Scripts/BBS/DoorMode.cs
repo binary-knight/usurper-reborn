@@ -176,7 +176,7 @@ namespace UsurperRemake.BBS
                 else if (arg == "--verbose" || arg == "-v")
                 {
                     _verboseMode = true;
-                    Console.Error.WriteLine("[VERBOSE] Verbose mode enabled - detailed debug output will be shown");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "Verbose mode enabled - detailed debug output will be shown");
                 }
                 // --sysop-level <number> sets the minimum security level for SysOp access
                 else if (arg == "--sysop-level" && i + 1 < args.Length)
@@ -184,14 +184,14 @@ namespace UsurperRemake.BBS
                     if (int.TryParse(args[i + 1], out int level) && level >= 0)
                     {
                         SysOpSecurityLevel = level;
-                        Console.Error.WriteLine($"SysOp security level set to: {level}");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"SysOp security level set to: {level}");
                     }
                 }
                 // --online enables online multiplayer mode (SQLite backend)
                 else if (arg == "--online")
                 {
                     _onlineMode = true;
-                    Console.Error.WriteLine("[ONLINE] Online multiplayer mode enabled");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "Online multiplayer mode enabled");
                 }
                 // --user <username> sets the online player username
                 else if (arg == "--user" && i + 1 < args.Length)
@@ -209,7 +209,7 @@ namespace UsurperRemake.BBS
                 else if (arg == "--no-worldsim")
                 {
                     _noAutoWorldSim = true;
-                    Console.Error.WriteLine("[ONLINE] Auto world simulator disabled (use --worldsim separately for 24/7 simulation)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "Auto world simulator disabled (use --worldsim separately for 24/7 simulation)");
                 }
                 // --worldsim enables headless world simulator mode (24/7 NPC simulation)
                 else if (arg == "--worldsim")
@@ -217,7 +217,7 @@ namespace UsurperRemake.BBS
                     _worldSimMode = true;
                     _onlineMode = true; // implies online mode
                     _forceStdio = true;
-                    Console.Error.WriteLine("[WORLDSIM] World simulator mode enabled");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLDSIM", "World simulator mode enabled");
                 }
                 // --sim-interval <seconds> sets the simulation tick interval
                 else if (arg == "--sim-interval" && i + 1 < args.Length)
@@ -339,8 +339,8 @@ namespace UsurperRemake.BBS
                     _sessionInfo = DropFileParser.CreateLocalSession();
                     _sessionInfo.UserName = "__worldsim__";
                     _sessionInfo.UserAlias = "__worldsim__";
-                    Console.Error.WriteLine($"[WORLDSIM] Sim interval: {_simIntervalSeconds}s, NPC XP: {_npcXpMultiplier:F2}x, Save interval: {_saveIntervalMinutes}min");
-                    Console.Error.WriteLine($"[WORLDSIM] Database: {_onlineDatabasePath}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLDSIM", $"Sim interval: {_simIntervalSeconds}s, NPC XP: {_npcXpMultiplier:F2}x, Save interval: {_saveIntervalMinutes}min");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLDSIM", $"Database: {_onlineDatabasePath}");
                     return true;
                 }
 
@@ -365,8 +365,8 @@ namespace UsurperRemake.BBS
                     if (hasDoorFlag)
                     {
                         // BBS Online mode: skip local session creation, let door flag handle it
-                        Console.Error.WriteLine("[ONLINE] BBS Online mode — session will be created from drop file");
-                        Console.Error.WriteLine($"[ONLINE] Database: {_onlineDatabasePath}");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "BBS Online mode — session will be created from drop file");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Database: {_onlineDatabasePath}");
                         continue;
                     }
 
@@ -381,8 +381,8 @@ namespace UsurperRemake.BBS
                         _sessionInfo.UserAlias = _onlineUsername;
                     }
 
-                    Console.Error.WriteLine($"[ONLINE] User: {_onlineUsername ?? "(in-game auth)"}");
-                    Console.Error.WriteLine($"[ONLINE] Database: {_onlineDatabasePath}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"User: {_onlineUsername ?? "(in-game auth)"}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Database: {_onlineDatabasePath}");
                     return true;
                 }
 
@@ -415,26 +415,26 @@ namespace UsurperRemake.BBS
 
                 if (_sessionInfo == null)
                 {
-                    Console.Error.WriteLine($"Could not parse drop file: {path}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogWarning("BBS", $"Could not parse drop file: {path}");
                     if (_verboseMode)
                     {
-                        Console.Error.WriteLine("[VERBOSE] (continuing...)");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "(continuing...)");
                     }
                     return false;
                 }
 
-                Console.Error.WriteLine($"Loaded {_sessionInfo.SourceType} from: {_sessionInfo.SourcePath}");
-                Console.Error.WriteLine($"User: {_sessionInfo.UserName} ({_sessionInfo.UserAlias})");
-                Console.Error.WriteLine($"Connection: {_sessionInfo.CommType}, Handle: {_sessionInfo.SocketHandle}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Loaded {_sessionInfo.SourceType} from: {_sessionInfo.SourcePath}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"User: {_sessionInfo.UserName} ({_sessionInfo.UserAlias})");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Connection: {_sessionInfo.CommType}, Handle: {_sessionInfo.SocketHandle}");
 
                 return true;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error loading drop file: {ex.Message}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("BBS", $"Error loading drop file: {ex.Message}");
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "(continuing...)");
                 }
                 return false;
             }
@@ -477,27 +477,27 @@ namespace UsurperRemake.BBS
 
                 if (!File.Exists(actualPath))
                 {
-                    Console.Error.WriteLine($"[VERBOSE] Drop file not found: {actualPath}");
-                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" Drop file not found: {actualPath}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "(continuing...)");
                     return;
                 }
 
-                Console.Error.WriteLine($"[VERBOSE] === RAW DROP FILE CONTENTS: {actualPath} ===");
+                UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" === RAW DROP FILE CONTENTS: {actualPath} ===");
                 var lines = File.ReadAllLines(actualPath);
                 for (int i = 0; i < lines.Length && i < 20; i++) // First 20 lines
                 {
-                    Console.Error.WriteLine($"[VERBOSE] Line {i + 1}: {lines[i]}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" Line {i + 1}: {lines[i]}");
                 }
                 if (lines.Length > 20)
                 {
-                    Console.Error.WriteLine($"[VERBOSE] ... ({lines.Length - 20} more lines)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" ... ({lines.Length - 20} more lines)");
                 }
-                Console.Error.WriteLine("[VERBOSE] === END DROP FILE ===");
+                UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "=== END DROP FILE ===");
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[VERBOSE] Error reading drop file: {ex.Message}");
-                Console.Error.WriteLine("[VERBOSE] (continuing...)");
+                UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" Error reading drop file: {ex.Message}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "(continuing...)");
             }
         }
 
@@ -514,17 +514,17 @@ namespace UsurperRemake.BBS
                 }
 
                 _sessionInfo = DropFileParser.ParseDoor32SysAsync(path).GetAwaiter().GetResult();
-                Console.Error.WriteLine($"Loaded DOOR32.SYS: {path}");
-                Console.Error.WriteLine($"User: {_sessionInfo.UserName} ({_sessionInfo.UserAlias})");
-                Console.Error.WriteLine($"Connection: {_sessionInfo.CommType}, Handle: {_sessionInfo.SocketHandle}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Loaded DOOR32.SYS: {path}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"User: {_sessionInfo.UserName} ({_sessionInfo.UserAlias})");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Connection: {_sessionInfo.CommType}, Handle: {_sessionInfo.SocketHandle}");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error loading DOOR32.SYS: {ex.Message}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("BBS", $"Error loading DOOR32.SYS: {ex.Message}");
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "(continuing...)");
                 }
                 return false;
             }
@@ -543,17 +543,17 @@ namespace UsurperRemake.BBS
                 }
 
                 _sessionInfo = DropFileParser.ParseDoorSysAsync(path).GetAwaiter().GetResult();
-                Console.Error.WriteLine($"Loaded DOOR.SYS: {path}");
-                Console.Error.WriteLine($"User: {_sessionInfo.UserName} ({_sessionInfo.UserAlias})");
-                Console.Error.WriteLine($"Connection: {_sessionInfo.CommType}, ComPort: {_sessionInfo.ComPort}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Loaded DOOR.SYS: {path}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"User: {_sessionInfo.UserName} ({_sessionInfo.UserAlias})");
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Connection: {_sessionInfo.CommType}, ComPort: {_sessionInfo.ComPort}");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error loading DOOR.SYS: {ex.Message}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("BBS", $"Error loading DOOR.SYS: {ex.Message}");
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "(continuing...)");
                 }
                 return false;
             }
@@ -566,7 +566,7 @@ namespace UsurperRemake.BBS
         {
             if (!Directory.Exists(nodeDir))
             {
-                Console.Error.WriteLine($"Node directory not found: {nodeDir}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("BBS", $"Node directory not found: {nodeDir}");
                 return false;
             }
 
@@ -581,7 +581,7 @@ namespace UsurperRemake.BBS
         {
             if (_sessionInfo == null)
             {
-                Console.Error.WriteLine("No session info - call ParseCommandLineArgs first");
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("BBS", "No session info - call ParseCommandLineArgs first");
                 return null;
             }
 
@@ -591,25 +591,25 @@ namespace UsurperRemake.BBS
                 if (_verboseMode)
                 {
                     SocketTerminal.VerboseLogging = true;
-                    Console.Error.WriteLine("[VERBOSE] Session info from drop file:");
-                    Console.Error.WriteLine($"[VERBOSE]   CommType: {_sessionInfo.CommType}");
-                    Console.Error.WriteLine($"[VERBOSE]   SocketHandle: {_sessionInfo.SocketHandle} (0x{_sessionInfo.SocketHandle:X8})");
-                    Console.Error.WriteLine($"[VERBOSE]   ComPort: {_sessionInfo.ComPort}");
-                    Console.Error.WriteLine($"[VERBOSE]   BaudRate: {_sessionInfo.BaudRate}");
-                    Console.Error.WriteLine($"[VERBOSE]   UserName: {_sessionInfo.UserName}");
-                    Console.Error.WriteLine($"[VERBOSE]   UserAlias: {_sessionInfo.UserAlias}");
-                    Console.Error.WriteLine($"[VERBOSE]   BBSName: {_sessionInfo.BBSName}");
-                    Console.Error.WriteLine($"[VERBOSE]   Emulation: {_sessionInfo.Emulation}");
-                    Console.Error.WriteLine($"[VERBOSE]   SourceType: {_sessionInfo.SourceType}");
-                    Console.Error.WriteLine($"[VERBOSE]   SourcePath: {_sessionInfo.SourcePath}");
-                    Console.Error.WriteLine("");
-                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "Session info from drop file:");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   CommType: {_sessionInfo.CommType}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   SocketHandle: {_sessionInfo.SocketHandle} (0x{_sessionInfo.SocketHandle:X8})");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   ComPort: {_sessionInfo.ComPort}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   BaudRate: {_sessionInfo.BaudRate}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   UserName: {_sessionInfo.UserName}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   UserAlias: {_sessionInfo.UserAlias}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   BBSName: {_sessionInfo.BBSName}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   Emulation: {_sessionInfo.Emulation}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   SourceType: {_sessionInfo.SourceType}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"   SourcePath: {_sessionInfo.SourcePath}");
+                    // (verbose separator - now goes to debug log)
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "(continuing...)");
                 }
 
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine($"[VERBOSE] CommType check: {_sessionInfo.CommType}");
-                    Console.Error.WriteLine($"[VERBOSE] _forceStdio={_forceStdio}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" CommType check: {_sessionInfo.CommType}");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" _forceStdio={_forceStdio}");
                 }
 
                 // Auto-detect BBS software that requires stdio mode
@@ -632,10 +632,10 @@ namespace UsurperRemake.BBS
                     if (detectedBBS != null)
                     {
                         _forceStdio = true;
-                        Console.Error.WriteLine($"Detected {detectedBBS} BBS - automatically using Standard I/O mode");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Detected {detectedBBS} BBS - automatically using Standard I/O mode");
                         if (_verboseMode)
                         {
-                            Console.Error.WriteLine($"[VERBOSE] {detectedBBS} requires --stdio mode. Auto-enabled.");
+                            UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" {detectedBBS} requires --stdio mode. Auto-enabled.");
                         }
                     }
                 }
@@ -648,14 +648,14 @@ namespace UsurperRemake.BBS
                 if (!_forceStdio && (Console.IsInputRedirected || Console.IsOutputRedirected))
                 {
                     _forceStdio = true;
-                    Console.Error.WriteLine("Detected redirected I/O - automatically using Standard I/O mode");
-                    Console.Error.WriteLine("(BBS is handling the transport layer - stdin/stdout will be used)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "Detected redirected I/O - automatically using Standard I/O mode");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "BBS is handling the transport layer - stdin/stdout will be used");
                     if (_verboseMode)
                     {
-                        Console.Error.WriteLine($"[VERBOSE] Console.IsInputRedirected={Console.IsInputRedirected}");
-                        Console.Error.WriteLine($"[VERBOSE] Console.IsOutputRedirected={Console.IsOutputRedirected}");
-                        Console.Error.WriteLine("[VERBOSE] This typically means SSH, TLS, or pipe-based transport.");
-                        Console.Error.WriteLine("[VERBOSE] Socket I/O would bypass encryption. Using stdio instead.");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" Console.IsInputRedirected={Console.IsInputRedirected}");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $" Console.IsOutputRedirected={Console.IsOutputRedirected}");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "This typically means SSH, TLS, or pipe-based transport.");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "Socket I/O would bypass encryption. Using stdio instead.");
                     }
                 }
 
@@ -663,32 +663,32 @@ namespace UsurperRemake.BBS
                 // This is for Synchronet's "Standard" I/O mode where stdin/stdout are redirected
                 if (_forceStdio)
                 {
-                    Console.Error.WriteLine("Using Standard I/O mode (--stdio flag)");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "Using Standard I/O mode (--stdio flag)");
                     _sessionInfo.CommType = ConnectionType.Local;
                 }
 
                 // Use socket terminal for telnet or local connections
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("[VERBOSE] Creating SocketTerminal...");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "Creating SocketTerminal...");
                 }
                 _socketTerminal = new SocketTerminal(_sessionInfo);
 
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("[VERBOSE] Calling SocketTerminal.Initialize()...");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "Calling SocketTerminal.Initialize()...");
                 }
                 if (!_socketTerminal.Initialize())
                 {
-                    Console.Error.WriteLine("Failed to initialize socket terminal");
+                    UsurperRemake.Systems.DebugLogger.Instance.LogWarning("BBS", "Failed to initialize socket terminal");
 
                     // Fall back to local mode
                     if (_sessionInfo.CommType != ConnectionType.Local)
                     {
-                        Console.Error.WriteLine("Falling back to local console mode");
+                        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "Falling back to local console mode");
                         if (_verboseMode)
                         {
-                            Console.Error.WriteLine("[VERBOSE] Socket initialization failed. (continuing...)");
+                            UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "Socket initialization failed. (continuing...)");
                         }
                         _sessionInfo.CommType = ConnectionType.Local;
                     }
@@ -700,9 +700,7 @@ namespace UsurperRemake.BBS
                 // Final verbose pause - so sysop can read/copy all diagnostic output
                 if (_verboseMode)
                 {
-                    Console.Error.WriteLine("");
-                    Console.Error.WriteLine("[VERBOSE] === Initialization complete. Press Enter to continue... ===");
-                    Console.ReadLine();
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", "=== Initialization complete ===");
                 }
 
                 // Auto-hide the console window in BBS socket mode (unless verbose mode is on for debugging)
@@ -729,13 +727,8 @@ namespace UsurperRemake.BBS
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Terminal initialization failed: {ex.Message}");
-                if (_verboseMode)
-                {
-                    Console.Error.WriteLine($"[VERBOSE] Exception type: {ex.GetType().Name}");
-                    Console.Error.WriteLine($"[VERBOSE] Stack trace: {ex.StackTrace}");
-                    Console.Error.WriteLine("[VERBOSE] (continuing...)");
-                }
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("BBS", $"Terminal initialization failed: {ex.Message}");
+                UsurperRemake.Systems.DebugLogger.Instance.LogDebug("BBS", $"Exception type: {ex.GetType().Name}, Stack trace: {ex.StackTrace}");
                 return null;
             }
         }
@@ -891,12 +884,12 @@ namespace UsurperRemake.BBS
         }
 
         /// <summary>
-        /// Write a message to the BBS log (stderr)
+        /// Write a message to the debug log. Previously wrote to stderr which leaked
+        /// into the player's terminal in BBS stdio mode (Synchronet, etc.).
         /// </summary>
         public static void Log(string message)
         {
-            var timestamp = DateTime.Now.ToString("HH:mm:ss");
-            Console.Error.WriteLine($"[{timestamp}] USURPER: {message}");
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", message);
         }
     }
 }

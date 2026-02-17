@@ -728,10 +728,20 @@ public class MaintenanceSystem
     /// </summary>
     private void SaveMaintenanceDate()
     {
+        // In online mode, maintenance is handled by the world sim — skip file operations
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            lastMaintenanceDate = DateTime.Now;
+            return;
+        }
+
         var datePath = Path.Combine(GameEngine.DataPath, GameConfig.MaintenanceDateFile);
-        
+
         try
         {
+            var dir = Path.GetDirectoryName(datePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
             lastMaintenanceDate = DateTime.Now;
             File.WriteAllText(datePath, lastMaintenanceDate.ToString("yyyy-MM-dd"));
         }

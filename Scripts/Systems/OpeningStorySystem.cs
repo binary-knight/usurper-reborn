@@ -18,6 +18,7 @@ namespace UsurperRemake.Systems
 
         // Skip mode - when true, text appears instantly
         private bool _skipMode = false;
+        private TerminalEmulator? _terminal;
 
         public OpeningStorySystem()
         {
@@ -25,7 +26,8 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Delay that can be skipped by pressing space bar
+        /// Delay that can be skipped by pressing space bar.
+        /// Works in local, BBS socket, BBS stdio, and MUD modes via TerminalEmulator.IsInputAvailable().
         /// </summary>
         private async Task SkippableDelay(int milliseconds)
         {
@@ -35,33 +37,23 @@ namespace UsurperRemake.Systems
                 return;
             }
 
-            // Check for space press during delay
-            // In BBS door mode, Console.KeyAvailable is not available (stdin is redirected)
-            bool canCheckConsole = !UsurperRemake.BBS.DoorMode.IsInDoorMode;
-
             int elapsed = 0;
             const int checkInterval = 50;
 
             while (elapsed < milliseconds)
             {
-                if (canCheckConsole)
+                try
                 {
-                    try
+                    if (_terminal != null && _terminal.IsInputAvailable())
                     {
-                        if (Console.KeyAvailable)
-                        {
-                            var key = Console.ReadKey(true);
-                            if (key.Key == ConsoleKey.Spacebar)
-                            {
-                                _skipMode = true;
-                                return;
-                            }
-                        }
+                        _terminal.FlushPendingInput();
+                        _skipMode = true;
+                        return;
                     }
-                    catch (InvalidOperationException)
-                    {
-                        canCheckConsole = false; // Console not available, stop checking
-                    }
+                }
+                catch
+                {
+                    // Input check failed, just continue with the delay
                 }
                 await Task.Delay(checkInterval);
                 elapsed += checkInterval;
@@ -75,6 +67,7 @@ namespace UsurperRemake.Systems
         {
             // Reset skip mode for this playthrough
             _skipMode = false;
+            _terminal = terminal;
 
             // Show skip hint
             terminal.Clear();
@@ -423,6 +416,7 @@ namespace UsurperRemake.Systems
         {
             // Reset skip mode for this playthrough
             _skipMode = false;
+            _terminal = terminal;
 
             terminal.Clear();
             terminal.WriteLine("");

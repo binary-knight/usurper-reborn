@@ -100,6 +100,8 @@ Navigate to: `External Programs` → `Online Programs (Doors)` → `Add`
 
 > **Important:** I/O Method must be set to Standard, not Socket. The game auto-detects Synchronet.
 
+> **Echo:** Synchronet handles character echo via telnet WILL ECHO negotiation. Players using SyncTERM should ensure local echo is **off** (the default) to avoid seeing double characters.
+
 **Reference:** [Synchronet Door Setup Guide](https://wiki.synchro.net/howto:door:index)
 
 ---
@@ -307,6 +309,36 @@ Or use local mode (no drop file):
 ```bash
 UsurperReborn --local
 ```
+
+---
+
+## Character Echo Configuration
+
+**Important:** Usurper Reborn does **not** echo typed characters back to the user in BBS door mode. Your BBS software must handle character echo.
+
+Most BBS software handles this automatically via telnet's WILL ECHO negotiation — characters typed by the user are echoed back by the BBS before they reach the door. If players report seeing no characters when they type, or seeing double characters, check these settings:
+
+| BBS Software | Echo Setting | Notes |
+|--------------|-------------|-------|
+| **Synchronet** | Automatic (telnet WILL ECHO) | No configuration needed. SyncTERM users should ensure local echo is **off** in their terminal (it's off by default). |
+| **EleBBS** | Automatic (telnet WILL ECHO) | No configuration needed. |
+| **Mystic** | Automatic | No configuration needed for telnet or SSH. |
+| **WWIV** | Automatic (STDIO mode) | WWIV handles echo in STDIO mode. |
+| **GameSrv** | Automatic (STDIO mode) | GameSrv handles echo in STDIO mode. |
+| **ENiGMA½** | Automatic (STDIO mode) | ENiGMA handles echo in STDIO mode. |
+
+### If Players See No Characters When Typing
+
+The BBS is not echoing input. Check:
+1. Telnet WILL ECHO is enabled in your BBS telnet server settings
+2. The terminal client's local echo is turned **on** as a workaround
+3. Try a different terminal client (SyncTERM, NetRunner, mTelnet)
+
+### If Players See Double Characters (e.g., "dd" when pressing "d")
+
+Both the BBS and the terminal client are echoing. Fix:
+1. Turn **off** local echo in the terminal client (SyncTERM: File → Properties → uncheck "Local Echo")
+2. Or check your BBS telnet settings — most should have WILL ECHO enabled by default
 
 ---
 

@@ -307,7 +307,7 @@ namespace UsurperConsole
             catch (Exception ex)
             {
                 DoorMode.Log($"Door mode error: {ex.Message}");
-                Console.Error.WriteLine(ex.ToString());
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("BBS", $"Door mode exception: {ex}");
             }
             finally
             {
@@ -441,11 +441,11 @@ namespace UsurperConsole
         /// </summary>
         private static async Task RunWorldSimMode()
         {
-            Console.Error.WriteLine("[WORLDSIM] Initializing persistent world simulator...");
+            DebugLogger.Instance.LogInfo("WORLDSIM", "Initializing persistent world simulator...");
 
             // Initialize SQLite backend
             var sqlBackend = new SqlSaveBackend(DoorMode.OnlineDatabasePath);
-            Console.Error.WriteLine($"[WORLDSIM] Database: {DoorMode.OnlineDatabasePath}");
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Database: {DoorMode.OnlineDatabasePath}");
 
             // Set up cancellation for graceful shutdown
             using var cts = new CancellationTokenSource();
@@ -454,14 +454,14 @@ namespace UsurperConsole
             Console.CancelKeyPress += (sender, e) =>
             {
                 e.Cancel = true; // Prevent immediate exit
-                Console.Error.WriteLine("[WORLDSIM] Shutdown signal received (Ctrl+C)...");
+                DebugLogger.Instance.LogInfo("WORLDSIM", "Shutdown signal received (Ctrl+C)...");
                 cts.Cancel();
             };
             AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
             {
                 if (!cts.IsCancellationRequested)
                 {
-                    Console.Error.WriteLine("[WORLDSIM] Process exit signal received...");
+                    DebugLogger.Instance.LogInfo("WORLDSIM", "Process exit signal received...");
                     cts.Cancel();
                 }
             };
