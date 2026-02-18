@@ -193,7 +193,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("1");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -203,7 +203,7 @@ public class CastleLocation : BaseLocation
         // Row 2
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("G");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -212,7 +212,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("C");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -221,7 +221,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("H");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -231,7 +231,7 @@ public class CastleLocation : BaseLocation
         // Row 3
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("A");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -240,7 +240,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("M");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -259,7 +259,7 @@ public class CastleLocation : BaseLocation
         // Row 4
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -268,7 +268,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -287,7 +287,7 @@ public class CastleLocation : BaseLocation
         // Row 5 - Political systems
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("W");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -296,7 +296,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("U");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -305,7 +305,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("E");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -317,7 +317,7 @@ public class CastleLocation : BaseLocation
         // Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -358,7 +358,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("D");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -368,7 +368,7 @@ public class CastleLocation : BaseLocation
         // Row 2
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("H");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -377,7 +377,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -387,7 +387,7 @@ public class CastleLocation : BaseLocation
         // Apply for Royal Guard option
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("A");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -400,7 +400,7 @@ public class CastleLocation : BaseLocation
             // There is a king - show infiltrate option
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("I");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -448,7 +448,7 @@ public class CastleLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("B");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -503,7 +503,7 @@ public class CastleLocation : BaseLocation
         // Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -537,10 +537,10 @@ public class CastleLocation : BaseLocation
         }
         ShowBBSNPCs();
         // Menu rows
-        ShowBBSMenuRow(("P", "bright_yellow", "Prison"), ("O", "bright_yellow", "Orders"), ("1", "bright_cyan", "Mail"), ("G", "bright_green", "Sleep"));
-        ShowBBSMenuRow(("C", "bright_green", "Security"), ("H", "bright_cyan", "History"), ("A", "bright_red", "Abdicate"), ("M", "bright_magenta", "Magic"));
-        ShowBBSMenuRow(("F", "bright_yellow", "Fiscal"), ("Q", "bright_magenta", "Quests"), ("T", "bright_yellow", "Orphanage"), ("W", "bright_magenta", "Wedding"));
-        ShowBBSMenuRow(("U", "bright_cyan", "Court"), ("E", "bright_green", "Succession"), ("R", "bright_red", "Return"));
+        ShowBBSMenuRow(("P", "bright_yellow", "Prison"), ("O", "bright_yellow", "Orders"), ("1", "bright_yellow", "Mail"), ("G", "bright_yellow", "Sleep"));
+        ShowBBSMenuRow(("C", "bright_yellow", "Security"), ("H", "bright_yellow", "History"), ("A", "bright_yellow", "Abdicate"), ("M", "bright_yellow", "Magic"));
+        ShowBBSMenuRow(("F", "bright_yellow", "Fiscal"), ("Q", "bright_yellow", "Quests"), ("T", "bright_yellow", "Orphanage"), ("W", "bright_yellow", "Wedding"));
+        ShowBBSMenuRow(("U", "bright_yellow", "Court"), ("E", "bright_yellow", "Succession"), ("R", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
 
@@ -567,13 +567,13 @@ public class CastleLocation : BaseLocation
         }
         ShowBBSNPCs();
         // Menu rows
-        ShowBBSMenuRow(("T", "bright_yellow", "Royal Guard"), ("P", "bright_yellow", "Prison"), ("D", "bright_green", "Donate"));
-        ShowBBSMenuRow(("H", "bright_cyan", "History"), ("S", "bright_magenta", "Audience"), ("A", "bright_green", "Apply Guard"));
+        ShowBBSMenuRow(("T", "bright_yellow", "Royal Guard"), ("P", "bright_yellow", "Prison"), ("D", "bright_yellow", "Donate"));
+        ShowBBSMenuRow(("H", "bright_yellow", "History"), ("S", "bright_yellow", "Audience"), ("A", "bright_yellow", "Apply Guard"));
         // Throne challenge / claim
         if (currentKing != null && currentKing.IsActive)
         {
             if (CanChallengeThrone())
-                ShowBBSMenuRow(("I", "bright_red", "Infiltrate (Challenge Throne)"));
+                ShowBBSMenuRow(("I", "bright_yellow", "Infiltrate (Challenge Throne)"));
             else
                 ShowBBSMenuRow(("I", "gray", $"Infiltrate (Lv{GameConfig.MinLevelKing}+)"));
         }
@@ -586,14 +586,14 @@ public class CastleLocation : BaseLocation
         }
         // Siege option
         if (DoorMode.IsOnlineMode && !string.IsNullOrEmpty(currentPlayer.Team))
-            ShowBBSMenuRow(("B", "bright_red", "Besiege Castle"));
+            ShowBBSMenuRow(("B", "bright_yellow", "Besiege Castle"));
         // Faction
         var factionSystem = FactionSystem.Instance;
         if (factionSystem.PlayerFaction != Faction.TheCrown)
             ShowBBSMenuRow(("J", "bright_yellow", "Join Crown"));
         if (FactionSystem.Instance?.HasCastleAccess() == true)
             ShowBBSMenuRow(("L", "bright_yellow", "Royal Armory"));
-        ShowBBSMenuRow(("R", "bright_red", "Return"));
+        ShowBBSMenuRow(("R", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
 
@@ -2494,9 +2494,21 @@ public class CastleLocation : BaseLocation
 
             terminal.SetColor("yellow");
             terminal.WriteLine("Options:");
-            terminal.WriteLine(" [G]ift to spouse (improve happiness)");
-            terminal.WriteLine(" [D]ivorce (political consequences)");
-            terminal.WriteLine(" [R]eturn");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("G");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("]ift to spouse (improve happiness)");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("D");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("]ivorce (political consequences)");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("R");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("]eturn");
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
@@ -2905,9 +2917,21 @@ public class CastleLocation : BaseLocation
         // Options
         terminal.SetColor("cyan");
         terminal.WriteLine("Options:");
-        terminal.WriteLine(" [D]esignate an heir");
-        terminal.WriteLine(" [N]ame a new heir (adopt/legitimize)");
-        terminal.WriteLine(" [R]eturn");
+        terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("D");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("]esignate an heir");
+        terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("N");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("]ame a new heir (adopt/legitimize)");
+        terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("R");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("]eturn");
         terminal.WriteLine("");
 
         terminal.Write("Your choice: ");
@@ -5026,20 +5050,54 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.WriteLine("  ─────────────────────────────────────────────────────────");
 
-        terminal.SetColor(currentPlayer.Gold >= crownBladePrice ? "white" : "darkgray");
-        terminal.WriteLine($"  [1] Crown Blade         {crownBladePrice,10:N0}g   WeapPow {bladeWeapPow}");
+        string bladeColor = currentPlayer.Gold >= crownBladePrice ? "white" : "darkgray";
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor(bladeColor);
+        terminal.WriteLine($"Crown Blade         {crownBladePrice,10:N0}g   WeapPow {bladeWeapPow}");
 
-        terminal.SetColor(currentPlayer.Gold >= royalPlatePrice ? "white" : "darkgray");
-        terminal.WriteLine($"  [2] Royal Guard Plate   {royalPlatePrice,10:N0}g   ArmPow {plateArmPow}");
+        string plateColor = currentPlayer.Gold >= royalPlatePrice ? "white" : "darkgray";
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor(plateColor);
+        terminal.WriteLine($"Royal Guard Plate   {royalPlatePrice,10:N0}g   ArmPow {plateArmPow}");
 
-        terminal.SetColor(currentPlayer.Gold >= crownShieldPrice ? "white" : "darkgray");
-        terminal.WriteLine($"  [3] Crown Shield        {crownShieldPrice,10:N0}g   ArmPow {shieldArmPow}");
+        string shieldColor = currentPlayer.Gold >= crownShieldPrice ? "white" : "darkgray";
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("3");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor(shieldColor);
+        terminal.WriteLine($"Crown Shield        {crownShieldPrice,10:N0}g   ArmPow {shieldArmPow}");
 
-        terminal.SetColor(currentPlayer.Gold >= signetRingPrice ? "white" : "darkgray");
-        terminal.WriteLine($"  [4] Signet Ring         {signetRingPrice,10:N0}g   +5 CHA, +5 STR");
+        string ringColor = currentPlayer.Gold >= signetRingPrice ? "white" : "darkgray";
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("4");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor(ringColor);
+        terminal.WriteLine($"Signet Ring         {signetRingPrice,10:N0}g   +5 CHA, +5 STR");
 
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("0");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.WriteLine($"  [0] Leave");
+        terminal.WriteLine("Leave");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput("  Purchase? ");

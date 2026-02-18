@@ -36,6 +36,7 @@ public partial class GameEngine : Node
         }
     }
     private static readonly Queue<string> _staticPendingNotifications = new();
+    private bool _splashScreenShown = false;
 
     /// <summary>
     /// Add a notification to be shown to the player
@@ -318,17 +319,14 @@ public partial class GameEngine : Node
         var playerName = UsurperRemake.BBS.DoorMode.GetPlayerName();
         UsurperRemake.BBS.DoorMode.Log($"BBS Door mode: Looking for save for '{playerName}'");
 
-        // Show a brief welcome
+        // Show the title screen (once per session)
+        if (!_splashScreenShown)
+        {
+            await UsurperRemake.UI.SplashScreen.Show(terminal);
+            _splashScreenShown = true;
+        }
+
         terminal.ClearScreen();
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                USURPER REBORN - Halls of Avarice                            ║");
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
-        terminal.SetColor("gray");
-        terminal.WriteLine($"  v{GameConfig.Version}");
-        terminal.WriteLine("");
 
         // Show MOTD if set
         if (!string.IsNullOrEmpty(GameConfig.MessageOfTheDay))
@@ -358,27 +356,62 @@ public partial class GameEngine : Node
             terminal.WriteLine($"Last played: {existingSave.SaveTime:yyyy-MM-dd HH:mm}");
             terminal.WriteLine("");
 
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("L");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor("bright_white");
-            terminal.WriteLine("[L] Load existing character");
-            terminal.WriteLine("[N] Create new character (WARNING: Overwrites existing!)");
+            terminal.WriteLine("Load existing character");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("N");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_white");
+            terminal.WriteLine("Create new character (WARNING: Overwrites existing!)");
             if (isSysOp || isOnlineAdmin)
             {
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("[%] SysOp Administration Console");
-                terminal.SetColor("bright_white");
+                terminal.Write("%");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("SysOp Administration Console");
             }
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
             {
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("C");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
                 terminal.SetColor("gray");
-                terminal.WriteLine("[C] Change Password");
-                terminal.SetColor("bright_white");
+                terminal.WriteLine("Change Password");
             }
 #if !STEAM_BUILD
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine("[@] Support the Developer");
-            terminal.SetColor("bright_white");
+            terminal.Write("@");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("Support the Developer");
 #endif
-            terminal.WriteLine("[Q] Quit");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_white");
+            terminal.WriteLine("Quit");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Your choice: ");
@@ -469,26 +502,54 @@ public partial class GameEngine : Node
         else
         {
             // No existing character - create new one
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("N");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor("bright_white");
-            terminal.WriteLine("[N] Create new character");
+            terminal.WriteLine("Create new character");
             if (isSysOp || isOnlineAdmin)
             {
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("[%] SysOp Administration Console");
-                terminal.SetColor("bright_white");
+                terminal.Write("%");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("SysOp Administration Console");
             }
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
             {
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("C");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
                 terminal.SetColor("gray");
-                terminal.WriteLine("[C] Change Password");
-                terminal.SetColor("bright_white");
+                terminal.WriteLine("Change Password");
             }
 #if !STEAM_BUILD
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine("[@] Support the Developer");
-            terminal.SetColor("bright_white");
+            terminal.Write("@");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("Support the Developer");
 #endif
-            terminal.WriteLine("[Q] Quit");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_white");
+            terminal.WriteLine("Quit");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Your choice: ");
@@ -1223,7 +1284,7 @@ public partial class GameEngine : Node
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("N");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -1232,7 +1293,7 @@ public partial class GameEngine : Node
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("B");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -1345,7 +1406,7 @@ public partial class GameEngine : Node
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("D");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -1354,7 +1415,7 @@ public partial class GameEngine : Node
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("B");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -2090,6 +2151,10 @@ public partial class GameEngine : Node
 
         currentPlayer = (Character)newCharacter;
 
+        // Apply SysOp's default color theme to new characters
+        currentPlayer.ColorTheme = GameConfig.DefaultColorTheme;
+        ColorTheme.Current = GameConfig.DefaultColorTheme;
+
         // Auto-populate quickbar with starting spells/abilities
         AutoPopulateQuickbar(currentPlayer);
 
@@ -2318,6 +2383,7 @@ public partial class GameEngine : Node
             CombatSpeed = playerData.CombatSpeed,
             SkipIntimateScenes = playerData.SkipIntimateScenes,
             ScreenReaderMode = playerData.ScreenReaderMode,
+            ColorTheme = playerData.ColorTheme,
             Loyalty = playerData.Loyalty,
             Haunt = playerData.Haunt,
             Master = playerData.Master,
@@ -2754,6 +2820,9 @@ public partial class GameEngine : Node
         {
             WorldSimulator.RegisterPlayerTeam(player.Team);
         }
+
+        // Apply player's color theme preference
+        ColorTheme.Current = player.ColorTheme;
 
         return player;
     }
@@ -4000,6 +4069,13 @@ public partial class GameEngine : Node
         terminal.Write("EleBBS      ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("shsbbs.net");
+
+        terminal.SetColor("bright_white");
+        terminal.Write("  The X-BIT BBS                  ");
+        terminal.SetColor("gray");
+        terminal.Write("Synchronet  ");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("x-bit.org -p 22222");
 
         // --- End BBS Entries ---
 

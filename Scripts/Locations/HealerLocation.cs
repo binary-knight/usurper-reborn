@@ -134,9 +134,9 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine("");
         ShowBBSNPCs();
         // Menu rows
-        ShowBBSMenuRow(("H", "bright_green", "Heal HP"), ("F", "bright_green", "Full Heal"), ("B", "bright_green", "Buy Potions"), ("M", "bright_blue", "Mana Pots"));
+        ShowBBSMenuRow(("H", "bright_yellow", "Heal HP"), ("F", "bright_yellow", "Full Heal"), ("B", "bright_yellow", "Buy Potions"), ("M", "bright_yellow", "Mana Pots"));
         ShowBBSMenuRow(("P", "bright_yellow", "Poison Cure"), ("C", "bright_yellow", "Cure Disease"), ("D", "bright_yellow", "Decurse"));
-        ShowBBSMenuRow(("A", "bright_magenta", "Addiction"), ("S", "bright_cyan", "Status"), ("R", "bright_red", "Return"));
+        ShowBBSMenuRow(("A", "bright_yellow", "Addiction"), ("S", "bright_yellow", "Status"), ("R", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
 
@@ -239,7 +239,7 @@ public class HealerLocation : BaseLocation
         // Row 1 - Healing services
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("H");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -248,7 +248,7 @@ public class HealerLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("F");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -257,7 +257,7 @@ public class HealerLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("B");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -266,7 +266,7 @@ public class HealerLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_blue");
+        terminal.SetColor("bright_yellow");
         terminal.Write("M");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -304,7 +304,7 @@ public class HealerLocation : BaseLocation
         // Row 3 - Addiction & Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("A");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -313,7 +313,7 @@ public class HealerLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -322,7 +322,7 @@ public class HealerLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");

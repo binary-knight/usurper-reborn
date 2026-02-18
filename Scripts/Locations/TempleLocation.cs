@@ -266,7 +266,7 @@ public partial class TempleLocation : BaseLocation
         // Row 1
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("W");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -275,7 +275,7 @@ public partial class TempleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("D");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -284,7 +284,7 @@ public partial class TempleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("H");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -322,7 +322,7 @@ public partial class TempleLocation : BaseLocation
         // Row 3
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -331,7 +331,7 @@ public partial class TempleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("G");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -340,7 +340,7 @@ public partial class TempleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("P");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -356,7 +356,7 @@ public partial class TempleLocation : BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("[");
-                terminal.SetColor("bright_green");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("Y");
                 terminal.SetColor("darkgray");
                 terminal.Write("]");
@@ -397,7 +397,7 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("T");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -414,7 +414,7 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("M");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -458,7 +458,7 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("N");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -479,7 +479,7 @@ public partial class TempleLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");

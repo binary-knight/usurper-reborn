@@ -83,21 +83,21 @@ public partial class MagicShopLocation : BaseLocation
         // Menu rows - Shopping
         terminal.SetColor("cyan");
         terminal.WriteLine(" Shopping:");
-        ShowBBSMenuRow(("A", "bright_green", "ccessories"), ("S", "bright_green", "ell"), ("I", "bright_green", "dentify"));
+        ShowBBSMenuRow(("A", "bright_yellow", "ccessories"), ("S", "bright_yellow", "ell"), ("I", "bright_yellow", "dentify"));
 
         // Potions & Scrolls
         terminal.SetColor("cyan");
         terminal.WriteLine(" Potions & Scrolls:");
-        ShowBBSMenuRow(("H", "bright_green", "ealing Pots"), ("M", "bright_green", "ana Pots"), ("D", "bright_green", "ungeon Reset"));
+        ShowBBSMenuRow(("H", "bright_yellow", "ealing Pots"), ("M", "bright_yellow", "ana Pots"), ("D", "bright_yellow", "ungeon Reset"));
 
         // Enchanting & Arcane
         terminal.SetColor("cyan");
         terminal.WriteLine(" Enchanting / Arcane:");
-        ShowBBSMenuRow(("E", "bright_yellow", "nchant"), ("W", "bright_yellow", "Remove Ench"), ("C", "bright_yellow", "urse Removal"), ("F", "magenta", "orge"));
-        ShowBBSMenuRow(("V", "bright_magenta", "Love Spells"), ("K", "bright_magenta", "Dark Arts"), ("Y", "bright_magenta", "Study"), ("G", "bright_magenta", "Scry"));
+        ShowBBSMenuRow(("E", "bright_yellow", "nchant"), ("W", "bright_yellow", "Remove Ench"), ("C", "bright_yellow", "urse Removal"), ("F", "bright_yellow", "orge"));
+        ShowBBSMenuRow(("V", "bright_yellow", "Love Spells"), ("K", "bright_yellow", "Dark Arts"), ("Y", "bright_yellow", "Study"), ("G", "bright_yellow", "Scry"));
 
         // Talk & Return
-        ShowBBSMenuRow(("T", "bright_cyan", $"alk to {_ownerName}"), ("R", "bright_red", "eturn"));
+        ShowBBSMenuRow(("T", "bright_yellow", $"alk to {_ownerName}"), ("R", "bright_yellow", "eturn"));
 
         // Footer
         ShowBBSFooter();
@@ -519,22 +519,22 @@ public partial class MagicShopLocation : BaseLocation
         // Menu options - two-column layout
         DisplayMessage("  ═══ Shopping ═══                      ═══ Enchanting ═══", "cyan");
         terminal.WriteLine("");
-        WriteMenuRow("A", "bright_green", "ccessories (Rings/Necklaces)", "E", "bright_yellow", "nchant Equipment");
-        WriteMenuRow("S", "bright_green", "ell Item", "W", "bright_yellow", " Remove Enchantment");
-        WriteMenuRow("I", "bright_green", "dentify Item", "C", "bright_yellow", "urse Removal");
+        WriteMenuRow("A", "bright_yellow", "ccessories (Rings/Necklaces)", "E", "bright_yellow", "nchant Equipment");
+        WriteMenuRow("S", "bright_yellow", "ell Item", "W", "bright_yellow", " Remove Enchantment");
+        WriteMenuRow("I", "bright_yellow", "dentify Item", "C", "bright_yellow", "urse Removal");
         terminal.WriteLine("");
         DisplayMessage("  ═══ Potions & Scrolls ═══             ═══ Arcane Arts ═══", "cyan");
         terminal.WriteLine("");
-        WriteMenuRow("H", "bright_green", "ealing Potions", "V", "bright_magenta", " Love Spells");
-        WriteMenuRow("M", "bright_green", "ana Potions", "K", "bright_magenta", " Dark Arts");
-        WriteMenuRow("D", "bright_green", "ungeon Reset Scroll", "Y", "bright_magenta", " Study Spells");
+        WriteMenuRow("H", "bright_yellow", "ealing Potions", "V", "bright_yellow", " Love Spells");
+        WriteMenuRow("M", "bright_yellow", "ana Potions", "K", "bright_yellow", " Dark Arts");
+        WriteMenuRow("D", "bright_yellow", "ungeon Reset Scroll", "Y", "bright_yellow", " Study Spells");
         terminal.Write(new string(' ', 42));
-        WriteMenuKey("G", "bright_magenta", " Scrying (NPC Info)");
+        WriteMenuKey("G", "bright_yellow", " Scrying (NPC Info)");
         terminal.WriteLine("");
         terminal.WriteLine("");
-        WriteMenuRow("T", "bright_cyan", $"alk to {_ownerName}", "F", "magenta", " Enchantment Forge");
+        WriteMenuRow("T", "bright_yellow", $"alk to {_ownerName}", "F", "bright_yellow", " Enchantment Forge");
         terminal.Write("  ");
-        WriteMenuKey("R", "bright_red", "eturn to street");
+        WriteMenuKey("R", "bright_yellow", "eturn to street");
         terminal.WriteLine("");
         terminal.WriteLine("");
 
@@ -2270,7 +2270,7 @@ public partial class MagicShopLocation : BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("[");
-                terminal.SetColor("bright_cyan");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("P");
                 terminal.SetColor("darkgray");
                 terminal.Write("] Prev   ");
@@ -2280,7 +2280,7 @@ public partial class MagicShopLocation : BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("[");
-                terminal.SetColor("bright_cyan");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("N");
                 terminal.SetColor("darkgray");
                 terminal.Write("] Next   ");
@@ -2288,7 +2288,7 @@ public partial class MagicShopLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
             terminal.Write("] ");

@@ -13,10 +13,20 @@ namespace UsurperRemake.Locations;
 /// Love Street - Adult entertainment district combining the Beauty Nest (brothel for men),
 /// Hall of Dreams (gigolos for women), and NPC dating/romance features.
 /// Based on Pascal WHORES.PAS and GIGOLOC.PAS with expanded modern features.
+/// v0.41.3: Overhauled Mingle, Gossip, Love Potions, and Gift Shop systems.
 /// </summary>
 public class LoveStreetLocation : BaseLocation
 {
     private Random random = new Random();
+
+    // Per-visit state (cleared on each EnterLocation)
+    private HashSet<string> _flirtedThisVisit = new();
+    private bool _charmActive;
+    private bool _allureActive;
+    private bool _passionActive;
+
+    // Per-session cosmetic state (not saved — traits revealed by buying drinks)
+    private Dictionary<string, HashSet<string>> _revealedTraits = new();
 
     // Courtesans (female workers) - based on Pascal WHORES.PAS
     private static readonly List<Courtesan> Courtesans = new()
@@ -70,17 +80,26 @@ public class LoveStreetLocation : BaseLocation
         "The infamous pleasure district where desires are fulfilled for a price."
     ) { }
 
+    public override async Task EnterLocation(Character player, TerminalEmulator term)
+    {
+        _flirtedThisVisit.Clear();
+        _charmActive = false;
+        _allureActive = false;
+        _passionActive = false;
+        await base.EnterLocation(player, term);
+    }
+
     protected override void SetupLocation()
     {
         PossibleExits = new List<GameLocation> { GameLocation.MainStreet };
         LocationActions = new List<string>
         {
             "Visit the Pleasure Houses",
-            "Meet NPCs",
+            "Mingle with NPCs",
             "Take someone on a date",
             "Gift Shop",
-            "Gossip Corner",
-            "View Romance Stats",
+            "Gossip",
+            "Love Potions",
             "Return to Main Street"
         };
     }
@@ -92,9 +111,9 @@ public class LoveStreetLocation : BaseLocation
         terminal.ClearScreen();
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           <3 LOVE STREET <3                                  ║");
-        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
+        terminal.WriteLine("|                           <3 LOVE STREET <3                                  |");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -107,17 +126,17 @@ public class LoveStreetLocation : BaseLocation
         ShowNPCsInLocation();
 
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine("║                        -= PLEASURE AWAITS =-                                ║");
+        terminal.WriteLine("|                        -= PLEASURE AWAITS =-                                |");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╠═════════════════════════════════════════════════════════════════════════════╣");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
         terminal.WriteLine("");
 
         // Pleasure Houses
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("1");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -126,7 +145,7 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_blue");
+        terminal.SetColor("bright_yellow");
         terminal.Write("2");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -139,15 +158,15 @@ public class LoveStreetLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
         terminal.SetColor("bright_yellow");
-        terminal.Write("N");
+        terminal.Write("M");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.Write(" Meet NPCs       ");
+        terminal.Write(" Mingle          ");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("D");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -156,7 +175,7 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("G");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -165,28 +184,28 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("V");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.WriteLine(" Gossip Corner");
+        terminal.WriteLine(" Gossip");
 
         terminal.WriteLine("");
 
-        // Status
+        // Potions & Return
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("cyan");
-        terminal.Write("S");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("L");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.Write(" Romance Stats   ");
+        terminal.Write(" Love Potions    ");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("gray");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -195,12 +214,21 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
         terminal.WriteLine("");
 
-        // Show gold
+        // Show gold + active potions
         terminal.SetColor("yellow");
-        terminal.WriteLine($" Gold: {currentPlayer.Gold:N0}");
+        terminal.Write($" Gold: {currentPlayer.Gold:N0}");
+        if (_charmActive || _allureActive || _passionActive)
+        {
+            terminal.SetColor("magenta");
+            terminal.Write("  Potions:");
+            if (_charmActive) terminal.Write(" [Charm]");
+            if (_allureActive) terminal.Write(" [Allure]");
+            if (_passionActive) terminal.Write(" [Passion]");
+        }
+        terminal.WriteLine("");
         terminal.WriteLine("");
     }
 
@@ -220,14 +248,22 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
 
         // Menu rows
-        ShowBBSMenuRow(("1", "bright_red", "BeautyNest"), ("2", "bright_blue", "HallDreams"), ("N", "yellow", "MeetNPCs"), ("D", "green", "Date"));
-        ShowBBSMenuRow(("G", "cyan", "GiftShop"), ("V", "magenta", "Gossip"), ("S", "cyan", "RomanceStats"), ("R", "red", "Return"));
+        ShowBBSMenuRow(("1", "bright_red", "BeautyNest"), ("2", "bright_blue", "HallDreams"), ("M", "yellow", "Mingle"), ("D", "green", "Date"));
+        ShowBBSMenuRow(("G", "cyan", "Gifts"), ("V", "magenta", "Gossip"), ("L", "cyan", "Potions"), ("R", "red", "Return"));
 
-        // Gold
+        // Gold + active potions
         terminal.SetColor("gray");
         terminal.Write(" Gold:");
         terminal.SetColor("yellow");
-        terminal.WriteLine($"{currentPlayer.Gold:N0}");
+        terminal.Write($"{currentPlayer.Gold:N0}");
+        if (_charmActive || _allureActive || _passionActive)
+        {
+            terminal.SetColor("magenta");
+            if (_charmActive) terminal.Write(" [Charm]");
+            if (_allureActive) terminal.Write(" [Allure]");
+            if (_passionActive) terminal.Write(" [Passion]");
+        }
+        terminal.WriteLine("");
 
         ShowBBSFooter();
     }
@@ -253,8 +289,8 @@ public class LoveStreetLocation : BaseLocation
                 await VisitHallOfDreams();
                 return false;
 
-            case "N":
-                await MeetNPCs();
+            case "M":
+                await Mingle();
                 return false;
 
             case "D":
@@ -266,11 +302,11 @@ public class LoveStreetLocation : BaseLocation
                 return false;
 
             case "V":
-                await VisitGossipCorner();
+                await Gossip();
                 return false;
 
-            case "S":
-                await ShowRomanceStats();
+            case "L":
+                await LovePotions();
                 return false;
 
             case "R":
@@ -288,10 +324,10 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
-        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                     THE BEAUTY NEST                                         ║");
-        terminal.WriteLine("║              Driven by Clarissa the Half-Elf                                ║");
-        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
+        terminal.WriteLine("|                     THE BEAUTY NEST                                         |");
+        terminal.WriteLine("|              Driven by Clarissa the Half-Elf                                |");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -360,9 +396,9 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"\n═══════════════════════════════════════════════════════════════════════════════");
-        terminal.WriteLine($"                         {courtesan.Name} the {courtesan.Race}");
-        terminal.WriteLine($"═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine($"\n+---------------------------------------------------------------------------+");
+        terminal.WriteLine($"  {courtesan.Name} the {courtesan.Race}");
+        terminal.WriteLine($"+---------------------------------------------------------------------------+\n");
 
         terminal.SetColor("white");
         terminal.WriteLine(courtesan.IntroText);
@@ -373,7 +409,7 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
 
         var confirm = await terminal.GetInput($"Pay {courtesan.Name} {courtesan.Price:N0} gold? (Y/N): ");
-        if (confirm.ToUpper() != "Y")
+        if (string.IsNullOrEmpty(confirm) || confirm.ToUpper() != "Y")
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"\"{courtesan.Name} shrugs. \"Your loss, honey.\"");
@@ -394,6 +430,7 @@ public class LoveStreetLocation : BaseLocation
 
         // Process payment
         currentPlayer.Gold -= courtesan.Price;
+        currentPlayer.Statistics?.RecordGoldSpent(courtesan.Price);
 
         // Show the intimate encounter
         await ShowIntimateEncounter(courtesan.Name, courtesan.Race, courtesan.Price, courtesan.DiseaseChance);
@@ -407,10 +444,10 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_blue");
-        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                      HALL OF DREAMS                                         ║");
-        terminal.WriteLine("║              Supervised by Giovanni the Gnome                               ║");
-        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
+        terminal.WriteLine("|                      HALL OF DREAMS                                         |");
+        terminal.WriteLine("|              Supervised by Giovanni the Gnome                               |");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -479,9 +516,9 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_blue");
-        terminal.WriteLine($"\n═══════════════════════════════════════════════════════════════════════════════");
-        terminal.WriteLine($"                         {gigolo.Name} the {gigolo.Race}");
-        terminal.WriteLine($"═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine($"\n+---------------------------------------------------------------------------+");
+        terminal.WriteLine($"  {gigolo.Name} the {gigolo.Race}");
+        terminal.WriteLine($"+---------------------------------------------------------------------------+\n");
 
         terminal.SetColor("white");
         terminal.WriteLine(gigolo.IntroText);
@@ -492,7 +529,7 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
 
         var confirm = await terminal.GetInput($"Pay {gigolo.Name} {gigolo.Price:N0} gold? (Y/N): ");
-        if (confirm.ToUpper() != "Y")
+        if (string.IsNullOrEmpty(confirm) || confirm.ToUpper() != "Y")
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"\"{gigolo.Name} bows politely. \"Perhaps another time.\"");
@@ -513,6 +550,7 @@ public class LoveStreetLocation : BaseLocation
 
         // Process payment
         currentPlayer.Gold -= gigolo.Price;
+        currentPlayer.Statistics?.RecordGoldSpent(gigolo.Price);
 
         // Show the intimate encounter
         await ShowIntimateEncounter(gigolo.Name, gigolo.Race, gigolo.Price, gigolo.DiseaseChance);
@@ -526,9 +564,9 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine("\n═══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("\n+---------------------------------------------------------------------------+");
         terminal.WriteLine("                              A Night of Passion");
-        terminal.WriteLine("═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine("+---------------------------------------------------------------------------+\n");
 
         // Generate encounter based on price tier
         await GenerateIntimateScene(partnerName, race, price);
@@ -555,7 +593,7 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine("══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("+---------------------------------------------------------------------------+");
         terminal.WriteLine($" ** Night of Pleasure with {partnerName} **");
         terminal.WriteLine("");
         terminal.SetColor("white");
@@ -573,17 +611,14 @@ public class LoveStreetLocation : BaseLocation
         RecordPaidEncounter(partnerName, price);
 
         // News system
-        await GenerateNews(partnerName);
+        GenerateNews(partnerName);
 
         // Notify spouse if married
-        await NotifySpouse(partnerName);
+        NotifySpouse(partnerName);
 
         await terminal.WaitForKey();
     }
 
-    /// <summary>
-    /// Record a paid encounter in the RomanceTracker for statistics and history
-    /// </summary>
     private void RecordPaidEncounter(string partnerName, long price)
     {
         var encounter = new IntimateEncounter
@@ -596,16 +631,13 @@ public class LoveStreetLocation : BaseLocation
             IsFirstTime = false
         };
         RomanceTracker.Instance.RecordEncounter(encounter);
-
-        // Track total spending on pleasure (could be used for achievements, stats)
-        currentPlayer.Darkness += 1; // Small extra darkness for paid encounters
+        currentPlayer.Darkness += 1;
     }
 
     private async Task GenerateIntimateScene(string partnerName, string race, long price)
     {
         terminal.SetColor("white");
 
-        // Opening based on setting
         var openings = new[]
         {
             $"The door closes behind you with a soft click. {partnerName} approaches slowly...",
@@ -618,7 +650,6 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1000);
 
-        // Building tension
         terminal.SetColor("bright_magenta");
         var tensions = new[]
         {
@@ -631,25 +662,15 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1000);
 
-        // Main event - detailed based on price tier
         if (price >= 50000)
-        {
             await ShowPremiumEncounter(partnerName, race);
-        }
         else if (price >= 20000)
-        {
             await ShowHighEndEncounter(partnerName, race);
-        }
         else if (price >= 5000)
-        {
             await ShowStandardEncounter(partnerName, race);
-        }
         else
-        {
             await ShowBasicEncounter(partnerName, race);
-        }
 
-        // Aftermath
         terminal.WriteLine("");
         terminal.SetColor("gray");
         var aftermaths = new[]
@@ -791,9 +812,9 @@ public class LoveStreetLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.SetColor("red");
-            terminal.WriteLine("═══════════════════════════════════════════════════════════════════════════════");
+            terminal.WriteLine("+---------------------------------------------------------------------------+");
             terminal.WriteLine("                         SOMETHING IS WRONG!");
-            terminal.WriteLine("═══════════════════════════════════════════════════════════════════════════════");
+            terminal.WriteLine("+---------------------------------------------------------------------------+");
             terminal.WriteLine("");
             terminal.WriteLine("As you leave, you start to feel pain in your nether regions!");
             terminal.WriteLine("By the gods! You've been infected with a venereal disease!");
@@ -803,7 +824,6 @@ public class LoveStreetLocation : BaseLocation
             terminal.WriteLine("The monks give you foul-smelling potions and painful treatments.");
             terminal.WriteLine("");
 
-            // Apply disease effects
             currentPlayer.HP = Math.Max(1, currentPlayer.HP / 2);
             currentPlayer.LoversBane = true;
 
@@ -812,12 +832,10 @@ public class LoveStreetLocation : BaseLocation
             terminal.WriteLine("Your HP has been halved! Visit the Healer to cure this affliction.");
             terminal.WriteLine("");
 
-            // News about it
             NewsSystem.Instance.Newsy(true,
                 $"{currentPlayer.Name2} contracted a disease at Love Street!",
                 $"The pleasure houses claim another victim...");
 
-            // Mail the player
             MailSystem.SendSystemMail(currentPlayer.Name2, "Disease Notice",
                 "Medical Emergency",
                 $"You contracted a sexual disease from {partnerName}.",
@@ -827,9 +845,8 @@ public class LoveStreetLocation : BaseLocation
         }
     }
 
-    private async Task GenerateNews(string partnerName)
+    private void GenerateNews(string partnerName)
     {
-        // Random news about the visit (33% chance)
         if (random.Next(3) == 0)
         {
             var headlines = new[]
@@ -843,18 +860,16 @@ public class LoveStreetLocation : BaseLocation
         }
     }
 
-    private async Task NotifySpouse(string partnerName)
+    private void NotifySpouse(string partnerName)
     {
         var spouses = RomanceTracker.Instance.Spouses;
         foreach (var spouse in spouses)
         {
-            // Send mail to spouse about infidelity
             MailSystem.SendSystemMail(spouse.NPCId, "HOW COULD THEY?",
                 "INFIDELITY!",
                 $"{currentPlayer.Name2} has been unfaithful to you!",
                 $"They enjoyed themselves with {partnerName} at Love Street!");
 
-            // Increase jealousy
             RomanceTracker.Instance.JealousyLevels[spouse.NPCId] =
                 Math.Min(100, RomanceTracker.Instance.JealousyLevels.GetValueOrDefault(spouse.NPCId, 0) + 20);
         }
@@ -862,51 +877,101 @@ public class LoveStreetLocation : BaseLocation
 
     #endregion
 
-    #region NPC Dating & Romance
+    #region Mingle (replaces Meet NPCs)
 
-    private async Task MeetNPCs()
+    private async Task Mingle()
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine("\n═══════════════════════════════════════════════════════════════════════════════");
-        terminal.WriteLine("                           MEET THE LOCALS");
-        terminal.WriteLine("═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine("\n+---------------------------------------------------------------------------+");
+        terminal.WriteLine("                              MINGLE");
+        terminal.WriteLine("+---------------------------------------------------------------------------+\n");
 
-        // Get NPCs currently at Love Street
-        var npcsHere = NPCSpawnSystem.Instance.ActiveNPCs?
-            .Where(n => n.CurrentLocation == "Love Street" || n.CurrentLocation == "Love Corner")
-            .ToList() ?? new List<NPC>();
+        // Get NPCs at Love Street first
+        var npcsHere = GetLiveNPCsAtLocation();
+        var allNPCs = new List<NPC>(npcsHere);
 
-        if (npcsHere.Count == 0)
+        // Pad with compatible NPCs from other locations if needed
+        if (allNPCs.Count < GameConfig.LoveStreetMaxMingleNPCs)
+        {
+            var playerGender = currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+            var hereIds = new HashSet<string>(allNPCs.Select(n => n.ID));
+
+            var extras = (NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>())
+                .Where(n => n.IsAlive && !n.IsDead && !hereIds.Contains(n.ID))
+                .Where(n => n.Brain?.Personality?.IsAttractedTo(playerGender) == true ||
+                            RelationshipSystem.GetRelationshipStatus(currentPlayer, n) <= 40)
+                .OrderBy(n => RelationshipSystem.GetRelationshipStatus(currentPlayer, n))
+                .Take(GameConfig.LoveStreetMaxMingleNPCs - allNPCs.Count)
+                .ToList();
+
+            if (extras.Count > 0)
+            {
+                allNPCs.AddRange(extras);
+            }
+        }
+
+        if (allNPCs.Count == 0)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("There are no adventurers here at the moment.");
-            terminal.WriteLine("Try coming back later, or look for someone on Main Street.");
+            terminal.WriteLine("There's no one around to mingle with right now.");
+            terminal.WriteLine("Try coming back later.");
             await terminal.WaitForKey();
             return;
         }
 
-        terminal.SetColor("white");
-        terminal.WriteLine("The following adventurers are here looking for company:\n");
-
-        for (int i = 0; i < npcsHere.Count; i++)
+        // Show NPC list with romance-relevant info
+        if (npcsHere.Count > 0)
         {
-            var npc = npcsHere[i];
-            var relationship = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
+            terminal.SetColor("white");
+            terminal.WriteLine("People at Love Street:\n");
+        }
+
+        for (int i = 0; i < allNPCs.Count; i++)
+        {
+            var npc = allNPCs[i];
+            if (i == npcsHere.Count && npcsHere.Count > 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("Others around town:\n");
+            }
+
             var romanceType = RomanceTracker.Instance.GetRelationType(npc.ID);
+            int relationLevel = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
 
             terminal.SetColor("bright_yellow");
             terminal.Write($" [{i + 1}] ");
             terminal.SetColor("white");
             terminal.Write($"{npc.Name}");
             terminal.SetColor("gray");
-            terminal.Write($" - Level {npc.Level} {npc.Race} {npc.Class}");
+            terminal.Write($" (Lv{npc.Level} {npc.Race} {npc.Class})");
 
-            if (romanceType != RomanceRelationType.None)
+            // Relationship tag
+            string tag = romanceType switch
             {
-                terminal.SetColor("bright_magenta");
-                terminal.Write($" [{romanceType}]");
+                RomanceRelationType.Spouse => " [Spouse]",
+                RomanceRelationType.Lover => " [Lover]",
+                RomanceRelationType.FWB => " [FWB]",
+                _ => relationLevel <= 40 ? " [Friend]" : relationLevel <= 70 ? "" : " [Stranger]"
+            };
+            if (!string.IsNullOrEmpty(tag))
+            {
+                terminal.SetColor(romanceType == RomanceRelationType.Spouse ? "bright_red" :
+                                  romanceType == RomanceRelationType.Lover ? "bright_magenta" :
+                                  romanceType == RomanceRelationType.FWB ? "cyan" :
+                                  tag == " [Friend]" ? "bright_green" : "darkgray");
+                terminal.Write(tag);
             }
+
+            // Personality hint
+            var profile = npc.Brain?.Personality;
+            if (profile != null)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write($" - {GetPersonalityHint(profile)}");
+            }
+
             terminal.WriteLine("");
         }
 
@@ -915,52 +980,354 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine(" [0] Return");
         terminal.WriteLine("");
 
-        var input = await terminal.GetInput("Choose someone to approach: ");
-        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= npcsHere.Count)
+        var input = await terminal.GetInput("Who catches your eye? ");
+        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= allNPCs.Count)
         {
-            var selectedNpc = npcsHere[choice - 1];
-            await InteractWithNPC(selectedNpc);
+            await MingleWithNPC(allNPCs[choice - 1]);
         }
     }
 
-    protected override async Task InteractWithNPC(NPC npc)
+    private async Task MingleWithNPC(NPC npc)
     {
-        // Use the visual novel dialogue system for full romance interactions
-        await VisualNovelDialogueSystem.Instance.StartConversation(currentPlayer, npc, terminal);
+        bool stayInMenu = true;
+        while (stayInMenu)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"\n+---------------------------------------------------------------------------+");
+            terminal.WriteLine($"  Spending time with {npc.Name}");
+            terminal.WriteLine($"+---------------------------------------------------------------------------+\n");
+
+            // Show NPC details
+            var romanceType = RomanceTracker.Instance.GetRelationType(npc.ID);
+            int relationLevel = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
+
+            terminal.SetColor("white");
+            terminal.Write($" {npc.Name}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($" - Level {npc.Level} {npc.Race} {npc.Class}, Age {npc.Age}");
+
+            terminal.SetColor("white");
+            terminal.Write(" Relationship: ");
+            terminal.SetColor(relationLevel <= 20 ? "bright_magenta" : relationLevel <= 50 ? "bright_green" : relationLevel <= 70 ? "yellow" : "red");
+            terminal.WriteLine(GetRelationDescription(relationLevel));
+
+            // Show revealed traits
+            if (_revealedTraits.TryGetValue(npc.ID, out var traits) && traits.Count > 0)
+            {
+                terminal.SetColor("cyan");
+                terminal.Write(" Traits: ");
+                terminal.SetColor("white");
+                terminal.WriteLine(string.Join(", ", traits));
+            }
+
+            bool alreadyFlirted = _flirtedThisVisit.Contains(npc.ID);
+
+            terminal.WriteLine("");
+            if (!alreadyFlirted)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_magenta");
+                terminal.Write("F");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Flirt");
+            }
+            else
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(" [F] Flirt (already tried)");
+            }
+
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_green");
+            terminal.Write("C");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Compliment");
+
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("yellow");
+            terminal.Write("B");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine($"Buy a Drink ({GameConfig.LoveStreetDrinkCost}g)");
+
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("D");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Ask on a Date");
+
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("gray");
+            terminal.Write("T");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Talk");
+
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("red");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Back");
+
+            terminal.WriteLine("");
+
+            var action = await terminal.GetInput("What do you do? ");
+            switch (action?.ToUpper())
+            {
+                case "F":
+                    await FlirtWithNPC(npc);
+                    break;
+                case "C":
+                    await ComplimentNPC(npc);
+                    break;
+                case "B":
+                    await BuyDrinkForNPC(npc);
+                    break;
+                case "D":
+                    await GoOnDate(npc);
+                    stayInMenu = false;
+                    break;
+                case "T":
+                    await VisualNovelDialogueSystem.Instance.StartConversation(currentPlayer, npc, terminal);
+                    stayInMenu = false;
+                    break;
+                case "0":
+                    stayInMenu = false;
+                    break;
+            }
+        }
     }
+
+    private async Task FlirtWithNPC(NPC npc)
+    {
+        if (_flirtedThisVisit.Contains(npc.ID))
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\nYou've already tried flirting with them this visit.");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        _flirtedThisVisit.Add(npc.ID);
+
+        terminal.WriteLine("");
+
+        var profile = npc.Brain?.Personality;
+        var playerGender = currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+        bool isAttracted = profile?.IsAttractedTo(playerGender) ?? true;
+        bool npcIsMarried = NPCMarriageRegistry.Instance?.IsMarriedToNPC(npc.ID) == true;
+        bool npcHasLover = RomanceTracker.Instance.GetRelationType(npc.ID) == RomanceRelationType.Lover;
+        int relationLevel = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
+
+        float receptiveness = profile?.GetFlirtReceptiveness(relationLevel, isAttracted, npcIsMarried, npcHasLover) ?? 0.3f;
+
+        // Apply CHA modifier
+        float chaBonus = ((currentPlayer.Charisma + (_charmActive ? GameConfig.LoveStreetCharmBonus : 0)) - 10) * 0.02f;
+        receptiveness += chaBonus;
+        receptiveness = Math.Clamp(receptiveness, 0.05f, 0.90f);
+
+        // Allure potion = guaranteed success
+        bool success = _allureActive || (random.NextDouble() < receptiveness);
+
+        if (success)
+        {
+            int boost = _allureActive ? GameConfig.LoveStreetAllureFlirtBoost : GameConfig.LoveStreetFlirtBoost;
+            if (_allureActive)
+            {
+                _allureActive = false;
+                terminal.SetColor("magenta");
+                terminal.WriteLine("The Elixir of Allure surges through you...");
+            }
+
+            RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, boost, false, true);
+
+            // Flavor text based on personality
+            var flirtResponses = new[]
+            {
+                $"{npc.Name} blushes and looks away with a smile.",
+                $"{npc.Name} laughs warmly. \"You're quite charming, you know.\"",
+                $"{npc.Name}'s eyes light up. \"Well, aren't you bold!\"",
+                $"A smile plays across {npc.Name}'s lips. \"I like your style.\"",
+                $"{npc.Name} leans closer. \"Tell me more about yourself...\"",
+                $"{npc.Name} touches your arm gently. \"You're fun to be around.\""
+            };
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(flirtResponses[random.Next(flirtResponses.Length)]);
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"Your relationship with {npc.Name} has improved!");
+        }
+        else
+        {
+            var failResponses = new[]
+            {
+                $"{npc.Name} gives you an awkward smile and changes the subject.",
+                $"\"That's... sweet,\" {npc.Name} says unconvincingly.",
+                $"{npc.Name} raises an eyebrow. \"Nice try.\"",
+                $"An uncomfortable silence follows. {npc.Name} coughs politely.",
+                $"{npc.Name} pretends not to notice your advance."
+            };
+            terminal.SetColor("yellow");
+            terminal.WriteLine(failResponses[random.Next(failResponses.Length)]);
+        }
+
+        await terminal.WaitForKey();
+    }
+
+    private async Task ComplimentNPC(NPC npc)
+    {
+        terminal.WriteLine("");
+
+        // Race/class-specific compliments
+        var compliments = new List<string>
+        {
+            $"\"You have the most captivating eyes, {npc.Name}.\"",
+            $"\"Your smile could light up the darkest dungeon, {npc.Name}.\"",
+            $"\"I've never met anyone as interesting as you, {npc.Name}.\""
+        };
+
+        // Add race-specific
+        switch (npc.Race.ToString())
+        {
+            case "Elf":
+                compliments.Add($"\"Your elven grace is truly mesmerizing, {npc.Name}.\"");
+                break;
+            case "Dwarf":
+                compliments.Add($"\"You've got more strength and character than most, {npc.Name}.\"");
+                break;
+            case "Human":
+                compliments.Add($"\"There's something wonderfully warm about you, {npc.Name}.\"");
+                break;
+            default:
+                compliments.Add($"\"You're unlike anyone I've ever met, {npc.Name}.\"");
+                break;
+        }
+
+        string compliment = compliments[random.Next(compliments.Count)];
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(compliment);
+        terminal.WriteLine("");
+
+        RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, GameConfig.LoveStreetComplimentBoost, false, true);
+
+        var reactions = new[]
+        {
+            $"{npc.Name} smiles appreciatively. \"How kind of you.\"",
+            $"{npc.Name} nods graciously. \"You have a way with words.\"",
+            $"A faint blush colors {npc.Name}'s cheeks. \"Thank you.\""
+        };
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(reactions[random.Next(reactions.Length)]);
+
+        await terminal.WaitForKey();
+    }
+
+    private async Task BuyDrinkForNPC(NPC npc)
+    {
+        if (currentPlayer.Gold < GameConfig.LoveStreetDrinkCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\nYou need {GameConfig.LoveStreetDrinkCost} gold to buy a drink.");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        currentPlayer.Gold -= GameConfig.LoveStreetDrinkCost;
+        currentPlayer.Statistics?.RecordGoldSpent(GameConfig.LoveStreetDrinkCost);
+
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"You signal the barkeep and two drinks appear. {npc.Name} accepts gratefully.");
+        terminal.WriteLine("");
+
+        RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, GameConfig.LoveStreetDrinkBoost, false, true);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"Your relationship with {npc.Name} has improved!");
+
+        // Reveal a personality trait
+        var profile = npc.Brain?.Personality;
+        if (profile != null)
+        {
+            if (!_revealedTraits.ContainsKey(npc.ID))
+                _revealedTraits[npc.ID] = new HashSet<string>();
+
+            var possible = new List<(string key, string text)>();
+            if (!_revealedTraits[npc.ID].Contains("romanticism"))
+                possible.Add(("romanticism", profile.Romanticism > 0.6f ? "a hopeless romantic" : profile.Romanticism > 0.3f ? "open to romance" : "quite practical about love"));
+            if (!_revealedTraits[npc.ID].Contains("commitment"))
+                possible.Add(("commitment", profile.Commitment > 0.6f ? "seeking commitment" : profile.Commitment > 0.3f ? "open to possibilities" : "a free spirit"));
+            if (!_revealedTraits[npc.ID].Contains("sensuality"))
+                possible.Add(("sensuality", profile.Sensuality > 0.6f ? "deeply passionate" : profile.Sensuality > 0.3f ? "warm and affectionate" : "reserved but genuine"));
+            if (!_revealedTraits[npc.ID].Contains("preference"))
+            {
+                var pref = profile.RelationshipPref.ToString();
+                possible.Add(("preference", $"prefers {pref.ToLower()} relationships"));
+            }
+
+            if (possible.Count > 0)
+            {
+                var reveal = possible[random.Next(possible.Count)];
+                _revealedTraits[npc.ID].Add(reveal.key);
+
+                terminal.WriteLine("");
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"Over drinks, you learn that {npc.Name} is {reveal.text}.");
+            }
+        }
+
+        await terminal.WaitForKey();
+    }
+
+    #endregion
+
+    #region Dating
 
     private async Task TakeOnDate()
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine("\n═══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("\n+---------------------------------------------------------------------------+");
         terminal.WriteLine("                           TAKE SOMEONE ON A DATE");
-        terminal.WriteLine("═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine("+---------------------------------------------------------------------------+\n");
 
         // Get potential dates (lovers, spouses, or NPCs with good relations)
         var romance = RomanceTracker.Instance;
         var potentialDates = new List<(string id, string name, string type)>();
 
-        // Add spouses
         foreach (var spouse in romance.Spouses)
         {
             var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
-            // Use cached name if NPC lookup fails
             var name = npc?.Name ?? (!string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId);
             potentialDates.Add((spouse.NPCId, name, "Spouse"));
         }
 
-        // Add lovers
         foreach (var lover in romance.CurrentLovers)
         {
             var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
-            // Use cached name if NPC lookup fails
             var name = npc?.Name ?? (!string.IsNullOrEmpty(lover.NPCName) ? lover.NPCName : lover.NPCId);
             potentialDates.Add((lover.NPCId, name, "Lover"));
         }
 
-        // Add friendly NPCs
         var friendlyNpcs = NPCSpawnSystem.Instance?.ActiveNPCs?
+            .Where(n => n.IsAlive && !n.IsDead)
             .Where(n => RelationshipSystem.GetRelationshipStatus(currentPlayer, n) <= 40)
             .Where(n => !potentialDates.Any(p => p.id == n.ID))
             .Take(5)
@@ -975,7 +1342,7 @@ public class LoveStreetLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine("You don't have anyone to take on a date.");
-            terminal.WriteLine("Try meeting people and improving your relationships first!");
+            terminal.WriteLine("Try mingling and improving your relationships first!");
             await terminal.WaitForKey();
             return;
         }
@@ -1003,11 +1370,9 @@ public class LoveStreetLocation : BaseLocation
         if (int.TryParse(input, out int choice) && choice >= 1 && choice <= potentialDates.Count)
         {
             var selected = potentialDates[choice - 1];
-            // Try to find NPC by ID first, then fall back to name match
             var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == selected.id);
             if (npc == null)
             {
-                // Fall back to matching by name (handles saved data with different ID formats)
                 npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n =>
                     n.Name.Equals(selected.name, StringComparison.OrdinalIgnoreCase) ||
                     n.Name2.Equals(selected.name, StringComparison.OrdinalIgnoreCase));
@@ -1029,9 +1394,9 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"\n═══════════════════════════════════════════════════════════════════════════════");
-        terminal.WriteLine($"                      A Date with {partner.Name}");
-        terminal.WriteLine($"═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine($"\n+---------------------------------------------------------------------------+");
+        terminal.WriteLine($"  A Date with {partner.Name}");
+        terminal.WriteLine($"+---------------------------------------------------------------------------+\n");
 
         terminal.SetColor("white");
         terminal.WriteLine("Where would you like to take them?\n");
@@ -1064,6 +1429,7 @@ public class LoveStreetLocation : BaseLocation
         }
 
         currentPlayer.Gold -= cost;
+        if (cost > 0) currentPlayer.Statistics?.RecordGoldSpent(cost);
 
         await ProcessDateActivity(partner, choice);
     }
@@ -1075,7 +1441,7 @@ public class LoveStreetLocation : BaseLocation
 
         switch (activity)
         {
-            case 1: // Dinner
+            case 1:
                 terminal.WriteLine("\n                         * Romantic Dinner *\n");
                 terminal.SetColor("white");
                 terminal.WriteLine($"You take {partner.Name} to the finest restaurant in town.");
@@ -1087,7 +1453,7 @@ public class LoveStreetLocation : BaseLocation
                 currentPlayer.Experience += currentPlayer.Level * 30;
                 break;
 
-            case 2: // Moonlit Walk
+            case 2:
                 terminal.WriteLine("\n                         * Moonlit Walk *\n");
                 terminal.SetColor("white");
                 terminal.WriteLine($"Hand in hand, you and {partner.Name} stroll through the quiet streets.");
@@ -1099,7 +1465,7 @@ public class LoveStreetLocation : BaseLocation
                 currentPlayer.HP = Math.Min(currentPlayer.HP + currentPlayer.MaxHP / 10, currentPlayer.MaxHP);
                 break;
 
-            case 3: // Theater
+            case 3:
                 terminal.WriteLine("\n                         * Theater Performance *\n");
                 terminal.SetColor("white");
                 terminal.WriteLine($"You and {partner.Name} watch an enchanting performance.");
@@ -1111,7 +1477,7 @@ public class LoveStreetLocation : BaseLocation
                 currentPlayer.Experience += currentPlayer.Level * 50;
                 break;
 
-            case 4: // Picnic
+            case 4:
                 terminal.WriteLine("\n                         * Picnic by the Lake *\n");
                 terminal.SetColor("white");
                 terminal.WriteLine($"You spread a blanket by the water's edge with {partner.Name}.");
@@ -1123,7 +1489,7 @@ public class LoveStreetLocation : BaseLocation
                 currentPlayer.Mana = Math.Min(currentPlayer.Mana + currentPlayer.MaxMana / 5, currentPlayer.MaxMana);
                 break;
 
-            case 5: // Dancing
+            case 5:
                 terminal.WriteLine("\n                         * Dancing at the Inn *\n");
                 terminal.SetColor("white");
                 terminal.WriteLine($"You lead {partner.Name} onto the dance floor at the Inn.");
@@ -1153,15 +1519,27 @@ public class LoveStreetLocation : BaseLocation
 
         await terminal.WaitForKey();
 
-        // If relationship is good enough, offer intimacy option
+        // Check for intimacy invitation
         var romanceType = RomanceTracker.Instance.GetRelationType(partner.ID);
         int relationLevel = RelationshipSystem.GetRelationshipStatus(currentPlayer, partner);
 
-        if (romanceType == RomanceRelationType.Lover ||
+        bool intimacyAvailable = _passionActive ||
+            romanceType == RomanceRelationType.Lover ||
             romanceType == RomanceRelationType.Spouse ||
             romanceType == RomanceRelationType.FWB ||
-            (relationLevel <= 20 && random.NextDouble() < 0.5))
+            (relationLevel <= 20 && random.NextDouble() < 0.5);
+
+        if (intimacyAvailable)
         {
+            if (_passionActive)
+            {
+                _passionActive = false;
+                terminal.ClearScreen();
+                terminal.SetColor("magenta");
+                terminal.WriteLine("\nThe Passion Potion's warmth spreads through you both...");
+                terminal.WriteLine("");
+            }
+
             terminal.ClearScreen();
             terminal.SetColor("bright_magenta");
             terminal.WriteLine("");
@@ -1178,7 +1556,6 @@ public class LoveStreetLocation : BaseLocation
             var response = await terminal.GetKeyInput();
             if (response.ToUpper() == "Y")
             {
-                // Use the IntimacySystem for the intimate encounter
                 await IntimacySystem.Instance.StartIntimateScene(
                     currentPlayer,
                     partner,
@@ -1202,110 +1579,177 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine("\n═══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("\n+---------------------------------------------------------------------------+");
         terminal.WriteLine("                           LOVE STREET GIFT SHOP");
-        terminal.WriteLine("═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine("+---------------------------------------------------------------------------+\n");
 
         terminal.SetColor("white");
         terminal.WriteLine("\"Welcome, welcome! Looking for something special for someone special?\"\n");
 
-        terminal.WriteLine(" [1] Red Roses (100 gold) - Classic and romantic");
-        terminal.WriteLine(" [2] Box of Chocolates (200 gold) - Sweet and thoughtful");
-        terminal.WriteLine(" [3] Bottle of Fine Wine (500 gold) - For a special occasion");
-        terminal.WriteLine(" [4] Silver Necklace (2,000 gold) - Elegant and meaningful");
-        terminal.WriteLine(" [5] Diamond Ring (10,000 gold) - For someone truly special");
-        terminal.WriteLine(" [6] Exotic Perfume (1,000 gold) - Enchanting and alluring");
+        var gifts = new (string name, long cost, int boost)[]
+        {
+            ("Red Roses", 100, 3),
+            ("Box of Chocolates", 200, 4),
+            ("Bottle of Fine Wine", 500, 6),
+            ("Exotic Perfume", 1000, 8),
+            ("Silver Necklace", 2000, 10),
+            ("Diamond Ring", 10000, 20),
+            ("Enchanted Locket", 25000, 25),
+            ("Moonstone Tiara", 50000, 30),
+            ("Star of Eternity", 100000, 40)
+        };
+
+        for (int i = 0; i < gifts.Length; i++)
+        {
+            var (name, cost, boost) = gifts[i];
+            terminal.SetColor("bright_yellow");
+            terminal.Write($" [{i + 1}] ");
+            terminal.SetColor(currentPlayer.Gold >= cost ? "white" : "darkgray");
+            terminal.Write($"{name}");
+            terminal.SetColor("gray");
+            terminal.Write($" ({cost:N0}g)");
+            if (cost >= 25000)
+            {
+                terminal.SetColor("magenta");
+                terminal.Write(" *Luxury*");
+            }
+            terminal.WriteLine("");
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(" [0] Leave shop");
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
-        terminal.WriteLine($"Your gold: {currentPlayer.Gold:N0}");
+        terminal.WriteLine($" Your gold: {currentPlayer.Gold:N0}");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput("What would you like to buy? ");
-        if (!int.TryParse(input, out int choice) || choice < 1 || choice > 6)
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > gifts.Length)
         {
             terminal.WriteLine("\"Come back when you're ready to shop!\"", "gray");
             await terminal.WaitForKey();
             return;
         }
 
-        var gifts = new[]
-        {
-            ("Red Roses", 100L, 3),
-            ("Box of Chocolates", 200L, 4),
-            ("Bottle of Fine Wine", 500L, 6),
-            ("Silver Necklace", 2000L, 10),
-            ("Diamond Ring", 10000L, 20),
-            ("Exotic Perfume", 1000L, 8)
-        };
+        var (giftName, giftCost, relationBoost) = gifts[choice - 1];
 
-        var (giftName, cost, relationBoost) = gifts[choice - 1];
-
-        if (currentPlayer.Gold < cost)
+        if (currentPlayer.Gold < giftCost)
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"\"That costs {cost} gold! You don't have enough.\"");
+            terminal.WriteLine($"\"That costs {giftCost:N0} gold! You don't have enough.\"");
             await terminal.WaitForKey();
             return;
         }
 
-        // Ask who to give it to
+        // Show numbered list of NPCs to give to
         terminal.WriteLine("");
-        var recipient = await terminal.GetInput("Who would you like to give this to? (enter name): ");
+        terminal.SetColor("white");
+        terminal.WriteLine($"Who should receive the {giftName}?\n");
 
-        if (string.IsNullOrWhiteSpace(recipient))
+        var knownNPCs = (NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>())
+            .Where(n => n.IsAlive && !n.IsDead)
+            .Where(n => RelationshipSystem.GetRelationshipStatus(currentPlayer, n) < 80)
+            .OrderBy(n => RelationshipSystem.GetRelationshipStatus(currentPlayer, n))
+            .Take(12)
+            .ToList();
+
+        if (knownNPCs.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("You don't know anyone well enough to give gifts to.");
+            terminal.WriteLine("Try meeting and talking to people first!");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        for (int i = 0; i < knownNPCs.Count; i++)
+        {
+            var npc = knownNPCs[i];
+            var romType = RomanceTracker.Instance.GetRelationType(npc.ID);
+            string tag = romType switch
+            {
+                RomanceRelationType.Spouse => " (Spouse)",
+                RomanceRelationType.Lover => " (Lover)",
+                RomanceRelationType.FWB => " (FWB)",
+                _ => ""
+            };
+
+            terminal.SetColor("bright_yellow");
+            terminal.Write($" [{i + 1}] ");
+            terminal.SetColor("white");
+            terminal.Write($"{npc.Name}");
+            terminal.SetColor("gray");
+            terminal.WriteLine(tag);
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine(" [0] Cancel");
+        terminal.WriteLine("");
+
+        var recipientInput = await terminal.GetInput("Give to: ");
+        if (!int.TryParse(recipientInput, out int recipChoice) || recipChoice < 1 || recipChoice > knownNPCs.Count)
         {
             terminal.WriteLine("\"Changed your mind? No problem.\"", "gray");
             await terminal.WaitForKey();
             return;
         }
 
-        // Find the recipient
-        var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(
-            n => n.Name.Equals(recipient, StringComparison.OrdinalIgnoreCase) ||
-                 n.Name2.Equals(recipient, StringComparison.OrdinalIgnoreCase));
+        var recipient = knownNPCs[recipChoice - 1];
 
-        if (npc == null)
+        // Show reaction preview
+        int currentRelation = RelationshipSystem.GetRelationshipStatus(currentPlayer, recipient);
+        bool isAttracted = recipient.Brain?.Personality?.IsAttractedTo(
+            currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male) ?? true;
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        if (isAttracted && currentRelation <= 40)
+            terminal.WriteLine($"  (You think {recipient.Name} would love this!)");
+        else if (isAttracted && currentRelation <= 60)
+            terminal.WriteLine($"  (You think {recipient.Name} would appreciate this.)");
+        else if (!isAttracted)
+            terminal.WriteLine($"  ({recipient.Name} might not see this as romantic...)");
+        else
+            terminal.WriteLine($"  ({recipient.Name} might not accept this from you...)");
+
+        terminal.WriteLine("");
+        var confirm = await terminal.GetInput($"Buy {giftName} for {recipient.Name}? ({giftCost:N0}g) (Y/N): ");
+        if (string.IsNullOrEmpty(confirm) || confirm.ToUpper() != "Y")
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"Could not find anyone named '{recipient}'.");
+            terminal.WriteLine("\"Maybe next time!\"", "gray");
             await terminal.WaitForKey();
             return;
         }
 
         // Process gift
-        currentPlayer.Gold -= cost;
+        currentPlayer.Gold -= giftCost;
+        currentPlayer.Statistics?.RecordGoldSpent(giftCost);
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"\nYou purchase {giftName} and present it to {npc.Name}.");
+        terminal.WriteLine($"\nYou purchase {giftName} and present it to {recipient.Name}.");
         terminal.WriteLine("");
-
-        // Check their reaction
-        int currentRelation = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
-        bool isAttracted = npc.Brain?.Personality?.IsAttractedTo(
-            currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male) ?? true;
 
         if (isAttracted && currentRelation <= 60)
         {
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"{npc.Name}'s eyes light up with joy!");
+            terminal.WriteLine($"{recipient.Name}'s eyes light up with joy!");
             terminal.WriteLine($"\"Oh, {giftName}! How thoughtful of you!\"");
-            RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, relationBoost, false, true);
+            RelationshipSystem.UpdateRelationship(currentPlayer, recipient, 1, relationBoost, false, true);
         }
         else if (currentRelation <= 80)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"{npc.Name} accepts the gift politely.");
+            terminal.WriteLine($"{recipient.Name} accepts the gift politely.");
             terminal.WriteLine($"\"Thank you, that's... nice of you.\"");
-            RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, relationBoost / 2, false, false);
+            RelationshipSystem.UpdateRelationship(currentPlayer, recipient, 1, relationBoost / 2, false, false);
         }
         else
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"{npc.Name} looks uncomfortable.");
+            terminal.WriteLine($"{recipient.Name} looks uncomfortable.");
             terminal.WriteLine($"\"I... can't accept this from you.\"");
             terminal.WriteLine("They walk away, leaving the gift behind.");
         }
@@ -1315,16 +1759,15 @@ public class LoveStreetLocation : BaseLocation
 
     #endregion
 
-    #region Gossip Corner
+    #region Gossip (Overhauled)
 
-    private async Task VisitGossipCorner()
+    private async Task Gossip()
     {
         terminal.ClearScreen();
         terminal.SetColor("magenta");
-        terminal.WriteLine("\n═══════════════════════════════════════════════════════════════════════════════");
-        terminal.WriteLine("                           THE GOSSIP CORNER");
-        terminal.WriteLine("                      Madame Whispers Knows All");
-        terminal.WriteLine("═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine("\n+---------------------------------------------------------------------------+");
+        terminal.WriteLine("                           MADAME WHISPERS' GOSSIP");
+        terminal.WriteLine("+---------------------------------------------------------------------------+\n");
 
         terminal.SetColor("gray");
         terminal.WriteLine("An ancient crone beckons you into a shadowy alcove.");
@@ -1333,10 +1776,10 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine(" [1] Who is seeing whom? (100 gold) - Current romances");
-        terminal.WriteLine(" [2] Recent marriages (50 gold) - Wedding announcements");
-        terminal.WriteLine(" [3] Scandalous affairs (200 gold) - Who's being naughty");
-        terminal.WriteLine(" [4] About a specific person (500 gold) - Deep investigation");
+        terminal.WriteLine($" [1] Who's Together ({GameConfig.LoveStreetGossipCostBasic}g) - All the couples");
+        terminal.WriteLine($" [2] Juicy Scandals ({GameConfig.LoveStreetGossipCostScandals}g) - Affairs and intrigue");
+        terminal.WriteLine($" [3] Who's Available ({GameConfig.LoveStreetGossipCostBasic}g) - Singles looking for love");
+        terminal.WriteLine($" [4] Investigate Someone ({GameConfig.LoveStreetGossipCostInvestigate}g) - Deep secrets");
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(" [0] Leave");
@@ -1347,256 +1790,627 @@ public class LoveStreetLocation : BaseLocation
         switch (input)
         {
             case "1":
-                if (currentPlayer.Gold >= 100)
-                {
-                    currentPlayer.Gold -= 100;
-                    await ShowCurrentRomances();
-                }
-                else
-                {
-                    terminal.WriteLine("\"No gold, no gossip!\"", "red");
-                }
+                if (SpendGossipGold(GameConfig.LoveStreetGossipCostBasic))
+                    await GossipWhoseTogether();
                 break;
-
             case "2":
-                if (currentPlayer.Gold >= 50)
-                {
-                    currentPlayer.Gold -= 50;
-                    await ShowRecentMarriages();
-                }
-                else
-                {
-                    terminal.WriteLine("\"No gold, no gossip!\"", "red");
-                }
+                if (SpendGossipGold(GameConfig.LoveStreetGossipCostScandals))
+                    await GossipScandals();
                 break;
-
             case "3":
-                if (currentPlayer.Gold >= 200)
-                {
-                    currentPlayer.Gold -= 200;
-                    await ShowAffairs();
-                }
-                else
-                {
-                    terminal.WriteLine("\"No gold, no gossip!\"", "red");
-                }
+                if (SpendGossipGold(GameConfig.LoveStreetGossipCostBasic))
+                    await GossipWhosAvailable();
                 break;
-
             case "4":
-                if (currentPlayer.Gold >= 500)
-                {
-                    var name = await terminal.GetInput("Whose secrets do you seek? ");
-                    currentPlayer.Gold -= 500;
-                    await InvestigatePerson(name);
-                }
-                else
-                {
-                    terminal.WriteLine("\"No gold, no gossip!\"", "red");
-                }
+                if (SpendGossipGold(GameConfig.LoveStreetGossipCostInvestigate))
+                    await GossipInvestigate();
                 break;
         }
 
         await terminal.WaitForKey();
     }
 
-    private Task ShowCurrentRomances()
+    private bool SpendGossipGold(long cost)
     {
+        if (currentPlayer.Gold >= cost)
+        {
+            currentPlayer.Gold -= cost;
+            currentPlayer.Statistics?.RecordGoldSpent(cost);
+            return true;
+        }
+        terminal.SetColor("red");
+        terminal.WriteLine("\"No gold, no gossip!\" Madame Whispers cackles.");
+        return false;
+    }
+
+    private async Task GossipWhoseTogether()
+    {
+        terminal.ClearScreen();
         terminal.SetColor("magenta");
         terminal.WriteLine("\n\"Ah, the tangled webs of love...\"\n");
-        terminal.SetColor("white");
 
-        var npcs = NPCSpawnSystem.Instance?.ActiveNPCs?.ToList() ?? new List<NPC>();
-        int romanceCount = 0;
+        int count = 0;
 
-        // Show player's romances
+        // Player marriages
         var playerRomance = RomanceTracker.Instance;
         if (playerRomance.Spouses.Count > 0)
         {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("Your marriages:");
+            terminal.SetColor("white");
             foreach (var spouse in playerRomance.Spouses)
             {
-                var npc = npcs.FirstOrDefault(n => n.ID == spouse.NPCId);
-                var name = npc?.Name ?? (!string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId);
-                terminal.WriteLine($"<3 {currentPlayer.Name2} is married to {name}");
-                romanceCount++;
-            }
-        }
-        if (playerRomance.CurrentLovers.Count > 0)
-        {
-            foreach (var lover in playerRomance.CurrentLovers)
-            {
-                var npc = npcs.FirstOrDefault(n => n.ID == lover.NPCId);
-                var name = npc?.Name ?? (!string.IsNullOrEmpty(lover.NPCName) ? lover.NPCName : lover.NPCId);
-                terminal.WriteLine($"<3 {currentPlayer.Name2} is involved with {name}");
-                romanceCount++;
-            }
-        }
-
-        if (romanceCount == 0)
-        {
-            terminal.WriteLine("\"Not much happening in the romance department lately...\"");
-        }
-
-        return Task.CompletedTask;
-    }
-
-    private Task ShowRecentMarriages()
-    {
-        terminal.SetColor("bright_magenta");
-        terminal.WriteLine("\n\"Recent wedding bells...\"\n");
-        terminal.SetColor("white");
-
-        var playerRomance = RomanceTracker.Instance;
-        if (playerRomance.Spouses.Count > 0)
-        {
-            foreach (var spouse in playerRomance.Spouses)
-            {
-                var daysSince = (DateTime.Now - spouse.MarriedDate).Days;
                 var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
                 var name = npc?.Name ?? (!string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId);
-                terminal.WriteLine($"<3 {currentPlayer.Name2} married {name} ({daysSince} days ago)");
+                var days = (DateTime.Now - spouse.MarriedDate).Days;
+                terminal.WriteLine($" <3 {currentPlayer.Name2} & {name} ({days} days, {spouse.Children} children)");
+                count++;
+            }
+            terminal.WriteLine("");
+        }
+
+        // NPC-NPC marriages from registry
+        var marriages = NPCMarriageRegistry.Instance?.GetAllMarriages() ?? new List<NPCMarriageData>();
+        if (marriages.Count > 0)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("NPC couples:");
+            terminal.SetColor("white");
+            foreach (var marriage in marriages.Take(15))
+            {
+                var npc1 = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == marriage.Npc1Id);
+                var npc2 = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == marriage.Npc2Id);
+                string name1 = npc1?.Name ?? marriage.Npc1Id;
+                string name2 = npc2?.Name ?? marriage.Npc2Id;
+                terminal.WriteLine($" <3 {name1} & {name2}");
+                count++;
             }
         }
-        else
-        {
-            terminal.WriteLine("\"No recent marriages to report...\"");
-        }
 
-        return Task.CompletedTask;
+        if (count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\"Not many couples in the realm at the moment... how sad!\"");
+        }
     }
 
-    private Task ShowAffairs()
+    private async Task GossipScandals()
     {
+        terminal.ClearScreen();
         terminal.SetColor("red");
-        terminal.WriteLine("\n\"Scandalous behavior, you say?\"\n");
-        terminal.SetColor("white");
+        terminal.WriteLine("\n\"Oh, you want the JUICY stuff...\"\n");
 
+        var allAffairs = NPCMarriageRegistry.Instance?.GetAllAffairs() ?? new List<AffairState>();
+        var juicy = allAffairs.Where(a => a.SpouseSuspicion > 0 || a.IsActive).ToList();
+
+        int count = 0;
+
+        if (juicy.Count > 0)
+        {
+            terminal.SetColor("white");
+            foreach (var affair in juicy.Take(10))
+            {
+                var married = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == affair.MarriedNpcId);
+                var seducer = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == affair.SeducerId);
+                string marriedName = married?.Name ?? affair.MarriedNpcId;
+                string seducerName = seducer?.Name ?? affair.SeducerId;
+
+                // Find the spouse
+                string spouseId = NPCMarriageRegistry.Instance?.GetSpouseId(affair.MarriedNpcId) ?? "";
+                var spouse = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouseId);
+                string spouseName = spouse?.Name ?? "someone";
+
+                terminal.SetColor("bright_red");
+                terminal.Write(" ! ");
+                terminal.SetColor("white");
+                terminal.WriteLine($"Word is {marriedName} has been seen with {seducerName}");
+                terminal.SetColor("gray");
+                terminal.Write("   behind ");
+                terminal.SetColor("yellow");
+                terminal.Write(spouseName);
+                terminal.SetColor("gray");
+                terminal.Write("'s back!");
+
+                if (affair.SpouseSuspicion > 60)
+                {
+                    terminal.SetColor("red");
+                    terminal.Write(" The spouse is getting suspicious...");
+                }
+                if (affair.IsActive)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.Write(" Full-blown affair!");
+                }
+                terminal.WriteLine("");
+                terminal.WriteLine("");
+                count++;
+            }
+        }
+
+        // Also check recent Love Street news for color
         var recentNews = NewsSystem.Instance.GetTodaysNews(GameConfig.NewsCategory.General);
         var scandalous = recentNews.Where(n =>
-            n.Contains("Love Street") ||
-            n.Contains("unfaithful") ||
-            n.Contains("disease") ||
-            n.Contains("Beauty Nest") ||
-            n.Contains("Hall of Dreams")).Take(5).ToList();
+            n.Contains("Love Street") || n.Contains("unfaithful") ||
+            n.Contains("disease") || n.Contains("affair")).Take(5).ToList();
 
         if (scandalous.Count > 0)
         {
+            terminal.SetColor("magenta");
+            terminal.WriteLine("Recent rumors:");
+            terminal.SetColor("gray");
             foreach (var news in scandalous)
             {
-                terminal.WriteLine($"- {news}");
+                terminal.WriteLine($" - {news}");
+                count++;
             }
         }
-        else
-        {
-            terminal.WriteLine("\"Everyone's been remarkably well-behaved lately... how boring!\"");
-        }
 
-        return Task.CompletedTask;
-    }
-
-    private Task InvestigatePerson(string name)
-    {
-        var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(
-            n => n.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
-
-        if (npc == null)
+        if (count == 0)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine($"\"I don't know anyone by that name...\"");
-            return Task.CompletedTask;
+            terminal.WriteLine("\"Everyone's been remarkably well-behaved lately... how boring!\"");
+        }
+    }
+
+    private async Task GossipWhosAvailable()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("\n\"Looking for love? Let me see who's available...\"\n");
+
+        var playerGender = currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+
+        var singles = (NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>())
+            .Where(n => n.IsAlive && !n.IsDead)
+            .Where(n => NPCMarriageRegistry.Instance?.IsMarriedToNPC(n.ID) != true)
+            .Where(n => RomanceTracker.Instance.GetRelationType(n.ID) == RomanceRelationType.None)
+            .Where(n => n.Brain?.Personality?.IsAttractedTo(playerGender) == true)
+            .OrderBy(n => RelationshipSystem.GetRelationshipStatus(currentPlayer, n))
+            .Take(10)
+            .ToList();
+
+        if (singles.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\"Slim pickings right now, I'm afraid. Everyone's taken!\"");
+            return;
         }
 
-        terminal.SetColor("magenta");
-        terminal.WriteLine($"\n\"Ah, {npc.Name}... let me see what I know...\"\n");
         terminal.SetColor("white");
+        foreach (var npc in singles)
+        {
+            int relation = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
+            var profile = npc.Brain?.Personality;
 
-        terminal.WriteLine($"Name: {npc.Name}");
-        terminal.WriteLine($"Level {npc.Level} {npc.Race} {npc.Class}");
-        terminal.WriteLine($"Age: {npc.Age}");
+            terminal.SetColor("bright_yellow");
+            terminal.Write($" * ");
+            terminal.SetColor("white");
+            terminal.Write($"{npc.Name}");
+            terminal.SetColor("gray");
+            terminal.Write($" (Lv{npc.Level} {npc.Race} {npc.Class})");
+
+            if (profile != null)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write($" - {GetPersonalityHint(profile)}");
+            }
+
+            terminal.SetColor(relation <= 40 ? "bright_green" : relation <= 60 ? "yellow" : "gray");
+            terminal.Write($" [{GetRelationDescription(relation)}]");
+            terminal.WriteLine("");
+        }
+
+        terminal.SetColor("gray");
+        terminal.WriteLine($"\n\"That's {singles.Count} eligible soul{(singles.Count != 1 ? "s" : "")} for you, dearie!\"");
+    }
+
+    private async Task GossipInvestigate()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("magenta");
+        terminal.WriteLine("\n\"Who do you want me to look into?\"\n");
+
+        var npcs = (NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>())
+            .Where(n => n.IsAlive && !n.IsDead)
+            .Take(15)
+            .ToList();
+
+        if (npcs.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("\"Nobody to investigate right now...\"");
+            return;
+        }
+
+        for (int i = 0; i < npcs.Count; i++)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write($" [{i + 1}] ");
+            terminal.SetColor("white");
+            terminal.Write($"{npcs[i].Name}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($" (Lv{npcs[i].Level} {npcs[i].Race})");
+        }
+
+        terminal.WriteLine("");
+        var input = await terminal.GetInput("Investigate who? ");
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > npcs.Count)
+            return;
+
+        var npc = npcs[choice - 1];
+        terminal.ClearScreen();
+        terminal.SetColor("magenta");
+        terminal.WriteLine($"\n\"Ah, {npc.Name}... let me dig up what I know...\"\n");
+
+        terminal.SetColor("white");
+        terminal.WriteLine($" Name: {npc.Name}");
+        terminal.WriteLine($" Level {npc.Level} {npc.Race} {npc.Class}, Age {npc.Age}");
         terminal.WriteLine("");
 
         var profile = npc.Brain?.Personality;
         if (profile != null)
         {
-            terminal.WriteLine($"Orientation: {profile.Orientation}");
-            terminal.WriteLine($"Romanticism: {(profile.Romanticism > 0.7f ? "Very romantic" : profile.Romanticism > 0.3f ? "Moderate" : "Practical")}");
-            terminal.WriteLine($"Commitment: {(profile.Commitment > 0.7f ? "Seeks commitment" : profile.Commitment > 0.3f ? "Open to options" : "Prefers freedom")}");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(" Personality Secrets:");
+            terminal.SetColor("white");
+
+            // Orientation
+            terminal.Write("   Orientation: ");
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine(GetOrientationDescription(profile));
+
+            // Romanticism
+            terminal.SetColor("white");
+            terminal.Write("   Romance: ");
+            terminal.SetColor(profile.Romanticism > 0.6f ? "bright_magenta" : "gray");
+            terminal.WriteLine(profile.Romanticism > 0.7f ? "Hopeless romantic" :
+                              profile.Romanticism > 0.4f ? "Enjoys romance" : "Pragmatic about love");
+
+            // Commitment
+            terminal.SetColor("white");
+            terminal.Write("   Commitment: ");
+            terminal.SetColor(profile.Commitment > 0.6f ? "bright_green" : "yellow");
+            terminal.WriteLine(profile.Commitment > 0.7f ? "Deeply loyal" :
+                              profile.Commitment > 0.4f ? "Open to commitment" : "Values freedom");
+
+            // Sensuality
+            terminal.SetColor("white");
+            terminal.Write("   Passion: ");
+            terminal.SetColor(profile.Sensuality > 0.6f ? "bright_red" : "gray");
+            terminal.WriteLine(profile.Sensuality > 0.7f ? "Intensely passionate" :
+                              profile.Sensuality > 0.4f ? "Warm and affectionate" : "Reserved");
+
+            // Flirtatiousness
+            terminal.SetColor("white");
+            terminal.Write("   Flirtiness: ");
+            terminal.SetColor(profile.Flirtatiousness > 0.6f ? "bright_yellow" : "gray");
+            terminal.WriteLine(profile.Flirtatiousness > 0.7f ? "Very flirtatious" :
+                              profile.Flirtatiousness > 0.4f ? "Somewhat coy" : "Shy");
         }
 
-        int relation = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
         terminal.WriteLine("");
-        terminal.WriteLine($"Their opinion of you: {GetRelationDescription(relation)}");
 
-        return Task.CompletedTask;
+        // Relationship status
+        terminal.SetColor("white");
+        terminal.Write(" Status: ");
+        bool isMarried = NPCMarriageRegistry.Instance?.IsMarriedToNPC(npc.ID) == true;
+        if (isMarried)
+        {
+            var spouseId = NPCMarriageRegistry.Instance?.GetSpouseId(npc.ID);
+            var spouse = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouseId);
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"Married to {spouse?.Name ?? "someone"}");
+        }
+        else
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("Single");
+        }
+
+        // Their opinion of player
+        int relation = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
+        terminal.SetColor("white");
+        terminal.Write(" Thinks of you: ");
+        terminal.SetColor(relation <= 20 ? "bright_magenta" : relation <= 50 ? "bright_green" : relation <= 70 ? "yellow" : "red");
+        terminal.WriteLine(GetRelationDescription(relation));
+
+        // Compatibility
+        if (profile != null)
+        {
+            var playerGender = currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+            bool attracted = profile.IsAttractedTo(playerGender);
+            terminal.SetColor("white");
+            terminal.Write(" Compatibility: ");
+            if (!attracted)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Not interested in your type");
+            }
+            else if (relation <= 30)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("Excellent match!");
+            }
+            else if (relation <= 50)
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine("Good potential");
+            }
+            else
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("Needs work");
+            }
+        }
     }
 
     #endregion
 
-    #region Romance Stats
+    #region Love Potions (replaces Romance Stats)
+
+    private async Task LovePotions()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("magenta");
+        terminal.WriteLine("\n+---------------------------------------------------------------------------+");
+        terminal.WriteLine("                        MADAME ZARA'S LOVE POTIONS");
+        terminal.WriteLine("+---------------------------------------------------------------------------+\n");
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("An old witch cackles as you approach her bubbling cauldron.");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("\"Looking for a little... magical assistance in matters of the heart?\"");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.Write($" [1] Philter of Charm ");
+        terminal.SetColor("yellow");
+        terminal.Write($"({GameConfig.LoveStreetCharmPotionCost}g)");
+        terminal.SetColor("gray");
+        terminal.Write($" - +{GameConfig.LoveStreetCharmBonus} CHA for this visit");
+        if (_charmActive) { terminal.SetColor("bright_green"); terminal.Write(" [ACTIVE]"); }
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.Write($" [2] Elixir of Allure ");
+        terminal.SetColor("yellow");
+        terminal.Write($"({GameConfig.LoveStreetAllurePotionCost}g)");
+        terminal.SetColor("gray");
+        terminal.Write($" - Next flirt auto-succeeds");
+        if (_allureActive) { terminal.SetColor("bright_green"); terminal.Write(" [ACTIVE]"); }
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.Write($" [3] Draught of Forgetting ");
+        terminal.SetColor("yellow");
+        terminal.Write($"({GameConfig.LoveStreetForgetPotionCost}g)");
+        terminal.SetColor("gray");
+        terminal.WriteLine($" - Reduce partner jealousy by {GameConfig.LoveStreetJealousyReduction}");
+
+        terminal.SetColor("white");
+        terminal.Write($" [4] Passion Potion ");
+        terminal.SetColor("yellow");
+        terminal.Write($"({GameConfig.LoveStreetPassionPotionCost}g)");
+        terminal.SetColor("gray");
+        terminal.Write($" - Next date guarantees intimacy");
+        if (_passionActive) { terminal.SetColor("bright_green"); terminal.Write(" [ACTIVE]"); }
+        terminal.WriteLine("");
+
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine(" [5] My Romance Stats - View your romantic history");
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine(" [0] Leave");
+        terminal.WriteLine("");
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine($" Your gold: {currentPlayer.Gold:N0}");
+        terminal.WriteLine("");
+
+        var input = await terminal.GetInput("What catches your eye? ");
+        switch (input)
+        {
+            case "1":
+                await BuyCharmPotion();
+                break;
+            case "2":
+                await BuyAllurePotion();
+                break;
+            case "3":
+                await BuyForgetPotion();
+                break;
+            case "4":
+                await BuyPassionPotion();
+                break;
+            case "5":
+                await ShowRomanceStats();
+                break;
+        }
+    }
+
+    private async Task BuyCharmPotion()
+    {
+        if (_charmActive)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("\n\"You already have the charm flowing through you, dear!\"");
+            await terminal.WaitForKey();
+            return;
+        }
+        if (currentPlayer.Gold < GameConfig.LoveStreetCharmPotionCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n\"That costs {GameConfig.LoveStreetCharmPotionCost} gold, dear.\"");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        currentPlayer.Gold -= GameConfig.LoveStreetCharmPotionCost;
+        currentPlayer.Statistics?.RecordGoldSpent(GameConfig.LoveStreetCharmPotionCost);
+        _charmActive = true;
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("\nYou drink the shimmering pink liquid. Warmth spreads through you.");
+        terminal.WriteLine($"You feel irresistibly charming! (+{GameConfig.LoveStreetCharmBonus} CHA for this visit)");
+        await terminal.WaitForKey();
+    }
+
+    private async Task BuyAllurePotion()
+    {
+        if (_allureActive)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("\n\"You already have allure magic ready, dear!\"");
+            await terminal.WaitForKey();
+            return;
+        }
+        if (currentPlayer.Gold < GameConfig.LoveStreetAllurePotionCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n\"That costs {GameConfig.LoveStreetAllurePotionCost} gold, dear.\"");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        currentPlayer.Gold -= GameConfig.LoveStreetAllurePotionCost;
+        currentPlayer.Statistics?.RecordGoldSpent(GameConfig.LoveStreetAllurePotionCost);
+        _allureActive = true;
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("\nYou drink the golden elixir. Your eyes seem to sparkle with magic.");
+        terminal.WriteLine("Your next flirt will be absolutely irresistible!");
+        await terminal.WaitForKey();
+    }
+
+    private async Task BuyForgetPotion()
+    {
+        if (currentPlayer.Gold < GameConfig.LoveStreetForgetPotionCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n\"That costs {GameConfig.LoveStreetForgetPotionCost} gold, dear.\"");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        currentPlayer.Gold -= GameConfig.LoveStreetForgetPotionCost;
+        currentPlayer.Statistics?.RecordGoldSpent(GameConfig.LoveStreetForgetPotionCost);
+
+        // Reduce jealousy on all partners
+        var jealousy = RomanceTracker.Instance.JealousyLevels;
+        int reduced = 0;
+        foreach (var key in jealousy.Keys.ToList())
+        {
+            if (jealousy[key] > 0)
+            {
+                jealousy[key] = Math.Max(0, jealousy[key] - GameConfig.LoveStreetJealousyReduction);
+                reduced++;
+            }
+        }
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("\nYou pour the misty blue liquid into your partners' drinks.");
+        if (reduced > 0)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"The jealousy of {reduced} partner{(reduced > 1 ? "s" : "")} has been soothed!");
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("None of your partners were jealous. The potion was wasted.");
+        }
+        await terminal.WaitForKey();
+    }
+
+    private async Task BuyPassionPotion()
+    {
+        if (_passionActive)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("\n\"You already have passion magic ready, dear!\"");
+            await terminal.WaitForKey();
+            return;
+        }
+        if (currentPlayer.Gold < GameConfig.LoveStreetPassionPotionCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n\"That costs {GameConfig.LoveStreetPassionPotionCost} gold, dear.\"");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        currentPlayer.Gold -= GameConfig.LoveStreetPassionPotionCost;
+        currentPlayer.Statistics?.RecordGoldSpent(GameConfig.LoveStreetPassionPotionCost);
+        _passionActive = true;
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("\nYou drink the deep red potion. Fire courses through your veins.");
+        terminal.WriteLine("Your next date will end with a guaranteed invitation to intimacy!");
+        await terminal.WaitForKey();
+    }
 
     private async Task ShowRomanceStats()
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine("\n═══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("\n+---------------------------------------------------------------------------+");
         terminal.WriteLine("                           YOUR ROMANTIC LIFE");
-        terminal.WriteLine("═══════════════════════════════════════════════════════════════════════════════\n");
+        terminal.WriteLine("+---------------------------------------------------------------------------+\n");
 
         var romance = RomanceTracker.Instance;
 
         // Spouses
         terminal.SetColor("bright_red");
-        terminal.WriteLine($"<3 SPOUSES: {romance.Spouses.Count}");
+        terminal.WriteLine($" <3 SPOUSES: {romance.Spouses.Count}");
         if (romance.Spouses.Count > 0)
         {
             terminal.SetColor("white");
             foreach (var spouse in romance.Spouses)
             {
                 var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
-                // Use cached name if NPC lookup fails
                 var name = npc?.Name ?? (!string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId);
                 var days = (DateTime.Now - spouse.MarriedDate).Days;
-                terminal.WriteLine($"  - {name} (married {days} days, {spouse.Children} children)");
+                terminal.WriteLine($"   - {name} (married {days} days, {spouse.Children} children)");
             }
         }
         terminal.WriteLine("");
 
         // Lovers
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"<3 LOVERS: {romance.CurrentLovers.Count}");
+        terminal.WriteLine($" <3 LOVERS: {romance.CurrentLovers.Count}");
         if (romance.CurrentLovers.Count > 0)
         {
             terminal.SetColor("white");
             foreach (var lover in romance.CurrentLovers)
             {
                 var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
-                // Use cached name if NPC lookup fails
                 var name = npc?.Name ?? (!string.IsNullOrEmpty(lover.NPCName) ? lover.NPCName : lover.NPCId);
                 var days = (DateTime.Now - lover.RelationshipStart).Days;
-                terminal.WriteLine($"  - {name} (together {days} days)");
+                terminal.WriteLine($"   - {name} (together {days} days)");
             }
         }
         terminal.WriteLine("");
 
         // FWB
         terminal.SetColor("cyan");
-        terminal.WriteLine($"~ FRIENDS WITH BENEFITS: {romance.FriendsWithBenefits.Count}");
+        terminal.WriteLine($" ~ FRIENDS WITH BENEFITS: {romance.FriendsWithBenefits.Count}");
         terminal.WriteLine("");
 
         // Exes
         terminal.SetColor("gray");
-        terminal.WriteLine($"X PAST RELATIONSHIPS: {romance.Exes.Count}");
+        terminal.WriteLine($" X PAST RELATIONSHIPS: {romance.Exes.Count}");
         terminal.WriteLine("");
 
-        // Encounters
+        // Summary
         terminal.SetColor("white");
-        terminal.WriteLine($"Total intimate encounters: {romance.EncounterHistory.Count}");
-        terminal.WriteLine($"Times married: {currentPlayer.MarriedTimes}");
-        terminal.WriteLine($"Children: {currentPlayer.Children}");
+        terminal.WriteLine($" Total intimate encounters: {romance.EncounterHistory.Count}");
+        terminal.WriteLine($" Times married: {currentPlayer.MarriedTimes}");
+        terminal.WriteLine($" Children: {currentPlayer.Children}");
         terminal.WriteLine("");
 
-        // Darkness from carnal activities
         terminal.SetColor("red");
-        terminal.WriteLine($"Darkness points: {currentPlayer.Darkness}");
+        terminal.WriteLine($" Darkness points: {currentPlayer.Darkness}");
 
         await terminal.WaitForKey();
     }
@@ -1618,7 +2432,7 @@ public class LoveStreetLocation : BaseLocation
 
     private float GetCharismaModifier()
     {
-        long charisma = currentPlayer.Charisma;
+        long charisma = currentPlayer.Charisma + (_charmActive ? GameConfig.LoveStreetCharmBonus : 0);
         if (charisma >= 20) return 0.25f;
         if (charisma >= 16) return 0.15f;
         if (charisma >= 12) return 0.05f;
@@ -1635,13 +2449,49 @@ public class LoveStreetLocation : BaseLocation
     {
         return level switch
         {
-            <= 10 => "Deeply in love with you",
-            <= 25 => "Very fond of you",
+            <= 10 => "Deeply in love",
+            <= 25 => "Very fond",
             <= 40 => "Friendly",
             <= 50 => "Neutral",
-            <= 65 => "Wary of you",
+            <= 65 => "Wary",
             <= 80 => "Dislikes you",
-            _ => "Despises you"
+            _ => "Hostile"
+        };
+    }
+
+    private string GetPersonalityHint(PersonalityProfile profile)
+    {
+        // Return the most prominent trait
+        var traits = new List<(float val, string desc)>
+        {
+            (profile.Flirtatiousness, "flirtatious"),
+            (profile.Romanticism, "romantic"),
+            (profile.Sensuality, "passionate"),
+            (profile.Tenderness, "gentle"),
+            (profile.Commitment, "devoted"),
+            (1f - profile.Commitment, "free-spirited"),
+        };
+
+        // Only consider traits above 0.5 to avoid weird descriptions
+        var strong = traits.Where(t => t.val > 0.5f).OrderByDescending(t => t.val).ToList();
+        if (strong.Count > 0)
+            return $"seems {strong[0].desc}";
+
+        return "seems reserved";
+    }
+
+    private string GetOrientationDescription(PersonalityProfile profile)
+    {
+        return profile.Orientation switch
+        {
+            SexualOrientation.Straight => "Prefers the opposite sex",
+            SexualOrientation.Gay => "Prefers the same sex",
+            SexualOrientation.Lesbian => "Prefers the same sex",
+            SexualOrientation.Bisexual => "Interested in all genders",
+            SexualOrientation.Pansexual => "Interested in all genders",
+            SexualOrientation.Asexual => "Not interested in romance",
+            SexualOrientation.Demisexual => "Needs a deep bond first",
+            _ => "Hard to tell"
         };
     }
 

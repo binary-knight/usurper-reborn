@@ -90,7 +90,15 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.WriteLine($"  Shadows standing: {standing:N0} — you need at least -50 to access underground services.");
             terminal.SetColor("yellow");
-            terminal.WriteLine("  Try paying [W]tribute to improve your standing.");
+            terminal.Write("  Try paying ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("W");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("tribute to improve your standing.");
             terminal.WriteLine("");
             await terminal.PressAnyKey();
         }
@@ -244,7 +252,7 @@ namespace UsurperRemake.Locations
             // Row 1
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("D");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -253,7 +261,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("S");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -263,7 +271,7 @@ namespace UsurperRemake.Locations
             // Row 2
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("O");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -272,7 +280,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("G");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -282,7 +290,7 @@ namespace UsurperRemake.Locations
             // Row 3
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("B");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -291,7 +299,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("A");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -313,7 +321,7 @@ namespace UsurperRemake.Locations
             }
             terminal.WriteLine("");
 
-            string keyColor = undergroundLocked ? "darkgray" : "red";
+            string keyColor = undergroundLocked ? "darkgray" : "bright_yellow";
             string labelColor = undergroundLocked ? "darkgray" : "white";
 
             // Row 1
@@ -380,7 +388,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("darkgray");
                 terminal.Write(" [");
-                terminal.SetColor("yellow");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("W");
                 terminal.SetColor("darkgray");
                 terminal.Write("]");
@@ -394,7 +402,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("darkgray");
                 terminal.Write(" [");
-                terminal.SetColor("bright_magenta");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("J");
                 terminal.SetColor("darkgray");
                 terminal.Write("]");
@@ -422,7 +430,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("darkgray");
                 terminal.Write(" [");
-                terminal.SetColor("bright_magenta");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("M");
                 terminal.SetColor("darkgray");
                 terminal.Write("]");
@@ -435,7 +443,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("darkgray");
                 terminal.Write(" [");
-                terminal.SetColor("bright_magenta");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("I");
                 terminal.SetColor("darkgray");
                 terminal.Write("]");
@@ -446,7 +454,7 @@ namespace UsurperRemake.Locations
             // Navigation
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -475,12 +483,12 @@ namespace UsurperRemake.Locations
             // Shady establishments (2 rows)
             terminal.SetColor("dark_red");
             terminal.WriteLine(" Shady Establishments:");
-            ShowBBSMenuRow(("D", "magenta", "DrugPalace"), ("S", "magenta", "Steroids"), ("O", "magenta", "OrbsClub"), ("G", "magenta", "Groggo"));
-            ShowBBSMenuRow(("B", "magenta", "BeerHut"), ("A", "magenta", "Alchemist"));
+            ShowBBSMenuRow(("D", "bright_yellow", "DrugPalace"), ("S", "bright_yellow", "Steroids"), ("O", "bright_yellow", "OrbsClub"), ("G", "bright_yellow", "Groggo"));
+            ShowBBSMenuRow(("B", "bright_yellow", "BeerHut"), ("A", "bright_yellow", "Alchemist"));
 
             // Underground services (2 rows)
             bool locked = !IsUndergroundAccessAllowed();
-            string kc = locked ? "darkgray" : "red";
+            string kc = locked ? "darkgray" : "bright_yellow";
             terminal.SetColor("dark_red");
             terminal.Write(" Underground");
             if (locked)
@@ -497,17 +505,17 @@ namespace UsurperRemake.Locations
             var shadowsStanding = FactionSystem.Instance?.FactionStanding[Faction.TheShadows] ?? 0;
             var specialItems = new List<(string key, string color, string label)>();
             if (shadowsStanding < 0)
-                specialItems.Add(("W", "yellow", "Tribute"));
+                specialItems.Add(("W", "bright_yellow", "Tribute"));
             if (factionSystem.PlayerFaction != Faction.TheShadows)
-                specialItems.Add(("J", "magenta", "JoinShadows"));
+                specialItems.Add(("J", "bright_yellow", "JoinShadows"));
             if (FactionSystem.Instance?.HasBlackMarketAccess() == true)
-                specialItems.Add(("M", "magenta", "BlackMkt"));
+                specialItems.Add(("M", "bright_yellow", "BlackMkt"));
             if (FactionSystem.Instance?.HasInformationNetwork() == true)
-                specialItems.Add(("I", "magenta", "Informant"));
+                specialItems.Add(("I", "bright_yellow", "Informant"));
             if (specialItems.Count > 0)
                 ShowBBSMenuRow(specialItems.ToArray());
 
-            ShowBBSMenuRow(("Q", "red", "Return"));
+            ShowBBSMenuRow(("Q", "bright_yellow", "Return"));
 
             ShowBBSFooter();
         }
@@ -576,8 +584,12 @@ namespace UsurperRemake.Locations
             {
                 var d = drugs[i];
                 long price = GetAdjustedPrice(d.basePrice);
-                terminal.SetColor("cyan");
-                terminal.Write($"[{i + 1}] ");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"{i + 1}");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
                 terminal.SetColor(d.drug >= DrugType.DarkEssence ? "red" : "white");
                 terminal.Write($"{d.name,-18}");
                 terminal.SetColor("gray");
@@ -587,8 +599,14 @@ namespace UsurperRemake.Locations
             }
 
             terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("[0] Leave");
+            terminal.WriteLine(" Leave");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Your choice: ");
@@ -1225,14 +1243,38 @@ namespace UsurperRemake.Locations
             long poisonVialPrice = (long)((300 + level * 20) * (1.0f - rankDiscount));
             long smokeBombPrice = (long)((500 + level * 30) * (1.0f - rankDiscount));
 
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine($"  [1] Forged Papers     {forgedPapersPrice,8:N0}g  — Reduce Darkness by 100");
+            terminal.WriteLine($"Forged Papers     {forgedPapersPrice,8:N0}g  — Reduce Darkness by 100");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor(currentPlayer.PoisonCoatingCombats > 0 ? "gray" : "white");
-            terminal.WriteLine($"  [2] Poison Vial       {poisonVialPrice,8:N0}g  — +20% damage for 5 combats");
+            terminal.WriteLine($"Poison Vial       {poisonVialPrice,8:N0}g  — +20% damage for 5 combats");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("3");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor(currentPlayer.SmokeBombs >= 3 ? "gray" : "white");
-            terminal.WriteLine($"  [3] Smoke Bomb        {smokeBombPrice,8:N0}g  — Guaranteed escape (max 3)");
+            terminal.WriteLine($"Smoke Bomb        {smokeBombPrice,8:N0}g  — Guaranteed escape (max 3)");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine($"  [0] Leave");
+            terminal.WriteLine($"Leave");
             terminal.WriteLine("");
 
             if (rankDiscount > 0)
@@ -1466,11 +1508,38 @@ namespace UsurperRemake.Locations
             terminal.WriteLine($"Gold on hand: {currentPlayer.Gold:N0}");
             terminal.WriteLine("");
 
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("cyan");
-            terminal.WriteLine("[1] Loaded Dice       - Guess over/under 7. Win = 1.8x bet");
-            terminal.WriteLine("[2] Three Card Monte  - Pick the right card. Win = 2.5x bet");
-            terminal.WriteLine("[3] Skull & Bones     - Choose your risk. 2x/3x/5x payout");
-            terminal.WriteLine("[0] Leave");
+            terminal.WriteLine(" Loaded Dice       - Guess over/under 7. Win = 1.8x bet");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(" Three Card Monte  - Pick the right card. Win = 2.5x bet");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("3");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(" Skull & Bones     - Choose your risk. 2x/3x/5x payout");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(" Leave");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Your game: ");
@@ -1560,8 +1629,22 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.WriteLine("The half-orc rattles two dice in a leather cup.");
             terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("[1] Over 7    [2] Under 7");
+            terminal.Write(" Over 7    ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" Under 7");
             var guess = await terminal.GetInput("> ");
             bool guessOver = guess != "2"; // Default to over
 
@@ -1621,8 +1704,30 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             await Task.Delay(1000);
 
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("[1] Left card    [2] Middle card    [3] Right card");
+            terminal.Write(" Left card    ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.Write(" Middle card    ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("3");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" Right card");
             var pick = await terminal.GetInput("> ");
 
             await Task.Delay(1500);
@@ -1665,10 +1770,30 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.WriteLine("A grinning skull sits on the table. Choose your risk.");
             terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("[1] Safe bet   - 2x payout (45% win)");
-            terminal.WriteLine("[2] Risky bet  - 3x payout (30% win)");
-            terminal.WriteLine("[3] All or nothing - 5x payout (15% win)");
+            terminal.WriteLine(" Safe bet   - 2x payout (45% win)");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" Risky bet  - 3x payout (30% win)");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("3");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" All or nothing - 5x payout (15% win)");
             var riskChoice = await terminal.GetInput("> ");
 
             float winChance;
@@ -1763,8 +1888,12 @@ namespace UsurperRemake.Locations
             {
                 var npc = allNPCs[i];
                 string goldHint = npc.Gold > 1000 ? "heavy purse" : npc.Gold > 200 ? "decent coin" : "light pockets";
-                terminal.SetColor("white");
-                terminal.Write($"  [{i + 1}] ");
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"{i + 1}");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
                 terminal.SetColor("yellow");
                 terminal.Write($"{npc.Name2,-20}");
                 terminal.SetColor("gray");
@@ -1773,8 +1902,14 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine($" ({goldHint})");
             }
             terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("[0] Changed my mind");
+            terminal.WriteLine(" Changed my mind");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Target: ");
@@ -1901,10 +2036,30 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("All pit fights are bare-knuckle — no armor allowed!");
             terminal.WriteLine("");
 
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("cyan");
-            terminal.WriteLine("[1] Fight a monster  (generated at your level, 2x gold)");
-            terminal.WriteLine("[2] Fight an NPC     (winner takes 20% of loser's gold)");
-            terminal.WriteLine("[0] Leave the pit");
+            terminal.WriteLine(" Fight a monster  (generated at your level, 2x gold)");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(" Fight an NPC     (winner takes 20% of loser's gold)");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(" Leave the pit");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Your choice: ");
@@ -2019,8 +2174,12 @@ namespace UsurperRemake.Locations
             for (int i = 0; i < candidates.Count; i++)
             {
                 var npc = candidates[i];
-                terminal.SetColor("white");
-                terminal.Write($"  [{i + 1}] ");
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"{i + 1}");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
                 terminal.SetColor("yellow");
                 terminal.Write($"{npc.Name2,-20}");
                 terminal.SetColor("gray");
@@ -2029,8 +2188,14 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine($" Gold: {npc.Gold:N0}");
             }
             terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("[0] Back out");
+            terminal.WriteLine(" Back out");
             terminal.WriteLine("");
 
             var pick = await terminal.GetInput("Challenge: ");
@@ -2126,7 +2291,38 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("yellow");
             terminal.WriteLine("Place a side bet on the fight?");
-            terminal.WriteLine("[1] 1.5x (safe)  [2] 2x (risky)  [3] 3x (reckless)  [0] No bet");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.Write(" 1.5x (safe)  ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.Write(" 2x (risky)  ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("3");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.Write(" 3x (reckless)  ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" No bet");
             var betChoice = await terminal.GetInput("> ");
 
             if (betChoice != "1" && betChoice != "2" && betChoice != "3") return (0, 1.0f);
@@ -2190,10 +2386,30 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine($"Gold on hand: {currentPlayer.Gold:N0}");
                 terminal.WriteLine("");
 
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("1");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"[1] Repay in full ({totalOwed:N0} gold)");
-                terminal.WriteLine("[2] Make partial payment");
-                terminal.WriteLine("[0] Leave");
+                terminal.WriteLine($" Repay in full ({totalOwed:N0} gold)");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("2");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("cyan");
+                terminal.WriteLine(" Make partial payment");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("0");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("cyan");
+                terminal.WriteLine(" Leave");
                 terminal.WriteLine("");
 
                 var choice = await terminal.GetInput("Your choice: ");
@@ -2284,9 +2500,22 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("\"Miss the deadline... and my boys will collect in other ways.\"");
                 terminal.WriteLine("");
 
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("1");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
                 terminal.SetColor("cyan");
-                terminal.WriteLine("[1] Take out a loan");
-                terminal.WriteLine("[0] Leave");
+                terminal.WriteLine(" Take out a loan");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("0");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("cyan");
+                terminal.WriteLine(" Leave");
                 terminal.WriteLine("");
 
                 var choice = await terminal.GetInput("Your choice: ");
@@ -2377,8 +2606,14 @@ namespace UsurperRemake.Locations
             for (int i = 0; i < itemsForSale.Count; i++)
             {
                 var (_, name, value, cursed) = itemsForSale[i];
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"{i + 1}");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
                 terminal.SetColor(cursed ? "red" : "white");
-                terminal.Write($"  [{i + 1}] {name,-30}");
+                terminal.Write($"{name,-30}");
                 terminal.SetColor("yellow");
                 terminal.Write($" {value:N0}g");
                 if (cursed)
@@ -2389,8 +2624,14 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("");
             }
             terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("[0] Leave");
+            terminal.WriteLine(" Leave");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Sell which item? ");
@@ -2639,8 +2880,22 @@ namespace UsurperRemake.Locations
                 term.SetColor("red");
                 term.WriteLine("\"Hand over 50 gold or I'll gut you like a fish!\"");
                 term.WriteLine("");
+                term.SetColor("darkgray");
+                term.Write("[");
+                term.SetColor("bright_yellow");
+                term.Write("1");
+                term.SetColor("darkgray");
+                term.Write("]");
                 term.SetColor("yellow");
-                term.WriteLine("[1] Pay 50 gold    [2] Fight!");
+                term.Write(" Pay 50 gold    ");
+                term.SetColor("darkgray");
+                term.Write("[");
+                term.SetColor("bright_yellow");
+                term.Write("2");
+                term.SetColor("darkgray");
+                term.Write("]");
+                term.SetColor("yellow");
+                term.WriteLine(" Fight!");
                 var choice = await term.GetInput("> ");
 
                 if (choice == "1" && player.Gold >= 50)
@@ -2736,8 +2991,22 @@ namespace UsurperRemake.Locations
                     // Healing potion at half price
                     long potionPrice = GetAdjustedPrice(50);
                     term.WriteLine($"\"Psst... healing potion. Real good stuff. Only {potionPrice} gold.\"");
+                    term.SetColor("darkgray");
+                    term.Write("[");
+                    term.SetColor("bright_yellow");
+                    term.Write("Y");
+                    term.SetColor("darkgray");
+                    term.Write("]");
                     term.SetColor("cyan");
-                    term.WriteLine("[Y] Buy    [N] Pass");
+                    term.Write(" Buy    ");
+                    term.SetColor("darkgray");
+                    term.Write("[");
+                    term.SetColor("bright_yellow");
+                    term.Write("N");
+                    term.SetColor("darkgray");
+                    term.Write("]");
+                    term.SetColor("cyan");
+                    term.WriteLine(" Pass");
                     var ans = await term.GetInput("> ");
                     if (ans.ToUpper() == "Y" && player.Gold >= potionPrice)
                     {
@@ -2757,8 +3026,22 @@ namespace UsurperRemake.Locations
                     // Random stat boost (small)
                     long price = GetAdjustedPrice(100);
                     term.WriteLine($"\"Special elixir. Makes you... better. {price} gold.\"");
+                    term.SetColor("darkgray");
+                    term.Write("[");
+                    term.SetColor("bright_yellow");
+                    term.Write("Y");
+                    term.SetColor("darkgray");
+                    term.Write("]");
                     term.SetColor("cyan");
-                    term.WriteLine("[Y] Buy    [N] Pass");
+                    term.Write(" Buy    ");
+                    term.SetColor("darkgray");
+                    term.Write("[");
+                    term.SetColor("bright_yellow");
+                    term.Write("N");
+                    term.SetColor("darkgray");
+                    term.Write("]");
+                    term.SetColor("cyan");
+                    term.WriteLine(" Pass");
                     var ans = await term.GetInput("> ");
                     if (ans.ToUpper() == "Y" && player.Gold >= price)
                     {

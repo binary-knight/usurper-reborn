@@ -129,7 +129,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write(key1);
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -141,7 +141,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write(key2);
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -181,16 +181,16 @@ public class TeamCornerLocation : BaseLocation
         // Menu rows (3 rows for all options)
         terminal.SetColor("cyan");
         terminal.WriteLine(" Info:");
-        ShowBBSMenuRow(("T", "cyan", "Rankings"), ("P", "cyan", "Password"), ("I", "cyan", "Info"), ("E", "cyan", "Examine"), ("Y", "cyan", "YourTeam"));
+        ShowBBSMenuRow(("T", "bright_yellow", "Rankings"), ("P", "bright_yellow", "Password"), ("I", "bright_yellow", "Info"), ("E", "bright_yellow", "Examine"), ("Y", "bright_yellow", "YourTeam"));
         terminal.SetColor("cyan");
         terminal.WriteLine(" Actions:");
-        ShowBBSMenuRow(("C", "green", "Create"), ("J", "green", "Join"), ("Q", "red", "QuitTeam"), ("A", "green", "Apply"), ("N", "green", "RecruitNPC"));
-        ShowBBSMenuRow(("2", "red", "SackMember"), ("G", "yellow", "EquipMbr"), ("M", "cyan", "Message"), ("!", "magenta", "Resurrect"));
+        ShowBBSMenuRow(("C", "bright_yellow", "Create"), ("J", "bright_yellow", "Join"), ("Q", "bright_yellow", "QuitTeam"), ("A", "bright_yellow", "Apply"), ("N", "bright_yellow", "RecruitNPC"));
+        ShowBBSMenuRow(("2", "bright_yellow", "SackMember"), ("G", "bright_yellow", "EquipMbr"), ("M", "bright_yellow", "Message"), ("!", "bright_yellow", "Resurrect"));
         if (DoorMode.IsOnlineMode)
         {
-            ShowBBSMenuRow(("W", "green", "RecruitAlly"), ("B", "red", "TeamBattle"), ("H", "cyan", "HQ"));
+            ShowBBSMenuRow(("W", "bright_yellow", "RecruitAlly"), ("B", "bright_yellow", "TeamBattle"), ("H", "bright_yellow", "HQ"));
         }
-        ShowBBSMenuRow(("R", "red", "ReturnInn"));
+        ShowBBSMenuRow(("R", "bright_yellow", "ReturnInn"));
 
         ShowBBSFooter();
     }
@@ -1644,11 +1644,38 @@ public class TeamCornerLocation : BaseLocation
             // Show options
             terminal.SetColor("cyan");
             terminal.WriteLine("Options:");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("E");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine("  [E] Equip item from your inventory");
-            terminal.WriteLine("  [U] Unequip item from them");
-            terminal.WriteLine("  [T] Take all their equipment");
-            terminal.WriteLine("  [Q] Done / Return");
+            terminal.WriteLine("Equip item from your inventory");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("U");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Unequip item from them");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("T");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Take all their equipment");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Done / Return");
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
@@ -1809,7 +1836,15 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine("Which hand? [M]ain hand or [O]ff hand?");
+            terminal.Write("Which hand? [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("M");
+            terminal.SetColor("cyan");
+            terminal.Write("]ain hand or [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("O");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("]ff hand?");
             terminal.Write(": ");
             terminal.SetColor("white");
             var handChoice = (await terminal.ReadLineAsync()).ToUpper().Trim();
@@ -2121,8 +2156,30 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine($"  Your Team: {currentPlayer.Team}");
             terminal.WriteLine("");
 
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("C");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor("cyan");
-            terminal.WriteLine("  [C] Challenge a Team    [H] War History    [Q] Back");
+            terminal.Write("Challenge a Team    ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("H");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("cyan");
+            terminal.Write("War History    ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Back");
             terminal.SetColor("white");
             terminal.Write("\n  Choice: ");
             string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
@@ -2401,8 +2458,38 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine($"  Team Vault: {vaultGold:N0} / {vaultCapacity:N0} gold");
             terminal.WriteLine("");
 
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("U");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
             terminal.SetColor("cyan");
-            terminal.WriteLine("  [U] Upgrade Facility    [D] Deposit Gold    [W] Withdraw Gold    [Q] Back");
+            terminal.Write("Upgrade Facility    ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("D");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("cyan");
+            terminal.Write("Deposit Gold    ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("W");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("cyan");
+            terminal.Write("Withdraw Gold    ");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Back");
             terminal.SetColor("white");
             terminal.Write("\n  Choice: ");
             string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
@@ -2447,7 +2534,15 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine($"  Upgrade {def.Name} to Lv {currentLevel + 1} costs {cost:N0} gold.");
         terminal.WriteLine($"  Team vault has {vaultGold:N0}g, you have {currentPlayer.Gold:N0}g.");
-        terminal.Write("  Pay from [V]ault or [P]ersonal gold? ");
+        terminal.Write("  Pay from [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("V");
+        terminal.SetColor("yellow");
+        terminal.Write("]ault or [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("P");
+        terminal.SetColor("yellow");
+        terminal.Write("]ersonal gold? ");
         string payChoice = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
 
         if (payChoice == "V")

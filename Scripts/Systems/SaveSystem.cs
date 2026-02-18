@@ -500,6 +500,7 @@ namespace UsurperRemake.Systems
                 CombatSpeed = player.CombatSpeed,
                 SkipIntimateScenes = player.SkipIntimateScenes,
                 ScreenReaderMode = player.ScreenReaderMode,
+                ColorTheme = player.ColorTheme,
                 Loyalty = player.Loyalty,
                 Haunt = player.Haunt,
                 Master = player.Master,

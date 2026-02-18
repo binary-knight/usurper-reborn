@@ -1152,31 +1152,50 @@ public static class AchievementSystem
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
+        terminal.Write("║");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("║            * ACHIEVEMENT UNLOCKED! *                     ║");
+        terminal.Write($"{"* ACHIEVEMENT UNLOCKED! *",58}");
         terminal.SetColor("bright_yellow");
+        terminal.WriteLine("║");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════╣");
+
+        string tierLine = $"  {achievement.GetTierSymbol()} {achievement.Name}";
+        terminal.Write("║");
         terminal.SetColor(achievement.GetTierColor());
-        terminal.WriteLine($"║  {achievement.GetTierSymbol()} {achievement.Name,-48} ║");
+        terminal.Write($"{tierLine,-58}");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("║");
+
+        string descLine = $"  {achievement.Description}";
+        terminal.Write("║");
         terminal.SetColor("white");
-        terminal.WriteLine($"║  {achievement.Description,-52} ║");
+        terminal.Write($"{descLine,-58}");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("║");
 
         if (achievement.GoldReward > 0 || achievement.ExperienceReward > 0)
         {
             var rewards = "";
             if (achievement.GoldReward > 0) rewards += $"+{achievement.GoldReward} Gold ";
             if (achievement.ExperienceReward > 0) rewards += $"+{achievement.ExperienceReward} XP";
+            string rewardLine = $"  Rewards: {rewards}";
+            terminal.Write("║");
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"║  Rewards: {rewards,-44} ║");
+            terminal.Write($"{rewardLine,-58}");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("║");
         }
 
         if (!string.IsNullOrEmpty(achievement.UnlockMessage))
         {
+            string msgLine = $"  \"{achievement.UnlockMessage}\"";
+            terminal.Write("║");
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"║  \"{achievement.UnlockMessage}\"".PadRight(59) + "║");
+            terminal.Write($"{msgLine,-58}");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("║");
         }
 
-        terminal.SetColor("bright_yellow");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1194,28 +1213,36 @@ public static class AchievementSystem
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
+        string headerText = $"* {achievements.Count} ACHIEVEMENTS UNLOCKED! *";
+        terminal.Write("║");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"║      * {achievements.Count} ACHIEVEMENTS UNLOCKED! *".PadRight(59) + "║");
+        terminal.Write($"{headerText,58}");
         terminal.SetColor("bright_yellow");
+        terminal.WriteLine("║");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════╣");
 
         // Show up to 8 achievements, summarize if more
-        int shown = 0;
         foreach (var achievement in achievements.OrderByDescending(a => a.Tier).Take(8))
         {
-            terminal.SetColor(achievement.GetTierColor());
             var name = achievement.Name.Length > 45 ? achievement.Name.Substring(0, 42) + "..." : achievement.Name;
-            terminal.WriteLine($"║  {achievement.GetTierSymbol()} {name,-48} ║");
-            shown++;
+            string achLine = $"  {achievement.GetTierSymbol()} {name}";
+            terminal.Write("║");
+            terminal.SetColor(achievement.GetTierColor());
+            terminal.Write($"{achLine,-58}");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("║");
         }
 
         if (achievements.Count > 8)
         {
+            string moreLine = $"  ... and {achievements.Count - 8} more!";
+            terminal.Write("║");
             terminal.SetColor("gray");
-            terminal.WriteLine($"║  ... and {achievements.Count - 8} more!".PadRight(56) + "║");
+            terminal.Write($"{moreLine,-58}");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("║");
         }
 
-        terminal.SetColor("bright_yellow");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════╣");
 
         if (totalGold > 0 || totalXP > 0)
@@ -1223,11 +1250,14 @@ public static class AchievementSystem
             var rewards = "";
             if (totalGold > 0) rewards += $"+{totalGold:N0} Gold ";
             if (totalXP > 0) rewards += $"+{totalXP:N0} XP";
+            string rewardLine = $"  Total Rewards: {rewards}";
+            terminal.Write("║");
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"║  Total Rewards: {rewards,-38} ║");
+            terminal.Write($"{rewardLine,-58}");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("║");
         }
 
-        terminal.SetColor("bright_yellow");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

@@ -465,8 +465,12 @@ public abstract class BaseLocation
 
             foreach (var opt in encounter.ResponseOptions)
             {
-                terminal.SetColor("yellow");
-                terminal.Write($"    [{opt.Key}] ");
+                terminal.SetColor("white");
+                terminal.Write("    [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(opt.Key);
+                terminal.SetColor("white");
+                terminal.Write("] ");
                 terminal.SetColor("white");
                 terminal.WriteLine(opt.Text);
             }
@@ -503,8 +507,12 @@ public abstract class BaseLocation
 
             foreach (var (key, text, _) in options)
             {
-                terminal.SetColor("yellow");
-                terminal.Write($"    [{key}] ");
+                terminal.SetColor("white");
+                terminal.Write("    [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(key);
+                terminal.SetColor("white");
+                terminal.Write("] ");
                 terminal.SetColor("white");
                 terminal.WriteLine(text);
             }
@@ -597,8 +605,12 @@ public abstract class BaseLocation
 
             foreach (var opt in encounter.Responses)
             {
-                terminal.SetColor("yellow");
-                terminal.Write($"    [{opt.Key}] ");
+                terminal.SetColor("white");
+                terminal.Write("    [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(opt.Key);
+                terminal.SetColor("white");
+                terminal.Write("] ");
                 terminal.SetColor("white");
                 terminal.WriteLine(opt.Text);
             }
@@ -689,8 +701,12 @@ public abstract class BaseLocation
 
             foreach (var option in stage.Choice.Options)
             {
-                terminal.SetColor("cyan");
-                terminal.Write($"    [{option.Key}] ");
+                terminal.SetColor("white");
+                terminal.Write("    [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(option.Key);
+                terminal.SetColor("white");
+                terminal.Write("] ");
                 terminal.SetColor("white");
                 terminal.WriteLine(option.Text);
             }
@@ -904,6 +920,7 @@ public abstract class BaseLocation
             GameLocation.DarkAlley => "Dark Alley",
             GameLocation.Castle => "Castle",
             GameLocation.LoveStreet => "Love Street",
+            GameLocation.LoveCorner => "Love Street",
             GameLocation.Home => "Home",
             GameLocation.Orbs => "Inn",
             GameLocation.BobsBeer => "Inn",
@@ -1373,7 +1390,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -1384,7 +1401,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -1394,7 +1411,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("*");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -1403,7 +1420,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("?");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -1416,7 +1433,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("0");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -1427,7 +1444,7 @@ public abstract class BaseLocation
         // Show Preferences option
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("~");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -1437,7 +1454,7 @@ public abstract class BaseLocation
         // Show slash commands hint
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("/");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -1447,7 +1464,7 @@ public abstract class BaseLocation
         // Show bug report hint
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("!");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -1547,15 +1564,15 @@ public abstract class BaseLocation
     {
         var npcsHere = GetLiveNPCsAtLocation();
         terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("cyan"); terminal.Write("S"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("S"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("tatus ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("*"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("*"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Inv ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("?"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("?"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Help ");
         if (npcsHere.Count > 0)
         {
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("0"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("0"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write($"Talk({npcsHere.Count}) ");
         }
         terminal.WriteLine("");
@@ -1939,23 +1956,23 @@ public abstract class BaseLocation
         terminal.WriteLine("║  Quick keys (single character):                                              ║");
         terminal.SetColor("bright_yellow");
         terminal.Write("║  ");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("*  ");
         terminal.SetColor("white");
         terminal.WriteLine("- Inventory    ");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("~  ");
         terminal.SetColor("white");
         terminal.WriteLine("- Preferences    ");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S  ");
         terminal.SetColor("white");
         terminal.WriteLine("- Status    ");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("?  ");
         terminal.SetColor("white");
         terminal.WriteLine("- This help    ");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("!  ");
         terminal.SetColor("white");
         terminal.WriteLine("- Report bug         ║");
@@ -2256,30 +2273,30 @@ public abstract class BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine($"Invalid choice: '{choice}'");
                 terminal.SetColor("gray");
-                terminal.Write("Try: ");
-                terminal.SetColor("cyan");
-                terminal.Write("[S]");
+                terminal.Write("Try: [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("S");
                 terminal.SetColor("gray");
-                terminal.Write("tatus, ");
-                terminal.SetColor("cyan");
-                terminal.Write("[*]");
+                terminal.Write("]tatus, [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("*");
                 terminal.SetColor("gray");
-                terminal.Write("Inventory");
+                terminal.Write("]Inventory");
 
                 if (LocationId != GameLocation.MainStreet)
                 {
-                    terminal.Write(", ");
-                    terminal.SetColor("cyan");
-                    terminal.Write("[Q]");
+                    terminal.Write(", [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write("Q");
                     terminal.SetColor("gray");
-                    terminal.Write("uick Return");
+                    terminal.Write("]uick Return");
                 }
 
-                terminal.Write(", or ");
-                terminal.SetColor("cyan");
-                terminal.Write("[?]");
+                terminal.Write(", or [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("?");
                 terminal.SetColor("gray");
-                terminal.WriteLine(" for help");
+                terminal.WriteLine("] for help");
                 await Task.Delay(2000);
                 break;
         }
@@ -2424,8 +2441,16 @@ public abstract class BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine("What do you do?");
         terminal.SetColor("white");
-        terminal.WriteLine(" [F]ight - Engage the ambusher");
-        terminal.WriteLine(" [R]un  - Attempt to flee (may fail)");
+        terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("F");
+        terminal.SetColor("white");
+        terminal.WriteLine("]ight - Engage the ambusher");
+        terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("R");
+        terminal.SetColor("white");
+        terminal.WriteLine("]un  - Attempt to flee (may fail)");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInputAsync("Your choice: ");
@@ -2588,16 +2613,48 @@ public abstract class BaseLocation
 
             // Telemetry
             terminal.WriteLine($"  Alpha Telemetry: {(UsurperRemake.Systems.TelemetrySystem.Instance.IsEnabled ? "Enabled (Sending Anonymous Stats)" : "Disabled")}", "yellow");
+
+            // Color Theme
+            terminal.WriteLine($"  Color Theme: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)} - {ColorTheme.GetThemeDescription(currentPlayer.ColorTheme)}", "yellow");
             terminal.WriteLine("");
 
             terminal.SetColor("white");
             terminal.WriteLine("Options:");
-            terminal.WriteLine("[1] Toggle Combat Speed (Normal -> Fast -> Instant)");
-            terminal.WriteLine("[2] Toggle Auto-heal in Battle");
-            terminal.WriteLine("[3] Toggle Skip Intimate Scenes");
-            terminal.WriteLine("[4] Toggle Screen Reader Mode (Accessibility)");
-            terminal.WriteLine("[5] Toggle Alpha Telemetry (Anonymous Stats)");
-            terminal.WriteLine("[0] Back");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("white");
+            terminal.WriteLine("] Toggle Combat Speed (Normal -> Fast -> Instant)");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("white");
+            terminal.WriteLine("] Toggle Auto-heal in Battle");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("3");
+            terminal.SetColor("white");
+            terminal.WriteLine("] Toggle Skip Intimate Scenes");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("4");
+            terminal.SetColor("white");
+            terminal.WriteLine("] Toggle Screen Reader Mode (Accessibility)");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("5");
+            terminal.SetColor("white");
+            terminal.WriteLine("] Toggle Alpha Telemetry (Anonymous Stats)");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("6");
+            terminal.SetColor("white");
+            terminal.WriteLine($"] Color Theme (Current: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)})");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("white");
+            terminal.WriteLine("] Back");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Choice: ");
@@ -2682,6 +2739,17 @@ public abstract class BaseLocation
                     await Task.Delay(1200);
                     break;
 
+                case "6":
+                    // Cycle color theme
+                    var nextTheme = ColorTheme.NextTheme(currentPlayer.ColorTheme);
+                    currentPlayer.ColorTheme = nextTheme;
+                    ColorTheme.Current = nextTheme;
+                    terminal.WriteLine($"Color theme set to: {ColorTheme.GetThemeName(nextTheme)}", "green");
+                    terminal.WriteLine($"  {ColorTheme.GetThemeDescription(nextTheme)}", "white");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(800);
+                    break;
+
                 case "0":
                 case "":
                     exitPrefs = true;
@@ -2739,8 +2807,12 @@ public abstract class BaseLocation
             int relationLevel = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
             var (relationColor, relationText, relationSymbol) = GetRelationshipDisplayInfo(relationLevel);
 
-            terminal.SetColor("cyan");
-            terminal.Write($"  [{i + 1}] ");
+            terminal.SetColor("white");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"{i + 1}");
+            terminal.SetColor("white");
+            terminal.Write("] ");
 
             // Name color based on relationship rather than alignment
             terminal.SetColor(relationColor);
@@ -2764,8 +2836,12 @@ public abstract class BaseLocation
         }
 
         terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.WriteLine("  [0] Never mind");
+        terminal.SetColor("white");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("0");
+        terminal.SetColor("white");
+        terminal.WriteLine("] Never mind");
         terminal.WriteLine("");
 
         string choice = await terminal.GetInput("Talk to who? ");
@@ -2840,7 +2916,7 @@ public abstract class BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("1");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -2858,7 +2934,7 @@ public abstract class BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("3");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -2870,7 +2946,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
-                terminal.SetColor("bright_red");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("4");
                 terminal.SetColor("darkgray");
                 terminal.Write("]");
@@ -2881,7 +2957,7 @@ public abstract class BaseLocation
             // Full conversation option (visual novel style)
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("5");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -2893,7 +2969,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
-                terminal.SetColor("dark_red");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("6");
                 terminal.SetColor("darkgray");
                 terminal.Write("]");
@@ -2902,12 +2978,20 @@ public abstract class BaseLocation
             }
 
             terminal.WriteLine("");
-            terminal.SetColor("gray");
-            terminal.WriteLine("  [0] Walk away");
+            terminal.SetColor("white");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("white");
+            terminal.WriteLine("] Walk away");
 
             // Debug option
             terminal.SetColor("dark_gray");
-            terminal.WriteLine("  [9] (DEBUG) View personality traits");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("9");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine("] (DEBUG) View personality traits");
             terminal.WriteLine("");
 
             string action = await terminal.GetInput("Your choice: ");
@@ -4759,8 +4843,32 @@ public abstract class BaseLocation
             }
 
             terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine("[R]ead #  [S]end  [D]elete #  [N]ext Page  [P]rev Page  [Q]uit");
+            terminal.SetColor("white");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("R");
+            terminal.SetColor("white");
+            terminal.Write("]ead #  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("S");
+            terminal.SetColor("white");
+            terminal.Write("]end  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("D");
+            terminal.SetColor("white");
+            terminal.Write("]elete #  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("N");
+            terminal.SetColor("white");
+            terminal.Write("]ext Page  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("P");
+            terminal.SetColor("white");
+            terminal.Write("]rev Page  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("white");
+            terminal.WriteLine("]uit");
             terminal.Write("> ");
             terminal.SetColor("white");
             string input = (await terminal.ReadLineAsync()).Trim();
@@ -4968,8 +5076,28 @@ public abstract class BaseLocation
             }
 
             terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine("[A]ccept #  [D]ecline #  [S]end Package  [C]ancel #  [Q]uit");
+            terminal.SetColor("white");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("A");
+            terminal.SetColor("white");
+            terminal.Write("]ccept #  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("D");
+            terminal.SetColor("white");
+            terminal.Write("]ecline #  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("S");
+            terminal.SetColor("white");
+            terminal.Write("]end Package  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("C");
+            terminal.SetColor("white");
+            terminal.Write("]ancel #  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("white");
+            terminal.WriteLine("]uit");
             terminal.Write("> ");
             terminal.SetColor("white");
             string input = (await terminal.ReadLineAsync()).Trim();
@@ -5319,8 +5447,20 @@ public abstract class BaseLocation
             }
 
             terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine("  [P] Place Bounty    [M] My Bounties    [Q] Back");
+            terminal.SetColor("white");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("P");
+            terminal.SetColor("white");
+            terminal.Write("] Place Bounty    [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("M");
+            terminal.SetColor("white");
+            terminal.Write("] My Bounties    [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("white");
+            terminal.WriteLine("] Back");
             terminal.SetColor("white");
             terminal.Write("\n  Choice: ");
             string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
@@ -5584,7 +5724,7 @@ public abstract class BaseLocation
             // Row 1
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("B");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -5593,7 +5733,7 @@ public abstract class BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("S");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -5602,7 +5742,7 @@ public abstract class BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("M");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -5612,7 +5752,7 @@ public abstract class BaseLocation
             // Row 2
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -5623,7 +5763,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("[");
-                terminal.SetColor("bright_green");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("0");
                 terminal.SetColor("darkgray");
                 terminal.Write("]");
@@ -5694,8 +5834,12 @@ public abstract class BaseLocation
             int relationLevel = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
             var (relationColor, relationText, relationSymbol) = GetRelationshipDisplayInfo(relationLevel);
 
-            terminal.SetColor("cyan");
-            terminal.Write($"  [{i + 1}] ");
+            terminal.SetColor("white");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"{i + 1}");
+            terminal.SetColor("white");
+            terminal.Write("] ");
             terminal.SetColor(relationColor);
             terminal.Write($"{npc.Name2}");
             terminal.SetColor("gray");
@@ -5711,8 +5855,12 @@ public abstract class BaseLocation
             terminal.WriteLine("]");
         }
 
-        terminal.SetColor("gray");
-        terminal.WriteLine($"\n  [0] Cancel");
+        terminal.SetColor("white");
+        terminal.Write("\n  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("0");
+        terminal.SetColor("white");
+        terminal.WriteLine("] Cancel");
         terminal.SetColor("white");
         string choice = await terminal.GetInput("\n  Talk to: ");
         if (!int.TryParse(choice, out int idx) || idx < 1 || idx > npcsHere.Count) return;
@@ -6084,8 +6232,12 @@ public abstract class BaseLocation
         {
             var (hours, label) = AuctionDurations[i];
             var (fee, basePct, taxPct) = CalculateAuctionFee(price, hours);
+            terminal.SetColor("white");
+            terminal.Write("  [");
             terminal.SetColor("bright_yellow");
-            terminal.Write($"  [{i + 1}] {label,-12}");
+            terminal.Write($"{i + 1}");
+            terminal.SetColor("white");
+            terminal.Write($"] {label,-12}");
             terminal.SetColor("gray");
             terminal.Write("  Fee: ");
             terminal.SetColor("white");
@@ -6227,12 +6379,29 @@ public abstract class BaseLocation
 
         terminal.SetColor("white");
         terminal.WriteLine("");
-        var menuParts = new List<string>();
-        if (uncollectedGold > 0) menuParts.Add("[C] Collect all gold");
-        if (expiredUncollected.Count > 0) menuParts.Add("[E] Collect expired items");
-        menuParts.Add("[#] Cancel/collect listing");
-        menuParts.Add("[Enter] Back");
-        terminal.WriteLine("  " + string.Join("    ", menuParts));
+        terminal.Write("  ");
+        if (uncollectedGold > 0)
+        {
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("C");
+            terminal.SetColor("white");
+            terminal.Write("] Collect all gold    ");
+        }
+        if (expiredUncollected.Count > 0)
+        {
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("E");
+            terminal.SetColor("white");
+            terminal.Write("] Collect expired items    ");
+        }
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("#");
+        terminal.SetColor("white");
+        terminal.Write("] Cancel/collect listing    [Enter] Back");
+        terminal.WriteLine("");
 
         terminal.Write("\n  Choice: ");
         string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";

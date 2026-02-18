@@ -991,11 +991,11 @@ public partial class CombatEngine
     private void ShowCombatMenuBBS(Character player, Monster? monster, Character? pvpOpponent, bool isPvP)
     {
         // Row 1: Core actions
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write(" [A]");
         terminal.SetColor("green");
         terminal.Write("ttack ");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("[D]");
         terminal.SetColor("cyan");
         terminal.Write("efend ");
@@ -1003,7 +1003,7 @@ public partial class CombatEngine
         // Potions (healing and/or mana)
         if (player.Healing > 0 || player.ManaPotions > 0)
         {
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("[H]");
             terminal.SetColor("magenta");
             string potLabel = "";
@@ -1028,14 +1028,14 @@ public partial class CombatEngine
 
         if (monster != null)
         {
-            terminal.SetColor("yellow");
+            terminal.SetColor("bright_yellow");
             terminal.Write("[R]");
             terminal.SetColor("white");
             terminal.Write("etreat ");
         }
         else if (isPvP)
         {
-            terminal.SetColor("yellow");
+            terminal.SetColor("bright_yellow");
             terminal.Write("[R]");
             terminal.SetColor("white");
             terminal.Write("Flee ");
@@ -1045,20 +1045,20 @@ public partial class CombatEngine
         // Row 2: Tactical + utility
         if (monster != null)
         {
-            terminal.SetColor("yellow");
+            terminal.SetColor("bright_yellow");
             terminal.Write(" [P]");
             terminal.SetColor("darkgray");
             terminal.Write("ower ");
-            terminal.SetColor("yellow");
+            terminal.SetColor("bright_yellow");
             terminal.Write("[E]");
             terminal.SetColor("darkgray");
             terminal.Write("xact ");
         }
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("[I]");
         terminal.SetColor("darkgray");
         terminal.Write("Disarm ");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("[T]");
         terminal.SetColor("darkgray");
         terminal.Write("aunt ");
@@ -1069,10 +1069,15 @@ public partial class CombatEngine
             CombatSpeed.Fast => "Fast",
             _ => "Nrml"
         };
-        terminal.SetColor("gray");
+        terminal.SetColor("bright_yellow");
         terminal.Write("[AUTO] ");
-        terminal.Write($"[SPD]{speedLabel} ");
-        terminal.Write("[S]tats");
+        terminal.Write($"[SPD]");
+        terminal.SetColor("darkgray");
+        terminal.Write($"{speedLabel} ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[S]");
+        terminal.SetColor("darkgray");
+        terminal.Write("tats");
         terminal.WriteLine("");
     }
 
@@ -1083,11 +1088,11 @@ public partial class CombatEngine
     private void ShowDungeonCombatMenuBBS(Character player, bool hasInjuredTeammates, bool canHealAlly, List<(string key, string name, bool available)> classInfo)
     {
         // Row 1: Core actions
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write(" [A]");
         terminal.SetColor("green");
         terminal.Write("ttack ");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("[D]");
         terminal.SetColor("cyan");
         terminal.Write("efend ");
@@ -1095,7 +1100,7 @@ public partial class CombatEngine
         // Potions (healing and/or mana)
         if (player.Healing > 0 || player.ManaPotions > 0)
         {
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("[I]");
             terminal.SetColor("magenta");
             string potLabel = "";
@@ -1107,7 +1112,7 @@ public partial class CombatEngine
         // Heal ally
         if (hasInjuredTeammates && canHealAlly)
         {
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("[H]");
             terminal.SetColor("green");
             terminal.Write("ealAlly ");
@@ -1126,14 +1131,14 @@ public partial class CombatEngine
             }
         }
 
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("[R]");
         terminal.SetColor("white");
         terminal.Write("etreat");
         terminal.WriteLine("");
 
         // Row 2: Utility
-        terminal.SetColor("gray");
+        terminal.SetColor("bright_yellow");
         terminal.Write(" [AUTO] ");
         string speedLabel = player.CombatSpeed switch
         {
@@ -1141,12 +1146,14 @@ public partial class CombatEngine
             CombatSpeed.Fast => "Fast",
             _ => "Nrml"
         };
-        terminal.Write($"[SPD]{speedLabel}");
+        terminal.Write("[SPD]");
+        terminal.SetColor("darkgray");
+        terminal.Write($"{speedLabel}");
 
         // Boss save option
         if (BossContext?.CanSave == true)
         {
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write(" [V]");
             terminal.SetColor("magenta");
             terminal.Write("Save");
@@ -1160,13 +1167,16 @@ public partial class CombatEngine
     private void ShowCombatMenuStandard(Character player, Monster? monster, Character? pvpOpponent, bool isPvP)
     {
         // Combat header with HP display
-        terminal.SetColor("bright_white");
+        terminal.SetColor("green");
         terminal.WriteLine("╔═══════════════════════════════════════╗");
-        terminal.WriteLine("║           CHOOSE YOUR ACTION          ║");
+        terminal.Write("║");
+        terminal.SetColor("bright_white");
+        terminal.Write("           CHOOSE YOUR ACTION          ");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
         terminal.WriteLine("╠═══════════════════════════════════════╣");
 
         // HP Status line
-        terminal.SetColor("cyan");
         string hpStatus = $"Your HP: {player.HP}/{player.MaxHP}";
         if (monster != null)
         {
@@ -1176,7 +1186,11 @@ public partial class CombatEngine
         {
             hpStatus += $"  │  {pvpOpponent.DisplayName}: {pvpOpponent.HP}/{pvpOpponent.MaxHP}";
         }
-        terminal.WriteLine($"║ {hpStatus,-37} ║");
+        terminal.Write("║ ");
+        terminal.SetColor("cyan");
+        terminal.Write($"{hpStatus,-37}");
+        terminal.SetColor("green");
+        terminal.WriteLine(" ║");
 
         // Show status effects if any
         if (player.ActiveStatuses.Count > 0 || player.IsRaging)
@@ -1191,142 +1205,197 @@ public partial class CombatEngine
             if (player.IsRaging && !list.Any(s => s.StartsWith("Raging")))
                 list.Add("Raging");
 
+            terminal.Write("║ ");
             terminal.SetColor("yellow");
             string statusStr = string.Join(", ", list);
             if (statusStr.Length > 35) statusStr = statusStr.Substring(0, 32) + "...";
-            terminal.WriteLine($"║ Status: {statusStr,-29} ║");
+            terminal.Write($"Status: {statusStr,-29}");
+            terminal.SetColor("green");
+            terminal.WriteLine(" ║");
         }
 
-        terminal.SetColor("bright_white");
+        terminal.SetColor("green");
         terminal.WriteLine("╠═══════════════════════════════════════╣");
 
         // === BASIC ACTIONS ===
-        terminal.SetColor("bright_green");
-        terminal.Write("║ [A] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[A] ");
         terminal.SetColor("green");
-        terminal.WriteLine("Attack                             ║");
+        terminal.Write($"{"Attack",-34}");
+        terminal.WriteLine("║");
 
-        terminal.SetColor("bright_cyan");
-        terminal.Write("║ [D] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[D] ");
         terminal.SetColor("cyan");
-        terminal.WriteLine("Defend (reduce damage 50%)         ║");
+        terminal.Write($"{"Defend (reduce damage 50%)",-34}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
         // === QUICKBAR SLOTS [1]-[9] ===
         var quickbarActions = GetQuickbarActions(player);
         if (quickbarActions.Count > 0)
         {
-            terminal.SetColor("bright_white");
+            terminal.SetColor("green");
             terminal.WriteLine("╠═══════════════════════════════════════╣");
             foreach (var (qKey, slotId, displayName, available) in quickbarActions)
             {
+                terminal.Write("║ ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"[{qKey}] ");
                 if (available)
                 {
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write($"║ [{qKey}] ");
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"{displayName,-33}║");
                 }
                 else
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"║ [{qKey}] {displayName,-33}║");
                 }
+                terminal.Write($"{displayName,-34}");
+                terminal.SetColor("green");
+                terminal.WriteLine("║");
             }
         }
 
         // === HEALING OPTIONS ===
         if (player.Healing > 0)
         {
-            terminal.SetColor("bright_magenta");
-            terminal.Write("║ [H] ");
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[H] ");
             terminal.SetColor("magenta");
-            terminal.WriteLine($"Heal (Potions: {player.Healing}/{player.MaxPotions})              ║");
+            string healDesc = $"Heal (Potions: {player.Healing}/{player.MaxPotions})";
+            terminal.Write($"{healDesc,-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
         else
         {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[H] ");
             terminal.SetColor("darkgray");
-            terminal.WriteLine("║ [H] Heal (No Potions)                  ║");
+            terminal.Write($"{"Heal (No Potions)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
 
         // === CLASS-SPECIFIC ABILITIES ===
         if (player.Class == CharacterClass.Barbarian && !player.IsRaging)
         {
-            terminal.SetColor("bright_red");
-            terminal.Write("║ [G] ");
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[G] ");
             terminal.SetColor("red");
-            terminal.WriteLine("Rage (Berserker fury!)             ║");
+            terminal.Write($"{"Rage (Berserker fury!)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
 
         if (player.Class == CharacterClass.Ranger)
         {
+            terminal.Write("║ ");
             terminal.SetColor("bright_yellow");
-            terminal.Write("║ [V] ");
+            terminal.Write("[V] ");
             terminal.SetColor("yellow");
-            terminal.WriteLine("Ranged Attack                      ║");
+            terminal.Write($"{"Ranged Attack",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
 
         // === TACTICAL OPTIONS (monster combat only) ===
         if (monster != null)
         {
+            terminal.Write("║ ");
             terminal.SetColor("bright_yellow");
-            terminal.Write("║ [P] ");
+            terminal.Write("[P] ");
             terminal.SetColor("yellow");
-            terminal.WriteLine("Power Attack (+50% dmg, -accuracy) ║");
+            terminal.Write($"{"Power Attack (+50% dmg, -accuracy)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
 
+            terminal.Write("║ ");
             terminal.SetColor("bright_yellow");
-            terminal.Write("║ [E] ");
+            terminal.Write("[E] ");
             terminal.SetColor("yellow");
-            terminal.WriteLine("Precise Strike (+accuracy)         ║");
+            terminal.Write($"{"Precise Strike (+accuracy)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
 
         // Tactical options for both combat types
-        terminal.SetColor("bright_cyan");
-        terminal.Write("║ [I] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[I] ");
         terminal.SetColor("cyan");
-        terminal.WriteLine("Disarm (remove weapon bonus)       ║");
+        terminal.Write($"{"Disarm (remove weapon bonus)",-34}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
-        terminal.SetColor("bright_cyan");
-        terminal.Write("║ [T] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[T] ");
         terminal.SetColor("cyan");
-        terminal.WriteLine("Taunt (lower enemy defense)        ║");
+        terminal.Write($"{"Taunt (lower enemy defense)",-34}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
-        terminal.SetColor("gray");
-        terminal.Write("║ [L] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[L] ");
         terminal.SetColor("darkgray");
-        terminal.WriteLine("Hide (attempt to slip away)        ║");
+        terminal.Write($"{"Hide (attempt to slip away)",-34}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
         // === RETREAT/FLEE OPTIONS ===
         if (monster != null)
         {
-            terminal.SetColor("yellow");
-            terminal.Write("║ [R] ");
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[R] ");
             terminal.SetColor("white");
-            terminal.WriteLine("Retreat (attempt to flee)          ║");
+            terminal.Write($"{"Retreat (attempt to flee)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
 
-            terminal.SetColor("gray");
-            terminal.Write("║ [M] ");
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[M] ");
             terminal.SetColor("darkgray");
-            terminal.WriteLine("Beg for Mercy                      ║");
+            terminal.Write($"{"Beg for Mercy",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
 
-            terminal.SetColor("bright_red");
-            terminal.Write("║ [F] ");
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[F] ");
             terminal.SetColor("red");
-            terminal.WriteLine("Fight to Death (no retreat)        ║");
+            terminal.Write($"{"Fight to Death (no retreat)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
         else if (isPvP)
         {
             // PvP-specific: Flee instead of retreat
-            terminal.SetColor("yellow");
-            terminal.Write("║ [R] ");
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[R] ");
             terminal.SetColor("white");
-            terminal.WriteLine("Flee Combat                        ║");
+            terminal.Write($"{"Flee Combat",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
 
         // === UTILITY ===
-        terminal.SetColor("gray");
-        terminal.Write("║ [S] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[S] ");
         terminal.SetColor("darkgray");
-        terminal.WriteLine("View Status                        ║");
+        terminal.Write($"{"View Status",-34}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
         // Combat speed option
         string speedLabel = player.CombatSpeed switch
@@ -1335,12 +1404,15 @@ public partial class CombatEngine
             CombatSpeed.Fast => "Fast",
             _ => "Normal"
         };
-        terminal.SetColor("gray");
-        terminal.Write("║ [SPD] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[SPD]  ");
         terminal.SetColor("darkgray");
-        terminal.WriteLine($"Combat Speed: {speedLabel,-18}║");
+        string spdDesc = $"Combat Speed: {speedLabel}";
+        terminal.Write($"{spdDesc,-31}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
-        terminal.SetColor("bright_white");
         terminal.WriteLine("╚═══════════════════════════════════════╝");
         terminal.WriteLine("");
     }
@@ -1417,34 +1489,52 @@ public partial class CombatEngine
     /// </summary>
     private void ShowDungeonCombatMenuStandard(Character player, bool hasInjuredTeammates, bool canHealAlly, List<(string key, string name, bool available)> classInfo)
     {
-        terminal.SetColor("bright_white");
+        terminal.SetColor("green");
         terminal.WriteLine("╔═══════════════════════════════════════╗");
-        terminal.WriteLine("║           CHOOSE YOUR ACTION          ║");
+        terminal.Write("║");
+        terminal.SetColor("bright_white");
+        terminal.Write("           CHOOSE YOUR ACTION          ");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
         terminal.WriteLine("╠═══════════════════════════════════════╣");
 
         // Basic actions
-        terminal.SetColor("bright_green");
-        terminal.Write("║ [A] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[A] ");
         terminal.SetColor("green");
-        terminal.WriteLine("Attack                             ║");
+        terminal.Write($"{"Attack",-34}");
+        terminal.WriteLine("║");
 
-        terminal.SetColor("bright_cyan");
-        terminal.Write("║ [D] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[D] ");
         terminal.SetColor("cyan");
-        terminal.WriteLine("Defend (reduce damage 50%)         ║");
+        terminal.Write($"{"Defend (reduce damage 50%)",-34}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
         // Item option (show potion count)
         if (player.Healing > 0)
         {
-            terminal.SetColor("bright_magenta");
-            terminal.Write("║ [I] ");
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[I] ");
             terminal.SetColor("magenta");
-            terminal.WriteLine($"Use Item (Potions: {player.Healing}/{player.MaxPotions})         ║");
+            string itemDesc = $"Use Item (Potions: {player.Healing}/{player.MaxPotions})";
+            terminal.Write($"{itemDesc,-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
         else
         {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[I] ");
             terminal.SetColor("darkgray");
-            terminal.WriteLine("║ [I] Use Item (No Potions)              ║");
+            terminal.Write($"{"Use Item (No Potions)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
 
         // Heal Ally option
@@ -1452,59 +1542,77 @@ public partial class CombatEngine
         {
             if (canHealAlly)
             {
-                terminal.SetColor("bright_green");
-                terminal.Write("║ [H] ");
+                terminal.Write("║ ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[H] ");
                 terminal.SetColor("green");
-                terminal.WriteLine("Heal Ally                          ║");
+                terminal.Write($"{"Heal Ally",-34}");
+                terminal.WriteLine("║");
             }
             else
             {
+                terminal.Write("║ ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[H] ");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine("║ [H] Heal Ally (No means to heal)      ║");
+                terminal.Write($"{"Heal Ally (No means to heal)",-34}");
+                terminal.SetColor("green");
+                terminal.WriteLine("║");
             }
         }
 
         // Quickbar slots [1]-[9]
         if (classInfo.Count > 0)
         {
-            terminal.SetColor("bright_white");
+            terminal.SetColor("green");
             terminal.WriteLine("╠═══════════════════════════════════════╣");
             foreach (var (key, name, available) in classInfo)
             {
+                terminal.Write("║ ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"[{key}] ");
                 if (available)
                 {
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write($"║ [{key}] ");
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"{name,-33}║");
                 }
                 else
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"║ [{key}] {name,-33}║");
                 }
+                terminal.Write($"{name,-34}");
+                terminal.SetColor("green");
+                terminal.WriteLine("║");
             }
         }
 
         // Boss Save option (only when fighting saveable Old God with artifact)
         if (BossContext?.CanSave == true)
         {
-            terminal.SetColor("bright_magenta");
-            terminal.Write("║ [V] ");
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[V] ");
             terminal.SetColor("magenta");
-            terminal.WriteLine("Attempt to Save (Soulweaver's Loom)║");
+            terminal.Write($"{"Save (Soulweaver's Loom)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
         }
 
         // Retreat and auto
-        terminal.SetColor("yellow");
-        terminal.Write("║ [R] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[R] ");
         terminal.SetColor("white");
-        terminal.WriteLine("Retreat (attempt to flee)          ║");
+        terminal.Write($"{"Retreat (attempt to flee)",-34}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
-        terminal.SetColor("bright_cyan");
-        terminal.Write("║ [AUTO] ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[AUTO] ");
         terminal.SetColor("cyan");
-        terminal.WriteLine("Auto-Combat Mode                ║");
+        terminal.Write($"{"Auto-Combat Mode",-31}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
         // Combat speed option
         string speedLabel = player.CombatSpeed switch
@@ -1513,12 +1621,15 @@ public partial class CombatEngine
             CombatSpeed.Fast => "Fast",
             _ => "Normal"
         };
-        terminal.SetColor("gray");
-        terminal.Write("║ [SPD]  ");
+        terminal.Write("║ ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[SPD]  ");
         terminal.SetColor("darkgray");
-        terminal.WriteLine($"Combat Speed: {speedLabel,-18}║");
+        string spdDesc2 = $"Combat Speed: {speedLabel}";
+        terminal.Write($"{spdDesc2,-31}");
+        terminal.SetColor("green");
+        terminal.WriteLine("║");
 
-        terminal.SetColor("bright_white");
         terminal.WriteLine("╚═══════════════════════════════════════╝");
         terminal.WriteLine("");
     }

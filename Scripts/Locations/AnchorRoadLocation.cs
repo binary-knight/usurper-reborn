@@ -92,7 +92,7 @@ public class AnchorRoadLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write(key1);
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -104,7 +104,7 @@ public class AnchorRoadLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write(key2);
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -116,7 +116,7 @@ public class AnchorRoadLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write(key3);
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -130,7 +130,7 @@ public class AnchorRoadLocation : BaseLocation
     {
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write(key);
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -252,10 +252,10 @@ public class AnchorRoadLocation : BaseLocation
         // Menu rows
         terminal.SetColor("cyan");
         terminal.WriteLine(" Challenges:");
-        ShowBBSMenuRow(("B", "bright_cyan", "Bounty"), ("G", "bright_cyan", "GangWar"), ("T", "bright_cyan", "Gauntlet"));
+        ShowBBSMenuRow(("B", "bright_yellow", "Bounty"), ("G", "bright_yellow", "GangWar"), ("T", "bright_yellow", "Gauntlet"));
         terminal.SetColor("cyan");
         terminal.WriteLine(" Town Control:");
-        ShowBBSMenuRow(("C", "bright_cyan", "ClaimTown"), ("F", "bright_cyan", "FleeTown"), ("P", "bright_cyan", "Prison"), ("R", "red", "Return"));
+        ShowBBSMenuRow(("C", "bright_yellow", "ClaimTown"), ("F", "bright_yellow", "FleeTown"), ("P", "bright_yellow", "Prison"), ("R", "bright_yellow", "Return"));
 
         ShowBBSFooter();
     }

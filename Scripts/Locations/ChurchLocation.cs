@@ -204,7 +204,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("C");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -222,7 +222,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("H");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -231,7 +231,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("M");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -240,7 +240,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("F");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -249,7 +249,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("yellow");
+            terminal.SetColor("bright_yellow");
             terminal.Write("R");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -258,7 +258,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("S");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -268,7 +268,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
             terminal.Write("] ");

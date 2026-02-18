@@ -101,6 +101,15 @@ namespace UsurperRemake.Systems
             // SysOp security level: 1-255 (0 would let everyone in)
             DoorMode.SysOpSecurityLevel = Math.Clamp(_config.SysOpSecurityLevel, 1, 255);
 
+            // Idle timeout: 1-60 minutes (default 15)
+            DoorMode.IdleTimeoutMinutes = Math.Clamp(_config.IdleTimeoutMinutes, GameConfig.MinBBSIdleTimeoutMinutes, GameConfig.MaxBBSIdleTimeoutMinutes);
+
+            // Default color theme
+            if (Enum.TryParse<ColorThemeType>(_config.DefaultColorTheme, true, out var theme))
+                GameConfig.DefaultColorTheme = theme;
+            else
+                GameConfig.DefaultColorTheme = ColorThemeType.Default;
+
             // Log if any values were clamped
             bool wasClamped = false;
             if (_config.DefaultDailyTurns < 1 || _config.DefaultDailyTurns > 9999) wasClamped = true;
@@ -130,6 +139,8 @@ namespace UsurperRemake.Systems
             _config.MonsterDamageMultiplier = GameConfig.MonsterDamageMultiplier;
             _config.MaxDungeonLevel = GameConfig.MaxDungeonLevel;
             _config.SysOpSecurityLevel = DoorMode.SysOpSecurityLevel;
+            _config.IdleTimeoutMinutes = DoorMode.IdleTimeoutMinutes;
+            _config.DefaultColorTheme = GameConfig.DefaultColorTheme.ToString();
         }
 
         /// <summary>
@@ -167,6 +178,8 @@ namespace UsurperRemake.Systems
 
         // SysOp settings
         public int SysOpSecurityLevel { get; set; } = 100;
+        public int IdleTimeoutMinutes { get; set; } = GameConfig.DefaultBBSIdleTimeoutMinutes;
+        public string DefaultColorTheme { get; set; } = "Default";
 
         // Metadata
         public DateTime LastModified { get; set; } = DateTime.UtcNow;

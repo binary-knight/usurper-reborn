@@ -35,6 +35,33 @@ namespace UsurperRemake.BBS
         private static int _mudPort = 4000;
         private static readonly List<string> _mudAdminUsers = new();
 
+        // Idle timeout and session time tracking
+        private static int _idleTimeoutMinutes = GameConfig.DefaultBBSIdleTimeoutMinutes;
+
+        /// <summary>Last time the player sent any input. Used for idle timeout detection in BBS door mode.</summary>
+        public static DateTime LastInputTime { get; set; } = DateTime.UtcNow;
+
+        /// <summary>When the BBS session started. Used to enforce drop file TimeLeftMinutes.</summary>
+        public static DateTime SessionStartTime { get; set; } = DateTime.UtcNow;
+
+        /// <summary>Idle timeout in minutes. SysOp-configurable via --idle-timeout or SysOp Console. Default 15.</summary>
+        public static int IdleTimeoutMinutes
+        {
+            get => _idleTimeoutMinutes;
+            set => _idleTimeoutMinutes = Math.Clamp(value, GameConfig.MinBBSIdleTimeoutMinutes, GameConfig.MaxBBSIdleTimeoutMinutes);
+        }
+
+        /// <summary>True when the player has been idle longer than the timeout.</summary>
+        public static bool IsIdleTimedOut =>
+            (IsInDoorMode || _onlineMode) &&
+            (DateTime.UtcNow - LastInputTime).TotalMinutes >= _idleTimeoutMinutes;
+
+        /// <summary>True when the session has exceeded the time limit from the drop file.</summary>
+        public static bool IsSessionExpired =>
+            IsInDoorMode &&
+            _sessionInfo != null && _sessionInfo.TimeLeftMinutes < int.MaxValue &&
+            (DateTime.UtcNow - SessionStartTime).TotalMinutes >= _sessionInfo.TimeLeftMinutes;
+
         // Windows API for hiding console window
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetConsoleWindow();
@@ -186,6 +213,16 @@ namespace UsurperRemake.BBS
                         SysOpSecurityLevel = level;
                         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"SysOp security level set to: {level}");
                     }
+                }
+                // --idle-timeout <minutes> sets the idle timeout for BBS door mode (1-60, default 15)
+                else if (arg == "--idle-timeout" && i + 1 < args.Length)
+                {
+                    if (int.TryParse(args[i + 1], out int timeout) && timeout >= GameConfig.MinBBSIdleTimeoutMinutes && timeout <= GameConfig.MaxBBSIdleTimeoutMinutes)
+                    {
+                        IdleTimeoutMinutes = timeout;
+                        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", $"Idle timeout set to: {timeout} minutes");
+                    }
+                    i++;
                 }
                 // --online enables online multiplayer mode (SQLite backend)
                 else if (arg == "--online")

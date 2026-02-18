@@ -159,7 +159,7 @@ public class LevelMasterLocation : BaseLocation
         // Row 1
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("L");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -189,7 +189,7 @@ public class LevelMasterLocation : BaseLocation
         // Row 4
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("C");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -199,7 +199,7 @@ public class LevelMasterLocation : BaseLocation
         // Row 5
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("H");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -209,7 +209,7 @@ public class LevelMasterLocation : BaseLocation
         // Row 6
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -221,7 +221,7 @@ public class LevelMasterLocation : BaseLocation
         // Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -305,8 +305,8 @@ public class LevelMasterLocation : BaseLocation
         terminal.WriteLine("");
         ShowBBSNPCs();
         // Menu rows
-        ShowBBSMenuRow(("L", "bright_green", "Level Raise"), ("A", "bright_yellow", "Abilities"), ("T", "bright_yellow", "Training"));
-        ShowBBSMenuRow(("C", "bright_cyan", "Crystal Ball"), ("H", "bright_cyan", "Help Team"), ("R", "bright_red", "Return"));
+        ShowBBSMenuRow(("L", "bright_yellow", "Level Raise"), ("A", "bright_yellow", "Abilities"), ("T", "bright_yellow", "Training"));
+        ShowBBSMenuRow(("C", "bright_yellow", "Crystal Ball"), ("H", "bright_yellow", "Help Team"), ("R", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
 

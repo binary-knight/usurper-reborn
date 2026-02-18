@@ -308,6 +308,7 @@ namespace UsurperRemake.Systems
         public CombatSpeed CombatSpeed { get; set; } = CombatSpeed.Normal;  // Combat text speed
         public bool SkipIntimateScenes { get; set; }  // Skip detailed intimate scenes (fade to black)
         public bool ScreenReaderMode { get; set; }  // Simplified text for screen readers (accessibility)
+        public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // Player-selected color theme
         public int Loyalty { get; set; }    // Loyalty percentage (0-100)
         public int Haunt { get; set; }      // How many demons haunt player
         public char Master { get; set; }    // Level master player uses

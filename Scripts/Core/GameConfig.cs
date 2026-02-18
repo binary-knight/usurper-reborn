@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.41.2";
-    public const string VersionName = "BBS Polish";
+    public const string Version = "0.41.3";
+    public const string VersionName = "Love Street Overhaul";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -102,6 +102,11 @@ public static partial class GameConfig
     /// Monster damage multiplier for difficulty adjustment (1.0 = normal)
     /// </summary>
     public static float MonsterDamageMultiplier { get; set; } = 1.0f;
+
+    /// <summary>
+    /// Default color theme for new characters (set by SysOp via SysOp Console)
+    /// </summary>
+    public static ColorThemeType DefaultColorTheme { get; set; } = ColorThemeType.Default;
 
     /// <summary>
     /// Maximum dungeon level (default: 100)
@@ -647,6 +652,27 @@ public static partial class GameConfig
     public const string DefaultLoveCornerName = "Lover's Corner";
     public const string DefaultGossipMongerName = "Elvira the Gossip Monger";
     public const int LoveCorner = 77;            // Location ID from Pascal INIT.PAS
+
+    // Love Street Mingle Settings
+    public const int LoveStreetFlirtBoost = 2;          // Relationship steps on successful flirt
+    public const int LoveStreetAllureFlirtBoost = 4;    // Relationship steps with Elixir of Allure
+    public const int LoveStreetComplimentBoost = 1;     // Relationship steps on compliment
+    public const int LoveStreetDrinkCost = 50;          // Gold cost to buy NPC a drink
+    public const int LoveStreetDrinkBoost = 2;          // Relationship steps from buying drink
+    public const int LoveStreetMaxMingleNPCs = 8;       // Max NPCs shown in Mingle
+
+    // Love Street Gossip Costs
+    public const int LoveStreetGossipCostBasic = 100;       // Who's Together / Who's Available
+    public const int LoveStreetGossipCostScandals = 200;    // Juicy Scandals
+    public const int LoveStreetGossipCostInvestigate = 300; // Investigate Someone
+
+    // Love Street Potion Costs
+    public const int LoveStreetCharmPotionCost = 500;
+    public const int LoveStreetAllurePotionCost = 2000;
+    public const int LoveStreetForgetPotionCost = 3000;
+    public const int LoveStreetPassionPotionCost = 5000;
+    public const int LoveStreetJealousyReduction = 30;  // Draught of Forgetting reduction
+    public const int LoveStreetCharmBonus = 3;          // CHA bonus from Philter of Charm
     
     // Marriage and Relationship Costs
     public const long WeddingCostBase = 1000;
@@ -1062,6 +1088,11 @@ Alchemist - Potion makers and researchers. Requires intellect and patience.
     public const float HealingSpoilageRate = 0.5f;        // 50% of overage spoils per day
     public const int MinHealingSpoilage = 2;               // Minimum spoilage threshold
     
+    // BBS Idle Timeout (auto-disconnect inactive callers)
+    public const int DefaultBBSIdleTimeoutMinutes = 15;   // Default idle timeout for BBS door mode
+    public const int MinBBSIdleTimeoutMinutes = 1;        // Minimum configurable idle timeout
+    public const int MaxBBSIdleTimeoutMinutes = 60;       // Maximum configurable idle timeout
+
     // Player Activity and Cleanup (Pascal inactivity system)
     public const int DefaultInactivityDays = 30;          // Days before deletion consideration
     public const int MinInactivityDays = 15;              // Minimum inactivity setting

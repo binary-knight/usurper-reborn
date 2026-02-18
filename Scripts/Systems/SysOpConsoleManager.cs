@@ -112,6 +112,12 @@ namespace UsurperRemake.Systems
                 case "P":
                     await PardonPlayer();
                     break;
+                case "I":
+                    await SetIdleTimeout();
+                    break;
+                case "T":
+                    await SetDefaultColorTheme();
+                    break;
                 case "Q":
                     return true;
             }
@@ -185,6 +191,12 @@ namespace UsurperRemake.Systems
                 case "W":
                     await admin.FullGameReset();
                     break;
+                case "I":
+                    await SetIdleTimeout();
+                    break;
+                case "T":
+                    await SetDefaultColorTheme();
+                    break;
                 case "Q":
                     return true;
             }
@@ -252,6 +264,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(" Settings");
             terminal.SetColor("white");
             terminal.WriteLine("  [4] Difficulty          [5] Set MOTD");
+            terminal.WriteLine($"  [I] Idle Timeout: {DoorMode.IdleTimeoutMinutes} min");
+            terminal.WriteLine($"  [T] Color Theme: {ColorTheme.GetThemeName(GameConfig.DefaultColorTheme)}");
             terminal.SetColor("dark_gray");
             terminal.WriteLine(" ──────────────────────────────────────");
             terminal.SetColor("bright_cyan");
@@ -305,6 +319,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(" Settings");
             terminal.SetColor("white");
             terminal.WriteLine("  [5] Difficulty          [6] Set MOTD");
+            terminal.WriteLine($"  [I] Idle Timeout: {DoorMode.IdleTimeoutMinutes} min");
+            terminal.WriteLine($"  [T] Color Theme: {ColorTheme.GetThemeName(GameConfig.DefaultColorTheme)}");
             terminal.SetColor("dark_gray");
             terminal.WriteLine(" ──────────────────────────────────────");
             terminal.SetColor("bright_cyan");
@@ -1214,6 +1230,95 @@ namespace UsurperRemake.Systems
                         return;
                 }
             }
+        }
+
+        private async Task SetIdleTimeout()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══ IDLE TIMEOUT SETTINGS ═══");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine($"Current idle timeout: {DoorMode.IdleTimeoutMinutes} minutes");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("Players with no input for this many minutes will be");
+            terminal.WriteLine("auto-saved and disconnected. Applies to BBS door and online modes.");
+            terminal.WriteLine($"Valid range: {GameConfig.MinBBSIdleTimeoutMinutes}-{GameConfig.MaxBBSIdleTimeoutMinutes} minutes.");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.Write($"New idle timeout ({GameConfig.MinBBSIdleTimeoutMinutes}-{GameConfig.MaxBBSIdleTimeoutMinutes} minutes, or Q to cancel): ");
+            var input = await terminal.GetInputAsync("");
+
+            if (input.Trim().ToUpper() == "Q") return;
+
+            if (int.TryParse(input, out int timeout) && timeout >= GameConfig.MinBBSIdleTimeoutMinutes && timeout <= GameConfig.MaxBBSIdleTimeoutMinutes)
+            {
+                DoorMode.IdleTimeoutMinutes = timeout;
+                SysOpConfigSystem.Instance.SaveConfig();
+                terminal.SetColor("green");
+                terminal.WriteLine($"Idle timeout set to {timeout} minutes (saved).");
+                DebugLogger.Instance.LogInfo("SYSOP", $"Idle timeout changed to {timeout} minutes");
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"Invalid input. Please enter a number between {GameConfig.MinBBSIdleTimeoutMinutes} and {GameConfig.MaxBBSIdleTimeoutMinutes}.");
+            }
+            await terminal.GetInputAsync("Press Enter to continue...");
+        }
+
+        private async Task SetDefaultColorTheme()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══ DEFAULT COLOR THEME ═══");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine($"Current default: {ColorTheme.GetThemeName(GameConfig.DefaultColorTheme)}");
+            terminal.SetColor("gray");
+            terminal.WriteLine("New players will start with this theme.");
+            terminal.WriteLine("Players can change their own theme in preferences.");
+            terminal.WriteLine("");
+
+            // List all themes
+            var themes = new[] { ColorThemeType.Default, ColorThemeType.ClassicDark, ColorThemeType.AmberRetro, ColorThemeType.GreenPhosphor, ColorThemeType.HighContrast };
+            for (int i = 0; i < themes.Length; i++)
+            {
+                var marker = themes[i] == GameConfig.DefaultColorTheme ? " ◄" : "";
+                terminal.SetColor("white");
+                terminal.Write($"  [{i + 1}] ");
+                terminal.SetColor("cyan");
+                terminal.Write($"{ColorTheme.GetThemeName(themes[i]),-20}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"{ColorTheme.GetThemeDescription(themes[i])}{marker}");
+            }
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.Write("Choose theme (1-5, or Q to cancel): ");
+            var input = await terminal.GetInputAsync("");
+
+            if (input.Trim().ToUpper() == "Q") return;
+
+            if (int.TryParse(input, out int choice) && choice >= 1 && choice <= 5)
+            {
+                GameConfig.DefaultColorTheme = themes[choice - 1];
+                SysOpConfigSystem.Instance.SaveConfig();
+                terminal.SetColor("green");
+                terminal.WriteLine($"Default theme set to: {ColorTheme.GetThemeName(GameConfig.DefaultColorTheme)} (saved).");
+                DebugLogger.Instance.LogInfo("SYSOP", $"Default color theme changed to {GameConfig.DefaultColorTheme}");
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Invalid choice.");
+            }
+            await terminal.GetInputAsync("Press Enter to continue...");
         }
 
         private async Task SetMOTD()

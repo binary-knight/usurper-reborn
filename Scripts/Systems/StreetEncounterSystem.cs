@@ -276,8 +276,15 @@ public class StreetEncounterSystem
         terminal.WriteLine($"  Level {attacker.Level} {attacker.Class} - HP: {attacker.HP}/{attacker.MaxHP}");
         terminal.WriteLine("");
 
-        terminal.SetColor("cyan");
-        terminal.WriteLine("  [F]ight  [R]un  [B]ribe  [T]alk");
+        terminal.Write("  [", "white");
+        terminal.Write("F", "bright_yellow");
+        terminal.Write("]ight  [", "white");
+        terminal.Write("R", "bright_yellow");
+        terminal.Write("]un  [", "white");
+        terminal.Write("B", "bright_yellow");
+        terminal.Write("]ribe  [", "white");
+        terminal.Write("T", "bright_yellow");
+        terminal.WriteLine("]alk", "white");
         terminal.WriteLine("");
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
@@ -329,8 +336,13 @@ public class StreetEncounterSystem
             terminal.SetColor("green");
             terminal.WriteLine("  You feel a hand reaching for your coin purse!");
             terminal.WriteLine("");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [G]rab them  [S]hout for guards  [I]gnore");
+            terminal.Write("  [", "white");
+            terminal.Write("G", "bright_yellow");
+            terminal.Write("]rab them  [", "white");
+            terminal.Write("S", "bright_yellow");
+            terminal.Write("]hout for guards  [", "white");
+            terminal.Write("I", "bright_yellow");
+            terminal.WriteLine("]gnore", "white");
 
             string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
@@ -413,8 +425,13 @@ public class StreetEncounterSystem
         terminal.WriteLine($"  {brawlReasons[_random.Next(brawlReasons.Length)]}");
         terminal.WriteLine("");
 
-        terminal.SetColor("white");
-        terminal.WriteLine("  [F]ight  [D]uck and run  [B]uy them a drink");
+        terminal.Write("  [", "white");
+        terminal.Write("F", "bright_yellow");
+        terminal.Write("]ight  [", "white");
+        terminal.Write("D", "bright_yellow");
+        terminal.Write("]uck and run  [", "white");
+        terminal.Write("B", "bright_yellow");
+        terminal.WriteLine("]uy them a drink", "white");
         terminal.WriteLine("");
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
@@ -505,8 +522,13 @@ public class StreetEncounterSystem
         terminal.WriteLine($"  {challenger.Name} - Level {challenger.Level} {challenger.Class}");
         terminal.WriteLine("");
 
-        terminal.SetColor("gray");
-        terminal.WriteLine("  [A]ccept challenge  [D]ecline  [I]nsult them");
+        terminal.Write("  [", "white");
+        terminal.Write("A", "bright_yellow");
+        terminal.Write("]ccept challenge  [", "white");
+        terminal.Write("D", "bright_yellow");
+        terminal.Write("]ecline  [", "white");
+        terminal.Write("I", "bright_yellow");
+        terminal.WriteLine("]nsult them", "white");
         terminal.WriteLine("");
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
@@ -565,8 +587,13 @@ public class StreetEncounterSystem
         terminal.WriteLine("  \"Your gold or your life!\"");
         terminal.WriteLine("");
 
-        terminal.SetColor("white");
-        terminal.WriteLine("  [F]ight  [S]urrender gold  [R]un for it");
+        terminal.Write("  [", "white");
+        terminal.Write("F", "bright_yellow");
+        terminal.Write("]ight  [", "white");
+        terminal.Write("S", "bright_yellow");
+        terminal.Write("]urrender gold  [", "white");
+        terminal.Write("R", "bright_yellow");
+        terminal.WriteLine("]un for it", "white");
         terminal.WriteLine("");
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
@@ -713,8 +740,13 @@ public class StreetEncounterSystem
             terminal.WriteLine("  \"This is our territory!\"");
             terminal.WriteLine("");
 
-            terminal.SetColor("white");
-            terminal.WriteLine("  [F]ight for territory  [N]egotiate  [L]eave");
+            terminal.Write("  [", "white");
+            terminal.Write("F", "bright_yellow");
+            terminal.Write("]ight for territory  [", "white");
+            terminal.Write("N", "bright_yellow");
+            terminal.Write("]egotiate  [", "white");
+            terminal.Write("L", "bright_yellow");
+            terminal.WriteLine("]eave", "white");
         }
         else
         {
@@ -722,8 +754,13 @@ public class StreetEncounterSystem
             terminal.WriteLine("  \"You look like you could use some friends...\"");
             terminal.WriteLine("");
 
-            terminal.SetColor("white");
-            terminal.WriteLine("  [J]oin them  [R]efuse  [F]ight");
+            terminal.Write("  [", "white");
+            terminal.Write("J", "bright_yellow");
+            terminal.Write("]oin them  [", "white");
+            terminal.Write("R", "bright_yellow");
+            terminal.Write("]efuse  [", "white");
+            terminal.Write("F", "bright_yellow");
+            terminal.WriteLine("]ight", "white");
         }
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
@@ -841,8 +878,13 @@ public class StreetEncounterSystem
         terminal.WriteLine("  \"Hey. Buy me a drink?\"");
         terminal.WriteLine("");
 
-        terminal.SetColor("white");
-        terminal.WriteLine("  [Y]es  [N]o thanks  [F]lirt back");
+        terminal.Write("  [", "white");
+        terminal.Write("Y", "bright_yellow");
+        terminal.Write("]es  [", "white");
+        terminal.Write("N", "bright_yellow");
+        terminal.Write("]o thanks  [", "white");
+        terminal.Write("F", "bright_yellow");
+        terminal.WriteLine("]lirt back", "white");
         terminal.WriteLine("");
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
@@ -929,12 +971,15 @@ public class StreetEncounterSystem
         // Generate random items
         var items = GenerateMerchantItems(player.Level, shadyMerchant);
 
-        terminal.SetColor("white");
         for (int i = 0; i < items.Count; i++)
         {
-            terminal.WriteLine($"  [{i + 1}] {items[i].Name} - {items[i].Price} gold");
+            terminal.Write("  [", "white");
+            terminal.Write($"{i + 1}", "bright_yellow");
+            terminal.WriteLine($"] {items[i].Name} - {items[i].Price} gold", "white");
         }
-        terminal.WriteLine("  [0] No thanks");
+        terminal.Write("  [", "white");
+        terminal.Write("0", "bright_yellow");
+        terminal.WriteLine("] No thanks", "white");
         terminal.WriteLine("");
 
         string choice = await terminal.GetInput("Buy which item? ");
@@ -985,8 +1030,15 @@ public class StreetEncounterSystem
         terminal.WriteLine("  \"Please, kind adventurer, spare a few coins for the poor?\"");
         terminal.WriteLine("");
 
-        terminal.SetColor("white");
-        terminal.WriteLine("  [G]ive gold (10)  [L]arge donation (50)  [I]gnore  [R]ob them");
+        terminal.Write("  [", "white");
+        terminal.Write("G", "bright_yellow");
+        terminal.Write("]ive gold (10)  [", "white");
+        terminal.Write("L", "bright_yellow");
+        terminal.Write("]arge donation (50)  [", "white");
+        terminal.Write("I", "bright_yellow");
+        terminal.Write("]gnore  [", "white");
+        terminal.Write("R", "bright_yellow");
+        terminal.WriteLine("]ob them", "white");
         terminal.WriteLine("");
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
@@ -1108,8 +1160,15 @@ public class StreetEncounterSystem
             terminal.WriteLine($"  (Theyre looking for you — Darkness: {player.Darkness})");
             terminal.WriteLine("");
 
-            terminal.SetColor("white");
-            terminal.WriteLine("  [S]urrender  [F]ight  [R]un  [B]ribe (100 gold)");
+            terminal.Write("  [", "white");
+            terminal.Write("S", "bright_yellow");
+            terminal.Write("]urrender  [", "white");
+            terminal.Write("F", "bright_yellow");
+            terminal.Write("]ight  [", "white");
+            terminal.Write("R", "bright_yellow");
+            terminal.Write("]un  [", "white");
+            terminal.Write("B", "bright_yellow");
+            terminal.WriteLine("]ribe (100 gold)", "white");
 
             string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
@@ -1426,8 +1485,11 @@ public class StreetEncounterSystem
             return;
         }
 
-        terminal.SetColor("white");
-        terminal.WriteLine($"  [Y]es, pay {bribeAmount}  [N]o, fight instead");
+        terminal.Write("  [", "white");
+        terminal.Write("Y", "bright_yellow");
+        terminal.Write($"]es, pay {bribeAmount}  [", "white");
+        terminal.Write("N", "bright_yellow");
+        terminal.WriteLine("]o, fight instead", "white");
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
@@ -2446,10 +2508,10 @@ public class StreetEncounterSystem
         UIHelper.DrawBoxLine(terminal, $"  \"Your times up. Im taking that throne.\"", "bright_yellow", "bright_cyan");
         UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
         UIHelper.DrawBoxSeparator(terminal, "bright_yellow");
-        UIHelper.DrawMenuOption(terminal, "A", "Accept the challenge", "bright_yellow", "bright_cyan", "bright_green");
-        UIHelper.DrawMenuOption(terminal, "D", "Dismiss (send guards)", "bright_yellow", "bright_cyan", "white");
-        UIHelper.DrawMenuOption(terminal, "N", "Negotiate", "bright_yellow", "bright_cyan", "white");
-        UIHelper.DrawMenuOption(terminal, "I", "Imprison them", "bright_yellow", "bright_cyan", "red");
+        UIHelper.DrawMenuOption(terminal, "A", "Accept the challenge", "bright_yellow", "bright_yellow", "bright_green");
+        UIHelper.DrawMenuOption(terminal, "D", "Dismiss (send guards)", "bright_yellow", "bright_yellow", "white");
+        UIHelper.DrawMenuOption(terminal, "N", "Negotiate", "bright_yellow", "bright_yellow", "white");
+        UIHelper.DrawMenuOption(terminal, "I", "Imprison them", "bright_yellow", "bright_yellow", "red");
         UIHelper.DrawBoxBottom(terminal, "bright_yellow");
 
         var choice = await terminal.GetInput("\n  Your decree, Majesty? ");

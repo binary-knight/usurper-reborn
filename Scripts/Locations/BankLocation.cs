@@ -143,10 +143,10 @@ public class BankLocation : BaseLocation
         terminal.WriteLine("");
         ShowBBSNPCs();
         // Menu rows
-        ShowBBSMenuRow(("D", "bright_green", "Deposit"), ("W", "bright_green", "Withdraw"), ("T", "bright_green", "Transfer"));
-        ShowBBSMenuRow(("L", "bright_cyan", "Loan"), ("I", "bright_cyan", "Interest"), ("A", "bright_cyan", "History"));
-        ShowBBSMenuRow(("G", "yellow", "Guard Duty"), ("*", "yellow", "Resign Guard"), ("R", "bright_red", "Rob Bank!"));
-        ShowBBSMenuRow(("Q", "gray", "Return"));
+        ShowBBSMenuRow(("D", "bright_yellow", "Deposit"), ("W", "bright_yellow", "Withdraw"), ("T", "bright_yellow", "Transfer"));
+        ShowBBSMenuRow(("L", "bright_yellow", "Loan"), ("I", "bright_yellow", "Interest"), ("A", "bright_yellow", "History"));
+        ShowBBSMenuRow(("G", "bright_yellow", "Guard Duty"), ("*", "bright_yellow", "Resign Guard"), ("R", "bright_yellow", "Rob Bank!"));
+        ShowBBSMenuRow(("Q", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
 
@@ -259,7 +259,7 @@ public class BankLocation : BaseLocation
         // Basic services
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("D");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -268,7 +268,7 @@ public class BankLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("W");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -277,7 +277,7 @@ public class BankLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("T");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -287,7 +287,7 @@ public class BankLocation : BaseLocation
         // Secondary services
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("L");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -296,7 +296,7 @@ public class BankLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("I");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -305,7 +305,7 @@ public class BankLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("A");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -315,7 +315,7 @@ public class BankLocation : BaseLocation
         // Guard & crime
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("G");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -324,7 +324,7 @@ public class BankLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("*");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -333,7 +333,7 @@ public class BankLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -345,7 +345,7 @@ public class BankLocation : BaseLocation
         // Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("gray");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
         terminal.Write("]");

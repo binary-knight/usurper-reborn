@@ -66,7 +66,7 @@ public class DormitoryLocation : BaseLocation
             // Row 1
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("L");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -75,7 +75,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("E");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -84,7 +84,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("G");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -94,7 +94,7 @@ public class DormitoryLocation : BaseLocation
             // Row 2
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("K");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -103,7 +103,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("W");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -112,7 +112,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("S");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -122,7 +122,7 @@ public class DormitoryLocation : BaseLocation
             // Row 3
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("R");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -134,7 +134,7 @@ public class DormitoryLocation : BaseLocation
             // Row 1
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("L");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -143,7 +143,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("E");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -152,7 +152,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("G");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -162,7 +162,7 @@ public class DormitoryLocation : BaseLocation
             // Row 2
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("W");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -171,7 +171,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("S");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -180,7 +180,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("R");
             terminal.SetColor("darkgray");
             terminal.Write("]");

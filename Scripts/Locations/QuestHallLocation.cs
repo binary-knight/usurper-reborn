@@ -58,35 +58,35 @@ public class QuestHallLocation : BaseLocation
         terminal.WriteLine($"Active Quests: {activeQuests.Count}  |  Available: {availableQuests.Count}");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_cyan");
-        terminal.Write(" [V]");
-        terminal.SetColor("white");
-        terminal.Write("iew Available Quests    ");
+        terminal.Write(" [", "white");
+        terminal.Write("V", "bright_yellow");
+        terminal.Write("]", "white");
+        terminal.Write("iew Available Quests    ", "white");
 
-        terminal.SetColor("bright_cyan");
-        terminal.Write("[A]");
-        terminal.SetColor("white");
-        terminal.WriteLine("ctive Quests");
+        terminal.Write("[", "white");
+        terminal.Write("A", "bright_yellow");
+        terminal.Write("]", "white");
+        terminal.WriteLine("ctive Quests", "white");
 
-        terminal.SetColor("bright_green");
-        terminal.Write(" [C]");
-        terminal.SetColor("white");
-        terminal.Write("laim a Quest           ");
+        terminal.Write(" [", "white");
+        terminal.Write("C", "bright_yellow");
+        terminal.Write("]", "white");
+        terminal.Write("laim a Quest           ", "white");
 
-        terminal.SetColor("bright_green");
-        terminal.Write("[T]");
-        terminal.SetColor("white");
-        terminal.WriteLine("urn In Quest");
+        terminal.Write("[", "white");
+        terminal.Write("T", "bright_yellow");
+        terminal.Write("]", "white");
+        terminal.WriteLine("urn In Quest", "white");
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write(" [B]");
-        terminal.SetColor("white");
-        terminal.Write("ounty Board            ");
+        terminal.Write(" [", "white");
+        terminal.Write("B", "bright_yellow");
+        terminal.Write("]", "white");
+        terminal.Write("ounty Board            ", "white");
 
-        terminal.SetColor("gray");
-        terminal.Write("[R]");
-        terminal.SetColor("white");
-        terminal.WriteLine("eturn to Street");
+        terminal.Write("[", "white");
+        terminal.Write("R", "bright_yellow");
+        terminal.Write("]", "white");
+        terminal.WriteLine("eturn to Street", "white");
 
         terminal.WriteLine("");
 
@@ -197,14 +197,18 @@ public class QuestHallLocation : BaseLocation
                 3 => "bright_red",
                 _ => "red"
             };
-            terminal.Write($" [{i + 1}] ");
+            terminal.Write(" [", "white");
+            terminal.Write($"{i + 1}", "bright_yellow");
+            terminal.Write("] ", "white");
             terminal.SetColor(diffColor);
             terminal.Write($"[{quest.GetDifficultyString()}] ");
             terminal.SetColor("white");
             terminal.WriteLine(quest.Title ?? quest.GetTargetDescription());
         }
 
-        terminal.WriteLine(" [0] Cancel");
+        terminal.Write(" [", "white");
+        terminal.Write("0", "bright_yellow");
+        terminal.WriteLine("] Cancel", "white");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput("Select: ");
@@ -278,11 +282,15 @@ public class QuestHallLocation : BaseLocation
         {
             var quest = quests[i];
             var progress = QuestSystem.GetQuestProgressSummary(quest);
-            terminal.WriteLine($" [{i + 1}] {quest.Title ?? quest.GetTargetDescription()}");
+            terminal.Write(" [", "white");
+            terminal.Write($"{i + 1}", "bright_yellow");
+            terminal.WriteLine($"] {quest.Title ?? quest.GetTargetDescription()}", "white");
             terminal.WriteLine($"     {progress}", "gray");
         }
 
-        terminal.WriteLine(" [0] Cancel");
+        terminal.Write(" [", "white");
+        terminal.Write("0", "bright_yellow");
+        terminal.WriteLine("] Cancel", "white");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput("Select: ");

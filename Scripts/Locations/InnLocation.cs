@@ -330,7 +330,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("T");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -340,7 +340,7 @@ public class InnLocation : BaseLocation
         // Row 2
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("F");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -349,7 +349,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("G");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -359,7 +359,7 @@ public class InnLocation : BaseLocation
         // Row 3
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -368,7 +368,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("B");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -378,7 +378,7 @@ public class InnLocation : BaseLocation
         // Row 4
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("E");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -387,7 +387,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("O");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -419,7 +419,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("C");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -437,7 +437,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("L");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -449,7 +449,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("A");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -462,7 +462,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("P");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -477,7 +477,7 @@ public class InnLocation : BaseLocation
             long roomCost = (long)(currentPlayer.Level * GameConfig.InnRoomCostPerLevel);
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("N");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -486,7 +486,7 @@ public class InnLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("K");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -499,7 +499,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -508,7 +508,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -517,7 +517,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("?");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -563,19 +563,19 @@ public class InnLocation : BaseLocation
         // Menu rows
         terminal.SetColor("yellow");
         terminal.WriteLine(" Inn Activities:");
-        ShowBBSMenuRow(("D", "bright_yellow", "rink(5g)"), ("F", "bright_red", "ight Seth"), ("T", "bright_cyan", "alk"), ("G", "bright_magenta", "ame"));
-        ShowBBSMenuRow(("R", "cyan", "umors"), ("B", "yellow", "ulletin"), ("E", "green", "at/Rest"), ("O", "bright_green", "rder(10g)"));
+        ShowBBSMenuRow(("D", "bright_yellow", "rink(5g)"), ("F", "bright_yellow", "ight Seth"), ("T", "bright_yellow", "alk"), ("G", "bright_yellow", "ame"));
+        ShowBBSMenuRow(("R", "bright_yellow", "umors"), ("B", "bright_yellow", "ulletin"), ("E", "bright_yellow", "at/Rest"), ("O", "bright_yellow", "rder(10g)"));
 
         terminal.SetColor("cyan");
         terminal.WriteLine(" Areas:");
-        ShowBBSMenuRow(("C", "bright_cyan", "Team Corner"), ("W", "bright_yellow", "Train"), ("L", "bright_red", "Gamble"));
+        ShowBBSMenuRow(("C", "bright_yellow", "Team Corner"), ("W", "bright_yellow", "Train"), ("L", "bright_yellow", "Gamble"));
         if (recruitableCompanions.Any() || recruitedCompanions.Any())
         {
             var items = new List<(string, string, string)>();
             if (recruitableCompanions.Any())
-                items.Add(("A", "bright_magenta", $"Stranger({recruitableCompanions.Count})"));
+                items.Add(("A", "bright_yellow", $"Stranger({recruitableCompanions.Count})"));
             if (recruitedCompanions.Any())
-                items.Add(("P", "bright_cyan", $"Party({recruitedCompanions.Count})"));
+                items.Add(("P", "bright_yellow", $"Party({recruitedCompanions.Count})"));
             ShowBBSMenuRow(items.ToArray());
         }
 
@@ -583,10 +583,10 @@ public class InnLocation : BaseLocation
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
             long roomCost = (long)(currentPlayer.Level * GameConfig.InnRoomCostPerLevel);
-            ShowBBSMenuRow(("N", "bright_green", $"Room({roomCost}g)"), ("K", "bright_red", "Attack Sleeper"));
+            ShowBBSMenuRow(("N", "bright_yellow", $"Room({roomCost}g)"), ("K", "bright_yellow", "Attack Sleeper"));
         }
 
-        ShowBBSMenuRow(("Q", "red", "Return"));
+        ShowBBSMenuRow(("Q", "bright_yellow", "Return"));
 
         // Footer: status + quick commands
         ShowBBSFooter();
@@ -1019,7 +1019,7 @@ public class InnLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.WriteLine("[0] Return to inn menu");
         terminal.WriteLine("");
 
@@ -1087,14 +1087,24 @@ public class InnLocation : BaseLocation
             terminal.WriteLine("What would you like to do?");
             terminal.WriteLine("");
 
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[T]");
             terminal.SetColor("white");
-            terminal.WriteLine("[T] Talk - Have a deep conversation (flirt, confess, romance)");
-            terminal.WriteLine("[C] Challenge - Challenge to a duel");
-            terminal.WriteLine("[G] Gift - Give a gift (costs 50 gold)");
+            terminal.WriteLine(" Talk - Have a deep conversation (flirt, confess, romance)");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[C]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Challenge - Challenge to a duel");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[G]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Gift - Give a gift (costs 50 gold)");
 
             terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[0]");
             terminal.SetColor("gray");
-            terminal.WriteLine("[0] Return");
+            terminal.WriteLine(" Return");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Your choice: ");
@@ -1401,15 +1411,15 @@ public class InnLocation : BaseLocation
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("  Choose Your Competition Drink:");
         terminal.WriteLine("");
-        terminal.SetColor("bright_white");
+        terminal.SetColor("bright_yellow");
         terminal.Write("  [A] ");
         terminal.SetColor("yellow");
         terminal.WriteLine("Ale            - Easy going, more rounds to survive");
-        terminal.SetColor("bright_white");
+        terminal.SetColor("bright_yellow");
         terminal.Write("  [S] ");
         terminal.SetColor("yellow");
         terminal.WriteLine("Stout          - A solid choice for serious drinkers");
-        terminal.SetColor("bright_white");
+        terminal.SetColor("bright_yellow");
         terminal.Write("  [K] ");
         terminal.SetColor("red");
         terminal.WriteLine("Seth's Bomber  - Rocket fuel! Only the brave dare...");
@@ -1502,9 +1512,14 @@ public class InnLocation : BaseLocation
                 terminal.SetColor("bright_white");
                 terminal.WriteLine($"  Your soberness: {GetSobernessBar(playerSoberness)}");
                 terminal.WriteLine("");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("  [D]");
                 terminal.SetColor("white");
-                terminal.WriteLine("  [D] Down your drink!");
-                terminal.WriteLine("  [Q] Try to bow out gracefully");
+                terminal.WriteLine(" Down your drink!");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("  [Q]");
+                terminal.SetColor("white");
+                terminal.WriteLine(" Try to bow out gracefully");
                 terminal.WriteLine("");
 
                 var action = (await terminal.GetInput("  What do you do? ")).Trim().ToUpperInvariant();
@@ -2028,8 +2043,10 @@ public class InnLocation : BaseLocation
             index++;
         }
 
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[0]");
         terminal.SetColor("yellow");
-        terminal.WriteLine("[0] Return to the bar");
+        terminal.WriteLine(" Return to the bar");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("Approach who? ");
@@ -2230,10 +2247,14 @@ public class InnLocation : BaseLocation
                 index++;
             }
             terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [S]");
             terminal.SetColor("cyan");
-            terminal.WriteLine("  [S] Switch active companions");
+            terminal.WriteLine(" Switch active companions");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [0]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("  [0] Return to the bar");
+            terminal.WriteLine(" Return to the bar");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Choice: ");
@@ -2473,26 +2494,39 @@ public class InnLocation : BaseLocation
         // Show personal quest option if available
         if (!companion.PersonalQuestStarted && companion.LoyaltyLevel >= 50)
         {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [Q]");
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine("  [Q] Begin Personal Quest: " + companion.PersonalQuestName);
+            terminal.WriteLine(" Begin Personal Quest: " + companion.PersonalQuestName);
         }
         else if (companion.PersonalQuestStarted && !companion.PersonalQuestCompleted)
         {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [Q]");
             terminal.SetColor("magenta");
-            terminal.WriteLine("  [Q] Discuss Quest Progress");
+            terminal.WriteLine(" Discuss Quest Progress");
         }
 
         if (companion.RomanceAvailable)
         {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [R]");
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine("  [R] Deepen your bond...");
+            terminal.WriteLine(" Deepen your bond...");
         }
 
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [G]");
         terminal.SetColor("white");
-        terminal.WriteLine("  [G] Give a gift");
-        terminal.WriteLine("  [H] View history together");
+        terminal.WriteLine(" Give a gift");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [H]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" View history together");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [0]");
         terminal.SetColor("yellow");
-        terminal.WriteLine("  [0] Return");
+        terminal.WriteLine(" Return");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("Choice: ");
@@ -2574,9 +2608,14 @@ public class InnLocation : BaseLocation
             terminal.WriteLine($"\"{companion.PersonalQuestDescription}\"");
             terminal.WriteLine("");
 
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[Y]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("[Y] Accept this quest");
-            terminal.WriteLine("[N] Not yet");
+            terminal.WriteLine(" Accept this quest");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[N]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" Not yet");
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Will you help? ");
@@ -2687,15 +2726,27 @@ public class InnLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("Gift Options:");
         terminal.WriteLine("");
-        terminal.WriteLine("  [1] Simple Gift (50 gold) - +3 loyalty");
-        terminal.WriteLine("  [2] Fine Gift (200 gold) - +8 loyalty");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [1]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Simple Gift (50 gold) - +3 loyalty");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [2]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Fine Gift (200 gold) - +8 loyalty");
 
         if (currentPlayer.Gold >= 500)
         {
-            terminal.WriteLine("  [3] Rare Gift (500 gold) - +15 loyalty");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [3]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Rare Gift (500 gold) - +15 loyalty");
         }
 
-        terminal.WriteLine("  [0] Cancel");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [0]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Cancel");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("Choose: ");
@@ -3084,7 +3135,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("2");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -3093,7 +3144,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("3");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -3169,7 +3220,15 @@ public class InnLocation : BaseLocation
             terminal.WriteLine($"The dealer rolls: [{firstRoll}]");
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.Write("Will the next roll be [H]igher or [L]ower? ");
+            terminal.Write("Will the next roll be ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[H]");
+            terminal.SetColor("cyan");
+            terminal.Write("igher or ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[L]");
+            terminal.SetColor("cyan");
+            terminal.Write("ower? ");
             terminal.SetColor("white");
             string guess = (await terminal.ReadLineAsync()).ToUpper().Trim();
 
@@ -3209,7 +3268,15 @@ public class InnLocation : BaseLocation
                     long totalPot = bet + winnings;
                     terminal.WriteLine("");
                     terminal.SetColor("cyan");
-                    terminal.Write($"Double or nothing? Current pot: {totalPot:N0}g [Y/N] ");
+                    terminal.Write($"Double or nothing? Current pot: {totalPot:N0}g ");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write("[Y]");
+                    terminal.SetColor("cyan");
+                    terminal.Write("/");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write("[N]");
+                    terminal.SetColor("cyan");
+                    terminal.Write(" ");
                     terminal.SetColor("white");
                     string dd = (await terminal.ReadLineAsync()).ToUpper().Trim();
 
@@ -3330,8 +3397,14 @@ public class InnLocation : BaseLocation
         while (playerTotal < 21 && !playerBlackjack)
         {
             terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[H]");
             terminal.SetColor("cyan");
-            terminal.Write("[H]it or [S]tand? ");
+            terminal.Write("it or ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[S]");
+            terminal.SetColor("cyan");
+            terminal.Write("tand? ");
             terminal.SetColor("white");
             string action = (await terminal.ReadLineAsync()).ToUpper().Trim();
 
@@ -3479,7 +3552,15 @@ public class InnLocation : BaseLocation
         }
 
         terminal.SetColor("cyan");
-        terminal.Write($"Accept the challenge? ({wagerAmount:N0}g) [Y/N] ");
+        terminal.Write($"Accept the challenge? ({wagerAmount:N0}g) ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[Y]");
+        terminal.SetColor("cyan");
+        terminal.Write("/");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[N]");
+        terminal.SetColor("cyan");
+        terminal.Write(" ");
         terminal.SetColor("white");
         string accept = (await terminal.ReadLineAsync()).ToUpper().Trim();
 
@@ -3610,8 +3691,10 @@ public class InnLocation : BaseLocation
                 terminal.SetColor(canAfford ? "white" : "dark_red");
                 terminal.WriteLine($"  [{i + 1}] {opt.name,-16} {cost,6:N0}g  (HP: {hp})");
             }
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [D]");
             terminal.SetColor("bright_green");
-            terminal.WriteLine("  [D] Done hiring");
+            terminal.WriteLine(" Done hiring");
             terminal.SetColor("white");
             terminal.WriteLine($"\n  Your gold: {currentPlayer.Gold:N0}  |  Room: {roomCost:N0}  |  Guards: {totalGuardCost:N0}  |  Total: {roomCost + totalGuardCost:N0}");
 

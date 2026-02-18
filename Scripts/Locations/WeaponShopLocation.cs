@@ -169,7 +169,7 @@ public class WeaponShopLocation : BaseLocation
         // Dual-wield setup
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("D");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -179,7 +179,7 @@ public class WeaponShopLocation : BaseLocation
         // Sell option
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -189,7 +189,7 @@ public class WeaponShopLocation : BaseLocation
         // Auto-equip
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("A");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -199,7 +199,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -477,7 +477,7 @@ public class WeaponShopLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("P");
             terminal.SetColor("darkgray");
             terminal.Write("] Previous   ");
@@ -487,7 +487,7 @@ public class WeaponShopLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("N");
             terminal.SetColor("darkgray");
             terminal.Write("] Next   ");
@@ -495,7 +495,7 @@ public class WeaponShopLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("B");
         terminal.SetColor("darkgray");
         terminal.Write("] ");

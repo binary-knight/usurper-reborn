@@ -161,13 +161,13 @@ public class MainStreetLocation : BaseLocation
 
         // Lines 5-8: Location menu (4 rows of 4)
         terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_green"); terminal.Write("D"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("D"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("ungeons    ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("I"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("I"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("nn         ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("T"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("T"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("emple      ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("O"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("O"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.WriteLine("ld Church");
 
         terminal.SetColor("darkgray");
@@ -177,27 +177,27 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor("white"); terminal.Write("rmor Shop  ");
         terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("M"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("agic Shop  ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("J"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("J"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.WriteLine("Auction");
 
         terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_cyan"); terminal.Write("B"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("B"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("ank        ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("1"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("1"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Healer     ");
         terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("2"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Quest Hall ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("V"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("V"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.WriteLine("Master");
 
         terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_magenta"); terminal.Write("K"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("K"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Castle     ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("H"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("H"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("ome        ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("C"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("C"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("hallenges  ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("L"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("L"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.WriteLine("odging");
 
         // Line 9: blank
@@ -205,24 +205,24 @@ public class MainStreetLocation : BaseLocation
 
         // Line 10: Shady + info row
         terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_red"); terminal.Write("Y"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("Y"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("gray"); terminal.Write("Dark Alley ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("X"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("X"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("magenta"); terminal.Write("Love St    ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("N"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("N"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("ews        ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("F"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("F"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.WriteLine("ame");
 
         // Line 11: Info + quit row
         terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_cyan"); terminal.Write("="); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("="); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Stats      ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("P"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("P"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("rogress    ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("magenta"); terminal.Write("R"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("R"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("elations   ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("red"); terminal.Write("Q"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("Q"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("gray"); terminal.WriteLine("uit");
 
         // Online multiplayer row (only in online mode)
@@ -231,15 +231,15 @@ public class MainStreetLocation : BaseLocation
             int onlineCount = OnlineStateManager.Instance?.CachedOnlinePlayerCount ?? 0;
             terminal.SetColor("bright_green");
             terminal.Write(" ── Online ── ");
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("3"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("3"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write($"Who({onlineCount}) ");
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("4"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("4"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write("Chat ");
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_cyan"); terminal.Write("5"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("5"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write("News ");
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_red"); terminal.Write("6"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("6"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write("Arena ");
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_magenta"); terminal.Write("7"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("7"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.WriteLine("Boss");
         }
 
@@ -298,18 +298,18 @@ public class MainStreetLocation : BaseLocation
 
         // Line 15: Quick commands (compact)
         terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("cyan"); terminal.Write("S"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("S"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("tatus ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("*"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("*"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Inv ");
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("cyan"); terminal.Write("?"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("?"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Help ");
         if (liveNPCs.Count > 0)
         {
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_green"); terminal.Write("0"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("0"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write($"Talk({liveNPCs.Count}) ");
         }
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("red"); terminal.Write("!"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("!"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Bug");
         terminal.WriteLine("");
 
@@ -381,7 +381,7 @@ public class MainStreetLocation : BaseLocation
         // Row 1 - Primary locations
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("D");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -390,7 +390,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("I");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -399,7 +399,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("T");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -408,7 +408,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("O");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -445,7 +445,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("J");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -455,7 +455,7 @@ public class MainStreetLocation : BaseLocation
         // Row 3 - Services
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("B");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -464,7 +464,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("1");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -482,7 +482,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("V");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -492,7 +492,7 @@ public class MainStreetLocation : BaseLocation
         // Row 4 - Important locations
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("K");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -501,7 +501,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("H");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -510,7 +510,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("C");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -519,7 +519,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("L");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -531,7 +531,7 @@ public class MainStreetLocation : BaseLocation
         // Row 5 - Information
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -540,7 +540,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("N");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -549,7 +549,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("F");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -562,7 +562,7 @@ public class MainStreetLocation : BaseLocation
         // Row 6 - Stats & Progress
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("=");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -571,7 +571,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("P");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -580,7 +580,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -600,7 +600,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Y");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -609,7 +609,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("X");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -618,7 +618,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -641,7 +641,7 @@ public class MainStreetLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("3");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -654,7 +654,7 @@ public class MainStreetLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write(" [");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("4");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -663,7 +663,7 @@ public class MainStreetLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("5");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -672,7 +672,7 @@ public class MainStreetLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("6");
             terminal.SetColor("darkgray");
             terminal.Write("]");
@@ -681,7 +681,7 @@ public class MainStreetLocation : BaseLocation
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("7");
             terminal.SetColor("darkgray");
             terminal.Write("]");

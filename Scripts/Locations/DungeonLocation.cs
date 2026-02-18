@@ -1034,8 +1034,12 @@ public class DungeonLocation : BaseLocation
 
             foreach (var opt in encounter.Responses)
             {
-                term.SetColor("yellow");
-                term.Write($"    [{opt.Key}] ");
+                term.SetColor("darkgray");
+                term.Write("    [");
+                term.SetColor("bright_yellow");
+                term.Write($"{opt.Key}");
+                term.SetColor("darkgray");
+                term.Write("] ");
                 term.SetColor("white");
                 term.WriteLine(opt.Text);
             }
@@ -1582,27 +1586,27 @@ public class DungeonLocation : BaseLocation
         // Actions - context-sensitive rows
         var row1 = new List<(string key, string color, string label)>();
         if (room.HasMonsters && !room.IsCleared)
-            row1.Add(("F", "red", "Fight"));
+            row1.Add(("F", "bright_yellow", "Fight"));
         if (room.HasTreasure && !room.TreasureLooted && (room.IsCleared || !room.HasMonsters))
-            row1.Add(("T", "yellow", "Treasure"));
+            row1.Add(("T", "bright_yellow", "Treasure"));
         if (room.HasEvent && !room.EventCompleted)
-            row1.Add(("V", "cyan", "Investigate"));
+            row1.Add(("V", "bright_yellow", "Investigate"));
         if (uninteractedFeatures.Any())
-            row1.Add(("X", "magenta", "Examine"));
+            row1.Add(("X", "bright_yellow", "Examine"));
         if (room.HasStairsDown && (room.IsCleared || !room.HasMonsters))
-            row1.Add(("D", "blue", "Descend"));
+            row1.Add(("D", "bright_yellow", "Descend"));
         if ((room.IsCleared || !room.HasMonsters) && !hasRestThisFloor)
-            row1.Add(("R", "green", "Rest"));
+            row1.Add(("R", "bright_yellow", "Rest"));
 
         if (row1.Count > 0)
             ShowBBSMenuRow(row1.ToArray());
 
         ShowBBSMenuRow(
-            ("M", "cyan", "Map"),
-            ("I", "cyan", "Inv"),
-            ("P", "cyan", "Potions"),
-            ("=", "cyan", "Status"),
-            ("Q", "red", "Leave")
+            ("M", "bright_yellow", "Map"),
+            ("I", "bright_yellow", "Inv"),
+            ("P", "bright_yellow", "Potions"),
+            ("=", "bright_yellow", "Status"),
+            ("Q", "bright_yellow", "Leave")
         );
 
         // Status line
@@ -1706,14 +1710,14 @@ public class DungeonLocation : BaseLocation
 
         // Menu rows
         ShowBBSMenuRow(
-            ("E", "bright_green", "Enter"),
-            ("J", "bright_cyan", "Journal"),
+            ("E", "bright_yellow", "Enter"),
+            ("J", "bright_yellow", "Journal"),
             ("T", "bright_yellow", "Party"),
-            ("S", "bright_cyan", "Status")
+            ("S", "bright_yellow", "Status")
         );
         ShowBBSMenuRow(
             ("L", "bright_yellow", "Level(+/-10)"),
-            ("Q", "bright_red", "Quit to town")
+            ("Q", "bright_yellow", "Quit to town")
         );
 
         // Footer status
@@ -1938,7 +1942,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("F");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -1951,7 +1955,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("yellow");
+            terminal.SetColor("bright_yellow");
             terminal.Write("T");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -1964,7 +1968,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("V");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -1977,7 +1981,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("X");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -1990,7 +1994,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("blue");
+            terminal.SetColor("bright_yellow");
             terminal.Write("D");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -2003,7 +2007,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("R");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -2014,7 +2018,7 @@ public class DungeonLocation : BaseLocation
         // General options
         terminal.SetColor("darkgray");
         terminal.Write("  [");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("M");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -2023,7 +2027,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("I");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -2032,7 +2036,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("P");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -2041,7 +2045,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("=");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -2050,7 +2054,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -2208,7 +2212,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("E");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -2217,7 +2221,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("J");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -2235,7 +2239,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -2253,7 +2257,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -3948,8 +3952,14 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("0");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.WriteLine("[0] Cancel");
+        terminal.WriteLine("Cancel");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput("Choice: ");
@@ -7874,17 +7884,37 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("Options:");
         if (inactiveCompanions.Count > 0 && teammates.Count < 4)
         {
-            terminal.WriteLine("  [C1-C" + inactiveCompanions.Count + "] Add companion to party");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("C1");
+            terminal.SetColor("white");
+            terminal.Write("-");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("C" + inactiveCompanions.Count);
+            terminal.SetColor("white");
+            terminal.WriteLine("] Add companion to party");
         }
         if (npcTeammates.Count > 0 && teammates.Count < 4) // Max 4 teammates + player = 5
         {
-            terminal.WriteLine("  [A]dd ally to dungeon party");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("A");
+            terminal.SetColor("white");
+            terminal.WriteLine("]dd ally to dungeon party");
         }
         if (teammates.Count > 0)
         {
-            terminal.WriteLine("  [R]emove ally from party");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("R");
+            terminal.SetColor("white");
+            terminal.WriteLine("]emove ally from party");
         }
-        terminal.WriteLine("  [B]ack to dungeon menu");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("B");
+        terminal.SetColor("white");
+        terminal.WriteLine("]ack to dungeon menu");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("Choice: ");
@@ -8304,7 +8334,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
-                terminal.SetColor("green");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("U");
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
@@ -8321,7 +8351,7 @@ public class DungeonLocation : BaseLocation
             int costPerPotion = 50 + (player.Level * 10);
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("yellow");
+            terminal.SetColor("bright_yellow");
             terminal.Write("B");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -8333,7 +8363,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
-                terminal.SetColor("bright_green");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("H");
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
@@ -8346,7 +8376,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
-                terminal.SetColor("bright_cyan");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("T");
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
@@ -8360,7 +8390,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
-                terminal.SetColor("bright_magenta");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("A");
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
@@ -8371,7 +8401,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -8488,8 +8518,14 @@ public class DungeonLocation : BaseLocation
             string status = hpPercent >= 100 ? " (Full)" : "";
             terminal.WriteLine($"  [{i + 1}] {companion.DisplayName} - HP: {companion.HP}/{companion.MaxHP} ({hpPercent}%){status}");
         }
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("0");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("gray");
-        terminal.WriteLine("  [0] Cancel");
+        terminal.WriteLine("Cancel");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -8528,14 +8564,33 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine($"{target.DisplayName} is missing {missingHP} HP.");
         terminal.WriteLine($"Each potion heals approximately {healPerPotion} HP.");
         terminal.WriteLine("");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.WriteLine($"[1] Use 1 potion");
+        terminal.WriteLine("Use 1 potion");
         if (potionsNeeded > 1)
         {
-            terminal.WriteLine($"[F] Fully heal (uses up to {potionsNeeded} potions)");
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("F");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine($"Fully heal (uses up to {potionsNeeded} potions)");
         }
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("0");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("gray");
-        terminal.WriteLine("[0] Cancel");
+        terminal.WriteLine("Cancel");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -8646,10 +8701,22 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
         }
 
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("Y");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.WriteLine($"[Y] Yes, heal the party (uses {potionsToUse} potions)");
+        terminal.WriteLine($"Yes, heal the party (uses {potionsToUse} potions)");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("N");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("gray");
-        terminal.WriteLine("[N] Cancel");
+        terminal.WriteLine("Cancel");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -8853,16 +8920,47 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         if (canBuyHealing)
-            terminal.WriteLine($"[H]ealing Potions - {healCost}g each ({player.Healing}/{player.MaxPotions})", "green");
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("H");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("green");
+            terminal.WriteLine($"ealing Potions - {healCost}g each ({player.Healing}/{player.MaxPotions})");
+        }
         else
-            terminal.WriteLine($"[H]ealing Potions - FULL ({player.Healing}/{player.MaxPotions})", "darkgray");
+        {
+            terminal.SetColor("darkgray");
+            terminal.WriteLine($"[H]ealing Potions - FULL ({player.Healing}/{player.MaxPotions})");
+        }
 
         if (canBuyMana)
-            terminal.WriteLine($"[M]ana Potions - {manaCost}g each ({player.ManaPotions}/{player.MaxManaPotions})", "blue");
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("M");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("blue");
+            terminal.WriteLine($"ana Potions - {manaCost}g each ({player.ManaPotions}/{player.MaxManaPotions})");
+        }
         else if (SpellSystem.HasSpells(player))
-            terminal.WriteLine($"[M]ana Potions - FULL ({player.ManaPotions}/{player.MaxManaPotions})", "darkgray");
+        {
+            terminal.SetColor("darkgray");
+            terminal.WriteLine($"[M]ana Potions - FULL ({player.ManaPotions}/{player.MaxManaPotions})");
+        }
 
-        terminal.WriteLine("[C]ancel", "gray");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("C");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("gray");
+        terminal.WriteLine("ancel");
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
@@ -9400,9 +9498,30 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("\"Greetings, friend! I have supplies for sale.\"", "yellow");
                 terminal.WriteLine("");
 
-                terminal.WriteLine("[B] Buy healing potions (500 gold each)");
-                terminal.WriteLine("[I] Trade information (100 gold)");
-                terminal.WriteLine("[L] Leave");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("B");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Buy healing potions (500 gold each)");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("I");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Trade information (100 gold)");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("L");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Leave");
 
                 var tradeChoice = await terminal.GetInput("Choice: ");
                 if (tradeChoice.ToUpper() == "B")
@@ -9817,9 +9936,30 @@ public class DungeonLocation : BaseLocation
         // Generic handler for other puzzle types - use Intelligence check
         terminal.WriteLine("This puzzle requires careful thought...", "white");
         terminal.WriteLine("");
-        terminal.WriteLine("[1] Examine carefully and deduce the answer", "white");
-        terminal.WriteLine("[2] Try a random approach", "white");
-        terminal.WriteLine("[3] Give up", "white");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.WriteLine("Examine carefully and deduce the answer");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.WriteLine("Try a random approach");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("3");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.WriteLine("Give up");
 
         var choice = await terminal.GetInput("> ");
 
@@ -10708,10 +10848,30 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("She reaches for it, then hesitates, looking at you.");
         terminal.WriteLine("");
 
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("yellow");
-        terminal.WriteLine("[1] Encourage her to take it");
-        terminal.WriteLine("[2] Warn her it might be dangerous");
-        terminal.WriteLine("[3] Take it yourself");
+        terminal.WriteLine("Encourage her to take it");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Warn her it might be dangerous");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("3");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Take it yourself");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("What do you do? ");
@@ -10863,10 +11023,30 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("Aldric's hands tremble on his shield.");
         terminal.WriteLine("");
 
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("yellow");
-        terminal.WriteLine("[1] \"Aldric, we fight together. You're not alone this time.\"");
-        terminal.WriteLine("[2] \"This is your battle. I'll support you from behind.\"");
-        terminal.WriteLine("[3] \"We should retreat and prepare properly.\"");
+        terminal.WriteLine("\"Aldric, we fight together. You're not alone this time.\"");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("\"This is your battle. I'll support you from behind.\"");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("3");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("\"We should retreat and prepare properly.\"");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("What do you say? ");
@@ -11082,10 +11262,30 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("The young man's eyes find yours. He shakes his head slightly.");
         terminal.WriteLine("");
 
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("yellow");
-        terminal.WriteLine("[1] \"Heal him, Mira. Life is precious, no matter the cost.\"");
-        terminal.WriteLine("[2] \"Let him go peacefully. Some pain should not be prolonged.\"");
-        terminal.WriteLine("[3] \"This is your choice, Mira. Not mine.\"");
+        terminal.WriteLine("\"Heal him, Mira. Life is precious, no matter the cost.\"");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("\"Let him go peacefully. Some pain should not be prolonged.\"");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("3");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("\"This is your choice, Mira. Not mine.\"");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("What do you say? ");
@@ -11285,9 +11485,22 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("Inside: a chest covered in ancient runes.");
         terminal.WriteLine("");
 
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("yellow");
-        terminal.WriteLine("[1] Help him open it together");
-        terminal.WriteLine("[2] Let him have this moment alone");
+        terminal.WriteLine("Help him open it together");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Let him have this moment alone");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("Choice: ");
@@ -11389,9 +11602,22 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("\"Something I've never told anyone?\"");
         terminal.WriteLine("");
 
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
         terminal.SetColor("yellow");
-        terminal.WriteLine("[1] \"Of course. I'm listening.\"");
-        terminal.WriteLine("[2] \"You don't have to tell me anything.\"");
+        terminal.WriteLine("\"Of course. I'm listening.\"");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("\"You don't have to tell me anything.\"");
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("Response: ");

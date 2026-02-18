@@ -395,7 +395,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_green");
+            terminal.SetColor("bright_yellow");
             terminal.Write("1");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -413,7 +413,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("3");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -590,7 +590,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("1");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -599,7 +599,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_red");
+            terminal.SetColor("bright_yellow");
             terminal.Write("2");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -761,7 +761,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_magenta");
+            terminal.SetColor("bright_yellow");
             terminal.Write("1");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -770,7 +770,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("2");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
@@ -779,7 +779,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
-            terminal.SetColor("gray");
+            terminal.SetColor("bright_yellow");
             terminal.Write("3");
             terminal.SetColor("darkgray");
             terminal.Write("] ");

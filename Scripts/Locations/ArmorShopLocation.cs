@@ -182,7 +182,7 @@ public class ArmorShopLocation : BaseLocation
         // Sell option
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -192,7 +192,7 @@ public class ArmorShopLocation : BaseLocation
         // Auto-equip option
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("A");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -202,7 +202,7 @@ public class ArmorShopLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
@@ -380,7 +380,7 @@ public class ArmorShopLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("P");
             terminal.SetColor("darkgray");
             terminal.Write("] Previous   ");
@@ -390,7 +390,7 @@ public class ArmorShopLocation : BaseLocation
         {
             terminal.SetColor("darkgray");
             terminal.Write("[");
-            terminal.SetColor("bright_cyan");
+            terminal.SetColor("bright_yellow");
             terminal.Write("N");
             terminal.SetColor("darkgray");
             terminal.Write("] Next   ");
@@ -398,7 +398,7 @@ public class ArmorShopLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("B");
         terminal.SetColor("darkgray");
         terminal.Write("] ");

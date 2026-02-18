@@ -138,7 +138,7 @@ public class MarketplaceLocation : BaseLocation
         // Row 1
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("C");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -147,7 +147,7 @@ public class MarketplaceLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("B");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -156,7 +156,7 @@ public class MarketplaceLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("A");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -166,7 +166,7 @@ public class MarketplaceLocation : BaseLocation
         // Row 2
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -175,7 +175,7 @@ public class MarketplaceLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -221,7 +221,7 @@ public class MarketplaceLocation : BaseLocation
         terminal.WriteLine("");
 
         // Menu rows
-        ShowBBSMenuRow(("C", "cyan", "Browse"), ("B", "green", "Buy"), ("A", "green", "AddItem"), ("S", "cyan", "Status"), ("R", "red", "Return"));
+        ShowBBSMenuRow(("C", "bright_yellow", "Browse"), ("B", "bright_yellow", "Buy"), ("A", "bright_yellow", "AddItem"), ("S", "bright_yellow", "Status"), ("R", "bright_yellow", "Return"));
 
         ShowBBSFooter();
     }

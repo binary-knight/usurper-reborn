@@ -91,8 +91,14 @@ public static class SpellLearningSystem
                 {
                     char letter = (char)('a' + i);
                     int manaCost = SpellSystem.CalculateManaCost(knownUnequipped[i], player);
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"{letter}");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.WriteLine($"  [{letter}] {knownUnequipped[i].Name,-22} ({manaCost} MP) Lv{knownUnequipped[i].Level} {knownUnequipped[i].SpellType}");
+                    terminal.WriteLine($"{knownUnequipped[i].Name,-22} ({manaCost} MP) Lv{knownUnequipped[i].Level} {knownUnequipped[i].SpellType}");
                 }
             }
 
@@ -130,8 +136,8 @@ public static class SpellLearningSystem
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine("[1-9] Equip/change slot  [C] Clear slot  [A] Auto-fill", "yellow");
-            terminal.WriteLine("[L#] Learn spell (e.g. L5)  [F#] Forget spell  [X] Exit", "yellow");
+            terminal.WriteLine("[1-9] Equip/change slot  [C] Clear slot  [A] Auto-fill", "bright_yellow");
+            terminal.WriteLine("[L#] Learn spell (e.g. L5)  [F#] Forget spell  [X] Exit", "bright_yellow");
             var input = await terminal.GetInput("> ");
             if (string.IsNullOrWhiteSpace(input)) continue;
 
@@ -262,11 +268,23 @@ public static class SpellLearningSystem
                 {
                     char letter = (char)('a' + i);
                     int manaCost = SpellSystem.CalculateManaCost(knownUnequipped[i], player);
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"{letter}");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.WriteLine($"  [{letter}] {knownUnequipped[i].Name,-22} ({manaCost} MP) {knownUnequipped[i].SpellType}");
+                    terminal.WriteLine($"{knownUnequipped[i].Name,-22} ({manaCost} MP) {knownUnequipped[i].SpellType}");
                 }
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("0");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  [0] Cancel");
+                terminal.WriteLine("Cancel");
 
                 var pick = await terminal.GetInput("> ");
                 if (string.IsNullOrWhiteSpace(pick) || pick.Trim() == "0") continue;

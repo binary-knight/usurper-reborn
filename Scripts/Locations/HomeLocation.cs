@@ -190,7 +190,7 @@ public class HomeLocation : BaseLocation
         // Row 1 - Rest & Storage
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -199,7 +199,7 @@ public class HomeLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("D");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -208,7 +208,7 @@ public class HomeLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("W");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -218,7 +218,7 @@ public class HomeLocation : BaseLocation
         // Row 2 - View
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("L");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -227,7 +227,7 @@ public class HomeLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("T");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -236,7 +236,7 @@ public class HomeLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("yellow");
+        terminal.SetColor("bright_yellow");
         terminal.Write("F");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -246,7 +246,7 @@ public class HomeLocation : BaseLocation
         // Row 3 - Romance
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("P");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -255,7 +255,7 @@ public class HomeLocation : BaseLocation
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("B");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -264,7 +264,7 @@ public class HomeLocation : BaseLocation
 
 terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("bright_magenta");
+        terminal.SetColor("bright_yellow");
         terminal.Write("!");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -273,7 +273,7 @@ terminal.SetColor("darkgray");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_green");
+        terminal.SetColor("bright_yellow");
         terminal.Write("H");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -283,7 +283,7 @@ terminal.SetColor("darkgray");
         // Row 4 - Inventory & Equipment
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("I");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -307,7 +307,7 @@ terminal.SetColor("darkgray");
 
         terminal.SetColor("darkgray");
         terminal.Write(" [");
-        terminal.SetColor("cyan");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -316,7 +316,7 @@ terminal.SetColor("darkgray");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
-        terminal.SetColor("bright_red");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -384,10 +384,10 @@ terminal.SetColor("darkgray");
         terminal.WriteLine("");
 
         // Menu rows
-        ShowBBSMenuRow(("R", "bright_green", "Rest"), ("D", "cyan", "Deposit"), ("W", "cyan", "Withdraw"), ("L", "yellow", "List Chest"));
-        ShowBBSMenuRow(("T", "yellow", "Trophies"), ("F", "yellow", "Family"), ("P", "magenta", "Partner"), ("B", "magenta", "Bedroom"));
-        ShowBBSMenuRow(("I", "cyan", "Inventory"), ("G", "yellow", "GearPartner"), ("H", "green", "Heal(Pot)"), ("!", "magenta", "Resurrect"));
-        ShowBBSMenuRow(("Q", "red", "Return"));
+        ShowBBSMenuRow(("R", "bright_yellow", "Rest"), ("D", "bright_yellow", "Deposit"), ("W", "bright_yellow", "Withdraw"), ("L", "bright_yellow", "List Chest"));
+        ShowBBSMenuRow(("T", "bright_yellow", "Trophies"), ("F", "bright_yellow", "Family"), ("P", "bright_yellow", "Partner"), ("B", "bright_yellow", "Bedroom"));
+        ShowBBSMenuRow(("I", "bright_yellow", "Inventory"), ("G", "bright_yellow", "GearPartner"), ("H", "bright_yellow", "Heal(Pot)"), ("!", "bright_yellow", "Resurrect"));
+        ShowBBSMenuRow(("Q", "bright_yellow", "Return"));
 
         ShowBBSFooter();
     }
@@ -701,7 +701,19 @@ terminal.SetColor("darkgray");
 
         terminal.WriteLine();
         terminal.SetColor("cyan");
-        terminal.WriteLine("Options: [D]eposit to chest, [E]quip item, [Q]uit");
+        terminal.Write("Options: ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[D]");
+        terminal.SetColor("cyan");
+        terminal.Write("eposit to chest, ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[E]");
+        terminal.SetColor("cyan");
+        terminal.Write("quip item, ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[Q]");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("uit");
 
         var input = await terminal.GetInput("Choice: ");
         var c = input.Trim().ToUpperInvariant();
@@ -1221,8 +1233,10 @@ terminal.SetColor("darkgray");
             terminal.SetColor("gray");
             terminal.WriteLine($" ({opt.type})");
         }
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [0]");
         terminal.SetColor("gray");
-        terminal.WriteLine("  [0] Cancel");
+        terminal.WriteLine(" Cancel");
         terminal.WriteLine();
 
         var input = await terminal.GetInput("Choice: ");
@@ -1253,20 +1267,37 @@ terminal.SetColor("darkgray");
         terminal.WriteLine($"You spend quality time with {partner.Name}...");
         terminal.WriteLine();
 
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [1]");
         terminal.SetColor("white");
-        terminal.WriteLine("  [1] Have a romantic dinner together");
-        terminal.WriteLine("  [2] Take a walk and hold hands");
-        terminal.WriteLine("  [3] Cuddle by the fire");
-        terminal.WriteLine("  [4] Have a deep conversation");
+        terminal.WriteLine(" Have a romantic dinner together");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [2]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Take a walk and hold hands");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [3]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Cuddle by the fire");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [4]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Have a deep conversation");
         if (relationType == "spouse")
         {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [5]");
             terminal.SetColor("bright_red");
-            terminal.WriteLine("  [5] Retire to the bedroom...");
+            terminal.WriteLine(" Retire to the bedroom...");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [6]");
             terminal.SetColor("yellow");
-            terminal.WriteLine("  [6] Discuss our relationship...");
+            terminal.WriteLine(" Discuss our relationship...");
         }
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [0]");
         terminal.SetColor("gray");
-        terminal.WriteLine("  [0] Cancel");
+        terminal.WriteLine(" Cancel");
         terminal.WriteLine();
 
         var input = await terminal.GetInput("Choice: ");
@@ -1383,23 +1414,34 @@ terminal.SetColor("darkgray");
         terminal.SetColor("white");
         terminal.WriteLine("What would you like to discuss?");
         terminal.WriteLine();
-        terminal.WriteLine("  [1] Express your love and commitment");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [1]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Express your love and commitment");
 
         if (spouseData != null && !spouseData.AcceptsPolyamory)
         {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [2]");
             terminal.SetColor("magenta");
-            terminal.WriteLine("  [2] Discuss opening our marriage (polyamory)");
+            terminal.WriteLine(" Discuss opening our marriage (polyamory)");
         }
         else if (spouseData != null && spouseData.AcceptsPolyamory)
         {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [2]");
             terminal.SetColor("magenta");
-            terminal.WriteLine("  [2] Discuss returning to monogamy");
+            terminal.WriteLine(" Discuss returning to monogamy");
         }
 
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [3]");
         terminal.SetColor("red");
-        terminal.WriteLine("  [3] Discuss separation/divorce...");
+        terminal.WriteLine(" Discuss separation/divorce...");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [0]");
         terminal.SetColor("gray");
-        terminal.WriteLine("  [0] Never mind");
+        terminal.WriteLine(" Never mind");
         terminal.WriteLine();
 
         var input = await terminal.GetInput("Choice: ");
@@ -1648,10 +1690,15 @@ terminal.SetColor("darkgray");
             terminal.WriteLine("You will lose custody of your children!");
         }
 
-        terminal.SetColor("white");
         terminal.WriteLine();
-        terminal.WriteLine("  [Y] Yes, I want a divorce");
-        terminal.WriteLine("  [N] No, I changed my mind");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [Y]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Yes, I want a divorce");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [N]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" No, I changed my mind");
         terminal.WriteLine();
 
         var input = await terminal.GetInput("Choice: ");
@@ -1776,11 +1823,22 @@ terminal.SetColor("darkgray");
         terminal.SetColor("white");
         terminal.WriteLine("What do you want to discuss?");
         terminal.WriteLine();
-        terminal.WriteLine("  [1] Group encounters (threesomes, moresomes)");
-        terminal.WriteLine("  [2] Watching (voyeurism)");
-        terminal.WriteLine("  [3] Being watched (exhibitionism)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [1]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Group encounters (threesomes, moresomes)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [2]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Watching (voyeurism)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [3]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Being watched (exhibitionism)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [0]");
         terminal.SetColor("gray");
-        terminal.WriteLine("  [0] Never mind");
+        terminal.WriteLine(" Never mind");
         terminal.WriteLine();
 
         var input = await terminal.GetInput("Choice: ");
@@ -2011,11 +2069,22 @@ terminal.SetColor("darkgray");
         terminal.SetColor("white");
         terminal.WriteLine("What arrangement do you want to discuss?");
         terminal.WriteLine();
-        terminal.WriteLine("  [1] Hotwifing/Hothusbanding (your partner with others while you watch/know)");
-        terminal.WriteLine("  [2] Cuckolding (a specific power dynamic version)");
-        terminal.WriteLine("  [3] Stag/Vixen (you enjoy sharing your partner)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [1]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Hotwifing/Hothusbanding (your partner with others while you watch/know)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [2]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Cuckolding (a specific power dynamic version)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [3]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Stag/Vixen (you enjoy sharing your partner)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [0]");
         terminal.SetColor("gray");
-        terminal.WriteLine("  [0] Never mind");
+        terminal.WriteLine(" Never mind");
         terminal.WriteLine();
 
         var input = await terminal.GetInput("Choice: ");
@@ -2090,8 +2159,14 @@ terminal.SetColor("darkgray");
             terminal.SetColor("white");
             terminal.WriteLine("Do you want them to try it tonight?");
             terminal.WriteLine();
-            terminal.WriteLine("  [Y] Yes, let's try it");
-            terminal.WriteLine("  [N] No, maybe another time");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [Y]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Yes, let's try it");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [N]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" No, maybe another time");
             terminal.WriteLine();
 
             var input = await terminal.GetInput("Choice: ");
@@ -2314,8 +2389,14 @@ terminal.SetColor("darkgray");
             terminal.SetColor("white");
             terminal.WriteLine("Do you want to try it tonight?");
             terminal.WriteLine();
-            terminal.WriteLine("  [Y] Yes, let's try it");
-            terminal.WriteLine("  [N] No, maybe another time");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [Y]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Yes, let's try it");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [N]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" No, maybe another time");
             terminal.WriteLine();
 
             var input = await terminal.GetInput("Choice: ");
@@ -2650,8 +2731,14 @@ terminal.SetColor("darkgray");
             terminal.SetColor("yellow");
             terminal.WriteLine("Your spouse has asked for a divorce.");
             terminal.WriteLine();
-            terminal.WriteLine("  [A] Accept the divorce");
-            terminal.WriteLine("  [P] Plead with them to reconsider");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [A]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" Accept the divorce");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [P]");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(" Plead with them to reconsider");
             terminal.WriteLine();
 
             var input = await terminal.GetInput("Choice: ");
@@ -2824,9 +2911,14 @@ terminal.SetColor("darkgray");
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"{partner.Name} is here, looking inviting...");
             terminal.WriteLine();
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [1]");
             terminal.SetColor("white");
-            terminal.WriteLine($"  [1] Join {partner.Name} in bed");
-            terminal.WriteLine("  [0] Leave the bedroom");
+            terminal.WriteLine($" Join {partner.Name} in bed");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [0]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Leave the bedroom");
 
             var input = await terminal.GetInput("Choice: ");
             if (input == "1")
@@ -2851,8 +2943,10 @@ terminal.SetColor("darkgray");
                 terminal.SetColor("white");
                 terminal.WriteLine($"  [{i + 1}] {availablePartners[i].Name}");
             }
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [0]");
             terminal.SetColor("gray");
-            terminal.WriteLine("  [0] Leave the bedroom");
+            terminal.WriteLine(" Leave the bedroom");
 
             var input = await terminal.GetInput("Choice: ");
             if (int.TryParse(input, out int choice) && choice >= 1 && choice <= availablePartners.Count)
@@ -2966,8 +3060,10 @@ terminal.SetColor("darkgray");
         terminal.WriteLine("    +10% max HP permanently");
         terminal.WriteLine();
 
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[0]");
         terminal.SetColor("white");
-        terminal.WriteLine("[0] Return");
+        terminal.WriteLine(" Return");
         terminal.WriteLine();
 
         var input = await terminal.GetInput("Select upgrade: ");
@@ -3379,11 +3475,22 @@ toResurrect.IsDead = false;
             // Show options
             terminal.SetColor("cyan");
             terminal.WriteLine("Options:");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [E]");
             terminal.SetColor("white");
-            terminal.WriteLine("  [E] Equip item from your inventory");
-            terminal.WriteLine("  [U] Unequip item from them");
-            terminal.WriteLine("  [T] Take all their equipment");
-            terminal.WriteLine("  [Q] Done / Return");
+            terminal.WriteLine(" Equip item from your inventory");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [U]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Unequip item from them");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [T]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Take all their equipment");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [Q]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Done / Return");
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
@@ -3544,7 +3651,15 @@ toResurrect.IsDead = false;
         {
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine("Which hand? [M]ain hand or [O]ff hand?");
+            terminal.Write("Which hand? ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[M]");
+            terminal.SetColor("cyan");
+            terminal.Write("ain hand or ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[O]");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("ff hand?");
             terminal.Write(": ");
             terminal.SetColor("white");
             var handChoice = (await terminal.ReadLineAsync()).ToUpper().Trim();

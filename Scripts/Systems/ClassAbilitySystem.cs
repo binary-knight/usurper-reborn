@@ -1296,8 +1296,14 @@ public static class ClassAbilitySystem
                 for (int i = 0; i < unequipped.Count; i++)
                 {
                     char letter = (char)('a' + i);
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"{letter}");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.Write($"  [{letter}] {unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST) Lv{unequipped[i].LevelRequired}");
+                    terminal.Write($"{unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST) Lv{unequipped[i].LevelRequired}");
                     if (!string.IsNullOrEmpty(unequipped[i].Description))
                     {
                         terminal.SetColor("gray");
@@ -1325,7 +1331,7 @@ public static class ClassAbilitySystem
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine("[1-9] Equip/change slot  [C] Clear a slot  [A] Auto-fill  [X] Exit", "yellow");
+            terminal.WriteLine("[1-9] Equip/change slot  [C] Clear a slot  [A] Auto-fill  [X] Exit", "bright_yellow");
             var input = await terminal.GetInput("> ");
             if (string.IsNullOrWhiteSpace(input)) continue;
 
@@ -1386,11 +1392,23 @@ public static class ClassAbilitySystem
                 for (int i = 0; i < unequipped.Count; i++)
                 {
                     char letter = (char)('a' + i);
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"{letter}");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.WriteLine($"  [{letter}] {unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST)");
+                    terminal.WriteLine($"{unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST)");
                 }
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("0");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  [0] Cancel");
+                terminal.WriteLine("Cancel");
 
                 var pick = await terminal.GetInput("> ");
                 if (string.IsNullOrWhiteSpace(pick) || pick.Trim() == "0") continue;

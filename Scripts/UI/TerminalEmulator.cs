@@ -26,6 +26,9 @@ public partial class TerminalEmulator : Control
     private int _bbsLineCount = 0;
     private const int BBS_PAGE_LIMIT = 23; // Leave 2 rows for "-- More --" prompt
 
+    // BBS idle timeout warning tracking
+    private bool _idleWarningShown = false;
+
     /// <summary>
     /// Show "-- More --" prompt and wait for keypress in BBS door mode.
     /// Resets the line counter so the next page of output can begin.
@@ -454,8 +457,9 @@ public partial class TerminalEmulator : Control
     
     private ConsoleColor ColorNameToConsole(string colorName)
     {
+        var resolved = ColorTheme.Resolve(colorName);
         // Full color map supporting dark_*, bright_*, and base color names
-        return colorName?.ToLower() switch
+        return resolved?.ToLower() switch
         {
             "black" => ConsoleColor.Black,
 
@@ -522,7 +526,8 @@ public partial class TerminalEmulator : Control
 
     private string GetAnsiColorCode(string color)
     {
-        if (AnsiColorCodes.TryGetValue(color?.ToLower() ?? "white", out var code))
+        var resolved = ColorTheme.Resolve(color);
+        if (AnsiColorCodes.TryGetValue(resolved?.ToLower() ?? "white", out var code))
             return code;
         return "37"; // Default white
     }
@@ -688,11 +693,42 @@ public partial class TerminalEmulator : Control
             return line ?? string.Empty;
         }
 
+        // BBS/Online idle timeout and session time limit checks
+        if (DoorMode.IsInDoorMode || DoorMode.IsOnlineMode)
+        {
+            // Check for session time expiry (from drop file TimeLeftMinutes)
+            if (DoorMode.IsSessionExpired)
+            {
+                await HandleSessionExpired();
+                return "";
+            }
+
+            // Check for idle timeout
+            if (DoorMode.IsIdleTimedOut)
+            {
+                await HandleIdleTimeout();
+                return "";
+            }
+
+            // Show warning 1 minute before idle timeout
+            var idleMinutes = (DateTime.UtcNow - DoorMode.LastInputTime).TotalMinutes;
+            if (idleMinutes >= DoorMode.IdleTimeoutMinutes - 1 && !_idleWarningShown)
+            {
+                WriteLine("", "white");
+                WriteLine("*** WARNING: You will be disconnected in 1 minute due to inactivity! ***", "bright_yellow");
+                WriteLine("", "white");
+                _idleWarningShown = true;
+            }
+        }
+
         // BBS socket mode - delegate entirely to BBSTerminalAdapter which reads from socket
         if (ShouldUseBBSAdapter())
         {
             _bbsLineCount = 0; // Reset BBS pagination counter on input
-            return await BBSTerminalAdapter.Instance!.GetInput(prompt);
+            var bbsResult = await BBSTerminalAdapter.Instance!.GetInput(prompt);
+            DoorMode.LastInputTime = DateTime.UtcNow;
+            _idleWarningShown = false;
+            return bbsResult;
         }
 
         Write(prompt, "bright_white");
@@ -727,8 +763,69 @@ public partial class TerminalEmulator : Control
                 result = Console.ReadLine() ?? string.Empty;
             }
             _bbsLineCount = 0; // Reset BBS pagination counter on input
+
+            // Update idle timeout tracker for non-BBS door/online modes
+            if (DoorMode.IsInDoorMode || DoorMode.IsOnlineMode)
+            {
+                DoorMode.LastInputTime = DateTime.UtcNow;
+                _idleWarningShown = false;
+            }
+
             return result;
         }
+    }
+
+    /// <summary>
+    /// Handle idle timeout — auto-save and disconnect the player.
+    /// </summary>
+    private async Task HandleIdleTimeout()
+    {
+        WriteLine("", "white");
+        WriteLine("*** IDLE TIMEOUT ***", "bright_red");
+        WriteLine($"No input received for {DoorMode.IdleTimeoutMinutes} minutes.", "yellow");
+        WriteLine("Auto-saving and disconnecting...", "yellow");
+        await AutoSaveAndExit("idle timeout");
+    }
+
+    /// <summary>
+    /// Handle session time expiry — auto-save and disconnect the player.
+    /// </summary>
+    private async Task HandleSessionExpired()
+    {
+        WriteLine("", "white");
+        WriteLine("*** TIME LIMIT REACHED ***", "bright_red");
+        WriteLine("Your session time has expired.", "yellow");
+        WriteLine("Auto-saving and disconnecting...", "yellow");
+        await AutoSaveAndExit("session time expired");
+    }
+
+    /// <summary>
+    /// Auto-save the current player and exit the process.
+    /// Used by idle timeout and session expiry handlers.
+    /// </summary>
+    private async Task AutoSaveAndExit(string reason)
+    {
+        var engine = GameEngine.Instance;
+        if (engine?.CurrentPlayer != null)
+        {
+            try
+            {
+                string name = engine.CurrentPlayer.Name2 ?? engine.CurrentPlayer.Name1;
+                await UsurperRemake.Systems.SaveSystem.Instance.SaveGame(name, engine.CurrentPlayer);
+                WriteLine("Game saved.", "bright_green");
+            }
+            catch (Exception ex)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("TIMEOUT", $"Auto-save failed: {ex.Message}");
+            }
+            UsurperRemake.Systems.DebugLogger.Instance.LogGameExit(engine.CurrentPlayer.Name, reason);
+        }
+        else
+        {
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("TIMEOUT", $"Disconnecting ({reason}) — no active player to save");
+        }
+        await Task.Delay(2000);
+        Environment.Exit(0);
     }
 
     /// <summary>

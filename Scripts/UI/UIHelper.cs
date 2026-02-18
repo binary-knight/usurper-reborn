@@ -134,15 +134,18 @@ namespace UsurperRemake.UI
         /// Draw a menu option line (e.g., "[A] Attack")
         /// </summary>
         public static void DrawMenuOption(TerminalEmulator terminal, string key, string description,
-            string borderColor = "bright_blue", string keyColor = "bright_yellow", string textColor = "white")
+            string borderColor = "bright_blue", string keyColor = "bright_yellow", string textColor = "white",
+            string bracketColor = "green")
         {
             string line = $"  [{key}] {description}";
             if (line.Length > BoxWidth)
                 line = line.Substring(0, BoxWidth);
 
-            terminal.Write($"{Vertical}  [", borderColor);
+            terminal.Write($"{Vertical}", borderColor);
+            terminal.Write("  [", bracketColor);
             terminal.Write(key, keyColor);
-            terminal.Write($"] {description}".PadRight(BoxWidth - key.Length - 5), textColor);
+            terminal.Write("] ", bracketColor);
+            terminal.Write(description.PadRight(BoxWidth - key.Length - 5), textColor);
             terminal.WriteLine($"{Vertical}", borderColor);
         }
 

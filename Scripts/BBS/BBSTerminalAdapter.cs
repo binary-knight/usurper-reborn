@@ -74,7 +74,8 @@ namespace UsurperRemake.BBS
 
         private string GetAnsiColorCode(string color)
         {
-            if (AnsiColorCodes.TryGetValue(color?.ToLower() ?? "white", out var code))
+            var resolved = ColorTheme.Resolve(color);
+            if (AnsiColorCodes.TryGetValue(resolved?.ToLower() ?? "white", out var code))
                 return code;
             return "37"; // Default white
         }
