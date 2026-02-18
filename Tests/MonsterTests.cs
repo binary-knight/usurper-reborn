@@ -62,6 +62,9 @@ public class MonsterTests
     [Fact]
     public void GetAttackPower_MiniBoss_Gets15PercentBonus()
     {
+        // v0.42.2: IsMiniBoss 1.15x multiplier removed from GetAttackPower() to fix
+        // double-dipping — mini-boss stats are already boosted 1.5x during generation.
+        // GetAttackPower() now returns the same value for mini-bosses and normal monsters.
         var normalMonster = CreateTestMonster(strength: 100, weappow: 0, punch: 0);
         var miniBossMonster = CreateTestMonster(strength: 100, weappow: 0, punch: 0);
         miniBossMonster.IsMiniBoss = true;
@@ -69,8 +72,8 @@ public class MonsterTests
         var normalAttack = normalMonster.GetAttackPower();
         var miniBossAttack = miniBossMonster.GetAttackPower();
 
-        miniBossAttack.Should().Be((long)(normalAttack * 1.15f),
-            "Mini-bosses should get 15% attack bonus");
+        miniBossAttack.Should().Be(normalAttack,
+            "Mini-boss attack bonus comes from stat generation, not GetAttackPower()");
     }
 
     [Fact]
