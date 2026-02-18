@@ -401,6 +401,14 @@ public class MaintenanceSystem
         // Reset shop haggling attempts (Pascal: daily haggling reset)
         player.WeapHag = 3;
         player.ArmHag = 3;
+
+        // Reset real-world-date daily tracking (online mode persistence)
+        player.SethFightsToday = 0;
+        player.ArmWrestlesToday = 0;
+        player.RoyQuestsToday = 0;
+        player.LastPrayerRealDate = DateTime.MinValue;
+        player.LastInnerSanctumRealDate = DateTime.MinValue;
+        player.LastBindingOfSoulsRealDate = DateTime.MinValue;
     }
     
     /// <summary>

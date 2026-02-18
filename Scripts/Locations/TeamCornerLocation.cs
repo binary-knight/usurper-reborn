@@ -1359,7 +1359,7 @@ public class TeamCornerLocation : BaseLocation
         // Find dead team members
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
         var deadMembers = allNPCs
-            .Where(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive))
+            .Where(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsAgedDeath && !n.IsPermaDead)
             .ToList();
 
         if (deadMembers.Count == 0)

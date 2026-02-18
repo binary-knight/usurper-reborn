@@ -952,7 +952,7 @@ namespace UsurperRemake.Systems
 
                 UsurperRemake.Server.MudServer.ActiveBroadcast = null;
                 var server = UsurperRemake.Server.MudServer.Instance;
-                server?.BroadcastToAll($"\u001b[1;33m  *** Broadcast cleared ***\u001b[0m");
+                server?.BroadcastToAll($"\u001b[1;31m  *** SYSTEM MESSAGE: Broadcast cleared ***\u001b[0m");
                 terminal.SetColor("green");
                 terminal.WriteLine("Broadcast cleared.");
                 DebugLogger.Instance.LogInfo("ADMIN", $"Broadcast cleared by {DoorMode.OnlineUsername}");
@@ -974,7 +974,7 @@ namespace UsurperRemake.Systems
 
             UsurperRemake.Server.MudServer.ActiveBroadcast = message;
             var srv = UsurperRemake.Server.MudServer.Instance;
-            srv?.BroadcastToAll($"\u001b[1;33m  *** {message} ***\u001b[0m");
+            srv?.BroadcastToAll($"\u001b[1;31m  *** SYSTEM MESSAGE: {message} ***\u001b[0m");
             terminal.SetColor("green");
             terminal.WriteLine("Persistent broadcast set for all players.");
             DebugLogger.Instance.LogInfo("ADMIN", $"Broadcast set by {DoorMode.OnlineUsername}: '{message}'");

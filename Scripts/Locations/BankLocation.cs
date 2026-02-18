@@ -145,8 +145,8 @@ public class BankLocation : BaseLocation
         // Menu rows
         ShowBBSMenuRow(("D", "bright_yellow", "Deposit"), ("W", "bright_yellow", "Withdraw"), ("T", "bright_yellow", "Transfer"));
         ShowBBSMenuRow(("L", "bright_yellow", "Loan"), ("I", "bright_yellow", "Interest"), ("A", "bright_yellow", "History"));
-        ShowBBSMenuRow(("G", "bright_yellow", "Guard Duty"), ("*", "bright_yellow", "Resign Guard"), ("R", "bright_yellow", "Rob Bank!"));
-        ShowBBSMenuRow(("Q", "bright_yellow", "Return"));
+        ShowBBSMenuRow(("G", "bright_yellow", "Guard Duty"), ("*", "bright_yellow", "Resign Guard"), ("O", "bright_yellow", "rOb Bank!"));
+        ShowBBSMenuRow(("R", "bright_yellow", "Return"), ("Q", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
 
@@ -331,20 +331,31 @@ public class BankLocation : BaseLocation
         terminal.SetColor("white");
         terminal.Write(" Resign Guard     ");
 
+        terminal.SetColor("red");
+        terminal.Write("r");
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
-        terminal.Write("R");
+        terminal.Write("O");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("red");
-        terminal.WriteLine("ob the Bank!");
+        terminal.WriteLine("b the Bank!");
 
         terminal.WriteLine("");
 
         // Navigation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("R");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("gray");
+        terminal.Write(" Return to Main Street  ");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
         terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
@@ -400,10 +411,11 @@ public class BankLocation : BaseLocation
                 await ResignGuardDuty();
                 return false;
 
-            case "R":
+            case "O":
                 await AttemptRobbery();
                 return false;
 
+            case "R":
             case "Q":
             case "M":
                 await NavigateToLocation(GameLocation.MainStreet);

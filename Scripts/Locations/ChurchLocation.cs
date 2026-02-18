@@ -127,15 +127,16 @@ namespace UsurperRemake.Locations
                     await ProcessConfession();
                     return false;
                     
-                case "R": // Church Records
+                case "V": // Church Records
                     await DisplayChurchRecords();
                     return false;
-                    
+
                 case "S": // Speak with the Bishop
                     await SpeakWithBishop();
                     return false;
-                    
-                case "Q": // Return to Main Street
+
+                case "R": // Return to Main Street
+                case "Q":
                 case "1":
                     await NavigateToLocation(GameLocation.MainStreet);
                     return true;
@@ -250,7 +251,7 @@ namespace UsurperRemake.Locations
             terminal.SetColor("darkgray");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
-            terminal.Write("R");
+            terminal.Write("V");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
@@ -269,7 +270,7 @@ namespace UsurperRemake.Locations
             terminal.SetColor("darkgray");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
-            terminal.Write("Q");
+            terminal.Write("R");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("red");
@@ -302,7 +303,7 @@ namespace UsurperRemake.Locations
             ShowBBSNPCs();
             // Menu rows
             ShowBBSMenuRow(("C", "bright_green", "Donate"), ("B", "bright_yellow", "Blessing"), ("H", "bright_cyan", "Heal"), ("M", "bright_magenta", "Marriage"));
-            ShowBBSMenuRow(("F", "cyan", "Confess"), ("R", "yellow", "Records"), ("S", "magenta", "Bishop"), ("Q", "bright_red", "Return"));
+            ShowBBSMenuRow(("F", "cyan", "Confess"), ("V", "yellow", "Records"), ("S", "magenta", "Bishop"), ("R", "bright_red", "Return"));
             ShowBBSFooter();
         }
 

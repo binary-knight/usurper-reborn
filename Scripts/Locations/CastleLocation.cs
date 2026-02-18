@@ -39,6 +39,10 @@ public class CastleLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        // Refresh king status every time we display (handles login, throne changes, etc.)
+        playerIsKing = currentPlayer?.King ?? false;
+        LoadKingData();
+
         terminal.ClearScreen();
 
         if (DoorMode.IsInDoorMode)
@@ -1245,30 +1249,89 @@ public class CastleLocation : BaseLocation
         // Full heal
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
+        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
-        // Process daily activities
-        currentKing.ProcessDailyActivities();
+        // Remove Groggo's Shadow Blessing on rest
+        if (currentPlayer.GroggoShadowBlessingDex > 0)
+        {
+            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
+            terminal.WriteLine("The Blessing of Shadows fades as you rest...", "gray");
+            currentPlayer.GroggoShadowBlessingDex = 0;
+        }
 
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("You rest peacefully through the night...");
-        terminal.WriteLine("");
-        terminal.WriteLine($"HP restored to {currentPlayer.MaxHP}!");
-        terminal.WriteLine($"Mana restored to {currentPlayer.MaxMana}!");
-        terminal.WriteLine("");
+        if (DoorMode.IsOnlineMode)
+        {
+            // Online mode: King sleeps in the castle (protected by royal guards) and logs out
+            // Day does NOT increment — only the 7 PM ET maintenance reset does that
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("You rest peacefully in the royal chambers...");
+            terminal.WriteLine("");
+            terminal.WriteLine($"HP restored to {currentPlayer.MaxHP}!");
+            terminal.WriteLine($"Mana restored to {currentPlayer.MaxMana}!");
+            terminal.WriteLine("");
 
-        // Show daily report
-        terminal.SetColor("cyan");
-        terminal.WriteLine("=== Daily Kingdom Report ===");
-        terminal.SetColor("white");
-        terminal.WriteLine($"Daily Income: {currentKing.CalculateDailyIncome():N0} gold");
-        terminal.WriteLine($"Daily Expenses: {currentKing.CalculateDailyExpenses():N0} gold");
-        terminal.WriteLine($"Treasury Balance: {currentKing.Treasury:N0} gold");
-        terminal.WriteLine($"Days of Reign: {currentKing.TotalReign}");
+            // Show kingdom status
+            terminal.SetColor("cyan");
+            terminal.WriteLine("=== Kingdom Status ===");
+            terminal.SetColor("white");
+            terminal.WriteLine($"Treasury Balance: {currentKing.Treasury:N0} gold");
+            terminal.WriteLine($"Days of Reign: {currentKing.TotalReign}");
+            terminal.WriteLine("");
 
-        terminal.WriteLine("");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine("Press Enter to continue...");
-        await terminal.ReadKeyAsync();
+            // Save game
+            await GameEngine.Instance.SaveCurrentGame();
+
+            // Register as sleeping at castle (protected by royal guards)
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (backend != null)
+            {
+                var username = DoorMode.OnlineUsername ?? currentPlayer.Name2;
+                // Royal guards protect the king — register with castle guards
+                int guardCount = currentKing.Guards?.Count ?? 0;
+                var guardsJson = "[]";
+                if (guardCount > 0)
+                {
+                    var guardsList = currentKing.Guards
+                        .Where(g => g != null)
+                        .Select(g => new { type = "royal_guard", hp = 500, maxHp = 500 })
+                        .ToList();
+                    guardsJson = System.Text.Json.JsonSerializer.Serialize(guardsList);
+                }
+                await backend.RegisterSleepingPlayer(username, "castle", guardsJson, 0);
+            }
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("Your royal guards stand watch outside the chambers... (logging out)");
+            await Task.Delay(2000);
+
+            throw new LocationExitException(GameLocation.NoWhere);
+        }
+        else
+        {
+            // Single-player mode: process daily activities and continue
+            currentKing.ProcessDailyActivities();
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("You rest peacefully through the night...");
+            terminal.WriteLine("");
+            terminal.WriteLine($"HP restored to {currentPlayer.MaxHP}!");
+            terminal.WriteLine($"Mana restored to {currentPlayer.MaxMana}!");
+            terminal.WriteLine("");
+
+            // Show daily report
+            terminal.SetColor("cyan");
+            terminal.WriteLine("=== Daily Kingdom Report ===");
+            terminal.SetColor("white");
+            terminal.WriteLine($"Daily Income: {currentKing.CalculateDailyIncome():N0} gold");
+            terminal.WriteLine($"Daily Expenses: {currentKing.CalculateDailyExpenses():N0} gold");
+            terminal.WriteLine($"Treasury Balance: {currentKing.Treasury:N0} gold");
+            terminal.WriteLine($"Days of Reign: {currentKing.TotalReign}");
+
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("Press Enter to continue...");
+            await terminal.ReadKeyAsync();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -2544,6 +2607,8 @@ public class CastleLocation : BaseLocation
         var eligibleNPCs = NPCSpawnSystem.Instance?.ActiveNPCs?
             .Where(n => n.IsAlive &&
                    !n.IsDead &&
+                   !n.IsMarried &&
+                   !n.Married &&
                    n.Level >= 10 &&
                    !n.King &&
                    !n.IsStoryNPC &&
@@ -2644,6 +2709,32 @@ public class CastleLocation : BaseLocation
 
             currentKing.Treasury += dowry;
 
+            // Register the actual marriage on both characters
+            currentPlayer.Married = true;
+            currentPlayer.IsMarried = true;
+            currentPlayer.SpouseName = candidate.Name;
+            currentPlayer.MarriedTimes++;
+
+            candidate.Married = true;
+            candidate.IsMarried = true;
+            candidate.SpouseName = currentPlayer.Name;
+            candidate.MarriedTimes++;
+
+            // Register with marriage registry and romance tracker
+            NPCMarriageRegistry.Instance.RegisterMarriage(currentPlayer.ID, candidate.ID, currentPlayer.Name, candidate.Name);
+            RomanceTracker.Instance?.AddSpouse(candidate.ID);
+
+            // Create/update the relationship record to married
+            var relation = RelationshipSystem.GetOrCreateRelationship(currentPlayer, candidate);
+            if (relation != null)
+            {
+                relation.Relation1 = GameConfig.RelationMarried;
+                relation.Relation2 = GameConfig.RelationMarried;
+                relation.MarriedDays = 0;
+                relation.MarriedTimes++;
+                RelationshipSystem.SaveRelationship(relation);
+            }
+
             // Boost loyalty of that faction
             foreach (var member in currentKing.CourtMembers.Where(m => m.Faction == faction))
             {
@@ -2660,6 +2751,9 @@ public class CastleLocation : BaseLocation
 
             NewsSystem.Instance?.Newsy(true,
                 $"ROYAL WEDDING! {currentKing.GetTitle()} {currentKing.Name} has married {candidate.Name}!");
+            NewsSystem.Instance?.WriteMarriageNews(currentPlayer.Name, candidate.Name, "Castle");
+
+            DebugLogger.Instance.LogMarriage(currentPlayer.Name, candidate.Name);
         }
         else
         {
@@ -2709,6 +2803,7 @@ public class CastleLocation : BaseLocation
         if (confirm?.ToUpper() == "Y")
         {
             var faction = currentKing.Spouse.OriginalFaction;
+            var spouseName = currentKing.Spouse.Name;
 
             // Severe loyalty penalty to that faction
             foreach (var member in currentKing.CourtMembers.Where(m => m.Faction == faction))
@@ -2716,12 +2811,31 @@ public class CastleLocation : BaseLocation
                 member.LoyaltyToKing = Math.Max(0, member.LoyaltyToKing - 40);
             }
 
+            // Clear marriage state on player
+            currentPlayer.Married = false;
+            currentPlayer.IsMarried = false;
+            currentPlayer.SpouseName = "";
+
+            // Clear marriage state on the NPC spouse
+            var spouseNPC = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.Name == spouseName);
+            if (spouseNPC != null)
+            {
+                spouseNPC.Married = false;
+                spouseNPC.IsMarried = false;
+                spouseNPC.SpouseName = "";
+            }
+
+            // Clean up registries
+            NPCMarriageRegistry.Instance.EndMarriage(currentPlayer.ID);
+            if (spouseNPC != null)
+                RomanceTracker.Instance?.Divorce(spouseNPC.ID, "Royal divorce", playerInitiated: true);
+
             terminal.SetColor("red");
-            terminal.WriteLine($"You have divorced {currentKing.Spouse.Name}.");
+            terminal.WriteLine($"You have divorced {spouseName}.");
             terminal.WriteLine($"The {faction} faction is furious!");
 
             NewsSystem.Instance?.Newsy(true,
-                $"SCANDAL! {currentKing.GetTitle()} {currentKing.Name} has divorced {currentKing.Spouse.Name}!");
+                $"SCANDAL! {currentKing.GetTitle()} {currentKing.Name} has divorced {spouseName}!");
 
             currentKing.Spouse = null;
         }

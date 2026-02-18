@@ -2792,12 +2792,26 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         // Check Binding of Souls daily limit
-        if (selected.bypassCap && _bindingOfSoulsUsedToday.Contains(targetNPC.Name1))
+        if (selected.bypassCap)
         {
-            terminal.SetColor("red");
-            terminal.WriteLine("  'The Binding can only be cast once per day on the same soul.'");
-            await terminal.WaitForKey();
-            return;
+            bool alreadyUsedToday = false;
+            if (DoorMode.IsOnlineMode)
+            {
+                var boundary = DailySystemManager.GetCurrentResetBoundary();
+                alreadyUsedToday = player.LastBindingOfSoulsRealDate >= boundary;
+            }
+            else
+            {
+                alreadyUsedToday = _bindingOfSoulsUsedToday.Contains(targetNPC.Name1);
+            }
+
+            if (alreadyUsedToday)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  'The Binding can only be cast once per day on the same soul.'");
+                await terminal.WaitForKey();
+                return;
+            }
         }
 
         // Show confirmation with before/after preview
@@ -2867,6 +2881,8 @@ public partial class MagicShopLocation : BaseLocation
             // Binding of Souls - bypasses daily cap via overrideMaxFeeling
             RelationshipSystem.UpdateRelationship(player, targetNPC, 1, selected.steps, false, true);
             _bindingOfSoulsUsedToday.Add(targetNPC.Name1);
+            if (DoorMode.IsOnlineMode)
+                player.LastBindingOfSoulsRealDate = DateTime.UtcNow;
         }
         else
         {

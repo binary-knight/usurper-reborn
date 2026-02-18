@@ -394,6 +394,34 @@ public class CityControlSystem
     }
 
     /// <summary>
+    /// Calculate taxed price for healing services with a 15% combined tax cap.
+    /// Prevents death spiral from high king+city taxes stacking on healing.
+    /// </summary>
+    public static (long kingTax, long cityTax, long total) CalculateHealingTaxedPrice(long basePrice)
+    {
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null)
+            return (0, 0, basePrice);
+
+        // Cap combined healing tax at 15% to prevent death spiral
+        const int MaxHealingTaxPercent = 15;
+        int kingPct = king.KingTaxPercent;
+        int cityPct = king.CityTaxPercent;
+        if (kingPct + cityPct > MaxHealingTaxPercent)
+        {
+            // Proportionally reduce both rates to fit within the cap
+            double ratio = (double)MaxHealingTaxPercent / (kingPct + cityPct);
+            kingPct = (int)(kingPct * ratio);
+            cityPct = MaxHealingTaxPercent - kingPct;
+        }
+
+        long kingTax = kingPct > 0 ? Math.Max(1, (basePrice * kingPct) / 100) : 0;
+        long cityTax = cityPct > 0 ? Math.Max(1, (basePrice * cityPct) / 100) : 0;
+
+        return (kingTax, cityTax, basePrice + kingTax + cityTax);
+    }
+
+    /// <summary>
     /// Display a tax breakdown to the player showing item cost, king's tax, city tax, and total.
     /// Only shows breakdown when taxes are active (at least one > 0%).
     /// </summary>

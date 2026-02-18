@@ -48,6 +48,7 @@ namespace UsurperRemake.BBS
             { "darkgray", "90" }, { "dark_gray", "90" },
             { "darkred", "31" }, { "dark_red", "31" },
             { "darkgreen", "32" }, { "dark_green", "32" },
+            { "dim_green", "2;32" },
             { "darkyellow", "33" }, { "dark_yellow", "33" }, { "brown", "33" },
             { "darkblue", "34" }, { "dark_blue", "34" },
             { "darkmagenta", "35" }, { "dark_magenta", "35" },
@@ -558,7 +559,7 @@ namespace UsurperRemake.BBS
             {
                 "black" => ConsoleColor.Black,
                 "darkred" or "dark_red" => ConsoleColor.DarkRed,
-                "darkgreen" or "dark_green" => ConsoleColor.DarkGreen,
+                "darkgreen" or "dark_green" or "dim_green" => ConsoleColor.DarkGreen,
                 "darkyellow" or "dark_yellow" or "brown" => ConsoleColor.DarkYellow,
                 "darkblue" or "dark_blue" => ConsoleColor.DarkBlue,
                 "darkmagenta" or "dark_magenta" => ConsoleColor.DarkMagenta,

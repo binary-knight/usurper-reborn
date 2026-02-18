@@ -369,7 +369,15 @@ public class Character
     // Faction consumable properties (v0.40.2)
     public int PoisonCoatingCombats { get; set; } = 0;  // Combats remaining with poison coating (+20% dmg)
     public int SmokeBombs { get; set; } = 0;             // Guaranteed escape items (max 3)
-    public int InnerSanctumLastDay { get; set; } = 0;    // Last day Inner Sanctum was used
+    public int InnerSanctumLastDay { get; set; } = 0;    // Last day Inner Sanctum was used (legacy, single-player)
+
+    // Real-world-date daily tracking (online mode — survives logout/login)
+    public DateTime LastDailyResetBoundary { get; set; } = DateTime.MinValue;
+    public DateTime LastPrayerRealDate { get; set; } = DateTime.MinValue;
+    public DateTime LastInnerSanctumRealDate { get; set; } = DateTime.MinValue;
+    public DateTime LastBindingOfSoulsRealDate { get; set; } = DateTime.MinValue;
+    public int SethFightsToday { get; set; } = 0;
+    public int ArmWrestlesToday { get; set; } = 0;
     public bool DivineFavorTriggeredThisCombat { get; set; } = false; // Transient: reset each combat
 
     // Dark Alley Overhaul (v0.41.0)

@@ -455,11 +455,11 @@ namespace UsurperRemake.Locations
             terminal.SetColor("darkgray");
             terminal.Write(" [");
             terminal.SetColor("bright_yellow");
-            terminal.Write("Q");
+            terminal.Write("R");
             terminal.SetColor("darkgray");
             terminal.Write("]");
             terminal.SetColor("white");
-            terminal.WriteLine(" Return to Main Street");
+            terminal.WriteLine("eturn to Main Street");
             terminal.WriteLine("");
 
             ShowStatusLine();
@@ -515,7 +515,7 @@ namespace UsurperRemake.Locations
             if (specialItems.Count > 0)
                 ShowBBSMenuRow(specialItems.ToArray());
 
-            ShowBBSMenuRow(("Q", "bright_yellow", "Return"));
+            ShowBBSMenuRow(("R", "bright_yellow", "Return"));
 
             ShowBBSFooter();
         }
@@ -1556,23 +1556,33 @@ namespace UsurperRemake.Locations
                 return;
             }
 
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"Place your bet (min {minBet}, max {maxBet:N0}): ");
-            var betInput = await terminal.GetInput("> ");
-            if (!long.TryParse(betInput, out long bet) || bet < minBet || bet > maxBet)
+            long bet = 0;
+            while (true)
             {
-                terminal.SetColor("red");
-                terminal.WriteLine("\"That ain't a proper wager.\"");
-                await Task.Delay(1500);
-                return;
-            }
-
-            if (bet > currentPlayer.Gold)
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine("\"You ain't got that kind of coin.\"");
-                await Task.Delay(1500);
-                return;
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"Place your bet (min {minBet}, max {maxBet:N0}, 0 to leave): ");
+                var betInput = await terminal.GetInput("> ");
+                if (!long.TryParse(betInput, out bet) || bet == 0)
+                    return;
+                if (bet < minBet)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\"Minimum wager is {minBet} gold.\"");
+                    continue;
+                }
+                if (bet > maxBet)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"\"Max wager is {maxBet:N0} gold.\"");
+                    continue;
+                }
+                if (bet > currentPlayer.Gold)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("\"You ain't got that kind of coin.\"");
+                    continue;
+                }
+                break;
             }
 
             currentPlayer.Gold -= bet;

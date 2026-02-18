@@ -60,6 +60,7 @@ public class DungeonLocation : BaseLocation
         // Check if player is trying to skip an uncleared boss/seal floor
         // They can't enter floors beyond an uncleared special floor
         currentDungeonLevel = GetMaxAccessibleFloor(player, currentDungeonLevel);
+        player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
 
         // Generate or restore floor based on persistence state
         // CRITICAL: Also regenerate if we have a cached floor but no saved state for it
@@ -1717,7 +1718,7 @@ public class DungeonLocation : BaseLocation
         );
         ShowBBSMenuRow(
             ("L", "bright_yellow", "Level(+/-10)"),
-            ("Q", "bright_yellow", "Quit to town")
+            ("R", "bright_yellow", "Return")
         );
 
         // Footer status
@@ -2258,11 +2259,11 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
-        terminal.Write("Q");
+        terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.WriteLine("uit to town");
+        terminal.WriteLine("eturn to town");
         terminal.WriteLine("");
     }
 
@@ -2547,6 +2548,7 @@ public class DungeonLocation : BaseLocation
                 await ChangeDungeonLevel();
                 return false;
 
+            case "R":
             case "Q":
                 // Players can always leave to town - they may need to gear up, get companions, etc.
                 // Floor locking only prevents ascending to PREVIOUS floors within the dungeon
@@ -4531,6 +4533,7 @@ public class DungeonLocation : BaseLocation
         var floorResult = GenerateOrRestoreFloor(player, nextLevel);
         currentFloor = floorResult.Floor;
         currentDungeonLevel = nextLevel;
+        if (player != null) player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
         roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
         hasRestThisFloor = false;
         consecutiveMonsterRooms = 0;
@@ -4775,6 +4778,7 @@ public class DungeonLocation : BaseLocation
             var floorResult = GenerateOrRestoreFloor(player, targetLevel);
             currentFloor = floorResult.Floor;
             currentDungeonLevel = targetLevel;
+            if (player != null) player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
             roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
             hasRestThisFloor = false;
             consecutiveMonsterRooms = 0;
@@ -5414,6 +5418,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine($"The portal whisks you deeper into the dungeon!");
                 terminal.WriteLine($"You emerge on floor {newFloor}!");
                 currentDungeonLevel = newFloor;
+                if (currentPlayer != null) currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
             }
             else if (roll < 75)
             {
@@ -5424,6 +5429,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine($"The portal carries you upward!");
                 terminal.WriteLine($"You emerge on floor {newFloor}.");
                 currentDungeonLevel = newFloor;
+                if (currentPlayer != null) currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
             }
             else if (roll < 90)
             {
@@ -7739,6 +7745,7 @@ public class DungeonLocation : BaseLocation
             var floorResult = GenerateOrRestoreFloor(player, nextLevel);
             currentFloor = floorResult.Floor;
             currentDungeonLevel = nextLevel;
+            if (player != null) player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
             terminal.WriteLine($"You descend to dungeon level {currentDungeonLevel}.", "yellow");
 
             // Update quest progress for reaching this floor
@@ -10620,6 +10627,7 @@ public class DungeonLocation : BaseLocation
         else
         {
             currentDungeonLevel = targetLevel;
+            if (currentPlayer != null) currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
             terminal.WriteLine($"You steel your nerves. The dungeon now feels like level {currentDungeonLevel}!", "magenta");
         }
 

@@ -527,7 +527,7 @@ public partial class RelationshipSystem
         return $"{name1}_{name2}";
     }
     
-    private static RelationshipRecord GetOrCreateRelationship(Character character1, Character character2)
+    internal static RelationshipRecord GetOrCreateRelationship(Character character1, Character character2)
     {
         var key1 = GetRelationshipKey(character1.Name, character2.Name);
         var key2 = GetRelationshipKey(character2.Name, character1.Name);
@@ -634,7 +634,7 @@ public partial class RelationshipSystem
         };
     }
     
-    private static void SaveRelationship(RelationshipRecord relation)
+    internal static void SaveRelationship(RelationshipRecord relation)
     {
         // In a full implementation, this would save to a file
         // For now, we keep it in memory

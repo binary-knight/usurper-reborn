@@ -2707,6 +2707,14 @@ public partial class CombatEngine
 
         long actualDamage = Math.Max(1, monsterAttack - playerDefense);
 
+        // Cap non-boss monster damage at 75% of player max HP to prevent one-shots
+        if (!monster.IsBoss)
+        {
+            long maxDamage = Math.Max(1, (long)(player.MaxHP * 0.75));
+            if (actualDamage > maxDamage)
+                actualDamage = maxDamage;
+        }
+
         // Worldstone artifact: 50% damage reduction (75% during Manwe fight)
         if (ArtifactSystem.Instance.HasWorldstone())
         {
@@ -8357,7 +8365,7 @@ public partial class CombatEngine
             terminal);
 
         // Generate death news for the realm
-        string location = result.Player?.CurrentLocation ?? "the dungeons";
+        string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? "the dungeons" : result.Player.CurrentLocation;
         NewsSystem.Instance?.WriteDeathNews(companion.DisplayName, killerName, location);
     }
 
@@ -8376,7 +8384,7 @@ public partial class CombatEngine
 
         // Mark the NPC as dead with permadeath roll (monster killed them — not player's fault)
         var npcId = npc.ID ?? "";
-        var deathLocation = result.Player?.CurrentLocation ?? "the dungeons";
+        var deathLocation = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? "the dungeons" : result.Player.CurrentLocation;
         var worldNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
         if (worldNpc != null)
         {
@@ -8435,7 +8443,7 @@ public partial class CombatEngine
         await Task.Delay(1000);
 
         // Generate death news for the realm
-        string location = result.Player?.CurrentLocation ?? "the dungeons";
+        string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? "the dungeons" : result.Player.CurrentLocation;
         NewsSystem.Instance?.WriteDeathNews(npc.DisplayName, killerName, location);
 
         // Ocean Philosophy awakening moment
@@ -8902,7 +8910,7 @@ public partial class CombatEngine
         choices.Add(new ResurrectionChoice
         {
             Name = "Accept Your Fate",
-            Description = "Accept death and face the consequences",
+            Description = "WARNING: Lose 10-20% XP, 50-75% gold, and possibly an item",
             Cost = 0,
             HPRestored = 0,
             Method = "Death Accepted",
@@ -9065,7 +9073,7 @@ public partial class CombatEngine
 
         // Generate death news for the realm
         string killerName = result.Monster?.Name ?? "unknown forces";
-        string location = player.CurrentLocation ?? "the dungeons";
+        string location = string.IsNullOrEmpty(player.CurrentLocation) ? "the dungeons" : player.CurrentLocation;
         NewsSystem.Instance?.WriteDeathNews(player.DisplayName, killerName, location);
     }
 

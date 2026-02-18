@@ -178,11 +178,11 @@ public class NewsLocation : BaseLocation
             if (currentPage < totalPages)
             {
                 terminal.SetColor("yellow");
-                terminal.Write("  [ENTER] Next page, [Q] Return: ");
+                terminal.Write("  [ENTER] Next page, [R] Return: ");
 
                 string input = await terminal.GetInput("");
 
-                if (!string.IsNullOrWhiteSpace(input) && input.Trim().ToUpper() == "Q")
+                if (!string.IsNullOrWhiteSpace(input) && (input.Trim().ToUpper() == "R" || input.Trim().ToUpper() == "Q"))
                 {
                     break;
                 }

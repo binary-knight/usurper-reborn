@@ -623,7 +623,16 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("gray");
-        terminal.WriteLine("uit Game");
+        terminal.Write("uit Game    ");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("~");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("gray");
+        terminal.WriteLine("Settings");
 
         // Online multiplayer section (only shown in online mode)
         if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
@@ -1787,7 +1796,10 @@ public class MainStreetLocation : BaseLocation
             currentPlayer.HP = currentPlayer.MaxHP;
             currentPlayer.Mana = currentPlayer.MaxMana;
             currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
-            await DailySystemManager.Instance.ForceDailyReset();
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                await DailySystemManager.Instance.ForceDailyReset();
+            }
             await GameEngine.Instance.SaveCurrentGame();
 
             // Register as sleeping in dormitory (vulnerable)

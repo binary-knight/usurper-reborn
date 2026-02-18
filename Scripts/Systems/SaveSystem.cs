@@ -614,6 +614,15 @@ namespace UsurperRemake.Systems
                 SmokeBombs = player.SmokeBombs,
                 InnerSanctumLastDay = player.InnerSanctumLastDay,
 
+                // Daily tracking (real-world-date based)
+                LastDailyResetBoundary = player.LastDailyResetBoundary,
+                LastPrayerRealDate = player.LastPrayerRealDate,
+                LastInnerSanctumRealDate = player.LastInnerSanctumRealDate,
+                LastBindingOfSoulsRealDate = player.LastBindingOfSoulsRealDate,
+                SethFightsToday = player.SethFightsToday,
+                ArmWrestlesToday = player.ArmWrestlesToday,
+                RoyQuestsToday = player.RoyQuestsToday,
+
                 // Dark Alley Overhaul (v0.41.0)
                 GroggoShadowBlessingDex = player.GroggoShadowBlessingDex,
                 SteroidShopPurchases = player.SteroidShopPurchases,

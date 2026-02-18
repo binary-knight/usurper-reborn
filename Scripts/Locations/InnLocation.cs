@@ -360,7 +360,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
-        terminal.Write("R");
+        terminal.Write("U");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("white");
@@ -500,7 +500,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
-        terminal.Write("Q");
+        terminal.Write("R");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("red");
@@ -564,7 +564,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine(" Inn Activities:");
         ShowBBSMenuRow(("D", "bright_yellow", "rink(5g)"), ("F", "bright_yellow", "ight Seth"), ("T", "bright_yellow", "alk"), ("G", "bright_yellow", "ame"));
-        ShowBBSMenuRow(("R", "bright_yellow", "umors"), ("B", "bright_yellow", "ulletin"), ("E", "bright_yellow", "at/Rest"), ("O", "bright_yellow", "rder(10g)"));
+        ShowBBSMenuRow(("U", "bright_yellow", "Rumors"), ("B", "bright_yellow", "ulletin"), ("E", "bright_yellow", "at/Rest"), ("O", "bright_yellow", "rder(10g)"));
 
         terminal.SetColor("cyan");
         terminal.WriteLine(" Areas:");
@@ -586,7 +586,7 @@ public class InnLocation : BaseLocation
             ShowBBSMenuRow(("N", "bright_yellow", $"Room({roomCost}g)"), ("K", "bright_yellow", "Attack Sleeper"));
         }
 
-        ShowBBSMenuRow(("Q", "bright_yellow", "Return"));
+        ShowBBSMenuRow(("R", "bright_yellow", "eturn"));
 
         // Footer: status + quick commands
         ShowBBSFooter();
@@ -621,10 +621,14 @@ public class InnLocation : BaseLocation
                 await PlayDrinkingGame();
                 return false;
                 
-            case "R":
+            case "U":
                 await ListenToRumors();
                 return false;
-                
+
+            case "R":
+                await NavigateToLocation(GameLocation.MainStreet);
+                return true;
+
             case "B":
                 await CheckBulletinBoard();
                 return false;
@@ -767,7 +771,8 @@ public class InnLocation : BaseLocation
         }
 
         // Daily fight limit: 3 per day
-        if (sethFightsToday >= 3)
+        var sethFights = DoorMode.IsOnlineMode ? currentPlayer.SethFightsToday : sethFightsToday;
+        if (sethFights >= 3)
         {
             terminal.SetColor("yellow");
             terminal.WriteLine("Seth Able waves you off dismissively.");
@@ -804,10 +809,10 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("WARNING: Seth Able is a dangerous opponent!");
         terminal.WriteLine($"Seth Able - Level {sethLevel} - HP: {GetSethHP(sethLevel)}");
         terminal.WriteLine($"You - Level {currentPlayer.Level} - HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
-        if (sethFightsToday > 0)
+        if (sethFights > 0)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine($"(Fights today: {sethFightsToday}/3)");
+            terminal.WriteLine($"(Fights today: {sethFights}/3)");
         }
         terminal.WriteLine("");
 
@@ -891,7 +896,10 @@ public class InnLocation : BaseLocation
         var combatEngine = new CombatEngine(terminal);
         var result = await combatEngine.PlayerVsMonster(currentPlayer, sethMonster);
 
-        sethFightsToday++;
+        if (DoorMode.IsOnlineMode)
+            currentPlayer.SethFightsToday++;
+        else
+            sethFightsToday++;
 
         if (result.ShouldReturnToTemple)
         {
@@ -3883,7 +3891,8 @@ public class InnLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.WriteLine($"Arm Wrestling       (STR contest vs NPC, {_armWrestlesToday}/{GameConfig.MaxArmWrestlesPerDay} today)");
+        var armWrestles = DoorMode.IsOnlineMode ? currentPlayer.ArmWrestlesToday : _armWrestlesToday;
+        terminal.WriteLine($"Arm Wrestling       (STR contest vs NPC, {armWrestles}/{GameConfig.MaxArmWrestlesPerDay} today)");
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
@@ -4238,7 +4247,8 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("═══════════ ARM WRESTLING ═══════════");
         terminal.WriteLine("");
 
-        if (_armWrestlesToday >= GameConfig.MaxArmWrestlesPerDay)
+        var armWrestles = DoorMode.IsOnlineMode ? currentPlayer.ArmWrestlesToday : _armWrestlesToday;
+        if (armWrestles >= GameConfig.MaxArmWrestlesPerDay)
         {
             terminal.SetColor("yellow");
             terminal.WriteLine("\"You've had enough for today, friend. Come back tomorrow.\"");
@@ -4306,7 +4316,10 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        _armWrestlesToday++;
+        if (DoorMode.IsOnlineMode)
+            currentPlayer.ArmWrestlesToday++;
+        else
+            _armWrestlesToday++;
 
         terminal.WriteLine("");
         terminal.SetColor("white");
@@ -4359,7 +4372,8 @@ public class InnLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.WriteLine($"Gold remaining: {currentPlayer.Gold:N0}");
         terminal.SetColor("darkgray");
-        terminal.WriteLine($"Arm wrestling matches today: {_armWrestlesToday}/{GameConfig.MaxArmWrestlesPerDay}");
+        var armWrestlesDone = DoorMode.IsOnlineMode ? currentPlayer.ArmWrestlesToday : _armWrestlesToday;
+        terminal.WriteLine($"Arm wrestling matches today: {armWrestlesDone}/{GameConfig.MaxArmWrestlesPerDay}");
         await terminal.PressAnyKey();
     }
 
@@ -4496,7 +4510,10 @@ public class InnLocation : BaseLocation
         currentPlayer.Mana = currentPlayer.MaxMana;
         currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
-        await DailySystemManager.Instance.ForceDailyReset();
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            await DailySystemManager.Instance.ForceDailyReset();
+        }
 
         // Save game
         await GameEngine.Instance.SaveCurrentGame();

@@ -64,6 +64,14 @@ public class ChallengeSystem
             return;
         }
 
+        // In online mode, NPCs cannot challenge a player king through simulation.
+        // Player kings can only lose the throne through PvP, siege, or abdication.
+        // The simulated combat uses fake stats and would unfairly depose strong player kings.
+        if (king.AI == CharacterAI.Human)
+        {
+            return;
+        }
+
         // Find potential challengers (high-level NPCs not in prison, not King, not story NPCs)
         // Story NPCs like The Stranger cannot become King - they have narrative roles
         var candidates = NPCSpawnSystem.Instance?.ActiveNPCs?

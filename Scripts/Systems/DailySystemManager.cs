@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using System;
 using System.Threading.Tasks;
 using Godot;
@@ -64,12 +65,33 @@ public class DailySystemManager
     }
     
     /// <summary>
+    /// Get the most recent 7 PM Eastern Time boundary as UTC.
+    /// This is the authoritative daily reset point for online mode.
+    /// </summary>
+    public static DateTime GetCurrentResetBoundary()
+    {
+        var eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        var nowEastern = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, eastern);
+        var resetToday = nowEastern.Date.AddHours(GameConfig.DailyResetHourEastern);
+        if (nowEastern < resetToday)
+            resetToday = resetToday.AddDays(-1); // Haven't hit 7 PM yet, use yesterday's
+        return TimeZoneInfo.ConvertTimeToUtc(resetToday, eastern);
+    }
+
+    /// <summary>
     /// Check if a daily reset should occur based on current mode
     /// </summary>
     public bool ShouldPerformDailyReset()
     {
         var player = GameEngine.Instance?.CurrentPlayer;
-        
+
+        // Online mode: reset at 7 PM Eastern Time
+        if (DoorMode.IsOnlineMode)
+        {
+            if (player == null) return false;
+            return player.LastDailyResetBoundary < GetCurrentResetBoundary();
+        }
+
         return currentMode switch
         {
             DailyCycleMode.SessionBased => player?.TurnsRemaining <= 0,
@@ -115,9 +137,13 @@ public class DailySystemManager
         var player = GameEngine.Instance?.CurrentPlayer;
         if (player == null) return;
         
-        // Don't reset in endless mode unless forced
-        if (currentMode == DailyCycleMode.Endless && !forced) return;
-        
+        // Don't reset in endless mode unless forced (single-player only)
+        if (!DoorMode.IsOnlineMode && currentMode == DailyCycleMode.Endless && !forced) return;
+
+        // In online mode, record when this reset boundary was applied
+        if (DoorMode.IsOnlineMode)
+            player.LastDailyResetBoundary = DateTime.UtcNow;
+
         // Increment day counter
         currentDay++;
         lastResetTime = DateTime.Now;
@@ -269,6 +295,14 @@ public class DailySystemManager
             player.GamblingRoundsToday = 0;
             player.PitFightsToday = 0;
 
+            // Reset real-world-date daily tracking (online mode persistence)
+            player.SethFightsToday = 0;
+            player.ArmWrestlesToday = 0;
+            player.RoyQuestsToday = 0;
+            player.LastPrayerRealDate = DateTime.MinValue;
+            player.LastInnerSanctumRealDate = DateTime.MinValue;
+            player.LastBindingOfSoulsRealDate = DateTime.MinValue;
+
             terminal?.WriteLine($"Your daily limits have been restored! ({turnsToRestore} turns)", "bright_green");
         }
         else
@@ -282,7 +316,11 @@ public class DailySystemManager
         }
         
         // Process daily events
-        await ProcessDailyEvents();
+        // In online mode, only process player-specific events (WorldSimService handles king/world)
+        if (DoorMode.IsOnlineMode)
+            await ProcessPlayerDailyEvents();
+        else
+            await ProcessDailyEvents();
 
         // Process bank maintenance
         BankLocation.ProcessDailyMaintenance(player);
@@ -458,6 +496,115 @@ public class DailySystemManager
                           (enabled ? $" (every {interval.TotalMinutes} minutes)" : ""), "cyan");
     }
     
+    /// <summary>
+    /// Process only player-specific daily events (online mode).
+    /// World-level events (king, guards, treasury) are handled by WorldSimService.
+    /// </summary>
+    private async Task ProcessPlayerDailyEvents()
+    {
+        var terminal = GameEngine.Instance?.Terminal;
+        var player = GameEngine.Instance?.CurrentPlayer;
+
+        // Decrement player prison sentence
+        if (player != null && player.DaysInPrison > 0)
+        {
+            player.DaysInPrison--;
+            player.PrisonEscapes = (byte)Math.Min(player.PrisonEscapes + 1, GameConfig.MaxPrisonEscapeAttempts);
+            if (terminal != null)
+            {
+                terminal.WriteLine($"A day passes in prison... ({player.DaysInPrison} day{(player.DaysInPrison == 1 ? "" : "s")} remaining)", "yellow");
+            }
+        }
+
+        // Update grief system
+        try
+        {
+            var grief = GriefSystem.Instance;
+            if (grief.IsGrieving)
+            {
+                var previousStage = grief.CurrentStage;
+                grief.UpdateGrief(currentDay);
+                if (grief.CurrentStage != previousStage && terminal != null)
+                {
+                    terminal.WriteLine("");
+                    terminal.WriteLine($"Your grief has evolved... ({previousStage} --> {grief.CurrentStage})", "dark_magenta");
+                    var effects = grief.GetCurrentEffects();
+                    if (!string.IsNullOrEmpty(effects.Description))
+                        terminal.WriteLine($"  {effects.Description}", "gray");
+                    terminal.WriteLine("");
+                }
+            }
+        }
+        catch { /* Grief system not initialized */ }
+
+        // Process drug effects
+        try
+        {
+            if (player != null && (player.OnDrugs || player.IsAddicted))
+            {
+                string drugMessage = DrugSystem.ProcessDailyDrugEffects(player);
+                if (!string.IsNullOrEmpty(drugMessage) && terminal != null)
+                {
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine(drugMessage);
+                }
+            }
+        }
+        catch { /* Drug system error */ }
+
+        // Process Loan Shark interest
+        try
+        {
+            if (player != null && player.LoanAmount > 0)
+            {
+                long interest = (long)(player.LoanAmount * GameConfig.LoanSharkDailyInterest);
+                player.LoanInterestAccrued += interest;
+                player.LoanAmount += interest;
+                player.LoanDaysRemaining--;
+
+                if (terminal != null)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"Loan Shark: Interest of {interest:N0}g accrued. You owe {player.LoanAmount:N0}g ({Math.Max(0, player.LoanDaysRemaining)} day{(player.LoanDaysRemaining == 1 ? "" : "s")} remaining).");
+                }
+
+                if (player.LoanDaysRemaining <= 0 && terminal != null)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("WARNING: The Loan Shark's enforcers are looking for you!");
+                }
+            }
+        }
+        catch { /* Loan system error */ }
+
+        // Process Quest System daily maintenance
+        QuestSystem.ProcessDailyQuestMaintenance();
+        if (player != null)
+            QuestSystem.RefreshBountyBoard(player.Level);
+
+        // Blood Price — natural murder weight decay
+        if (player != null && player.MurderWeight > 0)
+        {
+            var elapsed = DateTime.Now - player.LastMurderWeightDecay;
+            if (player.LastMurderWeightDecay == DateTime.MinValue)
+            {
+                player.LastMurderWeightDecay = DateTime.Now;
+            }
+            else if (elapsed.TotalDays >= 1.0)
+            {
+                int daysElapsed = (int)elapsed.TotalDays;
+                float decay = daysElapsed * GameConfig.MurderWeightDecayPerRealDay;
+                player.MurderWeight = Math.Max(0f, player.MurderWeight - decay);
+                player.LastMurderWeightDecay = DateTime.Now;
+                if (decay > 0)
+                    DebugLogger.Instance.LogInfo("BLOOD_PRICE",
+                        $"Murder weight decayed by {decay:F1} ({daysElapsed} days). Now {player.MurderWeight:F1}");
+            }
+        }
+
+        await Task.CompletedTask;
+    }
+
     private async Task ProcessDailyEvents()
     {
         var terminal = GameEngine.Instance?.Terminal;

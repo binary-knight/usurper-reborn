@@ -22,6 +22,7 @@ namespace UsurperRemake.Systems
 
         private WorldSimulator? worldSimulator;
         private DateTime lastSaveTime = DateTime.MinValue;
+        private DateTime _lastWorldDailyReset = DateTime.MinValue;  // 7 PM ET world-level daily reset
         private long lastNpcVersion = 0;  // Track world_state NPC version to detect player changes
         private long lastRoyalCourtVersion = 0;  // Track royal_court version to detect player changes (treasury, taxes, etc.)
         private string? _lastNpcJsonHash;  // Dirty-check: skip NPC save when nothing changed
@@ -79,6 +80,9 @@ namespace UsurperRemake.Systems
             LoadMarriageRegistryState();
             LoadWorldEventsState();
 
+            // Load last world daily reset time from world_state
+            LoadLastWorldDailyReset();
+
             // Load player team names so WorldSimulator can protect them from NPC AI
             await LoadPlayerTeamNames();
 
@@ -115,6 +119,9 @@ namespace UsurperRemake.Systems
                         {
                             sqlBackend.UpdateWorldSimHeartbeat(_heartbeatOwnerId);
                         }
+
+                        // Check for 7 PM ET world daily reset
+                        CheckWorldDailyReset();
 
                         // Log status every 10 ticks
                         if (tickCount % 10 == 0)
@@ -1042,6 +1049,7 @@ namespace UsurperRemake.Systems
                         ? data.BirthDate
                         : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : new Random().Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
                     IsAgedDeath = data.IsAgedDeath,
+                    IsPermaDead = data.IsPermaDead,
                     PregnancyDueDate = data.PregnancyDueDate,
 
                     IsMarried = data.IsMarried,
@@ -1391,6 +1399,146 @@ namespace UsurperRemake.Systems
 
             DebugLogger.Instance.LogInfo("WORLDSIM",
                 $"Restored {npcData.Count} NPCs, {npcData.Count(n => n.IsDead)} dead");
+        }
+
+        /// <summary>
+        /// Load the last world daily reset timestamp from world_state.
+        /// </summary>
+        private void LoadLastWorldDailyReset()
+        {
+            try
+            {
+                var json = sqlBackend.LoadWorldState("last_daily_reset").GetAwaiter().GetResult();
+                if (!string.IsNullOrEmpty(json))
+                {
+                    _lastWorldDailyReset = JsonSerializer.Deserialize<DateTime>(json, jsonOptions);
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Loaded last world daily reset: {_lastWorldDailyReset:o}");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load last_daily_reset: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Check if the 7 PM ET boundary has been crossed since the last world daily reset.
+        /// If so, process world-level daily events (king, guards, treasury, etc.).
+        /// </summary>
+        private void CheckWorldDailyReset()
+        {
+            try
+            {
+                var resetBoundary = DailySystemManager.GetCurrentResetBoundary();
+                if (_lastWorldDailyReset >= resetBoundary)
+                    return; // Already processed this cycle
+
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"7 PM ET daily reset triggered (boundary: {resetBoundary:o})");
+                ProcessWorldDailyReset();
+                _lastWorldDailyReset = resetBoundary;
+
+                // Persist to world_state so it survives server restarts
+                var json = JsonSerializer.Serialize(resetBoundary, jsonOptions);
+                sqlBackend.SaveWorldState("last_daily_reset", json).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"World daily reset error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Process world-level daily events at the 7 PM ET boundary.
+        /// Handles king activities, guard loyalty, treasury, and world events.
+        /// Player-specific resets are handled by DailySystemManager.ProcessPlayerDailyEvents().
+        /// </summary>
+        private void ProcessWorldDailyReset()
+        {
+            try
+            {
+                var king = CastleLocation.GetCurrentKing();
+                if (king?.IsActive == true)
+                {
+                    var treasuryBefore = king.Treasury;
+
+                    // King daily activities: treasury income/expenses, TotalReign++, prisoner processing
+                    king.ProcessDailyActivities();
+
+                    // Process guard loyalty changes based on treasury health
+                    var guardsToRemove = new List<RoyalGuard>();
+                    var random = new Random();
+                    foreach (var guard in king.Guards)
+                    {
+                        if (king.Treasury < king.CalculateDailyExpenses())
+                        {
+                            guard.Loyalty = Math.Max(0, guard.Loyalty - 5);
+                        }
+                        else
+                        {
+                            guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
+                        }
+
+                        var daysServed = (DateTime.Now - guard.RecruitmentDate).TotalDays;
+                        if (daysServed > 30)
+                            guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
+
+                        if (guard.Loyalty <= 10)
+                        {
+                            guardsToRemove.Add(guard);
+                            NewsSystem.Instance?.Newsy(true, $"Guard {guard.Name} has deserted the royal service!");
+                        }
+                        else if (guard.Loyalty <= 25 && random.Next(100) < 10)
+                        {
+                            guardsToRemove.Add(guard);
+                            NewsSystem.Instance?.Newsy(true, $"Disgruntled guard {guard.Name} has abandoned their post!");
+                        }
+                    }
+                    foreach (var deserter in guardsToRemove)
+                        king.Guards.Remove(deserter);
+
+                    // Treasury crisis check
+                    if (king.Treasury < king.CalculateDailyExpenses())
+                    {
+                        foreach (var guard in king.Guards)
+                            guard.Loyalty = Math.Max(0, guard.Loyalty - 3);
+
+                        var escapedMonsters = new List<MonsterGuard>();
+                        foreach (var monster in king.MonsterGuards)
+                        {
+                            if (random.Next(100) < 10)
+                            {
+                                escapedMonsters.Add(monster);
+                                NewsSystem.Instance?.Newsy(true, $"The unfed {monster.Name} has escaped from the castle moat!");
+                            }
+                        }
+                        foreach (var monster in escapedMonsters)
+                            king.MonsterGuards.Remove(monster);
+
+                        if (king.Guards.Count > 0 || king.MonsterGuards.Count > 0)
+                            NewsSystem.Instance?.Newsy(false, $"Royal treasury crisis! Guards and monsters go unpaid!");
+                    }
+
+                    // Log financial summary
+                    var netChange = king.CalculateDailyIncome() - king.CalculateDailyExpenses();
+                    if (netChange < 0 && Math.Abs(netChange) > 100)
+                        NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
+
+                    DebugLogger.Instance.LogInfo("WORLDSIM",
+                        $"World daily reset: King {king.Name}, Treasury {treasuryBefore:N0} -> {king.Treasury:N0}, Reign day {king.TotalReign}");
+                }
+
+                // Process world events
+                WorldEventSystem.Instance.ProcessDailyEvents(0);
+
+                // Process quest maintenance
+                QuestSystem.ProcessDailyQuestMaintenance();
+
+                NewsSystem.Instance?.Newsy(false, "A new day dawns in the realm...");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"ProcessWorldDailyReset error: {ex.Message}");
+            }
         }
 
         /// <summary>

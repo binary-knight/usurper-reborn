@@ -927,7 +927,7 @@ public partial class GameEngine : Node
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("USURPER REBORN - Halls of Avarice");
         terminal.SetColor("gray");
-        terminal.WriteLine($"v{GameConfig.Version}");
+        terminal.WriteLine($"v{GameConfig.Version} \"{GameConfig.VersionName}\"");
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine("1993 - Original by Jakob Dangarden");
@@ -962,7 +962,7 @@ public partial class GameEngine : Node
             terminal.SetColor("cyan");
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.SetColor("darkgray");
-            terminal.WriteLine($"  v{GameConfig.Version}");
+            terminal.WriteLine($"  v{GameConfig.Version} \"{GameConfig.VersionName}\"");
             terminal.WriteLine("");
 
             // PLAY section
@@ -1634,6 +1634,12 @@ public partial class GameEngine : Node
                 mudServer.ActiveSessions.TryGetValue(sessionKey, out var playerSession))
             {
                 playerSession.IsInGame = true;
+            }
+
+            // Online mode: check if a daily reset was missed while offline (7 PM ET boundary crossed)
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && dailyManager != null)
+            {
+                await dailyManager.CheckDailyReset();
             }
 
             // Start game at saved location
@@ -2778,6 +2784,15 @@ public partial class GameEngine : Node
         player.PoisonCoatingCombats = playerData.PoisonCoatingCombats;
         player.SmokeBombs = playerData.SmokeBombs;
         player.InnerSanctumLastDay = playerData.InnerSanctumLastDay;
+
+        // Daily tracking (real-world-date based)
+        player.LastDailyResetBoundary = playerData.LastDailyResetBoundary;
+        player.LastPrayerRealDate = playerData.LastPrayerRealDate;
+        player.LastInnerSanctumRealDate = playerData.LastInnerSanctumRealDate;
+        player.LastBindingOfSoulsRealDate = playerData.LastBindingOfSoulsRealDate;
+        player.SethFightsToday = playerData.SethFightsToday;
+        player.ArmWrestlesToday = playerData.ArmWrestlesToday;
+        player.RoyQuestsToday = playerData.RoyQuestsToday;
 
         // Dark Alley Overhaul (v0.41.0)
         player.GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex;

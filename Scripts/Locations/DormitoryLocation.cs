@@ -379,7 +379,10 @@ public class DormitoryLocation : BaseLocation
         currentPlayer.Mana = currentPlayer.MaxMana;
         currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
-        await DailySystemManager.Instance.ForceDailyReset();
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            await DailySystemManager.Instance.ForceDailyReset();
+        }
 
         terminal.WriteLine("You awaken refreshed, ready for a new day of adventure.", "green");
         await Task.Delay(1500);
@@ -419,7 +422,10 @@ public class DormitoryLocation : BaseLocation
         currentPlayer.Mana = currentPlayer.MaxMana;
         currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
-        await DailySystemManager.Instance.ForceDailyReset();
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            await DailySystemManager.Instance.ForceDailyReset();
+        }
 
         // Save game
         await GameEngine.Instance.SaveCurrentGame();

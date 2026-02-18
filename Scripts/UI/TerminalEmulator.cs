@@ -469,7 +469,7 @@ public partial class TerminalEmulator : Control
             "bright_red" => ConsoleColor.Red,
 
             // Green variants
-            "dark_green" or "darkgreen" => ConsoleColor.DarkGreen,
+            "dark_green" or "darkgreen" or "dim_green" => ConsoleColor.DarkGreen,
             "green" => ConsoleColor.Green,
             "bright_green" => ConsoleColor.Green,
 
@@ -518,6 +518,7 @@ public partial class TerminalEmulator : Control
         { "darkgray", "90" }, { "dark_gray", "90" },
         { "darkred", "31" }, { "dark_red", "31" },
         { "darkgreen", "32" }, { "dark_green", "32" },
+        { "dim_green", "2;32" },
         { "darkyellow", "33" }, { "dark_yellow", "33" }, { "brown", "33" },
         { "darkblue", "34" }, { "dark_blue", "34" },
         { "darkmagenta", "35" }, { "dark_magenta", "35" },

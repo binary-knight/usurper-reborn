@@ -289,14 +289,10 @@ public class Monster
     {
         long attack = Strength + WeapPow + Punch;
         
-        // Add bonus for boss monsters
+        // Add bonus for boss monsters (mini-boss stats are already boosted 1.5x during generation)
         if (IsBoss)
         {
             attack = (long)(attack * 1.3f);
-        }
-        else if (IsMiniBoss)
-        {
-            attack = (long)(attack * 1.15f);  // Mini-bosses get 15% attack bonus
         }
 
         // Add poison damage if poisoned

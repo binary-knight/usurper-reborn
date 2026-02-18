@@ -37,19 +37,22 @@ public static class ColorTheme
 
     // Classic Dark — authentic 1993 Usurper palette derived from the original Pascal source.
     // The original used ~5 colors per screen:
-    //   dark_green  (ANSI 32)   — body text, descriptions, menus (~60% of all text)
+    //   dim_green   (ANSI 2;32)  — body text, descriptions, menus (~60% of all text)
+    //   dark_green  (ANSI 32)    — secondary text, slightly brighter than dim
     //   bright_green (ANSI 1;32) — titles, player/NPC names, location headers
     //   dark_magenta (ANSI 35)  — hotkeys, column headers, separator lines, UI chrome
     //   yellow (ANSI 33)        — warnings, notices, gold amounts
     //   dark_red (ANSI 31)      — danger, damage, death
+    // dim_green uses SGR 2 (faint/dim attribute) for a darker green than standard ANSI 32.
+    // Terminals that don't support SGR 2 gracefully fall back to normal green.
     private static readonly Dictionary<string, string> ClassicDarkMap = new()
     {
-        // Body text → dark_green (the original's universal body text)
-        { "white", "dark_green" },
-        { "green", "dark_green" },
-        { "gray", "dark_green" },
-        { "grey", "dark_green" },
-        { "dark_gray", "dark_green" },
+        // Body text → dim_green (darker than standard green via SGR 2 faint attribute)
+        { "white", "dim_green" },
+        { "green", "dim_green" },
+        { "gray", "dim_green" },
+        { "grey", "dim_green" },
+        { "dark_gray", "dim_green" },
 
         // Emphasized text → bright_green (titles, names, highlights)
         { "bright_white", "bright_green" },
@@ -62,12 +65,12 @@ public static class ColorTheme
         // UI chrome → dark_magenta (headers, separators, hotkeys — very prominent in original)
         { "cyan", "dark_magenta" },
         { "bright_cyan", "dark_magenta" },
-        { "dark_cyan", "dark_green" },
+        { "dark_cyan", "dim_green" },
 
-        // Blues → dark_green (unused in original, collapse to body text)
-        { "blue", "dark_green" },
-        { "bright_blue", "dark_green" },
-        { "dark_blue", "dark_green" },
+        // Blues → dim_green (unused in original, collapse to body text)
+        { "blue", "dim_green" },
+        { "bright_blue", "dim_green" },
+        { "dark_blue", "dim_green" },
 
         // Danger → dark_red
         { "red", "dark_red" },
@@ -80,6 +83,7 @@ public static class ColorTheme
         // dark_magenta stays as-is
 
         // bright_green stays as-is (NOT remapped — names, titles)
+        // dark_green stays as-is (used for secondary text that should be slightly brighter than dim)
     };
 
     // Amber Retro — monochrome amber phosphor CRT

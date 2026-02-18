@@ -441,6 +441,15 @@ namespace UsurperRemake.Systems
         public int SmokeBombs { get; set; }
         public int InnerSanctumLastDay { get; set; }
 
+        // Daily tracking (real-world-date based, online mode)
+        public DateTime LastDailyResetBoundary { get; set; }
+        public DateTime LastPrayerRealDate { get; set; }
+        public DateTime LastInnerSanctumRealDate { get; set; }
+        public DateTime LastBindingOfSoulsRealDate { get; set; }
+        public int SethFightsToday { get; set; }
+        public int ArmWrestlesToday { get; set; }
+        public int RoyQuestsToday { get; set; }
+
         // Dark Alley Overhaul (v0.41.0)
         public int GroggoShadowBlessingDex { get; set; }
         public int SteroidShopPurchases { get; set; }

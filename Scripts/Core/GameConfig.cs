@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.42.1";
+    public const string Version = "0.42.2";
     public const string VersionName = "Blood Price";
 
     // From Pascal global_maxXX constants
@@ -1119,6 +1119,7 @@ Alchemist - Potion makers and researchers. Requires intellect and patience.
     public const long PvPMaxXPReward = 5000;            // Maximum XP reward for PvP win
 
     // Daily Limits and Resets (Pascal daily parameter resets)
+    public const int DailyResetHourEastern = 19;          // 7 PM Eastern Time — online mode daily reset
     public const int DailyDarknessReset = 6;              // Daily darkness deeds reset
     public const int DailyChivalryReset = 6;              // Daily chivalry deeds reset
     public const int DailyMentalStabilityChance = 7;      // 1 in 7 chance for mental stability increase

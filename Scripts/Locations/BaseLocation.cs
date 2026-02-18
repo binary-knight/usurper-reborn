@@ -64,6 +64,7 @@ public abstract class BaseLocation
 
         // Update player location
         player.Location = (int)LocationId;
+        player.CurrentLocation = Name;
 
         // Clear Safe House protection when player moves to any location
         if (player.SafeHouseResting)
@@ -163,7 +164,25 @@ public abstract class BaseLocation
                     (currentKing.Name != player.DisplayName && currentKing.Name != player.Name2))
                 {
                     player.King = false;
-                    GD.Print($"[BaseLocation] Synced player King=false (throne belongs to {currentKing?.Name ?? "nobody"})");
+                    string newRuler = currentKing?.Name ?? "nobody";
+                    GD.Print($"[BaseLocation] Synced player King=false (throne belongs to {newRuler})");
+
+                    // Notify the player they lost the throne
+                    var term = GameEngine.Instance?.Terminal;
+                    if (term != null)
+                    {
+                        term.SetColor("bright_red");
+                        term.WriteLine("");
+                        term.WriteLine("═══════════════════════════════════════════════════════════");
+                        term.WriteLine("  You have been DEPOSED! You are no longer the monarch!");
+                        if (currentKing != null && currentKing.IsActive)
+                            term.WriteLine($"  The throne now belongs to {currentKing.Name}.");
+                        else
+                            term.WriteLine("  The throne stands vacant.");
+                        term.WriteLine("═══════════════════════════════════════════════════════════");
+                        term.WriteLine("");
+                        term.SetColor("white");
+                    }
                 }
             }
 
@@ -419,7 +438,7 @@ public abstract class BaseLocation
                 if (!string.IsNullOrEmpty(broadcast))
                 {
                     terminal.WriteLine("");
-                    terminal.WriteLine($"*** {broadcast} ***", "bright_yellow");
+                    terminal.WriteLine($"*** SYSTEM MESSAGE: {broadcast} ***", "bright_red");
                 }
             }
 
@@ -1513,11 +1532,11 @@ public abstract class BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
-            terminal.Write("Q");
+            terminal.Write("R");
             terminal.SetColor("darkgray");
             terminal.Write("]");
             terminal.SetColor("white");
-            terminal.Write("uick Return  ");
+            terminal.Write("eturn  ");
         }
 
         terminal.SetColor("darkgray");
@@ -2398,9 +2417,9 @@ public abstract class BaseLocation
                 {
                     terminal.Write(", [");
                     terminal.SetColor("bright_yellow");
-                    terminal.Write("Q");
+                    terminal.Write("R");
                     terminal.SetColor("gray");
-                    terminal.Write("]uick Return");
+                    terminal.Write("]eturn");
                 }
 
                 terminal.Write(", or [");

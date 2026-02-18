@@ -191,11 +191,11 @@ public class HomeLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write(" [");
         terminal.SetColor("bright_yellow");
-        terminal.Write("R");
+        terminal.Write("E");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.Write("est & Recover   ");
+        terminal.Write(" Rest & Recover ");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
@@ -317,11 +317,20 @@ terminal.SetColor("darkgray");
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
+        terminal.Write("R");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.Write("eturn to Main St ");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
         terminal.Write("Q");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.WriteLine("uit to Main Street");
+        terminal.WriteLine("uit");
 
         terminal.WriteLine("");
     }
@@ -384,10 +393,10 @@ terminal.SetColor("darkgray");
         terminal.WriteLine("");
 
         // Menu rows
-        ShowBBSMenuRow(("R", "bright_yellow", "Rest"), ("D", "bright_yellow", "Deposit"), ("W", "bright_yellow", "Withdraw"), ("L", "bright_yellow", "List Chest"));
+        ShowBBSMenuRow(("E", "bright_yellow", "Rest"), ("D", "bright_yellow", "Deposit"), ("W", "bright_yellow", "Withdraw"), ("L", "bright_yellow", "List Chest"));
         ShowBBSMenuRow(("T", "bright_yellow", "Trophies"), ("F", "bright_yellow", "Family"), ("P", "bright_yellow", "Partner"), ("B", "bright_yellow", "Bedroom"));
         ShowBBSMenuRow(("I", "bright_yellow", "Inventory"), ("G", "bright_yellow", "GearPartner"), ("H", "bright_yellow", "Heal(Pot)"), ("!", "bright_yellow", "Resurrect"));
-        ShowBBSMenuRow(("Q", "bright_yellow", "Return"));
+        ShowBBSMenuRow(("R", "bright_yellow", "Return"), ("Q", "bright_yellow", "Quit"));
 
         ShowBBSFooter();
     }
@@ -412,7 +421,7 @@ terminal.SetColor("darkgray");
 
         switch (c)
         {
-            case "R":
+            case "E":
                 await DoRest();
                 return false;
             case "D":
@@ -456,6 +465,7 @@ terminal.SetColor("darkgray");
             case "U":
                 await ShowHomeUpgrades();
                 return false;
+            case "R":
             case "Q":
             case "M": // Also allow M for Main Street
                 await NavigateToLocation(GameLocation.MainStreet);
@@ -3288,7 +3298,7 @@ terminal.SetColor("darkgray");
                 var npc = allWorldNPCs.FirstOrDefault(n => n.ID == spouse.NPCId);
 
                 // Check IsDead (permanent death) OR !IsAlive (currently at 0 HP)
-                if (npc != null && (npc.IsDead || !npc.IsAlive))
+                if (npc != null && (npc.IsDead || !npc.IsAlive) && !npc.IsAgedDeath && !npc.IsPermaDead)
                 {
                     deadMembers.Add(npc);
                 }

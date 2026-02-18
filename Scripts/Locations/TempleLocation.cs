@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.BBS;
 using UsurperRemake.Data;
 using System;
 using System.Collections.Generic;
@@ -464,8 +465,18 @@ public partial class TempleLocation : BaseLocation
             terminal.Write("]");
             terminal.SetColor("cyan");
             terminal.Write(" Inner Sanctum");
-            int today = DailySystemManager.Instance?.CurrentDay ?? 0;
-            if (currentPlayer.InnerSanctumLastDay >= today)
+            bool meditatedToday;
+            if (DoorMode.IsOnlineMode)
+            {
+                var boundary = DailySystemManager.GetCurrentResetBoundary();
+                meditatedToday = currentPlayer.LastInnerSanctumRealDate >= boundary;
+            }
+            else
+            {
+                int today = DailySystemManager.Instance?.CurrentDay ?? 0;
+                meditatedToday = currentPlayer.InnerSanctumLastDay >= today;
+            }
+            if (meditatedToday)
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine("  (meditated today)");
@@ -2483,8 +2494,18 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        int today = DailySystemManager.Instance?.CurrentDay ?? 0;
-        if (currentPlayer.InnerSanctumLastDay >= today)
+        bool alreadyMeditated;
+        if (DoorMode.IsOnlineMode)
+        {
+            var boundary = DailySystemManager.GetCurrentResetBoundary();
+            alreadyMeditated = currentPlayer.LastInnerSanctumRealDate >= boundary;
+        }
+        else
+        {
+            int today = DailySystemManager.Instance?.CurrentDay ?? 0;
+            alreadyMeditated = currentPlayer.InnerSanctumLastDay >= today;
+        }
+        if (alreadyMeditated)
         {
             terminal.SetColor("gray");
             terminal.WriteLine("\n  You have already meditated today.");
@@ -2526,7 +2547,10 @@ public partial class TempleLocation : BaseLocation
 
         currentPlayer.Gold -= GameConfig.InnerSanctumCost;
         currentPlayer.Statistics?.RecordGoldSpent(GameConfig.InnerSanctumCost);
-        currentPlayer.InnerSanctumLastDay = today;
+        if (DoorMode.IsOnlineMode)
+            currentPlayer.LastInnerSanctumRealDate = DateTime.UtcNow;
+        else
+            currentPlayer.InnerSanctumLastDay = DailySystemManager.Instance?.CurrentDay ?? 0;
 
         terminal.SetColor("gray");
         terminal.WriteLine("\n  You kneel on the cold stone and close your eyes...");

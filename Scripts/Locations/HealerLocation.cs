@@ -440,12 +440,16 @@ public class HealerLocation : BaseLocation
 
         long hpNeeded = player.MaxHP - player.HP;
         long maxCost = hpNeeded * FullHealCostPerHP;
+        var (_, _, maxCostWithTax) = CityControlSystem.CalculateHealingTaxedPrice(maxCost);
+        // Calculate effective per-HP cost including taxes for affordability
+        long effectivePerHP = hpNeeded > 0 ? maxCostWithTax / hpNeeded : FullHealCostPerHP;
+        if (effectivePerHP < FullHealCostPerHP) effectivePerHP = FullHealCostPerHP;
 
         terminal.WriteLine($"\"How much HP would you like restored?\"", "cyan");
         terminal.WriteLine($", {Manager} asks.", "gray");
         terminal.WriteLine("");
-        terminal.WriteLine($"You need {hpNeeded} HP to be fully healed (costs {maxCost:N0} gold).", "gray");
-        terminal.WriteLine($"Cost is {FullHealCostPerHP} gold per HP restored.", "gray");
+        terminal.WriteLine($"You need {hpNeeded} HP to be fully healed (costs {maxCostWithTax:N0} gold with taxes).", "gray");
+        terminal.WriteLine($"Base cost is {FullHealCostPerHP} gold per HP restored.", "gray");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput("How much HP to restore (0 to cancel)? ");
@@ -462,12 +466,13 @@ public class HealerLocation : BaseLocation
             hpToHeal = hpNeeded;
 
         long cost = hpToHeal * FullHealCostPerHP;
-        var (healKingTax, healCityTax, healTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
+        var (healKingTax, healCityTax, healTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
 
         if (player.Gold < healTotalWithTax)
         {
+            long canAfford = effectivePerHP > 0 ? player.Gold / effectivePerHP : 0;
             terminal.WriteLine("You can't afford that much healing!", "red");
-            terminal.WriteLine($"You can afford up to {player.Gold / FullHealCostPerHP} HP.", "yellow");
+            terminal.WriteLine($"You can afford up to {canAfford} HP.", "yellow");
             await terminal.PressAnyKey();
             return;
         }
@@ -515,9 +520,9 @@ public class HealerLocation : BaseLocation
 
         long hpNeeded = player.MaxHP - player.HP;
         long cost = hpNeeded * FullHealCostPerHP;
-        var (fullHealKingTax, fullHealCityTax, fullHealTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
+        var (fullHealKingTax, fullHealCityTax, fullHealTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
 
-        terminal.WriteLine($"\"A full restoration will cost you {cost:N0} gold.\"", "cyan");
+        terminal.WriteLine($"\"A full restoration will cost you {fullHealTotalWithTax:N0} gold.\"", "cyan");
         terminal.WriteLine($", {Manager} says, examining your wounds.", "gray");
         terminal.WriteLine("");
 
@@ -578,14 +583,23 @@ public class HealerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine($"\"Healing potions are {HealingPotionCost} gold each.\"");
+        var (_, _, singlePotionWithTax) = CityControlSystem.CalculateHealingTaxedPrice(HealingPotionCost);
+        terminal.WriteLine($"\"Healing potions are {singlePotionWithTax} gold each (with taxes).\"");
         terminal.WriteLine($", {Manager} says, gesturing to his shelf of vials.", "gray");
         terminal.WriteLine("");
 
-        long maxAfford = player.Gold / HealingPotionCost;
+        long maxAfford = singlePotionWithTax > 0 ? player.Gold / singlePotionWithTax : 0;
+        int maxCanCarry = player.MaxPotions - (int)player.Healing;
 
-        terminal.WriteLine($"You currently have {player.Healing} healing potions.", "gray");
-        terminal.WriteLine($"You can afford up to {maxAfford} potions.", "gray");
+        if (maxCanCarry <= 0)
+        {
+            terminal.WriteLine($"You're carrying the maximum number of healing potions! ({player.MaxPotions})", "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.WriteLine($"You currently have {player.Healing}/{player.MaxPotions} healing potions.", "gray");
+        terminal.WriteLine($"You can afford up to {Math.Min(maxAfford, maxCanCarry)} potions.", "gray");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput("How many potions to buy (0 to cancel)? ");
@@ -597,8 +611,10 @@ public class HealerLocation : BaseLocation
             return;
         }
 
+        quantity = Math.Min(quantity, maxCanCarry);
+
         long cost = quantity * HealingPotionCost;
-        var (potionKingTax, potionCityTax, potionTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
+        var (potionKingTax, potionCityTax, potionTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
 
         if (player.Gold < potionTotalWithTax)
         {
@@ -637,14 +653,15 @@ public class HealerLocation : BaseLocation
 
         int potionPrice = Math.Max(75, player.Level * 3);
         int manaRestored = 30 + player.Level * 5;
+        var (_, _, singleManaWithTax) = CityControlSystem.CalculateHealingTaxedPrice(potionPrice);
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine($"\"Mana potions are {potionPrice} gold each. Each restores {manaRestored} mana.\"");
+        terminal.WriteLine($"\"Mana potions are {singleManaWithTax} gold each (with taxes). Each restores {manaRestored} mana.\"");
         terminal.WriteLine($", {Manager} says, pulling blue vials from a shelf.", "gray");
         terminal.WriteLine("");
 
-        long maxAfford = player.Gold / potionPrice;
+        long maxAfford = singleManaWithTax > 0 ? player.Gold / singleManaWithTax : 0;
         int maxCanCarry = player.MaxManaPotions - (int)player.ManaPotions;
 
         terminal.WriteLine($"You currently have {player.ManaPotions} mana potions (max {player.MaxManaPotions}).", "gray");
@@ -670,7 +687,7 @@ public class HealerLocation : BaseLocation
         quantity = Math.Min(quantity, maxCanCarry);
 
         long cost = quantity * potionPrice;
-        var (_, _, potionTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
+        var (_, _, potionTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
 
         if (player.Gold < potionTotalWithTax)
         {
@@ -717,7 +734,7 @@ public class HealerLocation : BaseLocation
         }
 
         long cost = CalculateDiseaseCost(PoisonBaseCost, player.Level);
-        var (poisonKingTax, poisonCityTax, poisonTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
+        var (poisonKingTax, poisonCityTax, poisonTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
 
         terminal.WriteLine($"\"Ah yes, I can see the venom coursing through your veins.\"", "cyan");
         terminal.WriteLine($"\"To purge this poison will cost {cost:N0} gold.\"", "cyan");
@@ -827,7 +844,7 @@ public class HealerLocation : BaseLocation
         if (choice == "C")
         {
             // Cure all
-            var (cureAllKingTax, cureAllCityTax, cureAllTotalWithTax) = CityControlSystem.CalculateTaxedPrice(totalCost);
+            var (cureAllKingTax, cureAllCityTax, cureAllTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(totalCost);
 
             terminal.WriteLine("");
             terminal.WriteLine($"\"A complete healing process will cost you {totalCost:N0} gold.\"", "cyan");
@@ -863,7 +880,7 @@ public class HealerLocation : BaseLocation
         {
             // Cure single disease
             var disease = diseases[choice];
-            var (cureOneKingTax, cureOneCityTax, cureOneTotalWithTax) = CityControlSystem.CalculateTaxedPrice(disease.Cost);
+            var (cureOneKingTax, cureOneCityTax, cureOneTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(disease.Cost);
 
             terminal.WriteLine("");
             terminal.WriteLine($"\"For healing {disease.Name} I want {disease.Cost:N0} gold.\"", "cyan");
@@ -1007,7 +1024,7 @@ public class HealerLocation : BaseLocation
         }
 
         long cost = CalculateDiseaseCost(CursedItemBaseCost, player.Level);
-        var (curseKingTax, curseCityTax, curseTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
+        var (curseKingTax, curseCityTax, curseTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
 
         foreach (var item in cursedItems)
         {
@@ -1193,7 +1210,7 @@ public class HealerLocation : BaseLocation
         long baseCost = GameConfig.RehabBaseCost;
         long addictionCost = player.Addict * GameConfig.RehabPerAddictionCost;
         long totalCost = baseCost + addictionCost;
-        var (_, _, totalWithTax) = CityControlSystem.CalculateTaxedPrice(totalCost);
+        var (_, _, totalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(totalCost);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("═══ Addiction Rehabilitation Program ═══");

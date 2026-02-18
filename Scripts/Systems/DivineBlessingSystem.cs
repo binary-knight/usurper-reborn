@@ -280,13 +280,18 @@ namespace UsurperRemake.Systems
                 return null;
 
             // Check if already prayed today
-            if (lastPrayerTime.TryGetValue(character.Name2, out var lastPrayer))
-            {
-                if (lastPrayer.Date == DateTime.Now.Date)
-                    return null; // Already prayed today
-            }
+            if (!CanPrayToday(character.Name2))
+                return null;
 
             lastPrayerTime[character.Name2] = DateTime.Now;
+
+            // In online mode, persist to player's LastPrayerRealDate so it survives logout/login
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                var player = GameEngine.Instance?.CurrentPlayer;
+                if (player != null)
+                    player.LastPrayerRealDate = DateTime.UtcNow;
+            }
 
             var god = godSystem.GetGod(godName);
             if (god == null) return null;
@@ -321,6 +326,15 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool CanPrayToday(string playerName)
         {
+            // In online mode, check persisted LastPrayerRealDate against the daily reset boundary
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                var player = GameEngine.Instance?.CurrentPlayer;
+                if (player == null) return false;
+                var boundary = DailySystemManager.GetCurrentResetBoundary();
+                return player.LastPrayerRealDate < boundary;
+            }
+
             if (lastPrayerTime.TryGetValue(playerName, out var lastPrayer))
             {
                 return lastPrayer.Date != DateTime.Now.Date;
