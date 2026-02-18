@@ -441,9 +441,6 @@ public partial class MagicShopLocation : BaseLocation
             case "T":
                 await TalkToOwnerEnhanced(player);
                 return false;
-            case "F":
-                await EnchantEquipment(player);
-                return false;
             case "R":
             case "Q":
                 await NavigateToLocation(GameLocation.MainStreet);
@@ -532,9 +529,7 @@ public partial class MagicShopLocation : BaseLocation
         WriteMenuKey("G", "bright_yellow", " Scrying (NPC Info)");
         terminal.WriteLine("");
         terminal.WriteLine("");
-        WriteMenuRow("T", "bright_yellow", $"alk to {_ownerName}", "F", "bright_yellow", " Enchantment Forge");
-        terminal.Write("  ");
-        WriteMenuKey("R", "bright_yellow", "eturn to street");
+        WriteMenuRow("T", "bright_yellow", $"alk to {_ownerName}", "R", "bright_yellow", "eturn to street");
         terminal.WriteLine("");
         terminal.WriteLine("");
 
@@ -3156,10 +3151,14 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine($"  'It is done. {targetNPC.Name1} has passed beyond the veil.'");
 
-            // Kill the NPC
+            // Kill the NPC — dark magic assassination is always permanent
             targetNPC.IsDead = true;
+            targetNPC.IsPermaDead = true;
             targetNPC.HP = 0;
-            WorldSimulator.Instance?.QueueNPCForRespawn(targetNPC.Name1);
+            // No respawn — IsPermaDead blocks it
+
+            // Blood price for dark magic kill
+            WorldSimulator.ApplyBloodPrice(player, targetNPC, GameConfig.MurderWeightPerDarkMagicKill, isDeliberate: true);
 
             // Alignment shift
             player.Darkness += darkShiftAmount;

@@ -938,8 +938,69 @@ namespace UsurperRemake.Locations
             terminal.WriteLine($"Your darkness decreases by {darknessReduction} points!", "bright_green");
             terminal.WriteLine($"Your chivalry increases by {chivalryGain} points!", "cyan");
             terminal.WriteLine("You feel spiritually cleansed!", "bright_white");
-            
+
             await Task.Delay(3000);
+
+            // Blood absolution — if the player carries murder weight, the priest detects it
+            if (currentPlayer.MurderWeight > 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("dark_red");
+                terminal.WriteLine($"{priestName} pauses. His expression darkens.");
+                await Task.Delay(2000);
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("\"Wait. There is something else. Something deeper.\"");
+                terminal.WriteLine("\"I sense blood on your soul. Not just sin. Death.\"");
+                terminal.WriteLine("");
+                await Task.Delay(2000);
+
+                long absolveCost = GameConfig.BloodConfessionBaseCost + (long)(currentPlayer.MurderWeight * GameConfig.BloodConfessionCostPerWeight);
+                terminal.SetColor("white");
+                terminal.WriteLine($"\"Blood absolution requires a donation of {absolveCost:N0} gold.\"");
+                terminal.WriteLine($"\"It will not erase what you've done. But it may ease the weight.\"");
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  Your murder weight: {currentPlayer.MurderWeight:F1}");
+                terminal.WriteLine($"  Absolution cost: {absolveCost:N0} gold");
+                terminal.WriteLine($"  Weight reduced by: {GameConfig.MurderWeightConfessionReduction:F1}");
+                terminal.WriteLine("");
+
+                var absolve = await terminal.GetInput("Accept blood absolution? (Y/N): ");
+                if (absolve.Trim().ToUpper() == "Y")
+                {
+                    if (currentPlayer.Gold >= absolveCost)
+                    {
+                        currentPlayer.Gold -= absolveCost;
+                        currentPlayer.Statistics?.RecordGoldSpent(absolveCost);
+                        float reduction = Math.Min(currentPlayer.MurderWeight, GameConfig.MurderWeightConfessionReduction);
+                        currentPlayer.MurderWeight -= reduction;
+                        currentPlayer.LastConfession = DateTime.Now;
+
+                        terminal.WriteLine("");
+                        terminal.SetColor("bright_white");
+                        terminal.WriteLine($"{priestName} places his hands on your head.");
+                        await Task.Delay(1500);
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine("\"The blood does not wash away. But the weight... the weight can be shared.\"");
+                        terminal.WriteLine("");
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"Murder weight reduced by {reduction:F1}! (Now {currentPlayer.MurderWeight:F1})");
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"(-{absolveCost:N0} gold)");
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"You don't have enough gold. ({currentPlayer.Gold:N0}/{absolveCost:N0})");
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("\"The weight remains, then. Return when you are ready.\"");
+                }
+                await Task.Delay(2500);
+            }
         }
         
         /// <summary>

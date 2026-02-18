@@ -167,19 +167,19 @@ public abstract class BaseLocation
                 }
             }
 
-            // Sync CTurf flag: if player thinks their team controls the city but no NPCs on their team have CTurf
-            if (player.CTurf && !string.IsNullOrEmpty(player.Team))
+            // Sync CTurf flag: derive from whether NPC teammates actually hold turf
+            if (!string.IsNullOrEmpty(player.Team))
             {
                 var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
-                bool anyTeammateHasTurf = npcs != null &&
+                bool teamHasTurf = npcs != null &&
                     npcs.Any(n => n.Team == player.Team && n.CTurf && n.IsAlive && !n.IsDead);
-                if (!anyTeammateHasTurf)
+                if (player.CTurf != teamHasTurf)
                 {
-                    player.CTurf = false;
-                    GD.Print($"[BaseLocation] Synced player CTurf=false (no NPC teammates hold turf)");
+                    player.CTurf = teamHasTurf;
+                    GD.Print($"[BaseLocation] Synced player CTurf={teamHasTurf} (team '{player.Team}')");
                 }
             }
-            else if (player.CTurf && string.IsNullOrEmpty(player.Team))
+            else if (player.CTurf)
             {
                 // Player has CTurf but no team — can't control city without a team
                 player.CTurf = false;
@@ -412,6 +412,14 @@ public abstract class BaseLocation
                             terminal.WriteLine(msg);
                         }
                     }
+                }
+
+                // Show persistent broadcast banner if active (MUD mode)
+                var broadcast = UsurperRemake.Server.MudServer.ActiveBroadcast;
+                if (!string.IsNullOrEmpty(broadcast))
+                {
+                    terminal.WriteLine("");
+                    terminal.WriteLine($"*** {broadcast} ***", "bright_yellow");
                 }
             }
 
@@ -2465,7 +2473,8 @@ public abstract class BaseLocation
                           npc.IsAlive &&  // Must have HP > 0
                           npc.NPCFaction.HasValue &&
                           factionSystem.IsNPCHostileToPlayer(npc.NPCFaction) &&
-                          npc.Level <= currentPlayer.Level + 5) // Don't ambush with NPCs way higher level
+                          npc.Level <= currentPlayer.Level + 5 && // Don't ambush with NPCs way higher level
+                          npc.Level >= currentPlayer.Level - 15) // Self-preservation: don't ambush players way above your level
             .ToList();
 
         if (potentialAmbushers == null || potentialAmbushers.Count == 0)
@@ -2598,10 +2607,9 @@ public abstract class BaseLocation
             terminal.SetColor("bright_green");
             terminal.WriteLine($"You defeated {ambusher.Name}!");
 
-            // Mark NPC as permanently dead and queue for respawn
-            ambusher.IsDead = true;
-            ambusher.HP = 0;
-            WorldSimulator.Instance?.QueueNPCForRespawn(ambusher.Id);
+            // Mark NPC dead with permadeath roll (self-defense — no blood price)
+            WorldSimulator.Instance?.MarkNPCDead(ambusher, GameConfig.PermadeathChancePlayerKill,
+                currentPlayer.Name2 ?? currentPlayer.Name1, ambusher.CurrentLocation ?? "unknown");
 
             // Display rewards summary (already calculated and given by combat engine)
             terminal.WriteLine("");

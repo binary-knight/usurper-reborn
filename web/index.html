@@ -2264,6 +2264,10 @@
         html += renderStatCard(s.deepestFloor || 0, 'Deepest Floor');
         html += renderStatCard(formatGold(s.totalGold || 0), 'Total Gold');
         html += renderStatCard((s.marriages || 0) + ' / ' + (s.children || 0), 'Marriages / Kids');
+        const permaTotal = (s.permadeadNpcs || 0) + (s.agedDeathNpcs || 0);
+        if (permaTotal > 0) {
+            html += renderStatCard((s.permadeadNpcs || 0) + ' / ' + (s.agedDeathNpcs || 0), 'Permadead / Old Age');
+        }
         html += '</div>';
 
         // Highlights
@@ -2288,6 +2292,13 @@
             html += '<div class="highlight-label">Most Popular Class</div>';
             html += '<div class="highlight-value">' + escapeHtml(h.popularClass) + '</div>';
             html += '<div class="highlight-detail">The favored path of adventurers</div>';
+            html += '</div>';
+        }
+        if (h.mostWanted) {
+            html += '<div class="highlight-card" style="border-color: #8b0000;">';
+            html += '<div class="highlight-label" style="color: #ff4444;">Most Wanted</div>';
+            html += '<div class="highlight-value">' + escapeHtml(h.mostWanted.name) + '</div>';
+            html += '<div class="highlight-detail">Blood Price: ' + h.mostWanted.murderWeight + ' | Level ' + h.mostWanted.level + ' ' + escapeHtml(h.mostWanted.className) + '</div>';
             html += '</div>';
         }
         html += '</div>';

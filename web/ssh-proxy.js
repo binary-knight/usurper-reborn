@@ -186,6 +186,8 @@ function getDashSummary() {
 
   const alive = npcs.filter(n => !n.isDead && !n.IsDead);
   const dead = npcs.filter(n => n.isDead || n.IsDead);
+  const permadead = npcs.filter(n => n.isPermaDead || n.IsPermaDead);
+  const agedDeath = npcs.filter(n => n.isAgedDeath || n.IsAgedDeath);
   const married = npcs.filter(n => n.isMarried || n.IsMarried);
   const pregnant = npcs.filter(n => n.pregnancyDueDate || n.PregnancyDueDate);
   const teams = new Set(npcs.filter(n => n.team || n.Team).map(n => n.team || n.Team).filter(t => t));
@@ -296,6 +298,8 @@ function getDashSummary() {
     total: npcs.length,
     alive: alive.length,
     dead: dead.length,
+    permadead: permadead.length,
+    agedDeath: agedDeath.length,
     married: married.length,
     pregnant: pregnant.length,
     teams: economy?.cityControlTeam && economy.cityControlTeam !== 'None' && !teams.has(economy.cityControlTeam)
@@ -619,6 +623,41 @@ function getStats() {
       }
     } catch (e) { /* npcs may not exist */ }
 
+    // NPC permadeath / aged death counts (from world_state NPC blob)
+    let permadeadCount = 0;
+    let agedDeathCount = 0;
+    try {
+      const npcs = getDashNpcs();
+      if (npcs && npcs.length > 0) {
+        permadeadCount = npcs.filter(n => n.isPermaDead || n.IsPermaDead).length;
+        agedDeathCount = npcs.filter(n => n.isAgedDeath || n.IsAgedDeath).length;
+      }
+    } catch (e) { /* npcs may not exist */ }
+
+    // Most wanted player (highest murder weight)
+    let mostWanted = null;
+    try {
+      const wanted = db.prepare(`
+        SELECT display_name,
+               json_extract(player_data, '$.player.level') as level,
+               json_extract(player_data, '$.player.class') as class_id,
+               CAST(json_extract(player_data, '$.player.murderWeight') AS REAL) as murder_weight
+        FROM players WHERE is_banned = 0
+          AND username NOT LIKE 'emergency_%'
+          AND json_extract(player_data, '$.player.murderWeight') IS NOT NULL
+          AND CAST(json_extract(player_data, '$.player.murderWeight') AS REAL) > 0
+        ORDER BY murder_weight DESC LIMIT 1
+      `).get();
+      if (wanted) {
+        mostWanted = {
+          name: wanted.display_name,
+          level: wanted.level || 1,
+          className: CLASS_NAMES[wanted.class_id] || 'Unknown',
+          murderWeight: Math.round(wanted.murder_weight * 10) / 10
+        };
+      }
+    } catch (e) { /* murder weight may not exist in older saves */ }
+
     // Current king (from world_state - the authoritative source maintained by world sim)
     let king = null;
     try {
@@ -762,7 +801,9 @@ function getStats() {
         deepestFloor: agg ? agg.deepestFloor : 0,
         totalGold: agg ? agg.totalGold : 0,
         marriages: marriageCount,
-        children: childrenCount
+        children: childrenCount,
+        permadeadNpcs: permadeadCount,
+        agedDeathNpcs: agedDeathCount
       },
       highlights: {
         topPlayer: topPlayer ? {
@@ -771,7 +812,8 @@ function getStats() {
           className: CLASS_NAMES[topPlayer.class_id] || 'Unknown'
         } : null,
         king: king,
-        popularClass: popClass ? CLASS_NAMES[popClass.class_id] || 'Unknown' : null
+        popularClass: popClass ? CLASS_NAMES[popClass.class_id] || 'Unknown' : null,
+        mostWanted: mostWanted
       },
       leaderboard: leaderboard,
       pvpLeaderboard: pvpLeaderboard,

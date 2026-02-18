@@ -1907,8 +1907,13 @@ public class InnLocation : BaseLocation
             currentPlayer.GroggoShadowBlessingDex = 0;
         }
 
-        var healing = Math.Min(10, currentPlayer.MaxHP - currentPlayer.HP);
-        var manaRecovery = Math.Min(currentPlayer.MaxMana / 4, currentPlayer.MaxMana - currentPlayer.Mana);
+        // Blood Price rest penalty — dark memories reduce rest effectiveness
+        float restEfficiency = 1.0f;
+        if (currentPlayer.MurderWeight >= 6f) restEfficiency = 0.50f;
+        else if (currentPlayer.MurderWeight >= 3f) restEfficiency = 0.75f;
+
+        var healing = (long)(Math.Min(10, currentPlayer.MaxHP - currentPlayer.HP) * restEfficiency);
+        var manaRecovery = (long)(Math.Min(currentPlayer.MaxMana / 4, currentPlayer.MaxMana - currentPlayer.Mana) * restEfficiency);
 
         if (healing > 0 || manaRecovery > 0)
         {
@@ -1922,13 +1927,18 @@ public class InnLocation : BaseLocation
                 currentPlayer.Mana += manaRecovery;
                 terminal.WriteLine($"Your mind clears, recovering {manaRecovery} mana.", "blue");
             }
+            if (restEfficiency < 1.0f)
+            {
+                terminal.SetColor("dark_red");
+                terminal.WriteLine("  Your rest is troubled by dark memories...");
+            }
         }
         else
         {
             terminal.WriteLine("You are already at full health.", "white");
         }
 
-        // Check for dreams during rest
+        // Check for dreams during rest (nightmares take priority if MurderWeight > 0)
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
         if (dream != null)
         {
@@ -2477,12 +2487,49 @@ public class InnLocation : BaseLocation
         terminal.WriteLine($"\"{dialogueHint}\"");
         terminal.WriteLine("");
 
-        // Show stats
+        // Show stats (with equipment bonuses if any)
         terminal.SetColor("yellow");
         terminal.WriteLine("Stats:");
         terminal.SetColor("white");
         terminal.WriteLine($"  Level: {companion.Level} | Role: {companion.CombatRole}");
-        terminal.WriteLine($"  HP: {companion.BaseStats.HP} | ATK: {companion.BaseStats.Attack} | DEF: {companion.BaseStats.Defense}");
+
+        if (companion.EquippedItems.Count > 0)
+        {
+            // Show effective stats with equipment
+            var tempChar = CreateCompanionCharacterWrapper(companion);
+            terminal.Write($"  HP: {companion.BaseStats.HP}");
+            if (tempChar.MaxHP != companion.BaseStats.HP)
+            {
+                terminal.SetColor("bright_green");
+                terminal.Write($" ({tempChar.MaxHP})");
+                terminal.SetColor("white");
+            }
+            terminal.Write($" | ATK: {companion.BaseStats.Attack}");
+            if (tempChar.Strength != companion.BaseStats.Attack)
+            {
+                terminal.SetColor("bright_green");
+                terminal.Write($" ({tempChar.Strength})");
+                terminal.SetColor("white");
+            }
+            terminal.Write($" | DEF: {companion.BaseStats.Defense}");
+            if (tempChar.Defence != companion.BaseStats.Defense)
+            {
+                terminal.SetColor("bright_green");
+                terminal.Write($" ({tempChar.Defence})");
+                terminal.SetColor("white");
+            }
+            terminal.WriteLine("");
+
+            // Show equipped item count
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  Equipment: {companion.EquippedItems.Count} item{(companion.EquippedItems.Count != 1 ? "s" : "")} equipped");
+        }
+        else
+        {
+            terminal.WriteLine($"  HP: {companion.BaseStats.HP} | ATK: {companion.BaseStats.Attack} | DEF: {companion.BaseStats.Defense}");
+        }
+
+        terminal.SetColor("white");
         terminal.WriteLine($"  Abilities: {string.Join(", ", companion.Abilities)}");
         terminal.WriteLine("");
 
@@ -2524,6 +2571,14 @@ public class InnLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(" View history together");
         terminal.SetColor("bright_yellow");
+        terminal.Write("  [E]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Manage Equipment");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [A]");
+        terminal.SetColor("white");
+        terminal.WriteLine(" Manage Combat Skills");
+        terminal.SetColor("bright_yellow");
         terminal.Write("  [0]");
         terminal.SetColor("yellow");
         terminal.WriteLine(" Return");
@@ -2545,6 +2600,12 @@ public class InnLocation : BaseLocation
                 break;
             case "H":
                 await ShowCompanionHistory(companion);
+                break;
+            case "E":
+                await ManageCompanionEquipment(companion);
+                break;
+            case "A":
+                await ManageCompanionAbilities(companion);
                 break;
         }
     }
@@ -2830,6 +2891,679 @@ public class InnLocation : BaseLocation
 
         await terminal.PressAnyKey();
     }
+
+    #region Companion Equipment & Abilities
+
+    /// <summary>
+    /// Create a Character wrapper from a Companion for equipment management UI
+    /// </summary>
+    private Character CreateCompanionCharacterWrapper(Companion companion)
+    {
+        var wrapper = new Character
+        {
+            Name2 = companion.Name,
+            Level = companion.Level,
+            Class = companion.CombatRole switch
+            {
+                CombatRole.Tank => CharacterClass.Warrior,
+                CombatRole.Healer => CharacterClass.Cleric,
+                CombatRole.Damage => CharacterClass.Assassin,
+                CombatRole.Hybrid => CharacterClass.Paladin,
+                _ => CharacterClass.Warrior
+            },
+            BaseStrength = companion.BaseStats.Attack,
+            BaseDefence = companion.BaseStats.Defense,
+            BaseDexterity = companion.BaseStats.Speed,
+            BaseAgility = companion.BaseStats.Speed,
+            BaseIntelligence = companion.BaseStats.MagicPower,
+            BaseWisdom = companion.BaseStats.HealingPower,
+            BaseCharisma = 10,
+            BaseConstitution = 10 + companion.Level,
+            BaseStamina = 10 + companion.Level,
+            BaseMaxHP = companion.BaseStats.HP,
+            BaseMaxMana = companion.BaseStats.MagicPower * 5
+        };
+
+        // Copy companion's equipment
+        foreach (var kvp in companion.EquippedItems)
+            wrapper.EquippedItems[kvp.Key] = kvp.Value;
+
+        wrapper.RecalculateStats();
+
+        // Set current HP to max for display purposes
+        wrapper.HP = wrapper.MaxHP;
+        wrapper.Mana = wrapper.MaxMana;
+
+        return wrapper;
+    }
+
+    /// <summary>
+    /// Manage equipment for a companion via Character wrapper
+    /// </summary>
+    private async Task ManageCompanionEquipment(Companion companion)
+    {
+        var wrapper = CreateCompanionCharacterWrapper(companion);
+
+        await ManageCompanionCharacterEquipment(wrapper);
+
+        // Sync equipment changes back to the companion
+        companion.EquippedItems.Clear();
+        foreach (var kvp in wrapper.EquippedItems)
+        {
+            if (kvp.Value > 0)
+                companion.EquippedItems[kvp.Key] = kvp.Value;
+        }
+
+        await SaveSystem.Instance.AutoSave(currentPlayer);
+    }
+
+    /// <summary>
+    /// Manage equipment for a specific character (companion wrapper)
+    /// Based on TeamCornerLocation.ManageCharacterEquipment
+    /// </summary>
+    private async Task ManageCompanionCharacterEquipment(Character target)
+    {
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"═══════════════════════════════════════════════════════════════════════════════");
+            terminal.WriteLine($"                    EQUIPMENT: {target.DisplayName.ToUpper()}");
+            terminal.WriteLine($"═══════════════════════════════════════════════════════════════════════════════");
+            terminal.WriteLine("");
+
+            // Show target's stats
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Level: {target.Level}  Class: {target.Class}  Race: {target.Race}");
+            terminal.WriteLine($"  HP: {target.HP}/{target.MaxHP}  Mana: {target.Mana}/{target.MaxMana}");
+            terminal.WriteLine($"  Str: {target.Strength}  Def: {target.Defence}  Agi: {target.Agility}");
+            terminal.WriteLine("");
+
+            // Show current equipment
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("Current Equipment:");
+            terminal.SetColor("white");
+
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.MainHand, "Main Hand");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.OffHand, "Off Hand");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Head, "Head");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Body, "Body");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Arms, "Arms");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Hands, "Hands");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Legs, "Legs");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Feet, "Feet");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Cloak, "Cloak");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Neck, "Neck");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.LFinger, "Left Ring");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.RFinger, "Right Ring");
+            terminal.WriteLine("");
+
+            // Show options
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Options:");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("E");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Equip item from your inventory");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("U");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Unequip item from them");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("T");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Take all their equipment");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Q");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine("Done / Return");
+            terminal.WriteLine("");
+
+            terminal.SetColor("cyan");
+            terminal.Write("Choice: ");
+            terminal.SetColor("white");
+
+            var choice = (await terminal.ReadLineAsync()).ToUpper().Trim();
+
+            switch (choice)
+            {
+                case "E":
+                    await CompanionEquipItemToCharacter(target);
+                    break;
+                case "U":
+                    await CompanionUnequipItemFromCharacter(target);
+                    break;
+                case "T":
+                    await CompanionTakeAllEquipment(target);
+                    break;
+                case "Q":
+                case "":
+                    return;
+            }
+        }
+    }
+
+    private void CompanionDisplayEquipmentSlot(Character target, EquipmentSlot slot, string label)
+    {
+        var item = target.GetEquipment(slot);
+        terminal.SetColor("gray");
+        terminal.Write($"  {label,-12}: ");
+        if (item != null)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(item.Name);
+        }
+        else
+        {
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("(empty)");
+        }
+    }
+
+    private async Task CompanionEquipItemToCharacter(Character target)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"═══ EQUIP ITEM TO {target.DisplayName.ToUpper()} ═══");
+        terminal.WriteLine("");
+
+        // Collect equippable items from player's inventory and equipped items
+        var equipmentItems = new List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)>();
+
+        // Add items from player's inventory that are Equipment type
+        foreach (var invItem in currentPlayer.Inventory)
+        {
+            var equipment = EquipmentDatabase.GetByName(invItem.Name);
+            if (equipment != null)
+            {
+                equipmentItems.Add((equipment, false, (EquipmentSlot?)null));
+            }
+        }
+
+        // Add player's currently equipped items
+        foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+        {
+            if (slot == EquipmentSlot.None) continue;
+            var equipped = currentPlayer.GetEquipment(slot);
+            if (equipped != null)
+            {
+                equipmentItems.Add((equipped, true, slot));
+            }
+        }
+
+        if (equipmentItems.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("You have no equipment to give.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Display available items
+        terminal.SetColor("white");
+        terminal.WriteLine("Available equipment:");
+        terminal.WriteLine("");
+
+        for (int i = 0; i < equipmentItems.Count; i++)
+        {
+            var (item, isEquipped, fromSlot) = equipmentItems[i];
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  {i + 1}. ");
+            terminal.SetColor("white");
+            terminal.Write($"{item.Name} ");
+
+            // Show item stats
+            terminal.SetColor("gray");
+            if (item.WeaponPower > 0)
+                terminal.Write($"[Atk:{item.WeaponPower}] ");
+            if (item.ArmorClass > 0)
+                terminal.Write($"[AC:{item.ArmorClass}] ");
+            if (item.ShieldBonus > 0)
+                terminal.Write($"[Shield:{item.ShieldBonus}] ");
+
+            // Show if currently equipped by player
+            if (isEquipped)
+            {
+                terminal.SetColor("cyan");
+                terminal.Write($"(your {fromSlot?.GetDisplayName()})");
+            }
+
+            // Check if target can use it
+            if (!item.CanEquip(target, out string reason))
+            {
+                terminal.SetColor("red");
+                terminal.Write($" [{reason}]");
+            }
+
+            terminal.WriteLine("");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write("Select item (0 to cancel): ");
+        terminal.SetColor("white");
+
+        var input = await terminal.ReadLineAsync();
+        if (!int.TryParse(input, out int itemIdx) || itemIdx < 1 || itemIdx > equipmentItems.Count)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("Cancelled.");
+            await Task.Delay(1000);
+            return;
+        }
+
+        var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+
+        // Check if target can equip
+        if (!selectedItem.CanEquip(target, out string equipReason))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"{target.DisplayName} cannot use this item: {equipReason}");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // For one-handed weapons, ask which hand
+        EquipmentSlot? targetSlot = null;
+        if (selectedItem.Handedness == WeaponHandedness.OneHanded &&
+            (selectedItem.Slot == EquipmentSlot.MainHand || selectedItem.Slot == EquipmentSlot.OffHand))
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.Write("Which hand? [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("M");
+            terminal.SetColor("cyan");
+            terminal.Write("]ain hand or [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("O");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("]ff hand?");
+            terminal.Write(": ");
+            terminal.SetColor("white");
+            var handChoice = (await terminal.ReadLineAsync()).ToUpper().Trim();
+            if (handChoice.StartsWith("O"))
+                targetSlot = EquipmentSlot.OffHand;
+            else
+                targetSlot = EquipmentSlot.MainHand;
+        }
+
+        // Remove from player
+        if (wasEquipped && sourceSlot.HasValue)
+        {
+            currentPlayer.UnequipSlot(sourceSlot.Value);
+            currentPlayer.RecalculateStats();
+        }
+        else
+        {
+            // Remove from inventory (find by name)
+            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+            if (invItem != null)
+            {
+                currentPlayer.Inventory.Remove(invItem);
+            }
+        }
+
+        // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
+        var targetInventoryBefore = target.Inventory.Count;
+
+        // Equip to target - EquipItem adds displaced items to target's inventory
+        var result = target.EquipItem(selectedItem, targetSlot, out string message);
+        target.RecalculateStats();
+
+        if (result)
+        {
+            // Move any items that were added to target's inventory (displaced equipment) to player's inventory
+            if (target.Inventory.Count > targetInventoryBefore)
+            {
+                var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
+                foreach (var displaced in displacedItems)
+                {
+                    target.Inventory.Remove(displaced);
+                    currentPlayer.Inventory.Add(displaced);
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"{target.DisplayName} equipped {selectedItem.Name}!");
+            if (!string.IsNullOrEmpty(message))
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(message);
+            }
+        }
+        else
+        {
+            // Failed - return item to player
+            var legacyItem = CompanionConvertEquipmentToItem(selectedItem);
+            currentPlayer.Inventory.Add(legacyItem);
+            terminal.SetColor("red");
+            terminal.WriteLine($"Failed to equip: {message}");
+        }
+
+        await Task.Delay(2000);
+    }
+
+    private async Task CompanionUnequipItemFromCharacter(Character target)
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"═══ UNEQUIP FROM {target.DisplayName.ToUpper()} ═══");
+        terminal.WriteLine("");
+
+        // Get all equipped slots
+        var equippedSlots = new List<(EquipmentSlot slot, Equipment item)>();
+        foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+        {
+            if (slot == EquipmentSlot.None) continue;
+            var item = target.GetEquipment(slot);
+            if (item != null)
+            {
+                equippedSlots.Add((slot, item));
+            }
+        }
+
+        if (equippedSlots.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"{target.DisplayName} has no equipment to unequip.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.SetColor("white");
+        terminal.WriteLine("Equipped items:");
+        terminal.WriteLine("");
+
+        for (int i = 0; i < equippedSlots.Count; i++)
+        {
+            var (slot, item) = equippedSlots[i];
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  {i + 1}. ");
+            terminal.SetColor("gray");
+            terminal.Write($"[{slot.GetDisplayName(),-12}] ");
+            terminal.SetColor("white");
+            terminal.Write($"{item.Name}");
+            if (item.IsCursed)
+            {
+                terminal.SetColor("red");
+                terminal.Write(" (CURSED)");
+            }
+            terminal.WriteLine("");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write("Select slot to unequip (0 to cancel): ");
+        terminal.SetColor("white");
+
+        var input = await terminal.ReadLineAsync();
+        if (!int.TryParse(input, out int slotIdx) || slotIdx < 1 || slotIdx > equippedSlots.Count)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("Cancelled.");
+            await Task.Delay(1000);
+            return;
+        }
+
+        var (selectedSlot, selectedItem) = equippedSlots[slotIdx - 1];
+
+        // Check if cursed
+        if (selectedItem.IsCursed)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"The {selectedItem.Name} is cursed and cannot be removed!");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Unequip and add to player inventory
+        var unequipped = target.UnequipSlot(selectedSlot);
+        if (unequipped != null)
+        {
+            target.RecalculateStats();
+            var legacyItem = CompanionConvertEquipmentToItem(unequipped);
+            currentPlayer.Inventory.Add(legacyItem);
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"Took {unequipped.Name} from {target.DisplayName}.");
+            terminal.SetColor("gray");
+            terminal.WriteLine("Item added to your inventory.");
+        }
+        else
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Failed to unequip item.");
+        }
+
+        await Task.Delay(2000);
+    }
+
+    private async Task CompanionTakeAllEquipment(Character target)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"Take ALL equipment from {target.DisplayName}?");
+        terminal.Write("This will leave them with nothing. Confirm (Y/N): ");
+        terminal.SetColor("white");
+
+        var confirm = await terminal.ReadLineAsync();
+        if (!confirm.ToUpper().StartsWith("Y"))
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("Cancelled.");
+            await Task.Delay(1000);
+            return;
+        }
+
+        int itemsTaken = 0;
+        var cursedItems = new List<string>();
+
+        foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+        {
+            if (slot == EquipmentSlot.None) continue;
+            var item = target.GetEquipment(slot);
+            if (item != null)
+            {
+                if (item.IsCursed)
+                {
+                    cursedItems.Add(item.Name);
+                    continue;
+                }
+
+                var unequipped = target.UnequipSlot(slot);
+                if (unequipped != null)
+                {
+                    var legacyItem = CompanionConvertEquipmentToItem(unequipped);
+                    currentPlayer.Inventory.Add(legacyItem);
+                    itemsTaken++;
+                }
+            }
+        }
+
+        target.RecalculateStats();
+
+        terminal.WriteLine("");
+        if (itemsTaken > 0)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"Took {itemsTaken} item{(itemsTaken != 1 ? "s" : "")} from {target.DisplayName}.");
+        }
+        else
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"{target.DisplayName} had no equipment to take.");
+        }
+
+        if (cursedItems.Count > 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"Could not remove cursed items: {string.Join(", ", cursedItems)}");
+        }
+
+        await Task.Delay(2000);
+    }
+
+    private Item CompanionConvertEquipmentToItem(Equipment equipment)
+    {
+        return new Item
+        {
+            Name = equipment.Name,
+            Type = CompanionSlotToObjType(equipment.Slot),
+            Value = equipment.Value,
+            Attack = equipment.WeaponPower,
+            Armor = equipment.ArmorClass,
+            Strength = equipment.StrengthBonus,
+            Dexterity = equipment.DexterityBonus,
+            HP = equipment.MaxHPBonus,
+            Mana = equipment.MaxManaBonus,
+            Defence = equipment.DefenceBonus,
+            IsCursed = equipment.IsCursed,
+            MinLevel = equipment.MinLevel,
+            StrengthNeeded = equipment.StrengthRequired,
+            RequiresGood = equipment.RequiresGood,
+            RequiresEvil = equipment.RequiresEvil,
+            ItemID = equipment.Id
+        };
+    }
+
+    private ObjType CompanionSlotToObjType(EquipmentSlot slot) => slot switch
+    {
+        EquipmentSlot.Head => ObjType.Head,
+        EquipmentSlot.Body => ObjType.Body,
+        EquipmentSlot.Arms => ObjType.Arms,
+        EquipmentSlot.Hands => ObjType.Hands,
+        EquipmentSlot.Legs => ObjType.Legs,
+        EquipmentSlot.Feet => ObjType.Feet,
+        EquipmentSlot.MainHand => ObjType.Weapon,
+        EquipmentSlot.OffHand => ObjType.Shield,
+        EquipmentSlot.Neck => ObjType.Neck,
+        EquipmentSlot.Neck2 => ObjType.Neck,
+        EquipmentSlot.LFinger => ObjType.Fingers,
+        EquipmentSlot.RFinger => ObjType.Fingers,
+        EquipmentSlot.Cloak => ObjType.Abody,
+        EquipmentSlot.Waist => ObjType.Waist,
+        _ => ObjType.Magic
+    };
+
+    /// <summary>
+    /// Manage combat abilities for a companion - toggle on/off
+    /// </summary>
+    private async Task ManageCompanionAbilities(Companion companion)
+    {
+        // Map CombatRole to CharacterClass (same as GetCompanionsAsCharacters)
+        var charClass = companion.CombatRole switch
+        {
+            CombatRole.Tank => CharacterClass.Warrior,
+            CombatRole.Healer => CharacterClass.Cleric,
+            CombatRole.Damage => CharacterClass.Assassin,
+            CombatRole.Hybrid => CharacterClass.Paladin,
+            _ => CharacterClass.Warrior
+        };
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"═══════════════════════════════════════════════════════════════════════════════");
+            terminal.WriteLine($"                  COMBAT SKILLS: {companion.Name.ToUpper()}");
+            terminal.WriteLine($"═══════════════════════════════════════════════════════════════════════════════");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Role: {companion.CombatRole} (as {charClass}) | Level: {companion.Level}");
+            terminal.WriteLine("");
+
+            // Get all abilities for this class at this level
+            var tempChar = new Character { Class = charClass, Level = companion.Level };
+            var abilities = ClassAbilitySystem.GetAvailableAbilities(tempChar);
+
+            if (abilities.Count == 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("No combat abilities available yet.");
+                await terminal.PressAnyKey();
+                return;
+            }
+
+            int enabledCount = 0;
+            for (int i = 0; i < abilities.Count; i++)
+            {
+                var ability = abilities[i];
+                bool isDisabled = companion.DisabledAbilities.Contains(ability.Id);
+                if (!isDisabled) enabledCount++;
+
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"  [{i + 1,2}] ");
+                terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
+                terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
+                terminal.SetColor(isDisabled ? "gray" : "white");
+                terminal.Write($"{ability.Name,-24}");
+                terminal.SetColor("darkgray");
+                terminal.Write($" {ability.StaminaCost,2} ST  Lv{ability.LevelRequired,-3}  ");
+                terminal.SetColor(isDisabled ? "darkgray" : "gray");
+                terminal.WriteLine(ability.Description.Length > 30 ? ability.Description[..30] + "..." : ability.Description);
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {enabledCount}/{abilities.Count} abilities enabled");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  [1-N] Toggle ability  [A] Enable all  [0] Return");
+            terminal.WriteLine("");
+
+            var input = await terminal.GetInput("Choice: ");
+            if (string.IsNullOrWhiteSpace(input) || input.Trim() == "0") break;
+
+            if (input.Trim().ToUpper() == "A")
+            {
+                companion.DisabledAbilities.Clear();
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("All abilities enabled!");
+                await Task.Delay(800);
+                continue;
+            }
+
+            if (int.TryParse(input.Trim(), out int idx) && idx >= 1 && idx <= abilities.Count)
+            {
+                var ability = abilities[idx - 1];
+                if (companion.DisabledAbilities.Contains(ability.Id))
+                {
+                    companion.DisabledAbilities.Remove(ability.Id);
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  Enabled: {ability.Name}");
+                }
+                else
+                {
+                    companion.DisabledAbilities.Add(ability.Id);
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  Disabled: {ability.Name}");
+                }
+                await Task.Delay(600);
+            }
+        }
+
+        await SaveSystem.Instance.AutoSave(currentPlayer);
+    }
+
+    #endregion
 
     #endregion
 

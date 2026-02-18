@@ -381,7 +381,7 @@ public partial class GameEngine : Node
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("SysOp Administration Console");
+                terminal.WriteLine(isSysOp ? "SysOp Console" : "Admin Console");
             }
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
             {
@@ -519,7 +519,7 @@ public partial class GameEngine : Node
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("SysOp Administration Console");
+                terminal.WriteLine(isSysOp ? "SysOp Console" : "Admin Console");
             }
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
             {
@@ -1176,8 +1176,7 @@ public partial class GameEngine : Node
         terminal.WriteLine($"Account: {username}");
         terminal.WriteLine("");
 
-        terminal.Write("Current password: ");
-        var currentPassword = await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true));
+        var currentPassword = await terminal.GetMaskedInput("Current password: ");
         if (string.IsNullOrWhiteSpace(currentPassword))
         {
             terminal.SetColor("yellow");
@@ -1186,8 +1185,7 @@ public partial class GameEngine : Node
             return;
         }
 
-        terminal.Write("New password (min 4 chars): ");
-        var newPassword = await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true));
+        var newPassword = await terminal.GetMaskedInput("New password (min 4 chars): ");
         if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
         {
             terminal.SetColor("red");
@@ -1196,8 +1194,7 @@ public partial class GameEngine : Node
             return;
         }
 
-        terminal.Write("Confirm new password: ");
-        var confirmPassword = await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true));
+        var confirmPassword = await terminal.GetMaskedInput("Confirm new password: ");
         if (newPassword != confirmPassword)
         {
             terminal.SetColor("red");
@@ -1553,8 +1550,6 @@ public partial class GameEngine : Node
                     DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
                 }
 
-                // Load current royal court from world_state
-                await OnlineStateManager.Instance.LoadRoyalCourtFromWorldState();
             }
 
             // In online mode, merge this player's quests into the shared database
@@ -1569,11 +1564,12 @@ public partial class GameEngine : Node
             // Restore story systems (companions, children, seals, etc.)
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems);
 
-            // In online mode, override children and marriages with world_state (authoritative source).
-            // RestoreStorySystems loaded stale data from the player's save — the world sim may have
-            // created new children and marriages while the player was offline.
+            // In online mode, override royal court, children, and marriages with world_state
+            // (authoritative source). RestoreStorySystems loaded stale data from the player's
+            // save — the world sim maintains these 24/7 while the player is offline.
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
             {
+                await OnlineStateManager.Instance.LoadRoyalCourtFromWorldState();
                 await LoadSharedChildrenAndMarriages();
             }
 
@@ -1614,6 +1610,13 @@ public partial class GameEngine : Node
                 }
             }
 
+            // Online mode: sync player King and CTurf flags with authoritative world state.
+            // Player's save may have stale flags if the world changed while they were offline.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
+            {
+                SyncPlayerFlagsFromWorldState(currentPlayer);
+            }
+
             // Check if player was sleeping and handle offline attacks
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend)
             {
@@ -1643,6 +1646,50 @@ public partial class GameEngine : Node
             UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Failed to load save {fileName}:\n{ex}");
             UsurperRemake.Systems.DebugLogger.Instance.Flush();
             await Task.Delay(3000);
+        }
+    }
+
+    /// <summary>
+    /// Sync player's King and CTurf flags with the authoritative world state.
+    /// Called on login after NPCs and royal court are loaded from world_state.
+    /// The player's save may have stale flags if the world changed while they were offline.
+    /// </summary>
+    private void SyncPlayerFlagsFromWorldState(Character player)
+    {
+        try
+        {
+            // Sync King flag: derive from current king identity
+            var currentKing = CastleLocation.GetCurrentKing();
+            bool shouldBeKing = currentKing != null && currentKing.IsActive &&
+                (currentKing.Name == player.DisplayName || currentKing.Name == player.Name2);
+            if (player.King != shouldBeKing)
+            {
+                player.King = shouldBeKing;
+                DebugLogger.Instance.LogInfo("ONLINE", $"Synced player King={shouldBeKing} (throne belongs to {currentKing?.Name ?? "nobody"})");
+            }
+
+            // Sync CTurf flag: derive from whether this player's team controls the city
+            if (!string.IsNullOrEmpty(player.Team))
+            {
+                var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+                bool teamHasTurf = npcs != null &&
+                    npcs.Any(n => n.Team == player.Team && n.CTurf && n.IsAlive && !n.IsDead);
+                if (player.CTurf != teamHasTurf)
+                {
+                    player.CTurf = teamHasTurf;
+                    DebugLogger.Instance.LogInfo("ONLINE", $"Synced player CTurf={teamHasTurf} (team '{player.Team}')");
+                }
+            }
+            else if (player.CTurf)
+            {
+                // No team but has CTurf — impossible, clear it
+                player.CTurf = false;
+                DebugLogger.Instance.LogInfo("ONLINE", "Synced player CTurf=false (no team)");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("ONLINE", $"Failed to sync player flags: {ex.Message}");
         }
     }
 
@@ -2056,19 +2103,24 @@ public partial class GameEngine : Node
                 DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
             }
 
-            // Load current royal court from world_state
-            await OnlineStateManager.Instance.LoadRoyalCourtFromWorldState();
         }
 
         // Restore story systems (companions, children, seals, etc.)
         SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems);
 
-        // In online mode, override children and marriages with world_state (authoritative source).
-        // RestoreStorySystems loaded stale data from the player's save — the world sim may have
-        // created new children and marriages while the player was offline.
+        // In online mode, override royal court, children, and marriages with world_state
+        // (authoritative source). RestoreStorySystems loaded stale data from the player's
+        // save — the world sim maintains these 24/7 while the player is offline.
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
         {
+            await OnlineStateManager.Instance.LoadRoyalCourtFromWorldState();
             await LoadSharedChildrenAndMarriages();
+        }
+
+        // Online mode: sync player King and CTurf flags with authoritative world state.
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
+        {
+            SyncPlayerFlagsFromWorldState(currentPlayer);
         }
 
         // Restore telemetry settings
@@ -2370,6 +2422,11 @@ public partial class GameEngine : Node
             BetrayedForGodName = playerData.BetrayedForGodName ?? "",
             DivineWrathPending = playerData.DivineWrathPending,
             DivineWrathTurnsRemaining = playerData.DivineWrathTurnsRemaining,
+
+            // Blood Price / Murder Weight System
+            MurderWeight = playerData.MurderWeight,
+            PermakillLog = playerData.PermakillLog ?? new(),
+            LastMurderWeightDecay = playerData.LastMurderWeightDecay,
 
             // Combat statistics (kill/death counts)
             MKills = playerData.MKills,
@@ -3034,6 +3091,7 @@ public partial class GameEngine : Node
                     ? data.BirthDate
                     : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : new Random().Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
                 IsAgedDeath = data.IsAgedDeath,
+                IsPermaDead = data.IsPermaDead,
                 PregnancyDueDate = data.PregnancyDueDate,
 
                 // Marriage status

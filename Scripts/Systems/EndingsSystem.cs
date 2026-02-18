@@ -110,6 +110,10 @@ namespace UsurperRemake.Systems
             if (player == null)
                 return false;
 
+            // Blood Price gate — murderers cannot achieve the True Ending
+            if (player.MurderWeight >= GameConfig.MurderWeightEndingBlock)
+                return false;
+
             var story = StoryProgressionSystem.Instance;
             var ocean = OceanPhilosophySystem.Instance;
             var companions = CompanionSystem.Instance;
@@ -152,6 +156,10 @@ namespace UsurperRemake.Systems
         private bool QualifiesForDissolutionEnding(Character player)
         {
             if (player == null)
+                return false;
+
+            // Blood Price gate — murderers cannot achieve the Dissolution Ending
+            if (player.MurderWeight >= GameConfig.MurderWeightEndingBlock)
                 return false;
 
             var story = StoryProgressionSystem.Instance;

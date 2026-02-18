@@ -590,6 +590,26 @@ public class DailySystemManager
             QuestSystem.RefreshBountyBoard(player.Level);
         }
 
+        // Blood Price — natural murder weight decay over real time
+        if (player != null && player.MurderWeight > 0)
+        {
+            var elapsed = DateTime.Now - player.LastMurderWeightDecay;
+            if (player.LastMurderWeightDecay == DateTime.MinValue)
+            {
+                player.LastMurderWeightDecay = DateTime.Now;
+            }
+            else if (elapsed.TotalDays >= 1.0)
+            {
+                int daysElapsed = (int)elapsed.TotalDays;
+                float decay = daysElapsed * GameConfig.MurderWeightDecayPerRealDay;
+                player.MurderWeight = Math.Max(0f, player.MurderWeight - decay);
+                player.LastMurderWeightDecay = DateTime.Now;
+                if (decay > 0)
+                    DebugLogger.Instance.LogInfo("BLOOD_PRICE",
+                        $"Murder weight decayed by {decay:F1} ({daysElapsed} days). Now {player.MurderWeight:F1}");
+            }
+        }
+
         // Special events based on day number
         if (currentDay % 7 == 0) // Weekly events
         {

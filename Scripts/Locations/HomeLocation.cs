@@ -469,11 +469,30 @@ terminal.SetColor("darkgray");
     {
         terminal.WriteLine("You relax in your comfortable bed...", "gray");
         await Task.Delay(1500);
-        currentPlayer.HP = currentPlayer.MaxHP;
-        currentPlayer.Mana = currentPlayer.MaxMana;
-        terminal.WriteLine("You feel completely rejuvenated!", "bright_green");
 
-        // Check for dreams during rest at home
+        // Blood Price rest penalty — dark memories reduce rest effectiveness
+        float restEfficiency = 1.0f;
+        if (currentPlayer.MurderWeight >= 6f) restEfficiency = 0.50f;
+        else if (currentPlayer.MurderWeight >= 3f) restEfficiency = 0.75f;
+
+        if (restEfficiency < 1.0f)
+        {
+            long healAmount = (long)((currentPlayer.MaxHP - currentPlayer.HP) * restEfficiency);
+            long manaAmount = (long)((currentPlayer.MaxMana - currentPlayer.Mana) * restEfficiency);
+            currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
+            currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + manaAmount);
+            terminal.WriteLine("You rest, but dark memories haunt your sleep...", "dark_red");
+            terminal.SetColor("green");
+            terminal.WriteLine($"Recovered {healAmount} HP and {manaAmount} mana.");
+        }
+        else
+        {
+            currentPlayer.HP = currentPlayer.MaxHP;
+            currentPlayer.Mana = currentPlayer.MaxMana;
+            terminal.WriteLine("You feel completely rejuvenated!", "bright_green");
+        }
+
+        // Check for dreams during rest at home (nightmares take priority)
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
         if (dream != null)
         {

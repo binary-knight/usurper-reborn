@@ -4607,16 +4607,21 @@ public class DungeonLocation : BaseLocation
 
         await Task.Delay(1500);
 
-        // Heal 25% of max HP
-        long healAmount = player.MaxHP / 4;
+        // Blood Price rest penalty — dark memories reduce rest effectiveness
+        float restEfficiency = 1.0f;
+        if (player.MurderWeight >= 6f) restEfficiency = 0.50f;
+        else if (player.MurderWeight >= 3f) restEfficiency = 0.75f;
+
+        // Heal 25% of max HP (reduced by murder weight)
+        long healAmount = (long)(player.MaxHP / 4 * restEfficiency);
         player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
 
         // Recover 25% of max Mana
-        long manaAmount = player.MaxMana / 4;
+        long manaAmount = (long)(player.MaxMana / 4 * restEfficiency);
         player.Mana = Math.Min(player.MaxMana, player.Mana + manaAmount);
 
         // Recover 25% of max Combat Stamina
-        long staminaAmount = player.MaxCombatStamina / 4;
+        long staminaAmount = (long)(player.MaxCombatStamina / 4 * restEfficiency);
         player.CurrentCombatStamina = Math.Min(player.MaxCombatStamina, player.CurrentCombatStamina + staminaAmount);
 
         terminal.WriteLine($"You recover {healAmount} hit points.");
@@ -4624,15 +4629,56 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine($"You recover {manaAmount} mana.");
         if (staminaAmount > 0)
             terminal.WriteLine($"You recover {staminaAmount} stamina.");
+
+        if (restEfficiency < 1.0f)
+        {
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("Your rest is troubled by dark memories...");
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("cyan");
         terminal.WriteLine($"HP: {player.HP}/{player.MaxHP}  MP: {player.Mana}/{player.MaxMana}  ST: {player.CurrentCombatStamina}/{player.MaxCombatStamina}");
 
         hasRestThisFloor = true;
 
-        terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.WriteLine("You feel rested, but dare not linger too long.");
+        // Check for nightmares in the dungeon
+        var dream = UsurperRemake.Systems.DreamSystem.Instance.GetDreamForRest(player, currentDungeonLevel);
+        if (dream != null)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine("As you doze, a dream takes shape...");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"=== {dream.Title} ===");
+            terminal.WriteLine("");
+
+            terminal.SetColor("magenta");
+            foreach (var line in dream.Content)
+            {
+                terminal.WriteLine($"  {line}");
+                await Task.Delay(1200);
+            }
+
+            if (!string.IsNullOrEmpty(dream.PhilosophicalHint))
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("dark_cyan");
+                terminal.WriteLine($"  ({dream.PhilosophicalHint})");
+            }
+
+            terminal.WriteLine("");
+            UsurperRemake.Systems.DreamSystem.Instance.ExperienceDream(dream.Id);
+        }
+        else
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine("You feel rested, but dare not linger too long.");
+        }
 
         await Task.Delay(2500);
         await terminal.PressAnyKey();
@@ -9586,13 +9632,19 @@ public class DungeonLocation : BaseLocation
                 var rivalChoice = await terminal.GetInput("(F)ight, (N)egotiate, or (L)eave? ");
                 if (rivalChoice.ToUpper() == "F")
                 {
+                    int rivalLevel = Math.Max(1, currentDungeonLevel);
                     var rival = Monster.CreateMonster(
-                        currentDungeonLevel, "Rival Adventurer",
-                        currentDungeonLevel * 10, currentDungeonLevel * 3, 0,
+                        rivalLevel, "Rival Adventurer",
+                        80 + rivalLevel * 38,              // HP: comparable to real NPCs (80 + level*38)
+                        10 + rivalLevel * 3,               // STR: scales with level
+                        5 + rivalLevel * 2,                // DEF: real armor value
                         "Die!", false, false, "Steel Sword", "Chain Mail",
-                        false, false, currentDungeonLevel * 3, currentDungeonLevel * 2, currentDungeonLevel * 2
+                        false, false,
+                        5 + rivalLevel * 3,                // WeapPow
+                        3 + rivalLevel * 2,                // ArmPow (left)
+                        3 + rivalLevel * 2                 // ArmPow (right)
                     );
-                    rival.Level = currentDungeonLevel;
+                    rival.Level = rivalLevel;
 
                     var combatEngine = new CombatEngine(terminal);
                     var combatResult = await combatEngine.PlayerVsMonster(player, rival, teammates);

@@ -1240,19 +1240,30 @@ public static class WizardCommandSystem
 
     private static bool HandleBroadcast(string username, string message, TerminalEmulator terminal)
     {
+        var server = MudServer.Instance;
+        if (server == null) return true;
+
         if (string.IsNullOrWhiteSpace(message))
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  Usage: /broadcast <message>");
-            return true;
-        }
-
-        var server = MudServer.Instance;
-        if (server != null)
-        {
-            server.BroadcastToAll($"\u001b[1;31m  [SYSTEM] {message}\u001b[0m");
+            // Clear the persistent broadcast
+            if (MudServer.ActiveBroadcast == null)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  No active broadcast to clear.");
+                return true;
+            }
+            MudServer.ActiveBroadcast = null;
+            server.BroadcastToAll($"\u001b[1;33m  *** Broadcast cleared ***\u001b[0m");
             terminal.SetColor("bright_green");
-            terminal.WriteLine("  Broadcast sent.");
+            terminal.WriteLine("  Broadcast cleared.");
+            LogAction(username, "broadcast", null, "Cleared");
+        }
+        else
+        {
+            MudServer.ActiveBroadcast = message;
+            server.BroadcastToAll($"\u001b[1;33m  *** {message} ***\u001b[0m");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  Broadcast set.");
             LogAction(username, "broadcast", null, message);
         }
         return true;

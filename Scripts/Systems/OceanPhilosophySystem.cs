@@ -216,6 +216,14 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void GainInsight(int points)
         {
+            // Blood Price blocks positive insight — murderers cannot awaken
+            if (points > 0)
+            {
+                var player = GameEngine.Instance?.CurrentPlayer;
+                if (player != null && player.MurderWeight > GameConfig.MurderWeightAwakeningBlock)
+                    return; // The weight of death clouds your mind
+            }
+
             // Track insight points in a simple way - affects awakening level calculation
             // Positive points move toward awakening, negative move away
             if (points > 0)

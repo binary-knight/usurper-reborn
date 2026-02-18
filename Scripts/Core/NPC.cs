@@ -84,6 +84,12 @@ public partial class NPC : Character
     public bool IsAgedDeath { get; set; } = false;
 
     /// <summary>
+    /// True if this NPC was permanently killed (combat death that stuck).
+    /// Like IsAgedDeath, the respawn system skips permadead NPCs.
+    /// </summary>
+    public bool IsPermaDead { get; set; } = false;
+
+    /// <summary>
     /// If pregnant, when the child is due (real-time DateTime). Null = not pregnant.
     /// </summary>
     public DateTime? PregnancyDueDate { get; set; } = null;
@@ -1176,6 +1182,10 @@ public partial class NPC : Character
         if (mood > 0.7f) modifier -= 0.05f;
         else if (mood < 0.3f) modifier += 0.10f;
 
-        return Math.Clamp(modifier, 0.80f, 1.20f);
+        // Blood Price markup — merchants charge more for known killers (v0.42.0)
+        if (player != null && player.MurderWeight >= GameConfig.MurderWeightShopMarkupThreshold)
+            modifier += GameConfig.MurderWeightShopMarkupPercent;
+
+        return Math.Clamp(modifier, 0.80f, 1.30f);
     }
 } 

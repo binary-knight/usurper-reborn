@@ -2013,6 +2013,28 @@ public class StreetEncounterSystem
         result.EncounterOccurred = true;
         result.Type = EncounterType.GrudgeConfrontation;
 
+        // Self-preservation: vastly outmatched NPCs may reconsider
+        int levelGap = player.Level - grudgeNpc.Level;
+        if (levelGap >= 8)
+        {
+            // Chance to back down: 10% per level above 7, capped at 80%
+            int backDownChance = Math.Min(80, (levelGap - 7) * 10);
+            if (_random.Next(100) < backDownChance)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {grudgeNpc.Name2} steps out of the shadows, fists clenched...");
+                terminal.WriteLine($"  ...then sees you clearly and hesitates.");
+                terminal.SetColor("dark_yellow");
+                terminal.WriteLine($"  The level {grudgeNpc.Level} {grudgeNpc.Class} thinks better of it and melts back into the crowd.");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  (Self-preservation overrides grudge — {levelGap} level gap)");
+                await terminal.PressAnyKey();
+                result.EncounterOccurred = false;
+                return;
+            }
+        }
+
         // Determine grudge type for different dialogue and mechanics
         bool isMurderRevenge = grudgeNpc.Memory?.HasMemoryOfEvent(MemoryType.Murdered, player.Name2, hoursAgo: 720) == true;
         bool isWitnessRevenge = !isMurderRevenge &&
@@ -2354,6 +2376,25 @@ public class StreetEncounterSystem
     {
         result.EncounterOccurred = true;
         result.Type = EncounterType.SpouseConfrontation;
+
+        // Self-preservation: vastly outmatched spouse may confront verbally but not fight
+        int spouseLevelGap = player.Level - spouse.Level;
+        if (spouseLevelGap >= 8)
+        {
+            int backDownChance = Math.Min(80, (spouseLevelGap - 7) * 10);
+            if (_random.Next(100) < backDownChance)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {spouse.Name2} storms toward you, face twisted with anger...");
+                terminal.WriteLine($"  ...then stops short, remembering who they're dealing with.");
+                terminal.SetColor("dark_yellow");
+                terminal.WriteLine($"  \"This isn't over,\" they hiss, retreating to find another way.");
+                await terminal.PressAnyKey();
+                result.EncounterOccurred = false;
+                return;
+            }
+        }
 
         // Find who the player is having an affair with (the spouse's partner)
         string partnerName = RelationshipSystem.GetSpouseName(spouse);
@@ -2780,12 +2821,13 @@ public class StreetEncounterSystem
 
         if (result.Victory)
         {
-            // === PERMANENT DEATH ===
+            // === PERMANENT DEATH (deliberate murder = always permadeath) ===
             npc.HP = 0;
             if (realNpc != null)
             {
                 realNpc.HP = 0;
                 realNpc.IsDead = true;
+                realNpc.IsPermaDead = true;  // Murder is always permanent
             }
 
             // === GOLD THEFT ===
@@ -2856,11 +2898,47 @@ public class StreetEncounterSystem
                 result.GoldGained += bountyReward;
             }
 
-            // === NEWS ===
-            NewsSystem.Instance?.Newsy($"{player.Name2} murdered {npc.Name2 ?? npc.Name} in cold blood!");
+            // === NEWS (permadeath — this one isn't coming back) ===
+            NewsSystem.Instance?.Newsy(
+                $"\u2620 {player.Name2} murdered {npc.Name2 ?? npc.Name} in cold blood! They will not return.");
 
-            // === QUEUE RESPAWN ===
-            WorldSimulator.Instance?.QueueNPCForRespawn(npc.Name);
+            // No respawn queue — deliberate murder is always permanent (IsPermaDead blocks respawn)
+
+            // === BLOOD PRICE (adjusted by bounty type) ===
+            if (realNpc != null)
+            {
+                string npcNameForBloodPrice = npc.Name2 ?? npc.Name ?? "";
+                var bountyInitiator = QuestSystem.GetActiveBountyInitiator(player.Name2, npcNameForBloodPrice);
+
+                if (bountyInitiator == GameConfig.FactionInitiatorCrown
+                    || bountyInitiator == "The Crown"   // King bounties
+                    || bountyInitiator == "Bounty Board")
+                {
+                    // Crown/King bounties are state-sanctioned — no blood price
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("  (Sanctioned kill — your conscience is clear.)");
+                }
+                else if (bountyInitiator == GameConfig.FactionInitiatorShadows)
+                {
+                    // Shadows contract — professional hit, reduced weight with chance to skip
+                    if (_random.NextDouble() < GameConfig.ShadowContractBloodPriceSkipChance)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  (A clean job. No loose ends, no guilt.)");
+                    }
+                    else
+                    {
+                        WorldSimulator.ApplyBloodPrice(player, realNpc, GameConfig.MurderWeightPerShadowContract, isDeliberate: true);
+                        terminal.SetColor("dark_red");
+                        terminal.WriteLine("  (Contract or not, you still see their face...)");
+                    }
+                }
+                else
+                {
+                    // No bounty — full blood price for unprovoked murder
+                    WorldSimulator.ApplyBloodPrice(player, realNpc, GameConfig.MurderWeightPerDeliberateMurder, isDeliberate: true);
+                }
+            }
 
             // === FACTION STANDING PENALTY ===
             if (realNpc?.NPCFaction != null)

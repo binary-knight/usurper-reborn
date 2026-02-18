@@ -1172,6 +1172,38 @@ public partial class QuestSystem : Node
     }
 
     /// <summary>
+    /// Check if a player has an active bounty/contract for a specific NPC.
+    /// Returns the initiator string (e.g. "The Crown", "The Shadows", "Bounty Board")
+    /// or null if no matching bounty exists. Used by blood price system to determine
+    /// whether a kill is justified (Crown/King bounty) or a paid hit (Shadows contract).
+    /// </summary>
+    public static string? GetActiveBountyInitiator(string playerName, string npcName)
+    {
+        if (string.IsNullOrEmpty(npcName)) return null;
+
+        // Check claimed quests first (player accepted the bounty)
+        var claimed = questDatabase.FirstOrDefault(q =>
+            !q.Deleted &&
+            !string.IsNullOrEmpty(q.TargetNPCName) &&
+            q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrEmpty(q.Occupier) &&
+            q.Occupier.Equals(playerName, StringComparison.OrdinalIgnoreCase) &&
+            (q.QuestTarget == QuestTarget.DefeatNPC));
+
+        if (claimed != null) return claimed.Initiator;
+
+        // Also check unclaimed bounties (auto-complete path)
+        var unclaimed = questDatabase.FirstOrDefault(q =>
+            !q.Deleted &&
+            !string.IsNullOrEmpty(q.TargetNPCName) &&
+            q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrEmpty(q.Occupier) &&
+            (q.QuestTarget == QuestTarget.DefeatNPC));
+
+        return unclaimed?.Initiator;
+    }
+
+    /// <summary>
     /// Remove all bounties targeting a specific NPC (when they die) and refresh the bounty board
     /// </summary>
     private static void RemoveBountiesForDeadNPC(string npcName)

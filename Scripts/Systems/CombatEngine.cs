@@ -7911,6 +7911,19 @@ public partial class CombatEngine
         var availableAbilities = ClassAbilitySystem.GetAvailableAbilities(teammate);
         if (availableAbilities == null || availableAbilities.Count == 0) return false;
 
+        // Filter out abilities the player has disabled for this companion
+        if (teammate.IsCompanion && teammate.CompanionId.HasValue)
+        {
+            var companion = UsurperRemake.Systems.CompanionSystem.Instance?.GetCompanion(teammate.CompanionId.Value);
+            if (companion?.DisabledAbilities.Count > 0)
+            {
+                availableAbilities = availableAbilities
+                    .Where(a => !companion.DisabledAbilities.Contains(a.Id))
+                    .ToList();
+                if (availableAbilities.Count == 0) return false;
+            }
+        }
+
         // Filter to abilities the teammate can afford (stamina-wise)
         var affordableAbilities = availableAbilities
             .Where(a => teammate.CurrentCombatStamina >= a.StaminaCost)
@@ -8361,18 +8374,15 @@ public partial class CombatEngine
         terminal.WriteLine("");
         await Task.Delay(1500);
 
-        // Mark the NPC as permanently dead
-        // We need to find the actual NPC in the world and mark it dead
+        // Mark the NPC as dead with permadeath roll (monster killed them — not player's fault)
         var npcId = npc.ID ?? "";
+        var deathLocation = result.Player?.CurrentLocation ?? "the dungeons";
         var worldNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
         if (worldNpc != null)
         {
-            worldNpc.IsDead = true;
-            worldNpc.HP = 0; // Ensure HP is also zero
-            DebugLogger.Instance.LogInfo("NPC", $"NPC DIED: {worldNpc.Name} (ID: {npcId}) - marked as permanently dead");
-
-            // Queue for respawn immediately
-            WorldSimulator.Instance?.QueueNPCForRespawn(worldNpc.Name);
+            WorldSimulator.Instance?.MarkNPCDead(worldNpc, GameConfig.PermadeathChancePlayerKill,
+                killerName, deathLocation);
+            DebugLogger.Instance.LogInfo("NPC", $"NPC DIED: {worldNpc.Name} (ID: {npcId}) - marked as dead (permadeath rolled)");
         }
 
         // Also mark the combat character reference

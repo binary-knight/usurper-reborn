@@ -842,10 +842,17 @@ public partial class TerminalEmulator : Control
             // In BBS door mode, the BBS software (e.g. Synchronet) echoes characters back
             // to the user through the telnet session. If the game also echoes, the user sees
             // every character twice (e.g. "dd" instead of "d").
-            // However, the BBS echoes backspace (0x7F) as the raw byte, which renders as ⌂
-            // in CP437 terminals like SyncTERM. So for backspace we must send erase sequences
-            // to clean up both the echoed glyph AND the previous character.
+            // Backspace handling is tricky: some BBSes echo 0x7F as a visible ⌂ glyph (CP437),
+            // others process it as cursor-back. We can't know which, so we use ANSI
+            // save/restore cursor to always redraw from the correct position.
             bool bbsEchoes = DoorMode.IsInDoorMode;
+
+            // Save cursor position at the start of the input area (right after prompt)
+            if (bbsEchoes)
+            {
+                Console.Out.Write("\x1b[s"); // ANSI save cursor position
+                Console.Out.Flush();
+            }
 
             // Redirected stdin (pipe) - read raw bytes, handle 0x7F/0x08 manually
             while (true)
@@ -864,25 +871,23 @@ public partial class TerminalEmulator : Control
                 }
                 else if (ch == 0x7F || ch == 0x08) // DEL or BS
                 {
-                    if (buffer.Length > 0)
-                    {
+                    bool hadContent = buffer.Length > 0;
+                    if (hadContent)
                         buffer.Remove(buffer.Length - 1, 1);
-                        if (bbsEchoes)
-                        {
-                            // BBS echoed the raw 0x7F/0x08 byte as a visible glyph (⌂).
-                            // Erase the echoed glyph, then erase the previous character.
-                            Console.Out.Write("\b \b\b \b");
-                            Console.Out.Flush();
-                        }
-                        else
-                        {
-                            Console.Out.Write("\b \b");
-                            Console.Out.Flush();
-                        }
-                    }
-                    else if (bbsEchoes)
+
+                    if (bbsEchoes)
                     {
-                        // Buffer empty but BBS still echoed the glyph — erase just the ⌂
+                        // Restore cursor to saved position (start of input area),
+                        // rewrite the current buffer, then clear to end of line.
+                        // This handles all BBS behaviors: ⌂ echo, cursor-back, or anything else.
+                        Console.Out.Write("\x1b[u");  // Restore cursor to start of input
+                        Console.Out.Write(maskPassword ? new string('*', buffer.Length) : buffer.ToString());
+                        Console.Out.Write("\x1b[K");  // Clear from cursor to end of line
+                        Console.Out.Flush();
+                    }
+                    else if (hadContent)
+                    {
+                        // Non-BBS redirected stdin: standard single backspace erase
                         Console.Out.Write("\b \b");
                         Console.Out.Flush();
                     }
@@ -1172,6 +1177,72 @@ public partial class TerminalEmulator : Control
     public async Task<string> ReadLineAsync()
     {
         return await GetInput("");
+    }
+
+    /// <summary>
+    /// Read a line of input with password masking (shows * for each character).
+    /// Works across all I/O modes: MUD stream, BBS stdio, BBS socket, and console.
+    /// </summary>
+    public async Task<string> GetMaskedInput(string prompt = "")
+    {
+        // MUD stream mode - read character by character from TCP stream
+        if (_streamWriter != null && _streamReader != null)
+        {
+            if (!string.IsNullOrEmpty(prompt))
+                Write(prompt, "bright_white");
+
+            var buffer = new System.Text.StringBuilder();
+            var charBuf = new char[1];
+
+            while (true)
+            {
+                int read = await _streamReader.ReadAsync(charBuf, 0, 1);
+                if (read == 0) break; // EOF
+
+                char ch = charBuf[0];
+                if (ch == '\r' || ch == '\n')
+                {
+                    // Consume trailing \n after \r if present
+                    if (ch == '\r' && !_streamReader.EndOfStream)
+                    {
+                        char[] peek = new char[1];
+                        // Can't easily peek StreamReader, just break on \r
+                    }
+                    _streamWriter.Write("\r\n");
+                    _streamWriter.Flush();
+                    break;
+                }
+                else if (ch == (char)0x7F || ch == (char)0x08) // DEL or BS
+                {
+                    if (buffer.Length > 0)
+                    {
+                        buffer.Remove(buffer.Length - 1, 1);
+                        _streamWriter.Write("\b \b");
+                        _streamWriter.Flush();
+                    }
+                }
+                else if (ch >= ' ') // Printable
+                {
+                    buffer.Append(ch);
+                    _streamWriter.Write('*');
+                    _streamWriter.Flush();
+                }
+            }
+            return buffer.ToString();
+        }
+
+        // BBS socket mode - delegate to BBSTerminalAdapter
+        if (ShouldUseBBSAdapter())
+        {
+            if (!string.IsNullOrEmpty(prompt))
+                BBSTerminalAdapter.Instance!.Write(prompt, "bright_white");
+            return await Task.Run(() => ReadLineWithBackspace(maskPassword: true));
+        }
+
+        // Console/stdio mode - use ReadLineWithBackspace with masking
+        if (!string.IsNullOrEmpty(prompt))
+            Write(prompt, "bright_white");
+        return await Task.Run(() => ReadLineWithBackspace(maskPassword: true));
     }
     
     public async Task<string> ReadKeyAsync()

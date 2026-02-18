@@ -443,11 +443,23 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get a dream for the player when they rest
+        /// Get a dream for the player when they rest.
+        /// Nightmares from the Blood Price take priority over normal dreams.
         /// </summary>
         public NarrativeDreamData? GetDreamForRest(Character player, int currentFloor)
         {
             _restsSinceLastDream++;
+
+            // Blood Price nightmares take priority — the dead don't wait their turn
+            if (player.MurderWeight > 0)
+            {
+                var nightmare = GetNightmare(player);
+                if (nightmare != null)
+                {
+                    _restsSinceLastDream = 0;
+                    return nightmare;
+                }
+            }
 
             // Don't dream every rest
             if (_restsSinceLastDream < 2) return null;
@@ -535,6 +547,145 @@ namespace UsurperRemake.Systems
         public void ResetDungeonVisions()
         {
             SeenDungeonVisions.Clear();
+        }
+
+        // ====== BLOOD PRICE NIGHTMARES ======
+        // These override normal dreams when the player carries murder weight.
+        // {VICTIM} is replaced at runtime with a real name from the PermakillLog.
+
+        private static readonly List<(int tier, float triggerChance, NarrativeDreamData dream)> Nightmares = new()
+        {
+            // --- TIER 1: Weight 1-2 — unease, no mechanical penalty ---
+            (1, 0.30f, new NarrativeDreamData
+            {
+                Id = "nightmare_shadows",
+                Title = "Shadows in the Corner",
+                Content = new[] {
+                    "You sleep, but something watches.",
+                    "Every time you turn, the shadows move wrong. Not with you. Against you.",
+                    "There's a shape in the corner of the room. Standing still.",
+                    "You tell yourself it isn't real. You almost believe it."
+                },
+                PhilosophicalHint = "The shadow didn't move when you did."
+            }),
+            (1, 0.30f, new NarrativeDreamData
+            {
+                Id = "nightmare_hands",
+                Title = "Red Hands",
+                Content = new[] {
+                    "You look down at your hands in the dream.",
+                    "They're clean. You scrub them anyway.",
+                    "The water in the basin turns red. Your hands are still clean.",
+                    "You keep scrubbing."
+                },
+                PhilosophicalHint = "Clean hands. Dirty water."
+            }),
+
+            // --- TIER 2: Weight 3-5 — uses {VICTIM}, rest penalty starts ---
+            (2, 0.60f, new NarrativeDreamData
+            {
+                Id = "nightmare_face",
+                Title = "A Face You Know",
+                Content = new[] {
+                    "The dream starts like any other. A road. A town. Nothing wrong.",
+                    "Then you see {VICTIM} standing at the end of the street.",
+                    "They don't speak. They just look at you.",
+                    "You try to walk past but the street keeps stretching. They never get closer.",
+                    "They never look away."
+                },
+                AwakeningGain = -1,
+                PhilosophicalHint = "They were waiting for you."
+            }),
+            (2, 0.60f, new NarrativeDreamData
+            {
+                Id = "nightmare_chair",
+                Title = "The Empty Chair",
+                Content = new[] {
+                    "You dream of the Inn. Everyone is there. Laughing, talking.",
+                    "There's an empty chair at the table. Nobody sits in it.",
+                    "You ask who it belongs to. Everyone stops talking.",
+                    "'{VICTIM},' someone says. 'Don't you remember?'",
+                    "You wake up before they finish the sentence."
+                },
+                AwakeningGain = -1,
+                PhilosophicalHint = "The chair is always empty now."
+            }),
+
+            // --- TIER 3: Weight 6+ — vivid, repeatable, punishing ---
+            (3, 0.85f, new NarrativeDreamData
+            {
+                Id = "nightmare_trial",
+                Title = "The Trial",
+                Content = new[] {
+                    "You stand in a courtroom made of bone.",
+                    "The jury is everyone you've ever known. None of them look at you.",
+                    "{VICTIM} sits in the witness chair. They speak without moving their mouth.",
+                    "'Tell them what you did,' they say. 'Tell them why.'",
+                    "You open your mouth to answer and nothing comes out.",
+                    "The verdict comes anyway."
+                },
+                AwakeningGain = -1,
+                PhilosophicalHint = "There was no defense to offer."
+            }),
+            (3, 0.85f, new NarrativeDreamData
+            {
+                Id = "nightmare_echo",
+                Title = "The Echo",
+                Content = new[] {
+                    "You hear your own voice in the dream, but it's coming from somewhere else.",
+                    "It's saying the things you said before {VICTIM} died.",
+                    "The words sound different now. Smaller. Uglier.",
+                    "You try to stop listening but it's your own voice.",
+                    "It doesn't stop."
+                },
+                AwakeningGain = -1,
+                PhilosophicalHint = "You heard yourself clearly for the first time."
+            }),
+        };
+
+        /// <summary>
+        /// Select a nightmare based on the player's murder weight tier.
+        /// Tier 3 nightmares can repeat. Tier 1-2 nightmares are one-time only.
+        /// </summary>
+        private NarrativeDreamData? GetNightmare(Character player)
+        {
+            if (player.MurderWeight <= 0) return null;
+
+            int tier;
+            if (player.MurderWeight >= 6) tier = 3;
+            else if (player.MurderWeight >= 3) tier = 2;
+            else tier = 1;
+
+            var rng = new Random();
+
+            // Get nightmares for this tier (and lower tiers)
+            var candidates = Nightmares
+                .Where(n => n.tier <= tier)
+                .Where(n => n.tier == 3 || !ExperiencedDreams.Contains(n.dream.Id)) // Tier 3 can repeat
+                .ToList();
+
+            if (candidates.Count == 0) return null;
+
+            // Pick a random candidate and check its trigger chance
+            var pick = candidates[rng.Next(candidates.Count)];
+            if (rng.NextDouble() > pick.triggerChance) return null;
+
+            // Replace {VICTIM} placeholder with a real name from the kill log
+            var dream = pick.dream;
+            if (player.PermakillLog.Count > 0)
+            {
+                string victim = player.PermakillLog[rng.Next(player.PermakillLog.Count)];
+                dream = new NarrativeDreamData
+                {
+                    Id = dream.Id,
+                    Title = dream.Title,
+                    Content = dream.Content.Select(line => line.Replace("{VICTIM}", victim)).ToArray(),
+                    AwakeningGain = dream.AwakeningGain,
+                    PhilosophicalHint = dream.PhilosophicalHint.Replace("{VICTIM}", victim),
+                };
+            }
+
+            return dream;
         }
 
         /// <summary>

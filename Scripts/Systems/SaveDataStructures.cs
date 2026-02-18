@@ -155,6 +155,12 @@ namespace UsurperRemake.Systems
         public int BaseStatsMagicPower { get; set; }
         public int BaseStatsSpeed { get; set; }
         public int BaseStatsHealingPower { get; set; }
+
+        // Equipment (slot enum int -> equipment database ID)
+        public Dictionary<int, int> EquippedItemsSave { get; set; } = new();
+
+        // Disabled ability IDs
+        public List<string> DisabledAbilities { get; set; } = new();
     }
 
     public class CompanionDeathInfo
@@ -302,6 +308,11 @@ namespace UsurperRemake.Systems
         public string BetrayedForGodName { get; set; } = ""; // The god player sacrificed to instead
         public bool DivineWrathPending { get; set; }        // Has punishment triggered yet?
         public int DivineWrathTurnsRemaining { get; set; }  // Turns until wrath fades
+
+        // Blood Price / Murder Weight System (v0.42.0)
+        public float MurderWeight { get; set; }
+        public List<string> PermakillLog { get; set; } = new();
+        public DateTime LastMurderWeightDecay { get; set; } = DateTime.MinValue;
 
         // Dev menu flag - permanently disables Steam achievements
         public bool DevMenuUsed { get; set; }
@@ -538,6 +549,7 @@ namespace UsurperRemake.Systems
         public int Age { get; set; }
         public DateTime BirthDate { get; set; } = DateTime.MinValue;
         public bool IsAgedDeath { get; set; }
+        public bool IsPermaDead { get; set; }  // Permanent combat death (v0.42.0)
         public DateTime? PregnancyDueDate { get; set; }
 
         // Dialogue tracking - prevents repetition across sessions
@@ -1261,11 +1273,46 @@ namespace UsurperRemake.Systems
         public int KingTaxPercent { get; set; } = 5;
         public int CityTaxPercent { get; set; } = 2;
         public string DesignatedHeir { get; set; } = "";
+        public int KingAI { get; set; } = 1; // CharacterAI: 0=Human, 1=Computer
+        public int KingSex { get; set; } = 0; // CharacterSex
 
         public List<CourtMemberSaveData> CourtMembers { get; set; } = new();
         public List<RoyalHeirSaveData> Heirs { get; set; } = new();
         public RoyalSpouseSaveData? Spouse { get; set; }
         public List<CourtIntrigueSaveData> ActivePlots { get; set; } = new();
+        public List<RoyalGuardSaveData> Guards { get; set; } = new();
+        public List<MonsterGuardSaveData> MonsterGuards { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Save data for a royal NPC guard
+    /// </summary>
+    public class RoyalGuardSaveData
+    {
+        public string Name { get; set; } = "";
+        public int AI { get; set; }
+        public int Sex { get; set; }
+        public long DailySalary { get; set; }
+        public int Loyalty { get; set; } = 100;
+        public bool IsActive { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Save data for a moat monster guard
+    /// </summary>
+    public class MonsterGuardSaveData
+    {
+        public string Name { get; set; } = "";
+        public int Level { get; set; }
+        public long HP { get; set; }
+        public long MaxHP { get; set; }
+        public long Strength { get; set; }
+        public long Defence { get; set; }
+        public long WeapPow { get; set; }
+        public long ArmPow { get; set; }
+        public string MonsterType { get; set; } = "";
+        public long PurchaseCost { get; set; }
+        public long DailyFeedingCost { get; set; }
     }
 
     /// <summary>

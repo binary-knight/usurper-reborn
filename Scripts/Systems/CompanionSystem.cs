@@ -553,19 +553,8 @@ namespace UsurperRemake.Systems
                 var charWrapper = new Character
                 {
                     Name2 = companion.Name,
-                    Level = companion.Level, // Use companion's actual level (now dynamic)
-                    HP = companionCurrentHP[companion.Id],
-                    MaxHP = companion.BaseStats.HP,
-                    Strength = companion.BaseStats.Attack,
-                    Defence = companion.BaseStats.Defense,
-                    Dexterity = companion.BaseStats.Speed,
-                    Intelligence = companion.BaseStats.MagicPower,
-                    Wisdom = companion.BaseStats.HealingPower,
-                    WeapPow = companion.BaseStats.Attack / 2,
-                    ArmPow = companion.BaseStats.Defense / 2,
-                    Healing = companion.HealingPotions, // Copy healing potions
-                    Mana = companion.BaseStats.MagicPower * 5, // Mana for spellcasting
-                    MaxMana = companion.BaseStats.MagicPower * 5,
+                    Level = companion.Level,
+                    Healing = companion.HealingPotions,
                     Class = companion.CombatRole switch
                     {
                         CombatRole.Tank => CharacterClass.Warrior,
@@ -573,8 +562,34 @@ namespace UsurperRemake.Systems
                         CombatRole.Damage => CharacterClass.Assassin,
                         CombatRole.Hybrid => CharacterClass.Paladin,
                         _ => CharacterClass.Warrior
-                    }
+                    },
+                    // Initialize Base* fields for RecalculateStats
+                    BaseStrength = companion.BaseStats.Attack,
+                    BaseDefence = companion.BaseStats.Defense,
+                    BaseDexterity = companion.BaseStats.Speed,
+                    BaseAgility = companion.BaseStats.Speed,
+                    BaseIntelligence = companion.BaseStats.MagicPower,
+                    BaseWisdom = companion.BaseStats.HealingPower,
+                    BaseCharisma = 10,
+                    BaseConstitution = 10 + companion.Level,
+                    BaseStamina = 10 + companion.Level,
+                    BaseMaxHP = companion.BaseStats.HP,
+                    BaseMaxMana = companion.BaseStats.MagicPower * 5
                 };
+
+                // Copy companion's equipment to the character wrapper
+                if (companion.EquippedItems.Count > 0)
+                {
+                    foreach (var kvp in companion.EquippedItems)
+                        charWrapper.EquippedItems[kvp.Key] = kvp.Value;
+                }
+
+                // RecalculateStats applies equipment bonuses on top of Base* values
+                charWrapper.RecalculateStats();
+
+                // Restore tracked combat HP (don't heal to full mid-combat)
+                charWrapper.HP = companionCurrentHP[companion.Id];
+                charWrapper.Mana = companion.BaseStats.MagicPower * 5;
 
                 // Store companion ID in the character for tracking
                 charWrapper.CompanionId = companion.Id;
@@ -847,6 +862,46 @@ namespace UsurperRemake.Systems
             companion.IsActive = false;
             companion.DeathType = type;
 
+            // Return companion's equipment to player inventory
+            if (companion.EquippedItems.Count > 0)
+            {
+                var player = GameEngine.Instance?.CurrentPlayer;
+                if (player != null)
+                {
+                    int itemsReturned = 0;
+                    foreach (var kvp in companion.EquippedItems)
+                    {
+                        if (kvp.Value <= 0) continue;
+                        var equipment = EquipmentDatabase.GetById(kvp.Value);
+                        if (equipment != null)
+                        {
+                            player.Inventory.Add(new global::Item
+                            {
+                                Name = equipment.Name,
+                                Type = ObjType.Magic,
+                                Value = equipment.Value,
+                                Attack = equipment.WeaponPower,
+                                Armor = equipment.ArmorClass,
+                                Strength = equipment.StrengthBonus,
+                                Dexterity = equipment.DexterityBonus,
+                                HP = equipment.MaxHPBonus,
+                                Mana = equipment.MaxManaBonus,
+                                Defence = equipment.DefenceBonus,
+                                IsCursed = equipment.IsCursed,
+                                MinLevel = equipment.MinLevel
+                            });
+                            itemsReturned++;
+                        }
+                    }
+                    companion.EquippedItems.Clear();
+                    if (itemsReturned > 0 && terminal != null)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"\n{companion.Name}'s equipment ({itemsReturned} item{(itemsReturned != 1 ? "s" : "")}) has been returned to your inventory.");
+                    }
+                }
+            }
+
             activeCompanions.Remove(id);
 
             fallenCompanions[id] = new CompanionDeath
@@ -1021,6 +1076,38 @@ namespace UsurperRemake.Systems
             companion.IsActive = false;
             companion.DeathType = DeathType.ChoiceBased;
 
+            // Return companion's equipment to player inventory
+            if (companion.EquippedItems.Count > 0)
+            {
+                var player = GameEngine.Instance?.CurrentPlayer;
+                if (player != null)
+                {
+                    int itemsReturned = 0;
+                    foreach (var kvp in companion.EquippedItems)
+                    {
+                        if (kvp.Value <= 0) continue;
+                        var equipment = EquipmentDatabase.GetById(kvp.Value);
+                        if (equipment != null)
+                        {
+                            player.Inventory.Add(new global::Item
+                            {
+                                Name = equipment.Name,
+                                Type = ObjType.Magic,
+                                Value = equipment.Value,
+                                Attack = equipment.WeaponPower,
+                                Armor = equipment.ArmorClass
+                            });
+                            itemsReturned++;
+                        }
+                    }
+                    companion.EquippedItems.Clear();
+                    if (itemsReturned > 0)
+                    {
+                        pendingNotifications.Enqueue($"{companion.Name}'s equipment ({itemsReturned} item{(itemsReturned != 1 ? "s" : "")}) has been returned to your inventory.");
+                    }
+                }
+            }
+
             activeCompanions.Remove(companion.Id);
 
             fallenCompanions[companion.Id] = new CompanionDeath
@@ -1040,8 +1127,6 @@ namespace UsurperRemake.Systems
             OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.CompanionSacrifice);
 
             OnCompanionDeath?.Invoke(companion.Id, DeathType.ChoiceBased);
-
-            // GD.Print($"[Companion] {companionName} died from moral paradox choice");
         }
 
         #endregion
@@ -1270,7 +1355,9 @@ namespace UsurperRemake.Systems
                     BaseStatsDefense = c.BaseStats.Defense,
                     BaseStatsMagicPower = c.BaseStats.MagicPower,
                     BaseStatsSpeed = c.BaseStats.Speed,
-                    BaseStatsHealingPower = c.BaseStats.HealingPower
+                    BaseStatsHealingPower = c.BaseStats.HealingPower,
+                    EquippedItemsSave = c.EquippedItems.ToDictionary(kvp => (int)kvp.Key, kvp => kvp.Value),
+                    DisabledAbilities = c.DisabledAbilities.ToList()
                 }).ToList(),
                 ActiveCompanions = activeCompanions.ToList(),
                 FallenCompanions = fallenCompanions.Values.ToList()
@@ -1297,6 +1384,8 @@ namespace UsurperRemake.Systems
                 companion.PersonalQuestSuccess = false;
                 companion.RecruitedDay = 0;
                 companion.History.Clear();
+                companion.EquippedItems.Clear();
+                companion.DisabledAbilities.Clear();
                 companion.Level = Math.Max(1, companion.RecruitLevel + 5);
                 companion.Experience = GetExperienceForLevel(companion.Level);
             }
@@ -1371,6 +1460,22 @@ namespace UsurperRemake.Systems
                         // First reset to original defaults, then scale
                         ResetCompanionToBaseStats(companion);
                         ScaleCompanionStatsToLevel(companion);
+                    }
+
+                    // Restore equipment
+                    companion.EquippedItems.Clear();
+                    if (save.EquippedItemsSave != null)
+                    {
+                        foreach (var kvp in save.EquippedItemsSave)
+                            companion.EquippedItems[(EquipmentSlot)kvp.Key] = kvp.Value;
+                    }
+
+                    // Restore disabled abilities
+                    companion.DisabledAbilities.Clear();
+                    if (save.DisabledAbilities != null)
+                    {
+                        foreach (var id in save.DisabledAbilities)
+                            companion.DisabledAbilities.Add(id);
                     }
                 }
             }
@@ -1817,6 +1922,13 @@ namespace UsurperRemake.Systems
         public int HealingPotions { get; set; } = 0;
         public int MaxHealingPotions => 5 + Level;
 
+        // Equipment system - maps slot to equipment database ID (same as Character.EquippedItems)
+        public Dictionary<EquipmentSlot, int> EquippedItems { get; set; } = new();
+
+        // Disabled abilities - player can toggle off specific abilities via Inn menu
+        // Companion AI will skip any ability whose Id is in this set
+        public HashSet<string> DisabledAbilities { get; set; } = new();
+
         public List<CompanionEvent> History { get; set; } = new();
 
         public void AddHistory(CompanionEvent evt)
@@ -1896,6 +2008,12 @@ namespace UsurperRemake.Systems
         public int BaseStatsMagicPower { get; set; }
         public int BaseStatsSpeed { get; set; }
         public int BaseStatsHealingPower { get; set; }
+
+        // Equipment (slot enum int -> equipment database ID)
+        public Dictionary<int, int> EquippedItemsSave { get; set; } = new();
+
+        // Disabled ability IDs
+        public List<string> DisabledAbilities { get; set; } = new();
     }
 
     #endregion

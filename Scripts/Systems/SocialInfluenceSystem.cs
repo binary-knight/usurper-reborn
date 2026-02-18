@@ -565,7 +565,11 @@ public class SocialInfluenceSystem
     public void ProcessPlayerReputationSpread(List<NPC> npcs, string playerName, int currentTick)
     {
         if (string.IsNullOrEmpty(playerName)) return;
-        if (_random.NextDouble() > 0.05) return; // 5% per tick — faster than NPC gossip
+
+        // Blood Price: murder news travels twice as fast
+        var player = GameEngine.Instance?.CurrentPlayer;
+        float spreadChance = (player != null && player.MurderWeight > 0) ? 0.10f : 0.05f;
+        if (_random.NextDouble() > spreadChance) return; // 5% normally, 10% for killers
 
         // Find an NPC who has a strong impression of the player
         var spreaders = npcs.Where(n =>

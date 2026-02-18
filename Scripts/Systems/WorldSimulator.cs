@@ -333,8 +333,8 @@ public class WorldSimulator
             SocialInfluenceSystem.Instance?.ProcessPlayerReputationSpread(npcs, currentPlayer.Name, _currentTick);
 
         // Track dead NPCs for respawn (check both HP <= 0 and IsDead flag)
-        // Skip age-dead NPCs - their soul has moved on, no respawn
-        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath))
+        // Skip age-dead and perma-dead NPCs - they don't come back
+        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead))
         {
             if (!deadNPCRespawnTimers.ContainsKey(npc.Name))
             {
@@ -431,6 +431,124 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// Roll whether an NPC death becomes permanent. Story NPCs and population-floor-protected NPCs are exempt.
+    /// </summary>
+    /// <param name="npc">The NPC who died</param>
+    /// <param name="baseChance">Base permadeath chance (0.0 to 1.0)</param>
+    /// <returns>True if the death should be permanent</returns>
+    public bool RollPermadeath(NPC npc, float baseChance)
+    {
+        if (npc == null) return false;
+
+        // Story NPCs are always exempt
+        if (npc.IsStoryNPC) return false;
+
+        // Population floor — don't let the world get too empty
+        int aliveCount = npcs.Count(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead);
+        if (aliveCount < GameConfig.PermadeathPopulationFloor) return false;
+
+        // Higher-level NPCs are harder to permanently kill
+        float levelReduction = npc.Level * GameConfig.PermadeathLevelReduction;
+        float finalChance = Math.Max(0.01f, baseChance * (1f - levelReduction));
+
+        return random.NextDouble() < finalChance;
+    }
+
+    /// <summary>
+    /// Handle an NPC death with permadeath roll. Replaces the old IsDead=true + QueueNPCForRespawn pattern.
+    /// </summary>
+    /// <param name="npc">The NPC who died</param>
+    /// <param name="basePermadeathChance">Base permadeath chance for this death context</param>
+    /// <param name="killerName">Who killed them (for news)</param>
+    /// <param name="location">Where they died</param>
+    /// <returns>True if the death was permanent</returns>
+    public bool MarkNPCDead(NPC npc, float basePermadeathChance, string killerName, string location)
+    {
+        if (npc == null) return false;
+
+        npc.IsDead = true;
+        npc.HP = 0;
+        CheckKingDeath(npc);
+
+        bool permadeath = RollPermadeath(npc, basePermadeathChance);
+        if (permadeath)
+        {
+            npc.IsPermaDead = true;
+            deadNPCRespawnTimers.Remove(npc.Name);
+
+            // Big news — this one isn't coming back
+            NewsSystem.Instance?.Newsy(
+                $"\u2620 {npc.Name} has been slain by {killerName} and will not return. The realm mourns.");
+
+            // Witnesses record the permanent death
+            SocialInfluenceSystem.RecordWitnesses(npcs, location,
+                killerName, npc.Name2 ?? npc.Name, WitnessEventType.SawMurder);
+
+            DebugLogger.Instance.LogInfo("PERMADEATH", $"{npc.Name} permanently killed by {killerName} (chance was {basePermadeathChance:P0})");
+        }
+        else
+        {
+            QueueNPCForRespawn(npc.Name);
+            NewsSystem.Instance.WriteDeathNews(npc.Name, killerName, location);
+        }
+
+        return permadeath;
+    }
+
+    /// <summary>
+    /// Apply blood price consequences to a player who caused a permanent NPC death.
+    /// Only for player-initiated kills (deliberate murder, dark magic). Self-defense carries no blood price.
+    /// </summary>
+    public static void ApplyBloodPrice(Character player, NPC victim, float weight, bool isDeliberate)
+    {
+        if (player == null || victim == null) return;
+
+        // Check if the NPC was well-liked by others — extra guilt
+        float avgImpression = 0f;
+        var activeNPCs = NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (activeNPCs != null)
+        {
+            var impressions = activeNPCs
+                .Where(n => n != victim && n.IsAlive && !n.IsDead)
+                .Select(n => n.Memory?.GetCharacterImpression(victim.Name2 ?? victim.Name) ?? 0f)
+                .ToList();
+            if (impressions.Count > 0)
+                avgImpression = impressions.Average();
+        }
+
+        float totalWeight = weight;
+        if (avgImpression > 0.3f)
+            totalWeight += GameConfig.MurderWeightLikedNPCBonus;
+
+        player.MurderWeight += totalWeight;
+
+        // Log the victim's name (cap at 20 entries)
+        string victimName = victim.DisplayName ?? victim.Name2 ?? victim.Name;
+        if (player.PermakillLog.Count < 20)
+            player.PermakillLog.Add(victimName);
+
+        // Darkness increase proportional to weight
+        player.Darkness += (long)(totalWeight * 10);
+
+        // Reduce all active companion loyalty
+        var companionSystem = CompanionSystem.Instance;
+        if (companionSystem != null)
+        {
+            int loyaltyLoss = isDeliberate ? GameConfig.CompanionLossPerMurder : 5;
+            foreach (CompanionId id in Enum.GetValues(typeof(CompanionId)))
+            {
+                var companion = companionSystem.GetCompanion(id);
+                if (companion != null && companion.IsActive)
+                    companionSystem.ModifyLoyalty(id, -loyaltyLoss, $"witnessed the death of {victimName}");
+            }
+        }
+
+        DebugLogger.Instance.LogInfo("BLOOD_PRICE",
+            $"Player murder weight: {player.MurderWeight:F1} (+{totalWeight:F1}) for {victimName}" +
+            (isDeliberate ? " (DELIBERATE)" : " (combat)"));
+    }
+
+    /// <summary>
     /// Force immediate processing of dead NPCs - call after loading a save
     /// This ensures dead NPCs start their respawn timers immediately and
     /// respawn NPCs that have been dead for a while (based on save data)
@@ -450,7 +568,8 @@ public class WorldSimulator
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("NPC", $"ProcessDeadNPCsOnLoad: Found {deadCount} dead NPCs out of {npcs.Count} total");
 
         // Find all dead NPCs and add them to the respawn queue
-        foreach (var npc in npcs.Where(n => !n.IsAlive || n.IsDead))
+        // Skip permanently dead NPCs (aged death and permadeath)
+        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead))
         {
             if (!deadNPCRespawnTimers.ContainsKey(npc.Name))
             {
@@ -487,8 +606,8 @@ public class WorldSimulator
             var npc = npcs.FirstOrDefault(n => n.Name == npcName);
             if (npc != null)
             {
-                // Age death is permanent - the soul has moved on, never respawn
-                if (npc.IsAgedDeath)
+                // Age death and permadeath are permanent - they don't come back
+                if (npc.IsAgedDeath || npc.IsPermaDead)
                 {
                     deadNPCRespawnTimers.Remove(npcName);
                     continue;
@@ -1945,17 +2064,14 @@ public class WorldSimulator
         }
         else
         {
-            // Team lost - check for deaths
+            // Team lost - check for deaths (permadeath roll per member)
             var dead = teamMembers.Where(m => !m.IsAlive).ToList();
             if (dead.Any())
             {
                 var killerName = monsters.FirstOrDefault()?.Name ?? "dungeon monsters";
                 foreach (var deadMember in dead)
                 {
-                    deadMember.IsDead = true;
-                    QueueNPCForRespawn(deadMember.Name);
-                    CheckKingDeath(deadMember);
-                    NewsSystem.Instance.WriteDeathNews(deadMember.Name, killerName, "the Dungeon");
+                    MarkNPCDead(deadMember, GameConfig.PermadeathChanceDungeonTeam, killerName, "the Dungeon");
                 }
                 GD.Print($"[WorldSim] Team '{npc.Team}' was defeated! {dead.Count} members died");
             }
@@ -2101,11 +2217,8 @@ public class WorldSimulator
         }
         else if (!npc.IsAlive)
         {
-            // NPC died - mark as dead and queue for respawn
-            npc.IsDead = true;
-            QueueNPCForRespawn(npc.Name);
-            CheckKingDeath(npc);
-            NewsSystem.Instance.WriteDeathNews(npc.Name, monster.Name, "the Dungeon");
+            // NPC died in solo dungeon crawl — permadeath roll
+            MarkNPCDead(npc, GameConfig.PermadeathChanceDungeonSolo, monster.Name, "the Dungeon");
             GD.Print($"[WorldSim] {npc.Name} was slain by {monster.Name} in the dungeon!");
         }
         else
@@ -3192,10 +3305,8 @@ public class WorldSimulator
 
         if (!target.IsAlive)
         {
-            target.IsDead = true;
             target.SetState(NPCState.Dead);
-            QueueNPCForRespawn(target.Name);
-            CheckKingDeath(target);
+            MarkNPCDead(target, GameConfig.PermadeathChanceNPCvsNPC, npc.Name, npc.CurrentLocation ?? "unknown");
             npc.Brain?.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.SawDeath,
@@ -3204,9 +3315,6 @@ public class WorldSimulator
                 Importance = 0.9f,
                 Location = npc.CurrentLocation
             });
-
-            // Generate news about the killing
-            NewsSystem.Instance.WriteDeathNews(target.Name, npc.Name, npc.CurrentLocation ?? "unknown");
 
             // Victor gains gold from the fallen
             long stolenGold = Math.Max(0, target.Gold / 4);
@@ -3221,10 +3329,8 @@ public class WorldSimulator
         else if (!npc.IsAlive)
         {
             // Attacker died instead!
-            npc.IsDead = true;
             npc.SetState(NPCState.Dead);
-            QueueNPCForRespawn(npc.Name);
-            CheckKingDeath(npc);
+            MarkNPCDead(npc, GameConfig.PermadeathChanceNPCvsNPC, target.Name, target.CurrentLocation ?? "unknown");
             target.Brain?.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.SawDeath,
@@ -3234,7 +3340,6 @@ public class WorldSimulator
                 Location = target.CurrentLocation
             });
 
-            NewsSystem.Instance.WriteDeathNews(npc.Name, target.Name, target.CurrentLocation ?? "unknown");
             GD.Print($"[WorldSim] {npc.Name} was killed by {target.Name} in combat ({rounds} rounds)!");
         }
     }
@@ -3955,10 +4060,7 @@ public class WorldSimulator
 
                 if (!target.IsAlive)
                 {
-                    target.IsDead = true;
-                    QueueNPCForRespawn(target.Name);
-                    CheckKingDeath(target);
-                    NewsSystem.Instance.WriteDeathNews(target.Name, attacker.Name, target.CurrentLocation ?? "battle");
+                    MarkNPCDead(target, GameConfig.PermadeathChanceTeamWar, attacker.Name, target.CurrentLocation ?? "battle");
                 }
             }
 
@@ -3974,10 +4076,7 @@ public class WorldSimulator
 
                 if (!target.IsAlive)
                 {
-                    target.IsDead = true;
-                    QueueNPCForRespawn(target.Name);
-                    CheckKingDeath(target);
-                    NewsSystem.Instance.WriteDeathNews(target.Name, attacker.Name, target.CurrentLocation ?? "battle");
+                    MarkNPCDead(target, GameConfig.PermadeathChanceTeamWar, attacker.Name, target.CurrentLocation ?? "battle");
                 }
             }
         }

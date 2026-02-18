@@ -488,6 +488,11 @@ namespace UsurperRemake.Systems
                 DivineWrathPending = player.DivineWrathPending,
                 DivineWrathTurnsRemaining = player.DivineWrathTurnsRemaining,
 
+                // Blood Price / Murder Weight System
+                MurderWeight = player.MurderWeight,
+                PermakillLog = player.PermakillLog ?? new(),
+                LastMurderWeightDecay = player.LastMurderWeightDecay,
+
                 // Combat statistics (kill/death counts)
                 MKills = (int)player.MKills,
                 MDefeats = (int)player.MDefeats,
@@ -802,6 +807,7 @@ namespace UsurperRemake.Systems
                     Age = npc.Age,
                     BirthDate = npc.BirthDate,
                     IsAgedDeath = npc.IsAgedDeath,
+                    IsPermaDead = npc.IsPermaDead,
                     PregnancyDueDate = npc.PregnancyDueDate,
 
                     // Dialogue tracking
@@ -1375,7 +1381,9 @@ namespace UsurperRemake.Systems
                     BaseStatsDefense = c.BaseStatsDefense,
                     BaseStatsMagicPower = c.BaseStatsMagicPower,
                     BaseStatsSpeed = c.BaseStatsSpeed,
-                    BaseStatsHealingPower = c.BaseStatsHealingPower
+                    BaseStatsHealingPower = c.BaseStatsHealingPower,
+                    EquippedItemsSave = c.EquippedItemsSave,
+                    DisabledAbilities = c.DisabledAbilities
                 }).ToList();
 
                 data.ActiveCompanionIds = companionData.ActiveCompanions.Select(c => (int)c).ToList();
@@ -1486,9 +1494,37 @@ namespace UsurperRemake.Systems
                             IsDiscovered = p.IsDiscovered
                         }).ToList(),
 
-                        DesignatedHeir = king.DesignatedHeir ?? ""
+                        DesignatedHeir = king.DesignatedHeir ?? "",
+                        KingAI = (int)king.AI,
+                        KingSex = (int)king.Sex,
+
+                        // Guards and monsters
+                        Guards = king.Guards?.Select(g => new RoyalGuardSaveData
+                        {
+                            Name = g.Name,
+                            AI = (int)g.AI,
+                            Sex = (int)g.Sex,
+                            DailySalary = g.DailySalary,
+                            Loyalty = g.Loyalty,
+                            IsActive = g.IsActive
+                        }).ToList() ?? new List<RoyalGuardSaveData>(),
+
+                        MonsterGuards = king.MonsterGuards?.Select(m => new MonsterGuardSaveData
+                        {
+                            Name = m.Name,
+                            Level = m.Level,
+                            HP = m.HP,
+                            MaxHP = m.MaxHP,
+                            Strength = m.Strength,
+                            Defence = m.Defence,
+                            WeapPow = m.WeapPow,
+                            ArmPow = m.ArmPow,
+                            MonsterType = m.MonsterType,
+                            PurchaseCost = m.PurchaseCost,
+                            DailyFeedingCost = m.DailyFeedingCost
+                        }).ToList() ?? new List<MonsterGuardSaveData>()
                     };
-                    GD.Print($"[SaveSystem] Saved royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.ActivePlots.Count} plots");
+                    GD.Print($"[SaveSystem] Saved royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.Guards.Count} guards, {king.MonsterGuards.Count} monsters");
                 }
             }
             catch (Exception ex)
@@ -1755,7 +1791,9 @@ namespace UsurperRemake.Systems
                             BaseStatsDefense = c.BaseStatsDefense,
                             BaseStatsMagicPower = c.BaseStatsMagicPower,
                             BaseStatsSpeed = c.BaseStatsSpeed,
-                            BaseStatsHealingPower = c.BaseStatsHealingPower
+                            BaseStatsHealingPower = c.BaseStatsHealingPower,
+                            EquippedItemsSave = c.EquippedItemsSave ?? new Dictionary<int, int>(),
+                            DisabledAbilities = c.DisabledAbilities ?? new List<string>()
                         }).ToList() ?? new List<CompanionSaveData>(),
 
                         ActiveCompanions = data.ActiveCompanionIds?.Select(id => (CompanionId)id).ToList() ?? new List<CompanionId>(),
@@ -1882,7 +1920,40 @@ namespace UsurperRemake.Systems
 
                         king.DesignatedHeir = data.RoyalCourt.DesignatedHeir;
 
-                        GD.Print($"[SaveSystem] Restored royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.ActivePlots.Count} plots");
+                        // Restore guards
+                        if (data.RoyalCourt.Guards != null && data.RoyalCourt.Guards.Count > 0)
+                        {
+                            king.Guards = data.RoyalCourt.Guards.Select(g => new RoyalGuard
+                            {
+                                Name = g.Name,
+                                AI = (CharacterAI)g.AI,
+                                Sex = (CharacterSex)g.Sex,
+                                DailySalary = g.DailySalary,
+                                Loyalty = g.Loyalty,
+                                IsActive = g.IsActive
+                            }).ToList();
+                        }
+
+                        // Restore monster guards
+                        if (data.RoyalCourt.MonsterGuards != null && data.RoyalCourt.MonsterGuards.Count > 0)
+                        {
+                            king.MonsterGuards = data.RoyalCourt.MonsterGuards.Select(m => new MonsterGuard
+                            {
+                                Name = m.Name,
+                                Level = m.Level,
+                                HP = m.HP,
+                                MaxHP = m.MaxHP,
+                                Strength = m.Strength,
+                                Defence = m.Defence,
+                                WeapPow = m.WeapPow,
+                                ArmPow = m.ArmPow,
+                                MonsterType = m.MonsterType,
+                                PurchaseCost = m.PurchaseCost,
+                                DailyFeedingCost = m.DailyFeedingCost
+                            }).ToList();
+                        }
+
+                        GD.Print($"[SaveSystem] Restored royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.Guards.Count} guards, {king.MonsterGuards.Count} monsters");
                     }
                 }
             }

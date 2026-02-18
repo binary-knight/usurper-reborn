@@ -1501,6 +1501,7 @@ public class CastleLocation : BaseLocation
                 terminal.WriteLine($"A {name} has been added to your castle defenses!");
                 terminal.WriteLine($"The beast now lurks in the moat, awaiting intruders...");
                 NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} acquired a fearsome {name} to guard the castle!");
+                PersistRoyalCourtToWorldState();
             }
             else
             {
@@ -1531,6 +1532,7 @@ public class CastleLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine($"The {name} has been released from service.");
+            PersistRoyalCourtToWorldState();
         }
         else
         {
@@ -1575,6 +1577,7 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"{guardName} has joined the Royal Guard!");
+                PersistRoyalCourtToWorldState();
             }
         }
 
@@ -1600,6 +1603,7 @@ public class CastleLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine($"{name} has been dismissed from the Royal Guard.");
+            PersistRoyalCourtToWorldState();
         }
         else
         {
@@ -1643,6 +1647,7 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"Paid {bonus:N0} gold bonus to each guard!");
                 terminal.WriteLine("Guard loyalty has increased!");
+                PersistRoyalCourtToWorldState();
             }
         }
 

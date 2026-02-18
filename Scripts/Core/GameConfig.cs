@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.42.0";
-    public const string VersionName = "Social Emergence";
+    public const string Version = "0.42.1";
+    public const string VersionName = "Blood Price";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -388,6 +388,32 @@ public static partial class GameConfig
     public const float ReputationPricingMarkup = 0.10f;      // 10% markup for negative reputation
     public const float ReputationThresholdForReaction = 0.3f; // Min abs impression for reputation effects
     public const int ReputationFamousThreshold = 20;         // NPCs who heard about player for "famous" status
+
+    // NPC Permadeath System (v0.42.0)
+    public const float PermadeathChanceDungeonSolo = 0.08f;     // 8% for NPC dying alone in dungeon
+    public const float PermadeathChanceDungeonTeam = 0.05f;     // 5% for NPC dying with team
+    public const float PermadeathChanceNPCvsNPC = 0.04f;        // 4% for NPC-vs-NPC combat
+    public const float PermadeathChancePlayerKill = 0.12f;      // 12% for player killing NPC (non-murder)
+    public const float PermadeathChanceTeamWar = 0.04f;         // 4% for team war death
+    public const int PermadeathPopulationFloor = 40;            // Skip permadeath if alive NPCs < this
+    public const float PermadeathLevelReduction = 0.01f;        // Per NPC level: chance *= (1 - level * this)
+
+    // Blood Price / Murder Weight System (v0.42.0)
+    public const float MurderWeightPerDeliberateMurder = 3.0f;  // Weight from deliberate murder
+    public const float MurderWeightPerDarkMagicKill = 2.5f;     // Weight from dark magic assassination
+    public const float MurderWeightPerShadowContract = 1.5f;    // Weight from Shadows assassination contract
+    public const float ShadowContractBloodPriceSkipChance = 0.40f; // 40% chance a contract kill carries no blood price
+    public const float MurderWeightLikedNPCBonus = 1.5f;        // Extra weight if NPC was well-liked
+    public const float MurderWeightDecayPerRealDay = 0.1f;      // Decay per real day of play
+    public const float MurderWeightConfessionReduction = 2.5f;  // Weight removed per church confession
+    public const float MurderWeightAwakeningBlock = 3.0f;       // Ocean Philosophy blocked above this
+    public const float MurderWeightEndingBlock = 3.0f;          // True/Dissolution endings blocked above this
+    public const int MurderWeightShopMarkupThreshold = 5;       // Shop +20% markup at this weight
+    public const float MurderWeightShopMarkupPercent = 0.20f;   // 20% markup
+    public const int MurderWeightTeamRefuseThreshold = 4;       // NPCs refuse team at this weight
+    public const int CompanionLossPerMurder = 15;               // Companion loyalty loss per deliberate murder
+    public const long BloodConfessionBaseCost = 500;            // Base gold cost for blood absolution
+    public const long BloodConfessionCostPerWeight = 200;       // Extra gold per weight point
 
     // Faction Mission System (v0.40.2)
     public const string FactionInitiatorCrown = "The Crown";

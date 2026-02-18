@@ -391,19 +391,17 @@ namespace UsurperRemake.Systems
                 // Check if king identity changed (player took the throne, or NPC challenge)
                 if (king == null || king.Name != royalCourt.KingName)
                 {
-                    var kingNpc = NPCSpawnSystem.Instance.ActiveNPCs
-                        .FirstOrDefault(n => n.Name == royalCourt.KingName);
-                    if (kingNpc != null)
+                    // Create king directly from saved data — don't use SetCurrentKing
+                    // which creates a fresh King with default treasury/empty guards
+                    king = new King
                     {
-                        CastleLocation.SetCurrentKing(kingNpc);
-                        king = CastleLocation.GetCurrentKing();
-                        DebugLogger.Instance.LogInfo("WORLDSIM", $"King loaded from world_state: {royalCourt.KingName}");
-                    }
-                    else
-                    {
-                        DebugLogger.Instance.LogWarning("WORLDSIM", $"King '{royalCourt.KingName}' from world_state not found in NPCs");
-                        return;
-                    }
+                        Name = royalCourt.KingName,
+                        AI = (CharacterAI)royalCourt.KingAI,
+                        Sex = (CharacterSex)royalCourt.KingSex,
+                        IsActive = true
+                    };
+                    CastleLocation.SetKing(king);
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"King loaded from world_state: {royalCourt.KingName}");
                 }
 
                 if (king != null)
@@ -470,6 +468,41 @@ namespace UsurperRemake.Systems
                     }
 
                     king.DesignatedHeir = royalCourt.DesignatedHeir;
+
+                    // Restore guards
+                    if (royalCourt.Guards != null && royalCourt.Guards.Count > 0)
+                    {
+                        king.Guards = royalCourt.Guards.Select(g => new RoyalGuard
+                        {
+                            Name = g.Name,
+                            AI = (CharacterAI)g.AI,
+                            Sex = (CharacterSex)g.Sex,
+                            DailySalary = g.DailySalary,
+                            Loyalty = g.Loyalty,
+                            IsActive = g.IsActive
+                        }).ToList();
+                    }
+
+                    // Restore monster guards
+                    if (royalCourt.MonsterGuards != null && royalCourt.MonsterGuards.Count > 0)
+                    {
+                        king.MonsterGuards = royalCourt.MonsterGuards.Select(m => new MonsterGuard
+                        {
+                            Name = m.Name,
+                            Level = m.Level,
+                            HP = m.HP,
+                            MaxHP = m.MaxHP,
+                            Strength = m.Strength,
+                            Defence = m.Defence,
+                            WeapPow = m.WeapPow,
+                            ArmPow = m.ArmPow,
+                            MonsterType = m.MonsterType,
+                            PurchaseCost = m.PurchaseCost,
+                            DailyFeedingCost = m.DailyFeedingCost
+                        }).ToList();
+                    }
+
+                    DebugLogger.Instance.LogDebug("WORLDSIM", $"Royal court loaded: King {king.Name}, Treasury {king.Treasury:N0}, Guards {king.Guards.Count}, Monsters {king.MonsterGuards.Count}");
                 }
             }
             catch (Exception ex)
@@ -498,6 +531,8 @@ namespace UsurperRemake.Systems
                     KingTaxPercent = king.KingTaxPercent,
                     CityTaxPercent = king.CityTaxPercent,
                     DesignatedHeir = king.DesignatedHeir ?? "",
+                    KingAI = (int)king.AI,
+                    KingSex = (int)king.Sex,
                     CourtMembers = king.CourtMembers?.Select(m => new CourtMemberSaveData
                     {
                         Name = m.Name,
@@ -531,7 +566,30 @@ namespace UsurperRemake.Systems
                         Target = p.Target,
                         Progress = p.Progress,
                         IsDiscovered = p.IsDiscovered
-                    }).ToList() ?? new List<CourtIntrigueSaveData>()
+                    }).ToList() ?? new List<CourtIntrigueSaveData>(),
+                    Guards = king.Guards?.Select(g => new RoyalGuardSaveData
+                    {
+                        Name = g.Name,
+                        AI = (int)g.AI,
+                        Sex = (int)g.Sex,
+                        DailySalary = g.DailySalary,
+                        Loyalty = g.Loyalty,
+                        IsActive = g.IsActive
+                    }).ToList() ?? new List<RoyalGuardSaveData>(),
+                    MonsterGuards = king.MonsterGuards?.Select(m => new MonsterGuardSaveData
+                    {
+                        Name = m.Name,
+                        Level = m.Level,
+                        HP = m.HP,
+                        MaxHP = m.MaxHP,
+                        Strength = m.Strength,
+                        Defence = m.Defence,
+                        WeapPow = m.WeapPow,
+                        ArmPow = m.ArmPow,
+                        MonsterType = m.MonsterType,
+                        PurchaseCost = m.PurchaseCost,
+                        DailyFeedingCost = m.DailyFeedingCost
+                    }).ToList() ?? new List<MonsterGuardSaveData>()
                 };
 
                 var json = JsonSerializer.Serialize(data, jsonOptions);

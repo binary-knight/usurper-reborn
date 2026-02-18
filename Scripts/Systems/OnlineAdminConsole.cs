@@ -932,17 +932,38 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("═══ BROADCAST SYSTEM MESSAGE ═══");
             terminal.WriteLine("");
 
+            // Show current broadcast if active
+            var current = UsurperRemake.Server.MudServer.ActiveBroadcast;
+            if (!string.IsNullOrEmpty(current))
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  Current: *** {current} ***");
+                terminal.WriteLine("");
+            }
+
             terminal.SetColor("white");
-            terminal.WriteLine("Enter message to send to all players (or blank to cancel):");
+            terminal.WriteLine("Enter message (or blank to clear current broadcast):");
             var message = await ReadInput("> ");
 
             if (string.IsNullOrWhiteSpace(message))
+            {
+                if (string.IsNullOrEmpty(current))
+                    return; // Nothing to clear, just go back
+
+                UsurperRemake.Server.MudServer.ActiveBroadcast = null;
+                var server = UsurperRemake.Server.MudServer.Instance;
+                server?.BroadcastToAll($"\u001b[1;33m  *** Broadcast cleared ***\u001b[0m");
+                terminal.SetColor("green");
+                terminal.WriteLine("Broadcast cleared.");
+                DebugLogger.Instance.LogInfo("ADMIN", $"Broadcast cleared by {DoorMode.OnlineUsername}");
+                await ReadInput("Press Enter to continue...");
                 return;
+            }
 
             terminal.WriteLine("");
             terminal.SetColor("yellow");
-            terminal.WriteLine($"Message: {message}");
-            var confirm = await ReadInput("Send to all online players? (Y/N): ");
+            terminal.WriteLine($"Message: *** {message} ***");
+            var confirm = await ReadInput("Set as persistent broadcast? (Y/N): ");
             if (confirm.ToUpper() != "Y")
             {
                 terminal.SetColor("yellow");
@@ -951,10 +972,12 @@ namespace UsurperRemake.Systems
                 return;
             }
 
-            await backend.SendMessage("SYSTEM", "*", "system", message);
+            UsurperRemake.Server.MudServer.ActiveBroadcast = message;
+            var srv = UsurperRemake.Server.MudServer.Instance;
+            srv?.BroadcastToAll($"\u001b[1;33m  *** {message} ***\u001b[0m");
             terminal.SetColor("green");
-            terminal.WriteLine("System message broadcast to all players.");
-            DebugLogger.Instance.LogInfo("ADMIN", $"System broadcast by {DoorMode.OnlineUsername}: '{message}'");
+            terminal.WriteLine("Persistent broadcast set for all players.");
+            DebugLogger.Instance.LogInfo("ADMIN", $"Broadcast set by {DoorMode.OnlineUsername}: '{message}'");
             await ReadInput("Press Enter to continue...");
         }
 

@@ -940,6 +940,12 @@ public class Character
     public long ChurchDonations { get; set; } = 0;     // Total amount donated to church
     public int BlessingsReceived { get; set; } = 0;    // Number of blessings received
     public int HealingsReceived { get; set; } = 0;     // Number of healings received
+
+    // Blood Price / Murder Weight System (v0.42.0)
+    // Tracks the weight of the player's conscience from causing permanent NPC deaths
+    public float MurderWeight { get; set; } = 0f;                              // Accumulated guilt (affects dreams, rest, endings)
+    public List<string> PermakillLog { get; set; } = new();                    // Names of permanently killed NPCs (cap 20)
+    public DateTime LastMurderWeightDecay { get; set; } = DateTime.MinValue;   // When weight last decayed naturally
     
     // Additional compatibility properties
     public int QuestsLeft { get; set; } = 5;

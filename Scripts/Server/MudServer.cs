@@ -32,6 +32,10 @@ public class MudServer
     /// <summary>Idle timeout: disconnect players with no input for this long.</summary>
     public static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(15);
 
+    /// <summary>Persistent broadcast banner shown to all players on every screen refresh.
+    /// Set by /broadcast wizard command or sysop console. Null = no active broadcast.</summary>
+    public static volatile string? ActiveBroadcast;
+
     /// <summary>Usernames to bootstrap as God-level wizards on startup (from --admin flag).</summary>
     public HashSet<string> BootstrapAdminUsers { get; } = new(StringComparer.OrdinalIgnoreCase);
 
