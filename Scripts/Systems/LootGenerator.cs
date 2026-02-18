@@ -674,11 +674,9 @@ public static class LootGenerator
         {
             var stats = RarityStats[rarity];
 
-            // Calculate power with level scaling
-            // Power increases significantly as you progress
-            // Base formula: basePower * (1 + level/25) * rarityMult
-            // This gives level 100 legendary weapons around 800-1200 attack
-            float levelScale = 1.0f + (level / 25.0f);
+            // Calculate power with level scaling (v0.41.4: reduced from level/25 to level/40)
+            // Base formula: basePower * (1 + level/40) * rarityMult
+            float levelScale = 1.0f + (level / 40.0f);
             int basePower = (int)(template.BasePower * levelScale * stats.PowerMult);
 
             // Add randomness (±15%)
@@ -736,7 +734,7 @@ public static class LootGenerator
         {
             var stats = RarityStats[rarity];
 
-            float levelScale = 1.0f + (level / 25.0f);
+            float levelScale = 1.0f + (level / 40.0f);
             int basePower = (int)(template.BasePower * levelScale * stats.PowerMult);
 
             int variance = (int)(basePower * 0.15f);
@@ -786,7 +784,7 @@ public static class LootGenerator
         {
             var stats = RarityStats[rarity];
 
-            float levelScale = 1.0f + (level / 25.0f);
+            float levelScale = 1.0f + (level / 40.0f);
             int basePower = (int)(template.BasePower * levelScale * stats.PowerMult);
 
             int variance = (int)(basePower * 0.15f);
@@ -849,7 +847,7 @@ public static class LootGenerator
         private static Item CreateBasicWeapon(int level, ItemRarity rarity)
         {
             var stats = RarityStats[rarity];
-            float levelScale = 1.0f + (level / 25.0f);
+            float levelScale = 1.0f + (level / 40.0f);
             int power = (int)(10 * levelScale * stats.PowerMult);
 
             return new Item
@@ -866,7 +864,7 @@ public static class LootGenerator
         private static Item CreateBasicArmor(int level, ItemRarity rarity)
         {
             var stats = RarityStats[rarity];
-            float levelScale = 1.0f + (level / 25.0f);
+            float levelScale = 1.0f + (level / 40.0f);
             int power = (int)(8 * levelScale * stats.PowerMult);
 
             return new Item

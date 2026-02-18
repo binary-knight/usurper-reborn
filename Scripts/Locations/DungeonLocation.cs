@@ -2440,7 +2440,7 @@ public class DungeonLocation : BaseLocation
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 1.8) * 50);
+            exp += (long)(Math.Pow(i, 2.2) * 50);
         }
         return exp;
     }

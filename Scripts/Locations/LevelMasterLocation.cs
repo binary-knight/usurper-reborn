@@ -744,8 +744,8 @@ public class LevelMasterLocation : BaseLocation
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            // Gentler curve: level^1.8 * 50 instead of level^2.5 * 100
-            exp += (long)(Math.Pow(i, 1.8) * 50);
+            // Steeper curve: level^2.2 * 50 (rebalanced v0.41.4)
+            exp += (long)(Math.Pow(i, 2.2) * 50);
         }
         return exp;
     }

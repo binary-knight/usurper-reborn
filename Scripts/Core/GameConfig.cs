@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.41.3";
-    public const string VersionName = "Love Street Overhaul";
+    public const string Version = "0.42.0";
+    public const string VersionName = "Social Emergence";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -373,6 +373,21 @@ public static partial class GameConfig
     public const int MurderFactionStandingPenalty = 200;      // Faction standing loss for murdering a faction member
     public const float AssassinBackstabBonusDamage = 0.25f;  // 25% bonus damage for Assassin class on murder
     public const float GenericBackstabBonusDamage = 0.10f;   // 10% bonus damage for non-Assassin on murder
+
+    // Social Emergence System (v0.42.0 - Inspired by Project Sid)
+    public const float OpinionPropagationChance = 0.03f;     // 3% per tick for gossip sharing
+    public const float MemeSpreaderChance = 0.05f;           // 5% per tick for cultural meme spreading
+    public const float MemeGenerationChance = 0.01f;         // 1% per tick for new meme creation
+    public const float PlayerReputationSpreadChance = 0.05f; // 5% per tick for player rep spreading
+    public const float FactionRecruitmentChance = 0.01f;     // 1% per tick for faction recruitment
+    public const int RoleAdaptationIntervalTicks = 60;       // Every 60 ticks (~30 min) check roles
+    public const int OpinionShareCooldownTicks = 20;         // ~10 min between same gossip pair
+    public const int MaxDailySharesPerSubject = 8;           // Prevent single topic from dominating
+    public const float PlayerReputationInfluenceMultiplier = 1.5f; // Player news is more interesting
+    public const float ReputationPricingDiscount = 0.05f;    // 5% discount for positive reputation
+    public const float ReputationPricingMarkup = 0.10f;      // 10% markup for negative reputation
+    public const float ReputationThresholdForReaction = 0.3f; // Min abs impression for reputation effects
+    public const int ReputationFamousThreshold = 20;         // NPCs who heard about player for "famous" status
 
     // Faction Mission System (v0.40.2)
     public const string FactionInitiatorCrown = "The Crown";
@@ -1212,15 +1227,15 @@ Alchemist - Potion makers and researchers. Requires intellect and patience.
     public const byte QuestRewardMedium = 2;               // Medium reward level
     public const byte QuestRewardHigh = 3;                 // High reward level
     
-    // Quest Experience Rewards (Pascal reward calculations)
-    public const int QuestExpLowMultiplier = 100;          // level * 100 (low exp)
-    public const int QuestExpMediumMultiplier = 500;       // level * 500 (medium exp)
-    public const int QuestExpHighMultiplier = 1000;        // level * 1000 (high exp)
-    
-    // Quest Gold Rewards (Pascal money rewards)
-    public const int QuestGoldLowMultiplier = 1100;        // level * 1100 (low gold)
-    public const int QuestGoldMediumMultiplier = 5100;     // level * 5100 (medium gold)
-    public const int QuestGoldHighMultiplier = 11000;      // level * 11000 (high gold)
+    // Quest Experience Rewards (rebalanced v0.41.4 — quests supplement grinding, not replace it)
+    public const int QuestExpLowMultiplier = 40;           // level * 40 (low exp)
+    public const int QuestExpMediumMultiplier = 200;       // level * 200 (medium exp)
+    public const int QuestExpHighMultiplier = 400;         // level * 400 (high exp)
+
+    // Quest Gold Rewards (rebalanced v0.41.4 — proportional reduction)
+    public const int QuestGoldLowMultiplier = 500;         // level * 500 (low gold)
+    public const int QuestGoldMediumMultiplier = 2000;     // level * 2000 (medium gold)
+    public const int QuestGoldHighMultiplier = 4500;       // level * 4500 (high gold)
     
     // Quest Potion Rewards (Pascal healing potion rewards)
     public const int QuestPotionsLow = 50;                 // Low potion reward

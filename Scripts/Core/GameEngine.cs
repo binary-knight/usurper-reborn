@@ -3250,6 +3250,10 @@ public partial class GameEngine : Node
                 NPCDialogueDatabase.RestoreRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? "", data.RecentDialogueIds);
             }
 
+            // Restore social emergence role
+            npc.EmergentRole = data.EmergentRole ?? "";
+            npc.RoleStabilityTicks = data.RoleStabilityTicks;
+
             // Migrate: Assign faction to NPCs that don't have one (legacy save compatibility)
             if (!npc.NPCFaction.HasValue)
             {
@@ -3519,7 +3523,7 @@ public partial class GameEngine : Node
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 1.8) * 50);
+            exp += (long)(Math.Pow(i, 2.2) * 50);
         }
         return exp;
     }

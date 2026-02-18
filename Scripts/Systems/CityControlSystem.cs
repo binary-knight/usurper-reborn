@@ -260,6 +260,14 @@ public class CityControlSystem
             npc.CTurf = false;
         }
 
+        // Also clear player's CTurf if their team lost control
+        var player = GameEngine.Instance?.CurrentPlayer;
+        if (player != null && player.CTurf && player.Team != newControllingTeam)
+        {
+            player.CTurf = false;
+            GD.Print($"[CityControl] Player {player.DisplayName}'s team lost city control to '{newControllingTeam}'");
+        }
+
         // Give control to new team
         foreach (var npc in npcs.Where(n => n.Team == newControllingTeam && n.IsAlive))
         {
@@ -267,7 +275,11 @@ public class CityControlSystem
             npc.TeamRec = 0;
         }
 
-        // GD.Print($"[CityControl] City control transferred to '{newControllingTeam}'");
+        // If the player is on the new controlling team, give them CTurf too
+        if (player != null && player.Team == newControllingTeam)
+        {
+            player.CTurf = true;
+        }
     }
 
     /// <summary>
@@ -283,8 +295,14 @@ public class CityControlSystem
             npc.CTurf = false;
         }
 
+        // Also clear player's CTurf if they're on the disbanded team
+        var player = GameEngine.Instance?.CurrentPlayer;
+        if (player != null && player.CTurf && player.Team == teamName)
+        {
+            player.CTurf = false;
+        }
+
         NewsSystem.Instance?.Newsy(true, $"The city is no longer under team control!");
-        // GD.Print($"[CityControl] Removed city control from '{teamName}'");
     }
 
     /// <summary>

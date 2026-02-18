@@ -1898,34 +1898,9 @@ public class StreetEncounterSystem
             }
         }
 
-        if (player.King && (location == GameLocation.Castle || location == GameLocation.MainStreet))
-        {
-            if (_random.NextDouble() < GameConfig.ThroneEncounterChance)
-            {
-                var challenger = FindThroneChallenger(player, npcs);
-                if (challenger != null)
-                {
-                    MarkConsequenceFired();
-                    await ExecuteThroneChallenge(challenger, player, terminal, result);
-                    return result;
-                }
-            }
-        }
-
-        if (location == GameLocation.DarkAlley || location == GameLocation.MainStreet ||
-            location == GameLocation.AnchorRoad)
-        {
-            if (_random.NextDouble() < GameConfig.CityContestChance)
-            {
-                var rival = FindCityContestRival(player, npcs);
-                if (rival != null)
-                {
-                    MarkConsequenceFired();
-                    await ExecuteCityControlContest(rival, player, terminal, result);
-                    return result;
-                }
-            }
-        }
+        // NOTE: Throne challenges and city control contests are handled by the background
+        // simulation (ChallengeSystem and CityControlSystem) rather than consequence encounters.
+        // NPCs infiltrate the castle or contest turf through normal game mechanics.
 
         return result;
     }

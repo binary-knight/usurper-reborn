@@ -95,6 +95,18 @@ public partial class NPC : Character
     public string CurrentActivity { get; set; } = "";
 
     /// <summary>
+    /// Emergent role assigned by the Social Influence System based on community needs
+    /// and personality fit. Examples: "Defender", "Merchant", "Healer", "Explorer", etc.
+    /// </summary>
+    public string EmergentRole { get; set; } = "";
+
+    /// <summary>
+    /// How many ticks this NPC has held their current emergent role.
+    /// Higher values indicate more stable/established roles.
+    /// </summary>
+    public int RoleStabilityTicks { get; set; } = 0;
+
+    /// <summary>
     /// Tracks recently used dialogue line IDs to prevent repetition.
     /// Managed by NPCDialogueDatabase, persisted across saves.
     /// </summary>
@@ -364,8 +376,8 @@ public partial class NPC : Character
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            // Gentler curve: level^1.8 * 50 instead of level^2.5 * 100
-            exp += (long)(Math.Pow(i, 1.8) * 50);
+            // Steeper curve: level^2.2 * 50 (rebalanced v0.41.4)
+            exp += (long)(Math.Pow(i, 2.2) * 50);
         }
         return exp;
     }
@@ -1079,6 +1091,26 @@ public partial class NPC : Character
             return $"{Name2} seems distracted, eyes red-rimmed. \"Sorry, I... what did you need?\"";
         }
 
+        // Check if this NPC has heard about the player through gossip but never met them directly
+        var playerName = player?.Name2 ?? "";
+        bool heardThroughGossip = Memory != null && !string.IsNullOrEmpty(playerName) &&
+            Memory.GetMemoriesAboutCharacter(playerName).Any(m => m.Type == MemoryType.HeardGossip) &&
+            !Memory.GetMemoriesAboutCharacter(playerName).Any(m =>
+                m.Type != MemoryType.HeardGossip && m.Type != MemoryType.SharedOpinion);
+
+        // Gossip-based greetings — NPC has never met player but has heard about them
+        if (heardThroughGossip && Math.Abs(impression) > GameConfig.ReputationThresholdForReaction)
+        {
+            if (impression < -0.5f)
+                return $"{Name2} stiffens as you approach. \"I know what you've done. Stay away from me.\"";
+            if (impression < -0.3f)
+                return $"{Name2} eyes you warily. \"I've heard things about you... nothing good.\"";
+            if (impression > 0.5f)
+                return $"{Name2}'s eyes light up with recognition. \"You're {playerName}! I've heard great things about you!\"";
+            if (impression > 0.3f)
+                return $"{Name2} nods respectfully. \"I've heard good things about you, {playerName}.\"";
+        }
+
         // Strong negative impression of the player
         if (impression < -0.5f)
         {
@@ -1133,10 +1165,17 @@ public partial class NPC : Character
         if (impression > 0.5f) modifier -= 0.05f;
         else if (impression < -0.5f) modifier += 0.05f;
 
+        // Reputation-based pricing (gossip-informed, v0.42.0)
+        // NPCs who heard good things give a discount, bad things add markup
+        if (impression > GameConfig.ReputationThresholdForReaction)
+            modifier -= GameConfig.ReputationPricingDiscount;
+        else if (impression < -GameConfig.ReputationThresholdForReaction)
+            modifier += GameConfig.ReputationPricingMarkup;
+
         // Mood-based: happy = -5%, grieving/angry = +10%
         if (mood > 0.7f) modifier -= 0.05f;
         else if (mood < 0.3f) modifier += 0.10f;
 
-        return Math.Clamp(modifier, 0.85f, 1.15f);
+        return Math.Clamp(modifier, 0.80f, 1.20f);
     }
 } 

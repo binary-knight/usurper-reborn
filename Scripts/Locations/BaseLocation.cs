@@ -76,6 +76,9 @@ public abstract class BaseLocation
         // Track location visit statistics
         player.Statistics?.RecordLocationVisit(Name);
 
+        // Sync player King/CTurf state with world state (catches background sim changes)
+        SyncPlayerWorldState(player);
+
         // MUD mode: show other players at this location
         if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null)
         {
@@ -94,6 +97,9 @@ public abstract class BaseLocation
 
         // Show any pending game notifications (team events, etc.)
         await ShowPendingGameNotifications(term);
+
+        // Player reputation whisper effect (v0.42.0 - Social Emergence)
+        await CheckReputationWhispers(player, term);
 
         // Ensure NPCs are initialized (safety check)
         if (NPCSpawnSystem.Instance.ActiveNPCs.Count == 0)
@@ -139,6 +145,103 @@ public abstract class BaseLocation
         term.WriteLine("");
 
         await term.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Sync player King and CTurf flags with actual world state.
+    /// Background simulation can change the king or city control without updating the player directly.
+    /// </summary>
+    private void SyncPlayerWorldState(Character player)
+    {
+        try
+        {
+            // Sync King flag: if player thinks they're king but they're not
+            if (player.King)
+            {
+                var currentKing = CastleLocation.GetCurrentKing();
+                if (currentKing == null || !currentKing.IsActive ||
+                    (currentKing.Name != player.DisplayName && currentKing.Name != player.Name2))
+                {
+                    player.King = false;
+                    GD.Print($"[BaseLocation] Synced player King=false (throne belongs to {currentKing?.Name ?? "nobody"})");
+                }
+            }
+
+            // Sync CTurf flag: if player thinks their team controls the city but no NPCs on their team have CTurf
+            if (player.CTurf && !string.IsNullOrEmpty(player.Team))
+            {
+                var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+                bool anyTeammateHasTurf = npcs != null &&
+                    npcs.Any(n => n.Team == player.Team && n.CTurf && n.IsAlive && !n.IsDead);
+                if (!anyTeammateHasTurf)
+                {
+                    player.CTurf = false;
+                    GD.Print($"[BaseLocation] Synced player CTurf=false (no NPC teammates hold turf)");
+                }
+            }
+            else if (player.CTurf && string.IsNullOrEmpty(player.Team))
+            {
+                // Player has CTurf but no team — can't control city without a team
+                player.CTurf = false;
+            }
+        }
+        catch (Exception)
+        {
+            // Non-critical sync — don't break location entry
+        }
+    }
+
+    /// <summary>
+    /// Show subtle reputation whisper when player enters a location with NPCs who've heard about them (v0.42.0)
+    /// </summary>
+    private async Task CheckReputationWhispers(Character player, TerminalEmulator term)
+    {
+        try
+        {
+            var playerName = player?.Name2 ?? player?.DisplayName ?? "";
+            if (string.IsNullOrEmpty(playerName)) return;
+
+            // Find NPCs at this location who've heard about the player through gossip
+            var npcsHere = NPCSpawnSystem.Instance.ActiveNPCs
+                .Where(n => n.IsAlive && !n.IsDead && n.CurrentLocation == Name)
+                .ToList();
+
+            int gossipAwareCount = 0;
+            float averageImpression = 0f;
+
+            foreach (var npc in npcsHere)
+            {
+                var impression = npc.Brain?.Memory?.GetCharacterImpression(playerName) ?? 0f;
+                if (Math.Abs(impression) > GameConfig.ReputationThresholdForReaction)
+                {
+                    // Check if they know about the player through gossip
+                    var memories = npc.Brain?.Memory?.GetMemoriesAboutCharacter(playerName);
+                    if (memories != null && memories.Any(m => m.Type == MemoryType.HeardGossip))
+                    {
+                        gossipAwareCount++;
+                        averageImpression += impression;
+                    }
+                }
+            }
+
+            if (gossipAwareCount < 2) return; // Need at least 2 NPCs whispering
+
+            averageImpression /= gossipAwareCount;
+
+            // Show the whisper message
+            term.SetColor("gray");
+            if (averageImpression < -0.3f)
+                term.WriteLine("  You notice a few NPCs exchange uneasy glances as you arrive.");
+            else if (averageImpression > 0.3f)
+                term.WriteLine("  You notice a few NPCs nod approvingly as you walk past.");
+            else
+                term.WriteLine("  You notice a few NPCs whispering among themselves as you enter.");
+            term.SetColor("white");
+        }
+        catch (Exception)
+        {
+            // Non-critical — don't let reputation whispers break location entry
+        }
     }
 
     /// <summary>
@@ -1371,7 +1474,7 @@ public abstract class BaseLocation
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 1.8) * 50);
+            exp += (long)(Math.Pow(i, 2.2) * 50);
         }
         return exp;
     }

@@ -85,12 +85,12 @@ public static class StatEffectsSystem
     // =====================================================
 
     /// <summary>
-    /// Bonus HP from Constitution
-    /// Formula: (Constitution - 10) * 3 + Level * (Constitution / 10)
+    /// Bonus HP from Constitution (v0.41.4: reduced quadratic growth from CON/10 to CON/15)
+    /// Formula: (Constitution - 10) * 3 + Level * (Constitution / 15)
     /// </summary>
     public static long GetConstitutionHPBonus(long constitution, int level)
     {
-        return (constitution - 10) * 3 + level * (constitution / 10);
+        return (constitution - 10) * 3 + level * (constitution / 15);
     }
 
     /// <summary>

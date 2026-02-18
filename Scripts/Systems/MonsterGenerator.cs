@@ -171,10 +171,10 @@ public static class MonsterGenerator
         float bossMultiplier = isBoss ? 2.0f : (isMiniBoss ? 1.5f : 1.0f);
         float totalMultiplier = powerMultiplier * bossMultiplier;
 
-        // REBALANCED HP: Nearly linear scaling
-        // Formula: 25*level + level^1.1 * 8 (was 40*level + level^1.2 * 15)
-        // Level 1: ~33, Level 50: ~1600, Level 100: ~3200 (before multiplier)
-        long baseHP = (long)((25 * level) + Math.Pow(level, 1.1) * 8);
+        // REBALANCED HP (v0.41.4: increased ~45% so fights last 4-5 hits instead of 2-3)
+        // Formula: 35*level + level^1.15 * 10 (was 25*level + level^1.1 * 8)
+        // Level 1: ~45, Level 20: ~1028, Level 50: ~2350, Level 100: ~5500 (before multiplier)
+        long baseHP = (long)((35 * level) + Math.Pow(level, 1.15) * 10);
         long hp = (long)(baseHP * totalMultiplier);
 
         // REBALANCED STRENGTH: Reduced to match new player damage scaling
@@ -182,10 +182,10 @@ public static class MonsterGenerator
         long baseStrength = (long)((2 * level) + Math.Pow(level, 1.05) * 1.5);
         long strength = (long)(baseStrength * totalMultiplier);
 
-        // REBALANCED DEFENCE: Much lower so player damage isn't negated
-        // Formula: level + level^1.02 * 0.5 (was 2*level + level^1.1 * 1.5)
+        // Monster defence (v0.41.4: raised from 0.5f to 0.8f so monsters aren't defenseless)
+        // Formula: level + level^1.02 * 0.5
         long baseDefence = (long)((level) + Math.Pow(level, 1.02) * 0.5);
-        long defence = (long)(baseDefence * totalMultiplier * 0.5f);
+        long defence = (long)(baseDefence * totalMultiplier * 0.8f);
 
         // REBALANCED PUNCH: Reduced natural attack bonus
         // Formula: level + level^1.02 * 0.5 (was 1.5*level + level^1.1 * 1)
@@ -197,10 +197,10 @@ public static class MonsterGenerator
         long baseWeaponPower = (long)((1.5 * level) + Math.Pow(level, 1.05) * 1);
         long weaponPower = (long)(baseWeaponPower * totalMultiplier);
 
-        // REBALANCED ARMOR POWER: Minimal so player hits always matter
-        // Formula: level * 0.5 + level^1.02 * 0.3 (was 2*level + level^1.1 * 1.5)
+        // Monster armor power (v0.41.4: raised from 0.4f to 0.7f so monsters have real armor)
+        // Formula: level * 0.5 + level^1.02 * 0.3
         long baseArmorPower = (long)((0.5 * level) + Math.Pow(level, 1.02) * 0.3);
-        long armorPower = (long)(baseArmorPower * totalMultiplier * 0.4f);
+        long armorPower = (long)(baseArmorPower * totalMultiplier * 0.7f);
 
         // Apply server-wide SysOp HP multiplier
         hp = (long)(hp * GameConfig.MonsterHPMultiplier);

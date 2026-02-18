@@ -1778,8 +1778,8 @@ public partial class CombatEngine
     private async Task ExecuteSingleAttack(Character attacker, Monster target, CombatResult result, bool isExtra, bool isOffHandAttack = false)
     {
         // === D20 ROLL SYSTEM FOR HIT DETERMINATION ===
-        // Calculate monster AC based on level and defense
-        int monsterAC = 10 + (target.Level / 3) + (int)(target.Defence / 15);
+        // Calculate monster AC based on level and defense (v0.41.4: Level/3→/2, Defence/15→/10)
+        int monsterAC = 10 + (target.Level / 2) + (int)(target.Defence / 10);
 
         // Apply modifiers that affect hit chance
         if (attacker.IsRaging)
@@ -1851,8 +1851,8 @@ public partial class CombatEngine
         // Add Strength-based damage bonus from StatEffectsSystem
         attackPower += StatEffectsSystem.GetStrengthDamageBonus(attacker.Strength);
 
-        // Level-based scaling - CRITICAL for high level balance
-        attackPower += attacker.Level * 2;
+        // Level-based scaling (v0.41.4: reduced from Level*2 to Level to slow damage growth)
+        attackPower += attacker.Level;
 
         // Apply class/status modifiers
         if (attacker.IsRaging)
@@ -2666,9 +2666,11 @@ public partial class CombatEngine
 
         if (player.ArmPow > 0)
         {
-            // Guard against integer overflow when ArmPow is very large
-            int armPowMax = (int)Math.Min(player.ArmPow, int.MaxValue - 1);
-            playerDefense += random.Next(0, armPowMax + 1);
+            // v0.41.4: Diminishing returns on armor absorption using sqrt scaling.
+            // Prevents high ArmPow from making players "untouchable" (damage always = 1).
+            // ArmPow 50 → avg 17, ArmPow 200 → avg 35, ArmPow 500 → avg 56
+            int armAbsorbMax = (int)(Math.Sqrt(player.ArmPow) * 5);
+            playerDefense += random.Next(0, armAbsorbMax + 1);
         }
 
         playerDefense += blockBonus;
@@ -3725,19 +3727,22 @@ public partial class CombatEngine
         {
             Item? loot = null;
 
-            // Mini-bosses (Champions) ALWAYS drop equipment
+            // Mini-bosses (Champions) have 60% chance to drop equipment (v0.41.4: was 100%)
             if (monster.IsMiniBoss)
             {
-                loot = LootGenerator.GenerateMiniBossLoot(monster.Level, result.Player.Class);
-                if (loot != null)
+                if (random.NextDouble() < 0.60)
                 {
-                    // Cap MinLevel to player's level — if you killed it, you earned it
-                    if (loot.MinLevel > result.Player.Level)
-                        loot.MinLevel = result.Player.Level;
-                    terminal.WriteLine("");
-                    terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("The Champion drops valuable equipment!");
-                    await DisplayEquipmentDrop(loot, monster, result.Player);
+                    loot = LootGenerator.GenerateMiniBossLoot(monster.Level, result.Player.Class);
+                    if (loot != null)
+                    {
+                        // Cap MinLevel to player's level — if you killed it, you earned it
+                        if (loot.MinLevel > result.Player.Level)
+                            loot.MinLevel = result.Player.Level;
+                        terminal.WriteLine("");
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine("The Champion drops valuable equipment!");
+                        await DisplayEquipmentDrop(loot, monster, result.Player);
+                    }
                 }
                 continue; // Skip normal drop logic for mini-bosses
             }
@@ -3759,16 +3764,16 @@ public partial class CombatEngine
                 continue; // Skip normal drop logic for bosses
             }
 
-            // Regular monsters - normal drop chance
-            // Drop chance: 15% base + 0.5% per monster level, capped at 40%
-            double dropChance = 0.15 + (monster.Level * 0.005);
-            dropChance = Math.Min(0.40, dropChance);
+            // Regular monsters - normal drop chance (v0.41.4: reduced from 15%+0.5%/lvl cap 40%)
+            // Drop chance: 8% base + 0.3% per monster level, capped at 25%
+            double dropChance = 0.08 + (monster.Level * 0.003);
+            dropChance = Math.Min(0.25, dropChance);
 
-            // Named monsters (Lords, Chiefs, Kings) have better drop chance
+            // Named monsters (Lords, Chiefs, Kings) have better drop chance (v0.41.4: 60% → 35%)
             if (monster.Name.Contains("Boss") || monster.Name.Contains("Chief") ||
                 monster.Name.Contains("Lord") || monster.Name.Contains("King"))
             {
-                dropChance = 0.60;
+                dropChance = 0.35;
             }
 
             if (random.NextDouble() < dropChance)
@@ -5511,8 +5516,10 @@ public partial class CombatEngine
                         }
                         await Task.Delay(GetCombatDelay(500));
 
-                        // Calculate player attack damage
+                        // Calculate player attack damage (v0.41.4: added Level and STR/4 to match single combat)
                         long attackPower = player.Strength + player.WeapPow + random.Next(1, 16);
+                        attackPower += StatEffectsSystem.GetStrengthDamageBonus(player.Strength); // STR/4
+                        attackPower += player.Level; // Level scaling (single combat uses Level too)
 
                         // Apply temporary attack bonus from abilities
                         attackPower += player.TempAttackBonus;
@@ -11396,14 +11403,14 @@ public partial class CombatEngine
 
     /// <summary>
     /// Award experience to NPC teammates (spouses, lovers, team members)
-    /// NPCs get 50% of the player's XP and can level up during combat
+    /// NPCs get 75% of the player's XP and can level up during combat (v0.41.4: raised from 50%)
     /// </summary>
     private void AwardTeammateExperience(List<Character> teammates, long playerXP, TerminalEmulator terminal)
     {
         if (teammates == null || teammates.Count == 0 || playerXP <= 0) return;
 
-        // Teammates get 50% of player's XP
-        long teammateXP = playerXP / 2;
+        // Teammates get 75% of player's XP (v0.41.4: raised from 50% to keep companions viable)
+        long teammateXP = (long)(playerXP * 0.75);
         if (teammateXP <= 0) return;
 
         // Count eligible teammates first (echoes don't get XP but still count for team bonus)
@@ -11475,7 +11482,7 @@ public partial class CombatEngine
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 1.8) * 50);
+            exp += (long)(Math.Pow(i, 2.2) * 50);
         }
         return exp;
     }

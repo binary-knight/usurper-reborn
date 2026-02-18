@@ -165,6 +165,7 @@ public class WorldSimulator
         foreach (var key in expiredTensions) _tensionMessageCooldown.Remove(key);
         var expiredTeam = _npcTeamActionCooldown.Where(kv => _currentTick - kv.Value > TEAM_ACTION_COOLDOWN_TICKS).Select(kv => kv.Key).ToList();
         foreach (var key in expiredTeam) _npcTeamActionCooldown.Remove(key);
+        SocialInfluenceSystem.Instance?.ResetDailyCounters();
     }
 
     /// <summary>
@@ -228,6 +229,12 @@ public class WorldSimulator
         // Note: The worldNPCs parameter is ignored - we always use NPCSpawnSystem.Instance.ActiveNPCs
         // This ensures the simulator sees the correct NPCs even after save/load
         isRunning = true;
+
+        // Initialize social emergence systems
+        if (SocialInfluenceSystem.Instance == null)
+            new SocialInfluenceSystem();
+        if (CulturalMemeSystem.Instance == null)
+            new CulturalMemeSystem();
 
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"WorldSimulator starting - NPCs available: {npcs?.Count ?? 0}");
 
@@ -320,6 +327,11 @@ public class WorldSimulator
             }
         }
 
+        // Spread player reputation through NPC network
+        var currentPlayer = GameEngine.Instance?.CurrentPlayer;
+        if (currentPlayer != null)
+            SocialInfluenceSystem.Instance?.ProcessPlayerReputationSpread(npcs, currentPlayer.Name, _currentTick);
+
         // Track dead NPCs for respawn (check both HP <= 0 and IsDead flag)
         // Skip age-dead NPCs - their soul has moved on, no respawn
         foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath))
@@ -357,6 +369,14 @@ public class WorldSimulator
 
         // Process gossip spreading
         ProcessGossip();
+
+        // Process social emergence systems (v0.42.0)
+        SocialInfluenceSystem.Instance?.ProcessOpinionPropagation(npcs, _currentTick);
+        SocialInfluenceSystem.Instance?.ProcessFactionRecruitment(npcs, _currentTick);
+        SocialInfluenceSystem.Instance?.ProcessRoleAdaptation(npcs, _currentTick);
+        CulturalMemeSystem.Instance?.GenerateNewMemes(npcs, _currentTick);
+        CulturalMemeSystem.Instance?.ProcessMemeSpreading(npcs, _currentTick);
+        CulturalMemeSystem.Instance?.DecayMemes();
 
         // Process world events
         ProcessWorldEvents();
@@ -1148,6 +1168,8 @@ public class WorldSimulator
         ApplyMemoryWeights(activities, npc);
         ApplyRelationshipWeights(activities, npc);
         ApplyWorldEventWeights(activities, npc);
+        CulturalMemeSystem.Instance?.ApplyMemeWeights(activities, npc);
+        SocialInfluenceSystem.ApplyRoleWeights(activities, npc);
 
         // Weighted random selection
         double totalWeight = activities.Sum(a => a.weight);
@@ -2336,7 +2358,7 @@ public class WorldSimulator
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 1.8) * 50);
+            exp += (long)(Math.Pow(i, 2.2) * 50);
         }
         return exp;
     }
@@ -4232,6 +4254,9 @@ public class WorldSimulator
                 {
                     // Default: brawl (existing combat)
                     ExecuteAttack(npc, enemyId, world);
+                    // Witnesses observe the brawl
+                    SocialInfluenceSystem.RecordWitnesses(npcs, npc.CurrentLocation,
+                        npc.Name2 ?? npc.Name, enemy.Name2 ?? enemy.Name, WitnessEventType.SawBrawl);
                     AddGossip($"{npc.Name2 ?? npc.Name} got into a brawl with {enemy.Name2 ?? enemy.Name} at the {npc.CurrentLocation}");
                 }
 
@@ -4331,6 +4356,8 @@ public class WorldSimulator
         // Generate news
         string thiefName = thief.Name2 ?? thief.Name;
         string victimName = victim.Name2 ?? victim.Name;
+        // Witnesses observe the theft
+        SocialInfluenceSystem.RecordWitnesses(npcs, thief.CurrentLocation, thiefName, victimName, WitnessEventType.SawTheft);
         NewsSystem.Instance?.Newsy($"{thiefName} was caught pickpocketing {victimName} at the {thief.CurrentLocation}! {stolenAmount} gold went missing.");
         AddGossip($"{thiefName} stole from {victimName}");
 
@@ -4386,6 +4413,9 @@ public class WorldSimulator
             winner.Enemies.Add(loser.Id);
         if (!loser.Enemies.Contains(winner.Id))
             loser.Enemies.Add(winner.Id);
+
+        // Witnesses observe the challenge
+        SocialInfluenceSystem.RecordWitnesses(npcs, challenger.CurrentLocation, winnerName, loserName, WitnessEventType.SawChallenge);
 
         // Generate news
         NewsSystem.Instance?.Newsy($"{challengerName} publicly challenged {targetName} at the {challenger.CurrentLocation}! {winnerName} emerged victorious.");

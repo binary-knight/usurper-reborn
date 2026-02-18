@@ -807,6 +807,10 @@ namespace UsurperRemake.Systems
                     // Dialogue tracking
                     RecentDialogueIds = NPCDialogueDatabase.GetRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? ""),
 
+                    // Social emergence
+                    EmergentRole = npc.EmergentRole ?? "",
+                    RoleStabilityTicks = npc.RoleStabilityTicks,
+
                     // Marriage status
                     IsMarried = npc.IsMarried,
                     Married = npc.Married,
@@ -1597,6 +1601,20 @@ namespace UsurperRemake.Systems
                 GD.PrintErr($"[SaveSystem] Failed to save NPC marriages/affairs: {ex.Message}");
             }
 
+            // Cultural Meme System (Social Emergence)
+            try
+            {
+                data.CulturalMemes = CulturalMemeSystem.Instance?.ExportSaveData();
+                if (data.CulturalMemes != null)
+                {
+                    GD.Print($"[SaveSystem] Saved cultural meme system data");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to save cultural meme system: {ex.Message}");
+            }
+
             return data;
         }
 
@@ -2027,6 +2045,20 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 GD.PrintErr($"[SaveSystem] Failed to restore NPC marriages/affairs: {ex.Message}");
+            }
+
+            // Cultural Meme System (Social Emergence)
+            try
+            {
+                CulturalMemeSystem.Instance?.RestoreFromSaveData(data?.CulturalMemes);
+                if (data?.CulturalMemes != null)
+                {
+                    GD.Print($"[SaveSystem] Restored cultural meme system data");
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[SaveSystem] Failed to restore cultural meme system: {ex.Message}");
             }
         }
 

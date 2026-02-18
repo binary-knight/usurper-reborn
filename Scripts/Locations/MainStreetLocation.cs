@@ -350,8 +350,8 @@ public class MainStreetLocation : BaseLocation
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            // Gentler curve: level^1.8 * 50 instead of level^2.5 * 100
-            exp += (long)(Math.Pow(i, 1.8) * 50);
+            // Steeper curve: level^2.2 * 50 (rebalanced v0.41.4)
+            exp += (long)(Math.Pow(i, 2.2) * 50);
         }
         return exp;
     }
@@ -2767,6 +2767,30 @@ public class MainStreetLocation : BaseLocation
     /// </summary>
     private async Task EnterDevMenu()
     {
+        // In online/BBS mode, restrict dev menu to authorized users only
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            // Online mode: only "Rage" (the game admin) can access
+            if (!string.Equals(currentPlayer?.Name1, "Rage", StringComparison.OrdinalIgnoreCase))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  Access denied.");
+                await Task.Delay(1000);
+                return;
+            }
+        }
+        else if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
+        {
+            // BBS door mode: only SysOps can access
+            if (!UsurperRemake.BBS.DoorMode.IsSysOp)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  Access denied.");
+                await Task.Delay(1000);
+                return;
+            }
+        }
+
         terminal.SetColor("dark_magenta");
         terminal.WriteLine("");
         terminal.WriteLine("  You notice a strange shimmer in the air...");

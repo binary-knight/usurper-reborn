@@ -803,8 +803,10 @@ public class ArmorShopLocation : BaseLocation
             int currentAC = currentItem?.ArmorClass ?? 0;
 
             // Get all affordable upgrades for this slot, sorted by armor class (best first)
+            // Filter by CanEquip to exclude items the player can't use (level/stat requirements)
             var affordableArmor = EquipmentDatabase.GetBySlot(slot)
                 .Where(i => i.ArmorClass > currentAC)
+                .Where(i => i.CanEquip(currentPlayer, out _))
                 .Where(i => !i.RequiresGood || currentPlayer.Chivalry > currentPlayer.Darkness)
                 .Where(i => !i.RequiresEvil || currentPlayer.Darkness > currentPlayer.Chivalry)
                 .OrderByDescending(i => i.ArmorClass)
@@ -905,7 +907,7 @@ public class ArmorShopLocation : BaseLocation
                         // Process city tax share from this sale
                         CityControlSystem.Instance.ProcessSaleTax(itemPrice);
 
-                        if (currentPlayer.EquipItem(armor, out _))
+                        if (currentPlayer.EquipItem(armor, out string equipMsg))
                         {
                             purchased++;
                             terminal.SetColor("bright_green");
@@ -913,6 +915,14 @@ public class ArmorShopLocation : BaseLocation
 
                             // Check for equipment quest completion
                             QuestSystem.OnEquipmentPurchased(currentPlayer, armor);
+                        }
+                        else
+                        {
+                            // Refund gold if equip failed (level/stat requirement)
+                            currentPlayer.Gold += abItemTotal;
+                            totalSpent -= abItemTotal;
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"  ✗ Cannot equip: {equipMsg}");
                         }
                         slotHandled = true;
                         break;

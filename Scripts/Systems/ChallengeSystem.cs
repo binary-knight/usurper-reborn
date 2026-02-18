@@ -344,6 +344,15 @@ public class ChallengeSystem
             ImprisonChallenger(oldKingNPC, 14, "Deposed monarch");
         }
 
+        // If the old king was the player, clear their King flag too
+        var player = GameEngine.Instance?.CurrentPlayer;
+        if (player != null && player.King &&
+            (player.DisplayName == oldKing.Name || player.Name2 == oldKing.Name))
+        {
+            player.King = false;
+            GD.Print($"[ChallengeSystem] Player {player.DisplayName} deposed from throne by {newKing.Name}");
+        }
+
         NewsSystem.Instance?.Newsy(true,
             $"ALL HAIL {kingData.GetTitle()} {newKing.Name}! A new monarch sits upon the throne!");
 

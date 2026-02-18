@@ -91,26 +91,26 @@ public static class EnhancedNPCBehaviors
     
     /// <summary>
     /// NPC believer system - Pascal NPCMAINT.PAS NPC_Believer
+    /// Conversion now requires social contact with an existing believer (proselytizing).
     /// </summary>
     public static void ProcessBelieverSystem(NPC npc)
     {
         // NPCBelievers check removed - const 50 makes code unreachable
         if (random.Next(3) != 0) return; // Only 33% processed per cycle
-        
-        if (string.IsNullOrEmpty(npc.God))
+
+        if (!string.IsNullOrEmpty(npc.God))
         {
-            // Potential conversion based on personality
-            var conversionChance = CalculateConversionChance(npc);
-            if (random.NextDouble() < conversionChance)
+            // Existing believer actions (pray, offering, seek guidance, preach)
+            ProcessBelieverActions(npc);
+
+            // 2% chance this believer attempts to proselytize a nearby non-believer
+            if (random.NextDouble() < 0.02)
             {
-                ConvertNPCToFaith(npc);
+                AttemptProselytize(npc);
             }
         }
-        else
-        {
-            // Existing believer actions
-            ProcessBelieverActions(npc);
-        }
+        // Non-believers do nothing on their own — they can only be converted
+        // through social contact with an existing believer via AttemptProselytize.
     }
     
     /// <summary>
@@ -303,29 +303,85 @@ public static class EnhancedNPCBehaviors
         }
     }
     
-    private static double CalculateConversionChance(NPC npc)
+    /// <summary>
+    /// A believing NPC attempts to proselytize a non-believer at the same location.
+    /// Conversion chance is based on the speaker's sociability, the listener's personality,
+    /// and the existing relationship between them.
+    /// </summary>
+    private static void AttemptProselytize(NPC believer)
     {
-        // Base chance modified by personality
-        var baseChance = 0.05; // 5%
-        
-        // Personality modifiers
-        if (npc.Personality.Sociability > 0.7f)
-            baseChance *= 1.5;
-            
-        if (npc.Personality.Ambition > 0.8f)
-            baseChance *= 0.7; // Ambitious NPCs less likely to convert
-            
-        return baseChance;
+        if (believer.IsDead || !believer.IsAlive) return;
+
+        // Find non-believer NPCs at the same location
+        var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (allNPCs == null || allNPCs.Count == 0) return;
+
+        var candidates = allNPCs.Where(n =>
+            n != believer &&
+            !n.IsDead && n.IsAlive &&
+            string.IsNullOrEmpty(n.God) &&
+            n.CurrentLocation == believer.CurrentLocation).ToList();
+
+        if (candidates.Count == 0) return;
+
+        // Pick a random non-believer at the same location
+        var target = candidates[random.Next(candidates.Count)];
+
+        // Calculate social-contact-based conversion chance
+        var conversionChance = CalculateSocialConversionChance(believer, target);
+        if (random.NextDouble() < conversionChance)
+        {
+            ConvertNPCToFaith(target, believer.God);
+
+            // Generate news about the conversion
+            NewsSystem.Instance?.Newsy(
+                $"{GameConfig.NewsColorPlayer}{target.Name2}{GameConfig.NewsColorDefault} was converted to the faith of {believer.God} by {GameConfig.NewsColorPlayer}{believer.Name2}{GameConfig.NewsColorDefault}",
+                true, GameConfig.NewsCategory.General);
+        }
     }
-    
-    private static void ConvertNPCToFaith(NPC npc)
+
+    /// <summary>
+    /// Calculate conversion chance based on social contact between a believing speaker
+    /// and a non-believing listener. Factors: speaker sociability, listener mysticism,
+    /// listener intelligence, and their existing relationship.
+    /// </summary>
+    private static double CalculateSocialConversionChance(NPC speaker, NPC listener)
     {
-        var availableGods = new[] { "Nosferatu", "Darkcloak", "Druid", "Seth Able" };
-        npc.God = availableGods[random.Next(availableGods.Length)];
-        
+        // Base: 5%
+        double chance = 0.05;
+
+        // Speaker's Sociability bonus: multiply by (0.5 + Sociability)
+        float speakerSociability = speaker.Personality?.Sociability ?? 0.5f;
+        chance *= (0.5 + speakerSociability);
+
+        // Listener's Mysticism > 0.5: +30% additive to base
+        float listenerMysticism = listener.Personality?.Mysticism ?? 0.5f;
+        if (listenerMysticism > 0.5f)
+            chance += 0.30;
+
+        // Listener's Intelligence > 0.7: -20% additive to base (skeptical)
+        float listenerIntelligence = listener.Personality?.Intelligence ?? 0.5f;
+        if (listenerIntelligence > 0.7f)
+            chance -= 0.20;
+
+        // Relationship modifier: check speaker's impression of listener (and vice versa)
+        float impression = speaker.Brain?.Memory?.GetCharacterImpression(listener.Name2) ?? 0f;
+        if (impression > 0f)
+            chance += 0.20; // Positive relationship: +20%
+        else if (impression < 0f)
+            chance -= 0.30; // Negative relationship: -30%
+
+        // Clamp to a reasonable range (never negative, never guaranteed)
+        return Math.Clamp(chance, 0.0, 0.85);
+    }
+
+    private static void ConvertNPCToFaith(NPC npc, string deity)
+    {
+        npc.God = deity;
+
         npc.Memory?.AddMemory($"I found faith in {npc.God}", "faith", DateTime.Now);
         npc.EmotionalState?.AdjustMood("spiritual", 0.3f);
-        
+
         // GD.Print($"[Faith] {npc.Name2} converted to {npc.God}");
     }
     

@@ -332,8 +332,8 @@ public static class TrainingSystem
     {
         random ??= new Random();
 
-        // Base modifier from Strength or Dexterity
-        int statMod = (int)((attacker.Strength - 10) / 2);
+        // Base modifier from Strength (v0.41.4: reduced from /2 to /3 to slow hit scaling)
+        int statMod = (int)((attacker.Strength - 10) / 3);
 
         // Proficiency modifier if using trained ability
         int profMod = 0;
@@ -356,10 +356,10 @@ public static class TrainingSystem
 
         int rawMod = statMod + profMod + levelMod + equipMod;
 
-        // Diminishing returns: full value up to +6, half rate above that.
-        // Prevents high-level players from auto-hitting everything on the d20.
-        // Raw +4 → +4, Raw +11 → +8, Raw +22 → +14, Raw +45 → +25
-        int totalMod = rawMod <= 6 ? rawMod : 6 + (rawMod - 6) / 2;
+        // Diminishing returns: full value up to +6, third rate above that (v0.41.4: was /2).
+        // Keeps hit chance meaningful across 100 levels instead of auto-hitting by level 8.
+        // Raw +6 → +6, Raw +12 → +8, Raw +36 → +16, Raw +51 → +21
+        int totalMod = rawMod <= 6 ? rawMod : 6 + (rawMod - 6) / 3;
 
         return RollD20(totalMod, targetAC, random);
     }
@@ -374,11 +374,11 @@ public static class TrainingSystem
     {
         random ??= new Random();
 
-        // Monster attack modifier based on level and strength
-        int monsterMod = monster.Level / 3 + (int)((monster.Strength - 10) / 3);
+        // Monster attack modifier (v0.41.4: Level/3 → Level/2 so monsters hit more reliably)
+        int monsterMod = monster.Level / 2 + (int)((monster.Strength - 10) / 3);
 
-        // Player's AC is based on Dexterity, armor, and level
-        int playerAC = 10 + (int)((target.Dexterity - 10) / 2) + (int)(target.ArmPow / 15) + (target.Level / 10);
+        // Player's AC: DEX/3 (was /2), ArmPow/25 (was /15) to reduce armor stacking dominance
+        int playerAC = 10 + (int)((target.Dexterity - 10) / 3) + (int)(target.ArmPow / 25) + (target.Level / 10);
 
         // Check for dodge/evasion effects
         if (target.HasStatusEffect("evasion"))

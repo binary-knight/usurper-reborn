@@ -1049,9 +1049,11 @@ public class WeaponShopLocation : BaseLocation
         int currentPow = currentWeapon?.WeaponPower ?? 0;
 
         // Get all affordable upgrades sorted by power (best first)
+        // Filter by CanEquip to exclude items the player can't use (level/stat requirements)
         var affordableWeapons = EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.OneHanded)
             .Concat(EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.TwoHanded))
             .Where(w => w.WeaponPower > currentPow)
+            .Where(w => w.CanEquip(currentPlayer, out _))
             .Where(w => w.Value <= currentPlayer.Gold)
             .Where(w => !w.RequiresGood || currentPlayer.Chivalry > currentPlayer.Darkness)
             .Where(w => !w.RequiresEvil || currentPlayer.Darkness > currentPlayer.Chivalry)

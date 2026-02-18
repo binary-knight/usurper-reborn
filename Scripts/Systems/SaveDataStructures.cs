@@ -102,6 +102,9 @@ namespace UsurperRemake.Systems
 
         // Affairs System - tracks player affairs with married NPCs
         public List<AffairSaveData> Affairs { get; set; } = new();
+
+        // Social emergence - cultural memes (v0.42.0)
+        public CulturalMemeSaveData? CulturalMemes { get; set; }
     }
 
     /// <summary>
@@ -539,6 +542,10 @@ namespace UsurperRemake.Systems
 
         // Dialogue tracking - prevents repetition across sessions
         public List<string>? RecentDialogueIds { get; set; }
+
+        // Social emergence (v0.42.0)
+        public string EmergentRole { get; set; } = "";
+        public int RoleStabilityTicks { get; set; }
 
         // Marriage status
         public bool IsMarried { get; set; }

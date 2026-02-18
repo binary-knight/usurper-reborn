@@ -359,5 +359,12 @@ public enum MemoryType
     FailedQuest,
     
     // Other
-    Miscellaneous
+    Miscellaneous,
+
+    // Social influence events (v0.42.0 - Emergence System)
+    HeardGossip,          // Heard an opinion about someone from another NPC
+    WitnessedAttack,      // Saw someone attack another
+    WitnessedTheft,       // Saw someone steal
+    WitnessedGenerosity,  // Saw someone give/help
+    SharedOpinion         // Shared own opinion with another NPC
 } 
