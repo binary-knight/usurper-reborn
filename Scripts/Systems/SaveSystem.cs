@@ -275,6 +275,47 @@ namespace UsurperRemake.Systems
             return SerializeStorySystems();
         }
 
+        /// <summary>
+        /// Collect all dynamic equipment IDs (>= 100000) from both the player's equipped items
+        /// and all companion equipped items. This ensures companion dynamic equipment definitions
+        /// are saved alongside the player's, preventing equipment loss on reload.
+        /// </summary>
+        private HashSet<int> CollectAllDynamicEquipmentIds(Character player)
+        {
+            var ids = new HashSet<int>();
+
+            // Player's own equipped items
+            if (player.EquippedItems != null)
+            {
+                foreach (var id in player.EquippedItems.Values)
+                {
+                    if (id >= 100000) ids.Add(id);
+                }
+            }
+
+            // Companion equipped items (Lyris, Aldric, Mira, Vex)
+            try
+            {
+                var companionData = CompanionSystem.Instance.Serialize();
+                if (companionData?.CompanionStates != null)
+                {
+                    foreach (var comp in companionData.CompanionStates)
+                    {
+                        if (comp.EquippedItemsSave != null)
+                        {
+                            foreach (var id in comp.EquippedItemsSave.Values)
+                            {
+                                if (id >= 100000) ids.Add(id);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { /* CompanionSystem not initialized */ }
+
+            return ids;
+        }
+
         private PlayerData SerializePlayer(Character player)
         {
             return new PlayerData
@@ -379,10 +420,11 @@ namespace UsurperRemake.Systems
                     Description = item.Description?.ToList() ?? new List<string>()
                 }).ToList() ?? new List<InventoryItemData>(),
 
-                // Dynamic equipment (only items the player actually has equipped, not all dynamic items in the DB)
-                DynamicEquipment = (player.EquippedItems ?? new Dictionary<EquipmentSlot, int>())
-                    .Values
-                    .Where(id => id >= 100000) // Only dynamic equipment IDs
+                // Dynamic equipment (items equipped from dungeon loot that need definitions saved)
+                // Must include dynamic IDs from BOTH player's equipped items AND companion equipped items,
+                // otherwise companion dynamic equipment vanishes on reload (the ID is saved but the
+                // Equipment object definition is lost).
+                DynamicEquipment = CollectAllDynamicEquipmentIds(player)
                     .Select(id => EquipmentDatabase.GetById(id))
                     .Where(equip => equip != null)
                     .Select(equip => new DynamicEquipmentData

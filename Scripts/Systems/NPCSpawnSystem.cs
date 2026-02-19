@@ -329,7 +329,7 @@ namespace UsurperRemake.Systems
 
             npc.MaxHP = npc.HP;
             npc.MaxMana = npc.Mana;
-            // Use same XP curve as players: level^1.8 * 50 per level
+            // Use same XP curve as players: level^2.0 * 50 per level
             npc.Experience = GetExperienceForLevel(level);
             npc.Gold = random.Next(level * 100, level * 500);
 
@@ -864,7 +864,7 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Calculate experience points needed for a given level using same curve as players
-        /// Formula: Sum of level^1.8 * 50 for each level from 2 to target
+        /// Formula: Sum of level^2.0 * 50 for each level from 2 to target
         /// </summary>
         private static long GetExperienceForLevel(int level)
         {
@@ -872,7 +872,7 @@ namespace UsurperRemake.Systems
             long exp = 0;
             for (int i = 2; i <= level; i++)
             {
-                exp += (long)(Math.Pow(i, 2.2) * 50);
+                exp += (long)(Math.Pow(i, 2.0) * 50);
             }
             return exp;
         }

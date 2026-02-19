@@ -318,38 +318,52 @@ public class ArmorShopLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("bright_blue");
-        terminal.WriteLine("  #   Name                          AC   Price       Bonus");
+        terminal.WriteLine("  #   Name                        Lvl  AC   Price       Bonus");
         terminal.SetColor("darkgray");
-        terminal.WriteLine("─────────────────────────────────────────────────────────────");
+        terminal.WriteLine("───────────────────────────────────────────────────────────────");
 
         int num = 1;
         foreach (var item in pageItems)
         {
             bool canAfford = currentPlayer.Gold >= item.Value;
+            bool meetsLevel = currentPlayer.Level >= item.MinLevel;
+            bool canBuy = canAfford && meetsLevel;
             bool isUpgrade = currentItem == null || item.ArmorClass > currentItem.ArmorClass;
 
-            terminal.SetColor(canAfford ? "bright_cyan" : "darkgray");
+            terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
             terminal.Write($"{num,3}. ");
 
-            terminal.SetColor(canAfford ? "white" : "darkgray");
-            terminal.Write($"{item.Name,-28}");
+            terminal.SetColor(canBuy ? "white" : "darkgray");
+            terminal.Write($"{item.Name,-26}");
 
-            terminal.SetColor(canAfford ? "bright_cyan" : "darkgray");
+            // Level requirement
+            if (item.MinLevel > 1)
+            {
+                terminal.SetColor(!meetsLevel ? "red" : (canBuy ? "bright_cyan" : "darkgray"));
+                terminal.Write($"{item.MinLevel,3}  ");
+            }
+            else
+            {
+                terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
+                terminal.Write($"{"—",3}  ");
+            }
+
+            terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
             terminal.Write($"{item.ArmorClass,4}  ");
 
-            terminal.SetColor(canAfford ? "yellow" : "darkgray");
+            terminal.SetColor(canBuy ? "yellow" : "darkgray");
             terminal.Write($"{FormatNumber(item.Value),10}  ");
 
             // Show bonus stats
             var bonuses = GetBonusDescription(item);
             if (!string.IsNullOrEmpty(bonuses))
             {
-                terminal.SetColor(canAfford ? "green" : "darkgray");
+                terminal.SetColor(canBuy ? "green" : "darkgray");
                 terminal.Write(bonuses);
             }
 
             // Show upgrade indicator
-            if (isUpgrade && canAfford)
+            if (isUpgrade && canBuy)
             {
                 terminal.SetColor("bright_green");
                 terminal.Write(" ↑");

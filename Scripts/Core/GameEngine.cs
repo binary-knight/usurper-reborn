@@ -406,6 +406,22 @@ public partial class GameEngine : Node
 #endif
             terminal.SetColor("darkgray");
             terminal.Write("[");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("A");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            if (GameConfig.ScreenReaderMode)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("Screen Reader Mode: ON");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("Screen Reader Mode: OFF");
+            }
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
             terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
@@ -480,6 +496,23 @@ public partial class GameEngine : Node
                     }
                     break;
 
+                case "A":
+                    GameConfig.ScreenReaderMode = !GameConfig.ScreenReaderMode;
+                    terminal.WriteLine("");
+                    if (GameConfig.ScreenReaderMode)
+                    {
+                        terminal.WriteLine("Screen Reader Mode ENABLED", "bright_green");
+                        terminal.WriteLine("Menus will use simplified plain text format.", "white");
+                    }
+                    else
+                    {
+                        terminal.WriteLine("Screen Reader Mode DISABLED", "white");
+                        terminal.WriteLine("Menus will use visual ASCII art format.", "white");
+                    }
+                    await Task.Delay(1500);
+                    await RunBBSDoorMode();
+                    return;
+
                 case "Q":
                     IsIntentionalExit = true;
                     terminal.WriteLine("Goodbye!", "cyan");
@@ -544,6 +577,22 @@ public partial class GameEngine : Node
 #endif
             terminal.SetColor("darkgray");
             terminal.Write("[");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("A");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            if (GameConfig.ScreenReaderMode)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("Screen Reader Mode: ON");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("Screen Reader Mode: OFF");
+            }
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
             terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("darkgray");
@@ -587,6 +636,23 @@ public partial class GameEngine : Node
                         await CreateNewGame(playerName);
                     }
                     break;
+
+                case "A":
+                    GameConfig.ScreenReaderMode = !GameConfig.ScreenReaderMode;
+                    terminal.WriteLine("");
+                    if (GameConfig.ScreenReaderMode)
+                    {
+                        terminal.WriteLine("Screen Reader Mode ENABLED", "bright_green");
+                        terminal.WriteLine("Menus will use simplified plain text format.", "white");
+                    }
+                    else
+                    {
+                        terminal.WriteLine("Screen Reader Mode DISABLED", "white");
+                        terminal.WriteLine("Menus will use visual ASCII art format.", "white");
+                    }
+                    await Task.Delay(1500);
+                    await RunBBSDoorMode();
+                    return;
 
 #if !STEAM_BUILD
                 case "@":
@@ -1044,6 +1110,28 @@ public partial class GameEngine : Node
 #endif
 
             terminal.WriteLine("");
+
+            // Accessibility section
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("  ── ACCESSIBILITY ─────────────────────────────────────────────────────");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("A");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            if (GameConfig.ScreenReaderMode)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("Screen Reader Mode: ON");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("Screen Reader Mode: OFF");
+            }
+
+            terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("red");
@@ -1088,6 +1176,21 @@ public partial class GameEngine : Node
                     break;
                 case "C":
                     await ShowCredits();
+                    break;
+                case "A":
+                    GameConfig.ScreenReaderMode = !GameConfig.ScreenReaderMode;
+                    terminal.WriteLine("");
+                    if (GameConfig.ScreenReaderMode)
+                    {
+                        terminal.WriteLine("Screen Reader Mode ENABLED", "bright_green");
+                        terminal.WriteLine("Menus will use simplified plain text format.", "white");
+                    }
+                    else
+                    {
+                        terminal.WriteLine("Screen Reader Mode DISABLED", "white");
+                        terminal.WriteLine("Menus will use visual ASCII art format.", "white");
+                    }
+                    await Task.Delay(1500);
                     break;
                 case "Q":
                     IsIntentionalExit = true;
@@ -1563,6 +1666,57 @@ public partial class GameEngine : Node
 
             // Restore story systems (companions, children, seals, etc.)
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems);
+
+            // Migration: sync RelationshipSystem with RomanceTracker for saves affected by
+            // the bidirectional key bug (pre-v0.42.4). If RomanceTracker says Lover/Spouse/FWB
+            // but RelationshipSystem is stuck at Normal (70), force it to Love (20).
+            if (currentPlayer != null)
+            {
+                try
+                {
+                    foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
+                    {
+                        var romanceType = RomanceTracker.Instance.GetRelationType(npc.ID);
+                        if (romanceType == RomanceRelationType.None || romanceType == RomanceRelationType.Ex)
+                            continue;
+
+                        int currentRel = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
+                        int targetRel = romanceType == RomanceRelationType.Spouse ? GameConfig.RelationMarried :
+                                        romanceType == RomanceRelationType.Lover ? GameConfig.RelationLove :
+                                        GameConfig.RelationPassion; // FWB
+
+                        if (currentRel > targetRel)
+                        {
+                            // Relationship is worse than it should be — force it to match romance status
+                            int stepsNeeded = 0;
+                            int test = currentRel;
+                            while (test > targetRel && stepsNeeded < 20)
+                            {
+                                test = test switch
+                                {
+                                    >= 100 => 90,
+                                    >= 90 => 80,
+                                    >= 80 => 70,
+                                    >= 70 => 60,
+                                    >= 60 => 50,
+                                    >= 50 => 40,
+                                    >= 40 => 30,
+                                    >= 30 => 20,
+                                    >= 20 => 10,
+                                    _ => test
+                                };
+                                stepsNeeded++;
+                            }
+                            RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, stepsNeeded, false, true);
+                            DebugLogger.Instance.LogInfo("MIGRATION", $"Fixed relationship with {npc.Name}: {currentRel} -> {targetRel} (romance: {romanceType})");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Instance.LogWarning("MIGRATION", $"Relationship sync failed: {ex.Message}");
+                }
+            }
 
             // In online mode, override royal court, children, and marriages with world_state
             // (authoritative source). RestoreStorySystems loaded stale data from the player's
@@ -2212,6 +2366,9 @@ public partial class GameEngine : Node
         // Apply SysOp's default color theme to new characters
         currentPlayer.ColorTheme = GameConfig.DefaultColorTheme;
         ColorTheme.Current = GameConfig.DefaultColorTheme;
+
+        // Inherit pre-login screen reader toggle into new character
+        currentPlayer.ScreenReaderMode = GameConfig.ScreenReaderMode;
 
         // Auto-populate quickbar with starting spells/abilities
         AutoPopulateQuickbar(currentPlayer);
@@ -2895,6 +3052,9 @@ public partial class GameEngine : Node
 
         // Apply player's color theme preference
         ColorTheme.Current = player.ColorTheme;
+
+        // Sync screen reader mode from player save to global
+        GameConfig.ScreenReaderMode = player.ScreenReaderMode;
 
         return player;
     }
@@ -3587,7 +3747,7 @@ public partial class GameEngine : Node
     }
 
     /// <summary>
-    /// XP formula matching the player's curve (level^1.8 * 50)
+    /// XP formula matching the player's curve (level^2.0 * 50)
     /// Used to initialize NPC XP when loading legacy saves
     /// </summary>
     private static long GetExperienceForNPCLevel(int level)
@@ -3596,7 +3756,7 @@ public partial class GameEngine : Node
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 2.2) * 50);
+            exp += (long)(Math.Pow(i, 2.0) * 50);
         }
         return exp;
     }

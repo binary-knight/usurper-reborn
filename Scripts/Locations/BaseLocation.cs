@@ -1508,7 +1508,7 @@ public abstract class BaseLocation
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 2.2) * 50);
+            exp += (long)(Math.Pow(i, 2.0) * 50);
         }
         return exp;
     }
@@ -2840,6 +2840,7 @@ public abstract class BaseLocation
 
                 case "4":
                     currentPlayer.ScreenReaderMode = !currentPlayer.ScreenReaderMode;
+                    GameConfig.ScreenReaderMode = currentPlayer.ScreenReaderMode;
                     if (currentPlayer.ScreenReaderMode)
                     {
                         terminal.WriteLine("Screen Reader Mode ENABLED", "green");
@@ -5213,28 +5214,41 @@ public abstract class BaseLocation
             }
 
             terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(new string('─', 65));
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  Commands:  Type a letter + number together, e.g. A1, D2, C3");
+            terminal.WriteLine("");
             terminal.SetColor("white");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("A#");
+            terminal.SetColor("white");
+            terminal.Write("] Accept package    ");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
-            terminal.Write("A");
+            terminal.Write("D#");
             terminal.SetColor("white");
-            terminal.Write("]ccept #  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("D");
-            terminal.SetColor("white");
-            terminal.Write("]ecline #  [");
+            terminal.WriteLine("] Decline package");
+            terminal.Write("  [");
             terminal.SetColor("bright_yellow");
             terminal.Write("S");
             terminal.SetColor("white");
-            terminal.Write("]end Package  [");
+            terminal.Write("]  Send new package  ");
+            terminal.Write("[");
             terminal.SetColor("bright_yellow");
-            terminal.Write("C");
+            terminal.Write("C#");
             terminal.SetColor("white");
-            terminal.Write("]ancel #  [");
+            terminal.WriteLine("] Cancel sent package");
+            terminal.Write("  [");
             terminal.SetColor("bright_yellow");
             terminal.Write("Q");
             terminal.SetColor("white");
-            terminal.WriteLine("]uit");
+            terminal.WriteLine("]  Quit");
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            if (incoming.Count > 0)
+                terminal.WriteLine($"  Example: Type A1 to accept package #1, D1 to decline it");
             terminal.Write("> ");
             terminal.SetColor("white");
             string input = (await terminal.ReadLineAsync()).Trim();

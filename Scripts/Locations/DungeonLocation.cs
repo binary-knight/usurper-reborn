@@ -104,6 +104,7 @@ public class DungeonLocation : BaseLocation
             {
                 term.SetColor("yellow");
                 term.WriteLine("  [The dungeon's dark magic has drawn new creatures from the depths...]");
+                BroadcastDungeonRespawn();
             }
 
             term.WriteLine("");
@@ -2441,7 +2442,7 @@ public class DungeonLocation : BaseLocation
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 2.2) * 50);
+            exp += (long)(Math.Pow(i, 2.0) * 50);
         }
         return exp;
     }
@@ -4011,6 +4012,39 @@ public class DungeonLocation : BaseLocation
     // Combined list of all special floors for easy lookup (includes Old God floors)
     private static readonly int[] AllSpecialFloors = { 15, 25, 30, 40, 45, 50, 55, 60, 70, 75, 80, 85, 95, 99, 100 };
 
+    // Rate-limit dungeon respawn broadcasts to one per 30 minutes
+    private static DateTime _lastDungeonRespawnBroadcast = DateTime.MinValue;
+    private static readonly object _respawnBroadcastLock = new();
+    private static readonly string[] DungeonRespawnMessages = {
+        "The dungeon trembles as dark magic pulls new horrors from the void...",
+        "A cold wind howls through the dungeon depths. Something stirs below.",
+        "The Old Gods' power seeps through ancient stone — the dungeon renews itself.",
+        "Torches flicker and shadows shift. The dungeon has drawn new creatures to its halls.",
+        "The earth groans as the dungeon's hunger calls forth fresh terrors from the deep.",
+        "Whispers echo through forgotten corridors. The dead do not rest for long down here.",
+        "A pulse of ancient energy ripples through the dungeon. New dangers await the bold.",
+        "The dungeon breathes. Creatures crawl from cracks in reality, filling empty halls.",
+        "Bones rattle and dust swirls — the dungeon's eternal cycle begins anew.",
+        "The stones remember. The dungeon rebuilds its armies from shadow and spite.",
+        "Something ancient and hungry has restocked the dungeon's larder with fresh nightmares.",
+        "The seal-wards flare briefly. The dungeon's curse replenishes what adventurers have slain.",
+    };
+
+    /// <summary>
+    /// Broadcast a random dungeon respawn flavor message to all players (rate-limited)
+    /// </summary>
+    private static void BroadcastDungeonRespawn()
+    {
+        lock (_respawnBroadcastLock)
+        {
+            if ((DateTime.Now - _lastDungeonRespawnBroadcast).TotalMinutes < 30)
+                return;
+            _lastDungeonRespawnBroadcast = DateTime.Now;
+        }
+        var msg = DungeonRespawnMessages[new Random().Next(DungeonRespawnMessages.Length)];
+        try { NewsSystem.Instance?.Newsy(msg); } catch { }
+    }
+
     /// <summary>
     /// Check if a floor has an Old God boss encounter
     /// </summary>
@@ -4584,6 +4618,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine("[New creatures have emerged from the depths...]");
+            BroadcastDungeonRespawn();
         }
 
         terminal.WriteLine("");
@@ -4796,6 +4831,7 @@ public class DungeonLocation : BaseLocation
             else if (floorResult.DidRespawn)
             {
                 terminal.WriteLine("[New creatures have emerged from the depths...]", "yellow");
+                BroadcastDungeonRespawn();
             }
 
             // Check for story events (seals, narrative moments) on this new floor
@@ -9182,8 +9218,10 @@ public class DungeonLocation : BaseLocation
             {
                 if (posToRoom.TryGetValue((x, y), out var room))
                 {
-                    // West connector
-                    bool hasWest = room.Exits.ContainsKey(Direction.West);
+                    // West connector — only draw if target room is at adjacent grid position
+                    bool hasWest = room.Exits.TryGetValue(Direction.West, out var westExit)
+                        && roomPositions.TryGetValue(westExit.TargetRoomId, out var westPos)
+                        && westPos == (x - 1, y);
                     if (hasWest && room.IsExplored)
                     {
                         terminal.SetColor("darkgray");
@@ -9225,7 +9263,10 @@ public class DungeonLocation : BaseLocation
                 {
                     if (posToRoom.TryGetValue((x, y), out var room))
                     {
-                        bool hasSouth = room.Exits.ContainsKey(Direction.South);
+                        // South connector — only draw if target room is at grid position below
+                        bool hasSouth = room.Exits.TryGetValue(Direction.South, out var southExit)
+                            && roomPositions.TryGetValue(southExit.TargetRoomId, out var southPos)
+                            && southPos == (x, y + 1);
                         if (hasSouth && room.IsExplored)
                         {
                             terminal.SetColor("darkgray");
@@ -9365,7 +9406,9 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// Build a spatial position map by traversing room connections via BFS
+    /// Build a spatial position map centered on the current room.
+    /// Uses local BFS (max 3 hops) so directions always match exits.
+    /// Collisions are skipped — rooms that don't fit simply aren't shown.
     /// </summary>
     private Dictionary<string, (int x, int y)> BuildRoomPositionMap()
     {
@@ -9374,32 +9417,32 @@ public class DungeonLocation : BaseLocation
         if (currentFloor == null || currentFloor.Rooms.Count == 0)
             return positions;
 
-        var visited = new HashSet<string>();
-        var queue = new Queue<(string roomId, int x, int y)>();
+        // Start from current room at origin (not entrance)
+        var startId = currentFloor.CurrentRoomId;
+        if (string.IsNullOrEmpty(startId))
+            startId = currentFloor.EntranceRoomId;
+        if (string.IsNullOrEmpty(startId) && currentFloor.Rooms.Count > 0)
+            startId = currentFloor.Rooms[0].Id;
 
-        // Start from entrance room at origin
-        var entranceId = currentFloor.EntranceRoomId;
-        if (string.IsNullOrEmpty(entranceId) && currentFloor.Rooms.Count > 0)
-            entranceId = currentFloor.Rooms[0].Id;
+        positions[startId] = (0, 0);
+        var queue = new Queue<(string roomId, int x, int y, int depth)>();
+        queue.Enqueue((startId, 0, 0, 0));
 
-        queue.Enqueue((entranceId, 0, 0));
-        visited.Add(entranceId);
-        positions[entranceId] = (0, 0);
+        int maxDepth = 3;
 
-        // BFS to assign positions based on exit directions
         while (queue.Count > 0)
         {
-            var (roomId, x, y) = queue.Dequeue();
-            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == roomId);
+            var (roomId, x, y, depth) = queue.Dequeue();
+            if (depth >= maxDepth) continue;
 
+            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == roomId);
             if (room == null) continue;
 
             foreach (var exit in room.Exits)
             {
                 var targetId = exit.Value.TargetRoomId;
-                if (visited.Contains(targetId)) continue;
+                if (positions.ContainsKey(targetId)) continue;
 
-                // Calculate new position based on direction
                 int newX = x, newY = y;
                 switch (exit.Key)
                 {
@@ -9409,45 +9452,16 @@ public class DungeonLocation : BaseLocation
                     case Direction.West: newX--; break;
                 }
 
-                // Check for collision - if position taken, try to find nearby spot
-                var targetPos = (newX, newY);
-                if (positions.ContainsValue(targetPos))
-                {
-                    // Find nearest free position
-                    targetPos = FindNearestFreePosition(positions, newX, newY);
-                }
+                // Skip if position already taken — no displacement
+                if (positions.ContainsValue((newX, newY)))
+                    continue;
 
-                visited.Add(targetId);
-                positions[targetId] = targetPos;
-                queue.Enqueue((targetId, targetPos.Item1, targetPos.Item2));
+                positions[targetId] = (newX, newY);
+                queue.Enqueue((targetId, newX, newY, depth + 1));
             }
         }
 
         return positions;
-    }
-
-    /// <summary>
-    /// Find nearest free position when there's a collision
-    /// </summary>
-    private (int x, int y) FindNearestFreePosition(Dictionary<string, (int x, int y)> positions, int targetX, int targetY)
-    {
-        // Spiral outward to find free spot
-        for (int radius = 1; radius < 10; radius++)
-        {
-            for (int dx = -radius; dx <= radius; dx++)
-            {
-                for (int dy = -radius; dy <= radius; dy++)
-                {
-                    if (Math.Abs(dx) == radius || Math.Abs(dy) == radius)
-                    {
-                        var pos = (targetX + dx, targetY + dy);
-                        if (!positions.ContainsValue(pos))
-                            return pos;
-                    }
-                }
-            }
-        }
-        return (targetX, targetY); // Fallback
     }
 
     /// <summary>

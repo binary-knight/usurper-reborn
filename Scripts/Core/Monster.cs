@@ -487,7 +487,7 @@ public class Monster
     
     /// <summary>
     /// Get experience reward for defeating this monster
-    /// Scaled to match the gentler XP requirement curve (level^1.8 * 50)
+    /// Scaled to match the XP requirement curve (level^2.0 * 50)
     /// Applies difficulty multiplier from DifficultySystem
     /// </summary>
     public long GetExperienceReward()

@@ -382,8 +382,8 @@ public partial class NPC : Character
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            // Steeper curve: level^2.2 * 50 (rebalanced v0.41.4)
-            exp += (long)(Math.Pow(i, 2.2) * 50);
+            // Softened curve: level^2.0 * 50 (rebalanced v0.41.4)
+            exp += (long)(Math.Pow(i, 2.0) * 50);
         }
         return exp;
     }

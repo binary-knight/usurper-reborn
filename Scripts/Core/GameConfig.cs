@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.42.3";
+    public const string Version = "0.42.4";
     public const string VersionName = "Blood Price";
 
     // From Pascal global_maxXX constants
@@ -107,6 +107,26 @@ public static partial class GameConfig
     /// Default color theme for new characters (set by SysOp via SysOp Console)
     /// </summary>
     public static ColorThemeType DefaultColorTheme { get; set; } = ColorThemeType.Default;
+
+    /// <summary>
+    /// Global screen reader mode flag. Can be toggled pre-login from main menu/BBS menu.
+    /// ThreadStatic so each MUD session has its own value.
+    /// On player load, synced FROM player save. On player create, synced TO new player.
+    /// </summary>
+    [System.ThreadStatic] private static bool? _screenReaderThread;
+    private static bool _screenReaderGlobal = false;
+
+    public static bool ScreenReaderMode
+    {
+        get => _screenReaderThread ?? _screenReaderGlobal;
+        set
+        {
+            if (UsurperRemake.Server.SessionContext.IsActive)
+                _screenReaderThread = value;
+            else
+                _screenReaderGlobal = value;
+        }
+    }
 
     /// <summary>
     /// Maximum dungeon level (default: 100)

@@ -82,8 +82,8 @@ public class CharacterCreationSystem
             // Step 2: Select gender (Pascal gender selection)
             character.Sex = await SelectGender();
             
-            // Step 3: Select race (Pascal race selection with help)
-            character.Race = await SelectRace();
+            // Step 3: Select race (Pascal race selection with help + portrait preview)
+            character.Race = await SelectRace(character.Name2, character.Sex);
             
             // Step 4: Select class (Pascal class selection with validation)
             character.Class = await SelectClass(character.Race);
@@ -430,7 +430,7 @@ public class CharacterCreationSystem
     /// <summary>
     /// Select character race with help system (Pascal USERHUNC.PAS race selection)
     /// </summary>
-    private async Task<CharacterRace> SelectRace()
+    private async Task<CharacterRace> SelectRace(string playerName, CharacterSex sex)
     {
         string choice = "?";
 
@@ -481,14 +481,12 @@ public class CharacterCreationSystem
                 continue;
             }
 
-            // Handle race selection
+            // Handle race selection — show full preview with portrait + stats
             if (int.TryParse(choice, out int raceChoice) && raceChoice >= 0 && raceChoice <= 9)
             {
                 var race = (CharacterRace)raceChoice;
-                var description = GameConfig.RaceDescriptions[race];
 
-                terminal.WriteLine("");
-                if (await ConfirmChoice($"Be {description}", false))
+                if (await ShowRacePreview(race, playerName, sex))
                 {
                     return race;
                 }
@@ -565,7 +563,476 @@ public class CharacterCreationSystem
 
         return string.Join("/", classes.Select(c => abbreviations[c]));
     }
-    
+
+    #region Race Preview Screen
+
+    /// <summary>
+    /// Show full-width race info card with stat bars, classes, and description.
+    /// Returns true if player confirms the selection.
+    /// </summary>
+    private async Task<bool> ShowRacePreview(CharacterRace race, string playerName, CharacterSex sex)
+    {
+        // Screen reader mode: plain text, no boxes or bars
+        if (GameConfig.ScreenReaderMode)
+            return await ShowRacePreviewScreenReader(race);
+
+        terminal.Clear();
+
+        const int W = 76; // card width (centered in 80 cols, 2-char margin each side)
+        string pad = new string(' ', (80 - W) / 2); // left padding to center
+
+        var raceAttrib = GameConfig.RaceAttributes[race];
+        string raceName = GameConfig.RaceNames[(int)race];
+
+        // ── Top border with race name ──
+        CardTopBorder(pad, W, raceName);
+
+        CardBlank(pad, W);
+
+        // ── Description ──
+        string desc = GetRaceDescription(race);
+        CardLine(pad, W, $"  [bright_yellow]\"{desc}\"");
+
+        // ── Separator ──
+        CardSeparator(pad, W);
+        CardBlank(pad, W);
+
+        // ── Stat bars ──
+        CardStatBar(pad, W, "HP",       raceAttrib.HPBonus, 17);
+        CardStatBar(pad, W, "Strength", raceAttrib.StrengthBonus, 5);
+        CardStatBar(pad, W, "Defence",  raceAttrib.DefenceBonus, 5);
+        CardStatBar(pad, W, "Stamina",  raceAttrib.StaminaBonus, 5);
+
+        // ── Separator ──
+        CardSeparator(pad, W);
+        CardBlank(pad, W);
+
+        // ── Available classes ──
+        var allClasses = new[] {
+            CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Ranger,
+            CharacterClass.Assassin, CharacterClass.Bard, CharacterClass.Jester,
+            CharacterClass.Alchemist, CharacterClass.Magician, CharacterClass.Cleric,
+            CharacterClass.Sage, CharacterClass.Barbarian
+        };
+        var restricted = GameConfig.InvalidCombinations.ContainsKey(race)
+            ? GameConfig.InvalidCombinations[race]
+            : Array.Empty<CharacterClass>();
+        var available = allClasses.Where(c => !restricted.Contains(c)).ToList();
+
+        if (available.Count == allClasses.Length)
+        {
+            CardLine(pad, W, "  [cyan]Classes:  [white]All classes available");
+        }
+        else
+        {
+            var classNames = available.Select(c => c.ToString());
+            string classList = string.Join(", ", classNames);
+            if (("  Classes:  " + classList).Length <= W - 4)
+            {
+                CardLine(pad, W, $"  [cyan]Classes:  [white]{classList}");
+            }
+            else
+            {
+                CardLine(pad, W, $"  [cyan]Classes:");
+                var row1 = string.Join(", ", available.Take(available.Count / 2 + 1).Select(c => c.ToString()));
+                var row2 = string.Join(", ", available.Skip(available.Count / 2 + 1).Select(c => c.ToString()));
+                CardLine(pad, W, $"  [white]{row1}");
+                CardLine(pad, W, $"  [white]{row2}");
+            }
+        }
+
+        // ── Restricted classes (if any) ──
+        if (restricted.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
+        {
+            CardLine(pad, W, $"  [red]{GameConfig.RaceRestrictionReasons[race]}");
+        }
+
+        CardBlank(pad, W);
+
+        // ── Special trait ──
+        string special = race switch
+        {
+            CharacterRace.Troll => "[yellow]Regeneration [gray]- Heals HP each combat round",
+            CharacterRace.Gnoll => "[yellow]Poisonous Bite [gray]- Chance to poison enemies",
+            _ => "[gray]None"
+        };
+        CardLine(pad, W, $"  [cyan]Special:  {special}");
+
+        CardBlank(pad, W);
+
+        // ── Bottom border ──
+        CardBottomBorder(pad, W);
+
+        // ── Confirm prompt ──
+        terminal.WriteLine("");
+        var raceDesc = GameConfig.RaceDescriptions[race];
+        var response = await terminal.GetInputAsync($"{pad} Be {raceDesc}? (Y/N): ");
+
+        return !string.IsNullOrEmpty(response) &&
+               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+    }
+
+    /// <summary>
+    /// Write a blank card line: ║ (spaces) ║
+    /// </summary>
+    private void CardBlank(string pad, int cardWidth)
+    {
+        terminal.Write(pad, "gray");
+        terminal.Write("║", "gray");
+        terminal.Write(new string(' ', cardWidth - 2));
+        terminal.WriteLine("║", "gray");
+    }
+
+    /// <summary>
+    /// Write a card line with colored content: ║ content (padded to width) ║
+    /// </summary>
+    private void CardLine(string pad, int cardWidth, string content)
+    {
+        // Count visible characters in content (strip [color] tags)
+        int visibleLen = 0;
+        int idx = 0;
+        while (idx < content.Length)
+        {
+            if (content[idx] == '[')
+            {
+                int end = content.IndexOf(']', idx);
+                if (end > idx) { idx = end + 1; continue; }
+            }
+            visibleLen++;
+            idx++;
+        }
+
+        terminal.Write(pad, "gray");
+        terminal.Write("║", "gray");
+        UsurperRemake.UI.ANSIArt.DisplayColoredText(terminal, content);
+        int remaining = cardWidth - 2 - visibleLen;
+        if (remaining > 0) terminal.Write(new string(' ', remaining));
+        terminal.WriteLine("║", "gray");
+    }
+
+    /// <summary>
+    /// Write a stat bar line inside the card (single column, used by race card).
+    /// Format: ║  Label    ████████████░░░░░░░░  +N       ║
+    /// </summary>
+    private void CardStatBar(string pad, int cardWidth, string label, int value, int maxValue)
+    {
+        const int barWidth = 24;
+        int filled = (int)Math.Round((float)value / maxValue * barWidth);
+        filled = Math.Clamp(filled, 1, barWidth);
+
+        string filledBar = new string('█', filled);
+        string emptyBar = new string('░', barWidth - filled);
+        string bonus = $"+{value}";
+
+        string labelPad = $"  {label,-10}";
+        string bonusPad = $"  {bonus}";
+
+        int contentLen = labelPad.Length + barWidth + bonusPad.Length;
+        int trailing = cardWidth - 2 - contentLen;
+
+        terminal.Write(pad, "gray");
+        terminal.Write("║", "gray");
+        terminal.Write(labelPad, "white");
+        terminal.Write(filledBar, "bright_green");
+        terminal.Write(emptyBar, "gray");
+        terminal.Write(bonusPad, "white");
+        if (trailing > 0) terminal.Write(new string(' ', trailing));
+        terminal.WriteLine("║", "gray");
+    }
+
+    /// <summary>
+    /// Write two stat bars side-by-side inside the card (used by class card).
+    /// Format: ║  HP  ██████████░░░░  +4     AGI ██████░░░░░░░░  +3       ║
+    /// </summary>
+    private void CardStatBarPair(string pad, int cardWidth, string label1, int value1, string label2, int value2, int maxValue)
+    {
+        const int barWidth = 14;
+
+        // Left column: "  LBL ██████████████░  +N"
+        int filled1 = (int)Math.Round((float)value1 / maxValue * barWidth);
+        filled1 = Math.Clamp(filled1, 1, barWidth);
+        string fill1 = new string('█', filled1);
+        string empty1 = new string('░', barWidth - filled1);
+
+        // Right column: "  LBL ██████████████░  +N"
+        int filled2 = (int)Math.Round((float)value2 / maxValue * barWidth);
+        filled2 = Math.Clamp(filled2, 1, barWidth);
+        string fill2 = new string('█', filled2);
+        string empty2 = new string('░', barWidth - filled2);
+
+        // Layout: 2 margin + 4 label + 14 bar + 2 space + 2 bonus = 24 per col, 5 gap
+        // Total: 24 + 5 + 4 label + 14 bar + 2 space + 2 bonus = 51
+        string lbl1 = $"  {label1,-4}";  // "  HP  " or "  STR "
+        string bon1 = $"  +{value1}";
+        string gap  = "     ";
+        string lbl2 = $"{label2,-4}";    // "AGI " or "CHA "
+        string bon2 = $"  +{value2}";
+
+        int contentLen = lbl1.Length + barWidth + bon1.Length + gap.Length + lbl2.Length + barWidth + bon2.Length;
+        int trailing = cardWidth - 2 - contentLen;
+
+        terminal.Write(pad, "gray");
+        terminal.Write("║", "gray");
+        terminal.Write(lbl1, "white");
+        terminal.Write(fill1, "bright_green");
+        terminal.Write(empty1, "gray");
+        terminal.Write(bon1, "white");
+        terminal.Write(gap);
+        terminal.Write(lbl2, "white");
+        terminal.Write(fill2, "bright_green");
+        terminal.Write(empty2, "gray");
+        terminal.Write(bon2, "white");
+        if (trailing > 0) terminal.Write(new string(' ', trailing));
+        terminal.WriteLine("║", "gray");
+    }
+
+    /// <summary>Card top border: ╔═══ Title ══════╗</summary>
+    private void CardTopBorder(string pad, int cardWidth, string title)
+    {
+        string topLabel = $"═══ {title} ";
+        int topDashes = cardWidth - 2 - topLabel.Length;
+        terminal.WriteLine("");
+        terminal.Write(pad, "gray");
+        terminal.Write("╔", "gray");
+        terminal.Write(topLabel, "bright_yellow");
+        terminal.Write(new string('═', Math.Max(0, topDashes)), "gray");
+        terminal.WriteLine("╗", "gray");
+    }
+
+    /// <summary>Card separator: ╠──────────────╣</summary>
+    private void CardSeparator(string pad, int cardWidth)
+    {
+        terminal.Write(pad, "gray");
+        terminal.Write("╠", "gray");
+        terminal.Write(new string('─', cardWidth - 2), "gray");
+        terminal.WriteLine("╣", "gray");
+    }
+
+    /// <summary>Card bottom border: ╚══════════════╝</summary>
+    private void CardBottomBorder(string pad, int cardWidth)
+    {
+        terminal.Write(pad, "gray");
+        terminal.Write("╚", "gray");
+        terminal.Write(new string('═', cardWidth - 2), "gray");
+        terminal.WriteLine("╝", "gray");
+    }
+
+    private static string GetRaceDescription(CharacterRace race) => race switch
+    {
+        CharacterRace.Human => "Balanced in all areas. Can be any class.",
+        CharacterRace.Hobbit => "Small but agile. Excellent rogues and rangers.",
+        CharacterRace.Elf => "Graceful and magical. Excellent mages and clerics.",
+        CharacterRace.HalfElf => "Versatile like humans. Can be any class.",
+        CharacterRace.Dwarf => "Strong and tough. Great warriors, but distrust magic.",
+        CharacterRace.Troll => "Massive brutes with natural regeneration.",
+        CharacterRace.Orc => "Aggressive fighters with limited magic ability.",
+        CharacterRace.Gnome => "Small and clever. Great mages, poor heavy fighters.",
+        CharacterRace.Gnoll => "Pack hunters with a poisonous bite.",
+        CharacterRace.Mutant => "Chaotic and unpredictable. Can be any class.",
+        _ => "Unknown heritage."
+    };
+
+    private async Task<bool> ShowClassPreview(CharacterClass characterClass, CharacterRace race)
+    {
+        // Screen reader mode: plain text, no boxes or bars
+        if (GameConfig.ScreenReaderMode)
+            return await ShowClassPreviewScreenReader(characterClass);
+
+        terminal.Clear();
+
+        const int W = 76;
+        string pad = new string(' ', (80 - W) / 2);
+
+        var attrs = GameConfig.ClassStartingAttributes[characterClass];
+        string className = characterClass.ToString();
+
+        // Determine class category
+        string category = characterClass switch
+        {
+            CharacterClass.Warrior or CharacterClass.Barbarian or CharacterClass.Paladin => "Melee Fighter",
+            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester => "Hybrid Class",
+            CharacterClass.Magician or CharacterClass.Sage or CharacterClass.Cleric or CharacterClass.Alchemist => "Magic User",
+            _ => "Adventurer"
+        };
+
+        // ── Top border with class name ──
+        CardTopBorder(pad, W, className);
+
+        CardBlank(pad, W);
+
+        // ── Category + Description ──
+        CardLine(pad, W, $"  [cyan]{category}");
+        string desc = GetClassDescription(characterClass);
+        CardLine(pad, W, $"  [bright_yellow]\"{desc}\"");
+
+        // ── Separator ──
+        CardSeparator(pad, W);
+        CardBlank(pad, W);
+
+        // ── Two-column stat bars (5 rows instead of 10) ──
+        CardStatBarPair(pad, W, "HP",  attrs.HP,           "AGI", attrs.Agility, 5);
+        CardStatBarPair(pad, W, "STR", attrs.Strength,     "CHA", attrs.Charisma, 5);
+        CardStatBarPair(pad, W, "DEF", attrs.Defence,      "DEX", attrs.Dexterity, 5);
+        CardStatBarPair(pad, W, "STA", attrs.Stamina,      "WIS", attrs.Wisdom, 5);
+        CardStatBarPair(pad, W, "CON", attrs.Constitution, "INT", attrs.Intelligence, 5);
+
+        // ── Separator ──
+        CardSeparator(pad, W);
+        CardBlank(pad, W);
+
+        // ── Mana + Strengths (compact) ──
+        string manaText = attrs.Mana > 0 ? $"[bright_green]{attrs.Mana}" : "[gray]None";
+        CardLine(pad, W, $"  [cyan]Mana: {manaText}");
+        string strengths = GetClassStrengths(characterClass);
+        CardLine(pad, W, $"  [cyan]Strengths:  [white]{strengths}");
+
+        CardBlank(pad, W);
+
+        // ── Bottom border ──
+        CardBottomBorder(pad, W);
+
+        // ── Confirm prompt ──
+        terminal.WriteLine("");
+        var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
+        var response = await terminal.GetInputAsync($"{pad} Be {article} {className}? (Y/N): ");
+
+        return !string.IsNullOrEmpty(response) &&
+               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+    }
+
+    /// <summary>Screen reader race preview: plain text, no boxes or stat bars.</summary>
+    private async Task<bool> ShowRacePreviewScreenReader(CharacterRace race)
+    {
+        terminal.Clear();
+
+        var raceAttrib = GameConfig.RaceAttributes[race];
+        string raceName = GameConfig.RaceNames[(int)race];
+        string desc = GetRaceDescription(race);
+
+        terminal.WriteLine("");
+        terminal.WriteLine($"Race: {raceName}");
+        terminal.WriteLine($"\"{desc}\"");
+        terminal.WriteLine("");
+        terminal.WriteLine($"Stats: HP +{raceAttrib.HPBonus}, Strength +{raceAttrib.StrengthBonus}, Defence +{raceAttrib.DefenceBonus}, Stamina +{raceAttrib.StaminaBonus}");
+        terminal.WriteLine("");
+
+        // Available classes
+        var allClasses = new[] {
+            CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Ranger,
+            CharacterClass.Assassin, CharacterClass.Bard, CharacterClass.Jester,
+            CharacterClass.Alchemist, CharacterClass.Magician, CharacterClass.Cleric,
+            CharacterClass.Sage, CharacterClass.Barbarian
+        };
+        var restricted = GameConfig.InvalidCombinations.ContainsKey(race)
+            ? GameConfig.InvalidCombinations[race]
+            : Array.Empty<CharacterClass>();
+        var available = allClasses.Where(c => !restricted.Contains(c)).ToList();
+
+        if (available.Count == allClasses.Length)
+        {
+            terminal.WriteLine("Classes: All classes available");
+        }
+        else
+        {
+            terminal.WriteLine($"Classes: {string.Join(", ", available.Select(c => c.ToString()))}");
+        }
+
+        if (restricted.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
+        {
+            terminal.WriteLine($"Restricted: {GameConfig.RaceRestrictionReasons[race]}");
+        }
+
+        terminal.WriteLine("");
+
+        // Special trait
+        string special = race switch
+        {
+            CharacterRace.Troll => "Regeneration - Heals HP each combat round",
+            CharacterRace.Gnoll => "Poisonous Bite - Chance to poison enemies",
+            _ => "None"
+        };
+        terminal.WriteLine($"Special: {special}");
+
+        terminal.WriteLine("");
+        var raceDesc = GameConfig.RaceDescriptions[race];
+        var response = await terminal.GetInputAsync($"Be {raceDesc}? (Y/N): ");
+
+        return !string.IsNullOrEmpty(response) &&
+               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+    }
+
+    /// <summary>Screen reader class preview: plain text, no boxes or stat bars.</summary>
+    private async Task<bool> ShowClassPreviewScreenReader(CharacterClass characterClass)
+    {
+        terminal.Clear();
+
+        var attrs = GameConfig.ClassStartingAttributes[characterClass];
+        string className = characterClass.ToString();
+
+        string category = characterClass switch
+        {
+            CharacterClass.Warrior or CharacterClass.Barbarian or CharacterClass.Paladin => "Melee Fighter",
+            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester => "Hybrid Class",
+            CharacterClass.Magician or CharacterClass.Sage or CharacterClass.Cleric or CharacterClass.Alchemist => "Magic User",
+            _ => "Adventurer"
+        };
+
+        string desc = GetClassDescription(characterClass);
+
+        terminal.WriteLine("");
+        terminal.WriteLine($"Class: {className} ({category})");
+        terminal.WriteLine($"\"{desc}\"");
+        terminal.WriteLine("");
+        terminal.WriteLine($"Stats: HP +{attrs.HP}, STR +{attrs.Strength}, DEF +{attrs.Defence}, STA +{attrs.Stamina}, AGI +{attrs.Agility}, CHA +{attrs.Charisma}, DEX +{attrs.Dexterity}, WIS +{attrs.Wisdom}, INT +{attrs.Intelligence}, CON +{attrs.Constitution}");
+        terminal.WriteLine("");
+
+        string manaText = attrs.Mana > 0 ? attrs.Mana.ToString() : "None (physical class)";
+        terminal.WriteLine($"Mana: {manaText}");
+        string strengths = GetClassStrengths(characterClass);
+        terminal.WriteLine($"Strengths: {strengths}");
+
+        terminal.WriteLine("");
+        var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
+        var response = await terminal.GetInputAsync($"Be {article} {className}? (Y/N): ");
+
+        return !string.IsNullOrEmpty(response) &&
+               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+    }
+
+    private static string GetClassDescription(CharacterClass cls) => cls switch
+    {
+        CharacterClass.Warrior => "Strong fighters, masters of weapons. Balanced and reliable.",
+        CharacterClass.Barbarian => "Savage fighters with incredible strength and endurance.",
+        CharacterClass.Paladin => "Holy warriors of virtue. Strong in combat and spirit.",
+        CharacterClass.Ranger => "Woodsmen and trackers. Balanced fighters with survival skills.",
+        CharacterClass.Assassin => "Deadly killers, masters of stealth and critical strikes.",
+        CharacterClass.Bard => "Musicians and storytellers. Social skills and light combat.",
+        CharacterClass.Jester => "Entertainers and tricksters. Very agile and unpredictable.",
+        CharacterClass.Magician => "Powerful spellcasters with devastating magic but frail bodies.",
+        CharacterClass.Sage => "Scholars and wise magic users. The deepest mana reserves.",
+        CharacterClass.Cleric => "Healers and holy magic users. Devoted to faith and wisdom.",
+        CharacterClass.Alchemist => "Potion makers and researchers. Wisdom and charisma.",
+        _ => "An adventurer of unknown calling."
+    };
+
+    private static string GetClassStrengths(CharacterClass cls) => cls switch
+    {
+        CharacterClass.Warrior => "High HP, STR, DEF, CON. Well-rounded melee.",
+        CharacterClass.Barbarian => "Highest HP, STR, STA, CON. Raw power.",
+        CharacterClass.Paladin => "High HP, STR, STA, CON. Tough and honorable.",
+        CharacterClass.Ranger => "Good STA, DEX. Jack of all trades.",
+        CharacterClass.Assassin => "Best DEX. High STR and AGI for ambushes.",
+        CharacterClass.Bard => "Good CHA, DEX. Balanced across all stats.",
+        CharacterClass.Jester => "Best AGI and DEX. Unpredictable in combat.",
+        CharacterClass.Magician => "Best INT and CHA. Powerful offensive magic.",
+        CharacterClass.Sage => "Best WIS and INT. Deepest mana pool (50).",
+        CharacterClass.Cleric => "Good WIS and CHA. Healing magic and mana.",
+        CharacterClass.Alchemist => "Best WIS and INT. High CHA for trading.",
+        _ => "Unknown strengths."
+    };
+
+    #endregion
+
     /// <summary>
     /// Select character class with race validation (Pascal USERHUNC.PAS class selection)
     /// </summary>
@@ -668,9 +1135,8 @@ public class CharacterCreationSystem
                     continue;
                 }
 
-                terminal.WriteLine("");
-                var article2 = "aeiouAEIOU".Contains(characterClass.ToString()[0]) ? "an" : "a";
-                if (await ConfirmChoice($"Be {article2} {characterClass}", false))
+                // Show class preview card with stats
+                if (await ShowClassPreview(characterClass, race))
                 {
                     return characterClass;
                 }

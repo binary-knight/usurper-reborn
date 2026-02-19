@@ -3772,10 +3772,10 @@ public partial class CombatEngine
                 continue; // Skip normal drop logic for bosses
             }
 
-            // Regular monsters - normal drop chance (v0.41.4: reduced from 15%+0.5%/lvl cap 40%)
-            // Drop chance: 8% base + 0.3% per monster level, capped at 25%
-            double dropChance = 0.08 + (monster.Level * 0.003);
-            dropChance = Math.Min(0.25, dropChance);
+            // Regular monsters - drop chance scales with level
+            // Drop chance: 12% base + 0.5% per monster level, capped at 30%
+            double dropChance = 0.12 + (monster.Level * 0.005);
+            dropChance = Math.Min(0.30, dropChance);
 
             // Named monsters (Lords, Chiefs, Kings) have better drop chance (v0.41.4: 60% → 35%)
             if (monster.Name.Contains("Boss") || monster.Name.Contains("Chief") ||
@@ -11492,7 +11492,7 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// XP formula matching the player's curve (level^1.8 * 50)
+    /// XP formula matching the player's curve (level^2.0 * 50)
     /// </summary>
     private static long GetExperienceForLevel(int level)
     {
@@ -11500,7 +11500,7 @@ public partial class CombatEngine
         long exp = 0;
         for (int i = 2; i <= level; i++)
         {
-            exp += (long)(Math.Pow(i, 2.2) * 50);
+            exp += (long)(Math.Pow(i, 2.0) * 50);
         }
         return exp;
     }

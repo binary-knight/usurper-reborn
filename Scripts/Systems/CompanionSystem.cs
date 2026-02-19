@@ -1503,7 +1503,7 @@ namespace UsurperRemake.Systems
         #region Experience and Leveling
 
         /// <summary>
-        /// XP formula matching the player's curve (level^1.8 * 50)
+        /// XP formula matching the player's curve (level^2.0 * 50)
         /// </summary>
         public static long GetExperienceForLevel(int level)
         {
@@ -1511,7 +1511,7 @@ namespace UsurperRemake.Systems
             long exp = 0;
             for (int i = 2; i <= level; i++)
             {
-                exp += (long)(Math.Pow(i, 2.2) * 50);
+                exp += (long)(Math.Pow(i, 2.0) * 50);
             }
             return exp;
         }

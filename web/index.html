@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Usurper Reborn - A World That Lives Without You</title>
-    <meta name="description" content="A philosophical text RPG where 60+ autonomous NPCs are born, live, and die whether you're playing or not. Five endings. Seven corrupted gods. One question: what remains when you let go?">
+    <title>Usurper Reborn - A Modern Remake of the 1993 BBS Classic</title>
+    <meta name="description" content="A text RPG remake of the 1993 BBS door game Usurper. 60+ NPCs that live and die on their own, a 100-floor dungeon, seven gods to save or destroy, and five endings. Free and open source. Play in your browser, over SSH, or on a BBS.">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231a0a2e'/%3E%3Ctext x='16' y='22' font-family='serif' font-weight='bold' font-size='16' fill='%23ffaa00' text-anchor='middle'%3EUR%3C/text%3E%3Cpolygon points='10,7 16,3 22,7' fill='%23ffaa00'/%3E%3Cpolygon points='12,7 16,4.5 20,7' fill='%231a0a2e'/%3E%3Crect x='11' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3Crect x='15' y='5' width='2' height='4' fill='%23ffaa00'/%3E%3Crect x='19' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -1347,7 +1347,7 @@
         <a href="#" class="logo">USURPER REBORN</a>
         <nav class="nav-links">
             <a href="#live-stats">Live</a>
-            <a href="#philosophy">Philosophy</a>
+            <a href="#philosophy">About</a>
             <a href="#features">Features</a>
             <a href="#story">Story</a>
             <a href="#gods">Old Gods</a>
@@ -1373,11 +1373,11 @@
             <div class="title-main">USURPER</div>
             <div class="title-sub">REBORN</div>
         </div>
-        <p class="hero-subtitle">A WORLD THAT LIVES WITHOUT YOU</p>
+        <p class="hero-subtitle">THE 1993 BBS CLASSIC, REBUILT</p>
         <p class="hero-desc">
-            60+ souls are born, fall in love, grow old, and die. Whether you're watching or not.
-            Beneath a 100-floor dungeon, seven corrupted gods wait for someone to ask the right question.
-            Five endings. Only one offers peace.
+            A text RPG where the town keeps going when you log off. NPCs get married, have kids, get old, die.
+            100-floor dungeon. Seven gods who want to talk before you fight them.
+            Five different endings. GPL licensed, totally free.
         </p>
         <div class="hero-buttons">
             <button class="btn btn-primary" id="play-btn" onclick="openTerminal()">Play Now in Browser</button>
@@ -1408,7 +1408,7 @@
 <section id="live-stats">
     <div class="container">
         <h2 class="section-title">// WORLD STATUS</h2>
-        <p class="section-subtitle">Live data from the simulation. This is happening right now.</p>
+        <p class="section-subtitle">Pulled live from the game server. The world sim ticks every 30 seconds.</p>
 
         <div id="stats-content">
             <div class="stats-error" id="stats-loading">Loading world data...</div>
@@ -1419,39 +1419,39 @@
 <!-- Philosophy / Manifesto -->
 <section id="philosophy" class="manifesto-section">
     <div class="container">
-        <h2 class="section-title" style="color:var(--purple);text-shadow:var(--glow-purple)">// THE EXPERIMENT</h2>
-        <p class="section-subtitle">This isn't just a game. It's a question.</p>
+        <h2 class="section-title" style="color:var(--purple);text-shadow:var(--glow-purple)">// WHY I MADE THIS</h2>
+        <p class="section-subtitle">The short version.</p>
 
         <p class="manifesto-lead">
-            What happens when you build a world that doesn't need you?
+            I used to dial into BBSes on a 14.4k modem when I was a kid. Usurper was the game that stuck with me &mdash; not LORD, not Trade Wars, Usurper. Something about the depth of it. When Jakob Dangarden open-sourced the original Turbo Pascal code under the GPL back in 2004, I eventually stumbled on it and started thinking about what the game would be if you rebuilt it from scratch with modern tools. So I did.
         </p>
 
         <div class="manifesto-grid">
             <div class="manifesto-block">
-                <h3>Impermanence</h3>
-                <p>Every NPC in this world has a birthday, a personality, and a death. They fall in love on their own. They have children who grow up and replace them. Log out for a week and the town you knew is different. Marriages, funerals, new faces. Nothing waits. Nothing is permanent. That's the point.</p>
+                <h3>The World Keeps Going</h3>
+                <p>This was the thing I most wanted to get right. The NPCs aren't just standing around waiting for you to show up. They've got birthdays, personalities, opinions. They get married on their own, have kids, those kids grow up and become new NPCs. People die of old age. If you don't log in for a while, the town will look different when you come back &mdash; people you knew might be gone, and there'll be new faces you've never seen. It's a bit like checking in on a fish tank, except the fish have drama.</p>
             </div>
 
             <div class="manifesto-block">
-                <h3>The Cycle</h3>
-                <p>Beat the game, and it restarts. But this time the NPCs remember you. Faintly. By the third cycle, they're asking questions you can't answer. Is the loop a prison or a practice? Does the difference matter? The five endings aren't difficulty tiers. They're philosophical positions: power, compassion, independence, awakening, and release.</p>
+                <h3>NG+ That Isn't Just Harder Numbers</h3>
+                <p>When you beat the game, it loops. But the NPCs start to remember. First cycle it's subtle &mdash; "Have we met before?" By cycle three they're asking uncomfortable questions about why everything feels like it already happened. The five endings aren't ranked by difficulty. They're five different takes on the same problem, and honestly I don't think any of them are "the right one."</p>
             </div>
 
             <div class="manifesto-block">
-                <h3>The Gods Below</h3>
-                <p>Seven deities sealed in a 100-floor dungeon. Each one is a question wearing a body. A war god who forgot what honor means. A love goddess fading because no one believes love endures. A creator at the bottom, weary of eternity, who just wants to ask you: <em>what should I do?</em> Your answer determines everything. And the game remembers what you chose.</p>
+                <h3>The Gods Talk To You</h3>
+                <p>There are seven bosses sealed in the dungeon, but they're not really bosses. They're gods who used to mean something and got corrupted. Before you fight each one, they'll talk to you, and your dialogue choices actually change the combat &mdash; different stat modifiers, different abilities. The guy at the very bottom of floor 100 doesn't even want to fight. He's just tired and he has a question for you. What you tell him determines how the game ends.</p>
             </div>
 
             <div class="manifesto-block">
-                <h3>Presence</h3>
-                <p>This is a text game. No cutscenes, no voice acting, no motion capture. Just a blinking cursor and your imagination. The world is rendered in words because the most important things can't be shown. They can only be felt. Play alone at 2am and make a choice about a god who begs for death. Or play online and discover that someone else made a different choice, and the world shifted because of it.</p>
+                <h3>Why Text</h3>
+                <p>The original was a text game and this is a text game. I get asked about this a lot. Partly it's staying true to the source material, but honestly, some of the stuff in this game hits harder as words on a screen at 2am than it would as a cutscene. There's also a shared online server where other players' choices affect the same world, and you can play from literally anything with a terminal &mdash; browser, SSH client, telnet, even an actual BBS.</p>
             </div>
         </div>
 
         <div class="manifesto-closing">
-            <p>Built at the intersection of philosophy, science, art, and nostalgia.<br>
-            A living world. A deep dungeon. A question with no easy answer.</p>
-            <p class="manifesto-play">Play alone. Play together. The world is already running.</p>
+            <p>No microtransactions. No ads. No loot boxes. Just a game.<br>
+            GPL v2 licensed. The source code is on GitHub if you want to look at it or fork it.</p>
+            <p class="manifesto-play">Server's up 24/7. Drop in whenever.</p>
         </div>
     </div>
 </section>
@@ -1459,32 +1459,32 @@
 <!-- Features -->
 <section id="features">
     <div class="container">
-        <h2 class="section-title">// THE LIVING WORLD</h2>
-        <p class="section-subtitle">Not a scripted world. An emergent one.</p>
+        <h2 class="section-title">// WHAT'S IN IT</h2>
+        <p class="section-subtitle">The stuff the original had, plus everything I kept wishing it had back in the day.</p>
         <div class="feature-grid">
             <div class="feature-card">
-                <h3>Autonomous Souls</h3>
-                <p>60+ NPCs with personalities, goals, opinions, and memories. They choose careers, form friendships, hold grudges. They remember what you did to them, even across cycles.</p>
+                <h3>60+ NPCs</h3>
+                <p>They've each got personality traits (like commitment, romanticism, aggression), goals, opinions, and memory of what you've done to them. They hold grudges. They remember stuff across NG+ cycles too, which gets weird.</p>
             </div>
             <div class="feature-card">
-                <h3>Birth, Love, Death</h3>
-                <p>NPCs fall in love, marry, have children, age, and die. Their children grow up and take their place. The population turns over. No one is permanent. Not even the ones you care about.</p>
+                <h3>NPC Lifecycle</h3>
+                <p>This is the part people seem to notice first. The NPCs actually get married, have children, grow old, and die. Their kids grow up into new NPCs. The population turns over. You might log in one day and your favorite shopkeeper is just... gone, and their kid is running the place now.</p>
             </div>
             <div class="feature-card">
-                <h3>The News Never Stops</h3>
-                <p>Log in and discover the blacksmith married the barmaid, the king was assassinated, a plague swept through town, or a child you watched grow up just came of age.</p>
+                <h3>News Feed</h3>
+                <p>There's a live news system that tracks everything happening in town. Marriages, deaths, births, assassinations, plagues, coming-of-age ceremonies. It all just happens on its own.</p>
             </div>
             <div class="feature-card">
-                <h3>Shared World</h3>
-                <p>Play alone or connect to a persistent multiplayer world that runs 24/7. Your choices ripple through other players' experiences. Theirs ripple through yours.</p>
+                <h3>Multiplayer</h3>
+                <p>You can play offline by yourself or hop on the shared server. The server runs the world sim 24/7. There's PvP, chat, a shared economy, and a leaderboard. Your actions show up in other players' news feeds.</p>
             </div>
             <div class="feature-card">
-                <h3>100 Floors Down</h3>
-                <p>A dungeon that never changes layout but always changes meaning. Seven corrupted gods waiting in the dark. Ancient seals. Five endings. The deeper you go, the harder the questions.</p>
+                <h3>100-Floor Dungeon</h3>
+                <p>Floors are generated deterministically, so the layout stays the same each visit and you actually learn the map. Seven god encounters. Six seals to find. Gets genuinely hard around floor 50+.</p>
             </div>
             <div class="feature-card">
-                <h3>A Game Within a Game</h3>
-                <p>11 classes, 10 races, political intrigue, romance, court factions, PvP, companion quests, and a throne to usurp. Inspired by the 1993 BBS door game that started it all.</p>
+                <h3>The RPG Stuff</h3>
+                <p>11 classes, 10 races, 75 spells. Romance system, marriage, kids. Court politics and throne challenges. Factions you can join or betray. 4 recruitable companions with their own quest lines. A PvP arena. Pretty much everything the original had, plus a lot more on top.</p>
             </div>
         </div>
     </div>
@@ -1494,7 +1494,7 @@
 <section class="sponsors-section" id="sponsors">
     <div class="container" style="padding-top:48px;padding-bottom:48px;">
         <h2 class="section-title" style="color:#ea4aaa;text-shadow:0 0 10px rgba(234,74,170,0.5)">// SPONSORS</h2>
-        <p class="section-subtitle">Thank you to everyone who supports this project.</p>
+        <p class="section-subtitle">People who help keep this project alive. Thank you.</p>
         <div class="sponsors-grid" id="sponsors-grid">
             <div class="sponsors-empty" id="sponsors-loading">Loading sponsors...</div>
         </div>
@@ -1507,37 +1507,27 @@
 <!-- Story -->
 <section id="story">
     <div class="container">
-        <h2 class="section-title">// THE STORY SO FAR</h2>
-        <p class="section-subtitle">A tale of gods, corruption, and the mortal who dared to challenge eternity.</p>
+        <h2 class="section-title">// THE STORY</h2>
+        <p class="section-subtitle">The setup. No spoilers past what you learn in the first hour.</p>
 
         <div class="story-page">
             <h3>~ The Golden Age ~</h3>
-            <p>Long ago, in an age now lost to memory, the world was watched over by the Seven Divine. Gods of immense power who guided mortalkind with wisdom and grace. Under their benevolent gaze, civilizations flourished.</p>
-            <p>The god of war taught honor in battle. The goddess of love blessed every union. The god of light ensured truth prevailed over deception.</p>
-            <p>It was an age of miracles. An age of heroes. An age of hope.</p>
+            <p>There used to be seven gods watching over the world. The god of war taught honor in battle. The goddess of love blessed unions. The god of light kept truth alive. Things were good, or at least the legends say they were. Nobody alive remembers it firsthand.</p>
         </div>
 
         <div class="story-page">
             <h3>~ The Sundering ~</h3>
-            <p>Then came the Sundering. A cataclysm whose cause remains unknown. Some say mortals grew too proud and turned away from the gods. Others whisper of a betrayal among the Divine themselves. Whatever the truth, the result was catastrophic.</p>
-            <p>The Seven were corrupted. Twisted. Imprisoned in realms of their own making.</p>
-            <p>The god of war became rage incarnate, drowning in endless bloodshed. The goddess of love withered into jealousy and obsession. The god of light faded to barely a whisper, truth dying with each passing lie.</p>
+            <p>Then something went catastrophically wrong. Nobody agrees on what exactly happened &mdash; maybe mortals got too proud, maybe one of the gods betrayed the others. The result was the same either way: all seven gods were corrupted and imprisoned underground. The war god lost his mind. The love goddess started fading. The god of truth went quiet. One by one, they all broke.</p>
         </div>
 
         <div class="story-page">
             <h3>~ The Age of Avarice ~</h3>
-            <p>Centuries have passed. The Old Gods are now mere legends. Cautionary tales told to frighten children. In their absence, mortals have created new gods to worship, pale echoes of the Divine that once were.</p>
-            <p>And in this godless age, a new power has risen: <strong style="color:var(--gold)">AVARICE.</strong></p>
-            <p>The Halls of Avarice. A sprawling underground complex where adventurers seek fortune, glory, and power. Where the strong prey upon the weak. Where gold is the only god that matters.</p>
-            <p>Some come seeking treasure. Some come seeking fame. Some come to escape their past. And some... some hear whispers in the dark. Ancient voices calling from the depths. Promising power. Demanding sacrifice.</p>
+            <p>Centuries later, the old gods are just stories people tell to scare kids. The dungeon where they're sealed &mdash; the Halls of Avarice &mdash; became a place where adventurers go to get rich or die trying. Most of them are just there for gold and glory. But some of them, if they go deep enough, start hearing things. Voices in the dark, from something very old, calling them further down.</p>
         </div>
 
         <div class="story-page">
-            <h3>~ Your Story Begins ~</h3>
-            <p>You arrive at the gates of the realm with little more than the clothes on your back and a hunger for something more.</p>
-            <p>Will you delve into the deadly Dungeons in search of treasure and glory? Will you find love on the cobblestones of this dangerous town? Will you rise to become a champion... or fall to become a cautionary tale?</p>
-            <p>And perhaps, if you grow strong enough, you may discover what truly lurks in the deepest halls. You may learn the fate of the Old Gods. You may even have the chance to save them... or destroy them forever.</p>
-            <p style="color:var(--cyan)">The choice, adventurer, is yours.</p>
+            <h3>~ You ~</h3>
+            <p>You show up with nothing. Pick a race, pick a class, figure the rest out as you go. Fight monsters in the dungeon, make friends or enemies in town, get involved in local politics, maybe fall in love. If you get strong enough you can challenge the king for his throne. If you go deep enough you'll find out what's actually down there. The gods at the bottom will talk to you before the fight, and what you say matters. The whole ending changes depending on those conversations.</p>
         </div>
     </div>
 </section>
@@ -1546,7 +1536,7 @@
 <section id="gods">
     <div class="container">
         <h2 class="section-title" style="color:var(--purple);text-shadow:var(--glow-purple)">// THE SEVEN OLD GODS</h2>
-        <p class="section-subtitle">Once benevolent deities, now corrupted and imprisoned in the depths. Each must be confronted to learn the truth.</p>
+        <p class="section-subtitle">Seven gods sealed in the dungeon. Each one used to stand for something. Now they're broken. You decide what happens to them.</p>
 
         <div class="god-grid">
             <div class="god-card" style="border-top:3px solid var(--red)">
@@ -1554,7 +1544,7 @@
                 <h3>Maelketh</h3>
                 <div class="god-title">The Broken Blade</div>
                 <div class="god-domain">War &amp; Conquest</div>
-                <p>Once the noble god of honorable combat, Maelketh's mind shattered during the Sundering. Now he knows only endless war.</p>
+                <p>First one you'll run into. Used to represent honorable combat. His mind's gone now, he just fights on loop. Doesn't even know why anymore. Depending on what you say to him beforehand, the fight plays out very differently.</p>
             </div>
 
             <div class="god-card" style="border-top:3px solid #ff66aa">
@@ -1562,7 +1552,7 @@
                 <h3>Veloura</h3>
                 <div class="god-title">The Withered Heart</div>
                 <div class="god-domain">Love &amp; Passion</div>
-                <p>The goddess of love fades with each broken heart. She can still be saved... if one proves love endures.</p>
+                <p>She's fading. Not angry about it, just... going away. You can save her if you prove something to her, but I won't spoil what.</p>
             </div>
 
             <div class="god-card" style="border-top:3px solid var(--gold)">
@@ -1570,7 +1560,7 @@
                 <h3>Thorgrim</h3>
                 <div class="god-title">The Hollow Judge</div>
                 <div class="god-domain">Law &amp; Order</div>
-                <p>The god of justice became the god of tyranny. His scales weigh only power now.</p>
+                <p>God of justice turned tyrant. His arguments are technically correct and completely deranged at the same time. You can try to reason with him if you want. Good luck.</p>
             </div>
 
             <div class="god-card" style="border-top:3px solid var(--purple)">
@@ -1578,7 +1568,7 @@
                 <h3>Noctura</h3>
                 <div class="god-title">The Shadow Weaver</div>
                 <div class="god-domain">Shadow &amp; Secrets</div>
-                <p>The mysterious orchestrator. She set these events in motion. Her true motives remain hidden.</p>
+                <p>You've actually been running into her the whole game in various disguises. She orchestrated most of what happened to you. Won't say more than that.</p>
             </div>
 
             <div class="god-card" style="border-top:3px solid #ffee44">
@@ -1586,7 +1576,7 @@
                 <h3>Aurelion</h3>
                 <div class="god-title">The Fading Light</div>
                 <div class="god-domain">Light &amp; Truth</div>
-                <p>The god of truth speaks only in whispers now. His light dims with every lie told in the realm.</p>
+                <p>Used to be the god of truth. He gets weaker every time someone lies in the realm above. By the time you reach him he can barely talk.</p>
             </div>
 
             <div class="god-card" style="border-top:3px solid #886644">
@@ -1594,7 +1584,7 @@
                 <h3>Terravok</h3>
                 <div class="god-title">The Sleeping Mountain</div>
                 <div class="god-domain">Earth &amp; Endurance</div>
-                <p>The oldest god sleeps beneath the dungeon. He can be awakened... but should he be?</p>
+                <p>He's been asleep. For a very long time. The oldest of all seven. Waking him up is an option, but "should you" is the actual question.</p>
             </div>
 
             <div class="god-card" style="border-top:3px solid var(--cyan)">
@@ -1602,7 +1592,7 @@
                 <h3>Manwe</h3>
                 <div class="god-title">The Weary Creator</div>
                 <div class="god-domain">Creation &amp; Balance</div>
-                <p>The Supreme Creator. He waits at the end of all paths, weary of eternity. Your choices determine his fate. And yours.</p>
+                <p>He made everything. He's at the bottom of the whole dungeon and he doesn't want to fight. He's just tired of existing and he has one question for you. Your answer is the ending of the game. This is the encounter I spent the most time writing.</p>
             </div>
         </div>
     </div>
@@ -1612,84 +1602,84 @@
 <section id="classes">
     <div class="container">
         <h2 class="section-title">// CLASSES &amp; RACES</h2>
-        <p class="section-subtitle">Choose from 11 distinct classes and 10 races. Each combination offers unique strengths and playstyles.</p>
+        <p class="section-subtitle">11 classes, 10 races. Pick whatever sounds fun. They all play differently.</p>
 
         <h3 style="font-family:'JetBrains Mono',monospace;color:var(--cyan);font-size:13px;margin-bottom:16px;text-align:center;">Character Classes</h3>
         <div class="class-grid">
             <div class="class-card">
                 <h4>Warrior</h4>
                 <div class="class-role">Melee Fighter</div>
-                <p>Balanced melee combatant with solid HP, strength, and defense. The reliable choice for any adventurer.</p>
+                <p>The default pick. Decent at everything. Not going to blow anyone away but won't let you down either.</p>
                 <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
                 <div class="stat-bar"><span>DEF</span><div class="bar"><div class="bar-fill def" style="width:80%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Paladin</h4>
                 <div class="class-role">Holy Knight</div>
-                <p>Heavy armor, high stamina, and righteous fury. Strong defense with moderate offensive capability.</p>
+                <p>Tanky. Lots of stamina, strong defense. Good if you want to not die.</p>
                 <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
                 <div class="stat-bar"><span>DEF</span><div class="bar"><div class="bar-fill def" style="width:60%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Ranger</h4>
                 <div class="class-role">Scout &amp; Tracker</div>
-                <p>Swift and versatile. High stamina and dexterity make rangers excellent dungeon explorers.</p>
+                <p>Quick, versatile. High stamina and dex. Good all-arounder for people who want to explore the dungeon without worrying too much about builds.</p>
                 <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:80%"></div></div></div>
                 <div class="stat-bar"><span>STA</span><div class="bar"><div class="bar-fill def" style="width:80%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Assassin</h4>
                 <div class="class-role">Shadow Striker</div>
-                <p>Devastating backstab attacks and unmatched dexterity. Fragile but deadly in the right hands.</p>
+                <p>Highest dex in the game and the backstab mechanic is devastating when it lands. You will die fast if something connects though. High risk, high reward.</p>
                 <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
                 <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Bard</h4>
                 <div class="class-role">Jack of All Trades</div>
-                <p>Well-rounded with high charisma. Capable in combat, social situations, and support roles.</p>
+                <p>High charisma so NPCs treat you better. Can do a bit of everything. Not amazing at any one thing but you'll never feel useless.</p>
                 <div class="stat-bar"><span>CHA</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
                 <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:80%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Jester</h4>
                 <div class="class-role">Trickster</div>
-                <p>Unpredictable and agile. Highest dexterity and agility of any class, with chaos-based abilities.</p>
+                <p>Fastest thing on two legs. Max agility and dex. The abilities are chaotic and weird. Fun class if you don't mind some randomness.</p>
                 <div class="stat-bar"><span>AGI</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
                 <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Alchemist</h4>
                 <div class="class-role">Arcane Crafter</div>
-                <p>Blends science and magic. High wisdom and intelligence with charismatic flair.</p>
+                <p>Sort of a wizard-scientist hybrid. High INT and WIS. The abilities have a crafting flavor to them.</p>
                 <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
                 <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Magician</h4>
                 <div class="class-role">Arcane Caster</div>
-                <p>Pure spellcaster with devastating magical power. Fragile in melee but commands 75 spells.</p>
+                <p>The full spellcaster. Access to all 75 spells. Will destroy things with magic, but if a monster actually reaches you in melee you're in trouble.</p>
                 <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
                 <div class="stat-bar"><span>CHA</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Cleric</h4>
                 <div class="class-role">Divine Healer</div>
-                <p>Holy magic and healing spells. Moderate combat with strong support abilities and divine mana.</p>
+                <p>Healing and support magic. Can hold their own in a fight too. In multiplayer, everybody wants a cleric in the party.</p>
                 <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
                 <div class="stat-bar"><span>CHA</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Sage</h4>
                 <div class="class-role">Scholar Mage</div>
-                <p>Highest wisdom and intelligence. Massive mana pool (50 base) for unmatched spellcasting endurance.</p>
+                <p>Biggest mana pool in the game (50 base). Highest WIS and INT. You'll cast spells all day while the magician ran out three fights ago.</p>
                 <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
                 <div class="stat-bar"><span>MNA</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
             </div>
             <div class="class-card">
                 <h4>Barbarian</h4>
                 <div class="class-role">Berserker</div>
-                <p>Raw power incarnate. Highest HP, strength, stamina, and constitution. Brains optional.</p>
+                <p>Biggest numbers in the game. Most HP, most strength, most stamina. Basically just walks forward and hits things. INT stat is there technically.</p>
                 <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:100%"></div></div></div>
                 <div class="stat-bar"><span>HP</span><div class="bar"><div class="bar-fill str" style="width:100%"></div></div></div>
             </div>
@@ -1699,43 +1689,43 @@
         <div class="class-grid">
             <div class="class-card">
                 <h4>Human</h4>
-                <p>Balanced and adaptable. Solid bonuses across all stats with no weaknesses.</p>
+                <p>Middle of the road. No restrictions, no weaknesses, no standout strengths. Safe pick.</p>
             </div>
             <div class="class-card">
                 <h4>Hobbit</h4>
-                <p>Small but loyal. Lower strength but naturally resilient and surprisingly tough.</p>
+                <p>Harder to kill than you'd expect from something that short. Low STR though.</p>
             </div>
             <div class="class-card">
                 <h4>Elf</h4>
-                <p>Graceful and agile. Lower HP but enhanced magical affinity and precision.</p>
+                <p>The caster race. Lower HP but better magic stats and good agility. Pick this if you're going Magician or Sage.</p>
             </div>
             <div class="class-card">
                 <h4>Half-Elf</h4>
-                <p>The best of both worlds. Good stamina with balanced human and elven traits.</p>
+                <p>A bit of human, a bit of elf. Good stamina. Nothing flashy.</p>
             </div>
             <div class="class-card">
                 <h4>Dwarf</h4>
-                <p>Stubborn and sturdy. Highest HP, strength, and defense bonuses of all races.</p>
+                <p>Most HP, most STR, most DEF. The tank race. Short, stubborn, will outlast anything.</p>
             </div>
             <div class="class-card">
                 <h4>Troll</h4>
-                <p>Massive and powerful. Exceptional HP and strength with intimidating presence.</p>
+                <p>Huge. Can't be every class but the stats are hard to argue with. Dwarf-tier tankiness with even more raw strength.</p>
             </div>
             <div class="class-card">
                 <h4>Orc</h4>
-                <p>Ill-mannered but effective. Strong defense and natural combat instincts.</p>
+                <p>Natural fighter. Not charming. Gets the job done.</p>
             </div>
             <div class="class-card">
                 <h4>Gnome</h4>
-                <p>Willful and clever. Modest physical stats but resourceful in unexpected ways.</p>
+                <p>Small, clever, modest stats. They work better than they look on paper.</p>
             </div>
             <div class="class-card">
                 <h4>Gnoll</h4>
-                <p>Small and scrappy. Compensates for size with strength and determination.</p>
+                <p>Smallest race. Makes up for it with determination and surprisingly decent STR.</p>
             </div>
             <div class="class-card">
                 <h4>Mutant</h4>
-                <p>Unpredictable and unique. Adaptive bonuses make every mutant different.</p>
+                <p>Weird one. The bonuses are random-ish so every mutant plays a little different. Pick this if you like surprises.</p>
             </div>
         </div>
     </div>
@@ -1745,14 +1735,14 @@
 <section id="companions">
     <div class="container">
         <h2 class="section-title" style="color:var(--gold);text-shadow:var(--glow-gold)">// COMPANIONS</h2>
-        <p class="section-subtitle">Four souls whose fates intertwine with yours. They can fight, heal, and die. They will change your story.</p>
+        <p class="section-subtitle">Four recruitable NPCs with their own quest lines. They fight with you in the dungeon and they can permanently die, which matters more than you'd think.</p>
 
         <div class="companion-grid">
             <div class="companion-card">
                 <h3>Lyris</h3>
                 <div class="companion-title">The Wandering Star</div>
-                <div class="companion-desc">A mysterious traveler with silver-streaked hair and eyes that seem to hold ancient sorrow. She speaks in riddles and appears to know more than she reveals.</div>
-                <div class="companion-backstory">Once a priestess of Aurelion, the god of light. When the Old Gods were corrupted, she was cast out. Neither fully mortal nor divine. She wanders endlessly, seeking a way to heal the gods she once served.</div>
+                <div class="companion-desc">She knows things she shouldn't know. Talks in riddles sometimes, which is annoying until you realize she's usually right. Something about her isn't quite mortal.</div>
+                <div class="companion-backstory">Was a priestess of Aurelion before the gods got corrupted. She's been wandering since, looking for a way to fix things. She's the only companion you can romance and there's a reason for that, but it's a spoiler.</div>
                 <div class="companion-meta">
                     <span>Hybrid (Magic/Healer)</span>
                     <span>Recruits: Level 15</span>
@@ -1764,8 +1754,8 @@
             <div class="companion-card">
                 <h3>Aldric</h3>
                 <div class="companion-title">The Unbroken Shield</div>
-                <div class="companion-desc">A grizzled warrior with scars mapping decades of battle. His eyes hold the weight of those he couldn't save, and the determination to never fail again.</div>
-                <div class="companion-backstory">Once the captain of the King's Guard, Aldric lost his entire unit to a demonic incursion he blames himself for. He now wanders, seeking redemption through protecting those who need it most.</div>
+                <div class="companion-desc">Old soldier. Covered in scars. Doesn't talk about what happened to his unit but he's clearly carrying it. Earliest companion you can recruit (level 10) and probably the most reliable one in combat.</div>
+                <div class="companion-backstory">Used to be captain of the King's Guard. Everyone under his command died in a demonic incursion. He made it out. He'll protect you because that's all he knows how to do anymore.</div>
                 <div class="companion-meta">
                     <span>Tank</span>
                     <span>Recruits: Level 10</span>
@@ -1777,8 +1767,8 @@
             <div class="companion-card">
                 <h3>Mira</h3>
                 <div class="companion-title">The Faded Light</div>
-                <div class="companion-desc">A former priestess whose faith shattered when her temple was destroyed. Her healing powers remain, but her spirit is hollow. She helps others because she no longer knows what else to do.</div>
-                <div class="companion-backstory">Mira devoted her life to healing in Veloura's temple. When Veloura was corrupted, the temple turned on itself. Healers became reapers. Mira escaped, but left her faith behind.</div>
+                <div class="companion-desc">Your healer. She's good at it. She doesn't believe in anything anymore but the muscle memory is still there. There's a quest line about whether she finds her faith again or not, and it goes to some dark places.</div>
+                <div class="companion-backstory">Healer at Veloura's temple her whole life. When the goddess got corrupted, the healers in the temple turned on each other. Mira escaped but she left everything she believed in behind.</div>
                 <div class="companion-meta">
                     <span>Healer</span>
                     <span>Recruits: Level 20</span>
@@ -1790,8 +1780,8 @@
             <div class="companion-card">
                 <h3>Vex</h3>
                 <div class="companion-title">The Laughing Shadow</div>
-                <div class="companion-desc">A charming thief with a quick wit and quicker fingers. Vex treats everything as a joke. Including death. But there's a sadness behind the smile that he never speaks of.</div>
-                <div class="companion-backstory">Born with a wasting disease. He's been dying his whole life, one day at a time. Rather than despair, he chose to laugh. He steals to survive, jokes to cope, and refuses to take anything seriously.</div>
+                <div class="companion-desc">Thief. Funny guy. Makes jokes about everything including dying. You eventually find out why he's like that and it's not a funny reason. Last companion you unlock (level 25) and he hits hard.</div>
+                <div class="companion-backstory">He was born with a wasting disease. He's been slowly dying his entire life. He deals with it by stealing things and laughing about everything. His quest line ("One More Sunrise") has a time limit and it's real.</div>
                 <div class="companion-meta">
                     <span>Damage</span>
                     <span>Recruits: Level 25</span>
@@ -1807,33 +1797,33 @@
 <section id="endings">
     <div class="container">
         <h2 class="section-title" style="color:var(--red);text-shadow:var(--glow-red)">// FIVE ENDINGS</h2>
-        <p class="section-subtitle">Not difficulty tiers. Philosophical positions. Each one answers the same question differently.</p>
+        <p class="section-subtitle">Won't say much about these. They're better if you find them yourself.</p>
 
         <div class="ending-grid">
             <div class="ending-card" style="border-top:3px solid var(--red)">
                 <h3 style="color:var(--red)">The Usurper</h3>
-                <p>Seize divine power. Become the new god. Rule forever. And discover that eternity is the cruelest prison.</p>
-                <div class="ending-hint">Attachment</div>
+                <p>Take the power. Become god. Get everything you wanted. Live with the consequences of "everything" lasting forever.</p>
+                <div class="ending-hint">Power</div>
             </div>
             <div class="ending-card" style="border-top:3px solid var(--green)">
                 <h3 style="color:var(--green)">The Savior</h3>
-                <p>Choose mercy. Heal the corrupted gods. Restore what was lost. Become a legend. But legends are stories others tell. You'll never know peace.</p>
+                <p>Fix the gods. Heal what was broken. Everyone calls you a hero and that sounds great until you realize what that obligation actually means long-term.</p>
                 <div class="ending-hint">Compassion</div>
             </div>
             <div class="ending-card" style="border-top:3px solid var(--gold)">
                 <h3 style="color:var(--gold)">The Defiant</h3>
-                <p>Reject all of it. Shatter every artifact. Free mortals from gods forever. Walk into the sunrise as nothing more than a person who chose freedom.</p>
-                <div class="ending-hint">Non-attachment</div>
+                <p>Smash all of it. Walk away. No gods, no power, just a person.</p>
+                <div class="ending-hint">Independence</div>
             </div>
             <div class="ending-card" style="border-top:3px solid var(--purple)">
                 <h3 style="color:var(--purple)">The True Awakening</h3>
-                <p>See the cycle for what it is. Not a prison. A practice. Become the bridge between mortal and divine. The loop continues, but now you understand why.</p>
-                <div class="ending-hint">Awakening (NG+)</div>
+                <p>Requires NG+. You start to see the loop for what it is. This ending only makes sense if you've been through the cycle more than once.</p>
+                <div class="ending-hint">Requires NG+</div>
             </div>
             <div class="ending-card" style="border-top:3px solid #ffffff">
                 <h3 style="color:#ffffff">Dissolution</h3>
-                <p>After every ending. After every cycle. Make the choice no one has ever made: let go completely. Not victory. Not defeat. Release.</p>
-                <div class="ending-hint">Nirvana (Cycle 3+)</div>
+                <p>Cycle 3 or later. The secret one. Hardest to reach. Quietest. I'm not going to describe it here.</p>
+                <div class="ending-hint">Cycle 3+</div>
             </div>
         </div>
     </div>
@@ -1842,40 +1832,36 @@
 <!-- History -->
 <section id="history">
     <div class="container">
-        <h2 class="section-title">// USURPER HISTORY</h2>
-        <p class="section-subtitle">From 1993 BBS door game to a modern recreation. A journey through time.</p>
+        <h2 class="section-title">// HISTORY</h2>
+        <p class="section-subtitle">How a 1993 BBS door game became this.</p>
 
         <div class="history-timeline">
             <div class="history-entry">
-                <h3>The Age of the BBS (1978-1999)</h3>
-                <p>Before the World Wide Web, Bulletin Board Systems were tiny digital worlds you dialed into with a telephone modem. You'd hear the screech of the handshake, watch ANSI art fill your screen, and connect to a community of people you'd never meet in person.</p>
-                <p>By 1992, there were over 25,000 BBSes in the United States alone. Each one was run by a "SysOp" from their basement or bedroom. You could post messages, download files, chat, and play games.</p>
+                <h3>BBSes (1978&ndash;1999)</h3>
+                <p>If you're under 35 you probably missed this entirely. Before the web, people ran Bulletin Board Systems out of their houses. You'd use your phone line to dial into someone else's computer with a modem. It made this awful screeching noise during the handshake and then you were in &mdash; ANSI art, message forums, file downloads, games. There were something like 25,000 BBSes in the US by 1992, each one run by a "SysOp" on a dedicated phone line in their spare bedroom.</p>
             </div>
 
             <div class="history-entry">
-                <h3>The Door Games</h3>
-                <p>"Door Games" were external programs that BBSes could launch for callers. The constraints were brutal: text only, slow connections (2400-14400 baud), one caller at a time, and limited play time to share the phone line.</p>
-                <p>Yet from these constraints came innovation. Games like Trade Wars 2002, Legend of the Red Dragon, and Usurper created persistent worlds where your actions TODAY affected what other players found TOMORROW. These were the first massively multiplayer online games accessible to ordinary people.</p>
+                <h3>Door Games</h3>
+                <p>BBSes could run external programs called "door games." Totally text-based, running over a phone line at 2400&ndash;14400 baud, and you only got limited play time per day because other callers needed the line. The constraints were insane by modern standards, but that's exactly what made people creative. Trade Wars 2002, Legend of the Red Dragon, Usurper &mdash; these games had persistent worlds where what one caller did today affected what the next caller found tomorrow. Before the term "MMO" existed, these were it.</p>
             </div>
 
             <div class="history-entry">
-                <h3>The Birth of Usurper (1993)</h3>
-                <p>In 1993, programmer <strong style="color:var(--gold)">Jakob Dangarden</strong> created Usurper. At a time when Legend of the Red Dragon dominated, Usurper dared to be different. Multiple races and classes with real mechanical differences, a 100-level dungeon, team warfare, political systems, and complex character progression.</p>
-                <p>The game was set in the realm of Dorashire, where adventurers explored the Dungeons of Durunghins. The ultimate goal? Accumulate power and usurp the throne itself. Usurper quickly gained a devoted following. It was dark, complex, and rewarded mastery.</p>
+                <h3>Usurper (1993)</h3>
+                <p><strong style="color:var(--gold)">Jakob Dangarden</strong> wrote it in Turbo Pascal. LORD was the big one at the time, but Usurper went way deeper &mdash; real class differences, 10 races, a 100-level dungeon, team warfare, throne politics, complex progression. Set in Dorashire, you explored the Dungeons of Durunghins and the whole point was to get powerful enough to take the throne. It was harder and darker than most door games. Not as popular as LORD but the people who played it <em>really</em> played it.</p>
             </div>
 
             <div class="history-entry">
-                <h3>Those Who Preserved the Dream</h3>
-                <p><strong style="color:var(--gold)">Jakob Dangarden</strong> created the original masterpiece in Turbo Pascal. In 2004, he made the historic decision to release Usurper as open source under the GPL license, ensuring the game could live on forever.</p>
-                <p><strong style="color:var(--gold)">Rick Parrish</strong> of R&amp;M Software took on the monumental task of porting the original Pascal source code to modern systems, creating 32-bit and 64-bit versions. His GameSrv BBS server software keeps the entire door game era alive today.</p>
-                <p><strong style="color:var(--gold)">Daniel Zingaro</strong> provided tremendous help with massive bug fixing efforts, tracking down edge cases in decades-old code to make version 0.20e the most stable release ever.</p>
+                <h3>Who Kept It Alive</h3>
+                <p><strong style="color:var(--gold)">Jakob Dangarden</strong> open-sourced Usurper under the GPL in 2004. Can't overstate how important that was &mdash; without that, this remake literally could not exist.</p>
+                <p><strong style="color:var(--gold)">Rick Parrish</strong> at R&amp;M Software ported the Turbo Pascal source to run on modern systems. He also wrote GameSrv, which is the BBS server software that a lot of the surviving door game community still runs on. Huge amount of work.</p>
+                <p><strong style="color:var(--gold)">Daniel Zingaro</strong> did a ton of bug fixing on the ancient Pascal code. Edge cases from 1993 that nobody had bothered to track down until he went through it methodically. Version 0.20e is stable because of him.</p>
             </div>
 
             <div class="history-entry">
-                <h3>Usurper Reborn (2024-Present)</h3>
-                <p>This remake began with a simple question: what if Usurper had continued to evolve? What if the limitations of 1990s hardware were lifted, but the soul of the game remained intact?</p>
-                <p>Created by <strong style="color:var(--gold)">Jason Knight</strong>, Usurper Reborn is built in C# with modern architecture, staying true to the original vision. The core gameplay, class system, dungeon structure, and political intrigue are all here. Enhanced with 60 unique NPCs, dynamic world simulation, deep narrative systems, companion quests, and New Game+ cycles.</p>
-                <p>The text-based interface is intentional. It's a love letter to an era when imagination filled in what graphics couldn't show.</p>
+                <h3>Usurper Reborn (2024&ndash;Now)</h3>
+                <p>I (<strong style="color:var(--gold)">Jason Knight</strong>) started this project because I kept coming back to Usurper and thinking about what it could've been if the 90s hardware constraints weren't a factor. The original game had so much going on under the hood &mdash; race mechanics, class abilities, political systems &mdash; but the BBS environment limited how far any of it could go. I wanted to see what happened if you took that foundation and built on it with modern tools.</p>
+                <p>It's written in C# on .NET 8.0. All the original gameplay is in there. Then I added about 60 unique NPCs with an autonomous world simulation, a companion system, New Game+ where the NPCs gradually become aware of the loop, seven god encounters with branching dialogue, and five endings. The world simulation runs on the server 24/7 and keeps going whether anyone's logged in or not. It still runs on BBSes too &mdash; there are a couple boards on the BBS list below that have it installed as a door game right now.</p>
             </div>
         </div>
     </div>
@@ -1884,16 +1870,16 @@
 <!-- Connect -->
 <section id="connect">
     <div class="container">
-        <h2 class="section-title">// HOW TO CONNECT</h2>
+        <h2 class="section-title">// PLAY</h2>
         <div class="connect-methods">
             <div class="connect-card">
                 <h3>&#9658; Play in Browser</h3>
-                <p>No download required. Click the button to start playing instantly in a web terminal.</p>
+                <p>No install, no download. Opens a terminal right here in your browser.</p>
                 <button class="btn btn-primary" onclick="openTerminal()" style="width:100%;justify-content:center;">Play Now</button>
             </div>
             <div class="connect-card">
                 <h3>&#9658; SSH (Recommended)</h3>
-                <p>Encrypted connection. Use any terminal or MUD client that supports SSH.</p>
+                <p>Best experience. Use any terminal or MUD client that supports SSH.</p>
                 <div class="ssh-command" onclick="copyCommand(this)">
                     ssh usurper@play.usurper-reborn.net -p 4000
                     <span class="copy-hint">click to copy</span>
@@ -1901,8 +1887,8 @@
                 <p style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);">Password: <span style="color:var(--green);">play</span> / then login or register in-game</p>
             </div>
             <div class="connect-card">
-                <h3>&#9658; Telnet (Unencrypted)</h3>
-                <p>Classic telnet for MUD clients that don't support SSH. No encryption.</p>
+                <h3>&#9658; Telnet</h3>
+                <p>For MUD clients that don't do SSH. Unencrypted but works fine.</p>
                 <div class="ssh-command" onclick="copyCommand(this)">
                     telnet play.usurper-reborn.net 4001
                     <span class="copy-hint">click to copy</span>
@@ -1911,7 +1897,7 @@
             </div>
             <div class="connect-card">
                 <h3>&#9658; Download</h3>
-                <p>Download the standalone version for Windows, Linux, or macOS. Play offline or connect to the online server.</p>
+                <p>Standalone builds for Windows, Linux, and macOS. Play offline or connect to the online server.</p>
                 <a class="btn btn-secondary" href="https://github.com/binary-knight/usurper-reborn/releases/latest" target="_blank" style="width:100%;justify-content:center;">Latest Release on GitHub</a>
             </div>
             <div class="connect-card">
@@ -1921,7 +1907,7 @@
             </div>
             <div class="connect-card">
                 <h3>&#9658; The Observatory</h3>
-                <p>Watch 60+ NPCs live their lives in real-time. Personality radars, relationship networks, demographics, and live event feeds.</p>
+                <p>Watch the NPCs live their lives in real-time. Personality charts, relationship maps, demographics, live event feeds.</p>
                 <a class="btn btn-secondary" href="/dashboard" style="width:100%;justify-content:center;">Open Dashboard</a>
             </div>
         </div>
@@ -1932,7 +1918,7 @@
 <section id="bbs-list">
     <div class="container">
         <h2 class="section-title">// BBS LIST</h2>
-        <p class="section-subtitle">BBSes currently running Usurper Reborn as a door game. Connect via telnet or SSH to play!</p>
+        <p class="section-subtitle">BBSes that are running Usurper Reborn as a door game right now.</p>
 
         <table class="bbs-table">
             <thead>
@@ -1957,7 +1943,7 @@
         </table>
 
         <div class="bbs-note">
-            <p>Are you a SysOp running Usurper Reborn? <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank">Get listed here!</a></p>
+            <p>Running Usurper Reborn on your board? <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank">Let me know and I'll add you.</a></p>
         </div>
     </div>
 </section>
@@ -1970,28 +1956,28 @@
         <div class="credits-grid">
             <div class="credit-card">
                 <h3>Jakob Dangarden</h3>
-                <div class="credit-role">Original Game Creator (1993)</div>
-                <p>Created the original Usurper: Halls of Avarice in Turbo Pascal. Released as open source under GPL in 2004.</p>
+                <div class="credit-role">Original Creator (1993)</div>
+                <p>Wrote Usurper in Turbo Pascal. JAS Software. Made the decision to GPL it in 2004 which is the only reason any of this is possible.</p>
             </div>
             <div class="credit-card">
                 <h3>Rick Parrish</h3>
-                <div class="credit-role">Source Code Preservation &amp; Porting</div>
-                <p>Ported the original Pascal source to modern systems. Creator of GameSrv BBS software.</p>
+                <div class="credit-role">Preservation &amp; Porting</div>
+                <p>Ported the original Pascal to modern systems. Created GameSrv. If you've played a door game in the last 15 years, Rick's software was probably involved.</p>
             </div>
             <div class="credit-card">
                 <h3>Daniel Zingaro</h3>
-                <div class="credit-role">Bug Fixing &amp; Code Quality</div>
-                <p>Massive bug fixing efforts on the Pascal source code. Made v0.20e the most stable release.</p>
+                <div class="credit-role">Bug Fixing</div>
+                <p>Went through the 1993 Pascal source line by line fixing bugs nobody else had bothered to track down. v0.20e is the stable version because of his work.</p>
             </div>
             <div class="credit-card">
                 <h3>Jason Knight</h3>
-                <div class="credit-role">Creator of Usurper Reborn</div>
-                <p>Built the modern C# / .NET 8.0 recreation with expanded systems and deep narrative.</p>
+                <div class="credit-role">Usurper Reborn</div>
+                <p>That's me. Built the C# remake, wrote all the story content, the NPC system, the world sim, the god encounters. Still actively developing it.</p>
             </div>
         </div>
 
         <div style="text-align:center;margin-top:32px;color:var(--text-dim);font-size:14px;">
-            <p>Special thanks to the BBS community of the 1980s and 1990s, all the SysOps who kept the boards running, and every player who dialed in to explore Durunghins.</p>
+            <p>Thanks to every SysOp who kept a board running, and every kid who dialed in to explore Durunghins.</p>
             <p style="margin-top:12px;"><a href="https://discord.gg/EZhwgDT6Ta" target="_blank" style="color:var(--cyan-dim);text-decoration:none;">Join us on Discord</a></p>
         </div>
     </div>
@@ -2004,8 +1990,8 @@
             <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank">Report Bug</a>
             <a href="https://discord.gg/EZhwgDT6Ta" target="_blank">Discord</a>
         </div>
-        <p>Usurper Reborn. A free, open-source recreation of Usurper (1993) by Jakob Dangarden.</p>
-        <p style="margin-top:4px;">Licensed under GPL v2 &bull; Built with C# / .NET 8.0</p>
+        <p>Usurper Reborn &mdash; a free, open-source remake of Usurper (1993) by Jakob Dangarden.</p>
+        <p style="margin-top:4px;">GPL v2 &bull; C# / .NET 8.0 &bull; Made by one person who liked BBS games too much</p>
     </div>
 </footer>
 

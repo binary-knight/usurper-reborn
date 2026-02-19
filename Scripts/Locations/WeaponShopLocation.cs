@@ -410,50 +410,64 @@ public class WeaponShopLocation : BaseLocation
         if (category == WeaponCategory.Shields)
         {
             terminal.SetColor("bright_blue");
-            terminal.WriteLine("  #   Name                          AC   Block  Price       Bonus");
+            terminal.WriteLine("  #   Name                        Lvl  AC   Block  Price       Bonus");
             terminal.SetColor("darkgray");
-            terminal.WriteLine("───────────────────────────────────────────────────────────────────");
+            terminal.WriteLine("───────────────────────────────────────────────────────────────────────");
         }
         else
         {
             terminal.SetColor("bright_blue");
-            terminal.WriteLine("  #   Name                          Pow  Type      Price       Bonus");
+            terminal.WriteLine("  #   Name                        Lvl  Pow  Type      Price       Bonus");
             terminal.SetColor("darkgray");
-            terminal.WriteLine("────────────────────────────────────────────────────────────────────");
+            terminal.WriteLine("──────────────────────────────────────────────────────────────────────────");
         }
 
         int num = 1;
         foreach (var item in pageItems)
         {
             bool canAfford = currentPlayer.Gold >= item.Value;
+            bool meetsLevel = currentPlayer.Level >= item.MinLevel;
+            bool canBuy = canAfford && meetsLevel;
 
-            terminal.SetColor(canAfford ? "bright_cyan" : "darkgray");
+            terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
             terminal.Write($"{num,3}. ");
 
-            terminal.SetColor(canAfford ? "white" : "darkgray");
-            terminal.Write($"{item.Name,-28}");
+            terminal.SetColor(canBuy ? "white" : "darkgray");
+            terminal.Write($"{item.Name,-26}");
+
+            // Level requirement
+            if (item.MinLevel > 1)
+            {
+                terminal.SetColor(!meetsLevel ? "red" : (canBuy ? "bright_cyan" : "darkgray"));
+                terminal.Write($"{item.MinLevel,3}  ");
+            }
+            else
+            {
+                terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
+                terminal.Write($"{"—",3}  ");
+            }
 
             if (category == WeaponCategory.Shields)
             {
-                terminal.SetColor(canAfford ? "bright_cyan" : "darkgray");
+                terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
                 terminal.Write($"{item.ShieldBonus,4}  ");
                 terminal.Write($"{item.BlockChance,3}%   ");
             }
             else
             {
-                terminal.SetColor(canAfford ? "bright_cyan" : "darkgray");
+                terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
                 terminal.Write($"{item.WeaponPower,4}  ");
                 terminal.Write($"{item.WeaponType.ToString().Substring(0, Math.Min(8, item.WeaponType.ToString().Length)),-8}  ");
             }
 
-            terminal.SetColor(canAfford ? "yellow" : "darkgray");
+            terminal.SetColor(canBuy ? "yellow" : "darkgray");
             terminal.Write($"{FormatNumber(item.Value),10}  ");
 
             // Show bonus stats
             var bonuses = GetBonusDescription(item);
             if (!string.IsNullOrEmpty(bonuses))
             {
-                terminal.SetColor(canAfford ? "green" : "darkgray");
+                terminal.SetColor(canBuy ? "green" : "darkgray");
                 terminal.Write(bonuses);
             }
 

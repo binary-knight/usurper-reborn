@@ -1551,7 +1551,7 @@ namespace UsurperRemake.Systems
             long exp = 0;
             for (int i = 2; i <= level; i++)
             {
-                exp += (long)(Math.Pow(i, 2.2) * 50);
+                exp += (long)(Math.Pow(i, 2.0) * 50);
             }
             return exp;
         }

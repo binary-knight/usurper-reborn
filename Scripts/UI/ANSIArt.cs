@@ -266,9 +266,38 @@ namespace UsurperRemake.UI
         }
 
         /// <summary>
+        /// Display colored markup text WITHOUT trailing newline.
+        /// Used for side-by-side rendering where both columns share a line.
+        /// Parses [color]text format, same as DisplayColoredLine but no final WriteLine.
+        /// </summary>
+        public static void DisplayColoredText(TerminalEmulator terminal, string line)
+        {
+            int i = 0;
+            while (i < line.Length)
+            {
+                if (line[i] == '[')
+                {
+                    int end = line.IndexOf(']', i);
+                    if (end > i)
+                    {
+                        string colorCode = line.Substring(i + 1, end - i - 1);
+                        if (colorCode == "/")
+                            terminal.SetColor("white");
+                        else
+                            terminal.SetColor(colorCode);
+                        i = end + 1;
+                        continue;
+                    }
+                }
+                terminal.Write(line[i].ToString());
+                i++;
+            }
+        }
+
+        /// <summary>
         /// Display a line with inline color codes like [red]text[white]more text
         /// </summary>
-        private static void DisplayColoredLine(TerminalEmulator terminal, string line)
+        public static void DisplayColoredLine(TerminalEmulator terminal, string line)
         {
             int i = 0;
             while (i < line.Length)

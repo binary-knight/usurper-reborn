@@ -424,7 +424,6 @@ public partial class MagicShopLocation : BaseLocation
                 await BuyManaPotions(player);
                 return false;
             case "D":
-                await BuyDungeonResetScroll(player);
                 return false;
             case "V":
                 await CastLoveSpell(player);
@@ -524,9 +523,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
         WriteMenuRow("H", "bright_yellow", "ealing Potions", "V", "bright_yellow", " Love Spells");
         WriteMenuRow("M", "bright_yellow", "ana Potions", "K", "bright_yellow", " Dark Arts");
-        WriteMenuRow("D", "bright_yellow", "ungeon Reset Scroll", "Y", "bright_yellow", " Study Spells");
-        terminal.Write(new string(' ', 42));
-        WriteMenuKey("G", "bright_yellow", " Scrying (NPC Info)");
+        WriteMenuRow("Y", "bright_yellow", " Study Spells", "G", "bright_yellow", " Scrying (NPC Info)");
         terminal.WriteLine("");
         terminal.WriteLine("");
         WriteMenuRow("T", "bright_yellow", $"alk to {_ownerName}", "R", "bright_yellow", "eturn to street");
@@ -1177,119 +1174,6 @@ public partial class MagicShopLocation : BaseLocation
         }
     }
 
-    /// <summary>
-    /// Buy a Dungeon Reset Scroll to reset a dungeon floor's monsters
-    /// </summary>
-    private async Task BuyDungeonResetScroll(Character player)
-    {
-        DisplayMessage("");
-        DisplayMessage("═══ Dungeon Reset Scroll ═══", "magenta");
-        DisplayMessage("");
-        DisplayMessage($"{_ownerName} pulls out an ancient scroll covered in glowing runes.", "gray");
-        DisplayMessage("'This scroll contains the power to disturb the dungeon's slumber.'", "cyan");
-        DisplayMessage("'Monsters that have been slain will rise again, treasures replenished.'", "cyan");
-        DisplayMessage("'Use it wisely - the dungeon remembers those who abuse its cycles.'", "cyan");
-        DisplayMessage("");
-
-        // Get floors that have been cleared (have state and were cleared within respawn period)
-        var clearedFloors = player.DungeonFloorStates
-            .Where(kvp => kvp.Value.EverCleared && !kvp.Value.IsPermanentlyClear && !kvp.Value.ShouldRespawn())
-            .OrderBy(kvp => kvp.Key)
-            .ToList();
-
-        if (clearedFloors.Count == 0)
-        {
-            DisplayMessage("You have no dungeon floors eligible for reset.", "gray");
-            DisplayMessage("'Floors that are permanently cleared or already respawning cannot be reset.'", "cyan");
-            DisplayMessage("'Come back when you've conquered some dungeon levels.'", "cyan");
-            return;
-        }
-
-        // Calculate price based on player level
-        long scrollPrice = CalculateResetScrollPrice(player.Level);
-        var (scrollKingTax, scrollCityTax, scrollTotalWithTax) = CityControlSystem.CalculateTaxedPrice(scrollPrice);
-
-        DisplayMessage($"Reset Scroll Price: {scrollPrice:N0} gold", "yellow");
-        DisplayMessage($"You have: {player.Gold:N0} gold", "gray");
-        DisplayMessage("");
-
-        if (player.Gold < scrollTotalWithTax)
-        {
-            DisplayMessage("'You lack the gold for such powerful magic,' the gnome says.", "red");
-            return;
-        }
-
-        DisplayMessage("Floors available for reset:", "cyan");
-        for (int i = 0; i < clearedFloors.Count; i++)
-        {
-            var floor = clearedFloors[i];
-            var hoursSinceCleared = (DateTime.Now - floor.Value.LastClearedAt).TotalHours;
-            var hoursUntilRespawn = DungeonFloorState.RESPAWN_HOURS - hoursSinceCleared;
-            DisplayMessage($"{i + 1}. Floor {floor.Key} (respawns naturally in {hoursUntilRespawn:F1} hours)", "white");
-        }
-
-        DisplayMessage("");
-        DisplayMessage("Enter floor # to reset (0 to cancel): ", "yellow", false);
-        string input = await terminal.GetInput("");
-
-        if (!int.TryParse(input, out int floorChoice) || floorChoice <= 0 || floorChoice > clearedFloors.Count)
-        {
-            DisplayMessage("Cancelled.", "gray");
-            return;
-        }
-
-        var selectedFloor = clearedFloors[floorChoice - 1];
-
-        DisplayMessage("");
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Dungeon Reset Scroll", scrollPrice);
-        DisplayMessage($"Reset Floor {selectedFloor.Key} for {scrollTotalWithTax:N0} gold? (Y/N): ", "yellow", false);
-        var confirm = (await terminal.GetInput("")).ToUpper();
-
-        if (confirm == "Y")
-        {
-            player.Gold -= scrollTotalWithTax;
-            CityControlSystem.Instance.ProcessSaleTax(scrollPrice);
-
-            // Reset the floor by clearing its LastClearedAt timestamp
-            // This will make ShouldRespawn() return true on next visit
-            selectedFloor.Value.LastClearedAt = DateTime.MinValue;
-
-            // Also clear the room states so monsters respawn
-            foreach (var room in selectedFloor.Value.RoomStates.Values)
-            {
-                room.IsCleared = false;  // Monsters will respawn
-            }
-
-            DisplayMessage("");
-            DisplayMessage($"{_ownerName} unrolls the scroll and speaks words of power...", "gray");
-            DisplayMessage("The parchment ignites with ethereal flame!", "magenta");
-            DisplayMessage("");
-            DisplayMessage($"Floor {selectedFloor.Key} has been reset!", "bright_green");
-            DisplayMessage("Monsters will await you when you next descend.", "cyan");
-            DisplayMessage("'The dungeon stirs once more,' the gnome says with a knowing smile.", "gray");
-
-            // Track telemetry
-            TelemetrySystem.Instance.TrackShopTransaction("magic_shop", "buy", "Dungeon Reset Scroll", scrollTotalWithTax, player.Level, player.Gold);
-        }
-        else
-        {
-            DisplayMessage("Transaction cancelled.", "gray");
-        }
-    }
-
-    /// <summary>
-    /// Calculate the price of a dungeon reset scroll based on player level
-    /// Higher level players pay more since they likely have more gold
-    /// </summary>
-    private long CalculateResetScrollPrice(int playerLevel)
-    {
-        // Base price 1000 gold + 200 per level
-        // Level 1: 1,200 gold
-        // Level 10: 3,000 gold
-        // Level 50: 11,000 gold
-        // Level 100: 21,000 gold
-        return 1000 + (playerLevel * 200);
-    }
 
     /// <summary>
     /// Get current magic shop owner name
@@ -2194,7 +2078,7 @@ public partial class MagicShopLocation : BaseLocation
 
             // Column header
             terminal.SetColor("bright_blue");
-            terminal.WriteLine("  #   Name                          Price       Bonuses");
+            terminal.WriteLine("  #   Name                        Lvl  Price       Bonuses");
             terminal.SetColor("darkgray");
             terminal.WriteLine("─────────────────────────────────────────────────────────────────────────");
 
@@ -2207,30 +2091,44 @@ public partial class MagicShopLocation : BaseLocation
                 var item = items[i];
                 long price = ApplyAllPriceModifiers(item.Value, player);
                 bool canAfford = player.Gold >= price;
+                bool meetsLevel = player.Level >= item.MinLevel;
+                bool canBuy = canAfford && meetsLevel;
                 int displayNum = i - start + 1;
 
                 // Number
-                terminal.SetColor(canAfford ? "bright_cyan" : "darkgray");
+                terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
                 terminal.Write($" {displayNum,2}. ");
 
                 // Name (colored by rarity if affordable, dim if not)
-                terminal.SetColor(canAfford ? item.GetRarityColor() : "darkgray");
-                terminal.Write($"{item.Name,-28}");
+                terminal.SetColor(canBuy ? item.GetRarityColor() : "darkgray");
+                terminal.Write($"{item.Name,-26}");
+
+                // Level requirement
+                if (item.MinLevel > 1)
+                {
+                    terminal.SetColor(!meetsLevel ? "red" : (canBuy ? "bright_cyan" : "darkgray"));
+                    terminal.Write($"{item.MinLevel,3}  ");
+                }
+                else
+                {
+                    terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
+                    terminal.Write($"{"—",3}  ");
+                }
 
                 // Price
-                terminal.SetColor(canAfford ? "yellow" : "darkgray");
+                terminal.SetColor(canBuy ? "yellow" : "darkgray");
                 terminal.Write($"{price,10:N0}  ");
 
                 // Bonus stats (compact, inline)
                 var bonuses = GetAccessoryBonusDescription(item);
                 if (!string.IsNullOrEmpty(bonuses))
                 {
-                    terminal.SetColor(canAfford ? "green" : "darkgray");
+                    terminal.SetColor(canBuy ? "green" : "darkgray");
                     terminal.Write(bonuses);
                 }
 
                 // Upgrade indicator
-                if (canAfford && currentItem != null)
+                if (canBuy && currentItem != null)
                 {
                     int itemScore = GetAccessoryScore(item);
                     int currentScore = GetAccessoryScore(currentItem);

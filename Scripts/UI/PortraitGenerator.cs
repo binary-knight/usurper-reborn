@@ -56,6 +56,366 @@ namespace UsurperRemake.UI
             return Render(canvas, npc, t);
         }
 
+        /// <summary>
+        /// Generate portrait lines without the name/class bar at the bottom.
+        /// Returns 16 lines: top border + 14 canvas rows + bottom border.
+        /// No left padding — caller controls horizontal positioning.
+        /// Used by the race preview screen for side-by-side layout.
+        /// </summary>
+        public static string[] GeneratePortraitRaw(Character npc)
+        {
+            uint seed = DJB2(npc.Name2 ?? npc.Name1 ?? "Unknown");
+            var rng = new Rng(seed);
+
+            var t = BuildTraits(npc, rng);
+
+            var canvas = new Cell[H, W];
+
+            DrawAtmosphere(canvas, t, rng);
+            DrawHead(canvas, t);
+            DrawEyes(canvas, t);
+            DrawNose(canvas, t);
+            DrawMouth(canvas, t);
+            DrawHair(canvas, t);
+            DrawBeard(canvas, t);
+            DrawEars(canvas, t);
+            DrawAccessories(canvas, t);
+
+            return RenderRaw(canvas, t);
+        }
+
+        /// <summary>
+        /// Generate a Warsim-style ASCII art portrait using simple characters.
+        /// Each race has a distinctive silhouette drawn with /\|_-() etc.
+        /// Much cleaner and more charming than block-char portraits.
+        /// Returns 16 lines with [color] markup (border + 14 canvas + border).
+        /// </summary>
+        public static string[] GenerateAsciiPortrait(CharacterRace race, CharacterSex sex, string seedName)
+        {
+            uint seed = DJB2(seedName ?? "Unknown");
+            var rng = new Rng(seed);
+
+            string mainColor = GetRaceAsciiColor(race);
+            string eyeColor = "bright_white";
+            char eyeChar = rng.Pick(new[] { 'o', 'O', '*', '@', '0' });
+
+            // Get race-specific template
+            var template = GetRaceTemplate(race, sex, rng);
+
+            // Draw template onto canvas
+            var canvas = new Cell[H, W];
+            for (int y = 0; y < H && y < template.Length; y++)
+            {
+                string line = template[y];
+                for (int x = 0; x < W && x < line.Length; x++)
+                {
+                    char ch = line[x];
+                    if (ch == ' ') continue;
+
+                    if (ch == 'E')
+                        Plot(canvas, x, y, eyeChar, eyeColor);
+                    else
+                        Plot(canvas, x, y, ch, mainColor);
+                }
+            }
+
+            return RenderRaw(canvas, new Traits { BorderColor = mainColor });
+        }
+
+        private static string GetRaceAsciiColor(CharacterRace race) => race switch
+        {
+            CharacterRace.Human => "bright_yellow",
+            CharacterRace.Elf => "bright_cyan",
+            CharacterRace.Dwarf => "yellow",
+            CharacterRace.HalfElf => "cyan",
+            CharacterRace.Hobbit => "bright_yellow",
+            CharacterRace.Troll => "bright_green",
+            CharacterRace.Orc => "green",
+            CharacterRace.Gnome => "bright_cyan",
+            CharacterRace.Gnoll => "yellow",
+            CharacterRace.Mutant => "bright_magenta",
+            _ => "white"
+        };
+
+        private static string[] GetRaceTemplate(CharacterRace race, CharacterSex sex, Rng rng) => race switch
+        {
+            CharacterRace.Human => GetHumanTemplate(sex, rng),
+            CharacterRace.Elf => GetElfTemplate(sex, rng),
+            CharacterRace.Dwarf => GetDwarfTemplate(sex, rng),
+            CharacterRace.HalfElf => GetHalfElfTemplate(sex, rng),
+            CharacterRace.Hobbit => GetHobbitTemplate(sex, rng),
+            CharacterRace.Troll => GetTrollTemplate(rng),
+            CharacterRace.Orc => GetOrcTemplate(rng),
+            CharacterRace.Gnome => GetGnomeTemplate(sex, rng),
+            CharacterRace.Gnoll => GetGnollTemplate(rng),
+            CharacterRace.Mutant => GetMutantTemplate(rng),
+            _ => GetHumanTemplate(sex, rng)
+        };
+
+        private static string[] Pad14(params string[] lines)
+        {
+            var result = new string[14];
+            for (int i = 0; i < 14; i++)
+            {
+                string line = i < lines.Length ? lines[i] : "";
+                result[i] = line.Length >= 34 ? line.Substring(0, 34) : line.PadRight(34);
+            }
+            return result;
+        }
+
+        // ── Race Templates ───────────────────────────────────────
+        // E = eye placeholder (replaced by seeded variant)
+        // All other characters are literal ASCII art
+
+        private static string[] GetHumanTemplate(CharacterSex sex, Rng rng)
+        {
+            bool hasBeard = sex == CharacterSex.Male && rng.Chance(40);
+            string mouth = hasBeard
+                ? "     |    {------}    |"
+                : "     |     '----'     |";
+            string chin = hasBeard
+                ? "      \\   {======}   /"
+                : "      \\              /";
+
+            return Pad14(
+                "",
+                "        ___________",
+                "       / ||||||||| \\",
+                "      /             \\",
+                "     |   E       E   |",
+                "     |       >       |",
+                "     |               |",
+                mouth,
+                chin,
+                "       \\___________/",
+                "           |   |",
+                "          _|   |_",
+                "         |       |",
+                "         |_______|"
+            );
+        }
+
+        private static string[] GetElfTemplate(CharacterSex sex, Rng rng)
+        {
+            return Pad14(
+                "",
+                "          _______",
+                "         / .   . \\",
+                "        /         \\",
+                "   (>  |  E     E  |  <)",
+                "   (>  |     ^     |  <)",
+                "       |           |",
+                "       |   '---'   |",
+                "        \\_________/",
+                "            | |",
+                "           _| |_",
+                "          /     \\",
+                "         /       \\",
+                ""
+            );
+        }
+
+        private static string[] GetDwarfTemplate(CharacterSex sex, Rng rng)
+        {
+            return Pad14(
+                "    ###################",
+                "   /  ###############  \\",
+                "  /                     \\",
+                "  |    E           E    |",
+                "  |          >          |",
+                "  |                     |",
+                "  |   {.-----------.}   |",
+                "   \\  {'-----------'}  /",
+                "    \\ {|||||||||||||} /",
+                "     \\{|||||||||||||}/ ",
+                "      {|||||||||||||} ",
+                "       {|||||||||||} ",
+                "        \\_________/ ",
+                ""
+            );
+        }
+
+        private static string[] GetHalfElfTemplate(CharacterSex sex, Rng rng)
+        {
+            bool hasBeard = sex == CharacterSex.Male && rng.Chance(25);
+            string mouth = hasBeard
+                ? "      |   {-----}    |"
+                : "      |    '---'     |";
+
+            return Pad14(
+                "",
+                "         _________",
+                "        / ||||||| \\",
+                "       /           \\",
+                "  (>  |  E       E  | <)",
+                "      |      ^      |",
+                "      |             |",
+                mouth,
+                "       \\           /",
+                "        \\_________/",
+                "            | |",
+                "           _| |_",
+                "          |     |",
+                "          |_____|"
+            );
+        }
+
+        private static string[] GetHobbitTemplate(CharacterSex sex, Rng rng)
+        {
+            return Pad14(
+                "",
+                "",
+                "        ~~~~~~~~~~~",
+                "       / ~~~~~~~~~ \\",
+                "      /             \\",
+                "     |   E       E   |",
+                "     |       ^       |",
+                "     |    .-----.    |",
+                "      \\   '---'    /",
+                "       \\_________/",
+                "          |   |",
+                "         _|   |_",
+                "        |       |",
+                "        |_______|"
+            );
+        }
+
+        private static string[] GetTrollTemplate(Rng rng)
+        {
+            return Pad14(
+                "   _____________________",
+                "  /                     \\",
+                " /    __           __    \\",
+                " |   /E \\         /E \\   |",
+                " |   \\__/         \\__/   |",
+                " |          __          |",
+                " |         /  \\         |",
+                " |\\/    .--------.   \\/|",
+                "  \\     '--------'    /",
+                "   \\                 /",
+                "    \\               /",
+                "     \\_____________/",
+                "        |       |",
+                "       _|       |_"
+            );
+        }
+
+        private static string[] GetOrcTemplate(Rng rng)
+        {
+            return Pad14(
+                "",
+                "      _______________",
+                "     /  ___     ___  \\",
+                "    /  / _ \\   / _ \\  \\",
+                "   |   | E |   | E |   |",
+                "   |    \\_/     \\_/    |",
+                "   |         >         |",
+                "   |  \\/  .-----. \\/  |",
+                "    \\     '-----'    /",
+                "     \\______________/",
+                "         |     |",
+                "        _|     |_",
+                "       |         |",
+                "       |_________|"
+            );
+        }
+
+        private static string[] GetGnomeTemplate(CharacterSex sex, Rng rng)
+        {
+            return Pad14(
+                "            /\\",
+                "           /  \\",
+                "          / .. \\",
+                "         /      \\",
+                "        / E    E \\",
+                "       |    >>    |",
+                "       |   /  \\   |",
+                "       |  | -- |  |",
+                "        \\ '----' /",
+                "         \\______/",
+                "           |  |",
+                "          _|  |_",
+                "         |      |",
+                "         |______|"
+            );
+        }
+
+        private static string[] GetGnollTemplate(Rng rng)
+        {
+            return Pad14(
+                "",
+                "        __",
+                "       /  \\    ___",
+                "      / E  \\__/   \\",
+                "     |  E      >   \\",
+                "     |        / \\   |",
+                "     |       | . |  |",
+                "      \\       \\_/  /",
+                "       \\   '---'  /",
+                "        \\_______/",
+                "           |||",
+                "          _|||_",
+                "         |     |",
+                "         |_____|"
+            );
+        }
+
+        private static string[] GetMutantTemplate(Rng rng)
+        {
+            int variant = rng.Next(3);
+            return variant switch
+            {
+                0 => Pad14( // Asymmetric head
+                    "",
+                    "       ____~~~~~~",
+                    "      / ~~      _\\",
+                    "     /    ___     \\",
+                    "    | E  /   \\  E  |",
+                    "    |    \\___/     |",
+                    "    |       >      |",
+                    "    |    .--~~-.   |",
+                    "     \\   '----'   /",
+                    "      \\__~~_____/",
+                    "          |   |",
+                    "         _|   |_",
+                    "        |       |",
+                    ""
+                ),
+                1 => Pad14( // Extra features
+                    "       *           *",
+                    "        ___________",
+                    "       / ~ ~ ~ ~ ~ \\",
+                    "      /    _   _    \\",
+                    "     |    (E) (E)    |",
+                    "     |       >       |",
+                    "     |    /     \\    |",
+                    "     |   | ----- |   |",
+                    "      \\  '-------'  /",
+                    "       \\___________/",
+                    "          || | ||",
+                    "         _|| | ||_",
+                    "        |         |",
+                    ""
+                ),
+                _ => Pad14( // Warped
+                    "",
+                    "      ______________",
+                    "     /  ~~~~~~~~~~  \\",
+                    "    /   /~~\\  /~~\\   \\",
+                    "   |    | E|  |E |    |",
+                    "   |     \\_/  \\_/     |",
+                    "   |        <>        |",
+                    "   |     .~~~~-.      |",
+                    "    \\    '~~~~~'     /",
+                    "     \\______________/",
+                    "         |      |",
+                    "        _|      |_",
+                    "       |          |",
+                    ""
+                )
+            };
+        }
+
         #endregion
 
         #region Canvas
@@ -917,6 +1277,50 @@ namespace UsurperRemake.UI
             lines.Add($"[{bc}]   ║[gray]{CenterText(raceClass, 34)}[{bc}]║");
             lines.Add($"[{bc}]   ╚══════════════════════════════════╝");
             lines.Add("[/]");
+
+            return lines.ToArray();
+        }
+
+        /// <summary>
+        /// Render portrait canvas without name bar and without left padding.
+        /// Returns 16 lines: top border + 14 canvas rows + bottom border.
+        /// Visible width per line: 36 chars (╔ + 34═ + ╗).
+        /// </summary>
+        private static string[] RenderRaw(Cell[,] canvas, Traits t)
+        {
+            string bc = t.BorderColor;
+            var lines = new List<string>();
+
+            // Top border (no left padding)
+            lines.Add($"[{bc}]╔══════════════════════════════════╗");
+
+            // Canvas rows
+            for (int y = 0; y < H; y++)
+            {
+                var sb = new StringBuilder();
+                sb.Append($"[{bc}]║");
+
+                string curColor = bc;
+                for (int x = 0; x < W; x++)
+                {
+                    var cell = canvas[y, x];
+                    char ch = cell.Ch == '\0' ? ' ' : cell.Ch;
+                    string color = cell.Color ?? "";
+
+                    if (ch != ' ' && color.Length > 0 && color != curColor)
+                    {
+                        sb.Append($"[{color}]");
+                        curColor = color;
+                    }
+                    sb.Append(ch);
+                }
+
+                sb.Append($"[{bc}]║");
+                lines.Add(sb.ToString());
+            }
+
+            // Bottom border (no name bar)
+            lines.Add($"[{bc}]╚══════════════════════════════════╝");
 
             return lines.ToArray();
         }

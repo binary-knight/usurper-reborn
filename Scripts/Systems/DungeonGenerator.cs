@@ -1660,7 +1660,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Hours before regular floors respawn (monsters return, but treasure stays looted)
         /// </summary>
-        public const int RESPAWN_HOURS = 6;
+        public const int RESPAWN_HOURS = 1;
 
         /// <summary>
         /// Check if this floor should respawn (monsters return)

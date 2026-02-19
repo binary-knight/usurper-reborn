@@ -14,13 +14,31 @@ public partial class RelationshipSystem
 {
     // Simple singleton instance for global access
     public static RelationshipSystem Instance { get; } = new RelationshipSystem();
-    private static Dictionary<string, Dictionary<string, RelationshipRecord>> _relationships = new();
+
+    // ThreadStatic so each MUD session has its own relationship data (prevents cross-player Clear)
+    [ThreadStatic] private static Dictionary<string, Dictionary<string, RelationshipRecord>>? _relationshipsThread;
+    private static Dictionary<string, Dictionary<string, RelationshipRecord>> _relationships
+    {
+        get => _relationshipsThread ??= new();
+        set => _relationshipsThread = value;
+    }
+
     private static Random _random = new Random();
 
     // Daily relationship gain tracking (v0.26) - prevents relationship flooding
     // Key format: "{character1}_{character2}_{date}" -> steps gained today
-    private static Dictionary<string, int> _dailyRelationshipGains = new();
-    private static DateTime _lastDailyReset = DateTime.MinValue;
+    [ThreadStatic] private static Dictionary<string, int>? _dailyRelationshipGainsThread;
+    private static Dictionary<string, int> _dailyRelationshipGains
+    {
+        get => _dailyRelationshipGainsThread ??= new();
+        set => _dailyRelationshipGainsThread = value;
+    }
+    [ThreadStatic] private static DateTime? _lastDailyResetThread;
+    private static DateTime _lastDailyReset
+    {
+        get => _lastDailyResetThread ?? DateTime.MinValue;
+        set => _lastDailyResetThread = value;
+    }
 
     /// <summary>
     /// Relationship record structure based on Pascal RelationRec
@@ -63,12 +81,20 @@ public partial class RelationshipSystem
     {
         var key1 = GetRelationshipKey(character1.Name, character2.Name);
         var key2 = GetRelationshipKey(character2.Name, character1.Name);
-        
+
+        // Check (char1, char2) ordering — Relation1 is char1's feeling toward char2
         if (_relationships.ContainsKey(key1) && _relationships[key1].ContainsKey(key2))
         {
             return _relationships[key1][key2].Relation1;
         }
-        
+
+        // Check reverse ordering — if record was created as (char2, char1),
+        // then Relation2 is char1's feeling toward char2
+        if (_relationships.ContainsKey(key2) && _relationships[key2].ContainsKey(key1))
+        {
+            return _relationships[key2][key1].Relation2;
+        }
+
         // Default relationship is normal
         return GameConfig.RelationNormal;
     }
@@ -82,8 +108,13 @@ public partial class RelationshipSystem
     {
         var relation = GetOrCreateRelationship(character1, character2);
 
+        // Determine which side of the record represents character1's feeling
+        // If record was created as (char1, char2), use Relation1
+        // If record was created as (char2, char1), use Relation2
+        bool isReversed = relation.Name1 != character1.Name;
+
         // Track old relation to detect new friendships
-        int oldRelation = relation.Relation1;
+        int oldRelation = isReversed ? relation.Relation2 : relation.Relation1;
 
         // v0.26: Enforce daily relationship gain cap for positive relationship changes
         int effectiveSteps = steps;
@@ -99,19 +130,26 @@ public partial class RelationshipSystem
 
         for (int i = 0; i < effectiveSteps; i++)
         {
-            if (direction > 0) // Improve relationship
+            if (isReversed)
             {
-                relation.Relation1 = IncreaseRelation(relation.Relation1, overrideMaxFeeling);
+                if (direction > 0)
+                    relation.Relation2 = IncreaseRelation(relation.Relation2, overrideMaxFeeling);
+                else if (direction < 0)
+                    relation.Relation2 = DecreaseRelation(relation.Relation2);
             }
-            else if (direction < 0) // Worsen relationship
+            else
             {
-                relation.Relation1 = DecreaseRelation(relation.Relation1);
+                if (direction > 0)
+                    relation.Relation1 = IncreaseRelation(relation.Relation1, overrideMaxFeeling);
+                else if (direction < 0)
+                    relation.Relation1 = DecreaseRelation(relation.Relation1);
             }
         }
 
         // Track new friendship for achievements (when relation improves to Friendship level or better)
         // Friendship level is 40 or lower (lower = better relationship)
-        if (oldRelation > GameConfig.RelationFriendship && relation.Relation1 <= GameConfig.RelationFriendship)
+        int newRelation = isReversed ? relation.Relation2 : relation.Relation1;
+        if (oldRelation > GameConfig.RelationFriendship && newRelation <= GameConfig.RelationFriendship)
         {
             // A new friendship was formed - track for achievements
             character1.Statistics?.RecordFriendMade();
@@ -121,7 +159,7 @@ public partial class RelationshipSystem
         SaveRelationship(relation);
 
         // Send relationship change notification
-        SendRelationshipChangeNotification(character1, character2, relation.Relation1);
+        SendRelationshipChangeNotification(character1, character2, newRelation);
     }
 
     /// <summary>
@@ -531,37 +569,46 @@ public partial class RelationshipSystem
     {
         var key1 = GetRelationshipKey(character1.Name, character2.Name);
         var key2 = GetRelationshipKey(character2.Name, character1.Name);
-        
+
+        // Check if record exists in (char1, char2) ordering
+        if (_relationships.ContainsKey(key1) && _relationships[key1].ContainsKey(key2))
+        {
+            return _relationships[key1][key2];
+        }
+
+        // Check reverse ordering — record may have been created as (char2, char1)
+        if (_relationships.ContainsKey(key2) && _relationships[key2].ContainsKey(key1))
+        {
+            return _relationships[key2][key1];
+        }
+
+        // No existing record — create new one
         if (!_relationships.ContainsKey(key1))
             _relationships[key1] = new Dictionary<string, RelationshipRecord>();
-        
-        if (!_relationships[key1].ContainsKey(key2))
+
+        // Get current in-game day for tracking relationship duration
+        int currentGameDay = 1;
+        try { currentGameDay = StoryProgressionSystem.Instance.CurrentGameDay; }
+        catch { /* StoryProgressionSystem not initialized */ }
+
+        var newRelation = new RelationshipRecord
         {
-            // Get current in-game day for tracking relationship duration
-            int currentGameDay = 1;
-            try { currentGameDay = StoryProgressionSystem.Instance.CurrentGameDay; }
-            catch { /* StoryProgressionSystem not initialized */ }
+            Name1 = character1.Name,
+            Name2 = character2.Name,
+            AI1 = character1.AI,
+            AI2 = character2.AI,
+            Race1 = character1.Race,
+            Race2 = character2.Race,
+            Relation1 = GameConfig.RelationNormal,
+            Relation2 = GameConfig.RelationNormal,
+            IdTag1 = character1.ID,
+            IdTag2 = character2.ID,
+            CreatedDate = DateTime.Now,
+            LastUpdated = DateTime.Now,
+            CreatedOnGameDay = currentGameDay  // v0.26: Track in-game day
+        };
 
-            var newRelation = new RelationshipRecord
-            {
-                Name1 = character1.Name,
-                Name2 = character2.Name,
-                AI1 = character1.AI,
-                AI2 = character2.AI,
-                Race1 = character1.Race,
-                Race2 = character2.Race,
-                Relation1 = GameConfig.RelationNormal,
-                Relation2 = GameConfig.RelationNormal,
-                IdTag1 = character1.ID,
-                IdTag2 = character2.ID,
-                CreatedDate = DateTime.Now,
-                LastUpdated = DateTime.Now,
-                CreatedOnGameDay = currentGameDay  // v0.26: Track in-game day
-            };
-
-            _relationships[key1][key2] = newRelation;
-        }
-        
+        _relationships[key1][key2] = newRelation;
         return _relationships[key1][key2];
     }
     
@@ -573,6 +620,12 @@ public partial class RelationshipSystem
         if (_relationships.ContainsKey(key1) && _relationships[key1].ContainsKey(key2))
         {
             return _relationships[key1][key2];
+        }
+
+        // Check reverse ordering — record may have been created as (char2, char1)
+        if (_relationships.ContainsKey(key2) && _relationships[key2].ContainsKey(key1))
+        {
+            return _relationships[key2][key1];
         }
 
         return null;

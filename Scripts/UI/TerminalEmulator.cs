@@ -1460,6 +1460,13 @@ public partial class TerminalEmulator : Control
     }
     
     /// <summary>
+    /// Background read task for detecting input on redirected stdin (BBS stdio mode).
+    /// Started lazily by IsInputAvailable() when stdin is redirected.
+    /// Completes when ANY byte arrives, signaling "user pressed a key".
+    /// </summary>
+    private Task<int>? _stdinReadTask;
+
+    /// <summary>
     /// Non-blocking check if input is available. Used by auto-combat to detect "stop" key presses.
     /// Returns true if there is pending input that can be read.
     /// </summary>
@@ -1476,14 +1483,19 @@ public partial class TerminalEmulator : Control
                            : _streamReader.Peek() != -1);
             }
 
-            // Console mode (local, BBS stdio)
+            // Console mode (local)
             if (!Console.IsInputRedirected)
             {
                 return Console.KeyAvailable;
             }
 
-            // Redirected stdin — cannot reliably check without blocking
-            return false;
+            // Redirected stdin (BBS stdio mode) — start a background read and check if it completed
+            if (_stdinReadTask == null)
+            {
+                var buf = new char[1];
+                _stdinReadTask = Console.In.ReadAsync(buf, 0, 1);
+            }
+            return _stdinReadTask.IsCompleted;
         }
         catch
         {
@@ -1499,6 +1511,12 @@ public partial class TerminalEmulator : Control
     {
         try
         {
+            // Clear the background stdin read task if it completed
+            if (_stdinReadTask != null && _stdinReadTask.IsCompleted)
+            {
+                _stdinReadTask = null;
+            }
+
             if (_streamReader != null)
             {
                 // Read whatever is buffered
