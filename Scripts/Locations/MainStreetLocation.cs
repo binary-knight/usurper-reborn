@@ -309,6 +309,8 @@ public class MainStreetLocation : BaseLocation
             terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("0"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write($"Talk({liveNPCs.Count}) ");
         }
+        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("~"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.SetColor("white"); terminal.Write("Prefs ");
         terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("!"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write("Bug");
         terminal.WriteLine("");

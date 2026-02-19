@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.42.4";
+    public const string Version = "0.42.5";
     public const string VersionName = "Blood Price";
 
     // From Pascal global_maxXX constants

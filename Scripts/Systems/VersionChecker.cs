@@ -88,10 +88,10 @@ namespace UsurperRemake.Systems
                 return;
             }
 
-            // Skip update check for online server mode - admin updates manually
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            // Skip update check for online server mode unless SysOp forces it
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !forceCheck)
             {
-                DebugLogger.Instance.LogInfo("UPDATE", "Skipping version check - online server mode (admin updates manually)");
+                DebugLogger.Instance.LogInfo("UPDATE", "Skipping version check - online server mode (use SysOp console to check manually)");
                 CheckCompleted = true;
                 return;
             }
