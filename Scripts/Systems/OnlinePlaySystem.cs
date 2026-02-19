@@ -983,7 +983,7 @@ namespace UsurperRemake.Systems
 
         private string GetCredentialsPath()
         {
-            var dir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".";
+            var dir = AppContext.BaseDirectory;
             return Path.Combine(dir, CREDENTIALS_FILE);
         }
 
