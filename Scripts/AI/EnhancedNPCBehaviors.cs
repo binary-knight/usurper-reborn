@@ -878,7 +878,7 @@ public static class EnhancedNPCBehaviors
         }
 
         string oldSpouseName = npc.SpouseName;
-        string oldSpouseId = NPCMarriageRegistry.Instance.GetSpouseId(npc.ID);
+        string? oldSpouseId = NPCMarriageRegistry.Instance.GetSpouseId(npc.ID);
 
         // Find the old spouse NPC
         var oldSpouse = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == oldSpouseId);
@@ -1033,7 +1033,7 @@ public static class EnhancedNPCBehaviors
     
     public class ShoppingGoal
     {
-        public string Type { get; set; }
+        public string Type { get; set; } = "";
         public float Priority { get; set; }
     }
     
@@ -1045,16 +1045,16 @@ public static class EnhancedNPCBehaviors
     
     public class GangWarResult
     {
-        public string Gang1 { get; set; }
-        public string Gang2 { get; set; }
-        public string Outcome { get; set; }
+        public string Gang1 { get; set; } = "";
+        public string Gang2 { get; set; } = "";
+        public string Outcome { get; set; } = "";
         public List<BattleResult> Battles { get; set; } = new();
     }
-    
+
     public class BattleResult
     {
-        public string Fighter1 { get; set; }
-        public string Fighter2 { get; set; }
+        public string Fighter1 { get; set; } = "";
+        public string Fighter2 { get; set; } = "";
         public int Winner { get; set; } // 1 or 2
         public int Rounds { get; set; }
     }

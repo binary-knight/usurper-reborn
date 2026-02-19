@@ -124,11 +124,12 @@ public partial class PrisonLocation : BaseLocation
         }
     }
     
-    private async Task UpdatePrisonStatus(Character player)
+    private Task UpdatePrisonStatus(Character player)
     {
         // This would typically update the online player location
         // For now, just ensure the location is set correctly
         refreshMenu = true;
+        return Task.CompletedTask;
     }
     
     private async Task<bool> CanOpenCellDoor(Character player)
@@ -178,10 +179,11 @@ public partial class PrisonLocation : BaseLocation
         return true;
     }
     
-    private async Task ShowOthersHere(Character player)
+    private Task ShowOthersHere(Character player)
     {
         // TODO: Implement showing other players in prison
         // This would list other online prisoners
+        return Task.CompletedTask;
     }
     
     private async Task DisplayPrisonMenu(Character player, bool force, bool isShort)
@@ -601,13 +603,13 @@ public partial class PrisonLocation : BaseLocation
         return race.ToString();
     }
     
-    private async Task<bool> IsPlayerOnline(Character player)
+    private Task<bool> IsPlayerOnline(Character player)
     {
         // TODO: Implement online player checking
-        return false;
+        return Task.FromResult(false);
     }
-    
-    public async Task<List<string>> GetLocationCommands(Character player)
+
+    public Task<List<string>> GetLocationCommands(Character player)
     {
         var commands = new List<string>
         {
@@ -620,20 +622,20 @@ public partial class PrisonLocation : BaseLocation
             "Q - Quit game"
         };
 
-        return commands;
+        return Task.FromResult(commands);
     }
-    
-    public async Task<bool> CanEnterLocation(Character player)
+
+    public Task<bool> CanEnterLocation(Character player)
     {
         // Can only enter if actually imprisoned
-        return player.DaysInPrison > 0;
+        return Task.FromResult(player.DaysInPrison > 0);
     }
-    
-    public async Task<string> GetLocationStatus(Character player)
+
+    public Task<string> GetLocationStatus(Character player)
     {
         int daysLeft = player.DaysInPrison;
         string dayStr = daysLeft == 1 ? "day" : "days";
-        return $"Imprisoned - {daysLeft} {dayStr} remaining, {player.PrisonEscapes} escape attempts left";
+        return Task.FromResult($"Imprisoned - {daysLeft} {dayStr} remaining, {player.PrisonEscapes} escape attempts left");
     }
 
     #region Vex Companion Recruitment
@@ -678,7 +680,7 @@ public partial class PrisonLocation : BaseLocation
         await terminal.WriteLineAsync();
         await Task.Delay(1500);
 
-        await terminal.WriteColorAsync($"\"{vex.DialogueHints[0]}\"", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorAsync($"\"{vex!.DialogueHints[0]}\"", TerminalEmulator.ColorCyan);
         await terminal.WriteLineAsync();
         await terminal.WriteLineAsync();
         await Task.Delay(2000);

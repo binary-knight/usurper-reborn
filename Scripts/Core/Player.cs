@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 public class Player : Character
 {
-    public new string RealName { get; set; } // Player's real name vs character name
+    public new string RealName { get; set; } = ""; // Player's real name vs character name
     public new DateTime LastLogin { get; set; }
     public DateTime AccountCreated { get; set; }
     public int TotalLogins { get; set; }
@@ -305,12 +305,8 @@ public class Player : Character
         // Terminal?.WriteLine(message); // Terminal is read-only, use different approach
     }
     
-    public async Task<string> GetInput()
+    public Task<string> GetInput()
     {
-        // if (Terminal != null)
-        // {
-        //     return await Terminal.GetInput();
-        // }
-        return "";
+        return Task.FromResult("");
     }
 } 

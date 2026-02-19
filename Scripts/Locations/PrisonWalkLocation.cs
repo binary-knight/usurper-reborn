@@ -92,11 +92,12 @@ public partial class PrisonWalkLocation : BaseLocation
         await terminal.WriteLineAsync();
     }
     
-    private async Task UpdateLocationStatus(Character player)
+    private Task UpdateLocationStatus(Character player)
     {
         // This would typically update the online player location
         // For now, just ensure the location is set correctly
         refreshMenu = true;
+        return Task.CompletedTask;
     }
     
     private async Task DisplayPrisonWalkMenu(Character player, bool force, bool isShort)
@@ -345,27 +346,25 @@ public partial class PrisonWalkLocation : BaseLocation
         await AttemptPrisonBreak(player, prisoner);
     }
     
-    private async Task<bool> IsPrisonBreakInProgress()
+    private Task<bool> IsPrisonBreakInProgress()
     {
         // TODO: Check if any other player is currently on location onloc_prisonbreak
         // For now, always return false
-        return false;
+        return Task.FromResult(false);
     }
     
-    private async Task<Character> FindPrisoner(string searchName)
+    private Task<Character?> FindPrisoner(string searchName)
     {
-        await Task.CompletedTask;
-
         // First search NPC prisoners
         var npcPrisoner = UsurperRemake.Systems.NPCSpawnSystem.Instance.FindPrisoner(searchName);
         if (npcPrisoner != null)
         {
-            return npcPrisoner;
+            return Task.FromResult<Character?>(npcPrisoner);
         }
 
         // Could also search player prisoners here if multiplayer is enabled
 
-        return null;
+        return Task.FromResult<Character?>(null);
     }
     
     private async Task AttemptPrisonBreak(Character player, Character prisoner)
@@ -679,13 +678,13 @@ public partial class PrisonWalkLocation : BaseLocation
         return race.ToString();
     }
     
-    private async Task<bool> IsPlayerOnline(Character player)
+    private Task<bool> IsPlayerOnline(Character player)
     {
         // TODO: Implement online player checking
-        return false;
+        return Task.FromResult(false);
     }
-    
-    public async Task<List<string>> GetLocationCommands(Character player)
+
+    public Task<List<string>> GetLocationCommands(Character player)
     {
         var commands = new List<string>
         {
@@ -695,14 +694,14 @@ public partial class PrisonWalkLocation : BaseLocation
             "S - Show status",
             "R - Return to Main Street"
         };
-        
-        return commands;
+
+        return Task.FromResult(commands);
     }
-    
-    public async Task<bool> CanEnterLocation(Character player)
+
+    public Task<bool> CanEnterLocation(Character player)
     {
         // Cannot enter if player is imprisoned
-        return player.DaysInPrison <= 0;
+        return Task.FromResult(player.DaysInPrison <= 0);
     }
     
     public async Task<string> GetLocationStatus(Character player)

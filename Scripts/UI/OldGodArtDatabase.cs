@@ -275,7 +275,7 @@ namespace UsurperRemake.UI
         /// </summary>
         private static void DrawThorgrim(Cell[,] c)
         {
-            string w = "white", g = "gray", by = "bright_yellow", y = "yellow";
+            string w = "white", g = "gray", by = "bright_yellow";
 
             // === Scales beam (row 0-1) ===
             HLine(c, 5, 35, 0, '▄', g);
@@ -348,7 +348,7 @@ namespace UsurperRemake.UI
         /// </summary>
         private static void DrawNoctura(Cell[,] c)
         {
-            string dm = "dark_magenta", m = "magenta", bm = "bright_magenta", w = "white", g = "gray";
+            string dm = "dark_magenta", m = "magenta", bm = "bright_magenta", w = "white";
 
             // === Scattered shadow particles (atmosphere) ===
             Plot(c, 3, 0, '░', dm); Plot(c, 7, 1, '░', dm); Plot(c, 36, 0, '░', dm);
@@ -480,7 +480,7 @@ namespace UsurperRemake.UI
         /// </summary>
         private static void DrawTerravok(Cell[,] c)
         {
-            string bg = "bright_green", g = "green", y = "yellow", dy = "yellow", br = "bright_yellow";
+            string bg = "bright_green", g = "green", br = "bright_yellow";
 
             // === Mountain peak / crown (rows 0-3) ===
             Plot(c, 20, 0, '▄', g);
@@ -555,7 +555,7 @@ namespace UsurperRemake.UI
         /// </summary>
         private static void DrawManwe(Cell[,] c)
         {
-            string bc = "bright_cyan", cy = "cyan", w = "white", by = "bright_yellow", y = "yellow";
+            string bc = "bright_cyan", cy = "cyan", w = "white", by = "bright_yellow";
 
             // === Starfield background ===
             Plot(c, 2, 0, '░', w); Plot(c, 8, 0, '░', cy); Plot(c, 15, 0, '░', w);

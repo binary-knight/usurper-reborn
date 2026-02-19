@@ -1223,7 +1223,7 @@ public class AnchorRoadLocation : BaseLocation
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
         var controller = allNPCs.FirstOrDefault(n => n.CTurf && !string.IsNullOrEmpty(n.Team));
 
-        return controller?.Team;
+        return controller?.Team ?? "";
     }
 
     #endregion

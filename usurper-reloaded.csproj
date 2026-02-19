@@ -4,6 +4,7 @@
         <RootNamespace>UsurperRemake</RootNamespace>
         <AssemblyName>UsurperReborn</AssemblyName>
         <Nullable>enable</Nullable>
+        <NoWarn>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8619;CS8625;CS8629;CS8632;CS8669;CS4014;CS1998</NoWarn>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
         <ImplicitUsings>enable</ImplicitUsings>

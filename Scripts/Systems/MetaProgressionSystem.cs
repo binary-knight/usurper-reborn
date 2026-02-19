@@ -349,9 +349,8 @@ namespace UsurperRemake.Systems
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // GD.Print($"[MetaProgression] Error loading data: {ex.Message}");
             }
 
             return new MetaProgressionData();
@@ -370,11 +369,9 @@ namespace UsurperRemake.Systems
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 string json = JsonSerializer.Serialize(data, options);
                 File.WriteAllText(saveFilePath, json);
-                // GD.Print("[MetaProgression] Data saved");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // GD.Print($"[MetaProgression] Error saving data: {ex.Message}");
             }
         }
 

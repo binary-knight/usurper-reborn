@@ -198,7 +198,7 @@ namespace UsurperRemake.Systems
             {
                 try
                 {
-                    _ = sqlBackend.AddNews(message, "npc", null);
+                    _ = sqlBackend.AddNews(message, "npc", null!);
                 }
                 catch { /* fail silently - don't crash sim for logging */ }
             };

@@ -509,7 +509,7 @@ public static class ItemManager
     /// <summary>
     /// Get item by ID
     /// </summary>
-    public static Item GetItem(int itemId)
+    public static Item? GetItem(int itemId)
     {
         return gameItems.ContainsKey(itemId) ? gameItems[itemId] : null;
     }
@@ -517,7 +517,7 @@ public static class ItemManager
     /// <summary>
     /// Get classic weapon by index (Pascal compatible)
     /// </summary>
-    public static ClassicWeapon GetClassicWeapon(int index)
+    public static ClassicWeapon? GetClassicWeapon(int index)
     {
         return classicWeapons.ContainsKey(index) ? classicWeapons[index] : null;
     }
@@ -525,7 +525,7 @@ public static class ItemManager
     /// <summary>
     /// Get classic armor by index (Pascal compatible)
     /// </summary>
-    public static ClassicArmor GetClassicArmor(int index)
+    public static ClassicArmor? GetClassicArmor(int index)
     {
         return classicArmor.ContainsKey(index) ? classicArmor[index] : null;
     }
@@ -561,7 +561,7 @@ public static class ItemManager
     /// <summary>
     /// Get weapon by ID (for weapon shop)
     /// </summary>
-    public static ClassicWeapon GetWeapon(int weaponId)
+    public static ClassicWeapon? GetWeapon(int weaponId)
     {
         return classicWeapons.ContainsKey(weaponId) ? classicWeapons[weaponId] : null;
     }
@@ -569,7 +569,7 @@ public static class ItemManager
     /// <summary>
     /// Get armor by ID (for armor shop)  
     /// </summary>
-    public static ClassicArmor GetArmor(int armorId)
+    public static ClassicArmor? GetArmor(int armorId)
     {
         return classicArmor.ContainsKey(armorId) ? classicArmor[armorId] : null;
     }
@@ -602,7 +602,7 @@ public static class ItemManager
     /// <summary>
     /// Get best affordable weapon for player
     /// </summary>
-    public static ClassicWeapon GetBestAffordableWeapon(long maxGold, Character player)
+    public static ClassicWeapon? GetBestAffordableWeapon(long maxGold, Character player)
     {
         return classicWeapons.Values
             .Where(w => w.Value <= maxGold)
@@ -614,7 +614,7 @@ public static class ItemManager
     /// <summary>
     /// Get best affordable armor for specific slot
     /// </summary>
-    public static ClassicArmor GetBestAffordableArmor(ObjType armorType, long maxGold, Character player)
+    public static ClassicArmor? GetBestAffordableArmor(ObjType armorType, long maxGold, Character player)
     {
         return classicArmor.Values
             .Where(a => a.Value <= maxGold)

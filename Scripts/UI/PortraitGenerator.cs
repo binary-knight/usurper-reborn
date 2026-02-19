@@ -107,14 +107,14 @@ namespace UsurperRemake.UI
         {
             public CharacterRace Race;
             public CharacterSex Sex;
-            public string SkinColor;
-            public string SkinDark;
-            public string OutlineColor;
-            public string HairColor;
-            public string EyeColor;
-            public string MouthColor;
-            public string BorderColor;
-            public string AtmoColor;
+            public string SkinColor = "";
+            public string SkinDark = "";
+            public string OutlineColor = "";
+            public string HairColor = "";
+            public string EyeColor = "";
+            public string MouthColor = "";
+            public string BorderColor = "";
+            public string AtmoColor = "";
             public char AtmoChar;
             public int HairStyle;
             public int EyeStyle;
@@ -122,7 +122,7 @@ namespace UsurperRemake.UI
             public int MouthStyle;
             public int BeardStyle;
             public int AccessoryBits;
-            public int[] HeadWidths;
+            public int[] HeadWidths = Array.Empty<int>();
             public int EyeRow;
             public int NoseRow;
             public int MouthRow;

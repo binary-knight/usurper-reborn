@@ -23,7 +23,7 @@ public partial class TempleLocation : BaseLocation
     private readonly LocationManager locationManager;
     private readonly GodSystem godSystem;
     private bool refreshMenu = true;
-    private new Character currentPlayer;
+    private new Character currentPlayer = null!;
     private Random random = new Random();
 
     // Old Gods integration
@@ -216,9 +216,9 @@ public partial class TempleLocation : BaseLocation
     /// <summary>
     /// Display temple menu (Pascal TEMPLE.PAS Meny procedure)
     /// </summary>
-    private async Task DisplayMenu(bool forceDisplay)
+    private Task DisplayMenu(bool forceDisplay)
     {
-        if (!forceDisplay && currentPlayer.Expert) return;
+        if (!forceDisplay && currentPlayer.Expert) return Task.CompletedTask;
         
         terminal.ClearScreen();
 
@@ -497,8 +497,9 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("eturn");
         terminal.WriteLine("");
+        return Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// Process worship selection and god faith (Pascal TEMPLE.PAS)
     /// </summary>

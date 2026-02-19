@@ -95,7 +95,7 @@ public class PersonalityProfile
     public CombatStyle PreferredCombatStyle { get; set; }
     public List<string> Fears { get; set; } = new List<string>();
     public List<string> Desires { get; set; } = new List<string>();
-    public string Archetype { get; set; }
+    public string Archetype { get; set; } = "";
     
     public static PersonalityProfile GenerateRandom(string npcArchetype)
     {

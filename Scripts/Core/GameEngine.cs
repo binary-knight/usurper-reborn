@@ -627,7 +627,7 @@ public partial class GameEngine : Node
             catch (Exception ex)
             {
                 GD.PrintErr($"[GameEngine] Fatal error in main loop: {ex.Message}");
-                GD.PrintErr(ex.StackTrace);
+                GD.PrintErr(ex.StackTrace ?? "");
                 UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Fatal error in main loop:\n{ex}");
                 UsurperRemake.Systems.DebugLogger.Instance.Flush();
                 throw; // Re-throw to crash properly rather than hang silently
@@ -1590,7 +1590,7 @@ public partial class GameEngine : Node
             }
 
             // Online mode: validate player's team still exists
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !string.IsNullOrEmpty(currentPlayer.Team))
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null && !string.IsNullOrEmpty(currentPlayer.Team))
             {
                 if (SaveSystem.Instance?.Backend is SqlSaveBackend teamBackend)
                 {
@@ -1643,7 +1643,7 @@ public partial class GameEngine : Node
             }
 
             // Start game at saved location
-            await locationManager.EnterLocation(GameLocation.MainStreet, currentPlayer);
+            await locationManager.EnterLocation(GameLocation.MainStreet, currentPlayer!);
         }
         catch (Exception ex)
         {
@@ -1710,7 +1710,7 @@ public partial class GameEngine : Node
         try
         {
             // Load children from world_state (maintained by WorldSimService)
-            var sharedChildren = await OnlineStateManager.Instance.LoadSharedChildren();
+            var sharedChildren = await OnlineStateManager.Instance!.LoadSharedChildren();
             if (sharedChildren != null)
             {
                 // Empty list is valid — means all children aged out or were converted to NPCs
@@ -2143,7 +2143,7 @@ public partial class GameEngine : Node
             // Identify user for PostHog dashboards (DAUs, WAUs, Retention)
             // This updates user properties and ensures they show up in daily/weekly counts
             TelemetrySystem.Instance.Identify(
-                characterName: currentPlayer.Name,
+                characterName: currentPlayer?.Name ?? "",
                 characterClass: currentPlayer.Class.ToString(),
                 race: currentPlayer.Race.ToString(),
                 level: currentPlayer.Level,
@@ -2342,8 +2342,8 @@ public partial class GameEngine : Node
             // Unique player identifier (critical for romance/family systems)
             ID = !string.IsNullOrEmpty(playerData.Id) ? playerData.Id : (playerData.Name2 ?? playerData.Name1 ?? Guid.NewGuid().ToString()),
 
-            Name1 = playerData.Name1,
-            Name2 = playerData.Name2,
+            Name1 = playerData.Name1 ?? "",
+            Name2 = playerData.Name2 ?? "",
             Level = playerData.Level,
             Experience = playerData.Experience,
             HP = playerData.HP,
@@ -2835,19 +2835,19 @@ public partial class GameEngine : Node
         if (playerData.DungeonFloorStates != null && playerData.DungeonFloorStates.Count > 0)
         {
             player.DungeonFloorStates = RestoreDungeonFloorStates(playerData.DungeonFloorStates);
-            DebugLogger.Instance.LogDebug("LOAD", $"Restored dungeon floor states for {playerData.DungeonFloorStates.Count} floors");
+            DebugLogger.Instance?.LogDebug("LOAD", $"Restored dungeon floor states for {playerData.DungeonFloorStates.Count} floors");
         }
         else
         {
             player.DungeonFloorStates = new Dictionary<int, UsurperRemake.Systems.DungeonFloorState>();
-            DebugLogger.Instance.LogDebug("LOAD", "No dungeon floor states in save data - starting fresh");
+            DebugLogger.Instance?.LogDebug("LOAD", "No dungeon floor states in save data - starting fresh");
         }
 
         // Restore player's active quest references from the quest database
         if (playerData.ActiveQuests != null && playerData.ActiveQuests.Count > 0)
         {
             player.ActiveQuests.Clear();
-            var playerName = player.Name2 ?? player.Name1;
+            var playerName = player.Name2 ?? player.Name1 ?? "";
             var dbQuests = QuestSystem.GetPlayerQuests(playerName);
             foreach (var q in dbQuests)
             {
@@ -3047,7 +3047,7 @@ public partial class GameEngine : Node
         // Clear existing NPCs before restoring
         NPCSpawnSystem.Instance.ClearAllNPCs();
 
-        NPC kingNpc = null;
+        NPC? kingNpc = null;
 
         foreach (var data in npcData)
         {
@@ -4408,7 +4408,7 @@ public partial class GameEngine : Node
             var dataPath = Path.Combine(DataPath, "npcs.json");
             if (!File.Exists(dataPath))
             {
-                GD.PrintErr($"[Init] NPC data file not found at {dataPath}. Using hard-coded specials only.");
+                DebugLogger.Instance?.LogDebug("INIT", $"NPC data file not found at {dataPath}. Using hard-coded specials only.");
                 return;
             }
 
@@ -4492,13 +4492,13 @@ public partial class GameEngine : Node
     
     // Character creation helpers (now handled by CharacterCreationSystem)
     // These methods are kept for backwards compatibility but are no longer used
-    private async Task<CharacterSex> SelectSex() => CharacterSex.Male; // Legacy - use CharacterCreationSystem
-    private async Task<CharacterRace> SelectRace() => CharacterRace.Human; // Legacy - use CharacterCreationSystem
-    private async Task<CharacterClass> SelectClass() => CharacterClass.Warrior; // Legacy - use CharacterCreationSystem
-    private void ApplyRacialBonuses(Character character) { /* Legacy - handled by CharacterCreationSystem */ }
-    private void ApplyClassBonuses(Character character) { /* Legacy - handled by CharacterCreationSystem */ }
-    private void SetInitialEquipment(Character character) { /* Legacy - handled by CharacterCreationSystem */ }
-    private async Task ShowCharacterSummary(Character character) { /* Legacy - handled by CharacterCreationSystem */ }
+    private Task<CharacterSex> SelectSex() => Task.FromResult(CharacterSex.Male);
+    private Task<CharacterRace> SelectRace() => Task.FromResult(CharacterRace.Human);
+    private Task<CharacterClass> SelectClass() => Task.FromResult(CharacterClass.Warrior);
+    private void ApplyRacialBonuses(Character character) { }
+    private void ApplyClassBonuses(Character character) { }
+    private void SetInitialEquipment(Character character) { }
+    private Task ShowCharacterSummary(Character character) => Task.CompletedTask;
 
     /// <summary>
     /// Run magic shop system validation tests
@@ -4606,7 +4606,7 @@ public class MenuOption
 {
     public string Key { get; set; } = "";
     public string Text { get; set; } = "";
-    public Func<Task> Action { get; set; } = async () => { };
+    public Func<Task> Action { get; set; } = () => Task.CompletedTask;
 }
 
 /// <summary>

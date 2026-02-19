@@ -80,7 +80,6 @@ namespace UsurperRemake.Systems
 
         public event Action<OldGodType>? OnBossDefeated;
         public event Action<OldGodType>? OnBossSaved;
-        public event Action<OldGodType, int>? OnPhaseChange;
 
         public OldGodBossSystem()
         {

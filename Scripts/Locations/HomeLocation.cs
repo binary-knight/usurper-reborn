@@ -699,7 +699,7 @@ terminal.SetColor("darkgray");
         await terminal.WaitForKey();
     }
 
-    private async Task ShowInventory()
+    private new async Task ShowInventory()
     {
         terminal.WriteLine("\n", "white");
         terminal.SetColor("bright_cyan");
@@ -3579,15 +3579,12 @@ toResurrect.IsDead = false;
         // Collect equippable items from player's inventory and equipped items
         var equipmentItems = new List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)>();
 
-        // Add items from player's inventory that are Equipment type
+        // Add equippable items from player's inventory
         foreach (var invItem in currentPlayer.Inventory)
         {
-            // Try to find matching Equipment in database
-            var equipment = EquipmentDatabase.GetByName(invItem.Name);
+            var equipment = ConvertInventoryItemToEquipment(invItem);
             if (equipment != null)
-            {
                 equipmentItems.Add((equipment, false, (EquipmentSlot?)null));
-            }
         }
 
         // Add player's currently equipped items

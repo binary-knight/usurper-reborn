@@ -349,7 +349,7 @@ public class MaintenanceSystem
     /// Process class-specific daily maintenance
     /// Pascal: Class-specific processing in MAINT.PAS
     /// </summary>
-    private async Task ProcessClassSpecificMaintenance(Character player, MaintenanceConfig config)
+    private Task ProcessClassSpecificMaintenance(Character player, MaintenanceConfig config)
     {
         switch (player.Class)
         {
@@ -365,8 +365,9 @@ public class MaintenanceSystem
                 terminal.WriteLine($"  {player.Name2}: Assassin thief bonus applied", "yellow");
                 break;
         }
+        return Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// Reset daily parameters for all players
     /// Pascal: Daily parameter reset section in MAINT.PAS
@@ -459,17 +460,18 @@ public class MaintenanceSystem
     /// Process player birthday events
     /// Pascal: Birthday processing in MAIL.PAS
     /// </summary>
-    private async Task ProcessPlayerBirthday(Character player)
+    private Task ProcessPlayerBirthday(Character player)
     {
         // Simple birthday check (in real implementation, would track actual dates)
         if (random.Next(365) == 0) // 1 in 365 chance for birthday
         {
             player.Age++;
             terminal.WriteLine($"  {player.Name2}: Birthday! Now age {player.Age}", "bright_yellow");
-            
+
             // Send birthday mail with gift options (Pascal: birthday mail system)
             MailSystem.SendBirthdayMail(player.Name2, player.Age);
         }
+        return Task.CompletedTask;
     }
     
     /// <summary>
@@ -532,7 +534,7 @@ public class MaintenanceSystem
     /// Process bank interest for all accounts
     /// Pascal: Bank interest calculation
     /// </summary>
-    private async Task ProcessBankInterest(MaintenanceConfig config)
+    private Task ProcessBankInterest(MaintenanceConfig config)
     {
         var gameEngine = GameEngine.Instance;
         if (gameEngine?.CurrentPlayer != null)
@@ -553,6 +555,7 @@ public class MaintenanceSystem
                     $"Interest earned: {interest} gold");
             }
         }
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -600,28 +603,22 @@ public class MaintenanceSystem
     /// Clean up inactive players
     /// Pascal: Inactive player deletion in MAINT.PAS
     /// </summary>
-    private async Task CleanupInactivePlayers(MaintenanceConfig config)
+    private Task CleanupInactivePlayers(MaintenanceConfig config)
     {
-        // Inactive player cleanup logic (Pascal implementation)
         terminal.WriteLine("  Inactive players checked", "cyan");
+        return Task.CompletedTask;
     }
-    
-    /// <summary>
-    /// Clean up bounty lists
-    /// Pascal: Bounty list maintenance in MAINT.PAS
-    /// </summary>
-    private async Task CleanupBountyLists()
+
+    private Task CleanupBountyLists()
     {
         terminal.WriteLine("  Bounty lists updated", "cyan");
+        return Task.CompletedTask;
     }
-    
-    /// <summary>
-    /// Clean up royal guard
-    /// Pascal: Royal guard validation in MAINT.PAS
-    /// </summary>
-    private async Task CleanupRoyalGuard()
+
+    private Task CleanupRoyalGuard()
     {
         terminal.WriteLine("  Royal guard validated", "cyan");
+        return Task.CompletedTask;
     }
     
     /// <summary>

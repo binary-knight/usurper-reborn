@@ -372,7 +372,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine("");
 
         // Show current item in this category
-        Equipment currentItem = null;
+        Equipment? currentItem = null;
         if (category == WeaponCategory.Shields)
         {
             currentItem = currentPlayer.GetEquipment(EquipmentSlot.OffHand);
@@ -609,7 +609,7 @@ public class WeaponShopLocation : BaseLocation
                 return false;
 
             default:
-                if (int.TryParse(choice, out int itemNum) && itemNum >= 1)
+                if (int.TryParse(choice, out int itemNum) && itemNum >= 1 && currentCategory.HasValue)
                 {
                     await BuyItem(currentCategory.Value, itemNum);
                 }

@@ -129,11 +129,11 @@ public class OnlineDuelSystem : Node
     /// <summary>
     /// Initialize duel - Pascal ONDUEL.PAS initialization logic
     /// </summary>
-    private async Task InitializeDuel(Character player, Character opponent, DuelResult result, TerminalEmulator terminal)
+    private Task InitializeDuel(Character player, Character opponent, DuelResult result, TerminalEmulator terminal)
     {
         terminal.ClearScreen();
         terminal.WriteLine($"\n{GameConfig.CombatColor}═══ ONLINE DUEL ═══{GameConfig.TextColor}");
-        
+
         if (challenger)
         {
             terminal.WriteLine($"{GameConfig.PlayerColor}You are the challenger!{GameConfig.TextColor}");
@@ -147,27 +147,24 @@ public class OnlineDuelSystem : Node
                 terminal.WriteLine($"Challenger: {GameConfig.PlayerColor}{opponent.Name2}{GameConfig.TextColor}");
             }
         }
-        
+
         result.DuelLog.Add($"Duel initialized - Player is {(challenger ? "challenger" : "defender")}");
+        return Task.CompletedTask;
     }
     
     /// <summary>
     /// Setup communication files - Pascal ONDUEL.PAS file system
     /// </summary>
-    private async Task SetupCommunicationFiles(Character player, DuelResult result)
+    private Task SetupCommunicationFiles(Character player, DuelResult result)
     {
-        // Pascal communication file setup
-        // In original: uses files for inter-node communication
-        
-        // Set up say file path
         sayFile = Path.Combine(GameConfig.DataPath, $"duel_{player.Name2}_{DateTime.Now.Ticks}.say");
-        
-        // Initialize communication record
+
         commy.Command = CmNothing;
         commy.Nr1 = 0;
         commy.Nr2 = 0;
-        
+
         result.DuelLog.Add("Communication files initialized");
+        return Task.CompletedTask;
     }
     
     /// <summary>

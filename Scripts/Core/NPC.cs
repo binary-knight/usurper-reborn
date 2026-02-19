@@ -35,12 +35,12 @@ public enum NPCActionType
 public partial class NPC : Character
 {
     // NPC-specific properties
-    public NPCBrain Brain { get; set; }
-    public PersonalityProfile Personality { get; set; }
-    public MemorySystem Memory { get; set; }
-    public RelationshipManager Relationships { get; set; }
-    public EmotionalState EmotionalState { get; set; }
-    public GoalSystem Goals { get; set; }
+    public NPCBrain? Brain { get; set; }
+    public PersonalityProfile? Personality { get; set; }
+    public MemorySystem? Memory { get; set; }
+    public RelationshipManager? Relationships { get; set; }
+    public EmotionalState? EmotionalState { get; set; }
+    public GoalSystem? Goals { get; set; }
     
     // NPC behavior settings
     public string Archetype { get; set; } = "citizen";        // thug, merchant, guard, priest, etc.
@@ -550,7 +550,7 @@ public partial class NPC : Character
     /// <summary>
     /// Determine shopping goal based on class and personality
     /// </summary>
-    private Goal DetermineShoppingGoal()
+    private Goal? DetermineShoppingGoal()
     {
         switch (Class)
         {
@@ -712,7 +712,7 @@ public partial class NPC : Character
             if (playerFaction != null)
             {
                 // Use faction-aware greeting
-                return FactionSystem.Instance.GetFactionGreeting(NPCFaction.Value, player);
+                return FactionSystem.Instance!.GetFactionGreeting(NPCFaction.Value, player);
             }
         }
 
@@ -725,7 +725,7 @@ public partial class NPC : Character
         // Fallback for non-Player characters - use legacy personality-based greeting
         string playerName = player?.Name2 ?? player?.Name1 ?? "stranger";
         int relationship = Relationships?.GetRelationshipWith(playerName) ?? 0;
-        return Brain?.GenerateGreeting(player, relationship) ?? "Hello there.";
+        return Brain?.GenerateGreeting(player!, relationship) ?? "Hello there.";
     }
 
     /// <summary>

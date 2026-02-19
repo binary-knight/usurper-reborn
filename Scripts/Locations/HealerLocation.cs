@@ -106,7 +106,7 @@ public class HealerLocation : BaseLocation
         // 1-line health status
         terminal.SetColor("gray");
         terminal.Write(" HP:");
-        var hpPct = (float)player.HP / player.MaxHP;
+        var hpPct = player.MaxHP > 0 ? (float)player.HP / player.MaxHP : 0f;
         terminal.SetColor(hpPct >= 0.7f ? "bright_green" : hpPct >= 0.3f ? "yellow" : "bright_red");
         terminal.Write($"{player.HP}/{player.MaxHP}");
         terminal.SetColor("gray");
@@ -191,7 +191,7 @@ public class HealerLocation : BaseLocation
 
     protected override async Task<string> GetUserChoice()
     {
-        var prompt = GetCurrentPlayer().Expert ?
+        var prompt = GetCurrentPlayer()?.Expert == true ?
             "Healing Hut (H,F,B,M,P,C,D,A,S,R,?) :" :
             "Healing Hut (? for menu) :";
 

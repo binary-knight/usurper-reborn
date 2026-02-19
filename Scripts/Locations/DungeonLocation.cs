@@ -24,7 +24,7 @@ public class DungeonLocation : BaseLocation
     private const float SpecialEventChance = 0.10f;
 
     // Current floor state
-    private DungeonFloor currentFloor;
+    private DungeonFloor currentFloor = null!;
     private bool inRoomMode = false; // Are we exploring a room?
 
     // Player state tracking for tension
@@ -59,8 +59,8 @@ public class DungeonLocation : BaseLocation
 
         // Check if player is trying to skip an uncleared boss/seal floor
         // They can't enter floors beyond an uncleared special floor
-        currentDungeonLevel = GetMaxAccessibleFloor(player, currentDungeonLevel);
-        player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
+        currentDungeonLevel = GetMaxAccessibleFloor(player!, currentDungeonLevel);
+        player!.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
 
         // Generate or restore floor based on persistence state
         // CRITICAL: Also regenerate if we have a cached floor but no saved state for it
@@ -116,7 +116,7 @@ public class DungeonLocation : BaseLocation
         QuestSystem.RefreshBountyBoard(player?.Level ?? 1);
 
         // Check for story events at milestone floors
-        await CheckFloorStoryEvents(player, term);
+        await CheckFloorStoryEvents(player!, term);
 
         // Add active companions to the teammates list
         await AddCompanionsToParty(player, term);
@@ -226,7 +226,7 @@ public class DungeonLocation : BaseLocation
         // Trigger story events at milestone floors (first time only)
         string floorVisitedFlag = $"dungeon_floor_{currentDungeonLevel}_visited";
 
-        if (!story.HasStoryFlag(floorVisitedFlag))
+        if (!story!.HasStoryFlag(floorVisitedFlag))
         {
             story.SetStoryFlag(floorVisitedFlag, true);
 
@@ -1731,7 +1731,7 @@ public class DungeonLocation : BaseLocation
     private void ShowFloorGuidanceBBS(int floor)
     {
         var story = StoryProgressionSystem.Instance;
-        string hint = null;
+        string? hint = null;
         string color = "gray";
 
         // Seal floors
@@ -2289,7 +2289,7 @@ public class DungeonLocation : BaseLocation
     private void ShowFloorGuidance(int floor)
     {
         var story = StoryProgressionSystem.Instance;
-        string hint = null;
+        string? hint = null;
         string color = "gray";
 
         // Special floor hints - Seal floors match SevenSealsSystem.cs
@@ -2589,7 +2589,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("bright_white");
         terminal.WriteLine("═══ YOUR QUEST ═══");
         terminal.SetColor("white");
-        terminal.WriteLine(GetCurrentObjective(story, player));
+        terminal.WriteLine(GetCurrentObjective(story, player!));
         terminal.WriteLine("");
 
         // Seals progress
@@ -3351,7 +3351,7 @@ public class DungeonLocation : BaseLocation
         await Task.Delay(500);
 
         // Check for evasion based on agility
-        if (TryEvadeTrap(player))
+        if (TryEvadeTrap(player!))
         {
             terminal.SetColor("green");
             terminal.WriteLine("Your quick reflexes save you!");
@@ -3428,7 +3428,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(room.Description);
 
             // Check for Old God boss encounters on specific floors
-            bool hadOldGodEncounter = await TryOldGodBossEncounter(player, room);
+            bool hadOldGodEncounter = await TryOldGodBossEncounter(player!, room);
             if (hadOldGodEncounter)
             {
                 return; // Old God encounter handled the room
@@ -3555,7 +3555,7 @@ public class DungeonLocation : BaseLocation
         await Task.Delay(1500);
 
         // Check for divine punishment before combat
-        var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(player);
+        var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(player!);
 
         // Apply temporary combat penalties from divine wrath
         int originalTempAttackBonus = player.TempAttackBonus;
@@ -3860,7 +3860,7 @@ public class DungeonLocation : BaseLocation
         long goldFound = currentDungeonLevel * 100 + dungeonRandom.Next(currentDungeonLevel * 200);
         long expFound = currentDungeonLevel * 50 + dungeonRandom.Next(100);
 
-        player.Gold += goldFound;
+        player!.Gold += goldFound;
         player.Experience += expFound;
 
         terminal.WriteLine($"You find {goldFound} gold pieces!");
@@ -3994,7 +3994,7 @@ public class DungeonLocation : BaseLocation
         // Use the new comprehensive feature interaction system
         await FeatureInteractionSystem.Instance.InteractWithFeature(
             feature,
-            player,
+            player!,
             currentDungeonLevel,
             theme,
             terminal

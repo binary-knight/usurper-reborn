@@ -711,7 +711,7 @@ public class NPCBrain
         return actions.OrderByDescending(a => a.Priority).First();
     }
     
-    private string FindTradePartner(WorldState world)
+    private string? FindTradePartner(WorldState world)
     {
         // Find NPCs in the same location who are merchants or friendly
         return world.GetNPCsInLocation(owner.CurrentLocation)
@@ -719,7 +719,7 @@ public class NPCBrain
             .FirstOrDefault()?.Id;
     }
     
-    private string FindStealTarget(WorldState world)
+    private string? FindStealTarget(WorldState world)
     {
         // Find wealthy NPCs to steal from
         return world.GetNPCsInLocation(owner.CurrentLocation)
@@ -728,7 +728,7 @@ public class NPCBrain
             .FirstOrDefault()?.Id;
     }
     
-    private string FindSocialTarget(WorldState world)
+    private string? FindSocialTarget(WorldState world)
     {
         // Find compatible NPCs to socialize with
         return world.GetNPCsInLocation(owner.CurrentLocation)
@@ -736,7 +736,7 @@ public class NPCBrain
             .FirstOrDefault()?.Id;
     }
     
-    private string FindGangToJoin(WorldState world)
+    private string? FindGangToJoin(WorldState world)
     {
         // Find gang leaders to approach
         return world.GetNPCsInLocation(owner.CurrentLocation)
@@ -744,7 +744,7 @@ public class NPCBrain
             .FirstOrDefault()?.Id;
     }
     
-    private string FindRevengTarget()
+    private string? FindRevengTarget()
     {
         // Find enemies from memory
         return memory.GetMemoriesOfType(MemoryType.Attacked)
@@ -753,7 +753,7 @@ public class NPCBrain
             .FirstOrDefault()?.InvolvedCharacter;
     }
     
-    private string FindCombatTarget(WorldState world)
+    private string? FindCombatTarget(WorldState world)
     {
         // Find enemies or potential targets based on personality
         var npcsHere = world.GetNPCsInLocation(owner.CurrentLocation);
@@ -979,7 +979,7 @@ public class NPCAction
 {
     public ActionType Type { get; set; }
     public float Priority { get; set; } = 0.5f;
-    public string Target { get; set; } // Target character ID
+    public string Target { get; set; } = ""; // Target character ID
     public Dictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
 }
 
@@ -1037,9 +1037,9 @@ public partial class WorldState
     
     // Properties for test compatibility
     public int CurrentHour { get; set; }
-    public string CurrentLocation { get; set; }
+    public string CurrentLocation { get; set; } = "";
     public bool InCombat { get; set; }
-    public Character[] NearbyCharacters { get; set; }
+    public Character[] NearbyCharacters { get; set; } = Array.Empty<Character>();
     
     public WorldState(List<NPC>? worldNPCs = null)
     {
@@ -1051,7 +1051,7 @@ public partial class WorldState
         return npcs.Where(npc => npc.CurrentLocation == location && npc.IsAlive).ToList();
     }
     
-    public NPC GetNPCById(string id)
+    public NPC? GetNPCById(string id)
     {
         return npcs.FirstOrDefault(npc => npc.Id == id);
     }

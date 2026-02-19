@@ -269,13 +269,13 @@ public class God
     {
         var god = new God();
         
-        if (dict.ContainsKey("RealName")) god.RealName = dict["RealName"].ToString();
-        if (dict.ContainsKey("Name")) god.Name = dict["Name"].ToString();
-        if (dict.ContainsKey("Id")) god.Id = dict["Id"].ToString();
+        if (dict.ContainsKey("RealName")) god.RealName = dict["RealName"].ToString() ?? "";
+        if (dict.ContainsKey("Name")) god.Name = dict["Name"].ToString() ?? "";
+        if (dict.ContainsKey("Id")) god.Id = dict["Id"].ToString() ?? "";
         if (dict.ContainsKey("RecordNumber")) god.RecordNumber = Convert.ToInt32(dict["RecordNumber"]);
         if (dict.ContainsKey("Age")) god.Age = Convert.ToInt32(dict["Age"]);
         if (dict.ContainsKey("Sex")) god.Sex = Convert.ToInt32(dict["Sex"]);
-        if (dict.ContainsKey("AI")) god.AI = dict["AI"].ToString()[0];
+        if (dict.ContainsKey("AI")) god.AI = (dict["AI"].ToString() ?? "N")[0];
         if (dict.ContainsKey("Level")) god.Level = Convert.ToInt32(dict["Level"]);
         if (dict.ContainsKey("Experience")) god.Experience = Convert.ToInt64(dict["Experience"]);
         if (dict.ContainsKey("DeedsLeft")) god.DeedsLeft = Convert.ToInt32(dict["DeedsLeft"]);
@@ -285,7 +285,7 @@ public class God
         if (dict.ContainsKey("Goodness")) god.Goodness = Convert.ToInt64(dict["Goodness"]);
         if (dict.ContainsKey("LastActive")) god.LastActive = DateTime.FromBinary(Convert.ToInt64(dict["LastActive"]));
         if (dict.ContainsKey("CreatedDate")) god.CreatedDate = DateTime.FromBinary(Convert.ToInt64(dict["CreatedDate"]));
-        if (dict.ContainsKey("Disciples")) god.Disciples = ((object[])dict["Disciples"]).Select(x => x.ToString()).ToList();
+        if (dict.ContainsKey("Disciples")) god.Disciples = ((object[])dict["Disciples"]).Select(x => x.ToString() ?? "").ToList();
         if (dict.ContainsKey("Properties")) god.Properties = (Dictionary<string, object>)dict["Properties"];
         
         return god;

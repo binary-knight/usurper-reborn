@@ -113,6 +113,7 @@
         .pop-stat .lbl { color: var(--text-dim); font-size: 11px; }
         .pop-stat.alive .val { color: var(--green); }
         .pop-stat.dead .val { color: var(--red); }
+        .pop-stat.permadead .val { color: #666; }
         .pop-stat.married .val { color: var(--pink); }
         .pop-stat.pregnant .val { color: #ffaacc; }
         .pop-stat.children .val { color: #88ddff; }
@@ -868,6 +869,7 @@
         <div class="pop-bar" id="pop-bar">
             <div class="pop-stat alive"><span class="val" id="pop-alive">--</span><span class="lbl">Alive</span></div>
             <div class="pop-stat dead"><span class="val" id="pop-dead">--</span><span class="lbl">Dead</span></div>
+            <div class="pop-stat permadead"><span class="val" id="pop-permadead">--</span><span class="lbl">Permadead</span></div>
             <div class="pop-stat married"><span class="val" id="pop-married">--</span><span class="lbl">Married</span></div>
             <div class="pop-stat pregnant"><span class="val" id="pop-pregnant">--</span><span class="lbl">Pregnant</span></div>
             <div class="pop-stat children"><span class="val" id="pop-children">--</span><span class="lbl">Children</span></div>
@@ -995,6 +997,7 @@
                     <option value="">All Status</option>
                     <option value="alive">Alive</option>
                     <option value="dead">Dead</option>
+                    <option value="permadead">Permadead</option>
                     <option value="married">Married</option>
                     <option value="pregnant">Pregnant</option>
                 </select>
@@ -1284,8 +1287,10 @@ function connectSSE() {
 function updatePopBar() {
     const s = summary;
     if (!s || !s.total) return;
+    const permaCount = (s.permadead || 0) + (s.agedDeath || 0);
     document.getElementById('pop-alive').textContent = s.alive || 0;
-    document.getElementById('pop-dead').textContent = s.dead || 0;
+    document.getElementById('pop-dead').textContent = Math.max(0, (s.dead || 0) - permaCount);
+    document.getElementById('pop-permadead').textContent = permaCount;
     document.getElementById('pop-married').textContent = s.married || 0;
     document.getElementById('pop-pregnant').textContent = s.pregnant || 0;
     document.getElementById('pop-children').textContent = s.children?.count || 0;
@@ -1614,7 +1619,9 @@ function updateWorldMap() {
             const color = FACTION_COLORS[fid] || FACTION_COLORS['-1'];
             const lvl = n.level || n.Level || 1;
             const r = Math.max(2.5, Math.min(5.5, 2.5 + lvl / 15));
-            const opacity = dead ? 0.25 : 1;
+            const perma = isPermaDead(n);
+            const opacity = perma ? 0.12 : dead ? 0.25 : 1;
+            const dotColor = perma ? '#333' : color;
             const prev = prevNpcPositions[name];
             const startX = prev ? prev.x : x;
             const startY = prev ? prev.y : y;
@@ -1622,7 +1629,7 @@ function updateWorldMap() {
 
             svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
                 + 'cx="' + startX + '" cy="' + startY + '" r="' + r + '" '
-                + 'fill="' + color + '" opacity="' + opacity + '" '
+                + 'fill="' + dotColor + '" opacity="' + opacity + '" '
                 + 'stroke="' + (king ? '#ffaa00' : (pregnant ? '#ff66aa' : 'none')) + '" '
                 + 'stroke-width="' + (king ? 2 : (pregnant ? 1.5 : 0)) + '">'
                 + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title>'
@@ -1643,10 +1650,11 @@ function updateWorldMap() {
             const lvl = n.level || n.Level || 1;
             const r = Math.max(2.5, Math.min(5.5, 2.5 + lvl / 15));
             const dead = n.isDead || n.IsDead;
+            const perma2 = isPermaDead(n);
             newPositions[name] = { x, y };
             svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
                 + 'cx="' + x + '" cy="' + y + '" r="' + r + '" '
-                + 'fill="' + color + '" opacity="' + (dead ? 0.25 : 1) + '">'
+                + 'fill="' + (perma2 ? '#333' : color) + '" opacity="' + (perma2 ? 0.12 : dead ? 0.25 : 1) + '">'
                 + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title></circle>';
         });
     });
@@ -2022,7 +2030,8 @@ function updateNetwork() {
         const married = n.isMarried || n.IsMarried;
         const spouse = n.spouseName || n.SpouseName || '';
         const team = n.team || n.Team || '';
-        nodes.push({ id: name, level: lvl, faction: fid, dead, married, spouse, team, index: i });
+        const perma = isPermaDead(n);
+        nodes.push({ id: name, level: lvl, faction: fid, dead, perma, married, spouse, team, index: i });
         nodeMap[name] = nodes.length - 1;
     });
 
@@ -2109,7 +2118,7 @@ function updateNetwork() {
         .attr('class', 'node')
         .attr('r', d => 3 + d.level / 6)
         .attr('fill', d => FACTION_COLORS[d.faction] || '#666677')
-        .attr('opacity', d => d.dead ? 0.2 : 0.9)
+        .attr('opacity', d => d.perma ? 0.1 : d.dead ? 0.2 : 0.9)
         .attr('stroke', d => d.married ? '#ff66aa' : 'none')
         .attr('stroke-width', d => d.married ? 1.5 : 0)
         .style('cursor', 'pointer')
@@ -2141,7 +2150,7 @@ function updateNetwork() {
         const fName = FACTION_NAMES[d.faction] || 'None';
         tooltip.innerHTML = '<strong>' + escapeHtml(d.id) + '</strong><br>Level ' + d.level
             + '<br>Faction: ' + fName
-            + (d.dead ? '<br><span style="color:var(--red)">DEAD</span>' : '')
+            + (d.perma ? '<br><span style="color:#666">PERMADEAD</span>' : d.dead ? '<br><span style="color:var(--red)">DEAD</span>' : '')
             + (d.married ? '<br>Married to ' + escapeHtml(d.spouse) : '');
     }).on('mouseleave', () => { tooltip.style.display = 'none'; });
 
@@ -2282,11 +2291,13 @@ function updateTrendCharts(hourly) {
     // Population pie from summary
     const s = summary;
     if (s && s.total) {
+        const permaCount2 = (s.permadead || 0) + (s.agedDeath || 0);
+        const deadOnly = Math.max(0, (s.dead || 0) - permaCount2);
         const popData = {
-            labels: ['Alive', 'Dead'],
+            labels: ['Alive', 'Dead', 'Permadead'],
             datasets: [{
-                data: [s.alive || 0, s.dead || 0],
-                backgroundColor: ['#00ff88', '#ff4444'],
+                data: [s.alive || 0, deadOnly, permaCount2],
+                backgroundColor: ['#00ff88', '#ff4444', '#666666'],
                 borderWidth: 0
             }]
         };
@@ -2316,8 +2327,13 @@ function updateTrendCharts(hourly) {
 // ==========================================
 // NPC Status Indicators (#12)
 // ==========================================
+function isPermaDead(n) {
+    return !!(n.isAgedDeath || n.IsAgedDeath || n.isPermaDead || n.IsPermaDead);
+}
+
 function computeNpcStatus(n) {
     const dead = n.isDead || n.IsDead;
+    if (dead && isPermaDead(n)) return { label: 'Permadead', color: '#666', bg: 'rgba(102,102,102,0.15)' };
     if (dead) return { label: 'Dead', color: '#ff4444', bg: 'rgba(255,68,68,0.15)' };
 
     const emo = n.emotionalState || n.EmotionalState || {};
@@ -2505,10 +2521,12 @@ function filterNpcList() {
         }
         if (statusFilter) {
             const dead = n.isDead || n.IsDead;
+            const perma = isPermaDead(n);
             const married = n.isMarried || n.IsMarried;
             const pregnant = !!(n.pregnancyDueDate || n.PregnancyDueDate);
             if (statusFilter === 'alive' && dead) return false;
-            if (statusFilter === 'dead' && !dead) return false;
+            if (statusFilter === 'dead' && (!dead || perma)) return false;
+            if (statusFilter === 'permadead' && !(dead && perma)) return false;
             if (statusFilter === 'married' && !married) return false;
             if (statusFilter === 'pregnant' && !pregnant) return false;
         }
@@ -2551,10 +2569,12 @@ function renderNpcTable(npcs) {
         const age = n.age || n.Age || 0;
         const gold = n.gold || n.Gold || 0;
         const status = computeNpcStatus(n);
+        const perma = isPermaDead(n);
         const selClass = (selectedNpc === name) ? ' selected' : '';
+        const rowStyle = perma ? ' style="opacity:0.45"' : '';
 
-        html += '<tr class="' + selClass + '" onclick="selectNpcFromList(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">'
-            + '<td style="color:var(--gold)">' + escapeHtml(name) + '</td>'
+        html += '<tr class="' + selClass + '"' + rowStyle + ' onclick="selectNpcFromList(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">'
+            + '<td style="color:' + (perma ? '#666' : 'var(--gold)') + '">' + escapeHtml(name) + '</td>'
             + '<td>' + lvl + '</td>'
             + '<td>' + cls + '</td>'
             + '<td>' + race + '</td>'
@@ -3021,7 +3041,9 @@ updateWorldMap = function() {
                 const color = FACTION_COLORS[fid] || FACTION_COLORS['-1'];
                 const lvl = n.level || n.Level || 1;
                 const r = Math.max(2.5, Math.min(5.5, 2.5 + lvl / 15));
-                const opacity = dead ? 0.25 : 1;
+                const perma = isPermaDead(n);
+                const opacity = perma ? 0.12 : dead ? 0.25 : 1;
+                const dotColor = perma ? '#333' : color;
                 const prev = prevNpcPositions[name];
                 const startX = prev ? prev.x : x;
                 const startY = prev ? prev.y : y;
@@ -3030,7 +3052,7 @@ updateWorldMap = function() {
                 const selected = (selectedNpc === name);
                 svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
                     + 'cx="' + startX + '" cy="' + startY + '" r="' + r + '" '
-                    + 'fill="' + color + '" opacity="' + opacity + '" '
+                    + 'fill="' + dotColor + '" opacity="' + opacity + '" '
                     + 'stroke="' + (selected ? '#fff' : (king ? '#ffaa00' : (pregnant ? '#ff66aa' : 'none'))) + '" '
                     + 'stroke-width="' + (selected ? 2.5 : (king ? 2 : (pregnant ? 1.5 : 0))) + '"'
                     + (selected ? ' filter="url(#glow)"' : '') + '>'
@@ -3060,10 +3082,11 @@ updateWorldMap = function() {
                 const lvl = n.level || n.Level || 1;
                 const r = Math.max(2.5, Math.min(5.5, 2.5 + lvl / 15));
                 const dead = n.isDead || n.IsDead;
+                const perma3 = isPermaDead(n);
                 newPositions[name] = { x, y };
                 svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
                     + 'cx="' + x + '" cy="' + y + '" r="' + r + '" '
-                    + 'fill="' + color + '" opacity="' + (dead ? 0.25 : 1) + '">'
+                    + 'fill="' + (perma3 ? '#333' : color) + '" opacity="' + (perma3 ? 0.12 : dead ? 0.25 : 1) + '">'
                     + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title></circle>';
             });
         });
@@ -3154,7 +3177,11 @@ showNpcDetail = function(n) {
     const gold = n.gold || n.Gold || 0;
     const status = computeNpcStatus(n);
 
-    let html = '<div class="detail-name">' + escapeHtml(name) + (dead ? ' <span style="color:var(--red)">[DEAD]</span>' : '')
+    const perma = isPermaDead(n);
+    let deathTag = '';
+    if (dead && perma) deathTag = ' <span style="color:#666">[PERMADEAD]</span>';
+    else if (dead) deathTag = ' <span style="color:var(--red)">[DEAD]</span>';
+    let html = '<div class="detail-name">' + escapeHtml(name) + deathTag
         + ' <span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + '">' + status.label + '</span></div>';
     html += '<div class="detail-sub">Level ' + lvl + ' ' + race + ' ' + cls;
     if (age > 0) html += ' | Age ' + age;
@@ -3320,7 +3347,8 @@ updateNetwork = function() {
         const race = RACE_NAMES_ARR[n.race !== undefined ? n.race : (n.Race !== undefined ? n.Race : -1)] || 'Unknown';
         const rels = n.relationships || n.Relationships || {};
         const relCount = Object.keys(rels).length;
-        nodes.push({ id: name, level: lvl, faction: fid, dead, married, spouse, team, index: i, cls, race, relCount, isChild: false });
+        const perma = isPermaDead(n);
+        nodes.push({ id: name, level: lvl, faction: fid, dead, perma, married, spouse, team, index: i, cls, race, relCount, isChild: false });
         nodeMap[name] = nodes.length - 1;
     });
 
@@ -3465,11 +3493,13 @@ updateNetwork = function() {
     const node = g.selectAll('.node').data(visibleNodes).join('circle').attr('class', 'node')
         .attr('r', d => d.isChild ? 3 : 4 + d.level / 4)
         .attr('fill', d => {
+            if (d.perma) return '#333';
             if (d.dead) return '#444';
             if (d.isChild) return '#cc8800';
             return FACTION_COLORS[d.faction] || '#666677';
         })
         .attr('opacity', d => {
+            if (d.perma) return 0.08;
             if (d.dead) return 0.15;
             if (egoConnected) return 0.95;
             if (networkFilter !== 'all' && !connectedNodes.has(d.id)) return 0.12;
@@ -3524,7 +3554,8 @@ updateNetwork = function() {
             html += '<br>Level ' + d.level + ' ' + d.cls + ' (' + d.race + ')';
             html += '<br>Faction: ' + (FACTION_NAMES[d.faction] || 'None');
             if (d.team) html += '<br>Team: ' + escapeHtml(d.team);
-            if (d.dead) html += '<br><span style="color:var(--red)">DEAD</span>';
+            if (d.perma) html += '<br><span style="color:#666">PERMADEAD</span>';
+            else if (d.dead) html += '<br><span style="color:var(--red)">DEAD</span>';
             if (d.married) html += '<br>Married to ' + escapeHtml(d.spouse);
             if (d.relCount > 0) html += '<br>Relationships: ' + d.relCount;
 

@@ -493,14 +493,17 @@ public class ArmorShopLocation : BaseLocation
                 return false;
 
             case "N":
-                var items = EquipmentDatabase.GetBySlot(currentSlotCategory.Value);
-                int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
-                if (currentPage < totalPages - 1) currentPage++;
+                if (currentSlotCategory.HasValue)
+                {
+                    var items = EquipmentDatabase.GetBySlot(currentSlotCategory.Value);
+                    int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
+                    if (currentPage < totalPages - 1) currentPage++;
+                }
                 return false;
 
             default:
                 // Try to parse as item number
-                if (int.TryParse(choice, out int itemNum) && itemNum >= 1)
+                if (currentSlotCategory.HasValue && int.TryParse(choice, out int itemNum) && itemNum >= 1)
                 {
                     await BuyItem(currentSlotCategory.Value, itemNum);
                 }

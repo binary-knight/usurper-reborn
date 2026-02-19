@@ -49,7 +49,7 @@ public partial class GoalSystem
         goals.RemoveAll(g => g.Name == goalName);
     }
     
-    public Goal GetPriorityGoal()
+    public Goal? GetPriorityGoal()
     {
         return goals
             .Where(g => g.IsActive)
@@ -320,8 +320,8 @@ public class Goal
     public bool IsActive { get; set; } = true;
     public bool IsCompleted { get; set; } = false;
     public DateTime CreatedTime { get; set; } = DateTime.Now;
-    public string TargetCharacter { get; set; } // For revenge goals
-    public string TargetLocation { get; set; } // For location-based goals
+    public string TargetCharacter { get; set; } = ""; // For revenge goals
+    public string TargetLocation { get; set; } = ""; // For location-based goals
     public Dictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
 
     // Progress tracking for serialization

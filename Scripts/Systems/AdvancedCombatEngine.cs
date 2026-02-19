@@ -786,39 +786,41 @@ public class AdvancedCombatEngine : Node
     /// <summary>
     /// Send PvP victory mail - Pascal PLVSPLC.PAS mail system
     /// </summary>
-    private async Task SendPvPVictoryMail(Character winner, Character loser, long expGain, string subject, bool killed)
+    private Task SendPvPVictoryMail(Character winner, Character loser, long expGain, string subject, bool killed)
     {
-        string message1 = killed ? 
+        string message1 = killed ?
             $"You killed {GameConfig.NewsColorPlayer}{loser.Name2}{GameConfig.NewsColorDefault} in self defence! The idiot begged for mercy." :
             $"{GameConfig.NewsColorPlayer}{loser.Name2}{GameConfig.NewsColorDefault} cowardly attacked You! But the scumbag surrendered!";
-            
+
         string message2 = killed ?
             $"But you chopped {GetGenderPronoun(loser.Sex)} head clean off! NO MERCY!" :
             $"You had {GetGenderPronoun(loser.Sex)} begging at your feet, and perhaps should have killed {GetGenderPronoun(loser.Sex)}.";
-            
+
         string message3 = killed ?
             $"You received {GameConfig.NewsColorPlayer}{expGain:N0}{GameConfig.NewsColorDefault} experience points for this win!" :
             $"But you were in a good mood and spared {GetGenderPronoun(loser.Sex)} miserable life!";
-            
+
         string message4 = $"You received {GameConfig.NewsColorPlayer}{expGain:N0}{GameConfig.NewsColorDefault} experience points from this victory.";
-        
-        MailSystem.SendMail(winner.Name2, $"{GameConfig.NewsColorRoyal}{subject}{GameConfig.NewsColorDefault}", 
+
+        MailSystem.SendMail(winner.Name2, $"{GameConfig.NewsColorRoyal}{subject}{GameConfig.NewsColorDefault}",
             message1, message2, message3, message4);
+        return Task.CompletedTask;
     }
     
     /// <summary>
     /// Send PvP death mail - Pascal PLVSPLC.PAS death mail
     /// </summary>
-    private async Task SendPvPDeathMail(Character loser, Character winner, long goldLost)
+    private Task SendPvPDeathMail(Character loser, Character winner, long goldLost)
     {
         string goldMessage = goldLost > 0 ?
             $"{GameConfig.NewsColorPlayer}{winner.Name2}{GameConfig.NewsColorDefault} emptied your purse. You lost {GameConfig.GoldColor}{goldLost:N0}{GameConfig.NewsColorDefault} gold!" :
             "";
-            
+
         MailSystem.SendMail(loser.Name2, $"{GameConfig.NewsColorDeath}Your Death{GameConfig.NewsColorDefault}",
             $"You were slain by {GameConfig.NewsColorPlayer}{winner.Name2}{GameConfig.NewsColorDefault}!",
             "You begged for mercy, but the ignorant bastard killed you!",
             goldMessage);
+        return Task.CompletedTask;
     }
     
     /// <summary>

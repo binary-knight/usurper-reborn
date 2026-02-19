@@ -25,7 +25,7 @@ public partial class RelationshipManager
         }
     }
     
-    public Relationship GetRelationship(string characterId)
+    public Relationship? GetRelationship(string characterId)
     {
         return relationships.GetValueOrDefault(characterId);
     }
@@ -277,8 +277,8 @@ public class RelationshipEvent
     public MemoryType MemoryType { get; set; }
     public float Impact { get; set; }
     public DateTime Timestamp { get; set; }
-    public string Description { get; set; }
-    
+    public string Description { get; set; } = "";
+
     public bool IsRecent(int days = 7)
     {
         return DateTime.Now.Subtract(Timestamp).TotalDays <= days;

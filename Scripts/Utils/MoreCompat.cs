@@ -48,8 +48,8 @@ public static class EmotionalStateCompat
 
 public partial class GoalSystem
 {
-    public GoalSystem() { }
-    public GoalSystem(NPC owner, PersonalityProfile profile) { }
+    public GoalSystem() { personality = null!; }
+    public GoalSystem(NPC owner, PersonalityProfile profile) { personality = profile; }
     public void ProcessInteractionFeedback(InteractionType type, Character other, float importance) { }
 }
 #endregion

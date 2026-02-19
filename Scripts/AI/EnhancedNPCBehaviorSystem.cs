@@ -154,9 +154,10 @@ public class EnhancedNPCBehaviorSystem : Node
     /// <summary>
     /// Pascal mail notification system - Inform_By_Mail procedure
     /// </summary>
-    private async Task SendItemNotificationMail(Character npc, ItemDetails newItem, 
-        ItemDetails oldItem, int situation, int location)
+    private async Task SendItemNotificationMail(Character npc, ItemDetails newItem,
+        ItemDetails? oldItem, int situation, int location)
     {
+        await Task.CompletedTask;
         var header = GetRandomLootHeader();
         var locationDesc = GetLocationDescription(location);
         var situationText = GetSituationText(situation, newItem, oldItem);
@@ -578,28 +579,28 @@ public class EnhancedNPCBehaviorSystem : Node
     }
     
     // Placeholder methods for complete implementation
-    private async Task<ItemDetails> GetItemDetails(int itemId, ObjType itemType) { return new ItemDetails(); }
+    private Task<ItemDetails> GetItemDetails(int itemId, ObjType itemType) { return Task.FromResult(new ItemDetails()); }
     private bool CanNPCUseItemType(Character npc, ItemDetails item) { return true; }
-    private async Task ShowNPCExamineItem(Character npc, ItemDetails item) { }
-    private async Task ShowNPCRejectItem(Character npc, string reason) { }
-    private async Task<int> ProcessHeadSlotItem(Character npc, ItemDetails item, int location, bool shout, int emptySlot) { return 0; }
-    private async Task<int> ProcessBodySlotItem(Character npc, ItemDetails item, int location, bool shout, int emptySlot) { return 0; }
-    private async Task<int> ProcessWeaponSlotItem(Character npc, ItemDetails item, int location, bool shout, int emptySlot) { return 0; }
-    private async Task<int> ProcessArmsSlotItem(Character npc, ItemDetails item, int location, bool shout, int emptySlot) { return 0; }
-    private async Task PlaceItemInBackpack(Character npc, ItemDetails item, int slot, bool shout) { }
-    private async Task HandleFullInventory(Character npc, ItemDetails item, bool shout) { }
-    private async Task ReinventoryAllItems(Character npc) { }
+    private Task ShowNPCExamineItem(Character npc, ItemDetails item) { return Task.CompletedTask; }
+    private Task ShowNPCRejectItem(Character npc, string reason) { return Task.CompletedTask; }
+    private Task<int> ProcessHeadSlotItem(Character npc, ItemDetails item, int location, bool shout, int emptySlot) { return Task.FromResult(0); }
+    private Task<int> ProcessBodySlotItem(Character npc, ItemDetails item, int location, bool shout, int emptySlot) { return Task.FromResult(0); }
+    private Task<int> ProcessWeaponSlotItem(Character npc, ItemDetails item, int location, bool shout, int emptySlot) { return Task.FromResult(0); }
+    private Task<int> ProcessArmsSlotItem(Character npc, ItemDetails item, int location, bool shout, int emptySlot) { return Task.FromResult(0); }
+    private Task PlaceItemInBackpack(Character npc, ItemDetails item, int slot, bool shout) { return Task.CompletedTask; }
+    private Task HandleFullInventory(Character npc, ItemDetails item, bool shout) { return Task.CompletedTask; }
+    private Task ReinventoryAllItems(Character npc) { return Task.CompletedTask; }
     private string GetLocationDescription(int location) { return "in the dungeons"; }
-    private string GetSituationText(int situation, ItemDetails newItem, ItemDetails oldItem) { return ""; }
-    private async Task InitializeMaintenanceData(List<Character> npcs) { }
-    private async Task ProcessNPCMaintenance(Character npc, bool kingFound) { }
-    private async Task ProcessNPCShopping(List<Character> npcs) { }
-    private async Task ProcessExistingBeliever(Character npc) { }
-    private async Task ProcessPotentialConvert(Character npc) { }
+    private string GetSituationText(int situation, ItemDetails newItem, ItemDetails? oldItem) { return ""; }
+    private Task InitializeMaintenanceData(List<Character> npcs) { return Task.CompletedTask; }
+    private Task ProcessNPCMaintenance(Character npc, bool kingFound) { return Task.CompletedTask; }
+    private Task ProcessNPCShopping(List<Character> npcs) { return Task.CompletedTask; }
+    private Task ProcessExistingBeliever(Character npc) { return Task.CompletedTask; }
+    private Task ProcessPotentialConvert(Character npc) { return Task.CompletedTask; }
     private bool DoesGodExist(string godName) { return true; }
-    private async Task SaveCharacter(Character character) { }
-    private async Task<BattleResult> ConductComputerVsComputerBattle(Character fighter1, Character fighter2) { return new BattleResult(); }
-    private async Task SendGangBattleMail(BattleResult battleResult) { }
+    private Task SaveCharacter(Character character) { return Task.CompletedTask; }
+    private Task<BattleResult> ConductComputerVsComputerBattle(Character fighter1, Character fighter2) { return Task.FromResult(new BattleResult()); }
+    private Task SendGangBattleMail(BattleResult battleResult) { return Task.CompletedTask; }
     /// <summary>
     /// Update statistics and news when one character kills another
     /// </summary>
@@ -626,11 +627,11 @@ public class EnhancedNPCBehaviorSystem : Node
 
         await Task.CompletedTask;
     }
-    private async Task DetermineGangWarOutcome(List<Character> team1, List<Character> team2, GangWarResult result, bool turfWar) { }
-    private async Task AttemptNPCMarriage(Character npc, List<Character> npcs) { }
-    private async Task ProcessNewChild(Character npc) { }
-    private async Task UpdateExistingChildren(Character npc) { }
-    private async Task ValidateRelationshipConsistency(dynamic relationship, Character person1, Character person2) { }
+    private Task DetermineGangWarOutcome(List<Character> team1, List<Character> team2, GangWarResult result, bool turfWar) { return Task.CompletedTask; }
+    private Task AttemptNPCMarriage(Character npc, List<Character> npcs) { return Task.CompletedTask; }
+    private Task ProcessNewChild(Character npc) { return Task.CompletedTask; }
+    private Task UpdateExistingChildren(Character npc) { return Task.CompletedTask; }
+    private Task ValidateRelationshipConsistency(dynamic relationship, Character? person1, Character? person2) { return Task.CompletedTask; }
     
     #endregion
     
@@ -638,14 +639,14 @@ public class EnhancedNPCBehaviorSystem : Node
     
     public class NPCMaintenanceData
     {
-        public string NPCId { get; set; }
+        public string NPCId { get; set; } = "";
         public DateTime LastMaintenance { get; set; }
         public Dictionary<string, object> MaintenanceState { get; set; } = new();
     }
     
     public class NPCGangData
     {
-        public string GangName { get; set; }
+        public string GangName { get; set; } = "";
         public List<string> Members { get; set; } = new();
         public bool IsNPCOnly { get; set; }
         public DateTime LastActivity { get; set; }
@@ -666,19 +667,19 @@ public class EnhancedNPCBehaviorSystem : Node
     
     public class GangWarResult
     {
-        public string Gang1 { get; set; }
-        public string Gang2 { get; set; }
+        public string Gang1 { get; set; } = "";
+        public string Gang2 { get; set; } = "";
         public GangWarOutcome Outcome { get; set; }
         public List<BattleResult> BattleResults { get; set; } = new();
-        public string WinningGang { get; set; }
+        public string WinningGang { get; set; } = "";
         public bool TurfChanged { get; set; }
     }
     
     public class BattleResult
     {
-        public Character Fighter1 { get; set; }
-        public Character Fighter2 { get; set; }
-        public Character Winner { get; set; }
+        public Character Fighter1 { get; set; } = null!;
+        public Character Fighter2 { get; set; } = null!;
+        public Character Winner { get; set; } = null!;
         public int RoundsToVictory { get; set; }
         public bool BothDied { get; set; }
     }

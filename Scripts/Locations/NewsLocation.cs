@@ -38,7 +38,7 @@ public class NewsLocation : BaseLocation
     public override async Task EnterLocation(Character player, TerminalEmulator term)
     {
         // Set up the location
-        currentPlayer = player as Player;
+        currentPlayer = (player as Player)!;
         terminal = term;
 
         await ShowNewsBoard();

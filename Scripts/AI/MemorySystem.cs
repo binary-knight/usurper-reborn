@@ -276,10 +276,10 @@ public partial class MemorySystem
 public class MemoryEvent
 {
     public MemoryType Type { get; set; }
-    public string Description { get; set; }
+    public string Description { get; set; } = "";
     public DateTime Timestamp { get; set; }
-    public string InvolvedCharacter { get; set; } // Character ID
-    public string Location { get; set; }
+    public string InvolvedCharacter { get; set; } = ""; // Character ID
+    public string Location { get; set; } = "";
     public float Importance { get; set; } = 0.5f; // 0.0 to 1.0
     public float EmotionalImpact { get; set; } = 0f; // -1.0 (negative) to 1.0 (positive)
     public Dictionary<string, object> Details { get; set; } = new Dictionary<string, object>();

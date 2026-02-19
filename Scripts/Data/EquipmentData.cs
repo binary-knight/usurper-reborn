@@ -65,7 +65,7 @@ public static class EquipmentDatabase
     /// <summary>
     /// Get equipment by ID
     /// </summary>
-    public static Equipment GetById(int id)
+    public static Equipment? GetById(int id)
     {
         EnsureInitialized();
         lock (_lock)
@@ -77,7 +77,7 @@ public static class EquipmentDatabase
     /// <summary>
     /// Get equipment by name (case-insensitive search)
     /// </summary>
-    public static Equipment GetByName(string name)
+    public static Equipment? GetByName(string name)
     {
         if (string.IsNullOrEmpty(name)) return null;
         EnsureInitialized();
@@ -231,7 +231,7 @@ public static class EquipmentDatabase
     /// <summary>
     /// Find best base equipment by power/AC within budget (excludes dynamic/loot items)
     /// </summary>
-    public static Equipment GetBestAffordable(EquipmentSlot slot, long maxGold)
+    public static Equipment? GetBestAffordable(EquipmentSlot slot, long maxGold)
     {
         EnsureInitialized();
         return _allEquipment.Values
@@ -243,7 +243,7 @@ public static class EquipmentDatabase
     /// <summary>
     /// Find equipment matching a power value (for save migration)
     /// </summary>
-    public static Equipment FindByPower(long power, EquipmentSlot slot)
+    public static Equipment? FindByPower(long power, EquipmentSlot slot)
     {
         EnsureInitialized();
         return _allEquipment.Values

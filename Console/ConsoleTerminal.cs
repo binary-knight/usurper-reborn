@@ -197,29 +197,32 @@ namespace UsurperConsole
         
         public async Task<string> GetInput(string prompt = "")
         {
+            await Task.CompletedTask;
             if (!string.IsNullOrEmpty(prompt))
             {
                 Console.Write(prompt);
             }
             return Console.ReadLine() ?? "";
         }
-        
+
         public async Task<string> GetStringInput(string prompt = "")
         {
             return await GetInput(prompt);
         }
-        
+
         public async Task<string> GetKeyInput(string prompt = "")
         {
+            await Task.CompletedTask;
             if (!string.IsNullOrEmpty(prompt))
             {
                 Console.Write(prompt);
             }
             return Console.ReadKey().KeyChar.ToString();
         }
-        
+
         public async Task WaitForKeyPress(string message = "Press Enter to continue...")
         {
+            await Task.CompletedTask;
             Console.WriteLine(message);
             Console.ReadKey();
         }

@@ -414,21 +414,16 @@ public class DailySystemManager
     /// <summary>
     /// Process NPC activities during player absence
     /// </summary>
-    private async Task ProcessNPCsDuringAbsence(TimeSpan timeSpan)
+    private Task ProcessNPCsDuringAbsence(TimeSpan timeSpan)
     {
-        // Note: EnhancedNPCSystem doesn't have an Instance property or ProcessTimePassage method
-        // In a full implementation, this would process NPC activities during player absence
         terminal?.WriteLine($"NPCs have been active during your absence ({timeSpan.TotalHours:F1} hours simulated)", "yellow");
+        return Task.CompletedTask;
     }
-    
-    /// <summary>
-    /// Process world events during player absence
-    /// </summary>
-    private async Task ProcessWorldEventsDuringAbsence(TimeSpan timeSpan)
+
+    private Task ProcessWorldEventsDuringAbsence(TimeSpan timeSpan)
     {
-        // Note: WorldSimulator doesn't have an Instance property or SimulateTimePassage method
-        // In a full implementation, this would simulate world events during player absence
         terminal?.WriteLine("World events have unfolded in your absence!", "yellow");
+        return Task.CompletedTask;
     }
     
     /// <summary>

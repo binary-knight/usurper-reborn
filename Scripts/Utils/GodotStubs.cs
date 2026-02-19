@@ -280,11 +280,13 @@ namespace UsurperRemake.Utils
         }
         public async Task PressAnyKey(string message = "Press Enter to continue...")
         {
+            await Task.CompletedTask;
             Console.Write(message);
             Console.ReadKey();
         }
         public async Task<string> GetInputAsync(string prompt = "")
         {
+            await Task.CompletedTask;
             Console.Write(prompt);
             return Console.ReadLine() ?? "";
         }

@@ -67,7 +67,7 @@ namespace UsurperRemake.UI
             terminal.WriteLine("          1993 - Original by Jakob Dangarden (JAS Software)");
             terminal.WriteLine("          2026 - Reborn by Jason Knight");
             terminal.SetColor("dark_green");
-            terminal.WriteLine($"                              v{GameConfig.Version}");
+            terminal.WriteLine($"                         v{GameConfig.Version} \"{GameConfig.VersionName}\"");
 
             // === FIRE BOTTOM (3 rows — tips/dense/base, reaching up) ===        Lines 21-23
             terminal.SetColor("dark_red");

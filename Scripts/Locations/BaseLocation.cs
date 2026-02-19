@@ -25,8 +25,8 @@ public abstract class BaseLocation
     // Pascal compatibility
     public bool RefreshRequired { get; set; } = true;
 
-    protected TerminalEmulator terminal;
-    protected Character currentPlayer;
+    protected TerminalEmulator terminal = null!;
+    protected Character currentPlayer = null!;
 
     // NPC approach tracking - prevents spam from same NPC
     private static readonly Dictionary<string, int> _lastApproachedTurn = new();
@@ -42,6 +42,12 @@ public abstract class BaseLocation
         Description = description;
         SetupLocation();
     }
+
+    /// <summary>
+    /// Returns the current player. Shadows the global LegacyUI.GetCurrentPlayer() nullable version
+    /// since we always have a valid player when inside a location.
+    /// </summary>
+    protected Character GetCurrentPlayer() => currentPlayer ?? GameEngine.Instance.CurrentPlayer;
     
     /// <summary>
     /// Setup location-specific data (exits, NPCs, actions)
@@ -213,12 +219,12 @@ public abstract class BaseLocation
     /// <summary>
     /// Show subtle reputation whisper when player enters a location with NPCs who've heard about them (v0.42.0)
     /// </summary>
-    private async Task CheckReputationWhispers(Character player, TerminalEmulator term)
+    private Task CheckReputationWhispers(Character player, TerminalEmulator term)
     {
         try
         {
             var playerName = player?.Name2 ?? player?.DisplayName ?? "";
-            if (string.IsNullOrEmpty(playerName)) return;
+            if (string.IsNullOrEmpty(playerName)) return Task.CompletedTask;
 
             // Find NPCs at this location who've heard about the player through gossip
             var npcsHere = NPCSpawnSystem.Instance.ActiveNPCs
@@ -243,7 +249,7 @@ public abstract class BaseLocation
                 }
             }
 
-            if (gossipAwareCount < 2) return; // Need at least 2 NPCs whispering
+            if (gossipAwareCount < 2) return Task.CompletedTask; // Need at least 2 NPCs whispering
 
             averageImpression /= gossipAwareCount;
 
@@ -261,6 +267,7 @@ public abstract class BaseLocation
         {
             // Non-critical — don't let reputation whispers break location entry
         }
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -390,7 +397,7 @@ public abstract class BaseLocation
         await CheckNarrativeEncounters();
 
         // Check for NPC petitions (world-state-driven encounters)
-        if (currentPlayer.IsAlive)
+        if (currentPlayer.IsAlive && NPCPetitionSystem.Instance != null)
             await NPCPetitionSystem.Instance.CheckForPetition(currentPlayer, LocationId, terminal);
 
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
@@ -3161,7 +3168,7 @@ public abstract class BaseLocation
                 case "0":
                 default:
                     // Show NPC's farewell using dynamic dialogue system
-                    string farewell = npc.GetFarewell(currentPlayer as Player);
+                    string farewell = npc.GetFarewell((currentPlayer as Player)!);
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {npc.Name2} says:");
                     terminal.SetColor("white");
@@ -3185,7 +3192,7 @@ public abstract class BaseLocation
         terminal.WriteLine("");
 
         // Use the dynamic dialogue system for small talk
-        var player = currentPlayer as Player;
+        var player = (currentPlayer as Player)!;
         string smallTalk = npc.GetSmallTalk(player);
 
         terminal.SetColor("yellow");
@@ -6668,5 +6675,100 @@ public abstract class BaseLocation
             "help" => true,
             _ => false
         };
+    }
+
+    /// <summary>
+    /// Convert a legacy Item to an Equipment object for equipping to teammates/companions/spouses.
+    /// Returns null if the item is not equippable (potions, food, etc.).
+    /// </summary>
+    protected Equipment? ConvertInventoryItemToEquipment(Item invItem)
+    {
+        // Skip non-equippable item types
+        if (invItem.Type == ObjType.Food || invItem.Type == ObjType.Drink ||
+            invItem.Type == ObjType.Potion)
+            return null;
+
+        // Skip magic items that aren't equippable (rings, necklaces, belts are OK)
+        if (invItem.Type == ObjType.Magic)
+        {
+            int magicType = (int)invItem.MagicType;
+            if (magicType != 5 && magicType != 10 && magicType != 9) // Fingers, Neck, Waist
+                return null;
+        }
+
+        // Determine slot from ObjType
+        var slot = invItem.Type switch
+        {
+            ObjType.Weapon => EquipmentSlot.MainHand,
+            ObjType.Shield => EquipmentSlot.OffHand,
+            ObjType.Body => EquipmentSlot.Body,
+            ObjType.Head => EquipmentSlot.Head,
+            ObjType.Arms => EquipmentSlot.Arms,
+            ObjType.Hands => EquipmentSlot.Hands,
+            ObjType.Legs => EquipmentSlot.Legs,
+            ObjType.Feet => EquipmentSlot.Feet,
+            ObjType.Waist => EquipmentSlot.Waist,
+            ObjType.Neck => EquipmentSlot.Neck,
+            ObjType.Face => EquipmentSlot.Face,
+            ObjType.Fingers => EquipmentSlot.LFinger,
+            ObjType.Abody => EquipmentSlot.Cloak,
+            ObjType.Magic => (int)invItem.MagicType switch
+            {
+                5 => EquipmentSlot.LFinger,
+                10 => EquipmentSlot.Neck,
+                9 => EquipmentSlot.Waist,
+                _ => EquipmentSlot.MainHand
+            },
+            _ => EquipmentSlot.MainHand
+        };
+
+        // Determine handedness
+        WeaponHandedness handedness = WeaponHandedness.None;
+        if (invItem.Type == ObjType.Weapon)
+        {
+            var knownEquip = EquipmentDatabase.GetByName(invItem.Name);
+            if (knownEquip != null)
+                handedness = knownEquip.Handedness;
+            else
+            {
+                string nameLower = invItem.Name.ToLower();
+                if (nameLower.Contains("two-hand") || nameLower.Contains("2h") ||
+                    nameLower.Contains("greatsword") || nameLower.Contains("greataxe") ||
+                    nameLower.Contains("halberd") || nameLower.Contains("pike") ||
+                    nameLower.Contains("longbow") || nameLower.Contains("crossbow") ||
+                    nameLower.Contains("staff") || nameLower.Contains("quarterstaff") ||
+                    nameLower.Contains("maul") || nameLower.Contains("spear") ||
+                    nameLower.Contains("glaive") || nameLower.Contains("bardiche") ||
+                    nameLower.Contains("lance") || nameLower.Contains("voulge"))
+                    handedness = WeaponHandedness.TwoHanded;
+                else
+                    handedness = WeaponHandedness.OneHanded;
+            }
+        }
+        else if (invItem.Type == ObjType.Shield)
+            handedness = WeaponHandedness.OffHandOnly;
+
+        var equipment = new Equipment
+        {
+            Name = invItem.Name,
+            Slot = slot,
+            Handedness = handedness,
+            WeaponPower = invItem.Attack,
+            ArmorClass = invItem.Armor,
+            ShieldBonus = invItem.Type == ObjType.Shield ? invItem.Armor : 0,
+            DefenceBonus = invItem.Defence,
+            StrengthBonus = invItem.Strength,
+            DexterityBonus = invItem.Dexterity,
+            WisdomBonus = invItem.Wisdom,
+            CharismaBonus = invItem.Charisma,
+            MaxHPBonus = invItem.HP,
+            MaxManaBonus = invItem.Mana,
+            Value = invItem.Value,
+            IsCursed = invItem.IsCursed,
+            MinLevel = invItem.MinLevel,
+            Rarity = EquipmentRarity.Common
+        };
+        EquipmentDatabase.RegisterDynamic(equipment);
+        return equipment;
     }
 }

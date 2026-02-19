@@ -10,7 +10,7 @@ using Godot;
 /// </summary>
 public class CharacterCreationLocation : BaseLocation
 {
-    private CharacterCreationSystem creationSystem;
+    private CharacterCreationSystem creationSystem = null!;
     private LocationManager locationManager = LocationManager.Instance;
     
     public CharacterCreationLocation() : base("Character Creation", GameLocation.NoWhere)
@@ -247,9 +247,9 @@ public class CharacterCreationLocation : BaseLocation
         terminal.WriteLine("Please restart the game to try again.", "yellow");
     }
     
-    public async Task<bool> HandleInput(Character player, string input)
+    public Task<bool> HandleInput(Character player, string input)
     {
-        return true; // Simple stub return
+        return Task.FromResult(true);
     }
     
     public void ShowLocationHeader(Character player)

@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 /// </summary>
 public class InnLocation : BaseLocation
 {
-    private NPC sethAble;
+    private NPC sethAble = null!;
     private bool sethAbleAvailable = true;
     private int sethFightsToday = 0;     // Daily fight counter - max 3 per day
     private int sethDefeatsTotal = 0;    // Total times player has beaten Seth this session
@@ -3094,14 +3094,12 @@ public class InnLocation : BaseLocation
         // Collect equippable items from player's inventory and equipped items
         var equipmentItems = new List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)>();
 
-        // Add items from player's inventory that are Equipment type
+        // Add equippable items from player's inventory
         foreach (var invItem in currentPlayer.Inventory)
         {
-            var equipment = EquipmentDatabase.GetByName(invItem.Name);
+            var equipment = ConvertInventoryItemToEquipment(invItem);
             if (equipment != null)
-            {
                 equipmentItems.Add((equipment, false, (EquipmentSlot?)null));
-            }
         }
 
         // Add player's currently equipped items

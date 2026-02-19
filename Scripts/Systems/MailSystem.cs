@@ -452,10 +452,11 @@ public static partial class MailSystem
     /// <summary>
     /// Process child birth notification mail
     /// </summary>
-    private static async Task ProcessChildBirthMail(MailRecord mail, TerminalUI terminal)
+    private static Task ProcessChildBirthMail(MailRecord mail, TerminalUI terminal)
     {
         terminal.WriteLine("Congratulations on your new child!", "bright_green");
         terminal.WriteLine("Visit the Royal Orphanage to see them.", "cyan");
+        return Task.CompletedTask;
     }
     
     /// <summary>

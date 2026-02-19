@@ -2361,25 +2361,12 @@ public class WorldSimulator
 
             // Random stat increase - update BOTH current and base stats
             int statChoice = random.Next(4);
-            string statName = "";
             switch (statChoice)
             {
-                case 0:
-                    npc.BaseStrength++;
-                    statName = "Strength";
-                    break;
-                case 1:
-                    npc.BaseDefence++;
-                    statName = "Defence";
-                    break;
-                case 2:
-                    npc.BaseAgility++;
-                    statName = "Agility";
-                    break;
-                case 3:
-                    npc.BaseMaxHP += 5;
-                    statName = "Vitality";
-                    break;
+                case 0: npc.BaseStrength++; break;
+                case 1: npc.BaseDefence++; break;
+                case 2: npc.BaseAgility++; break;
+                case 3: npc.BaseMaxHP += 5; break;
             }
 
             // Recalculate all stats from base values

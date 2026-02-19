@@ -413,7 +413,7 @@ public class Character
     /// <summary>
     /// Get the equipment in a specific slot
     /// </summary>
-    public Equipment GetEquipment(EquipmentSlot slot)
+    public Equipment? GetEquipment(EquipmentSlot slot)
     {
         if (EquippedItems.TryGetValue(slot, out var id) && id > 0)
             return EquipmentDatabase.GetById(id);
@@ -673,7 +673,7 @@ public class Character
     /// <summary>
     /// Unequip item from a specific slot
     /// </summary>
-    public Equipment UnequipSlot(EquipmentSlot slot)
+    public Equipment? UnequipSlot(EquipmentSlot slot)
     {
         if (!EquippedItems.TryGetValue(slot, out var id) || id == 0)
             return null;

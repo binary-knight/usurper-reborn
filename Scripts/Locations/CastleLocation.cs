@@ -1291,7 +1291,7 @@ public class CastleLocation : BaseLocation
                 var guardsJson = "[]";
                 if (guardCount > 0)
                 {
-                    var guardsList = currentKing.Guards
+                    var guardsList = (currentKing.Guards ?? new List<RoyalGuard>())
                         .Where(g => g != null)
                         .Select(g => new { type = "royal_guard", hp = 500, maxHp = 500 })
                         .ToList();

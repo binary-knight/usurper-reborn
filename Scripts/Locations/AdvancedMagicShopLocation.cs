@@ -12,8 +12,8 @@ using System.Threading.Tasks;
 /// </summary>
 public class AdvancedMagicShopLocation : BaseLocation
 {
-    private LocationManager locationManager;
-    private NewsSystem newsSystem;
+    private LocationManager locationManager = null!;
+    private NewsSystem newsSystem = null!;
     private Random random = new Random();
     
     // Pascal constants from MAGIC.PAS
@@ -133,7 +133,7 @@ public class AdvancedMagicShopLocation : BaseLocation
     /// <summary>
     /// Show full menu - Pascal MAGIC.PAS Meny procedure
     /// </summary>
-    private async Task ShowFullMenu(Character player, TerminalEmulator terminal)
+    private Task ShowFullMenu(Character player, TerminalEmulator terminal)
     {
         terminal.ClearScreen();
         
@@ -159,6 +159,7 @@ public class AdvancedMagicShopLocation : BaseLocation
         terminal.WriteLine("(R)eturn to street     (L)ist Items     (T)alk to " + ownerName);
         terminal.WriteLine("(I)dentify item        (B)uy Item");
         terminal.WriteLine("(H)ealing Potions      (S)ell Item");
+        return Task.CompletedTask;
     }
     
     /// <summary>
@@ -672,21 +673,23 @@ public class AdvancedMagicShopLocation : BaseLocation
     /// <summary>
     /// Update online location - Pascal MAGIC.PAS online location update
     /// </summary>
-    private async Task UpdateOnlineLocation()
+    private Task UpdateOnlineLocation()
     {
         // Pascal: onliner.location := onloc_magicshop;
         // Pascal: onliner.doing := location_desc(onliner.location);
         // Pascal: add_onliner(OUpdateLocation, onliner);
-        
+
         // TODO: Implement online location tracking
+        return Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// Show who is here - Pascal MAGIC.PAS who_is_here
     /// </summary>
-    private async Task ShowWhoIsHere(TerminalEmulator terminal)
+    private Task ShowWhoIsHere(TerminalEmulator terminal)
     {
         // TODO: Implement who is here display
+        return Task.CompletedTask;
     }
     
     /// <summary>
