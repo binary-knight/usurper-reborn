@@ -29,6 +29,10 @@ public partial class TerminalEmulator : Control
     // BBS idle timeout warning tracking
     private bool _idleWarningShown = false;
 
+    // BBS disconnect detection — consecutive empty reads from a dead connection
+    private int _consecutiveEmptyInputs = 0;
+    private const int MAX_CONSECUTIVE_EMPTY_INPUTS = 5;
+
     /// <summary>
     /// Show "-- More --" prompt and wait for keypress in BBS door mode.
     /// Resets the line counter so the next page of output can begin.
@@ -694,9 +698,16 @@ public partial class TerminalEmulator : Control
             return line ?? string.Empty;
         }
 
-        // BBS/Online idle timeout and session time limit checks
+        // BBS/Online disconnect and timeout checks
         if (DoorMode.IsInDoorMode || DoorMode.IsOnlineMode)
         {
+            // Check for detected disconnection (socket closed, stdin EOF, or repeated empty reads)
+            if (DoorMode.IsDisconnected)
+            {
+                await AutoSaveAndExit("connection lost");
+                return "";
+            }
+
             // Check for session time expiry (from drop file TimeLeftMinutes)
             if (DoorMode.IsSessionExpired)
             {
@@ -727,8 +738,29 @@ public partial class TerminalEmulator : Control
         {
             _bbsLineCount = 0; // Reset BBS pagination counter on input
             var bbsResult = await BBSTerminalAdapter.Instance!.GetInput(prompt);
-            DoorMode.LastInputTime = DateTime.UtcNow;
-            _idleWarningShown = false;
+
+            // Only reset idle timer on real input, not empty reads from a dead connection
+            if (!string.IsNullOrEmpty(bbsResult))
+            {
+                DoorMode.LastInputTime = DateTime.UtcNow;
+                _idleWarningShown = false;
+                _consecutiveEmptyInputs = 0;
+            }
+            else if (DoorMode.IsDisconnected)
+            {
+                await AutoSaveAndExit("connection lost");
+                return "";
+            }
+            else
+            {
+                _consecutiveEmptyInputs++;
+                if (_consecutiveEmptyInputs >= MAX_CONSECUTIVE_EMPTY_INPUTS)
+                {
+                    DoorMode.IsDisconnected = true;
+                    await AutoSaveAndExit("connection lost (repeated empty input)");
+                    return "";
+                }
+            }
             return bbsResult;
         }
 
@@ -761,15 +793,38 @@ public partial class TerminalEmulator : Control
             }
             else
             {
-                result = Console.ReadLine() ?? string.Empty;
+                var rawLine = Console.ReadLine();
+                if (rawLine == null && (DoorMode.IsInDoorMode || DoorMode.IsOnlineMode))
+                    DoorMode.IsDisconnected = true;
+                result = rawLine ?? string.Empty;
             }
             _bbsLineCount = 0; // Reset BBS pagination counter on input
 
             // Update idle timeout tracker for non-BBS door/online modes
+            // Only reset on real input — empty reads from dead connections should NOT reset the timer
             if (DoorMode.IsInDoorMode || DoorMode.IsOnlineMode)
             {
-                DoorMode.LastInputTime = DateTime.UtcNow;
-                _idleWarningShown = false;
+                if (!string.IsNullOrEmpty(result))
+                {
+                    DoorMode.LastInputTime = DateTime.UtcNow;
+                    _idleWarningShown = false;
+                    _consecutiveEmptyInputs = 0;
+                }
+                else if (DoorMode.IsDisconnected)
+                {
+                    await AutoSaveAndExit("connection lost");
+                    return "";
+                }
+                else
+                {
+                    _consecutiveEmptyInputs++;
+                    if (_consecutiveEmptyInputs >= MAX_CONSECUTIVE_EMPTY_INPUTS)
+                    {
+                        DoorMode.IsDisconnected = true;
+                        await AutoSaveAndExit("connection lost (repeated empty input)");
+                        return "";
+                    }
+                }
             }
 
             return result;
@@ -861,6 +916,8 @@ public partial class TerminalEmulator : Control
                 int ch = Console.In.Read();
                 if (ch == -1 || ch == '\n' || ch == '\r')
                 {
+                    if (ch == -1)
+                        DoorMode.IsDisconnected = true;
                     if (ch == '\r' && Console.In.Peek() == '\n')
                         Console.In.Read();
                     if (!bbsEchoes)

@@ -84,6 +84,22 @@ namespace UsurperRemake.BBS
         public static bool HelpWasShown => _helpWasShown;
 
         /// <summary>
+        /// Set to true when the BBS connection is detected as dead (socket closed, stdin EOF, repeated empty reads).
+        /// Signals the game loop to auto-save and exit immediately.
+        /// </summary>
+        [ThreadStatic] private static bool _isDisconnected;
+        public static bool IsDisconnected
+        {
+            get => _isDisconnected;
+            set
+            {
+                if (value && !_isDisconnected)
+                    UsurperRemake.Systems.DebugLogger.Instance.LogWarning("BBS", "Connection lost detected — flagging for disconnect");
+                _isDisconnected = value;
+            }
+        }
+
+        /// <summary>
         /// Check if the current user is a SysOp (security level >= SysOpSecurityLevel)
         /// SysOps can access the admin console to manage the game
         /// </summary>

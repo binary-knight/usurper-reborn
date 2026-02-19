@@ -715,6 +715,7 @@ namespace UsurperRemake.BBS
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Socket write error: {ex.Message}");
+                DoorMode.IsDisconnected = true;
             }
         }
 
@@ -829,7 +830,7 @@ namespace UsurperRemake.BBS
                     await _rawHandleStream.WriteAsync(bytes, 0, bytes.Length);
                     await _rawHandleStream.FlushAsync();
                 }
-                catch { }
+                catch { DoorMode.IsDisconnected = true; }
                 return;
             }
 
@@ -846,7 +847,7 @@ namespace UsurperRemake.BBS
                 await _stream.WriteAsync(bytes, 0, bytes.Length);
                 await _stream.FlushAsync();
             }
-            catch { }
+            catch { DoorMode.IsDisconnected = true; }
         }
 
         /// <summary>
@@ -893,6 +894,7 @@ namespace UsurperRemake.BBS
                 }
                 catch
                 {
+                    DoorMode.IsDisconnected = true;
                     return "";
                 }
             }
@@ -909,6 +911,7 @@ namespace UsurperRemake.BBS
             }
             catch
             {
+                DoorMode.IsDisconnected = true;
                 return "";
             }
         }
@@ -932,11 +935,15 @@ namespace UsurperRemake.BBS
                     var buffer = new byte[1];
                     var bytesRead = await _rawHandleStream.ReadAsync(buffer, 0, 1);
                     if (bytesRead == 0)
+                    {
+                        DoorMode.IsDisconnected = true;
                         return "";
+                    }
                     return Encoding.ASCII.GetString(buffer, 0, 1);
                 }
                 catch
                 {
+                    DoorMode.IsDisconnected = true;
                     return "";
                 }
             }
@@ -954,12 +961,16 @@ namespace UsurperRemake.BBS
                 var bytesRead = await _stream.ReadAsync(buffer, 0, 1);
 
                 if (bytesRead == 0)
+                {
+                    DoorMode.IsDisconnected = true;
                     return "";
+                }
 
                 return Encoding.ASCII.GetString(buffer, 0, 1);
             }
             catch
             {
+                DoorMode.IsDisconnected = true;
                 return "";
             }
         }
@@ -978,7 +989,10 @@ namespace UsurperRemake.BBS
             {
                 var bytesRead = await _stream.ReadAsync(charBuffer, 0, 1);
                 if (bytesRead == 0)
+                {
+                    DoorMode.IsDisconnected = true;
                     return buffer.Length > 0 ? buffer.ToString() : null;
+                }
 
                 byte b = charBuffer[0];
 
@@ -1039,7 +1053,10 @@ namespace UsurperRemake.BBS
             {
                 var bytesRead = await _rawHandleStream.ReadAsync(charBuffer, 0, 1);
                 if (bytesRead == 0)
+                {
+                    DoorMode.IsDisconnected = true;
                     return buffer.Length > 0 ? buffer.ToString() : null;
+                }
 
                 byte b = charBuffer[0];
 
