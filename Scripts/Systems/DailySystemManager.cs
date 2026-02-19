@@ -70,7 +70,10 @@ public class DailySystemManager
     /// </summary>
     public static DateTime GetCurrentResetBoundary()
     {
-        var eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        // IANA ID for Linux/macOS, Windows ID for Windows
+        TimeZoneInfo eastern;
+        try { eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
+        catch (TimeZoneNotFoundException) { eastern = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
         var nowEastern = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, eastern);
         var resetToday = nowEastern.Date.AddHours(GameConfig.DailyResetHourEastern);
         if (nowEastern < resetToday)

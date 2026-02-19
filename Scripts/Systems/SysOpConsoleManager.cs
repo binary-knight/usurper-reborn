@@ -1820,7 +1820,7 @@ namespace UsurperRemake.Systems
             try
             {
                 var checker = VersionChecker.Instance;
-                await checker.CheckForUpdatesAsync();
+                await checker.CheckForUpdatesAsync(forceCheck: true);
 
                 if (checker.CheckFailed)
                 {

@@ -78,7 +78,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Check for updates asynchronously. Safe to call - will not throw.
         /// </summary>
-        public async Task CheckForUpdatesAsync()
+        public async Task CheckForUpdatesAsync(bool forceCheck = false)
         {
             // Skip update check for Steam builds - Steam handles updates
             if (IsSteamBuild)
@@ -96,12 +96,12 @@ namespace UsurperRemake.Systems
                 return;
             }
 
-            DebugLogger.Instance.LogInfo("UPDATE", $"Version check started (current: {CurrentVersion})");
+            DebugLogger.Instance.LogInfo("UPDATE", $"Version check started (current: {CurrentVersion}, force: {forceCheck})");
 
             try
             {
-                // Check if we should skip due to cache
-                if (ShouldSkipCheck())
+                // Check if we should skip due to cache (unless forced)
+                if (!forceCheck && ShouldSkipCheck())
                 {
                     DebugLogger.Instance.LogDebug("UPDATE", "Skipping version check (cached)");
                     CheckCompleted = true;
