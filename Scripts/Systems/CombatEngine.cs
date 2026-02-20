@@ -1934,6 +1934,12 @@ public partial class CombatEngine
             }
         }
 
+        // Apply Royal Authority bonus (+10% attack damage while player is king)
+        if (attacker is Player attackingPlayer && attackingPlayer.King)
+        {
+            attackPower = (long)(attackPower * GameConfig.KingCombatStrengthBonus);
+        }
+
         // Apply divine blessing bonus damage
         int divineBonusDamage = DivineBlessingSystem.Instance.CalculateBonusDamage(attacker, target, (int)attackPower);
         if (divineBonusDamage > 0)
@@ -2696,6 +2702,12 @@ public partial class CombatEngine
             // AllStatModifier: affects everything (Depression)
             float totalGriefDefMod = 1.0f + griefDefenseEffects.DefenseModifier + griefDefenseEffects.AllStatModifier;
             playerDefense = (long)(playerDefense * totalGriefDefMod);
+        }
+
+        // Apply Royal Authority bonus (+10% defense while player is king)
+        if (player.King)
+        {
+            playerDefense = (long)(playerDefense * GameConfig.KingCombatDefenseBonus);
         }
 
         // Apply monster distraction (reduces monster accuracy effectively increasing defense)
@@ -8317,6 +8329,11 @@ public partial class CombatEngine
                 terminal.WriteLine($"  Their real self is unharmed.");
                 result.Teammates?.Remove(companion);
             }
+            else if (companion.IsMercenary)
+            {
+                // Royal mercenary death — permanent, must re-hire
+                await HandleMercenaryDeath(companion, monster.Name, result);
+            }
             else if (companion.IsCompanion && companion.CompanionId.HasValue)
             {
                 // Story companion death
@@ -8334,6 +8351,18 @@ public partial class CombatEngine
         {
             var companionSystem = UsurperRemake.Systems.CompanionSystem.Instance;
             companionSystem.SyncCompanionHP(companion);
+        }
+
+        // Sync mercenary HP/Mana back to player's RoyalMercenaries list
+        if (companion.IsMercenary && companion.IsAlive && currentPlayer != null)
+        {
+            var merc = currentPlayer.RoyalMercenaries?.FirstOrDefault(m => m.Name == companion.MercenaryName);
+            if (merc != null)
+            {
+                merc.HP = companion.HP;
+                merc.Mana = companion.Mana;
+                merc.Healing = companion.Healing;
+            }
         }
 
         await Task.Delay(GetCombatDelay(1000));
@@ -8451,6 +8480,33 @@ public partial class CombatEngine
         {
             OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.FirstCompanionDeath);
         }
+    }
+
+    /// <summary>
+    /// Handle a royal mercenary dying in combat — permanently removed, must re-hire
+    /// </summary>
+    private async Task HandleMercenaryDeath(Character mercenary, string killerName, CombatResult result)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("dark_red");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════");
+        terminal.WriteLine($"  {mercenary.DisplayName} has fallen in battle!");
+        terminal.WriteLine("═══════════════════════════════════════════════════════════");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  Your hired bodyguard is gone. You'll need to hire a replacement.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Remove from player's mercenary list
+        if (currentPlayer != null)
+        {
+            currentPlayer.RoyalMercenaries?.RemoveAll(m => m.Name == mercenary.MercenaryName);
+        }
+
+        // Remove from teammates
+        result.Teammates?.Remove(mercenary);
+
+        DebugLogger.Instance.LogInfo("COMBAT", $"Mercenary DIED: {mercenary.DisplayName} killed by {killerName}");
     }
 
     /// <summary>
@@ -12110,6 +12166,17 @@ public partial class CombatEngine
             terminal.WriteLine($"  {boss.Name} unleashes their true form!");
         }
 
+        // Update monster's special abilities to include new phase abilities
+        if (ctx.BossData.Abilities != null)
+        {
+            var phaseAbilities = ctx.BossData.Abilities
+                .Where(a => a.Phase <= newPhase)
+                .Select(a => a.Name)
+                .ToList();
+            if (phaseAbilities.Count > 0)
+                boss.SpecialAbilities = phaseAbilities;
+        }
+
         terminal.WriteLine("");
         await Task.Delay(1500);
     }
@@ -12368,8 +12435,11 @@ public class BossCombatContext
     public int CheckPhase(long currentHP, long maxHP)
     {
         double pct = (double)currentHP / Math.Max(1, maxHP);
-        if (pct <= 0.20) return 3;
-        if (pct <= 0.50) return 2;
+        // Use per-boss thresholds from OldGodsData (e.g. Manwe has Phase3 at 10% instead of 20%)
+        double phase3Threshold = BossData?.Phase3Threshold > 0 ? BossData.Phase3Threshold : 0.20;
+        double phase2Threshold = BossData?.Phase2Threshold > 0 ? BossData.Phase2Threshold : 0.50;
+        if (pct <= phase3Threshold) return 3;
+        if (pct <= phase2Threshold) return 2;
         return 1;
     }
 }

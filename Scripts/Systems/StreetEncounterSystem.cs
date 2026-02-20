@@ -2556,6 +2556,8 @@ public class StreetEncounterSystem
                     terminal.SetColor("red");
                     terminal.WriteLine($"\n  You are defeated! {challenger.Name2} claims the throne!");
                     player.King = false;
+                    player.RoyalMercenaries?.Clear(); // Dismiss bodyguards on dethronement
+                    player.RecalculateStats(); // Remove Royal Authority HP bonus
                     // NPC becomes king
                     if (king != null)
                     {

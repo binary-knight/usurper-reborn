@@ -2586,6 +2586,38 @@ public partial class GameEngine : Node
             DivineWrathPending = playerData.DivineWrathPending,
             DivineWrathTurnsRemaining = playerData.DivineWrathTurnsRemaining,
 
+            // Royal Loan
+            RoyalLoanAmount = playerData.RoyalLoanAmount,
+            RoyalLoanDueDay = playerData.RoyalLoanDueDay,
+            RoyalLoanBountyPosted = playerData.RoyalLoanBountyPosted,
+
+            // Noble Title
+            NobleTitle = playerData.NobleTitle,
+
+            // Royal Mercenaries
+            RoyalMercenaries = playerData.RoyalMercenaries?.Select(m => new RoyalMercenary
+            {
+                Name = m.Name,
+                Role = m.Role,
+                Class = (CharacterClass)m.ClassId,
+                Sex = (CharacterSex)m.Sex,
+                Level = m.Level,
+                HP = m.HP,
+                MaxHP = m.MaxHP,
+                Mana = m.Mana,
+                MaxMana = m.MaxMana,
+                Strength = m.Strength,
+                Defence = m.Defence,
+                WeapPow = m.WeapPow,
+                ArmPow = m.ArmPow,
+                Agility = m.Agility,
+                Dexterity = m.Dexterity,
+                Wisdom = m.Wisdom,
+                Intelligence = m.Intelligence,
+                Constitution = m.Constitution,
+                Healing = m.Healing
+            }).ToList() ?? new(),
+
             // Blood Price / Murder Weight System
             MurderWeight = playerData.MurderWeight,
             PermakillLog = playerData.PermakillLog ?? new(),

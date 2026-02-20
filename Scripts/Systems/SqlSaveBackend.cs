@@ -2234,6 +2234,36 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// Atomically set DaysInPrison on a player's save data.
+        /// Used when the king imprisons another player via Royal Orders.
+        /// </summary>
+        public async Task ImprisonPlayer(string username, int days)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players
+                    SET player_data = json_set(
+                        player_data,
+                        '$.player.daysInPrison',
+                        @days
+                    )
+                    WHERE LOWER(username) = LOWER(@username)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@days", days);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to imprison player {username}: {ex.Message}");
+            }
+        }
+
         // =====================================================================
         // "While You Were Gone" Queries
         // =====================================================================

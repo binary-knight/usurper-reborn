@@ -309,6 +309,17 @@ namespace UsurperRemake.Systems
         public bool DivineWrathPending { get; set; }        // Has punishment triggered yet?
         public int DivineWrathTurnsRemaining { get; set; }  // Turns until wrath fades
 
+        // Royal Loan (from the Crown)
+        public long RoyalLoanAmount { get; set; }
+        public int RoyalLoanDueDay { get; set; }
+        public bool RoyalLoanBountyPosted { get; set; }
+
+        // Noble Title (knighthood from king)
+        public string? NobleTitle { get; set; }
+
+        // Royal Mercenaries (hired bodyguards for king's dungeon party)
+        public List<RoyalMercenarySaveData>? RoyalMercenaries { get; set; }
+
         // Blood Price / Murder Weight System (v0.42.0)
         public float MurderWeight { get; set; }
         public List<string> PermakillLog { get; set; } = new();
@@ -1285,12 +1296,73 @@ namespace UsurperRemake.Systems
         public int KingAI { get; set; } = 1; // CharacterAI: 0=Human, 1=Computer
         public int KingSex { get; set; } = 0; // CharacterSex
 
+        // New in Phase 1 — coronation, tax alignment, monarch history
+        public string CoronationDate { get; set; } = "";  // ISO 8601 string
+        public int TaxAlignment { get; set; } = 0;        // GameConfig.TaxAlignment enum
+        public List<MonarchRecordSaveData> MonarchHistory { get; set; } = new();
+
         public List<CourtMemberSaveData> CourtMembers { get; set; } = new();
         public List<RoyalHeirSaveData> Heirs { get; set; } = new();
         public RoyalSpouseSaveData? Spouse { get; set; }
         public List<CourtIntrigueSaveData> ActivePlots { get; set; } = new();
         public List<RoyalGuardSaveData> Guards { get; set; } = new();
         public List<MonsterGuardSaveData> MonsterGuards { get; set; } = new();
+
+        // Phase 2 — previously unserialized King fields
+        public List<PrisonRecordSaveData> Prisoners { get; set; } = new();
+        public List<RoyalOrphanSaveData> Orphans { get; set; } = new();
+        public long MagicBudget { get; set; } = 10000;
+        public Dictionary<string, bool> EstablishmentStatus { get; set; } = new();
+        public string LastProclamation { get; set; } = "";
+        public string LastProclamationDate { get; set; } = "";  // ISO 8601
+    }
+
+    /// <summary>
+    /// Save data for historical monarch record
+    /// </summary>
+    public class MonarchRecordSaveData
+    {
+        public string Name { get; set; } = "";
+        public string Title { get; set; } = "";
+        public int DaysReigned { get; set; }
+        public string CoronationDate { get; set; } = ""; // ISO 8601
+        public string EndReason { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Save data for a prison record
+    /// </summary>
+    public class PrisonRecordSaveData
+    {
+        public string CharacterName { get; set; } = "";
+        public string Crime { get; set; } = "";
+        public int Sentence { get; set; }
+        public int DaysServed { get; set; }
+        public string ImprisonmentDate { get; set; } = "";  // ISO 8601
+        public long BailAmount { get; set; }
+    }
+
+    /// <summary>
+    /// Save data for a royal orphan
+    /// </summary>
+    public class RoyalOrphanSaveData
+    {
+        public string Name { get; set; } = "";
+        public int Age { get; set; }
+        public int Sex { get; set; }
+        public string ArrivalDate { get; set; } = "";  // ISO 8601
+        public string BackgroundStory { get; set; } = "";
+        public int Happiness { get; set; }
+
+        // New fields (defaults are backwards-compatible with old saves)
+        public string? MotherName { get; set; }
+        public string? FatherName { get; set; }
+        public string? MotherID { get; set; }
+        public string? FatherID { get; set; }
+        public int Race { get; set; } = 0;             // CharacterRace as int
+        public string BirthDate { get; set; } = "";    // ISO 8601
+        public int Soul { get; set; } = 0;
+        public bool IsRealOrphan { get; set; } = false;
     }
 
     /// <summary>
@@ -1372,6 +1444,32 @@ namespace UsurperRemake.Systems
         public string Target { get; set; } = "";
         public int Progress { get; set; }
         public bool IsDiscovered { get; set; }
+    }
+
+    /// <summary>
+    /// Save data for royal mercenaries (hired bodyguards for king's dungeon party)
+    /// </summary>
+    public class RoyalMercenarySaveData
+    {
+        public string Name { get; set; } = "";
+        public string Role { get; set; } = "";
+        public int ClassId { get; set; }
+        public int Sex { get; set; }
+        public int Level { get; set; }
+        public long HP { get; set; }
+        public long MaxHP { get; set; }
+        public long Mana { get; set; }
+        public long MaxMana { get; set; }
+        public long Strength { get; set; }
+        public long Defence { get; set; }
+        public long WeapPow { get; set; }
+        public long ArmPow { get; set; }
+        public long Agility { get; set; }
+        public long Dexterity { get; set; }
+        public long Wisdom { get; set; }
+        public long Intelligence { get; set; }
+        public long Constitution { get; set; }
+        public long Healing { get; set; }
     }
 
     /// <summary>

@@ -530,6 +530,40 @@ namespace UsurperRemake.Systems
                 DivineWrathPending = player.DivineWrathPending,
                 DivineWrathTurnsRemaining = player.DivineWrathTurnsRemaining,
 
+                // Royal Loan
+                RoyalLoanAmount = player.RoyalLoanAmount,
+                RoyalLoanDueDay = player.RoyalLoanDueDay,
+                RoyalLoanBountyPosted = player.RoyalLoanBountyPosted,
+
+                // Noble Title
+                NobleTitle = player.NobleTitle,
+
+                // Royal Mercenaries
+                RoyalMercenaries = player.RoyalMercenaries?.Count > 0
+                    ? player.RoyalMercenaries.Select(m => new RoyalMercenarySaveData
+                    {
+                        Name = m.Name,
+                        Role = m.Role,
+                        ClassId = (int)m.Class,
+                        Sex = (int)m.Sex,
+                        Level = m.Level,
+                        HP = m.HP,
+                        MaxHP = m.MaxHP,
+                        Mana = m.Mana,
+                        MaxMana = m.MaxMana,
+                        Strength = m.Strength,
+                        Defence = m.Defence,
+                        WeapPow = m.WeapPow,
+                        ArmPow = m.ArmPow,
+                        Agility = m.Agility,
+                        Dexterity = m.Dexterity,
+                        Wisdom = m.Wisdom,
+                        Intelligence = m.Intelligence,
+                        Constitution = m.Constitution,
+                        Healing = m.Healing
+                    }).ToList()
+                    : null,
+
                 // Blood Price / Murder Weight System
                 MurderWeight = player.MurderWeight,
                 PermakillLog = player.PermakillLog ?? new(),
@@ -1502,6 +1536,16 @@ namespace UsurperRemake.Systems
                         TotalReign = king.TotalReign,
                         KingTaxPercent = king.KingTaxPercent,
                         CityTaxPercent = king.CityTaxPercent,
+                        CoronationDate = king.CoronationDate.ToString("o"),
+                        TaxAlignment = (int)king.TaxAlignment,
+                        MonarchHistory = global::CastleLocation.GetMonarchHistory()?.Select(m => new MonarchRecordSaveData
+                        {
+                            Name = m.Name,
+                            Title = m.Title,
+                            DaysReigned = m.DaysReigned,
+                            CoronationDate = m.CoronationDate.ToString("o"),
+                            EndReason = m.EndReason
+                        }).ToList() ?? new List<MonarchRecordSaveData>(),
 
                         // Court members
                         CourtMembers = king.CourtMembers.Select(m => new CourtMemberSaveData
@@ -1573,7 +1617,42 @@ namespace UsurperRemake.Systems
                             MonsterType = m.MonsterType,
                             PurchaseCost = m.PurchaseCost,
                             DailyFeedingCost = m.DailyFeedingCost
-                        }).ToList() ?? new List<MonsterGuardSaveData>()
+                        }).ToList() ?? new List<MonsterGuardSaveData>(),
+
+                        // Phase 2 — previously unserialized fields
+                        Prisoners = king.Prisoners?.Select(kvp => new PrisonRecordSaveData
+                        {
+                            CharacterName = kvp.Value.CharacterName,
+                            Crime = kvp.Value.Crime,
+                            Sentence = kvp.Value.Sentence,
+                            DaysServed = kvp.Value.DaysServed,
+                            ImprisonmentDate = kvp.Value.ImprisonmentDate.ToString("o"),
+                            BailAmount = kvp.Value.BailAmount
+                        }).ToList() ?? new List<PrisonRecordSaveData>(),
+
+                        Orphans = king.Orphans?.Select(o => new RoyalOrphanSaveData
+                        {
+                            Name = o.Name,
+                            Age = o.Age,
+                            Sex = (int)o.Sex,
+                            ArrivalDate = o.ArrivalDate.ToString("o"),
+                            BackgroundStory = o.BackgroundStory,
+                            Happiness = o.Happiness,
+                            MotherName = o.MotherName,
+                            FatherName = o.FatherName,
+                            MotherID = o.MotherID,
+                            FatherID = o.FatherID,
+                            Race = (int)o.Race,
+                            BirthDate = o.BirthDate.ToString("o"),
+                            Soul = o.Soul,
+                            IsRealOrphan = o.IsRealOrphan
+                        }).ToList() ?? new List<RoyalOrphanSaveData>(),
+
+                        MagicBudget = king.MagicBudget,
+                        EstablishmentStatus = king.EstablishmentStatus ?? new Dictionary<string, bool>(),
+                        LastProclamation = king.LastProclamation ?? "",
+                        LastProclamationDate = king.LastProclamationDate != DateTime.MinValue
+                            ? king.LastProclamationDate.ToString("o") : ""
                     };
                     GD.Print($"[SaveSystem] Saved royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.Guards.Count} guards, {king.MonsterGuards.Count} monsters");
                 }
@@ -1924,6 +2003,32 @@ namespace UsurperRemake.Systems
                         king.KingTaxPercent = data.RoyalCourt.KingTaxPercent > 0 ? data.RoyalCourt.KingTaxPercent : 5;
                         king.CityTaxPercent = data.RoyalCourt.CityTaxPercent > 0 ? data.RoyalCourt.CityTaxPercent : 2;
 
+                        // Restore coronation date and tax alignment
+                        if (!string.IsNullOrEmpty(data.RoyalCourt.CoronationDate))
+                        {
+                            if (DateTime.TryParse(data.RoyalCourt.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var coronation))
+                                king.CoronationDate = coronation;
+                        }
+                        king.TaxAlignment = (GameConfig.TaxAlignment)data.RoyalCourt.TaxAlignment;
+
+                        // Restore king AI and Sex (SetCurrentKing hardcodes AI=Computer)
+                        king.AI = (CharacterAI)data.RoyalCourt.KingAI;
+                        king.Sex = (CharacterSex)data.RoyalCourt.KingSex;
+
+                        // Restore monarch history
+                        if (data.RoyalCourt.MonarchHistory != null && data.RoyalCourt.MonarchHistory.Count > 0)
+                        {
+                            var history = data.RoyalCourt.MonarchHistory.Select(m => new MonarchRecord
+                            {
+                                Name = m.Name,
+                                Title = m.Title,
+                                DaysReigned = m.DaysReigned,
+                                CoronationDate = DateTime.TryParse(m.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var cd) ? cd : DateTime.Now,
+                                EndReason = m.EndReason
+                            }).ToList();
+                            global::CastleLocation.SetMonarchHistory(history);
+                        }
+
                         // Restore court members
                         king.CourtMembers = data.RoyalCourt.CourtMembers?.Select(m => new CourtMember
                         {
@@ -2004,7 +2109,62 @@ namespace UsurperRemake.Systems
                             }).ToList();
                         }
 
-                        GD.Print($"[SaveSystem] Restored royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.Guards.Count} guards, {king.MonsterGuards.Count} monsters");
+                        // Phase 2 — restore previously unserialized fields
+                        if (data.RoyalCourt.Prisoners != null && data.RoyalCourt.Prisoners.Count > 0)
+                        {
+                            king.Prisoners = data.RoyalCourt.Prisoners.ToDictionary(
+                                p => p.CharacterName,
+                                p => new PrisonRecord
+                                {
+                                    CharacterName = p.CharacterName,
+                                    Crime = p.Crime,
+                                    Sentence = p.Sentence,
+                                    DaysServed = p.DaysServed,
+                                    ImprisonmentDate = DateTime.TryParse(p.ImprisonmentDate, out var impDate) ? impDate : DateTime.Now,
+                                    BailAmount = p.BailAmount
+                                });
+                        }
+
+                        if (data.RoyalCourt.Orphans != null && data.RoyalCourt.Orphans.Count > 0)
+                        {
+                            king.Orphans = data.RoyalCourt.Orphans.Select(o => new RoyalOrphan
+                            {
+                                Name = o.Name,
+                                Age = o.Age,
+                                Sex = (CharacterSex)o.Sex,
+                                ArrivalDate = DateTime.TryParse(o.ArrivalDate, out var arrDate) ? arrDate : DateTime.Now,
+                                BackgroundStory = o.BackgroundStory,
+                                Happiness = o.Happiness,
+                                MotherName = o.MotherName,
+                                FatherName = o.FatherName,
+                                MotherID = o.MotherID,
+                                FatherID = o.FatherID,
+                                Race = (CharacterRace)o.Race,
+                                BirthDate = DateTime.TryParse(o.BirthDate, out var bd) ? bd : DateTime.Now,
+                                Soul = o.Soul,
+                                IsRealOrphan = o.IsRealOrphan
+                            }).ToList();
+                        }
+
+                        king.MagicBudget = data.RoyalCourt.MagicBudget;
+
+                        if (data.RoyalCourt.EstablishmentStatus != null && data.RoyalCourt.EstablishmentStatus.Count > 0)
+                        {
+                            king.EstablishmentStatus = new Dictionary<string, bool>(data.RoyalCourt.EstablishmentStatus);
+                        }
+
+                        if (!string.IsNullOrEmpty(data.RoyalCourt.LastProclamation))
+                        {
+                            king.LastProclamation = data.RoyalCourt.LastProclamation;
+                        }
+
+                        if (!string.IsNullOrEmpty(data.RoyalCourt.LastProclamationDate) &&
+                            DateTime.TryParse(data.RoyalCourt.LastProclamationDate, out var procDate))
+                        {
+                            king.LastProclamationDate = procDate;
+                        }
+
+                        GD.Print($"[SaveSystem] Restored royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.Guards.Count} guards, {king.MonsterGuards.Count} monsters, {king.Prisoners.Count} prisoners, {king.Orphans.Count} orphans");
                     }
                 }
             }

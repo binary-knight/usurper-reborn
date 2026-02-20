@@ -3,6 +3,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -24,6 +25,11 @@ public class ChallengeSystem
 
     private Random random = new();
 
+    /// <summary>
+    /// SQL backend for loading player stats when challenging a player king offline
+    /// </summary>
+    public IOnlineSaveBackend? SqlBackend { get; set; }
+
     // Challenge chances per maintenance tick
     public const float ThroneChallengeProbability = 0.05f;  // 5% per tick
     public const float CityChallengeProbability = 0.08f;    // 8% per tick
@@ -31,6 +37,20 @@ public class ChallengeSystem
     // Prison sentences for failed challengers
     public const int FailedThroneChallengerSentence = 7;    // 7 days
     public const int FailedCityChallengerSentence = 3;      // 3 days
+
+    // NPC challenge tracking for player kings
+    private int _npcChallengesThisDay = 0;
+    private int _lastChallengeDay = -1;
+    private PendingNPCChallenge? _pendingChallenge = null;
+
+    /// <summary>
+    /// Pending NPC challenge against a player king (warning period before execution)
+    /// </summary>
+    private class PendingNPCChallenge
+    {
+        public string ChallengerName { get; set; } = "";
+        public int TicksRemaining { get; set; }
+    }
 
     /// <summary>
     /// Process maintenance tick challenges
@@ -64,11 +84,108 @@ public class ChallengeSystem
             return;
         }
 
-        // In online mode, NPCs cannot challenge a player king through simulation.
-        // Player kings can only lose the throne through PvP, siege, or abdication.
-        // The simulated combat uses fake stats and would unfairly depose strong player kings.
+        // Remember designated heir in case king is dethroned
+        _lastDesignatedHeir = king.DesignatedHeir;
+
+        // Reset daily challenge counter
+        int currentDay = (int)(DateTime.UtcNow - DateTime.UnixEpoch).TotalDays;
+        if (currentDay != _lastChallengeDay)
+        {
+            _npcChallengesThisDay = 0;
+            _lastChallengeDay = currentDay;
+        }
+
+        // Process any pending NPC challenge against a player king
+        if (_pendingChallenge != null)
+        {
+            _pendingChallenge.TicksRemaining--;
+            if (_pendingChallenge.TicksRemaining <= 0)
+            {
+                // Execute the pending challenge
+                var pendingChallenger = NPCSpawnSystem.Instance?.GetNPCByName(_pendingChallenge.ChallengerName);
+                if (pendingChallenger != null && pendingChallenger.IsAlive && king.IsActive)
+                {
+                    NewsSystem.Instance?.Newsy(true, $"{pendingChallenger.Name} storms the castle to challenge {king.GetTitle()} {king.Name}!");
+                    ExecuteNPCThroneChallenge(pendingChallenger, king);
+                }
+                _pendingChallenge = null;
+            }
+            else
+            {
+                NewsSystem.Instance?.Newsy(false, $"{_pendingChallenge.ChallengerName} prepares their forces... the challenge approaches!");
+            }
+            return; // Don't start new challenges while one is pending
+        }
+
+        // For player kings: NPC threats with rate limiting and warnings
         if (king.AI == CharacterAI.Human)
         {
+            // Rate limit: max challenges per day
+            if (_npcChallengesThisDay >= GameConfig.MaxNPCChallengesPerDay)
+                return;
+
+            // Find qualified NPC challengers for player kings (stricter requirements)
+            var playerKingChallengers = NPCSpawnSystem.Instance?.ActiveNPCs?
+                .Where(n => n.IsAlive &&
+                       n.Level >= GameConfig.NPCMinLevelToChallenge &&
+                       n.DaysInPrison <= 0 &&
+                       !n.King &&
+                       !n.IsStoryNPC &&
+                       n.Brain?.Personality?.Ambition > GameConfig.NPCMinAmbitionToChallenge)
+                .ToList();
+
+            if (playerKingChallengers == null || playerKingChallengers.Count == 0)
+                return;
+
+            // Get king level for proximity check
+            int kingLevel = 20;
+            try
+            {
+                if (SqlBackend != null)
+                {
+                    var kingSave = SqlBackend.ReadGameData(king.Name.ToLowerInvariant()).GetAwaiter().GetResult();
+                    if (kingSave?.Player != null)
+                        kingLevel = kingSave.Player.Level;
+                }
+            }
+            catch { /* Use default */ }
+
+            // Filter by level proximity to king
+            var qualified = playerKingChallengers
+                .Where(n => Math.Abs(n.Level - kingLevel) <= GameConfig.NPCChallengeLevelRange)
+                .OrderByDescending(n => n.Level + n.Strength)
+                .Take(3)
+                .ToList();
+
+            if (qualified.Count == 0) return;
+
+            var npcChallenger = qualified[random.Next(qualified.Count)];
+
+            // Must leave team
+            if (!string.IsNullOrEmpty(npcChallenger.Team))
+            {
+                if (npcChallenger.Brain?.Personality?.Ambition < 0.8f)
+                    return;
+                CityControlSystem.Instance.ForceLeaveTeam(npcChallenger);
+            }
+
+            // Post warning — challenge delayed by warning ticks
+            _npcChallengesThisDay++;
+            _pendingChallenge = new PendingNPCChallenge
+            {
+                ChallengerName = npcChallenger.Name,
+                TicksRemaining = GameConfig.NPCChallengeWarningTicks
+            };
+
+            NewsSystem.Instance?.Newsy(true, $"THREAT: {npcChallenger.Name} (Level {npcChallenger.Level}) has declared intent to challenge for the throne!");
+
+            // Send direct message to king
+            try
+            {
+                SqlBackend?.SendMessage("System", king.Name, "throne_warning", $"WARNING: {npcChallenger.Name} (Level {npcChallenger.Level}) has declared intent to seize your throne! The challenge will happen soon.").GetAwaiter().GetResult();
+            }
+            catch { /* Message delivery failed, news is enough */ }
+
             return;
         }
 
@@ -248,11 +365,12 @@ public class ChallengeSystem
                 continue;
             }
 
-            // Look up actual NPC stats if available, otherwise use scaled defaults
+            // Look up actual NPC stats if available, otherwise scale with challenger level
             var actualNpc = NPCSpawnSystem.Instance?.GetNPCByName(guard.Name);
-            long guardStr = actualNpc?.Strength ?? (50 + random.Next(50));
-            long guardHP = actualNpc?.HP ?? (200 + random.Next(200));
-            long guardDef = actualNpc?.Defence ?? 20;
+            int estimatedKingLevel = Math.Max(20, challenger.Level - 5);
+            long guardStr = actualNpc?.Strength ?? (30 + estimatedKingLevel * 5);
+            long guardHP = actualNpc?.HP ?? (100 + estimatedKingLevel * 30);
+            long guardDef = actualNpc?.Defence ?? (10 + estimatedKingLevel * 3);
 
             // Apply loyalty modifier to guard effectiveness (loyal guards fight harder)
             float loyaltyMod = guard.Loyalty / 100f;
@@ -284,24 +402,73 @@ public class ChallengeSystem
             return false;
         }
 
-        // Phase 3: Fight the King
+        // Phase 3: Fight the King — use real stats with defender bonus
         // GD.Print($"[Challenge] {challenger.Name} fights {king.GetTitle()} {king.Name}!");
 
-        int kingStr = 100 + random.Next(100);
-        int kingHP = 500 + random.Next(500);
+        // Look up real king stats: NPC king or scaled fallback
+        long kingStr, kingDef, kingWeapPow, kingArmPow;
+        long kingHP;
+        var kingNpc = NPCSpawnSystem.Instance?.GetNPCByName(king.Name);
+
+        if (kingNpc != null)
+        {
+            // NPC King — use actual stats + defender bonus
+            kingStr = kingNpc.Strength;
+            kingDef = (long)(kingNpc.Defence * GameConfig.KingDefenderDefBonus);
+            kingWeapPow = kingNpc.WeapPow;
+            kingArmPow = kingNpc.ArmPow;
+            kingHP = (long)(kingNpc.MaxHP * GameConfig.KingDefenderHPBonus);
+        }
+        else if (king.AI == CharacterAI.Human)
+        {
+            // Player King (offline) — try loading from database
+            long pStr = 100, pDef = 50, pWP = 50, pAP = 30, pMaxHP = 500;
+            try
+            {
+                if (SqlBackend != null)
+                {
+                    var kingSaveData = SqlBackend.ReadGameData(king.Name.ToLowerInvariant()).GetAwaiter().GetResult();
+                    if (kingSaveData?.Player != null)
+                    {
+                        pStr = kingSaveData.Player.Strength;
+                        pDef = kingSaveData.Player.Defence;
+                        pWP = kingSaveData.Player.WeapPow;
+                        pAP = kingSaveData.Player.ArmPow;
+                        pMaxHP = kingSaveData.Player.MaxHP > 0 ? kingSaveData.Player.MaxHP : kingSaveData.Player.HP;
+                    }
+                }
+            }
+            catch { /* Fall through to defaults */ }
+
+            kingStr = pStr;
+            kingDef = (long)(pDef * GameConfig.KingDefenderDefBonus);
+            kingWeapPow = pWP;
+            kingArmPow = pAP;
+            kingHP = (long)(pMaxHP * GameConfig.KingDefenderHPBonus);
+        }
+        else
+        {
+            // Fallback — scale with estimated level
+            int estLevel = Math.Max(20, challenger.Level);
+            kingStr = 50 + estLevel * 8;
+            kingDef = (long)((10 + estLevel * 4) * GameConfig.KingDefenderDefBonus);
+            kingWeapPow = 20 + estLevel * 3;
+            kingArmPow = 10 + estLevel * 2;
+            kingHP = (long)((200 + estLevel * 40) * GameConfig.KingDefenderHPBonus);
+        }
 
         while (challengerHP > 0 && kingHP > 0)
         {
-            // Challenger attacks (king uses full defense, not reduced)
-            long damage = Math.Max(1, challengerPower - kingStr);
+            // Challenger attacks — armor reduces damage
+            long damage = Math.Max(1, challengerPower - kingDef - kingArmPow);
             damage += random.Next(1, (int)Math.Max(2, challenger.WeapPow / 2));
-            kingHP -= (int)damage;
+            kingHP -= damage;
 
             if (kingHP <= 0) break;
 
-            // King attacks
-            long kingDamage = Math.Max(1, kingStr - challengerDefence);
-            kingDamage += random.Next(10, 30);
+            // King attacks — uses full combat stats
+            long kingDamage = Math.Max(1, kingStr + kingWeapPow - challengerDefence);
+            kingDamage += random.Next(1, (int)Math.Max(2, kingWeapPow / 3));
             challengerHP -= kingDamage;
         }
 
@@ -333,8 +500,9 @@ public class ChallengeSystem
         // Mark as King
         newKing.King = true;
 
-        // Create new king data
-        var kingData = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex);
+        // Create new king data — inherit orphans from previous reign
+        var inheritedOrphans = oldKing?.Orphans?.ToList();
+        var kingData = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex, inheritedOrphans);
         kingData.Treasury = oldKing.Treasury / 2; // Inherits half the treasury
         kingData.TaxRate = oldKing.TaxRate;
         kingData.CityTaxPercent = oldKing.CityTaxPercent;
@@ -358,6 +526,8 @@ public class ChallengeSystem
             (player.DisplayName == oldKing.Name || player.Name2 == oldKing.Name))
         {
             player.King = false;
+            player.RoyalMercenaries?.Clear(); // Dismiss bodyguards on dethronement
+            player.RecalculateStats(); // Remove Royal Authority HP bonus
             GD.Print($"[ChallengeSystem] Player {player.DisplayName} deposed from throne by {newKing.Name}");
         }
 
@@ -370,8 +540,46 @@ public class ChallengeSystem
     /// <summary>
     /// Claim an empty throne
     /// </summary>
+    /// <summary>
+    /// Store the last king's designated heir before the throne is cleared
+    /// </summary>
+    private string? _lastDesignatedHeir;
+
     private void ClaimEmptyThrone()
     {
+        // Save orphans from the previous king before the throne changes hands
+        var previousOrphans = CastleLocation.GetCurrentKing()?.Orphans?.ToList();
+
+        // Check designated heir from previous king first
+        if (!string.IsNullOrEmpty(_lastDesignatedHeir))
+        {
+            var heir = NPCSpawnSystem.Instance?.ActiveNPCs?
+                .FirstOrDefault(n => n.Name == _lastDesignatedHeir &&
+                    n.IsAlive && !n.IsDead && n.DaysInPrison <= 0 &&
+                    n.Level >= GameConfig.MinLevelKing && !n.IsStoryNPC);
+            if (heir != null)
+            {
+                if (!string.IsNullOrEmpty(heir.Team))
+                    CityControlSystem.Instance.ForceLeaveTeam(heir);
+
+                heir.King = true;
+                var heirKingData = King.CreateNewKing(heir.Name, CharacterAI.Computer, heir.Sex, previousOrphans);
+                heirKingData.Treasury = random.Next(5000, 20000);
+                heirKingData.TaxRate = GameConfig.DefaultTaxRateNew;
+                CastleLocation.SetKing(heirKingData);
+
+                NewsSystem.Instance?.Newsy(true,
+                    $"The designated heir {heir.Name} has claimed the throne! ALL HAIL {heirKingData.GetTitle()} {heir.Name}!");
+                _lastDesignatedHeir = null;
+                return;
+            }
+            else
+            {
+                NewsSystem.Instance?.Newsy(false, $"The designated heir {_lastDesignatedHeir} could not be found or is not eligible.");
+            }
+            _lastDesignatedHeir = null;
+        }
+
         // Find highest level NPC not in a team (excluding story NPCs)
         var candidates = NPCSpawnSystem.Instance?.ActiveNPCs?
             .Where(n => n.IsAlive &&
@@ -413,7 +621,7 @@ public class ChallengeSystem
 
         newKing.King = true;
 
-        var kingData = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex);
+        var kingData = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex, previousOrphans);
         kingData.Treasury = random.Next(5000, 20000);
         kingData.TaxRate = random.Next(10, 30);
 
@@ -488,6 +696,52 @@ public class ChallengeSystem
     /// <summary>
     /// Imprison a failed challenger
     /// </summary>
+    /// <summary>
+    /// Execute an NPC challenge against a player king (offline defense).
+    /// Uses the standard SimulateThroneChallenge with real player stats loaded from DB.
+    /// Sends result notification to the player.
+    /// </summary>
+    private void ExecuteNPCThroneChallenge(NPC challenger, King king)
+    {
+        // RULE: Challenger must leave team
+        if (!string.IsNullOrEmpty(challenger.Team))
+        {
+            CityControlSystem.Instance.ForceLeaveTeam(challenger);
+        }
+
+        // Run the standard throne challenge simulation (now uses real stats + defender bonus)
+        bool success = SimulateThroneChallenge(challenger, king);
+
+        if (success)
+        {
+            // NPC wins — dethrone the player king
+            CrownNewKing(challenger, king);
+
+            // Notify the dethroned player
+            try
+            {
+                SqlBackend?.SendMessage("System", king.Name, "throne_lost",
+                    $"You have been DETHRONED! {challenger.Name} (Level {challenger.Level}) stormed the castle and defeated your defenses. The throne is no longer yours.")
+                    .GetAwaiter().GetResult();
+            }
+            catch { /* Notification failed */ }
+        }
+        else
+        {
+            // Player king's defenses held
+            ImprisonChallenger(challenger, FailedThroneChallengerSentence, "Failed throne challenge against player king");
+
+            // Notify the king that their defenses held
+            try
+            {
+                SqlBackend?.SendMessage("System", king.Name, "throne_defended",
+                    $"Your defenses held! {challenger.Name} (Level {challenger.Level}) challenged for your throne but was defeated and thrown in prison.")
+                    .GetAwaiter().GetResult();
+            }
+            catch { /* Notification failed */ }
+        }
+    }
+
     private void ImprisonChallenger(NPC? npc, int days, string crime)
     {
         if (npc == null) return;

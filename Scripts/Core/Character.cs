@@ -249,6 +249,10 @@ public class Character
     // Player echo (loaded from DB for cooperative dungeons)
     public bool IsEcho { get; set; } = false;
 
+    // Royal mercenary (hired bodyguard for king's dungeon party)
+    public bool IsMercenary { get; set; } = false;
+    public string MercenaryName { get; set; } = ""; // For syncing death back to RoyalMercenaries list
+
     // Combat Stamina System - resource for special abilities
     // Formula: MaxCombatStamina = 50 + (Stamina stat * 2) + (Level * 3)
     public long CurrentCombatStamina { get; set; } = 100;
@@ -739,6 +743,12 @@ public class Character
         // Apply child bonuses (family provides stat boosts)
         UsurperRemake.Systems.FamilySystem.Instance?.ApplyChildBonuses(this);
 
+        // Apply Royal Authority HP bonus (+5% max HP while player is king)
+        if (King)
+        {
+            MaxHP = (long)(MaxHP * GameConfig.KingCombatHPBonus);
+        }
+
         // Keep current HP/Mana within bounds
         var hpBefore = HP;
         HP = Math.Min(HP, MaxHP);
@@ -1000,6 +1010,10 @@ public class Character
     public string? NobleTitle { get; set; } = null; // Noble title (Sir, Dame, Lord, Lady, etc.)
     public long RoyalLoanAmount { get; set; } = 0; // Outstanding loan from the king
     public int RoyalLoanDueDay { get; set; } = 0; // Day number when loan is due (0 = no loan)
+    public bool RoyalLoanBountyPosted { get; set; } = false; // Has bounty been posted for overdue loan?
+
+    // Royal Mercenaries (hired bodyguards for king's dungeon party)
+    public List<RoyalMercenary> RoyalMercenaries { get; set; } = new();
 
     public DateTime LastLogin { get; set; }
     
@@ -1767,4 +1781,31 @@ public class DrugEffects
 
     // Special
     public int DarknessBonus { get; set; }
-} 
+}
+
+/// <summary>
+/// Royal Mercenary — hired bodyguard for the king's dungeon party.
+/// Stored on the player character. Dismissed when dethroned.
+/// </summary>
+public class RoyalMercenary
+{
+    public string Name { get; set; } = "";
+    public string Role { get; set; } = ""; // Tank, Healer, DPS, Support
+    public CharacterClass Class { get; set; }
+    public CharacterSex Sex { get; set; }
+    public int Level { get; set; }
+    public long HP { get; set; }
+    public long MaxHP { get; set; }
+    public long Mana { get; set; }
+    public long MaxMana { get; set; }
+    public long Strength { get; set; }
+    public long Defence { get; set; }
+    public long WeapPow { get; set; }
+    public long ArmPow { get; set; }
+    public long Agility { get; set; }
+    public long Dexterity { get; set; }
+    public long Wisdom { get; set; }
+    public long Intelligence { get; set; }
+    public long Constitution { get; set; }
+    public long Healing { get; set; } // Potion count
+}

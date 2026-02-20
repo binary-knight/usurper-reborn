@@ -128,6 +128,9 @@ public class DungeonLocation : BaseLocation
         // Restore player echoes (cooperative dungeon allies) from saved state
         await RestorePlayerTeammates(term);
 
+        // Add royal mercenaries (hired bodyguards for king players)
+        AddRoyalMercenariesToParty(player, term);
+
         // Check for dungeon entry fees for overleveled teammates
         // Player can always enter - unaffordable allies simply stay behind
         await CheckAndPayEntryFees(player, term);
@@ -764,6 +767,79 @@ public class DungeonLocation : BaseLocation
             term.WriteLine("  Player echoes fight as AI allies with their real stats.");
             term.WriteLine("");
             await Task.Delay(1500);
+        }
+    }
+
+    /// <summary>
+    /// Add royal mercenaries (hired bodyguards) to dungeon party for king players.
+    /// </summary>
+    private void AddRoyalMercenariesToParty(Character player, TerminalEmulator term)
+    {
+        if (!player.King || player.RoyalMercenaries == null || player.RoyalMercenaries.Count == 0) return;
+
+        const int maxPartySize = 4;
+        int addedCount = 0;
+
+        foreach (var merc in player.RoyalMercenaries)
+        {
+            if (teammates.Count >= maxPartySize) break;
+            if (merc.HP <= 0) continue; // Dead mercenaries don't join
+
+            // Skip if already in party (shouldn't happen since teammates is cleared on entry)
+            if (teammates.Any(t => t.IsMercenary && t.MercenaryName == merc.Name)) continue;
+
+            var character = new Character
+            {
+                Name2 = merc.Name,
+                Class = merc.Class,
+                Sex = merc.Sex,
+                Level = merc.Level,
+                HP = merc.HP,
+                MaxHP = merc.MaxHP,
+                Mana = merc.Mana,
+                MaxMana = merc.MaxMana,
+                Strength = merc.Strength,
+                Defence = merc.Defence,
+                WeapPow = merc.WeapPow,
+                ArmPow = merc.ArmPow,
+                Agility = merc.Agility,
+                Dexterity = merc.Dexterity,
+                Wisdom = merc.Wisdom,
+                Intelligence = merc.Intelligence,
+                Constitution = merc.Constitution,
+                Healing = merc.Healing,
+                AI = CharacterAI.Computer,
+                IsMercenary = true,
+                MercenaryName = merc.Name,
+                // Set Base* fields so RecalculateStats won't zero them
+                BaseMaxHP = merc.MaxHP,
+                BaseMaxMana = merc.MaxMana,
+                BaseStrength = merc.Strength,
+                BaseDefence = merc.Defence,
+                BaseAgility = merc.Agility,
+                BaseDexterity = merc.Dexterity,
+                BaseWisdom = merc.Wisdom,
+                BaseIntelligence = merc.Intelligence,
+                BaseConstitution = merc.Constitution,
+                Stamina = 5 + merc.Level * 2
+            };
+
+            teammates.Add(character);
+            addedCount++;
+        }
+
+        if (addedCount > 0)
+        {
+            term.SetColor("bright_cyan");
+            term.WriteLine($"  Your royal bodyguards join you ({addedCount}):");
+            foreach (var t in teammates.Where(t => t.IsMercenary))
+            {
+                term.SetColor("white");
+                term.Write($"    {t.DisplayName}");
+                term.SetColor("gray");
+                term.WriteLine($" - Level {t.Level} {t.Class}");
+            }
+            term.WriteLine("");
         }
     }
 

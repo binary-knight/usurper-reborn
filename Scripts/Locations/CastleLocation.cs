@@ -316,6 +316,16 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("state (Succession)");
 
+        // Row 6 - Royal Bodyguards
+        terminal.SetColor("darkgray");
+        terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("B");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.WriteLine("odyguards (Dungeon Mercenaries)");
+
         terminal.WriteLine("");
 
         // Navigation
@@ -418,6 +428,20 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine($"nfiltrate Castle (Requires Level {GameConfig.MinLevelKing})");
+            }
+            else if (currentKing != null && currentKing.IsActive)
+            {
+                int kLevel = GetKingLevel();
+                if (kLevel > 0 && kLevel - currentPlayer.Level > GameConfig.KingChallengeLevelRange)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"nfiltrate Castle (King Lv{kLevel}, need Lv{Math.Max(GameConfig.MinLevelKing, kLevel - GameConfig.KingChallengeLevelRange)}+)");
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("nfiltrate Castle (Not Available)");
+                }
             }
             else
             {
@@ -544,7 +568,8 @@ public class CastleLocation : BaseLocation
         ShowBBSMenuRow(("P", "bright_yellow", "Prison"), ("O", "bright_yellow", "Orders"), ("1", "bright_yellow", "Mail"), ("G", "bright_yellow", "Sleep"));
         ShowBBSMenuRow(("C", "bright_yellow", "Security"), ("H", "bright_yellow", "History"), ("A", "bright_yellow", "Abdicate"), ("M", "bright_yellow", "Magic"));
         ShowBBSMenuRow(("F", "bright_yellow", "Fiscal"), ("Q", "bright_yellow", "Quests"), ("T", "bright_yellow", "Orphanage"), ("W", "bright_yellow", "Wedding"));
-        ShowBBSMenuRow(("U", "bright_yellow", "Court"), ("E", "bright_yellow", "Succession"), ("R", "bright_yellow", "Return"));
+        ShowBBSMenuRow(("U", "bright_yellow", "Court"), ("E", "bright_yellow", "Succession"), ("B", "bright_yellow", "Bodyguards"));
+        ShowBBSMenuRow(("R", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
 
@@ -688,6 +713,10 @@ public class CastleLocation : BaseLocation
                 await ManageSuccession();
                 return false;
 
+            case "B":
+                await ManageRoyalBodyguards();
+                return false;
+
             case "R":
                 await NavigateToLocation(GameLocation.MainStreet);
                 return true;
@@ -739,7 +768,18 @@ public class CastleLocation : BaseLocation
                 else
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine("You are not worthy to challenge for the throne!");
+                    if (currentPlayer.Level < GameConfig.MinLevelKing)
+                        terminal.WriteLine($"You must be at least level {GameConfig.MinLevelKing} to challenge for the throne!");
+                    else if (currentKing != null && currentKing.IsActive)
+                    {
+                        int kLevel = GetKingLevel();
+                        if (kLevel > 0 && kLevel - currentPlayer.Level > GameConfig.KingChallengeLevelRange)
+                            terminal.WriteLine($"The {currentKing.GetTitle()} is level {kLevel}. You must be at least level {kLevel - GameConfig.KingChallengeLevelRange} to challenge!");
+                        else
+                            terminal.WriteLine("You are not worthy to challenge for the throne!");
+                    }
+                    else
+                        terminal.WriteLine("You are not worthy to challenge for the throne!");
                     await Task.Delay(2000);
                 }
                 return false;
@@ -969,18 +1009,69 @@ public class CastleLocation : BaseLocation
     private async Task ImprisonSomeone()
     {
         terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write("Name of the criminal: ");
-        terminal.SetColor("white");
-        string name = await terminal.ReadLineAsync();
 
-        if (string.IsNullOrEmpty(name)) return;
+        // Build a list of potential targets (NPCs + online players)
+        var targets = new List<(string Name, string Type, bool IsNPC)>();
+
+        // Add living NPCs (not already imprisoned, not the king)
+        var npcs = NPCSpawnSystem.Instance?.ActiveNPCs?
+            .Where(n => !n.IsDead && n.DaysInPrison <= 0 && n.Name2 != currentKing.Name)
+            .OrderBy(n => n.Name2)
+            .ToList() ?? new List<NPC>();
+        foreach (var npc in npcs)
+            targets.Add((npc.Name2, $"Lv{npc.Level} {npc.Class}", true));
+
+        // In online mode, add other players
+        if (DoorMode.IsOnlineMode)
+        {
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (backend != null)
+            {
+                var playerNames = backend.GetAllPlayerNames()
+                    .Where(p => !p.Equals(currentPlayer.Name, StringComparison.OrdinalIgnoreCase)
+                             && !p.Equals(currentKing.Name, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(p => p)
+                    .ToList();
+                foreach (var pn in playerNames)
+                    targets.Add((pn, "Player", false));
+            }
+        }
+
+        if (targets.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("There is no one to imprison.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Show numbered list
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"{"#",-4} {"Name",-20} {"Type",-20}");
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(new string('─', 44));
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            terminal.SetColor(targets[i].IsNPC ? "white" : "bright_yellow");
+            terminal.WriteLine($"{i + 1,-4} {targets[i].Name,-20} {targets[i].Type,-20}");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write("# to imprison (or 0 to cancel): ");
+        terminal.SetColor("white");
+        string input = await terminal.ReadLineAsync();
+
+        if (!int.TryParse(input, out int idx) || idx < 1 || idx > targets.Count)
+            return;
+
+        var target = targets[idx - 1];
 
         terminal.SetColor("cyan");
         terminal.Write("Crime committed: ");
         terminal.SetColor("white");
         string crime = await terminal.ReadLineAsync();
-
         if (string.IsNullOrEmpty(crime)) crime = "General Misconduct";
 
         terminal.SetColor("cyan");
@@ -992,11 +1083,44 @@ public class CastleLocation : BaseLocation
         if (int.TryParse(sentenceStr, out int s) && s > 0)
             sentence = Math.Min(s, 365);
 
-        currentKing.ImprisonCharacter(name, sentence, crime);
+        // Add to king's prison records
+        currentKing.ImprisonCharacter(target.Name, sentence, crime);
+
+        // Actually enforce the imprisonment
+        if (target.IsNPC)
+        {
+            var npc = NPCSpawnSystem.Instance?.GetNPCByName(target.Name);
+            if (npc != null)
+            {
+                npc.DaysInPrison = (byte)Math.Min(255, sentence);
+                npc.CurrentLocation = "Prison";
+                npc.CellDoorOpen = false;
+            }
+        }
+        else if (DoorMode.IsOnlineMode)
+        {
+            // Set DaysInPrison on the player's save data
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            if (backend != null)
+            {
+                await backend.ImprisonPlayer(target.Name, sentence);
+                // Send them a message
+                try
+                {
+                    await backend.SendMessage("System", target.Name, "system",
+                        $"You have been imprisoned by {currentKing.GetTitle()} {currentKing.Name} for {sentence} days! Crime: {crime}");
+                }
+                catch { /* notification failed */ }
+            }
+        }
+
+        // Persist royal court changes in online mode
+        if (DoorMode.IsOnlineMode)
+            PersistRoyalCourtToWorldState();
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"{name} has been imprisoned for {sentence} days!");
-        NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} imprisoned {name} for {crime}!");
+        terminal.WriteLine($"{target.Name} has been imprisoned for {sentence} days!");
+        NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} imprisoned {target.Name} for {crime}!");
 
         await Task.Delay(2000);
     }
@@ -1013,12 +1137,47 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.Write("Name to pardon: ");
+        terminal.Write("Prisoner # to pardon: ");
         terminal.SetColor("white");
-        string name = await terminal.ReadLineAsync();
+        string input = await terminal.ReadLineAsync();
 
+        var keys = currentKing.Prisoners.Keys.ToList();
+        if (!int.TryParse(input, out int idx) || idx < 1 || idx > keys.Count)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Invalid selection.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        string name = keys[idx - 1];
         if (currentKing.ReleaseCharacter(name))
         {
+            // Actually release the NPC
+            var npc = NPCSpawnSystem.Instance?.GetNPCByName(name);
+            if (npc != null)
+            {
+                npc.DaysInPrison = 0;
+                npc.CurrentLocation = "MainStreet";
+            }
+
+            // Release player in online mode
+            if (DoorMode.IsOnlineMode)
+            {
+                var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                if (backend != null)
+                {
+                    await backend.ImprisonPlayer(name, 0);
+                    try
+                    {
+                        await backend.SendMessage("System", name, "system",
+                            $"You have been pardoned by {currentKing.GetTitle()} {currentKing.Name}! You are free!");
+                    }
+                    catch { /* notification failed */ }
+                }
+                PersistRoyalCourtToWorldState();
+            }
+
             terminal.SetColor("bright_green");
             terminal.WriteLine($"{name} has been pardoned and released!");
             NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} pardoned {name}!");
@@ -1046,37 +1205,68 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("bright_red");
         terminal.WriteLine("WARNING: Executions greatly increase your Darkness!");
         terminal.SetColor("cyan");
-        terminal.Write("Name to execute: ");
+        terminal.Write("Prisoner # to execute: ");
         terminal.SetColor("white");
-        string name = await terminal.ReadLineAsync();
+        string input = await terminal.ReadLineAsync();
 
-        if (currentKing.Prisoners.ContainsKey(name))
+        var keys = currentKing.Prisoners.Keys.ToList();
+        if (!int.TryParse(input, out int idx) || idx < 1 || idx > keys.Count)
         {
-            terminal.SetColor("cyan");
-            terminal.Write("Are you SURE? (Y/N): ");
-            terminal.SetColor("white");
-            string confirm = await terminal.ReadLineAsync();
+            terminal.SetColor("red");
+            terminal.WriteLine("Invalid selection.");
+            await Task.Delay(1500);
+            return;
+        }
 
-            if (confirm?.ToUpper() == "Y")
-            {
-                currentKing.Prisoners.Remove(name);
-                currentPlayer.Darkness += 100;
+        string name = keys[idx - 1];
+        terminal.SetColor("cyan");
+        terminal.Write($"Execute {name}? Are you SURE? (Y/N): ");
+        terminal.SetColor("white");
+        string confirm = await terminal.ReadLineAsync();
 
-                terminal.SetColor("red");
-                terminal.WriteLine($"{name} has been executed!");
-                terminal.WriteLine("Your darkness increases significantly...");
-                NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} executed {name}!");
-            }
-            else
+        if (confirm?.ToUpper() == "Y")
+        {
+            currentKing.Prisoners.Remove(name);
+            currentPlayer.Darkness += 100;
+
+            // Permadeath the NPC
+            var npc = NPCSpawnSystem.Instance?.GetNPCByName(name);
+            if (npc != null)
             {
-                terminal.SetColor("gray");
-                terminal.WriteLine("Execution cancelled.");
+                npc.IsDead = true;
+                npc.IsPermaDead = true;
+                npc.DaysInPrison = 0;
+                npc.HP = 0;
             }
+
+            // Release player from prison (execution just frees them with a penalty)
+            if (DoorMode.IsOnlineMode)
+            {
+                var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                if (backend != null)
+                {
+                    await backend.ImprisonPlayer(name, 0);
+                    try
+                    {
+                        await backend.SendMessage("System", name, "system",
+                            $"You were sentenced to execution by {currentKing.GetTitle()} {currentKing.Name}! You narrowly escaped with your life but lost 10% of your gold.");
+                    }
+                    catch { /* notification failed */ }
+                    // Deduct 10% gold as execution penalty
+                    await backend.DeductGoldFromPlayer(name, 1000);
+                }
+                PersistRoyalCourtToWorldState();
+            }
+
+            terminal.SetColor("red");
+            terminal.WriteLine($"{name} has been executed!");
+            terminal.WriteLine("Your darkness increases significantly...");
+            NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} executed {name}!");
         }
         else
         {
-            terminal.SetColor("red");
-            terminal.WriteLine("That person is not in the dungeon.");
+            terminal.SetColor("gray");
+            terminal.WriteLine("Execution cancelled.");
         }
 
         await Task.Delay(2000);
@@ -1094,31 +1284,33 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.Write("Name of prisoner: ");
+        terminal.Write("Prisoner # to set bail: ");
         terminal.SetColor("white");
-        string name = await terminal.ReadLineAsync();
+        string input = await terminal.ReadLineAsync();
 
-        if (currentKing.Prisoners.ContainsKey(name))
-        {
-            terminal.SetColor("cyan");
-            terminal.Write("Bail amount (0 for no bail): ");
-            terminal.SetColor("white");
-            string amountStr = await terminal.ReadLineAsync();
-
-            if (long.TryParse(amountStr, out long amount) && amount >= 0)
-            {
-                currentKing.Prisoners[name].BailAmount = amount;
-                terminal.SetColor("bright_green");
-                if (amount > 0)
-                    terminal.WriteLine($"Bail set to {amount:N0} gold for {name}.");
-                else
-                    terminal.WriteLine($"No bail allowed for {name}.");
-            }
-        }
-        else
+        var keys = currentKing.Prisoners.Keys.ToList();
+        if (!int.TryParse(input, out int idx) || idx < 1 || idx > keys.Count)
         {
             terminal.SetColor("red");
-            terminal.WriteLine("That person is not in the dungeon.");
+            terminal.WriteLine("Invalid selection.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        string name = keys[idx - 1];
+        terminal.SetColor("cyan");
+        terminal.Write($"Bail amount for {name} (0 for no bail): ");
+        terminal.SetColor("white");
+        string amountStr = await terminal.ReadLineAsync();
+
+        if (long.TryParse(amountStr, out long amount) && amount >= 0)
+        {
+            currentKing.Prisoners[name].BailAmount = amount;
+            terminal.SetColor("bright_green");
+            if (amount > 0)
+                terminal.WriteLine($"Bail set to {amount:N0} gold for {name}.");
+            else
+                terminal.WriteLine($"No bail allowed for {name}.");
         }
 
         await Task.Delay(2000);
@@ -1636,7 +1828,10 @@ public class CastleLocation : BaseLocation
         if (confirm?.ToUpper() == "Y")
         {
             CharacterSex sex = guardName.StartsWith("Lady") || guardName.StartsWith("Dame") ? CharacterSex.Female : CharacterSex.Male;
-            if (currentKing.AddGuard(guardName, CharacterAI.Computer, sex, GameConfig.BaseGuardSalary))
+            // Scale guard salary with king level (guards hired by stronger kings demand more pay)
+            int kLevel = GetKingLevel();
+            long guardSalary = GameConfig.BaseGuardSalary + (kLevel * GameConfig.GuardSalaryPerGuardLevel);
+            if (currentKing.AddGuard(guardName, CharacterAI.Computer, sex, guardSalary))
             {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"{guardName} has joined the Royal Guard!");
@@ -2067,7 +2262,7 @@ public class CastleLocation : BaseLocation
                 1 => GameConfig.TaxAlignment.All,
                 2 => GameConfig.TaxAlignment.Good,
                 3 => GameConfig.TaxAlignment.Evil,
-                4 => GameConfig.TaxAlignment.All, // No Neutral enum, use All
+                4 => GameConfig.TaxAlignment.Neutral,
                 _ => GameConfig.TaxAlignment.All
             };
         }
@@ -2257,7 +2452,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("Commands:");
             terminal.SetColor("white");
             terminal.WriteLine("(E)stablishments    (P)roclamation     (B)ounty on someone");
-            terminal.WriteLine("(L)evel Masters     (R)eturn");
+            terminal.WriteLine("(R)eturn");
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
@@ -2277,9 +2472,6 @@ public class CastleLocation : BaseLocation
                     break;
                 case 'B':
                     await PlaceBounty();
-                    break;
-                case 'L':
-                    await ManageLevelMasters();
                     break;
                 case 'R':
                     done = true;
@@ -2386,81 +2578,145 @@ public class CastleLocation : BaseLocation
                 terminal.WriteLine($"A bounty of {amount:N0} gold has been placed on {name}!");
 
                 NewsSystem.Instance.Newsy(true, $"BOUNTY: {amount:N0} gold on {name} by order of {currentKing.GetTitle()} {currentKing.Name}!");
+
+                // Wire into QuestSystem so the bounty is trackable
+                QuestSystem.PostBountyOnPlayer(name, "Royal decree", (int)Math.Min(amount, int.MaxValue));
             }
         }
 
         await Task.Delay(2500);
     }
 
-    private async Task ManageLevelMasters()
-    {
-        terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.WriteLine("Level Master appointments are handled automatically.");
-        terminal.WriteLine("Masters train adventurers to advance in their classes.");
-        await Task.Delay(2000);
-    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ROYAL ORPHANAGE
     // ═══════════════════════════════════════════════════════════════════════════
 
+    private static readonly string[] OrphanNamesMale = {
+        "Tommy", "Billy", "Jack", "Oliver", "Henry", "Arthur", "Finn", "Leo",
+        "Marcus", "Theo", "Cedric", "Robin", "Edmund", "Gareth", "Pip", "Rory"
+    };
+    private static readonly string[] OrphanNamesFemale = {
+        "Sarah", "Emma", "Lily", "Sophie", "Rose", "Clara", "Ivy", "Hazel",
+        "Nora", "Wren", "Elise", "Mabel", "Ada", "Greta", "Tess", "Fern"
+    };
+    private static readonly string[] OrphanBackstories = {
+        "Found wandering the streets after a bandit raid.",
+        "Parents lost to dungeon creatures.",
+        "Left at the castle gates wrapped in a tattered blanket.",
+        "Orphaned by plague in the outer villages.",
+        "Sole survivor of a merchant caravan attack.",
+        "Abandoned at the church doorstep as an infant.",
+        "Parents died in a mining collapse.",
+        "Found hiding in the ruins of a burned farmstead.",
+        "Ran away from a cruel master in a distant town.",
+        "Family lost at sea during a storm."
+    };
+
     private async Task RoyalOrphanage()
     {
-        terminal.ClearScreen();
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          THE ROYAL ORPHANAGE                                ║");
-        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
-        terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("You visit the children under royal protection.");
-        terminal.WriteLine($"Daily care cost: {GameConfig.OrphanCareCost} gold per child");
-        terminal.WriteLine("");
-
-        if (currentKing.Orphans.Count == 0)
+        while (true)
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine("The orphanage is empty.");
-        }
-        else
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"{"Name",-20} {"Age",-6} {"Happiness",-12}");
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(new string('─', 40));
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                          THE ROYAL ORPHANAGE                                ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
 
-            foreach (var orphan in currentKing.Orphans)
+            // Update ages for real orphans
+            foreach (var o in currentKing.Orphans.Where(o => o.IsRealOrphan))
+                o.Age = o.ComputedAge;
+
+            terminal.SetColor("white");
+            terminal.WriteLine("You visit the children under royal protection.");
+            long dailyCost = currentKing.Orphans.Count * GameConfig.OrphanCareCost;
+            terminal.WriteLine($"Orphans: {currentKing.Orphans.Count}/{GameConfig.MaxRoyalOrphans}   Daily care cost: {dailyCost:N0} gold ({GameConfig.OrphanCareCost} per child)");
+            terminal.WriteLine("");
+
+            if (currentKing.Orphans.Count == 0)
             {
-                string happyColor = orphan.Happiness > 70 ? "bright_green" :
-                                   orphan.Happiness > 40 ? "yellow" : "red";
-
-                terminal.SetColor("white");
-                terminal.Write($"{orphan.Name,-20} {orphan.Age,-6} ");
-                terminal.SetColor(happyColor);
-                terminal.WriteLine($"{orphan.Happiness}%");
+                terminal.SetColor("gray");
+                terminal.WriteLine("The orphanage is empty. Perhaps you could take in a child in need.");
             }
-        }
+            else
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"{"#",-4} {"Name",-20} {"Age",-6} {"Sex",-8} {"Race",-10} {"Type",-10} {"Happy",-6}");
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(new string('─', 66));
 
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.WriteLine("Commands:");
-        terminal.SetColor("white");
-        terminal.WriteLine("(A)dopt new orphan   (G)ive gifts (increase happiness)   (R)eturn");
-        terminal.WriteLine("");
+                for (int i = 0; i < currentKing.Orphans.Count; i++)
+                {
+                    var orphan = currentKing.Orphans[i];
+                    string happyColor = orphan.Happiness > 70 ? "bright_green" :
+                                       orphan.Happiness > 40 ? "yellow" : "red";
+                    string sexStr = orphan.Sex == CharacterSex.Male ? "Boy" : "Girl";
+                    string typeStr = orphan.IsRealOrphan ? "Orphaned" : "Adopted";
+                    string typeColor = orphan.IsRealOrphan ? "bright_magenta" : "cyan";
+                    string raceStr = orphan.IsRealOrphan ? orphan.Race.ToString() : "-";
 
-        terminal.SetColor("cyan");
-        terminal.Write("Action: ");
-        terminal.SetColor("white");
-        string input = await terminal.ReadLineAsync();
+                    terminal.SetColor("gray");
+                    terminal.Write($"{i + 1,-4} ");
+                    terminal.SetColor("white");
+                    terminal.Write($"{orphan.Name,-20} {orphan.Age,-6} {sexStr,-8} {raceStr,-10} ");
+                    terminal.SetColor(typeColor);
+                    terminal.Write($"{typeStr,-10} ");
+                    terminal.SetColor(happyColor);
+                    terminal.Write($"{orphan.Happiness}%");
 
-        if (!string.IsNullOrEmpty(input))
-        {
+                    // Coming-of-age indicator
+                    if (orphan.IsRealOrphan && orphan.Age >= GameConfig.OrphanCommissionAge)
+                    {
+                        terminal.SetColor("bright_yellow");
+                        terminal.Write(orphan.Age >= 18 ? "  ADULT" : "  Ready!");
+                    }
+                    terminal.WriteLine("");
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("Commands:");
+            long adoptCost = 500 + (currentKing.Orphans.Count * 100);
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [A] "); terminal.SetColor("white"); terminal.WriteLine($"Adopt new orphan ({adoptCost:N0} gold from treasury)");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [V] "); terminal.SetColor("white"); terminal.WriteLine("View orphan details");
+
+            // Show commission option if any real orphans are old enough
+            bool hasCommissionable = currentKing.Orphans.Any(o => o.IsRealOrphan && o.Age >= GameConfig.OrphanCommissionAge);
+            if (hasCommissionable)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write("  [C] "); terminal.SetColor("white"); terminal.WriteLine($"Commission orphan (recruit age {GameConfig.OrphanCommissionAge}+, {GameConfig.OrphanCommissionCost:N0} gold)");
+            }
+
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [G] "); terminal.SetColor("white"); terminal.WriteLine("Give gifts (increase happiness)");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  [R] "); terminal.SetColor("white"); terminal.WriteLine("Return to Royal Menu");
+            terminal.WriteLine("");
+
+            terminal.SetColor("cyan");
+            terminal.Write("Action: ");
+            terminal.SetColor("white");
+            string input = await terminal.ReadLineAsync();
+
+            if (string.IsNullOrEmpty(input) || char.ToUpper(input[0]) == 'R')
+                break;
+
             switch (char.ToUpper(input[0]))
             {
                 case 'A':
                     await AdoptOrphan();
+                    break;
+                case 'V':
+                    await ViewOrphanDetails();
+                    break;
+                case 'C':
+                    if (hasCommissionable)
+                        await CommissionOrphan();
                     break;
                 case 'G':
                     await GiveGiftsToOrphans();
@@ -2469,27 +2725,332 @@ public class CastleLocation : BaseLocation
         }
     }
 
+    private async Task ViewOrphanDetails()
+    {
+        if (currentKing.Orphans.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("No orphans to view.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.SetColor("cyan");
+        terminal.Write("Orphan number: ");
+        terminal.SetColor("white");
+        string input = await terminal.ReadLineAsync();
+
+        if (!int.TryParse(input, out int idx) || idx < 1 || idx > currentKing.Orphans.Count)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Invalid selection.");
+            await Task.Delay(1000);
+            return;
+        }
+
+        var orphan = currentKing.Orphans[idx - 1];
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"  === {orphan.Name} ===");
+        terminal.SetColor("white");
+        terminal.WriteLine($"  Age: {orphan.Age}   Sex: {(orphan.Sex == CharacterSex.Male ? "Boy" : "Girl")}   Happiness: {orphan.Happiness}%");
+
+        if (orphan.IsRealOrphan)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("  Type: Orphaned (both parents deceased)");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Mother: {orphan.MotherName ?? "Unknown"}");
+            terminal.WriteLine($"  Father: {orphan.FatherName ?? "Unknown"}");
+            terminal.WriteLine($"  Race: {orphan.Race}");
+            string soulDesc = orphan.Soul > 200 ? "Pure-hearted" :
+                              orphan.Soul > 100 ? "Good-natured" :
+                              orphan.Soul < -200 ? "Dark-souled" :
+                              orphan.Soul < -100 ? "Troubled" : "Neutral";
+            terminal.WriteLine($"  Temperament: {soulDesc} ({orphan.Soul:+0;-0;0})");
+
+            if (orphan.Age >= GameConfig.OrphanCommissionAge)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  Status: Ready for commission (age {GameConfig.OrphanCommissionAge}+)");
+            }
+        }
+        else
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  Type: Adopted (taken in by the crown)");
+        }
+
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  \"{orphan.BackgroundStory}\"");
+        terminal.SetColor("white");
+        terminal.WriteLine($"  Arrived: {orphan.ArrivalDate:yyyy-MM-dd}");
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    private async Task CommissionOrphan()
+    {
+        var eligible = currentKing.Orphans
+            .Select((o, i) => (orphan: o, index: i))
+            .Where(x => x.orphan.IsRealOrphan && x.orphan.Age >= GameConfig.OrphanCommissionAge)
+            .ToList();
+
+        if (eligible.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"No real orphans age {GameConfig.OrphanCommissionAge}+ available for commission.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        if (currentKing.Treasury < GameConfig.OrphanCommissionCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"Insufficient treasury! Need {GameConfig.OrphanCommissionCost:N0} gold for training costs.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("Eligible orphans for commission:");
+        foreach (var (orphan, _) in eligible)
+        {
+            int displayIdx = currentKing.Orphans.IndexOf(orphan) + 1;
+            terminal.SetColor("white");
+            terminal.WriteLine($"  {displayIdx}. {orphan.Name} (Age {orphan.Age}, {orphan.Race}, {(orphan.Sex == CharacterSex.Male ? "M" : "F")})");
+        }
+
+        terminal.SetColor("cyan");
+        terminal.Write("Select orphan number: ");
+        terminal.SetColor("white");
+        string input = await terminal.ReadLineAsync();
+
+        if (!int.TryParse(input, out int idx) || idx < 1 || idx > currentKing.Orphans.Count)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("Invalid selection.");
+            await Task.Delay(1000);
+            return;
+        }
+
+        var selected = currentKing.Orphans[idx - 1];
+        if (!selected.IsRealOrphan || selected.Age < GameConfig.OrphanCommissionAge)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("That orphan is not eligible for commission.");
+            await Task.Delay(1000);
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"Commission {selected.Name} as:");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [G] "); terminal.SetColor("white"); terminal.WriteLine("Royal Guard (free guard slot, high loyalty)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [M] "); terminal.SetColor("white"); terminal.WriteLine("Royal Mercenary (dungeon bodyguard, half cost)");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [N] "); terminal.SetColor("white"); terminal.WriteLine("Release as NPC citizen");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("  [X] "); terminal.SetColor("white"); terminal.WriteLine("Cancel");
+        terminal.WriteLine("");
+
+        terminal.SetColor("cyan");
+        terminal.Write("Choice: ");
+        terminal.SetColor("white");
+        string choice = await terminal.ReadLineAsync();
+
+        if (string.IsNullOrEmpty(choice)) return;
+
+        switch (char.ToUpper(choice[0]))
+        {
+            case 'G':
+                await CommissionAsGuard(selected);
+                break;
+            case 'M':
+                await CommissionAsMercenary(selected);
+                break;
+            case 'N':
+                await CommissionAsNPC(selected);
+                break;
+            default:
+                return;
+        }
+    }
+
+    private async Task CommissionAsGuard(RoyalOrphan orphan)
+    {
+        if (currentKing.Guards.Count >= King.MaxNPCGuards)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("No guard slots available!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        currentKing.Treasury -= GameConfig.OrphanCommissionCost;
+        currentKing.Orphans.Remove(orphan);
+
+        // Mark underlying Child as deleted
+        MarkOrphanChildDeleted(orphan);
+
+        // Create the NPC entity first (for combat stats)
+        WorldSimulator.Instance?.OrphanBecomesNPC(orphan);
+
+        // Create guard record with high loyalty (raised by the crown)
+        var guard = new RoyalGuard
+        {
+            Name = orphan.Name,
+            AI = CharacterAI.Computer,
+            Sex = orphan.Sex,
+            DailySalary = GameConfig.BaseGuardSalary,
+            RecruitmentDate = DateTime.Now,
+            Loyalty = 90 // Very high — raised by the crown
+        };
+        currentKing.Guards.Add(guard);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"{orphan.Name} has been commissioned as a Royal Guard!");
+        terminal.SetColor("white");
+        terminal.WriteLine("Loyalty: 90 (raised by the crown)");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"Treasury: -{GameConfig.OrphanCommissionCost:N0} gold");
+
+        currentPlayer.Chivalry += 10;
+        PersistRoyalCourtToWorldState();
+        await Task.Delay(2500);
+    }
+
+    private async Task CommissionAsMercenary(RoyalOrphan orphan)
+    {
+        if (currentPlayer.RoyalMercenaries.Count >= GameConfig.MaxRoyalMercenaries)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("No mercenary slots available!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Half the normal mercenary cost (orphan raised by the crown)
+        long mercCost = GameConfig.OrphanCommissionCost + (GameConfig.MercenaryBaseCost + currentPlayer.Level * GameConfig.MercenaryCostPerLevel) / 2;
+        if (currentKing.Treasury < mercCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"Insufficient treasury! Need {mercCost:N0} gold.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        currentKing.Treasury -= mercCost;
+        currentKing.Orphans.Remove(orphan);
+        MarkOrphanChildDeleted(orphan);
+
+        // Pick a mercenary role based on soul
+        string role = orphan.Soul > 100 ? "Support" :
+                      orphan.Soul < -100 ? "DPS" :
+                      "Tank";
+        var merc = GenerateMercenary(role, currentPlayer.Level);
+        merc.Name = orphan.Name; // Use their actual name
+        merc.Sex = orphan.Sex;
+        currentPlayer.RoyalMercenaries.Add(merc);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"{orphan.Name} has been commissioned as a Royal Mercenary ({role})!");
+        terminal.SetColor("white");
+        terminal.WriteLine($"Level: {merc.Level}  HP: {merc.MaxHP}  STR: {merc.Strength}  DEF: {merc.Defence}");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"Treasury: -{mercCost:N0} gold");
+
+        currentPlayer.Chivalry += 10;
+        PersistRoyalCourtToWorldState();
+        await Task.Delay(2500);
+    }
+
+    private async Task CommissionAsNPC(RoyalOrphan orphan)
+    {
+        currentKing.Treasury -= GameConfig.OrphanCommissionCost;
+        currentKing.Orphans.Remove(orphan);
+        MarkOrphanChildDeleted(orphan);
+
+        WorldSimulator.Instance?.OrphanBecomesNPC(orphan);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"{orphan.Name} has been released into the world as a citizen!");
+        terminal.SetColor("white");
+        terminal.WriteLine("They will make their own way, grateful for the crown's care.");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"Treasury: -{GameConfig.OrphanCommissionCost:N0} gold");
+
+        currentPlayer.Chivalry += 5;
+        PersistRoyalCourtToWorldState();
+        await Task.Delay(2500);
+    }
+
+    private void MarkOrphanChildDeleted(RoyalOrphan orphan)
+    {
+        if (!orphan.IsRealOrphan) return;
+        var child = FamilySystem.Instance?.AllChildren
+            .FirstOrDefault(c => c.Name == orphan.Name && !c.Deleted &&
+                                 c.Location == GameConfig.ChildLocationOrphanage);
+        if (child != null)
+            child.Deleted = true;
+    }
+
     private async Task AdoptOrphan()
     {
-        string[] names = { "Tommy", "Sarah", "Billy", "Emma", "Jack", "Lily", "Oliver", "Sophie" };
-        string name = names[random.Next(names.Length)];
+        if (currentKing.Orphans.Count >= GameConfig.MaxRoyalOrphans)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"The orphanage is full ({GameConfig.MaxRoyalOrphans} children).");
+            await Task.Delay(1500);
+            return;
+        }
+
+        long adoptCost = 500 + (currentKing.Orphans.Count * 100);
+        if (currentKing.Treasury < adoptCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"Insufficient treasury funds! Need {adoptCost:N0} gold to cover intake costs.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Pick a name that isn't already used
+        var sex = random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
+        var namePool = sex == CharacterSex.Male ? OrphanNamesMale : OrphanNamesFemale;
+        var usedNames = new HashSet<string>(currentKing.Orphans.Select(o => o.Name));
+        var availableNames = namePool.Where(n => !usedNames.Contains(n)).ToArray();
+        if (availableNames.Length == 0)
+            availableNames = namePool; // All used — allow duplicates as fallback
+
+        string name = availableNames[random.Next(availableNames.Length)];
 
         var orphan = new RoyalOrphan
         {
             Name = name,
-            Age = random.Next(5, 15),
-            Sex = random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female,
+            Age = random.Next(3, 13),
+            Sex = sex,
             Happiness = 50,
-            BackgroundStory = "Found wandering the streets."
+            BackgroundStory = OrphanBackstories[random.Next(OrphanBackstories.Length)]
         };
 
         currentKing.Orphans.Add(orphan);
+        currentKing.Treasury -= adoptCost;
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"{name}, age {orphan.Age}, has been taken into the Royal Orphanage.");
+        string sexStr = sex == CharacterSex.Male ? "boy" : "girl";
+        terminal.WriteLine($"{name}, a {orphan.Age}-year-old {sexStr}, has been taken into the Royal Orphanage.");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  \"{orphan.BackgroundStory}\"");
+        terminal.SetColor("bright_green");
         terminal.WriteLine("Your compassion increases your standing with the people!");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"Treasury: -{adoptCost:N0} gold");
 
         currentPlayer.Chivalry += 15;
+        PersistRoyalCourtToWorldState();
 
         await Task.Delay(2500);
     }
@@ -2504,6 +3065,8 @@ public class CastleLocation : BaseLocation
             return;
         }
 
+        terminal.SetColor("white");
+        terminal.WriteLine($"Treasury: {currentKing.Treasury:N0} gold");
         terminal.SetColor("cyan");
         terminal.Write("Gift amount (gold): ");
         terminal.SetColor("white");
@@ -2519,7 +3082,8 @@ public class CastleLocation : BaseLocation
             else
             {
                 currentKing.Treasury -= amount;
-                int happinessBoost = (int)Math.Min(30, amount / 100);
+                int happinessBoost = (int)Math.Min(30, amount / (currentKing.Orphans.Count * 50));
+                if (happinessBoost < 1) happinessBoost = 1;
 
                 foreach (var orphan in currentKing.Orphans)
                 {
@@ -2529,12 +3093,15 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("The children are delighted with your generosity!");
                 terminal.WriteLine($"Orphan happiness increased by {happinessBoost}%!");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"Treasury: -{amount:N0} gold");
 
-                currentPlayer.Chivalry += (int)(amount / 200);
+                currentPlayer.Chivalry += (int)Math.Min(50, amount / 200);
+                PersistRoyalCourtToWorldState();
             }
         }
 
-        await Task.Delay(2500);
+        await Task.Delay(2000);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -2960,7 +3527,240 @@ public class CastleLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        await terminal.PressAnyKey();
+
+        // Interactive menu — only for the king
+        if (currentPlayer.King && currentKing.CourtMembers.Count > 0)
+        {
+            bool courtLoop = true;
+            while (courtLoop)
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine("[D]ismiss  [A]rrest Plotter  [B]ribe  [P]romote  [Q]uit");
+                terminal.SetColor("white");
+                terminal.Write("Court action: ");
+                string courtChoice = (await terminal.ReadLineAsync())?.ToUpper() ?? "";
+
+                switch (courtChoice)
+                {
+                    case "D":
+                        await CourtAction_Dismiss();
+                        break;
+                    case "A":
+                        await CourtAction_Arrest();
+                        break;
+                    case "B":
+                        await CourtAction_Bribe();
+                        break;
+                    case "P":
+                        await CourtAction_Promote();
+                        break;
+                    default:
+                        courtLoop = false;
+                        break;
+                }
+            }
+        }
+        else
+        {
+            await terminal.PressAnyKey();
+        }
+    }
+
+    private async Task CourtAction_Dismiss()
+    {
+        terminal.SetColor("yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine("Dismiss which court member?");
+        for (int i = 0; i < currentKing.CourtMembers.Count; i++)
+        {
+            var m = currentKing.CourtMembers[i];
+            terminal.SetColor("white");
+            terminal.WriteLine($"  {i + 1}. {m.Name} ({m.Role}, {m.Faction})");
+        }
+        terminal.SetColor("cyan");
+        terminal.Write("Number (0 to cancel): ");
+        string input = await terminal.ReadLineAsync();
+        if (int.TryParse(input, out int idx) && idx > 0 && idx <= currentKing.CourtMembers.Count)
+        {
+            var member = currentKing.CourtMembers[idx - 1];
+            currentKing.CourtMembers.RemoveAt(idx - 1);
+
+            // Faction loyalty hit
+            foreach (var cm in currentKing.CourtMembers.Where(c => c.Faction == member.Faction))
+                cm.LoyaltyToKing = Math.Max(0, cm.LoyaltyToKing - GameConfig.DismissLoyaltyCost);
+
+            // Make the NPC hostile
+            var npc = NPCSpawnSystem.Instance?.GetNPCByName(member.Name);
+            if (npc?.Brain != null)
+                npc.Brain.Memory.CharacterImpressions[currentPlayer.DisplayName] = -0.5f;
+
+            terminal.SetColor("red");
+            terminal.WriteLine($"{member.Name} has been dismissed from the court!");
+            NewsSystem.Instance?.Newsy(false, $"{member.Name} has been dismissed from the royal court by {currentKing.GetTitle()} {currentKing.Name}.");
+        }
+        terminal.WriteLine("");
+    }
+
+    private async Task CourtAction_Arrest()
+    {
+        var discoveredPlots = currentKing.ActivePlots.Where(p => p.IsDiscovered).ToList();
+        if (discoveredPlots.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("No discovered plots. Use the Court Magician's 'Detect Threats' to find plotters.");
+            terminal.WriteLine("");
+            return;
+        }
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine("Arrest plotters from which conspiracy?");
+        for (int i = 0; i < discoveredPlots.Count; i++)
+        {
+            var plot = discoveredPlots[i];
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {i + 1}. {plot.PlotType} by {string.Join(", ", plot.Conspirators)} (Trial cost: {GameConfig.ArrestTrialCost:N0}g)");
+        }
+        terminal.SetColor("cyan");
+        terminal.Write("Number (0 to cancel): ");
+        string input = await terminal.ReadLineAsync();
+        if (int.TryParse(input, out int idx) && idx > 0 && idx <= discoveredPlots.Count)
+        {
+            if (currentKing.Treasury < GameConfig.ArrestTrialCost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Insufficient treasury funds for the trial!");
+                terminal.WriteLine("");
+                return;
+            }
+
+            var plot = discoveredPlots[idx - 1];
+            currentKing.Treasury -= GameConfig.ArrestTrialCost;
+
+            // Arrest each conspirator
+            foreach (var conspirator in plot.Conspirators)
+            {
+                // Remove from court
+                var courtMember = currentKing.CourtMembers.FirstOrDefault(c => c.Name == conspirator);
+                if (courtMember != null)
+                {
+                    // Faction loyalty hit
+                    foreach (var cm in currentKing.CourtMembers.Where(c => c.Faction == courtMember.Faction))
+                        cm.LoyaltyToKing = Math.Max(0, cm.LoyaltyToKing - GameConfig.ArrestFactionLoyaltyCost);
+                    currentKing.CourtMembers.Remove(courtMember);
+                }
+
+                // Imprison
+                var npc = NPCSpawnSystem.Instance?.GetNPCByName(conspirator);
+                if (npc != null)
+                    currentKing.ImprisonCharacter(conspirator, 14, $"{plot.PlotType} conspiracy");
+            }
+
+            // Remove the plot
+            currentKing.ActivePlots.Remove(plot);
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"The conspirators have been arrested and imprisoned! (-{GameConfig.ArrestTrialCost:N0}g)");
+            NewsSystem.Instance?.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} has crushed a {plot.PlotType} conspiracy!");
+        }
+        terminal.WriteLine("");
+    }
+
+    private async Task CourtAction_Bribe()
+    {
+        terminal.SetColor("yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine("Bribe which court member to increase loyalty?");
+        for (int i = 0; i < currentKing.CourtMembers.Count; i++)
+        {
+            var m = currentKing.CourtMembers[i];
+            long cost = GameConfig.BribeBaseCost + (100 - m.LoyaltyToKing) * 50;
+            string loyColor = m.LoyaltyToKing >= 70 ? "bright_green" : m.LoyaltyToKing >= 40 ? "yellow" : "red";
+            terminal.SetColor("white");
+            terminal.Write($"  {i + 1}. {m.Name,-20} ");
+            terminal.SetColor(loyColor);
+            terminal.Write($"Loyalty: {m.LoyaltyToKing}% ");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"(Cost: {cost:N0}g)");
+        }
+        terminal.SetColor("cyan");
+        terminal.Write("Number (0 to cancel): ");
+        string input = await terminal.ReadLineAsync();
+        if (int.TryParse(input, out int idx) && idx > 0 && idx <= currentKing.CourtMembers.Count)
+        {
+            var member = currentKing.CourtMembers[idx - 1];
+            long cost = GameConfig.BribeBaseCost + (100 - member.LoyaltyToKing) * 50;
+
+            if (currentKing.Treasury < cost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Insufficient treasury funds!");
+                terminal.WriteLine("");
+                return;
+            }
+
+            currentKing.Treasury -= cost;
+            var random = new Random();
+            int loyaltyGain = 15 + random.Next(11); // 15-25
+            member.LoyaltyToKing = Math.Min(100, member.LoyaltyToKing + loyaltyGain);
+
+            // If plotting and loyalty now above 60, abandon plot
+            if (member.IsPlotting && member.LoyaltyToKing > 60)
+            {
+                member.IsPlotting = false;
+                var plotToRemove = currentKing.ActivePlots.FirstOrDefault(p => p.Conspirators.Contains(member.Name));
+                if (plotToRemove != null)
+                {
+                    plotToRemove.Conspirators.Remove(member.Name);
+                    if (plotToRemove.Conspirators.Count == 0)
+                        currentKing.ActivePlots.Remove(plotToRemove);
+                }
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"{member.Name} has abandoned their scheming! (+{loyaltyGain} loyalty, -{cost:N0}g)");
+            }
+            else
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine($"{member.Name}'s loyalty increased to {member.LoyaltyToKing}%. (+{loyaltyGain} loyalty, -{cost:N0}g)");
+            }
+        }
+        terminal.WriteLine("");
+    }
+
+    private async Task CourtAction_Promote()
+    {
+        terminal.SetColor("yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine($"Promote which court member? (Cost: {GameConfig.PromoteCost:N0}g from treasury)");
+        for (int i = 0; i < currentKing.CourtMembers.Count; i++)
+        {
+            var m = currentKing.CourtMembers[i];
+            terminal.SetColor("white");
+            terminal.WriteLine($"  {i + 1}. {m.Name} ({m.Role}, Influence: {m.Influence})");
+        }
+        terminal.SetColor("cyan");
+        terminal.Write("Number (0 to cancel): ");
+        string input = await terminal.ReadLineAsync();
+        if (int.TryParse(input, out int idx) && idx > 0 && idx <= currentKing.CourtMembers.Count)
+        {
+            if (currentKing.Treasury < GameConfig.PromoteCost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Insufficient treasury funds!");
+                terminal.WriteLine("");
+                return;
+            }
+
+            var member = currentKing.CourtMembers[idx - 1];
+            currentKing.Treasury -= GameConfig.PromoteCost;
+            member.LoyaltyToKing = Math.Min(100, member.LoyaltyToKing + GameConfig.PromoteLoyaltyGain);
+            member.Influence = Math.Min(100, member.Influence + 5);
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"{member.Name} has been promoted! (+{GameConfig.PromoteLoyaltyGain} loyalty, +5 influence, -{GameConfig.PromoteCost:N0}g)");
+            NewsSystem.Instance?.Newsy(false, $"{member.Name} has been promoted in the royal court by {currentKing.GetTitle()} {currentKing.Name}.");
+        }
+        terminal.WriteLine("");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -3165,6 +3965,325 @@ public class CastleLocation : BaseLocation
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // ROYAL BODYGUARDS (Dungeon Mercenaries)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static readonly Dictionary<string, string[]> MercenaryNames = new()
+    {
+        ["Tank"] = new[] { "Sir Harken", "Dame Ironheart", "Ulric the Wall", "Brenna Shieldmaiden" },
+        ["Healer"] = new[] { "Brother Cedric", "Sister Alara", "Wynne the Mender", "Father Osric" },
+        ["DPS"] = new[] { "Kael Swiftblade", "Sera the Hawk", "Grimjaw the Sharp", "Nyx Shadowstrike" },
+        ["Support"] = new[] { "Theron the Stalwart", "Lady Maren", "Jorund Brightshield", "Elara the Wise" }
+    };
+
+    private RoyalMercenary GenerateMercenary(string role, int level)
+    {
+        var random = new Random();
+
+        // Pick a name not already in use
+        var existingNames = currentPlayer.RoyalMercenaries.Select(m => m.Name).ToHashSet();
+        var namePool = MercenaryNames[role].Where(n => !existingNames.Contains(n)).ToArray();
+        string name = namePool.Length > 0
+            ? namePool[random.Next(namePool.Length)]
+            : $"{MercenaryNames[role][0]} II"; // Fallback if all names used
+
+        var merc = new RoyalMercenary
+        {
+            Name = name,
+            Role = role,
+            Level = level,
+            Sex = random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female
+        };
+
+        // Stats scale with level — includes built-in gear (WeapPow/ArmPow represent equipment)
+        switch (role)
+        {
+            case "Tank":
+                merc.Class = CharacterClass.Warrior;
+                merc.HP = merc.MaxHP = 120 + level * 30;
+                merc.Strength = 12 + level * 4;
+                merc.Defence = 12 + level * 5;
+                merc.WeapPow = 8 + level * 3;
+                merc.ArmPow = 10 + level * 4;
+                merc.Agility = 5 + level * 2;
+                merc.Dexterity = 5 + level * 2;
+                merc.Constitution = 10 + level * 4;
+                merc.Wisdom = 3 + level;
+                merc.Intelligence = 3 + level;
+                merc.Healing = 3;
+                break;
+
+            case "Healer":
+                merc.Class = CharacterClass.Cleric;
+                merc.HP = merc.MaxHP = 80 + level * 20;
+                merc.Mana = merc.MaxMana = 50 + level * 10;
+                merc.Strength = 5 + level * 2;
+                merc.Defence = 8 + level * 3;
+                merc.WeapPow = 3 + level * 2;
+                merc.ArmPow = 6 + level * 3;
+                merc.Agility = 4 + level * 2;
+                merc.Dexterity = 4 + level * 2;
+                merc.Constitution = 6 + level * 2;
+                merc.Wisdom = 10 + level * 5;
+                merc.Intelligence = 8 + level * 4;
+                merc.Healing = 5;
+                break;
+
+            case "DPS":
+                merc.Class = CharacterClass.Ranger;
+                merc.HP = merc.MaxHP = 100 + level * 25;
+                merc.Strength = 14 + level * 5;
+                merc.Defence = 6 + level * 3;
+                merc.WeapPow = 10 + level * 4;
+                merc.ArmPow = 4 + level * 2;
+                merc.Agility = 10 + level * 4;
+                merc.Dexterity = 10 + level * 4;
+                merc.Constitution = 6 + level * 2;
+                merc.Wisdom = 3 + level;
+                merc.Intelligence = 3 + level;
+                merc.Healing = 3;
+                break;
+
+            case "Support":
+                merc.Class = CharacterClass.Paladin;
+                merc.HP = merc.MaxHP = 100 + level * 25;
+                merc.Mana = merc.MaxMana = 30 + level * 8;
+                merc.Strength = 8 + level * 3;
+                merc.Defence = 10 + level * 4;
+                merc.WeapPow = 6 + level * 3;
+                merc.ArmPow = 8 + level * 3;
+                merc.Agility = 6 + level * 3;
+                merc.Dexterity = 6 + level * 3;
+                merc.Constitution = 8 + level * 3;
+                merc.Wisdom = 8 + level * 3;
+                merc.Intelligence = 6 + level * 2;
+                merc.Healing = 4;
+                break;
+        }
+
+        return merc;
+    }
+
+    private async Task ManageRoyalBodyguards()
+    {
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.WriteLine("║                          ROYAL BODYGUARDS                                   ║");
+            terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("Hire elite mercenaries to accompany you in the dungeon.");
+            terminal.WriteLine($"Maximum bodyguards: {GameConfig.MaxRoyalMercenaries}");
+            terminal.WriteLine("");
+
+            // Show current mercenaries
+            if (currentPlayer.RoyalMercenaries.Count == 0)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine("You have no bodyguards in your employ.");
+            }
+            else
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("Current Bodyguards:");
+                terminal.SetColor("gray");
+
+                for (int i = 0; i < currentPlayer.RoyalMercenaries.Count; i++)
+                {
+                    var merc = currentPlayer.RoyalMercenaries[i];
+                    string hpColor = merc.HP >= merc.MaxHP ? "bright_green" :
+                                     merc.HP > merc.MaxHP / 2 ? "yellow" : "red";
+
+                    terminal.SetColor("white");
+                    terminal.Write($"  {i + 1}. {merc.Name}");
+                    terminal.SetColor("gray");
+                    terminal.Write($" - Level {merc.Level} {merc.Class} ({merc.Role})");
+                    terminal.SetColor(hpColor);
+                    terminal.Write($" - HP: {merc.HP}/{merc.MaxHP}");
+                    if (merc.MaxMana > 0)
+                    {
+                        terminal.SetColor("bright_cyan");
+                        terminal.Write($" MP: {merc.Mana}/{merc.MaxMana}");
+                    }
+                    terminal.WriteLine("");
+                }
+            }
+
+            terminal.WriteLine("");
+
+            long hireCost = GameConfig.MercenaryBaseCost + (currentPlayer.Level * GameConfig.MercenaryCostPerLevel);
+
+            // Menu
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("H");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write($"ire Mercenary ({hireCost:N0}g)   ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("D");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("ismiss   ");
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("R");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine("eturn");
+            terminal.WriteLine("");
+
+            string input = await terminal.ReadLineAsync();
+            if (string.IsNullOrEmpty(input)) continue;
+
+            switch (char.ToUpper(input[0]))
+            {
+                case 'H':
+                    await HireMercenary(hireCost);
+                    break;
+                case 'D':
+                    await DismissMercenary();
+                    break;
+                case 'R':
+                    return;
+            }
+        }
+    }
+
+    private async Task HireMercenary(long cost)
+    {
+        if (currentPlayer.RoyalMercenaries.Count >= GameConfig.MaxRoyalMercenaries)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"You already have {GameConfig.MaxRoyalMercenaries} bodyguards — the maximum allowed.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        if (currentPlayer.Gold < cost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"You need {cost:N0} gold to hire a mercenary. You have {currentPlayer.Gold:N0}g.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("Choose a mercenary role:");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.Write("  1. ");
+        terminal.SetColor("bright_red");
+        terminal.Write("Tank");
+        terminal.SetColor("gray");
+        terminal.WriteLine("     - Warrior. High HP and defense, draws enemy attacks.");
+
+        terminal.SetColor("white");
+        terminal.Write("  2. ");
+        terminal.SetColor("bright_green");
+        terminal.Write("Healer");
+        terminal.SetColor("gray");
+        terminal.WriteLine("   - Cleric. Heals wounded party members, casts holy spells.");
+
+        terminal.SetColor("white");
+        terminal.Write("  3. ");
+        terminal.SetColor("bright_magenta");
+        terminal.Write("DPS");
+        terminal.SetColor("gray");
+        terminal.WriteLine("      - Ranger. High damage output with fast attacks.");
+
+        terminal.SetColor("white");
+        terminal.Write("  4. ");
+        terminal.SetColor("bright_cyan");
+        terminal.Write("Support");
+        terminal.SetColor("gray");
+        terminal.WriteLine("  - Paladin. Balanced fighter with healing and combat spells.");
+
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write("Choose (1-4, or R to cancel): ");
+        string roleInput = await terminal.ReadLineAsync();
+
+        string? role = roleInput?.Trim() switch
+        {
+            "1" => "Tank",
+            "2" => "Healer",
+            "3" => "DPS",
+            "4" => "Support",
+            _ => null
+        };
+
+        if (role == null) return;
+
+        var merc = GenerateMercenary(role, currentPlayer.Level);
+
+        currentPlayer.Gold -= cost;
+        currentPlayer.RoyalMercenaries.Add(merc);
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"{merc.Name} has been hired as your royal bodyguard!");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  Role: {merc.Role} ({merc.Class})  Level: {merc.Level}");
+        terminal.WriteLine($"  HP: {merc.MaxHP}  STR: {merc.Strength}  DEF: {merc.Defence}");
+        terminal.WriteLine($"  Weapon Power: {merc.WeapPow}  Armor Power: {merc.ArmPow}");
+        if (merc.MaxMana > 0)
+            terminal.WriteLine($"  Mana: {merc.MaxMana}  Potions: {merc.Healing}");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  Cost: {cost:N0} gold. Remaining: {currentPlayer.Gold:N0}g");
+        await terminal.PressAnyKey();
+    }
+
+    private async Task DismissMercenary()
+    {
+        if (currentPlayer.RoyalMercenaries.Count == 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("You have no bodyguards to dismiss.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Dismiss which bodyguard?");
+        for (int i = 0; i < currentPlayer.RoyalMercenaries.Count; i++)
+        {
+            var merc = currentPlayer.RoyalMercenaries[i];
+            terminal.SetColor("white");
+            terminal.WriteLine($"  {i + 1}. {merc.Name} (Level {merc.Level} {merc.Role})");
+        }
+        terminal.SetColor("gray");
+        terminal.Write("Choose (or R to cancel): ");
+        string dismissInput = await terminal.ReadLineAsync();
+
+        if (int.TryParse(dismissInput, out int idx) && idx >= 1 && idx <= currentPlayer.RoyalMercenaries.Count)
+        {
+            var dismissed = currentPlayer.RoyalMercenaries[idx - 1];
+            currentPlayer.RoyalMercenaries.RemoveAt(idx - 1);
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"{dismissed.Name} has been dismissed from your service.");
+            await terminal.PressAnyKey();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // ROYAL QUESTS
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -3237,7 +4356,52 @@ public class CastleLocation : BaseLocation
         if (currentKing == null || !currentKing.IsActive)
             return false;
 
+        // Don't let the player fight themselves (stale king data from before abdication)
+        if (currentKing.Name == currentPlayer.DisplayName || currentKing.Name == currentPlayer.Name2)
+            return false;
+
+        // Level proximity check — challenger must not be too far below king's level (higher level always allowed)
+        int kingLevel = GetKingLevel();
+        if (kingLevel > 0 && kingLevel - currentPlayer.Level > GameConfig.KingChallengeLevelRange)
+            return false;
+
         return true;
+    }
+
+    /// <summary>
+    /// Get the current king's level by looking up their NPC or player data
+    /// </summary>
+    private int GetKingLevel()
+    {
+        if (currentKing == null || !currentKing.IsActive) return 0;
+
+        // Check if king is an NPC
+        var kingNpc = NPCSpawnSystem.Instance?.GetNPCByName(currentKing.Name);
+        if (kingNpc != null) return kingNpc.Level;
+
+        // Check if king is the current player
+        if (currentPlayer != null &&
+            (currentKing.Name == currentPlayer.DisplayName || currentKing.Name == currentPlayer.Name2))
+            return currentPlayer.Level;
+
+        // For offline player kings, try to load from database
+        if (currentKing.AI == CharacterAI.Human && DoorMode.IsOnlineMode)
+        {
+            try
+            {
+                var backend = UsurperRemake.Systems.SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend;
+                if (backend != null)
+                {
+                    var kingSave = backend.ReadGameData(currentKing.Name.ToLowerInvariant()).GetAwaiter().GetResult();
+                    if (kingSave?.Player != null)
+                        return kingSave.Player.Level;
+                }
+            }
+            catch { /* Fall through */ }
+        }
+
+        // Fallback — estimate from reign length
+        return Math.Max(20, 20 + (int)(currentKing.TotalReign / 5));
     }
 
     private async Task<bool> ChallengeThrone()
@@ -3391,12 +4555,13 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine($"=== Fighting Royal Guard: {guard.Name} ===");
             terminal.WriteLine("");
 
-            // Look up actual NPC stats if available, otherwise use scaled defaults
+            // Look up actual NPC stats if available, otherwise scale fallback with king level
             var actualNpc = NPCSpawnSystem.Instance?.GetNPCByName(guard.Name);
-            long guardStr = actualNpc?.Strength ?? (50 + random.Next(50));
-            long guardHP = actualNpc?.HP ?? (200 + random.Next(200));
-            long guardDef = actualNpc?.Defence ?? 20;
-            int guardLevel = actualNpc?.Level ?? 10;
+            int estKingLevel = currentKing != null ? Math.Max(20, (int)(currentKing.TotalReign / 5) + 20) : 20;
+            long guardStr = actualNpc?.Strength ?? (30 + estKingLevel * 5);
+            long guardHP = actualNpc?.HP ?? (100 + estKingLevel * 30);
+            long guardDef = actualNpc?.Defence ?? (10 + estKingLevel * 3);
+            int guardLevel = actualNpc?.Level ?? Math.Max(10, estKingLevel - 5);
 
             // Apply loyalty modifier to guard effectiveness
             float loyaltyMod = guard.Loyalty / 100f;
@@ -3464,14 +4629,75 @@ public class CastleLocation : BaseLocation
         // Update player HP from the guard battles
         currentPlayer.HP = runningPlayerHP;
 
-        // Fight the king (simulated as powerful NPC)
+        // Fight the king — use real stats with defender bonus
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine($"=== Final Battle: {currentKing.GetTitle()} {currentKing.Name} ===");
         terminal.WriteLine("");
 
-        int kingStr = 100 + random.Next(100);
-        int kingHP = 500 + random.Next(500);
+        // Look up real king stats: NPC king, player king (offline), or scaled fallback
+        long kingStr, kingDef, kingWeapPow, kingArmPow;
+        long kingHP;
+        int kingLevel;
+        var kingNpc = NPCSpawnSystem.Instance?.GetNPCByName(currentKing.Name);
+
+        if (kingNpc != null)
+        {
+            // NPC King — use actual stats + defender bonus
+            kingStr = kingNpc.Strength;
+            kingDef = (long)(kingNpc.Defence * GameConfig.KingDefenderDefBonus);
+            kingWeapPow = kingNpc.WeapPow;
+            kingArmPow = kingNpc.ArmPow;
+            kingHP = (long)(kingNpc.MaxHP * GameConfig.KingDefenderHPBonus);
+            kingLevel = kingNpc.Level;
+        }
+        else if (currentKing.AI == CharacterAI.Human && DoorMode.IsOnlineMode)
+        {
+            // Player King (offline) — try loading from database
+            long pStr = 100, pDef = 50, pWP = 50, pAP = 30, pHP = 500;
+            int pLevel = 20;
+            try
+            {
+                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                if (backend != null)
+                {
+                    var kingSave = await backend.ReadGameData(currentKing.Name.ToLowerInvariant());
+                    if (kingSave?.Player != null)
+                    {
+                        pStr = kingSave.Player.Strength;
+                        pDef = kingSave.Player.Defence;
+                        pWP = kingSave.Player.WeapPow;
+                        pAP = kingSave.Player.ArmPow;
+                        pHP = kingSave.Player.MaxHP > 0 ? kingSave.Player.MaxHP : kingSave.Player.HP;
+                        pLevel = kingSave.Player.Level;
+                    }
+                }
+            }
+            catch { /* Fall through to values above */ }
+
+            // Apply defender bonus
+            kingStr = pStr;
+            kingDef = (long)(pDef * GameConfig.KingDefenderDefBonus);
+            kingWeapPow = pWP;
+            kingArmPow = pAP;
+            kingHP = (long)(pHP * GameConfig.KingDefenderHPBonus);
+            kingLevel = pLevel;
+        }
+        else
+        {
+            // Fallback — scale with estimated king level
+            kingLevel = Math.Max(20, currentKing.TotalReign > 0 ? 20 + (int)(currentKing.TotalReign / 5) : 20);
+            kingStr = 50 + kingLevel * 8;
+            kingDef = (long)((10 + kingLevel * 4) * GameConfig.KingDefenderDefBonus);
+            kingWeapPow = 20 + kingLevel * 3;
+            kingArmPow = 10 + kingLevel * 2;
+            kingHP = (long)((200 + kingLevel * 40) * GameConfig.KingDefenderHPBonus);
+        }
+
+        terminal.SetColor("gray");
+        terminal.WriteLine($"Level {kingLevel} | STR: {kingStr} | DEF: {kingDef} | HP: {kingHP}");
+        terminal.WriteLine("");
+
         long finalPlayerHP = currentPlayer.HP;
 
         int round = 0;
@@ -3481,19 +4707,19 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine($"--- Round {round} ---");
 
-            // Player attacks (king uses full defense, not reduced)
-            long playerDmg = Math.Max(1, currentPlayer.Strength + currentPlayer.WeapPow - kingStr);
-            playerDmg += random.Next((int)currentPlayer.WeapPow / 2);
-            kingHP -= (int)playerDmg;
+            // Player attacks — armor reduces damage
+            long playerDmg = Math.Max(1, currentPlayer.Strength + currentPlayer.WeapPow - kingDef - kingArmPow);
+            playerDmg += random.Next(Math.Max(1, (int)currentPlayer.WeapPow / 2));
+            kingHP -= playerDmg;
 
             terminal.SetColor("bright_green");
             terminal.WriteLine($"You strike for {playerDmg} damage! (King HP: {Math.Max(0, kingHP)})");
 
             if (kingHP <= 0) break;
 
-            // King attacks
-            long kingDmg = Math.Max(1, kingStr - currentPlayer.Defence);
-            kingDmg += random.Next(20);
+            // King attacks — uses full combat stats
+            long kingDmg = Math.Max(1, kingStr + kingWeapPow - currentPlayer.Defence - currentPlayer.ArmPow);
+            kingDmg += random.Next(Math.Max(1, (int)kingWeapPow / 3));
             finalPlayerHP -= kingDmg;
 
             terminal.SetColor("red");
@@ -3527,9 +4753,12 @@ public class CastleLocation : BaseLocation
             while (monarchHistory.Count > MaxMonarchHistory)
                 monarchHistory.RemoveAt(0);
 
-            // Crown new monarch
+            // Crown new monarch — inherit the previous king's treasury and orphans
+            long inheritedTreasury = currentKing.Treasury;
+            var inheritedOrphans = currentKing?.Orphans?.ToList();
             currentPlayer.King = true;
-            currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex);
+            currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
+            currentKing.Treasury = inheritedTreasury;
             playerIsKing = true;
 
             currentPlayer.PKills++;
@@ -3627,9 +4856,10 @@ public class CastleLocation : BaseLocation
             return false;
         }
 
-        // Crown the new monarch
+        // Crown the new monarch — inherit any orphans from previous reign
+        var inheritedOrphans = currentKing?.Orphans?.ToList();
         currentPlayer.King = true;
-        currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex);
+        currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
         playerIsKing = true;
 
         // Track archetype - Major Ruler moment
@@ -3697,6 +4927,8 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             currentPlayer.King = false;
+            currentPlayer.RoyalMercenaries?.Clear(); // Dismiss bodyguards on abdication
+            currentPlayer.RecalculateStats(); // Remove Royal Authority HP bonus
             currentKing.IsActive = false;
             currentKing = null;
             playerIsKing = false;
@@ -3707,6 +4939,12 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("The land is in disarray! Who will claim the Throne?");
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has abdicated the throne! The kingdom is in chaos!");
+
+            // Trigger immediate NPC succession so the throne doesn't stay empty
+            TriggerNPCSuccession();
+
+            // Persist the new king (or empty throne) to world_state for online mode
+            PersistRoyalCourtToWorldState();
 
             await Task.Delay(4000);
             await NavigateToLocation(GameLocation.MainStreet);
@@ -4483,6 +5721,9 @@ public class CastleLocation : BaseLocation
 
                         NewsSystem.Instance?.Newsy(true, $"A bounty has been placed on {target.Name} by royal decree!");
 
+                        // Wire into QuestSystem so the bounty is trackable
+                        QuestSystem.PostBountyOnPlayer(target.Name, "Criminal activity", (int)Math.Min(bountyCost, int.MaxValue));
+
                         // Small chivalry boost for reporting
                         currentPlayer.Chivalry += 5;
                     }
@@ -4552,9 +5793,8 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("The Royal Blessing grants:");
-            terminal.WriteLine("  +10% to all combat stats for this session");
-            terminal.WriteLine("  +25 to maximum HP and Mana");
-            terminal.WriteLine("  Improved luck in dungeon encounters");
+            terminal.WriteLine("  +10% to attack and defense in combat");
+            terminal.WriteLine("  Improved accuracy against enemies");
             terminal.WriteLine("");
 
             bool canAfford = currentPlayer.Gold >= blessingCost || blessingCost == 0;
@@ -4581,9 +5821,8 @@ public class CastleLocation : BaseLocation
                         currentKing.Treasury += blessingCost;
                     }
 
-                    // Apply the Royal Blessing status effect (lasts many combat rounds)
-                    // Duration of 999 represents "for the rest of the day/session"
-                    currentPlayer.ApplyStatus(StatusEffect.RoyalBlessing, 999);
+                    // Apply the Royal Blessing status effect (lasts several combats)
+                    currentPlayer.ApplyStatus(StatusEffect.RoyalBlessing, GameConfig.RoyalBlessingDuration);
 
                     // Also give a small immediate HP/Mana restoration
                     long hpRestore = Math.Min(25, currentPlayer.MaxHP - currentPlayer.HP);
@@ -4605,7 +5844,7 @@ public class CastleLocation : BaseLocation
                     {
                         terminal.WriteLine($"  Restored {hpRestore} HP and {manaRestore} Mana");
                     }
-                    terminal.WriteLine("  (Blessing lasts until end of day)");
+                    terminal.WriteLine("  (Blessing lasts for several combats)");
 
                     NewsSystem.Instance?.Newsy(false, $"{currentPlayer.DisplayName} received the Royal Blessing from {currentKing.GetTitle()} {currentKing.Name}.");
                 }
@@ -4970,22 +6209,34 @@ public class CastleLocation : BaseLocation
     {
         var npcs = NPCSpawnSystem.Instance.ActiveNPCs;
         if (npcs == null || npcs.Count == 0)
-        {
-            // GD.Print("[Castle] No NPCs available for succession - throne remains empty");
             return;
+
+        // Check designated heir first
+        var designatedHeirName = currentKing?.DesignatedHeir;
+        if (!string.IsNullOrEmpty(designatedHeirName))
+        {
+            var heir = npcs.FirstOrDefault(n => n.Name == designatedHeirName &&
+                n.IsAlive && !n.IsDead && n.DaysInPrison <= 0 && n.Level >= GameConfig.MinLevelKing);
+            if (heir != null)
+            {
+                CrownNPC(heir);
+                NewsSystem.Instance?.Newsy(true, $"The designated heir {heir.DisplayName} has ascended to the throne as {(heir.Sex == CharacterSex.Male ? "King" : "Queen")}!");
+                return;
+            }
+            else
+            {
+                NewsSystem.Instance?.Newsy(false, $"The designated heir {designatedHeirName} could not be found or is not eligible for the throne.");
+            }
         }
 
-        // Find the most worthy NPC based on level, alignment (good preferred), and class
+        // Fallback: Find the most worthy NPC based on level, alignment (good preferred), and class
         var candidates = npcs
-            .Where(npc => npc.IsAlive && npc.Level >= 10) // Minimum level 10 to be king
+            .Where(npc => npc.IsAlive && npc.Level >= GameConfig.MinLevelKing)
             .OrderByDescending(npc => CalculateSuccessionScore(npc))
             .ToList();
 
         if (candidates.Count == 0)
-        {
-            // GD.Print("[Castle] No worthy NPCs found for succession - throne remains empty");
             return;
-        }
 
         // Crown the highest scoring NPC
         var newMonarch = candidates.First();
@@ -5056,6 +6307,19 @@ public class CastleLocation : BaseLocation
     /// Get the current king (for external access)
     /// </summary>
     public static King GetCurrentKing() => currentKing;
+
+    /// <summary>
+    /// Get the monarch history for serialization
+    /// </summary>
+    public static List<MonarchRecord> GetMonarchHistory() => monarchHistory;
+
+    /// <summary>
+    /// Set the monarch history from deserialized data
+    /// </summary>
+    public static void SetMonarchHistory(List<MonarchRecord> history)
+    {
+        monarchHistory = history ?? new List<MonarchRecord>();
+    }
 
     /// <summary>
     /// Set the king (for save/load)
@@ -5873,15 +7137,72 @@ public class CastleLocation : BaseLocation
             return;
         }
 
-        // Fight the king (randomized stats like solo throne challenge)
-        long kingHP = 500 + random.Next(500);
-        long kingStr = 100 + random.Next(100);
-        long kingDef = 50 + random.Next(50);
+        // Fight the king — use real stats with defender bonus (same pattern as solo throne challenge)
+        long siegeKingStr, siegeKingDef, siegeKingWeapPow, siegeKingArmPow;
+        long kingHP;
+        int siegeKingLevel;
+        var siegeKingNpc = NPCSpawnSystem.Instance?.GetNPCByName(currentKing.Name);
+
+        if (siegeKingNpc != null)
+        {
+            // NPC King — use actual stats + defender bonus
+            siegeKingStr = siegeKingNpc.Strength;
+            siegeKingDef = (long)(siegeKingNpc.Defence * GameConfig.KingDefenderDefBonus);
+            siegeKingWeapPow = siegeKingNpc.WeapPow;
+            siegeKingArmPow = siegeKingNpc.ArmPow;
+            kingHP = (long)(siegeKingNpc.MaxHP * GameConfig.KingDefenderHPBonus);
+            siegeKingLevel = siegeKingNpc.Level;
+        }
+        else if (currentKing.AI == CharacterAI.Human && DoorMode.IsOnlineMode)
+        {
+            // Player King (offline) — try loading from database
+            long pStr = 100, pDef = 50, pWP = 50, pAP = 30, pHP = 500;
+            int pLevel = 20;
+            try
+            {
+                var sqlBackend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                if (sqlBackend != null)
+                {
+                    var kingSave = await sqlBackend.ReadGameData(currentKing.Name.ToLowerInvariant());
+                    if (kingSave?.Player != null)
+                    {
+                        pStr = kingSave.Player.Strength;
+                        pDef = kingSave.Player.Defence;
+                        pWP = kingSave.Player.WeapPow;
+                        pAP = kingSave.Player.ArmPow;
+                        pHP = kingSave.Player.MaxHP > 0 ? kingSave.Player.MaxHP : kingSave.Player.HP;
+                        pLevel = kingSave.Player.Level;
+                    }
+                }
+            }
+            catch { /* Fall through to values above */ }
+
+            siegeKingStr = pStr;
+            siegeKingDef = (long)(pDef * GameConfig.KingDefenderDefBonus);
+            siegeKingWeapPow = pWP;
+            siegeKingArmPow = pAP;
+            kingHP = (long)(pHP * GameConfig.KingDefenderHPBonus);
+            siegeKingLevel = pLevel;
+        }
+        else
+        {
+            // Fallback — scale with estimated king level
+            siegeKingLevel = Math.Max(20, currentKing.TotalReign > 0 ? 20 + (int)(currentKing.TotalReign / 5) : 20);
+            siegeKingStr = 50 + siegeKingLevel * 8;
+            siegeKingDef = (long)((10 + siegeKingLevel * 4) * GameConfig.KingDefenderDefBonus);
+            siegeKingWeapPow = 20 + siegeKingLevel * 3;
+            siegeKingArmPow = 10 + siegeKingLevel * 2;
+            kingHP = (long)((200 + siegeKingLevel * 40) * GameConfig.KingDefenderHPBonus);
+        }
+
         long playerHP = currentPlayer.HP;
 
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine($"=== {currentKing.GetTitle()} {currentKing.Name} vs {currentPlayer.DisplayName} ===");
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"Level {siegeKingLevel} | STR: {siegeKingStr} | DEF: {siegeKingDef} | HP: {kingHP}");
         terminal.WriteLine("");
 
         int kingRounds = 0;
@@ -5889,8 +7210,8 @@ public class CastleLocation : BaseLocation
         {
             kingRounds++;
 
-            // Player attacks
-            long playerDamage = Math.Max(1, currentPlayer.Strength + currentPlayer.WeapPow - kingDef);
+            // Player attacks (accounts for weapon and armor power)
+            long playerDamage = Math.Max(1, currentPlayer.Strength + currentPlayer.WeapPow - siegeKingDef - siegeKingArmPow);
             playerDamage = (long)(playerDamage * (0.8 + random.NextDouble() * 0.4));
             kingHP -= playerDamage;
 
@@ -5899,8 +7220,8 @@ public class CastleLocation : BaseLocation
 
             if (kingHP <= 0) break;
 
-            // King attacks
-            long kingDamage = Math.Max(1, kingStr - currentPlayer.Defence - currentPlayer.ArmPow);
+            // King attacks (accounts for weapon and armor power)
+            long kingDamage = Math.Max(1, siegeKingStr + siegeKingWeapPow - currentPlayer.Defence - currentPlayer.ArmPow);
             kingDamage = (long)(kingDamage * (0.8 + random.NextDouble() * 0.4));
             playerHP -= kingDamage;
 
@@ -5910,15 +7231,22 @@ public class CastleLocation : BaseLocation
             await Task.Delay(300);
         }
 
-        if (playerHP <= 0)
+        if (playerHP <= 0 || (kingHP > 0 && playerHP > 0))
         {
-            // King wins
+            // King wins or stalemate — siege fails
             await backend.CompleteSiege(siegeId, "king_won");
             terminal.WriteLine("");
             terminal.SetColor("red");
-            terminal.WriteLine($"{currentKing.Name} has defeated you!");
+            if (playerHP <= 0)
+            {
+                terminal.WriteLine($"{currentKing.Name} has defeated you!");
+            }
+            else
+            {
+                terminal.WriteLine($"The battle reaches a stalemate! {currentKing.Name} holds firm.");
+            }
             terminal.WriteLine("The siege has failed at the final hurdle.");
-            currentPlayer.HP = 1;
+            currentPlayer.HP = Math.Max(1, playerHP);
 
             UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
                 $"{currentPlayer.Team} sieged the castle but {currentPlayer.DisplayName} fell to {currentKing.Name} in combat!",
@@ -5967,9 +7295,12 @@ public class CastleLocation : BaseLocation
         while (monarchHistory.Count > MaxMonarchHistory)
             monarchHistory.RemoveAt(0);
 
-        // Crown new monarch
+        // Crown new monarch — inherit the previous king's treasury and orphans
+        long inheritedTreasury = currentKing.Treasury;
+        var inheritedOrphans = currentKing?.Orphans?.ToList();
         currentPlayer.King = true;
-        currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex);
+        currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
+        currentKing.Treasury = inheritedTreasury;
         playerIsKing = true;
         currentPlayer.PKills++;
         UsurperRemake.Systems.ArchetypeTracker.Instance.RecordBecameKing();

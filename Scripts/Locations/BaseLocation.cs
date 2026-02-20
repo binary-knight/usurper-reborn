@@ -86,6 +86,21 @@ public abstract class BaseLocation
         // Sync player King/CTurf state with world state (catches background sim changes)
         SyncPlayerWorldState(player);
 
+        // Check if this establishment has been closed by royal decree
+        if (IsClosedByRoyalDecree())
+        {
+            var king = CastleLocation.GetCurrentKing();
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine("  This establishment has been CLOSED by royal decree!");
+            terminal.SetColor("gray");
+            if (king != null)
+                terminal.WriteLine($"  By order of {king.GetTitle()} {king.Name}, this location is off-limits.");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            throw new LocationExitException(GameLocation.MainStreet);
+        }
+
         // MUD mode: show other players at this location
         if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null)
         {
@@ -158,6 +173,38 @@ public abstract class BaseLocation
     /// Sync player King and CTurf flags with actual world state.
     /// Background simulation can change the king or city control without updating the player directly.
     /// </summary>
+    /// <summary>
+    /// Map location types to king establishment keys for royal decree closures
+    /// </summary>
+    private static readonly Dictionary<Type, string> EstablishmentTypeMap = new()
+    {
+        { typeof(InnLocation), "Inn" },
+        { typeof(WeaponShopLocation), "WeaponShop" },
+        { typeof(ArmorShopLocation), "ArmorShop" },
+        { typeof(BankLocation), "Bank" },
+        { typeof(MagicShopLocation), "MagicShop" },
+        { typeof(HealerLocation), "Healer" },
+        { typeof(UsurperRemake.Locations.MarketplaceLocation), "AuctionHouse" },
+        { typeof(UsurperRemake.Locations.ChurchLocation), "Church" },
+    };
+
+    /// <summary>
+    /// Check if the king has closed this establishment by royal decree
+    /// </summary>
+    private bool IsClosedByRoyalDecree()
+    {
+        if (!EstablishmentTypeMap.TryGetValue(GetType(), out var estKey))
+            return false; // Not a closeable establishment
+
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null) return false;
+
+        if (king.EstablishmentStatus.TryGetValue(estKey, out bool isOpen))
+            return !isOpen;
+
+        return false; // Not in dictionary = default open
+    }
+
     private void SyncPlayerWorldState(Character player)
     {
         try
@@ -170,6 +217,8 @@ public abstract class BaseLocation
                     (currentKing.Name != player.DisplayName && currentKing.Name != player.Name2))
                 {
                     player.King = false;
+                    player.RoyalMercenaries?.Clear(); // Dismiss bodyguards on dethronement
+                    player.RecalculateStats(); // Remove Royal Authority HP bonus
                     string newRuler = currentKing?.Name ?? "nobody";
                     GD.Print($"[BaseLocation] Synced player King=false (throne belongs to {newRuler})");
 
@@ -3696,6 +3745,13 @@ public abstract class BaseLocation
         terminal.Write("  |  Weight: ");
         terminal.SetColor("cyan");
         terminal.WriteLine($"{currentPlayer.Weight}kg");
+
+        // Royal Authority buff display
+        if (currentPlayer.King)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  Royal Authority: +10% ATK, +10% DEF, +5% HP");
+        }
         terminal.WriteLine("");
 
         // Level & Experience

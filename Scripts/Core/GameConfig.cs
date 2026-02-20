@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.42.7";
-    public const string VersionName = "Blood Price";
+    public const string Version = "0.43.0";
+    public const string VersionName = "Kings and Queens";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -270,7 +270,7 @@ public static partial class GameConfig
     // Castle and Royal Court Constants
     public const int MaxRoyalGuards = 20;
     public const int MaxMoatGuards = 100;
-    public const int MinLevelKing = 10;              // Minimum level to challenge for throne
+    public const int MinLevelKing = 20;              // Minimum level to challenge for throne
     public const long DefaultRoyalTreasury = 50000;  // Starting royal treasury
     public const float DonationTaxRate = 0.1f;       // Tax rate on donations to royal purse
     
@@ -279,12 +279,37 @@ public static partial class GameConfig
     {
         All = 0,        // Everyone must pay
         Good = 1,       // Only good characters pay
-        Evil = 2        // Only evil characters pay
+        Evil = 2,       // Only evil characters pay
+        Neutral = 3     // Only neutral characters pay
     }
     
     // Royal Guard System
-    public const long BaseGuardSalary = 1000;        // Base daily salary for guards
+    public const long BaseGuardSalary = 300;         // Base daily salary for guards (was 1000, now scales with level)
+    public const int GuardSalaryPerGuardLevel = 20;  // Additional salary per guard NPC level (300 + level*20)
     public const int GuardRecruitmentCost = 5000;    // Cost to recruit a guard
+
+    // King Combat - Defender Bonus (kings fight harder when defending their throne)
+    public const float KingDefenderHPBonus = 1.35f;   // +35% HP for defending king
+    public const float KingDefenderDefBonus = 1.20f;   // +20% DEF for defending king
+    public const int KingChallengeLevelRange = 20;     // Challenger must be within this many levels of king
+
+    // King Combat Buffs (Royal Authority - active while player is king)
+    public const float KingCombatStrengthBonus = 1.10f;  // +10% attack damage
+    public const float KingCombatDefenseBonus = 1.10f;   // +10% defense
+    public const float KingCombatHPBonus = 1.05f;        // +5% max HP
+
+    // NPC Throne Challenges (world sim challenging player kings)
+    public const int NPCMinLevelToChallenge = 30;     // NPC must be this level to challenge a player king
+    public const int NPCChallengeLevelRange = 15;      // NPC must be within this many levels of king
+    public const int NPCChallengeWarningTicks = 2;     // Ticks of warning before NPC challenge executes
+    public const int MaxNPCChallengesPerDay = 1;       // Max NPC challenges per day against player kings
+    public const float NPCMinAmbitionToChallenge = 0.6f; // Min ambition personality to challenge
+
+    // Economy Rebalance
+    public const long BaseCourtMaintenance = 500;      // Base daily court maintenance (was hardcoded 1000)
+    public const long DefaultTaxRateNew = 40;          // Default tax rate per citizen (was 20)
+    public const long KingDailyStipend = 500;          // Base daily gold stipend for player kings
+    public const int KingStipendPerLevel = 100;        // Additional stipend per king's level
     
     // Prison System (integrated with Castle)
     public const int MaxPrisonEscapeAttempts = 3;    // Daily escape attempts
@@ -293,10 +318,36 @@ public static partial class GameConfig
     // Royal Orphanage
     public const int MaxRoyalOrphans = 50;           // Maximum orphans in royal care
     public const long OrphanCareCost = 100;          // Daily cost per orphan
+    public const int OrphanCommissionAge = 16;       // Minimum age to commission an orphan early
+    public const long OrphanCommissionCost = 1000;   // Treasury cost to commission an orphan early
     
     // Court Magician
     public const long MagicSpellBaseCost = 500;      // Base cost for royal magic
     public const int MaxRoyalSpells = 10;            // Max spells available to king
+    public const long DailyMagicReplenishment = 500; // Daily magic budget replenishment from treasury
+    public const long MaxMagicBudget = 20000;        // Maximum magic budget cap
+
+    // Royal Loan Enforcement
+    public const int RoyalLoanChivalryLossEarly = 5;   // Chivalry loss/day, days 1-7 overdue
+    public const int RoyalLoanChivalryLossMid = 10;    // Chivalry loss/day, days 8-14 overdue
+    public const int RoyalLoanChivalryLossLate = 20;   // Chivalry loss/day, days 15+ overdue
+
+    // Court Politics (interactive)
+    public const int DismissLoyaltyCost = 15;       // Faction loyalty lost when dismissing a member
+    public const int ArrestTrialCost = 500;         // Gold cost to arrest a plotter
+    public const int ArrestFactionLoyaltyCost = 20; // Faction loyalty lost when arresting
+    public const int PromoteLoyaltyGain = 10;       // Loyalty gained from promotion
+    public const int PromoteCost = 1000;            // Gold cost to promote a member
+    public const int BribeBaseCost = 500;           // Base bribe cost
+    public const int BribeLoyaltyGain = 20;         // Loyalty gained from bribe (15-25 random)
+
+    // Royal Blessing
+    public const int RoyalBlessingDuration = 50;   // Combat turns (enough for several fights)
+
+    // Royal Mercenaries (hired bodyguards for king's dungeon party)
+    public const int MaxRoyalMercenaries = 4;      // Max mercenaries (full party of 5 with player)
+    public const int MercenaryBaseCost = 2000;     // Base hire cost in gold
+    public const int MercenaryCostPerLevel = 300;  // Additional cost per player level
 
     // Bank system constants
     public const int DefaultBankRobberyAttempts = 3;

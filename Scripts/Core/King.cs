@@ -57,7 +57,6 @@ public class King
     public List<RoyalOrphan> Orphans { get; set; } = new();
     
     // Court Magic System
-    public List<string> AvailableSpells { get; set; } = new();
     public long MagicBudget { get; set; } = 10000;
 
     // Defense Alert System - notify human guards when throne is challenged
@@ -73,7 +72,6 @@ public class King
     public King()
     {
         InitializeDefaultEstablishments();
-        InitializeDefaultSpells();
     }
     
     /// <summary>
@@ -89,18 +87,6 @@ public class King
         EstablishmentStatus["Healer"] = true;
         EstablishmentStatus["AuctionHouse"] = true;
         EstablishmentStatus["Church"] = true;
-    }
-    
-    /// <summary>
-    /// Initialize default court spells
-    /// </summary>
-    private void InitializeDefaultSpells()
-    {
-        AvailableSpells.Add("Royal Blessing");
-        AvailableSpells.Add("Detect Evil");
-        AvailableSpells.Add("Summon Guards");
-        AvailableSpells.Add("Treasury Insight");
-        AvailableSpells.Add("Divine Protection");
     }
     
     /// <summary>
@@ -134,7 +120,7 @@ public class King
         expenses += Orphans.Count * GameConfig.OrphanCareCost;
 
         // Base court maintenance
-        expenses += 1000; // Base daily cost
+        expenses += GameConfig.BaseCourtMaintenance;
 
         return expenses;
     }
@@ -144,9 +130,32 @@ public class King
     /// </summary>
     public long CalculateDailyIncome()
     {
-        // Base income from tax rate (TaxRate * number of active NPCs)
-        int npcCount = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.Count ?? 10;
-        long baseIncome = TaxRate * Math.Max(10, npcCount);
+        // Base income from tax rate (TaxRate * number of taxable NPCs)
+        var activeNPCs = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs;
+        int npcCount;
+        if (activeNPCs != null && TaxAlignment != GameConfig.TaxAlignment.All)
+        {
+            // Filter NPCs by tax alignment
+            var alignSys = UsurperRemake.Systems.AlignmentSystem.Instance;
+            npcCount = 0;
+            foreach (var npc in activeNPCs)
+            {
+                var align = alignSys.GetAlignment(npc);
+                bool taxable = TaxAlignment switch
+                {
+                    GameConfig.TaxAlignment.Good => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Good || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Holy,
+                    GameConfig.TaxAlignment.Evil => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Dark,
+                    GameConfig.TaxAlignment.Neutral => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Neutral,
+                    _ => true
+                };
+                if (taxable) npcCount++;
+            }
+        }
+        else
+        {
+            npcCount = activeNPCs?.Count ?? 10;
+        }
+        long baseIncome = TaxRate * Math.Max(1, npcCount);
 
         // Sales tax revenue (actual amount collected today via ProcessSaleTax)
         long salesTaxIncome = DailyTaxRevenue;
@@ -191,6 +200,15 @@ public class King
         foreach (var prisonerId in prisonersToRelease)
         {
             Prisoners.Remove(prisonerId);
+        }
+
+        // Replenish magic budget from treasury (up to cap)
+        long magicReplenish = Math.Min(GameConfig.DailyMagicReplenishment, Treasury);
+        magicReplenish = Math.Min(magicReplenish, GameConfig.MaxMagicBudget - MagicBudget);
+        if (magicReplenish > 0)
+        {
+            MagicBudget += magicReplenish;
+            Treasury -= magicReplenish;
         }
     }
     
@@ -314,7 +332,7 @@ public class King
     /// <summary>
     /// Create a new king (abdication or succession)
     /// </summary>
-    public static King CreateNewKing(string name, CharacterAI ai, CharacterSex sex)
+    public static King CreateNewKing(string name, CharacterAI ai, CharacterSex sex, List<RoyalOrphan>? inheritedOrphans = null)
     {
         var king = new King
         {
@@ -322,14 +340,18 @@ public class King
             AI = ai,
             Sex = sex,
             Treasury = GameConfig.DefaultRoyalTreasury,
-            TaxRate = 20,
+            TaxRate = GameConfig.DefaultTaxRateNew,
             TaxAlignment = GameConfig.TaxAlignment.All,
             KingTaxPercent = 5,
             CityTaxPercent = 2,
             CoronationDate = DateTime.Now,
-            TotalReign = 0
+            TotalReign = 0,
+            Orphans = inheritedOrphans ?? new List<RoyalOrphan>()
         };
-        
+
+        // Pick up any orphaned children that were flagged while no king existed
+        WorldSimulator.PickUpOrphanedChildren(king);
+
         return king;
     }
 }
@@ -362,7 +384,9 @@ public class PrisonRecord
 }
 
 /// <summary>
-/// Royal orphan under crown protection
+/// Royal orphan under crown protection.
+/// Real orphans (IsRealOrphan=true) come from FamilySystem when both parents die.
+/// Generated orphans (IsRealOrphan=false) are manually adopted via the orphanage UI.
 /// </summary>
 public class RoyalOrphan
 {
@@ -372,6 +396,22 @@ public class RoyalOrphan
     public DateTime ArrivalDate { get; set; } = DateTime.Now;
     public string BackgroundStory { get; set; } = "";
     public int Happiness { get; set; } = 50;          // 0-100, affects kingdom morale
+
+    // Parent tracking (populated for real orphans)
+    public string? MotherName { get; set; }
+    public string? FatherName { get; set; }
+    public string? MotherID { get; set; }
+    public string? FatherID { get; set; }
+    public CharacterRace Race { get; set; } = CharacterRace.Human;
+    public DateTime BirthDate { get; set; } = DateTime.Now;
+    public int Soul { get; set; } = 0;                // From Child.Soul — affects class at 18
+    public bool IsRealOrphan { get; set; } = false;   // true = from FamilySystem, false = manually adopted
+
+    /// <summary>
+    /// Computed age from BirthDate using NPC lifecycle rate (same as NPC aging).
+    /// Only meaningful for real orphans — generated orphans use static Age field.
+    /// </summary>
+    public int ComputedAge => (int)((DateTime.Now - BirthDate).TotalHours / GameConfig.NpcLifecycleHoursPerYear);
 }
 
 /// <summary>

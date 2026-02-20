@@ -190,6 +190,9 @@ namespace UsurperRemake.Systems
                 // Check if child just came of age
                 if (previousAge < ADULT_AGE && child.Age >= ADULT_AGE)
                 {
+                    // Orphanage children are handled by the orphanage coming-of-age system
+                    if (child.Location == GameConfig.ChildLocationOrphanage)
+                        continue;
                     ConvertChildToNPC(child);
                 }
             }

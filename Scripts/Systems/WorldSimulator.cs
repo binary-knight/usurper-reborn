@@ -291,6 +291,9 @@ public class WorldSimulator
         // Process NPC aging and natural death
         ProcessNPCAging();
 
+        // Process orphan aging in the Royal Orphanage
+        ProcessOrphanAging();
+
         // Process NPC pregnancies and births (including affairs)
         ProcessNPCPregnancies();
 
@@ -485,6 +488,9 @@ public class WorldSimulator
                 killerName, npc.Name2 ?? npc.Name, WitnessEventType.SawMurder);
 
             DebugLogger.Instance.LogInfo("PERMADEATH", $"{npc.Name} permanently killed by {killerName} (chance was {basePermadeathChance:P0})");
+
+            // Check if this NPC's children are now orphaned (both parents dead)
+            CheckForOrphanedChildren(npc);
         }
         else
         {
@@ -815,6 +821,9 @@ public class WorldSimulator
 
                     UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
                         $"{npc.Name2} died of old age at {currentAge} (max {maxAge} for {npc.Race})");
+
+                    // Check if this NPC's children are now orphaned (both parents dead)
+                    CheckForOrphanedChildren(npc);
                 }
             }
         }
@@ -841,6 +850,350 @@ public class WorldSimulator
 
             UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
                 $"{spouse.Name2} is now widowed after {deceased.Name2}'s passing");
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ROYAL ORPHANAGE — Orphan Detection and Aging
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Check if a dead NPC has children whose other parent is also dead.
+    /// If so, move those children to the Royal Orphanage.
+    /// </summary>
+    private void CheckForOrphanedChildren(NPC deadNPC)
+    {
+        var familySystem = FamilySystem.Instance;
+        if (familySystem == null) return;
+
+        string deadName = deadNPC.Name2 ?? deadNPC.Name;
+        string deadID = deadNPC.ID ?? "";
+
+        // Find all living children of this NPC
+        var childrenOfDead = familySystem.AllChildren
+            .Where(c => !c.Deleted &&
+                         c.Age < 18 &&
+                         c.Location != GameConfig.ChildLocationOrphanage &&
+                         ((!string.IsNullOrEmpty(deadID) && (c.MotherID == deadID || c.FatherID == deadID)) ||
+                          c.Mother == deadName || c.Father == deadName))
+            .ToList();
+
+        if (childrenOfDead.Count == 0) return;
+
+        var king = CastleLocation.GetCurrentKing();
+
+        foreach (var child in childrenOfDead)
+        {
+            bool otherParentDead = IsParentDeadOrMissing(child, deadID, deadName);
+            if (!otherParentDead) continue;
+
+            // Both parents dead/missing — child becomes an orphan
+            child.Location = GameConfig.ChildLocationOrphanage;
+
+            // Create RoyalOrphan record on the king's list (if king exists and space available)
+            if (king != null && king.Orphans.Count < GameConfig.MaxRoyalOrphans)
+            {
+                // Check not already added (same child orphaned by two deaths in same tick)
+                if (king.Orphans.Any(o => o.Name == child.Name && o.IsRealOrphan)) continue;
+
+                var orphan = new RoyalOrphan
+                {
+                    Name = child.Name,
+                    Age = child.Age,
+                    Sex = child.Sex,
+                    ArrivalDate = DateTime.Now,
+                    BirthDate = child.BirthDate,
+                    BackgroundStory = $"Both parents lost. Mother: {child.Mother}, Father: {child.Father}.",
+                    Happiness = 30, // Low — just lost family
+                    MotherName = child.Mother,
+                    FatherName = child.Father,
+                    MotherID = child.MotherID,
+                    FatherID = child.FatherID,
+                    Race = DetermineOrphanRace(child),
+                    Soul = child.Soul,
+                    IsRealOrphan = true
+                };
+
+                king.Orphans.Add(orphan);
+
+                NewsSystem.Instance?.Newsy(
+                    $"🏠 Young {child.Name}, child of the late {child.Mother} and {child.Father}, has been taken into the Royal Orphanage.");
+            }
+            else if (king == null)
+            {
+                // No king — child is flagged as orphan (Location=Orphanage) but no RoyalOrphan created yet.
+                // When a new king is crowned, orphaned children will be picked up.
+                DebugLogger.Instance.LogInfo("ORPHANAGE",
+                    $"{child.Name} orphaned but no king exists — will be picked up when king crowned");
+            }
+
+            DebugLogger.Instance.LogInfo("ORPHANAGE",
+                $"{child.Name} orphaned (parents: {child.Mother} & {child.Father})");
+        }
+    }
+
+    /// <summary>
+    /// Check if the other parent of a child (not the one who just died) is also dead or missing.
+    /// </summary>
+    private bool IsParentDeadOrMissing(Child child, string deadParentID, string deadParentName)
+    {
+        // Determine which parent is the "other" one
+        string otherID;
+        string otherName;
+
+        bool deadIsMother = (!string.IsNullOrEmpty(deadParentID) && child.MotherID == deadParentID) ||
+                            child.Mother == deadParentName;
+        if (deadIsMother)
+        {
+            otherID = child.FatherID;
+            otherName = child.Father;
+        }
+        else
+        {
+            otherID = child.MotherID;
+            otherName = child.Mother;
+        }
+
+        if (string.IsNullOrEmpty(otherID) && string.IsNullOrEmpty(otherName))
+            return true; // Unknown parent = effectively dead
+
+        // Check if other parent is the player (player is alive — don't orphan)
+        var player = GameEngine.Instance?.CurrentPlayer;
+        if (player != null)
+        {
+            if (player.DisplayName == otherName || player.Name2 == otherName)
+                return false; // Player is alive, child is not orphaned
+        }
+
+        // Check NPC list (includes dead NPCs since they stay in ActiveNPCs)
+        var otherParent = npcs.FirstOrDefault(n =>
+            (!string.IsNullOrEmpty(otherID) && n.ID == otherID) ||
+            n.Name2 == otherName || n.Name == otherName);
+
+        if (otherParent == null)
+            return true; // Parent not found in the game at all
+
+        return otherParent.IsDead;
+    }
+
+    /// <summary>
+    /// Determine orphan's race from their parents (looks up dead parents in NPC list).
+    /// </summary>
+    private CharacterRace DetermineOrphanRace(Child child)
+    {
+        var mother = npcs.FirstOrDefault(n =>
+            (!string.IsNullOrEmpty(child.MotherID) && n.ID == child.MotherID) ||
+            n.Name2 == child.Mother);
+        var father = npcs.FirstOrDefault(n =>
+            (!string.IsNullOrEmpty(child.FatherID) && n.ID == child.FatherID) ||
+            n.Name2 == child.Father);
+
+        // 50/50 from parents
+        if (mother != null && father != null)
+            return random.Next(2) == 0 ? mother.Race : father.Race;
+        if (mother != null) return mother.Race;
+        if (father != null) return father.Race;
+        return CharacterRace.Human;
+    }
+
+    /// <summary>
+    /// Age orphans in the Royal Orphanage. When real orphans reach 18, process their coming-of-age.
+    /// </summary>
+    private void ProcessOrphanAging()
+    {
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null || king.Orphans.Count == 0) return;
+
+        var comingOfAge = new List<RoyalOrphan>();
+
+        foreach (var orphan in king.Orphans)
+        {
+            if (orphan.IsRealOrphan)
+            {
+                // Real orphans age from BirthDate using lifecycle rate (same as NPCs)
+                orphan.Age = orphan.ComputedAge;
+
+                if (orphan.Age >= 18)
+                    comingOfAge.Add(orphan);
+            }
+            // Generated orphans: static Age, no aging/graduation
+        }
+
+        foreach (var orphan in comingOfAge)
+        {
+            ProcessOrphanComingOfAge(orphan, king);
+        }
+    }
+
+    /// <summary>
+    /// Process an orphan who has come of age (18+). They graduate from the orphanage
+    /// and either become a royal guard or are released as a citizen NPC.
+    /// </summary>
+    private void ProcessOrphanComingOfAge(RoyalOrphan orphan, King king)
+    {
+        // Remove from orphanage
+        king.Orphans.Remove(orphan);
+
+        // Mark underlying Child as Deleted
+        var child = FamilySystem.Instance?.AllChildren
+            .FirstOrDefault(c => c.Name == orphan.Name && !c.Deleted &&
+                                 c.Location == GameConfig.ChildLocationOrphanage);
+        if (child != null)
+            child.Deleted = true;
+
+        int roll = random.Next(100);
+
+        if (roll < 30 && king.Guards.Count < King.MaxNPCGuards)
+        {
+            // 30% chance: become a royal guard (if slots available)
+            OrphanBecomesRoyalGuard(orphan, king);
+        }
+        else
+        {
+            // 70% chance (or guard slots full): released as citizen NPC
+            OrphanBecomesNPC(orphan);
+        }
+    }
+
+    /// <summary>
+    /// Orphan graduates to become a Royal Guard with high loyalty (raised by the crown).
+    /// </summary>
+    private void OrphanBecomesRoyalGuard(RoyalOrphan orphan, King king)
+    {
+        var guard = new RoyalGuard
+        {
+            Name = orphan.Name,
+            AI = CharacterAI.Computer,
+            Sex = orphan.Sex,
+            DailySalary = GameConfig.BaseGuardSalary,
+            RecruitmentDate = DateTime.Now,
+            Loyalty = 85 // High loyalty — raised by the crown
+        };
+        king.Guards.Add(guard);
+
+        // Also create the NPC entity so the guard has real combat stats
+        OrphanBecomesNPC(orphan);
+
+        NewsSystem.Instance?.Newsy(
+            $"⚔ {orphan.Name}, raised in the Royal Orphanage, has come of age and joined the Royal Guard!");
+
+        DebugLogger.Instance.LogInfo("ORPHANAGE",
+            $"{orphan.Name} came of age and became a Royal Guard");
+    }
+
+    /// <summary>
+    /// Orphan graduates to become a citizen NPC (similar to FamilySystem.ConvertChildToNPC).
+    /// </summary>
+    public void OrphanBecomesNPC(RoyalOrphan orphan)
+    {
+        var npc = new NPC
+        {
+            ID = $"npc_{orphan.Name.ToLower().Replace(" ", "_")}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
+            Name1 = orphan.Name,
+            Name2 = orphan.Name,
+            Sex = orphan.Sex,
+            Age = 18,
+            Race = orphan.Race,
+            Class = DetermineOrphanClass(orphan.Soul),
+            Level = 1,
+            HP = 100,
+            MaxHP = 100,
+            Strength = 12 + random.Next(5),
+            Defence = 12 + random.Next(5),
+            Stamina = 10 + random.Next(5),
+            Agility = 10 + random.Next(5),
+            Intelligence = 10 + random.Next(5),
+            Charisma = 12 + random.Next(5), // Orphanage gives social skills
+            Gold = 200,
+            Experience = 0,
+            CurrentLocation = "Main Street",
+            AI = CharacterAI.Computer,
+            BirthDate = orphan.BirthDate
+        };
+
+        npc.HP = npc.MaxHP;
+
+        // Soul-based alignment
+        if (orphan.Soul > 200) { npc.Chivalry = 50 + random.Next(50); npc.Darkness = 0; }
+        else if (orphan.Soul < -200) { npc.Chivalry = 0; npc.Darkness = 50 + random.Next(50); }
+        else { npc.Chivalry = 25; npc.Darkness = 25; }
+
+        // Initialize NPC systems (personality, brain, etc.)
+        npc.EnsureSystemsInitialized();
+        if (npc.Personality != null)
+        {
+            npc.Personality.Gender = orphan.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+            if (orphan.Soul > 100) { npc.Personality.Aggression = 0.2f; npc.Personality.Tenderness = 0.8f; }
+            else if (orphan.Soul < -100) { npc.Personality.Aggression = 0.7f; npc.Personality.Tenderness = 0.2f; }
+        }
+
+        NPCSpawnSystem.Instance?.AddRestoredNPC(npc);
+
+        NewsSystem.Instance?.Newsy(
+            $"🎓 {orphan.Name}, raised in the Royal Orphanage, has come of age and joined the realm!");
+
+        DebugLogger.Instance.LogInfo("ORPHANAGE",
+            $"{orphan.Name} came of age and became a citizen NPC ({npc.Class})");
+    }
+
+    /// <summary>
+    /// Determine character class for an orphan based on their soul value.
+    /// </summary>
+    private CharacterClass DetermineOrphanClass(int soul)
+    {
+        if (soul > 200)
+            return random.Next(3) switch { 0 => CharacterClass.Paladin, 1 => CharacterClass.Cleric, _ => CharacterClass.Warrior };
+        else if (soul < -200)
+            return random.Next(3) switch { 0 => CharacterClass.Assassin, 1 => CharacterClass.Magician, _ => CharacterClass.Barbarian };
+        else
+        {
+            var classes = new[] { CharacterClass.Warrior, CharacterClass.Magician, CharacterClass.Assassin,
+                                  CharacterClass.Ranger, CharacterClass.Bard, CharacterClass.Sage };
+            return classes[random.Next(classes.Length)];
+        }
+    }
+
+    /// <summary>
+    /// Pick up orphaned children who were flagged while no king existed.
+    /// Called when a new king is crowned or when the orphanage is first accessed.
+    /// </summary>
+    public static void PickUpOrphanedChildren(King king)
+    {
+        var familySystem = FamilySystem.Instance;
+        if (familySystem == null || king == null) return;
+
+        var orphanedChildren = familySystem.AllChildren
+            .Where(c => !c.Deleted && c.Location == GameConfig.ChildLocationOrphanage &&
+                        !king.Orphans.Any(o => o.Name == c.Name && o.IsRealOrphan))
+            .ToList();
+
+        foreach (var child in orphanedChildren)
+        {
+            if (king.Orphans.Count >= GameConfig.MaxRoyalOrphans) break;
+
+            king.Orphans.Add(new RoyalOrphan
+            {
+                Name = child.Name,
+                Age = child.Age,
+                Sex = child.Sex,
+                ArrivalDate = DateTime.Now,
+                BirthDate = child.BirthDate,
+                BackgroundStory = $"Both parents lost. Mother: {child.Mother}, Father: {child.Father}.",
+                Happiness = 30,
+                MotherName = child.Mother,
+                FatherName = child.Father,
+                MotherID = child.MotherID,
+                FatherID = child.FatherID,
+                Race = CharacterRace.Human, // Can't easily look up parents without NPC list reference
+                Soul = child.Soul,
+                IsRealOrphan = true
+            });
+        }
+
+        if (orphanedChildren.Count > 0)
+        {
+            DebugLogger.Instance.LogInfo("ORPHANAGE",
+                $"Picked up {orphanedChildren.Count} orphaned children for new king");
         }
     }
 
@@ -3052,7 +3405,7 @@ public class WorldSimulator
             if (random.NextDouble() < applyChance)
             {
                 // NPC applies and is accepted!
-                long salary = GameConfig.BaseGuardSalary + (npc.Level * 20);
+                long salary = GameConfig.BaseGuardSalary + (npc.Level * GameConfig.GuardSalaryPerGuardLevel);
 
                 var guard = new RoyalGuard
                 {
@@ -3651,7 +4004,7 @@ public class WorldSimulator
             Name = applicant.Name,
             AI = CharacterAI.Computer,
             Sex = applicant.Sex,
-            DailySalary = GameConfig.BaseGuardSalary,
+            DailySalary = GameConfig.BaseGuardSalary + (applicant.Level * GameConfig.GuardSalaryPerGuardLevel),
             RecruitmentDate = DateTime.Now,
             Loyalty = 70 + GD.RandRange(0, 30)  // New recruits have 70-100 loyalty
         };

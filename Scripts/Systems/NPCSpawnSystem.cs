@@ -718,7 +718,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public List<NPC> GetNPCsAtLocation(string locationId)
         {
-            return ActiveNPCs.Where(npc => npc.CurrentLocation == locationId && !npc.IsDead).ToList();
+            return ActiveNPCs.Where(npc => npc.CurrentLocation == locationId && !npc.IsDead && npc.DaysInPrison <= 0).ToList();
         }
 
         /// <summary>

@@ -694,6 +694,56 @@ public class DailySystemManager
         }
         catch { /* Loan system error */ }
 
+        // Royal loan enforcement — escalating consequences for overdue loans
+        try
+        {
+            var royalLoanPlayer = GameEngine.Instance?.CurrentPlayer;
+            if (royalLoanPlayer != null && royalLoanPlayer.RoyalLoanAmount > 0 && royalLoanPlayer.RoyalLoanDueDay > 0)
+            {
+                int daysOverdue = currentDay - royalLoanPlayer.RoyalLoanDueDay;
+                if (daysOverdue > 0)
+                {
+                    if (daysOverdue <= 7)
+                    {
+                        // Early: mild chivalry loss + warning
+                        royalLoanPlayer.Chivalry = Math.Max(0, royalLoanPlayer.Chivalry - GameConfig.RoyalLoanChivalryLossEarly);
+                        if (terminal != null)
+                        {
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"Royal Debt: Your loan of {(long)(royalLoanPlayer.RoyalLoanAmount * 1.10):N0}g is {daysOverdue} day{(daysOverdue == 1 ? "" : "s")} overdue! (-{GameConfig.RoyalLoanChivalryLossEarly} Chivalry)");
+                        }
+                    }
+                    else if (daysOverdue <= 14)
+                    {
+                        // Mid: moderate chivalry loss + bounty posted
+                        royalLoanPlayer.Chivalry = Math.Max(0, royalLoanPlayer.Chivalry - GameConfig.RoyalLoanChivalryLossMid);
+                        if (!royalLoanPlayer.RoyalLoanBountyPosted)
+                        {
+                            royalLoanPlayer.RoyalLoanBountyPosted = true;
+                            QuestSystem.PostBountyOnPlayer(royalLoanPlayer.DisplayName, "Unpaid royal debt", (int)Math.Min(royalLoanPlayer.RoyalLoanAmount / 10, int.MaxValue));
+                            NewsSystem.Instance?.Newsy(true, $"{royalLoanPlayer.DisplayName} has defaulted on a royal loan! A bounty has been posted!");
+                        }
+                        if (terminal != null)
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"Royal Debt: A BOUNTY has been posted for your unpaid loan! ({daysOverdue} days overdue, -{GameConfig.RoyalLoanChivalryLossMid} Chivalry)");
+                        }
+                    }
+                    else
+                    {
+                        // Late: severe chivalry loss
+                        royalLoanPlayer.Chivalry = Math.Max(0, royalLoanPlayer.Chivalry - GameConfig.RoyalLoanChivalryLossLate);
+                        if (terminal != null)
+                        {
+                            terminal.SetColor("bright_red");
+                            terminal.WriteLine($"Royal Debt: The Crown demands immediate repayment! ({daysOverdue} days overdue, -{GameConfig.RoyalLoanChivalryLossLate} Chivalry)");
+                        }
+                    }
+                }
+            }
+        }
+        catch { /* Royal loan system error */ }
+
         // Process royal finances - guard salaries, monster feeding, tax collection
         try
         {
@@ -724,6 +774,40 @@ public class DailySystemManager
             }
         }
         catch { /* King system not initialized */ }
+
+        // King daily stipend — player kings receive personal gold income
+        try
+        {
+            var kingPlayer = GameEngine.Instance?.CurrentPlayer;
+            if (kingPlayer?.King == true)
+            {
+                long stipend = GameConfig.KingDailyStipend + (kingPlayer.Level * GameConfig.KingStipendPerLevel);
+                kingPlayer.Gold += stipend;
+                kingPlayer.Statistics?.RecordGoldChange(kingPlayer.Gold);
+                DebugLogger.Instance.LogInfo("KING", $"Royal stipend: {kingPlayer.DisplayName} receives {stipend:N0} gold (Level {kingPlayer.Level})");
+            }
+        }
+        catch { /* Stipend system error */ }
+
+        // Player guard salary — pay player if they serve as a royal guard
+        try
+        {
+            var guardPlayer = GameEngine.Instance?.CurrentPlayer;
+            var guardKing = CastleLocation.GetCurrentKing();
+            if (guardPlayer != null && guardKing != null)
+            {
+                var playerGuard = guardKing.Guards.FirstOrDefault(g => g.AI == CharacterAI.Human && g.Name == guardPlayer.DisplayName);
+                if (playerGuard != null)
+                {
+                    // Salary is always paid to the player — treasury deduction already
+                    // happened in King.ProcessDailyActivities() via CalculateDailyExpenses()
+                    guardPlayer.Gold += playerGuard.DailySalary;
+                    guardPlayer.Statistics?.RecordGoldChange(guardPlayer.Gold);
+                    DebugLogger.Instance.LogInfo("GUARD", $"Guard salary: {guardPlayer.DisplayName} receives {playerGuard.DailySalary:N0} gold");
+                }
+            }
+        }
+        catch { /* Guard salary system error */ }
 
         // Process Quest System daily maintenance (quest expiration, failure processing)
         QuestSystem.ProcessDailyQuestMaintenance();
