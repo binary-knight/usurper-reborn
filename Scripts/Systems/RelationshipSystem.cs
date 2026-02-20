@@ -12,32 +12,44 @@ using System.Linq;
 /// </summary>
 public partial class RelationshipSystem
 {
-    // Simple singleton instance for global access
-    public static RelationshipSystem Instance { get; } = new RelationshipSystem();
+    // SessionContext-aware singleton: uses per-session instance in MUD mode,
+    // falls back to static instance in single-player/BBS mode.
+    // IMPORTANT: [ThreadStatic] is NOT compatible with async/await (continuations
+    // can resume on different threads). AsyncLocal via SessionContext is correct.
+    private static RelationshipSystem? _fallbackInstance;
+    public static RelationshipSystem Instance
+    {
+        get
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null) return ctx.Relationships;
+            return _fallbackInstance ??= new RelationshipSystem();
+        }
+    }
 
-    // ThreadStatic so each MUD session has its own relationship data (prevents cross-player Clear)
-    [ThreadStatic] private static Dictionary<string, Dictionary<string, RelationshipRecord>>? _relationshipsThread;
+    // Per-instance relationship data (routed through Instance for static method access)
+    private Dictionary<string, Dictionary<string, RelationshipRecord>> _instanceRelationships = new();
     private static Dictionary<string, Dictionary<string, RelationshipRecord>> _relationships
     {
-        get => _relationshipsThread ??= new();
-        set => _relationshipsThread = value;
+        get => Instance._instanceRelationships;
+        set => Instance._instanceRelationships = value;
     }
 
     private static Random _random = new Random();
 
     // Daily relationship gain tracking (v0.26) - prevents relationship flooding
     // Key format: "{character1}_{character2}_{date}" -> steps gained today
-    [ThreadStatic] private static Dictionary<string, int>? _dailyRelationshipGainsThread;
+    private Dictionary<string, int> _instanceDailyGains = new();
     private static Dictionary<string, int> _dailyRelationshipGains
     {
-        get => _dailyRelationshipGainsThread ??= new();
-        set => _dailyRelationshipGainsThread = value;
+        get => Instance._instanceDailyGains;
+        set => Instance._instanceDailyGains = value;
     }
-    [ThreadStatic] private static DateTime? _lastDailyResetThread;
+    private DateTime _instanceLastDailyReset = DateTime.MinValue;
     private static DateTime _lastDailyReset
     {
-        get => _lastDailyResetThread ?? DateTime.MinValue;
-        set => _lastDailyResetThread = value;
+        get => Instance._instanceLastDailyReset;
+        set => Instance._instanceLastDailyReset = value;
     }
 
     /// <summary>
@@ -560,6 +572,36 @@ public partial class RelationshipSystem
     
     #region Private Helper Methods
     
+    /// <summary>
+    /// Check if two characters (by name) are married or lovers.
+    /// Lightweight name-based lookup for world sim use where Character objects may not be available.
+    /// </summary>
+    public static bool IsMarriedOrLover(string name1, string name2)
+    {
+        if (string.IsNullOrEmpty(name1) || string.IsNullOrEmpty(name2)) return false;
+
+        var key1 = GetRelationshipKey(name1, name2);
+        var key2 = GetRelationshipKey(name2, name1);
+
+        // Check (name1, name2) ordering
+        if (_relationships.ContainsKey(key1) && _relationships[key1].ContainsKey(key2))
+        {
+            var r = _relationships[key1][key2];
+            if (!r.Deleted && (r.Relation1 == GameConfig.RelationMarried || r.Relation1 == GameConfig.RelationLove))
+                return true;
+        }
+
+        // Check reverse ordering
+        if (_relationships.ContainsKey(key2) && _relationships[key2].ContainsKey(key1))
+        {
+            var r = _relationships[key2][key1];
+            if (!r.Deleted && (r.Relation2 == GameConfig.RelationMarried || r.Relation2 == GameConfig.RelationLove))
+                return true;
+        }
+
+        return false;
+    }
+
     private static string GetRelationshipKey(string name1, string name2)
     {
         return $"{name1}_{name2}";

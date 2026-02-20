@@ -63,9 +63,7 @@ public class WeaponShopLocation : BaseLocation
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                             WEAPON SHOP                                     ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"WEAPON SHOP".PadLeft((77 + 11) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

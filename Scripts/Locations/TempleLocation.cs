@@ -225,9 +225,7 @@ public partial class TempleLocation : BaseLocation
         // Temple header - standardized format
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                           TEMPLE OF THE GODS                                ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"TEMPLE OF THE GODS".PadLeft((77 + 18) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

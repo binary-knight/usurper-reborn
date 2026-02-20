@@ -210,9 +210,7 @@ namespace UsurperRemake.Locations
             // Header - standardized format
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("║                              THE DARK ALLEY                                 ║");
-            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"║{"THE DARK ALLEY".PadLeft((77 + 14) / 2).PadRight(77)}║");
             terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 

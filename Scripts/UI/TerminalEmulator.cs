@@ -612,6 +612,21 @@ public partial class TerminalEmulator : Control
 
     public void ClearScreen()
     {
+        // Screen reader mode: don't clear the screen — screen readers lose their
+        // reading position when the buffer is wiped. Instead, output a separator
+        // so the screen reader buffer grows naturally and the user hears each new
+        // section announced in order.
+        if (GameConfig.ScreenReaderMode)
+        {
+            WriteLine("");
+            WriteLine("────────────────────────────────────────");
+            WriteLine("");
+            cursorX = 0;
+            cursorY = 0;
+            _bbsLineCount = 0;
+            return;
+        }
+
         if (_streamWriter != null)
         {
             // MUD stream mode — ANSI clear screen

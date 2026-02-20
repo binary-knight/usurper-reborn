@@ -39,9 +39,7 @@ public class DormitoryLocation : BaseLocation
         // Header
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                              THE DORMITORY                                  ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"THE DORMITORY".PadLeft((77 + 13) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -477,11 +475,21 @@ public class DormitoryLocation : BaseLocation
         terminal.WriteLine("Dormitory — Vulnerable Sleepers");
         terminal.WriteLine("");
 
-        // Build combined target list
+        // Build combined target list (skip NPCs on the player's team or spouse/lover)
+        string playerTeam = currentPlayer.Team ?? "";
+        string playerName = currentPlayer.Name2 ?? currentPlayer.Name1 ?? "";
         var targets = new List<(string name, bool isNPC)>();
         foreach (var npcName in sleepingNPCNames)
         {
             var npc = NPCSpawnSystem.Instance.GetNPCByName(npcName);
+            // Don't allow attacking your own team members
+            if (npc != null && !string.IsNullOrEmpty(playerTeam) &&
+                playerTeam.Equals(npc.Team, StringComparison.OrdinalIgnoreCase))
+                continue;
+            // Don't allow attacking your spouse or lover
+            if (npc != null && (npc.SpouseName.Equals(playerName, StringComparison.OrdinalIgnoreCase)
+                || RelationshipSystem.IsMarriedOrLover(npcName, playerName)))
+                continue;
             string lvlStr = npc != null ? $" (Lvl {npc.Level})" : "";
             terminal.WriteLine($"  {targets.Count + 1}. {npcName}{lvlStr} [SLEEPING NPC]", "yellow");
             targets.Add((npcName, true));

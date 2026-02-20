@@ -456,9 +456,7 @@ public partial class MagicShopLocation : BaseLocation
         // Shop header - standardized format
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                              MAGIC SHOP                                     ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"MAGIC SHOP".PadLeft((77 + 10) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         DisplayMessage("");
         DisplayMessage($"Run by {_ownerName} the gnome", "gray");

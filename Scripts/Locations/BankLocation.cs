@@ -84,9 +84,7 @@ public class BankLocation : BaseLocation
         // Standardized bank header
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                           THE IRONVAULT BANK                                ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"THE IRONVAULT BANK".PadLeft((77 + 18) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         terminal.SetColor("gray");

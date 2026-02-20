@@ -813,6 +813,7 @@ namespace UsurperRemake.Systems
         public int PenaltyType { get; set; }
         public string OfferedTo { get; set; } = "";
         public bool Forced { get; set; }
+        public string TargetNPCName { get; set; } = "";
         public List<QuestObjectiveData> Objectives { get; set; } = new();
         public List<QuestMonsterData> Monsters { get; set; } = new();
     }

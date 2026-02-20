@@ -69,7 +69,7 @@ public class MainStreetLocation : BaseLocation
         // ASCII art header (simplified version)
         terminal.SetColor("bright_blue");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                              MAIN STREET                                     ║");
+        terminal.WriteLine($"║{"MAIN STREET".PadLeft((78 + 11) / 2).PadRight(78)}║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

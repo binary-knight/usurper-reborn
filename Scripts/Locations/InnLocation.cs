@@ -278,9 +278,7 @@ public class InnLocation : BaseLocation
         // Inn header - standardized format
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                         THE INN - 'The Drunken Dragon'                      ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"THE INN - 'The Drunken Dragon'".PadLeft((77 + 30) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         
@@ -4583,10 +4581,19 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("Inn — Sleeping Guests");
         terminal.WriteLine("");
 
+        // Skip NPCs on the player's team or spouse/lover
+        string playerTeam = currentPlayer?.Team ?? "";
+        string playerName = currentPlayer?.Name2 ?? currentPlayer?.Name1 ?? "";
         var targets = new List<(string name, bool isNPC)>();
         foreach (var npcName in sleepingNPCNames)
         {
             var npc = NPCSpawnSystem.Instance.GetNPCByName(npcName);
+            if (npc != null && !string.IsNullOrEmpty(playerTeam) &&
+                playerTeam.Equals(npc.Team, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (npc != null && (npc.SpouseName.Equals(playerName, StringComparison.OrdinalIgnoreCase)
+                || RelationshipSystem.IsMarriedOrLover(npcName, playerName)))
+                continue;
             string lvlStr = npc != null ? $" (Lvl {npc.Level})" : "";
             terminal.WriteLine($"  {targets.Count + 1}. {npcName}{lvlStr} [SLEEPING NPC]", "yellow");
             targets.Add((npcName, true));

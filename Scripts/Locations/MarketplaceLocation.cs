@@ -37,9 +37,7 @@ public class MarketplaceLocation : BaseLocation
         // Header
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                             AUCTION HOUSE                                   ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"AUCTION HOUSE".PadLeft((77 + 13) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -262,9 +260,7 @@ public class MarketplaceLocation : BaseLocation
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                          AUCTION HOUSE — LISTINGS                           ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"AUCTION HOUSE \u2014 LISTINGS".PadLeft((77 + 24) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -480,9 +476,7 @@ public class MarketplaceLocation : BaseLocation
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                         AUCTION HOUSE — YOUR STATUS                         ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"AUCTION HOUSE \u2014 YOUR STATUS".PadLeft((77 + 28) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

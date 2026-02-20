@@ -138,8 +138,25 @@ public class DungeonLocation : BaseLocation
         // Show contextual hint for new players on their first dungeon entry
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown);
 
-        // Call base to enter the location loop
-        await base.EnterLocation(player, term);
+        // Mark NPC teammates as engaged so the world sim won't kill them
+        foreach (var mate in teammates)
+        {
+            if (mate is NPC npcMate) npcMate.IsInConversation = true;
+        }
+
+        try
+        {
+            // Call base to enter the location loop
+            await base.EnterLocation(player, term);
+        }
+        finally
+        {
+            // Release NPC teammates when leaving the dungeon
+            foreach (var mate in teammates)
+            {
+                if (mate is NPC npcMate) npcMate.IsInConversation = false;
+            }
+        }
     }
 
     /// <summary>
@@ -2237,11 +2254,11 @@ public class DungeonLocation : BaseLocation
         ShowBreadcrumb();
 
         // Header - standardized format
+        string dlTitle = $"DUNGEON  LEVEL   {currentDungeonLevel}";
+        string dlPadded = dlTitle.PadLeft((77 + dlTitle.Length) / 2).PadRight(77);
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"║                         DUNGEON LEVEL {currentDungeonLevel.ToString().PadLeft(3)}                                  ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{dlPadded}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         terminal.SetColor(GetThemeColor(currentFloor.Theme));
@@ -3175,16 +3192,17 @@ public class DungeonLocation : BaseLocation
         // Update current room
         currentFloor.CurrentRoomId = targetRoomId;
 
+        // Auto-clear rooms without monsters on entry (even if already explored from
+        // knowledge events or floor respawn — IsCleared resets on respawn but IsExplored persists)
+        if (!targetRoom.IsCleared && !targetRoom.HasMonsters)
+        {
+            targetRoom.IsCleared = true;
+        }
+
         if (!targetRoom.IsExplored)
         {
             targetRoom.IsExplored = true;
             roomsExploredThisFloor++;
-
-            // Auto-clear rooms without monsters
-            if (!targetRoom.HasMonsters)
-            {
-                targetRoom.IsCleared = true;
-            }
 
             // Room discovery message
             terminal.SetColor(GetThemeColor(currentFloor.Theme));
@@ -9717,6 +9735,8 @@ public class DungeonLocation : BaseLocation
                 foreach (var room in currentFloor.Rooms.Take(currentFloor.Rooms.Count / 2))
                 {
                     room.IsExplored = true;
+                    if (!room.HasMonsters)
+                        room.IsCleared = true;
                 }
                 terminal.WriteLine("You gain knowledge of the dungeon layout!", "green");
                 break;
@@ -10214,6 +10234,8 @@ public class DungeonLocation : BaseLocation
                 foreach (var room in currentFloor.Rooms)
                 {
                     room.IsExplored = true;
+                    if (!room.HasMonsters)
+                        room.IsCleared = true;
                 }
                 terminal.WriteLine("All rooms are now revealed on your map!", "green");
                 break;

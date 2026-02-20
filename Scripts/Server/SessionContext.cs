@@ -76,6 +76,7 @@ public class SessionContext : IDisposable
     public PrisonActivitySystem PrisonActivity { get; set; } = null!;
     public RomanceTracker Romance { get; set; } = null!;
     public IntimacySystem Intimacy { get; set; } = null!;
+    public RelationshipSystem Relationships { get; set; } = null!;
 
     // --- Per-Session Online Systems ---
     public OnlineStateManager? OnlineState { get; set; }
@@ -116,6 +117,7 @@ public class SessionContext : IDisposable
         PrisonActivity = new PrisonActivitySystem();
         Romance = new RomanceTracker();
         Intimacy = new IntimacySystem();
+        Relationships = new RelationshipSystem();
     }
 
     public void Dispose()

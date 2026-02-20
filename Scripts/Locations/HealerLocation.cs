@@ -80,9 +80,7 @@ public class HealerLocation : BaseLocation
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                          THE GOLDEN BOW - HEALING HUT                       ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"THE GOLDEN BOW - HEALING HUT".PadLeft((77 + 28) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -665,7 +663,7 @@ public class HealerLocation : BaseLocation
         int maxCanCarry = player.MaxManaPotions - (int)player.ManaPotions;
 
         terminal.WriteLine($"You currently have {player.ManaPotions} mana potions (max {player.MaxManaPotions}).", "gray");
-        terminal.WriteLine($"You can afford up to {maxAfford} potions.", "gray");
+        terminal.WriteLine($"You can afford up to {Math.Min(maxAfford, maxCanCarry)} potions.", "gray");
         terminal.WriteLine("");
 
         if (maxCanCarry <= 0)

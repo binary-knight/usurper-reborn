@@ -469,6 +469,14 @@ public class WorldSimulator
     {
         if (npc == null) return false;
 
+        // NPCs engaged with a player (in conversation, dungeon party, etc.) are protected
+        // from world sim deaths. They can still "die" temporarily but skip permadeath.
+        if (npc.IsInConversation)
+        {
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Skipping death for {npc.Name} — engaged with player");
+            return false;
+        }
+
         npc.IsDead = true;
         npc.HP = 0;
         CheckKingDeath(npc);
@@ -2347,10 +2355,11 @@ public class WorldSimulator
     private void NPCTeamDungeonRun(NPC npc)
     {
         if (string.IsNullOrEmpty(npc.Team)) return;
+        if (npc.IsInConversation) return;
 
-        // Get all alive team members
+        // Get all alive team members (skip any engaged with players)
         var teamMembers = npcs
-            .Where(n => n.Team == npc.Team && n.IsAlive && n.HP > n.MaxHP * 0.5)
+            .Where(n => n.Team == npc.Team && n.IsAlive && n.HP > n.MaxHP * 0.5 && !n.IsInConversation)
             .ToList();
 
         if (teamMembers.Count < 2)
@@ -2494,6 +2503,9 @@ public class WorldSimulator
     /// </summary>
     private void NPCExploreDungeon(NPC npc)
     {
+        // Don't send NPCs on dungeon runs if they're engaged with a player
+        if (npc.IsInConversation) return;
+
         npc.UpdateLocation("Dungeon");
 
         // Determine dungeon level based on NPC level - sometimes they push too deep
@@ -3607,6 +3619,9 @@ public class WorldSimulator
 
         var target = world.GetNPCById(targetId);
         if (target == null || target.CurrentLocation != npc.CurrentLocation || !target.IsAlive) return;
+
+        // Don't attack NPCs engaged with a player (in conversation, dungeon party, etc.)
+        if (target.IsInConversation || npc.IsInConversation) return;
 
         // Multi-round combat simulation (like a real fight, not a single punch)
         int rounds = 0;
@@ -5004,11 +5019,17 @@ public class WorldSimulator
 
                 // Pick a random aggressive NPC — only Dark or Evil alignment NPCs will attack sleepers
                 // (Good/Holy/Neutral NPCs don't murder people in their sleep)
+                // Also skip NPCs on the same team, or who are spouse/lover of the sleeping player
                 var alignmentSystem = new UsurperRemake.Systems.AlignmentSystem();
+                string sleeperTeam = SqlBackend.GetPlayerTeamName(sleeper.Username);
+                string sleeperName = sleeper.Username;
                 var eligibleNPCs = npcs
                     .Where(n => n.IsAlive && !n.IsDead && n.Level >= GameConfig.MinNPCLevelForSleeperAttack && !n.IsStoryNPC
                         && (alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Dark
-                         || alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil))
+                         || alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil)
+                        && (string.IsNullOrEmpty(sleeperTeam) || !sleeperTeam.Equals(n.Team, StringComparison.OrdinalIgnoreCase))
+                        && !n.SpouseName.Equals(sleeperName, StringComparison.OrdinalIgnoreCase)
+                        && !RelationshipSystem.IsMarriedOrLover(n.Name2, sleeperName))
                     .ToList();
 
                 if (eligibleNPCs.Count == 0) continue;

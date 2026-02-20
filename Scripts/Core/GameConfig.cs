@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.43.1";
+    public const string Version = "0.43.2";
     public const string VersionName = "Kings and Queens";
 
     // From Pascal global_maxXX constants
@@ -110,19 +110,20 @@ public static partial class GameConfig
 
     /// <summary>
     /// Global screen reader mode flag. Can be toggled pre-login from main menu/BBS menu.
-    /// ThreadStatic so each MUD session has its own value.
+    /// Uses AsyncLocal so each MUD session has its own value (ThreadStatic is NOT safe
+    /// with async/await — continuations can resume on different threads, losing the value).
     /// On player load, synced FROM player save. On player create, synced TO new player.
     /// </summary>
-    [System.ThreadStatic] private static bool? _screenReaderThread;
+    private static readonly System.Threading.AsyncLocal<bool?> _screenReaderAsync = new();
     private static bool _screenReaderGlobal = false;
 
     public static bool ScreenReaderMode
     {
-        get => _screenReaderThread ?? _screenReaderGlobal;
+        get => _screenReaderAsync.Value ?? _screenReaderGlobal;
         set
         {
             if (UsurperRemake.Server.SessionContext.IsActive)
-                _screenReaderThread = value;
+                _screenReaderAsync.Value = value;
             else
                 _screenReaderGlobal = value;
         }
@@ -460,14 +461,14 @@ public static partial class GameConfig
     public const float ReputationThresholdForReaction = 0.3f; // Min abs impression for reputation effects
     public const int ReputationFamousThreshold = 20;         // NPCs who heard about player for "famous" status
 
-    // NPC Permadeath System (v0.42.0)
-    public const float PermadeathChanceDungeonSolo = 0.08f;     // 8% for NPC dying alone in dungeon
-    public const float PermadeathChanceDungeonTeam = 0.05f;     // 5% for NPC dying with team
-    public const float PermadeathChanceNPCvsNPC = 0.04f;        // 4% for NPC-vs-NPC combat
-    public const float PermadeathChancePlayerKill = 0.12f;      // 12% for player killing NPC (non-murder)
-    public const float PermadeathChanceTeamWar = 0.04f;         // 4% for team war death
-    public const int PermadeathPopulationFloor = 40;            // Skip permadeath if alive NPCs < this
-    public const float PermadeathLevelReduction = 0.01f;        // Per NPC level: chance *= (1 - level * this)
+    // NPC Permadeath System (v0.42.0, rates halved in v0.43.2)
+    public const float PermadeathChanceDungeonSolo = 0.04f;     // 4% for NPC dying alone in dungeon (was 8%)
+    public const float PermadeathChanceDungeonTeam = 0.02f;     // 2% for NPC dying with team (was 5%)
+    public const float PermadeathChanceNPCvsNPC = 0.02f;        // 2% for NPC-vs-NPC combat (was 4%)
+    public const float PermadeathChancePlayerKill = 0.08f;      // 8% for player killing NPC (was 12%)
+    public const float PermadeathChanceTeamWar = 0.02f;         // 2% for team war death (was 4%)
+    public const int PermadeathPopulationFloor = 45;            // Skip permadeath if alive NPCs < this (was 40)
+    public const float PermadeathLevelReduction = 0.015f;       // Per NPC level: chance *= (1 - level * this) (was 0.01)
 
     // Blood Price / Murder Weight System (v0.42.0)
     public const float MurderWeightPerDeliberateMurder = 3.0f;  // Weight from deliberate murder

@@ -73,9 +73,7 @@ public class ArmorShopLocation : BaseLocation
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                              ARMOR SHOP                                     ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"ARMOR SHOP".PadLeft((77 + 10) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         terminal.SetColor("gray");

@@ -1136,6 +1136,7 @@ namespace UsurperRemake.Systems
                     PenaltyType = (int)quest.PenaltyType,
                     OfferedTo = quest.OfferedTo,
                     Forced = quest.Forced,
+                    TargetNPCName = quest.TargetNPCName ?? "",
                     Objectives = new List<QuestObjectiveData>(),
                     Monsters = new List<QuestMonsterData>()
                 };
@@ -2062,6 +2063,10 @@ namespace UsurperRemake.Systems
                                 Dowry = data.RoyalCourt.Spouse.Dowry,
                                 Happiness = data.RoyalCourt.Spouse.Happiness
                             };
+                        }
+                        else
+                        {
+                            king.Spouse = null; // Ensure old spouse doesn't carry over
                         }
 
                         // Restore active plots

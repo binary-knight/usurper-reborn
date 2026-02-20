@@ -483,6 +483,10 @@ namespace UsurperRemake.Systems
                             Happiness = royalCourt.Spouse.Happiness
                         };
                     }
+                    else
+                    {
+                        king.Spouse = null; // Ensure old spouse doesn't carry over
+                    }
 
                     // Restore plots
                     if (royalCourt.ActivePlots != null)

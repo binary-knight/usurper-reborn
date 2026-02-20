@@ -118,9 +118,7 @@ public class LevelMasterLocation : BaseLocation
         // Header - standardized format
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                          LEVEL MASTER'S SANCTUM                             ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"LEVEL MASTER'S SANCTUM".PadLeft((77 + 22) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         terminal.SetColor(currentMaster.Color);

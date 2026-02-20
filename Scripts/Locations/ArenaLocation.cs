@@ -76,9 +76,7 @@ public class ArenaLocation : BaseLocation
     {
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                            -= THE ARENA =-                                 ║");
-        terminal.SetColor("bright_red");
+        terminal.WriteLine($"║{"-= THE ARENA =-".PadLeft((78 + 15) / 2).PadRight(78)}║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.SetColor("gray");
         terminal.WriteLine("  Torches flicker along the walls of the combat pit. The crowd roars");

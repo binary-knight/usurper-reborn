@@ -4152,6 +4152,29 @@ public partial class CombatEngine
                 break;
 
             default:
+                // Check if any alive teammate would benefit from the item
+                if (lootItem.IsIdentified && currentTeammates != null && currentTeammates.Count > 0)
+                {
+                    var pickup = TryTeammatePickupItem(lootItem);
+                    if (pickup.HasValue)
+                    {
+                        var (teammate, upgradePercent) = pickup.Value;
+                        // Convert Item to Equipment for the teammate
+                        var teammateEquip = ConvertLootItemToEquipment(lootItem);
+                        if (teammateEquip != null)
+                        {
+                            EquipmentDatabase.RegisterDynamic(teammateEquip);
+                            if (teammate.EquipItem(teammateEquip, out _))
+                            {
+                                teammate.RecalculateStats();
+                                string teammateName = teammate.Name2 ?? teammate.Name1 ?? "Your ally";
+                                terminal.SetColor("bright_green");
+                                terminal.WriteLine($"{teammateName} picks {lootItem.Name} off the ground and equips it — a {upgradePercent}% upgrade!");
+                                break;
+                            }
+                        }
+                    }
+                }
                 terminal.SetColor("gray");
                 terminal.WriteLine("You leave the item behind.");
                 break;
@@ -4175,6 +4198,194 @@ public partial class CombatEngine
             LootGenerator.ItemRarity.Artifact => EquipmentRarity.Artifact,
             _ => EquipmentRarity.Common
         };
+    }
+
+    /// <summary>
+    /// Check if any alive teammate would benefit from a dropped loot item.
+    /// Returns the best candidate and the upgrade percentage, or null if no upgrade found.
+    /// </summary>
+    private (Character teammate, int upgradePercent)? TryTeammatePickupItem(Item lootItem)
+    {
+        if (currentTeammates == null || currentTeammates.Count == 0) return null;
+
+        // Determine target slot for this item type
+        EquipmentSlot targetSlot = lootItem.Type switch
+        {
+            global::ObjType.Weapon => EquipmentSlot.MainHand,
+            global::ObjType.Shield => EquipmentSlot.OffHand,
+            global::ObjType.Body => EquipmentSlot.Body,
+            global::ObjType.Head => EquipmentSlot.Head,
+            global::ObjType.Arms => EquipmentSlot.Arms,
+            global::ObjType.Hands => EquipmentSlot.Hands,
+            global::ObjType.Legs => EquipmentSlot.Legs,
+            global::ObjType.Feet => EquipmentSlot.Feet,
+            global::ObjType.Waist => EquipmentSlot.Waist,
+            global::ObjType.Neck => EquipmentSlot.Neck,
+            global::ObjType.Face => EquipmentSlot.Face,
+            global::ObjType.Fingers => EquipmentSlot.LFinger,
+            global::ObjType.Abody => EquipmentSlot.Cloak,
+            _ => EquipmentSlot.Body
+        };
+
+        bool isWeapon = lootItem.Type == global::ObjType.Weapon;
+        int itemPower = isWeapon ? lootItem.Attack : lootItem.Armor;
+
+        Character? bestCandidate = null;
+        int bestUpgradePercent = 0;
+
+        foreach (var teammate in currentTeammates)
+        {
+            if (!teammate.IsAlive) continue;
+
+            // Check level requirement
+            if (lootItem.MinLevel > 0 && teammate.Level < lootItem.MinLevel) continue;
+
+            var currentEquip = teammate.GetEquipment(targetSlot);
+            int currentPower = 0;
+            if (currentEquip != null)
+            {
+                currentPower = isWeapon ? currentEquip.WeaponPower : currentEquip.ArmorClass;
+            }
+
+            // Only pick up if it's strictly better
+            if (itemPower <= currentPower) continue;
+
+            int upgradePercent;
+            if (currentPower == 0)
+                upgradePercent = 100; // Empty slot = 100% upgrade
+            else
+                upgradePercent = (int)(((double)(itemPower - currentPower) / currentPower) * 100);
+
+            if (upgradePercent > bestUpgradePercent)
+            {
+                bestUpgradePercent = upgradePercent;
+                bestCandidate = teammate;
+            }
+        }
+
+        if (bestCandidate != null && bestUpgradePercent > 0)
+            return (bestCandidate, bestUpgradePercent);
+
+        return null;
+    }
+
+    /// <summary>
+    /// Convert a loot Item into an Equipment object (same logic as the Equip path).
+    /// </summary>
+    private Equipment? ConvertLootItemToEquipment(Item lootItem)
+    {
+        Equipment equipment;
+        if (lootItem.Type == global::ObjType.Weapon)
+        {
+            var knownEquip = EquipmentDatabase.GetByName(lootItem.Name);
+            var lootHandedness = knownEquip?.Handedness ?? WeaponHandedness.OneHanded;
+            var lootWeaponType = knownEquip?.WeaponType ?? WeaponType.Sword;
+
+            equipment = Equipment.CreateWeapon(
+                id: 10000 + random.Next(10000),
+                name: lootItem.Name,
+                handedness: lootHandedness,
+                weaponType: lootWeaponType,
+                power: lootItem.Attack,
+                value: lootItem.Value,
+                rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
+            );
+        }
+        else
+        {
+            EquipmentSlot itemSlot = lootItem.Type switch
+            {
+                global::ObjType.Shield => EquipmentSlot.OffHand,
+                global::ObjType.Body => EquipmentSlot.Body,
+                global::ObjType.Head => EquipmentSlot.Head,
+                global::ObjType.Arms => EquipmentSlot.Arms,
+                global::ObjType.Hands => EquipmentSlot.Hands,
+                global::ObjType.Legs => EquipmentSlot.Legs,
+                global::ObjType.Feet => EquipmentSlot.Feet,
+                global::ObjType.Waist => EquipmentSlot.Waist,
+                global::ObjType.Neck => EquipmentSlot.Neck,
+                global::ObjType.Face => EquipmentSlot.Face,
+                global::ObjType.Fingers => EquipmentSlot.LFinger,
+                global::ObjType.Abody => EquipmentSlot.Cloak,
+                _ => EquipmentSlot.Body
+            };
+
+            if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
+            {
+                equipment = Equipment.CreateAccessory(
+                    id: 10000 + random.Next(10000),
+                    name: lootItem.Name,
+                    slot: itemSlot,
+                    value: lootItem.Value,
+                    rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
+                );
+            }
+            else
+            {
+                equipment = Equipment.CreateArmor(
+                    id: 10000 + random.Next(10000),
+                    name: lootItem.Name,
+                    slot: itemSlot,
+                    armorType: ArmorType.Chain,
+                    ac: lootItem.Armor,
+                    value: lootItem.Value,
+                    rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
+                );
+            }
+        }
+
+        equipment.MinLevel = lootItem.MinLevel;
+
+        // Apply bonus stats
+        if (lootItem.Strength != 0) equipment = equipment.WithStrength(lootItem.Strength);
+        if (lootItem.Dexterity != 0) equipment = equipment.WithDexterity(lootItem.Dexterity);
+        if (lootItem.Wisdom != 0) equipment = equipment.WithWisdom(lootItem.Wisdom);
+        if (lootItem.HP != 0) equipment = equipment.WithMaxHP(lootItem.HP);
+        if (lootItem.Mana != 0) equipment = equipment.WithMaxMana(lootItem.Mana);
+        if (lootItem.Defence != 0) equipment = equipment.WithDefence(lootItem.Defence);
+        if (lootItem.IsCursed) equipment.IsCursed = true;
+
+        // Transfer enchantment effects
+        if (lootItem.LootEffects != null && lootItem.LootEffects.Count > 0)
+        {
+            foreach (var (effectType, value) in lootItem.LootEffects)
+            {
+                var effect = (LootGenerator.SpecialEffect)effectType;
+                switch (effect)
+                {
+                    case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
+                    case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
+                    case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
+                    case LootGenerator.SpecialEffect.PoisonDamage:
+                        equipment.HasPoisonEnchant = true;
+                        equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
+                        break;
+                    case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
+                    case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
+                    case LootGenerator.SpecialEffect.LifeSteal:
+                        equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
+                    case LootGenerator.SpecialEffect.ManaSteal:
+                        equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
+                    case LootGenerator.SpecialEffect.CriticalStrike:
+                        equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
+                    case LootGenerator.SpecialEffect.CriticalDamage:
+                        equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
+                    case LootGenerator.SpecialEffect.ArmorPiercing:
+                        equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
+                    case LootGenerator.SpecialEffect.Thorns:
+                        equipment.Thorns = Math.Max(equipment.Thorns, value); break;
+                    case LootGenerator.SpecialEffect.Regeneration:
+                        equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
+                    case LootGenerator.SpecialEffect.ManaRegen:
+                        equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
+                    case LootGenerator.SpecialEffect.MagicResist:
+                        equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
+                }
+            }
+        }
+
+        equipment.EnforceMinLevelFromPower();
+        return equipment;
     }
 
     /// <summary>
@@ -6849,7 +7060,27 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("magenta");
         terminal.WriteLine($"You cast {spellInfo.Name}!");
-        terminal.WriteLine(spellResult.Message);
+
+        // When targeting an ally, strip the spell effect portion from the message
+        // (caster-named heal/buff text) since the correct target messages are shown by ApplySpellEffects
+        var displayMsg = spellResult.Message;
+        if (action.AllyTargetIndex.HasValue && (spellInfo.SpellType == "Heal" || spellInfo.SpellType == "Buff"))
+        {
+            // Keep incantation + CRITICAL CAST, strip spell-specific effect message
+            int critIdx = displayMsg.IndexOf("CRITICAL CAST!");
+            if (critIdx >= 0)
+            {
+                displayMsg = displayMsg.Substring(0, critIdx + "CRITICAL CAST!".Length);
+            }
+            else
+            {
+                // Cut after magic words: "'!" marks end of incantation
+                int magicEnd = displayMsg.IndexOf("'!");
+                if (magicEnd >= 0)
+                    displayMsg = displayMsg.Substring(0, magicEnd + 2);
+            }
+        }
+        terminal.WriteLine(displayMsg);
         await Task.Delay(GetCombatDelay(1000));
 
         // Only apply effects if spell succeeded (not fumbled/failed)
@@ -6860,15 +7091,23 @@ public partial class CombatEngine
         }
 
         // Handle buff/heal spells - apply effects to caster or targeted ally
+        // AllyTargetIndex is a stable index into currentTeammates (not a filtered list)
         if (spellInfo.SpellType == "Buff" || spellInfo.SpellType == "Heal")
         {
-            // Check if healing an ally
-            if (spellInfo.SpellType == "Heal" && action.AllyTargetIndex.HasValue && currentTeammates != null)
+            if (action.AllyTargetIndex.HasValue && currentTeammates != null
+                && action.AllyTargetIndex.Value < currentTeammates.Count)
             {
-                var injuredAllies = currentTeammates.Where(t => t.IsAlive && t.HP < t.MaxHP).ToList();
-                if (action.AllyTargetIndex.Value < injuredAllies.Count)
+                var allyTarget = currentTeammates[action.AllyTargetIndex.Value];
+
+                if (!allyTarget.IsAlive)
                 {
-                    var allyTarget = injuredAllies[action.AllyTargetIndex.Value];
+                    // Ally died between selection and execution — fall back to self
+                    ApplySpellEffects(player, null, spellResult);
+                    result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
+                }
+                else if (spellInfo.SpellType == "Heal")
+                {
+                    // Heal ally
                     if (spellResult.Healing > 0)
                     {
                         long oldHP = allyTarget.HP;
@@ -6886,16 +7125,16 @@ public partial class CombatEngine
                     }
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {allyTarget.DisplayName}.");
                 }
-                else
+                else // Buff targeting ally
                 {
-                    // Invalid target, heal self instead
-                    ApplySpellEffects(player, null, spellResult);
-                    result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
+                    // Apply all buff effects (protection, attack, special) to the ally
+                    ApplySpellEffects(allyTarget, null, spellResult);
+                    result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {allyTarget.DisplayName}.");
                 }
             }
             else
             {
-                // Self-targeting
+                // Self-targeting (no ally selected, or invalid index)
                 ApplySpellEffects(player, null, spellResult);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
             }
@@ -7478,53 +7717,125 @@ public partial class CombatEngine
 
     /// <summary>
     /// Prompt player to select heal target (self or ally)
-    /// Returns null for self, or index of teammate to heal
+    /// Returns null for self, or index into currentTeammates
     /// </summary>
     private async Task<int?> SelectHealTarget(Character player)
     {
         var injuredAllies = currentTeammates?.Where(t => t.IsAlive && t.HP < t.MaxHP).ToList() ?? new List<Character>();
 
-        terminal.WriteLine("");
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("Select heal target:");
-
-        // Self option (guard against division by zero)
-        int playerHpPercent = player.MaxHP > 0 ? (int)(100 * player.HP / player.MaxHP) : 100;
-        string playerHpColor = playerHpPercent < 25 ? "red" : playerHpPercent < 50 ? "yellow" : "green";
-        terminal.SetColor(playerHpColor);
-        terminal.WriteLine($"  [0] Self - HP: {player.HP}/{player.MaxHP} ({playerHpPercent}%)");
-
-        // Ally options
-        for (int i = 0; i < injuredAllies.Count; i++)
+        while (true)
         {
-            var ally = injuredAllies[i];
-            int hpPercent = ally.MaxHP > 0 ? (int)(100 * ally.HP / ally.MaxHP) : 100;
-            string hpColor = hpPercent < 25 ? "red" : hpPercent < 50 ? "yellow" : "green";
-            terminal.SetColor(hpColor);
-            terminal.WriteLine($"  [{i + 1}] {ally.DisplayName} - HP: {ally.HP}/{ally.MaxHP} ({hpPercent}%)");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("Select heal target:");
+
+            // Self option (guard against division by zero)
+            int playerHpPercent = player.MaxHP > 0 ? (int)(100 * player.HP / player.MaxHP) : 100;
+            string playerHpColor = playerHpPercent < 25 ? "red" : playerHpPercent < 50 ? "yellow" : "green";
+            terminal.SetColor(playerHpColor);
+            terminal.WriteLine($"  [0] Self - HP: {player.HP}/{player.MaxHP} ({playerHpPercent}%)");
+
+            // Ally options
+            for (int i = 0; i < injuredAllies.Count; i++)
+            {
+                var ally = injuredAllies[i];
+                int hpPercent = ally.MaxHP > 0 ? (int)(100 * ally.HP / ally.MaxHP) : 100;
+                string hpColor = hpPercent < 25 ? "red" : hpPercent < 50 ? "yellow" : "green";
+                terminal.SetColor(hpColor);
+                terminal.WriteLine($"  [{i + 1}] {ally.DisplayName} - HP: {ally.HP}/{ally.MaxHP} ({hpPercent}%)");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.Write("Target: ");
+            var input = await terminal.GetInput("");
+
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return null; // Empty input = self
+            }
+
+            if (!int.TryParse(input, out int choice))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Invalid target. Enter a number from the list above.");
+                continue;
+            }
+
+            if (choice == 0)
+            {
+                return null; // Self
+            }
+
+            if (choice >= 1 && choice <= injuredAllies.Count)
+            {
+                // Map back to stable currentTeammates index so the reference
+                // survives teammate HP changes between selection and execution
+                var selectedAlly = injuredAllies[choice - 1];
+                int teammateIdx = currentTeammates?.IndexOf(selectedAlly) ?? -1;
+                return teammateIdx >= 0 ? teammateIdx : choice - 1;
+            }
+
+            terminal.SetColor("red");
+            terminal.WriteLine($"Invalid target. Choose 0-{injuredAllies.Count}.");
         }
+    }
 
-        terminal.WriteLine("");
-        terminal.SetColor("white");
-        terminal.Write("Target: ");
-        var input = await terminal.GetInput("");
+    /// <summary>
+    /// Prompt player to select buff/spell target (self or any alive ally)
+    /// Returns null for self, or index into currentTeammates
+    /// </summary>
+    private async Task<int?> SelectBuffTarget(Character player)
+    {
+        var aliveAllies = currentTeammates?.Where(t => t.IsAlive).ToList() ?? new List<Character>();
 
-        if (!int.TryParse(input, out int choice))
+        while (true)
         {
-            return null; // Default to self
-        }
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("Select target:");
 
-        if (choice == 0)
-        {
-            return null; // Self
-        }
+            terminal.SetColor("green");
+            terminal.WriteLine($"  [0] Self");
 
-        if (choice >= 1 && choice <= injuredAllies.Count)
-        {
-            return choice - 1; // Return index into currentTeammates
-        }
+            for (int i = 0; i < aliveAllies.Count; i++)
+            {
+                var ally = aliveAllies[i];
+                int hpPercent = ally.MaxHP > 0 ? (int)(100 * ally.HP / ally.MaxHP) : 100;
+                string hpColor = hpPercent < 50 ? "yellow" : "white";
+                terminal.SetColor(hpColor);
+                terminal.WriteLine($"  [{i + 1}] {ally.DisplayName} - HP: {ally.HP}/{ally.MaxHP}");
+            }
 
-        return null; // Invalid, default to self
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.Write("Target: ");
+            var input = await terminal.GetInput("");
+
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return null; // Empty input = self
+            }
+
+            if (!int.TryParse(input, out int choice))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Invalid target. Enter a number from the list above.");
+                continue;
+            }
+
+            if (choice == 0) return null; // Self
+            if (choice >= 1 && choice <= aliveAllies.Count)
+            {
+                // Map back to stable currentTeammates index
+                var selectedAlly = aliveAllies[choice - 1];
+                int teammateIdx = currentTeammates?.IndexOf(selectedAlly) ?? -1;
+                return teammateIdx >= 0 ? teammateIdx : choice - 1;
+            }
+
+            terminal.SetColor("red");
+            terminal.WriteLine($"Invalid target. Choose 0-{aliveAllies.Count}.");
+        }
     }
 
     /// <summary>
@@ -11945,9 +12256,16 @@ public partial class CombatEngine
             if (spellInfo.SpellType == "Buff" || spellInfo.SpellType == "Heal")
             {
                 int? allyTarget = null;
-                if (spellInfo.SpellType == "Heal" && currentTeammates?.Any(t => t.IsAlive && t.HP < t.MaxHP) == true)
+                if (currentTeammates?.Any(t => t.IsAlive) == true)
                 {
-                    allyTarget = await SelectHealTarget(player);
+                    if (spellInfo.SpellType == "Heal" && currentTeammates.Any(t => t.IsAlive && t.HP < t.MaxHP))
+                    {
+                        allyTarget = await SelectHealTarget(player);
+                    }
+                    else if (spellInfo.SpellType == "Buff")
+                    {
+                        allyTarget = await SelectBuffTarget(player);
+                    }
                 }
                 return (CombatActionType.CastSpell, null, "", spLevel.Value, allyTarget, false);
             }

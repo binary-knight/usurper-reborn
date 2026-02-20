@@ -143,7 +143,8 @@ namespace UsurperRemake.Systems
                     terminal.Write($" - {item.Value:N0}g");
 
                     var stats = new List<string>();
-                    if (item.Attack > 0) stats.Add($"Att:{item.Attack}");
+                    if (item.Attack > 0) stats.Add($"WP:{item.Attack}");
+                    if (item.Armor > 0) stats.Add($"AC:{item.Armor}");
                     if (item.Defence > 0) stats.Add($"Def:{item.Defence}");
                     if (item.Strength != 0) stats.Add($"Str:{item.Strength:+#;-#;0}");
                     if (item.Dexterity != 0) stats.Add($"Dex:{item.Dexterity:+#;-#;0}");
@@ -422,7 +423,8 @@ namespace UsurperRemake.Systems
 
                 // Show stats
                 var stats = new List<string>();
-                if (item.Attack > 0) stats.Add($"Attack: +{item.Attack}");
+                if (item.Attack > 0) stats.Add($"Weapon Power: +{item.Attack}");
+                if (item.Armor > 0) stats.Add($"Armor Class: +{item.Armor}");
                 if (item.Defence > 0) stats.Add($"Defence: +{item.Defence}");
                 if (item.Strength != 0) stats.Add($"Strength: {item.Strength:+#;-#;0}");
                 if (item.Dexterity != 0) stats.Add($"Dexterity: {item.Dexterity:+#;-#;0}");
@@ -658,6 +660,115 @@ namespace UsurperRemake.Systems
                 if (finalSlot == null)
                 {
                     terminal.WriteLine("Cancelled.", "gray");
+                    await Task.Delay(1000);
+                    return;
+                }
+            }
+
+            // Show comparison with currently equipped item
+            EquipmentSlot compareSlot = finalSlot ?? targetSlot;
+            var currentEquip = player.GetEquipment(compareSlot);
+
+            if (currentEquip != null)
+            {
+                string slotDisplayName = compareSlot switch
+                {
+                    EquipmentSlot.MainHand => "Main Hand",
+                    EquipmentSlot.OffHand => "Off Hand",
+                    EquipmentSlot.LFinger => "Left Ring",
+                    EquipmentSlot.RFinger => "Right Ring",
+                    EquipmentSlot.Neck => "Necklace",
+                    _ => compareSlot.ToString()
+                };
+
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  ─────────────────────────────────────");
+                terminal.SetColor("white");
+                terminal.WriteLine($"  COMPARISON ({slotDisplayName} slot):");
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  Currently Equipped: {currentEquip.Name}");
+
+                // Compare primary stat
+                if (item.Type == ObjType.Weapon)
+                {
+                    int currentPower = currentEquip.WeaponPower;
+                    int newPower = equipment.WeaponPower;
+                    int diff = newPower - currentPower;
+                    terminal.SetColor("white");
+                    terminal.Write($"  Attack: {currentPower} -> {newPower} ");
+                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine($"(+{diff} UPGRADE)"); }
+                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine($"({diff} downgrade)"); }
+                    else { terminal.SetColor("yellow"); terminal.WriteLine("(same)"); }
+                }
+                else if (item.Type == ObjType.Fingers || item.Type == ObjType.Neck ||
+                         (item.Type == ObjType.Magic && ((int)item.MagicType == 5 || (int)item.MagicType == 10)))
+                {
+                    int currentStatTotal = currentEquip.StrengthBonus + currentEquip.DexterityBonus +
+                        currentEquip.WisdomBonus + currentEquip.MaxHPBonus + currentEquip.MaxManaBonus +
+                        currentEquip.DefenceBonus + currentEquip.AgilityBonus + currentEquip.ConstitutionBonus +
+                        currentEquip.IntelligenceBonus + currentEquip.CharismaBonus;
+                    int newStatTotal = equipment.StrengthBonus + equipment.DexterityBonus +
+                        equipment.WisdomBonus + equipment.MaxHPBonus + equipment.MaxManaBonus +
+                        equipment.DefenceBonus + equipment.AgilityBonus + equipment.ConstitutionBonus +
+                        equipment.IntelligenceBonus + equipment.CharismaBonus;
+                    int diff = newStatTotal - currentStatTotal;
+                    terminal.SetColor("white");
+                    terminal.Write($"  Stat Total: {currentStatTotal} -> {newStatTotal} ");
+                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine($"(+{diff} UPGRADE)"); }
+                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine($"({diff} downgrade)"); }
+                    else { terminal.SetColor("yellow"); terminal.WriteLine("(same)"); }
+                }
+                else
+                {
+                    int currentAC = currentEquip.ArmorClass;
+                    int newAC = equipment.ArmorClass;
+                    int diff = newAC - currentAC;
+                    terminal.SetColor("white");
+                    terminal.Write($"  Armor: {currentAC} -> {newAC} ");
+                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine($"(+{diff} UPGRADE)"); }
+                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine($"({diff} downgrade)"); }
+                    else { terminal.SetColor("yellow"); terminal.WriteLine("(same)"); }
+                }
+
+                // Compare bonus stats
+                var currentBonuses = new List<string>();
+                var newBonuses = new List<string>();
+                if (currentEquip.StrengthBonus != 0) currentBonuses.Add($"Str {currentEquip.StrengthBonus:+#;-#;0}");
+                if (currentEquip.DexterityBonus != 0) currentBonuses.Add($"Dex {currentEquip.DexterityBonus:+#;-#;0}");
+                if (currentEquip.WisdomBonus != 0) currentBonuses.Add($"Wis {currentEquip.WisdomBonus:+#;-#;0}");
+                if (currentEquip.MaxHPBonus != 0) currentBonuses.Add($"HP {currentEquip.MaxHPBonus:+#;-#;0}");
+                if (currentEquip.MaxManaBonus != 0) currentBonuses.Add($"Mana {currentEquip.MaxManaBonus:+#;-#;0}");
+                if (currentEquip.DefenceBonus != 0) currentBonuses.Add($"Def {currentEquip.DefenceBonus:+#;-#;0}");
+                if (equipment.StrengthBonus != 0) newBonuses.Add($"Str {equipment.StrengthBonus:+#;-#;0}");
+                if (equipment.DexterityBonus != 0) newBonuses.Add($"Dex {equipment.DexterityBonus:+#;-#;0}");
+                if (equipment.WisdomBonus != 0) newBonuses.Add($"Wis {equipment.WisdomBonus:+#;-#;0}");
+                if (equipment.MaxHPBonus != 0) newBonuses.Add($"HP {equipment.MaxHPBonus:+#;-#;0}");
+                if (equipment.MaxManaBonus != 0) newBonuses.Add($"Mana {equipment.MaxManaBonus:+#;-#;0}");
+                if (equipment.DefenceBonus != 0) newBonuses.Add($"Def {equipment.DefenceBonus:+#;-#;0}");
+
+                if (currentBonuses.Count > 0 || newBonuses.Count > 0)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(currentBonuses.Count > 0
+                        ? $"  Current bonuses: {string.Join(", ", currentBonuses)}"
+                        : "  Current bonuses: (none)");
+                    terminal.WriteLine(newBonuses.Count > 0
+                        ? $"  New bonuses: {string.Join(", ", newBonuses)}"
+                        : "  New bonuses: (none)");
+                }
+
+                terminal.SetColor("gray");
+                terminal.WriteLine("  ─────────────────────────────────────");
+                terminal.WriteLine("");
+
+                terminal.SetColor("white");
+                terminal.Write("Equip this item? (Y/N): ");
+                var confirm = await terminal.GetInput("");
+                if (confirm.ToUpper() != "Y")
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("Cancelled.");
                     await Task.Delay(1000);
                     return;
                 }

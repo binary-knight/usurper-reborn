@@ -3053,6 +3053,9 @@ public abstract class BaseLocation
     /// </summary>
     protected virtual async Task InteractWithNPC(NPC npc)
     {
+        npc.IsInConversation = true; // Protect from world sim during interaction
+        try
+        {
         bool stayInConversation = true;
         bool isFirstGreeting = true;
 
@@ -3233,6 +3236,8 @@ public abstract class BaseLocation
                     break;
             }
         }
+        }
+        finally { npc.IsInConversation = false; }
     }
 
     /// <summary>
@@ -3241,6 +3246,9 @@ public abstract class BaseLocation
     /// </summary>
     private async Task ChatWithNPC(NPC npc)
     {
+        npc.IsInConversation = true; // Protect from world sim while chatting
+        try
+        {
         terminal.WriteLine("");
 
         // Use the dynamic dialogue system for small talk
@@ -3270,6 +3278,8 @@ public abstract class BaseLocation
 
         terminal.WriteLine("");
         await terminal.PressAnyKey();
+        }
+        finally { npc.IsInConversation = false; }
     }
 
     /// <summary>
@@ -5823,9 +5833,7 @@ public abstract class BaseLocation
             // Header
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("║                             AUCTION HOUSE                                   ║");
-            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"║{"AUCTION HOUSE".PadLeft((77 + 13) / 2).PadRight(77)}║");
             terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -5962,11 +5970,11 @@ public abstract class BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write(" [");
             terminal.SetColor("bright_yellow");
-            terminal.Write("Q");
+            terminal.Write("R");
             terminal.SetColor("darkgray");
             terminal.Write("]");
             terminal.SetColor("white");
-            terminal.Write("uit to Town           ");
+            terminal.Write("eturn to Town         ");
 
             if (npcsHere.Count > 0)
             {
@@ -5989,7 +5997,7 @@ public abstract class BaseLocation
             string input = await terminal.GetInput("Your choice: ");
             input = input?.Trim().ToUpper() ?? "";
 
-            if (input == "Q" || input == "") break;
+            if (input == "R" || input == "Q" || input == "") break;
 
             switch (input)
             {

@@ -66,9 +66,9 @@ public class HomeLocation : BaseLocation
 
         // Header
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("+==========================================================+");
-        terminal.WriteLine("|                      YOUR HOME                           |");
-        terminal.WriteLine("+==========================================================+");
+        terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine($"║{"YOUR HOME".PadLeft((77 + 9) / 2).PadRight(77)}║");
+        terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
         // Quick stats bar
@@ -1291,6 +1291,9 @@ terminal.SetColor("darkgray");
 
     private async Task SpendQualityTime(NPC partner, string relationType)
     {
+        partner.IsInConversation = true; // Protect from world sim during romantic interaction
+        try
+        {
         terminal.WriteLine("\n", "white");
         terminal.SetColor("bright_magenta");
         terminal.WriteLine($"You spend quality time with {partner.Name}...");
@@ -1412,6 +1415,8 @@ terminal.SetColor("darkgray");
         }
 
         await terminal.WaitForKey();
+        }
+        finally { partner.IsInConversation = false; }
     }
 
     private async Task DiscussRelationship(NPC spouse)

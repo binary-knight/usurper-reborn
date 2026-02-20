@@ -703,6 +703,13 @@ public class Character
     /// </summary>
     public void RecalculateStats()
     {
+        // Save current HP/Mana before recalculation — ApplyToCharacter() clamps
+        // HP/Mana on each call, but MaxHP isn't final until after Constitution bonus,
+        // King bonus, etc. are applied. Without this, HP gets incorrectly clamped to
+        // BaseMaxHP + equipment bonuses (missing the Constitution HP bonus).
+        var savedHP = HP;
+        var savedMana = Mana;
+
         // Start from base values
         Strength = BaseStrength;
         Dexterity = BaseDexterity;
@@ -749,7 +756,10 @@ public class Character
             MaxHP = (long)(MaxHP * GameConfig.KingCombatHPBonus);
         }
 
-        // Keep current HP/Mana within bounds
+        // Restore saved HP/Mana and clamp to final MaxHP/MaxMana
+        // (the per-item ApplyToCharacter clamps were premature since MaxHP wasn't complete)
+        HP = savedHP;
+        Mana = savedMana;
         var hpBefore = HP;
         HP = Math.Min(HP, MaxHP);
         // Log if HP was clamped (helps debug HP not saving correctly)

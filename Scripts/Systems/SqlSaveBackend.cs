@@ -398,6 +398,30 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// Lightweight lookup of a player's team name from their save JSON without deserializing the full save.
+        /// </summary>
+        public string GetPlayerTeamName(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT json_extract(player_data, '$.Player.Team')
+                    FROM players
+                    WHERE LOWER(username) = LOWER(@username) AND is_banned = 0
+                    ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@username", username);
+                var result = cmd.ExecuteScalar();
+                return result as string ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
         public async Task<SaveGameData?> ReadGameDataByFileName(string fileName)
         {
             // In SQL mode, "fileName" is treated as a username

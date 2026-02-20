@@ -72,9 +72,7 @@ public class CastleLocation : BaseLocation
         // Header - standardized format
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                            THE ROYAL CASTLE                                 ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"THE ROYAL CASTLE".PadLeft((77 + 16) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -128,9 +126,7 @@ public class CastleLocation : BaseLocation
         // Header - standardized format
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("║                        OUTSIDE THE ROYAL CASTLE                             ║");
-        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"║{"OUTSIDE THE ROYAL CASTLE".PadLeft((77 + 24) / 2).PadRight(77)}║");
         terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -4756,6 +4752,9 @@ public class CastleLocation : BaseLocation
             // Crown new monarch — inherit the previous king's treasury and orphans
             long inheritedTreasury = currentKing.Treasury;
             var inheritedOrphans = currentKing?.Orphans?.ToList();
+            string oldKingName = currentKing.Name;
+            bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
+            ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before replacing
             currentPlayer.King = true;
             currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
             currentKing.Treasury = inheritedTreasury;
@@ -4767,6 +4766,10 @@ public class CastleLocation : BaseLocation
             UsurperRemake.Systems.ArchetypeTracker.Instance.RecordBecameKing();
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has seized the throne! Long live the new {currentKing.GetTitle()}!");
+
+            // Notify the dethroned player
+            if (oldKingWasHuman)
+                NotifyDethronedPlayer(oldKingName, currentPlayer.DisplayName, "defeated you in combat");
 
             // Persist to world_state so world sim and other players see the new king immediately
             PersistRoyalCourtToWorldState();
@@ -4858,6 +4861,7 @@ public class CastleLocation : BaseLocation
 
         // Crown the new monarch — inherit any orphans from previous reign
         var inheritedOrphans = currentKing?.Orphans?.ToList();
+        ClearRoyalMarriage(currentKing); // Clear old king's royal spouse if any
         currentPlayer.King = true;
         currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
         playerIsKing = true;
@@ -4929,6 +4933,7 @@ public class CastleLocation : BaseLocation
             currentPlayer.King = false;
             currentPlayer.RoyalMercenaries?.Clear(); // Dismiss bodyguards on abdication
             currentPlayer.RecalculateStats(); // Remove Royal Authority HP bonus
+            ClearRoyalMarriage(currentKing); // Clear royal spouse before abdication
             currentKing.IsActive = false;
             currentKing = null;
             playerIsKing = false;
@@ -6276,6 +6281,7 @@ public class CastleLocation : BaseLocation
     /// </summary>
     private void CrownNPC(NPC npc)
     {
+        ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before crowning NPC
         currentKing = new King
         {
             Name = npc.DisplayName,
@@ -6319,6 +6325,58 @@ public class CastleLocation : BaseLocation
     public static void SetMonarchHistory(List<MonarchRecord> history)
     {
         monarchHistory = history ?? new List<MonarchRecord>();
+    }
+
+    /// <summary>
+    /// Notify a dethroned player via system message.
+    /// Their King flag will sync from world_state on next login or castle entry.
+    /// </summary>
+    private void NotifyDethronedPlayer(string oldKingName, string newKingName, string reason)
+    {
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                if (backend == null) return;
+
+                await backend.SendMessage("System", oldKingName, "system",
+                    $"You have been DETHRONED! {newKingName} {reason} and now sits on the throne. " +
+                    $"Your reign has ended.");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("CASTLE", $"Failed to notify dethroned player {oldKingName}: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Clear the outgoing king's royal marriage state (spouse NPC + marriage registry).
+    /// Must be called BEFORE overwriting currentKing when the throne changes hands.
+    /// </summary>
+    private static void ClearRoyalMarriage(King outgoingKing)
+    {
+        if (outgoingKing?.Spouse == null) return;
+
+        var spouseName = outgoingKing.Spouse.Name;
+        outgoingKing.Spouse = null;
+
+        // Clear marriage state on the NPC
+        var spouseNPC = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.Name == spouseName);
+        if (spouseNPC != null)
+        {
+            spouseNPC.Married = false;
+            spouseNPC.IsMarried = false;
+            spouseNPC.SpouseName = "";
+        }
+
+        // Clear marriage registry entry for the old king
+        NPCMarriageRegistry.Instance?.EndMarriage(outgoingKing.Name);
+
+        DebugLogger.Instance.LogInfo("CASTLE", $"Cleared royal marriage to {spouseName} (throne changed)");
     }
 
     /// <summary>
@@ -7298,6 +7356,8 @@ public class CastleLocation : BaseLocation
         // Crown new monarch — inherit the previous king's treasury and orphans
         long inheritedTreasury = currentKing.Treasury;
         var inheritedOrphans = currentKing?.Orphans?.ToList();
+        bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
+        ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before replacing
         currentPlayer.King = true;
         currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
         currentKing.Treasury = inheritedTreasury;
@@ -7316,6 +7376,10 @@ public class CastleLocation : BaseLocation
         UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
             $"{siegeTeam} has conquered the castle! {currentPlayer.DisplayName} overthrew {oldKingName} and claims the throne!",
             "siege");
+
+        // Notify the dethroned player
+        if (oldKingWasHuman)
+            NotifyDethronedPlayer(oldKingName, currentPlayer.DisplayName, $"was overthrown by {siegeTeam}'s siege");
 
         // Persist royal court changes
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)

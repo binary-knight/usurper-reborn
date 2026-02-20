@@ -875,6 +875,7 @@ public partial class QuestSystem : Node
                 PenaltyType = (QuestRewardType)questData.PenaltyType,
                 OfferedTo = questData.OfferedTo,
                 Forced = questData.Forced,
+                TargetNPCName = questData.TargetNPCName ?? "",
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed
             };
 
@@ -950,6 +951,7 @@ public partial class QuestSystem : Node
                 PenaltyType = (QuestRewardType)questData.PenaltyType,
                 OfferedTo = questData.OfferedTo,
                 Forced = questData.Forced,
+                TargetNPCName = questData.TargetNPCName ?? "",
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed
             };
 

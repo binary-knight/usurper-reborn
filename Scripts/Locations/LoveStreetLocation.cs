@@ -111,9 +111,9 @@ public class LoveStreetLocation : BaseLocation
         terminal.ClearScreen();
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine("+---------------------------------------------------------------------------+");
-        terminal.WriteLine("|                           <3 LOVE STREET <3                                  |");
-        terminal.WriteLine("+---------------------------------------------------------------------------+");
+        terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine($"║{"<3 LOVE STREET <3".PadLeft((77 + 17) / 2).PadRight(77)}║");
+        terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -126,11 +126,9 @@ public class LoveStreetLocation : BaseLocation
         ShowNPCsInLocation();
 
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("+---------------------------------------------------------------------------+");
-        terminal.SetColor("bright_magenta");
-        terminal.WriteLine("|                        -= PLEASURE AWAITS =-                                |");
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine("+---------------------------------------------------------------------------+");
+        terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine($"║{"-= PLEASURE AWAITS =-".PadLeft((77 + 21) / 2).PadRight(77)}║");
+        terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
         // Pleasure Houses
@@ -989,6 +987,9 @@ public class LoveStreetLocation : BaseLocation
 
     private async Task MingleWithNPC(NPC npc)
     {
+        npc.IsInConversation = true; // Protect from world sim during romantic interaction
+        try
+        {
         bool stayInMenu = true;
         while (stayInMenu)
         {
@@ -1113,6 +1114,8 @@ public class LoveStreetLocation : BaseLocation
                     break;
             }
         }
+        }
+        finally { npc.IsInConversation = false; }
     }
 
     private async Task FlirtWithNPC(NPC npc)
