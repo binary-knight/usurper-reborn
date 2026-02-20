@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.43.0";
+    public const string Version = "0.43.1";
     public const string VersionName = "Kings and Queens";
 
     // From Pascal global_maxXX constants

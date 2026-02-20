@@ -718,6 +718,24 @@ namespace UsurperRemake.BBS
                 {
                     UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "Using Standard I/O mode (--stdio flag)");
                     _sessionInfo.CommType = ConnectionType.Local;
+
+                    // BBS door with stdio = user is on a CP437 terminal (SyncTERM, NetRunner, etc.)
+                    // Set Console.OutputEncoding to CP437 so Unicode box-drawing chars are
+                    // automatically converted to single-byte CP437 equivalents on output.
+                    // Excludes MUD server/relay/worldsim which use stream-based I/O, not Console.
+                    if (!_mudServerMode && !_mudRelayMode && !_worldSimMode)
+                    {
+                        try
+                        {
+                            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                            Console.OutputEncoding = System.Text.Encoding.GetEncoding(437);
+                            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BBS", "Console output encoding set to CP437 for BBS terminal compatibility");
+                        }
+                        catch (Exception ex)
+                        {
+                            UsurperRemake.Systems.DebugLogger.Instance.LogWarning("BBS", $"Could not set CP437 encoding: {ex.Message}");
+                        }
+                    }
                 }
 
                 // Use socket terminal for telnet or local connections
