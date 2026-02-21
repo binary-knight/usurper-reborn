@@ -314,6 +314,35 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Export all string-based story flags for serialization
+        /// </summary>
+        public Dictionary<string, bool> ExportStringFlags()
+        {
+            var result = new Dictionary<string, bool>();
+            foreach (var flag in StringStoryFlags)
+                result[flag] = true;
+            return result;
+        }
+
+        /// <summary>
+        /// Import string-based story flags from serialized data
+        /// </summary>
+        public void ImportStringFlags(Dictionary<string, bool> flags)
+        {
+            if (flags == null) return;
+            foreach (var kvp in flags)
+            {
+                if (kvp.Value) StringStoryFlags.Add(kvp.Key);
+                else StringStoryFlags.Remove(kvp.Key);
+            }
+        }
+
+        /// <summary>
+        /// Add a completed ending to the cycle history
+        /// </summary>
+        public void AddCompletedEnding(EndingType ending) => CompletedEndings.Add(ending);
+
+        /// <summary>
         /// Check if a specific choice was made
         /// </summary>
         public bool HasMadeChoice(string choiceId)

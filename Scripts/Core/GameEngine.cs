@@ -83,6 +83,11 @@ public partial class GameEngine : Node
     }
 
     /// <summary>
+    /// Flag indicating the player accepted NG+ and needs a fresh character
+    /// </summary>
+    public bool PendingNewGamePlus { get; set; }
+
+    /// <summary>
     /// Thread-safe singleton accessor. In MUD mode, returns the per-session engine.
     /// In single-player/BBS, returns the static fallback instance.
     /// </summary>
@@ -530,6 +535,17 @@ public partial class GameEngine : Node
                     // Default to loading existing character
                     await LoadSaveByFileName(existingSave.FileName);
                     break;
+            }
+
+            // Handle NG+ restart in BBS/online mode — after any LoadSaveByFileName path
+            if (PendingNewGamePlus)
+            {
+                PendingNewGamePlus = false;
+                // Delete old save and create fresh character with cycle bonuses
+                var ngpSaves = SaveSystem.Instance.GetPlayerSaves(playerName);
+                foreach (var save in ngpSaves)
+                    SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
+                await CreateNewGame(playerName);
             }
         }
         else
@@ -1012,6 +1028,14 @@ public partial class GameEngine : Node
 
         while (!done)
         {
+            // NG+ auto-restart: player accepted New Game+, skip menu and create fresh character
+            if (PendingNewGamePlus)
+            {
+                PendingNewGamePlus = false;
+                await CreateNewGame("");
+                continue;
+            }
+
             terminal.ClearScreen();
 
             // Title header
@@ -2321,9 +2345,18 @@ public partial class GameEngine : Node
     private async Task CreateNewGame(string playerName)
     {
         // Reset per-player session systems for new game
+        bool isNgPlus = StoryProgressionSystem.Instance.CurrentCycle > 1;
         UsurperRemake.Systems.RomanceTracker.Instance.Reset();
         UsurperRemake.Systems.CompanionSystem.Instance?.ResetAllCompanions();
-        UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
+        if (isNgPlus)
+        {
+            // NG+ — StartNewCycle already reset story state while preserving cycle/endings/seals.
+            // Don't call FullReset which would wipe cycle counter and completed endings.
+        }
+        else
+        {
+            UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
+        }
         UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();
         UsurperRemake.Systems.FactionSystem.Instance.Reset();
 
@@ -2372,6 +2405,17 @@ public partial class GameEngine : Node
 
         // Auto-populate quickbar with starting spells/abilities
         AutoPopulateQuickbar(currentPlayer);
+
+        // Apply NG+ cycle bonuses to the fresh character
+        if (isNgPlus)
+        {
+            var story = StoryProgressionSystem.Instance;
+            var lastEnding = story.CompletedEndings.Count > 0
+                ? story.CompletedEndings.Last()
+                : EndingType.Defiant; // fallback
+            CycleSystem.Instance.ApplyCycleBonusesToNewCharacter(currentPlayer, story.CurrentCycle, lastEnding);
+            currentPlayer.RecalculateStats();
+        }
 
         // Ask about telemetry opt-in for new players
         await PromptTelemetryOptIn();
@@ -2976,6 +3020,7 @@ public partial class GameEngine : Node
         player.HerbsGatheredToday = playerData.HerbsGatheredToday;
         player.WellRestedCombats = playerData.WellRestedCombats;
         player.WellRestedBonus = playerData.WellRestedBonus;
+        player.CycleExpMultiplier = playerData.CycleExpMultiplier;
 
         // Restore chest contents
         var playerKey = (player is Player pp ? pp.RealName : player.Name2) ?? player.Name2;

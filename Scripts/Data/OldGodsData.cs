@@ -731,8 +731,23 @@ namespace UsurperRemake.Data
 
                 DefeatDialogue = new[]
                 {
-                    "This text depends on which ending path the player is on.",
-                    "See EndingsData.cs for ending-specific dialogue."
+                    "Manwe staggers. Light and shadow bleed from the wound in his chest.",
+                    "",
+                    "MANWE: \"So. You chose to fight.\"",
+                    "",
+                    "He sinks to one knee. The dungeon trembles. Somewhere far above,",
+                    "the sky cracks like glass.",
+                    "",
+                    "MANWE: \"Ten thousand years I waited for an answer.\"",
+                    "MANWE: \"And you gave me one.\"",
+                    "",
+                    "He reaches out and presses his hand to your chest.",
+                    "The weight of creation flows into you — every star, every stone,",
+                    "every life that ever was or will be.",
+                    "",
+                    "MANWE: \"It is yours now. All of it. The choice of what comes next.\"",
+                    "",
+                    "His eyes close. The Weary Creator rests at last."
                 },
 
                 ArtifactDropped = ArtifactType.VoidKey,

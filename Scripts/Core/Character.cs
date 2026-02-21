@@ -377,6 +377,7 @@ public class Character
     public int HerbsGatheredToday { get; set; } = 0;   // Daily herb counter
     public int WellRestedCombats { get; set; } = 0;    // Combats remaining with Well-Rested buff
     public float WellRestedBonus { get; set; } = 0f;   // Damage/defense % bonus from hearth
+    public float CycleExpMultiplier { get; set; } = 1.0f; // NG+ XP multiplier (scales with cycle)
 
     // Faction consumable properties (v0.40.2)
     public int PoisonCoatingCombats { get; set; } = 0;  // Combats remaining with poison coating (+20% dmg)

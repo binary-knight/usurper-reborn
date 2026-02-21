@@ -582,11 +582,15 @@ public class DungeonLocation : BaseLocation
                         var result = await OldGodBossSystem.Instance.StartBossEncounter(player, OldGodType.Manwe, term, teammates);
                         await HandleGodEncounterResult(result, player, term);
 
-                        // After Manwe, trigger ending determination
+                        // After Manwe, trigger the full ending sequence (cinematic ending, credits, NG+ offer)
                         if (result.Outcome != BossOutcome.Fled)
                         {
                             var endingType = EndingsSystem.Instance.DetermineEnding(player);
-                            await ShowEnding(endingType, player, term);
+                            await EndingsSystem.Instance.TriggerEnding(player, endingType, term);
+                            if (GameEngine.Instance.PendingNewGamePlus)
+                                throw new LocationExitException(GameLocation.NoWhere);
+                            else
+                                await NavigateToLocation(GameLocation.MainStreet);
                         }
                     }
                     else
@@ -613,7 +617,11 @@ public class DungeonLocation : BaseLocation
                         else
                             endingType = EndingsSystem.Instance.DetermineEnding(player);
 
-                        await ShowEnding(endingType, player, term);
+                        await EndingsSystem.Instance.TriggerEnding(player, endingType, term);
+                        if (GameEngine.Instance.PendingNewGamePlus)
+                            throw new LocationExitException(GameLocation.NoWhere);
+                        else
+                            await NavigateToLocation(GameLocation.MainStreet);
                     }
                 }
                 break;
@@ -1314,223 +1322,6 @@ public class DungeonLocation : BaseLocation
         };
     }
 
-    /// <summary>
-    /// Display the ending sequence based on ending type
-    /// </summary>
-    private async Task ShowEnding(EndingType ending, Character player, TerminalEmulator term)
-    {
-        term.ClearScreen();
-        term.WriteLine("");
-
-        string color = ending switch
-        {
-            EndingType.Usurper => "bright_red",
-            EndingType.Savior => "bright_green",
-            EndingType.Defiant => "bright_yellow",
-            EndingType.TrueEnding => "bright_cyan",
-            EndingType.Secret => "bright_magenta",
-            _ => "white"
-        };
-
-        string title = ending switch
-        {
-            EndingType.Usurper => "THE USURPER",
-            EndingType.Savior => "THE SAVIOR",
-            EndingType.Defiant => "THE DEFIANT",
-            EndingType.TrueEnding => "THE AWAKENED",
-            EndingType.Secret => "DISSOLUTION",
-            _ => "THE END"
-        };
-
-        term.SetColor(color);
-        term.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-        term.WriteLine($"║                         {title.PadRight(35)}  ║");
-        term.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
-        term.WriteLine("");
-
-        await Task.Delay(2000);
-
-        // Show ending text based on type
-        switch (ending)
-        {
-            case EndingType.Usurper:
-                await ShowUsurperEnding(term);
-                break;
-            case EndingType.Savior:
-                await ShowSaviorEnding(term);
-                break;
-            case EndingType.Defiant:
-                await ShowDefiantEnding(term);
-                break;
-            case EndingType.TrueEnding:
-                await ShowTrueEnding(term);
-                break;
-            case EndingType.Secret:
-                await ShowSecretEnding(term);
-                break;
-        }
-
-        // Mark the ending
-        StoryProgressionSystem.Instance.SetStoryFlag($"completed_{ending.ToString().ToLower()}", true);
-
-        term.WriteLine("");
-        term.SetColor("gray");
-        term.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-        term.WriteLine("║                    CONGRATULATIONS                               ║");
-        term.WriteLine("║                                                                  ║");
-        term.WriteLine("║        You have completed Usurper Reborn.                       ║");
-        term.WriteLine("║                                                                  ║");
-        term.WriteLine("║        Your journey is recorded in the annals of time.          ║");
-        term.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
-        term.WriteLine("");
-
-        await term.GetInputAsync("Press Enter to continue...");
-    }
-
-    private async Task ShowUsurperEnding(TerminalEmulator term)
-    {
-        string[] lines = {
-            "You stand where Manwe once stood.",
-            "The power of creation flows through you.",
-            "",
-            "The Old Gods bow to your will.",
-            "The world trembles at your command.",
-            "",
-            "You have become what you were sent to destroy.",
-            "The Usurper. The new Creator.",
-            "",
-            "But power, you discover, is a cold companion.",
-            "And eternity stretches before you, empty and vast.",
-            "",
-            "Was it worth it?",
-            "Only you can answer that now."
-        };
-
-        foreach (var line in lines)
-        {
-            term.SetColor(string.IsNullOrEmpty(line) ? "white" : "red");
-            term.WriteLine($"  {line}");
-            await Task.Delay(300);
-        }
-    }
-
-    private async Task ShowSaviorEnding(TerminalEmulator term)
-    {
-        string[] lines = {
-            "The corruption lifts from the world.",
-            "The Old Gods remember who they were.",
-            "",
-            "Maelketh becomes the god of honorable combat once more.",
-            "Veloura's love heals instead of destroying.",
-            "Thorgrim judges with wisdom instead of tyranny.",
-            "",
-            "And you... you return to mortality.",
-            "But not alone.",
-            "",
-            "Songs are sung of the one who saved the gods.",
-            "Children speak your name with wonder.",
-            "",
-            "When you finally rest, paradise awaits.",
-            "The gods remember their Savior."
-        };
-
-        foreach (var line in lines)
-        {
-            term.SetColor(string.IsNullOrEmpty(line) ? "white" : "bright_green");
-            term.WriteLine($"  {line}");
-            await Task.Delay(300);
-        }
-    }
-
-    private async Task ShowDefiantEnding(TerminalEmulator term)
-    {
-        string[] lines = {
-            "You reject them all.",
-            "Manwe. The Old Gods. The cycles. The power.",
-            "",
-            "\"I am not your pawn,\" you declare.",
-            "\"I am not your child. I am not your successor.\"",
-            "",
-            "\"I am myself. Nothing more. Nothing less.\"",
-            "",
-            "And with that, you walk away.",
-            "Into the sunrise. Into the unknown.",
-            "",
-            "Behind you, the gods become mortal.",
-            "Equals now, instead of masters.",
-            "",
-            "Freedom, you realize, is the greatest power of all."
-        };
-
-        foreach (var line in lines)
-        {
-            term.SetColor(string.IsNullOrEmpty(line) ? "white" : "bright_yellow");
-            term.WriteLine($"  {line}");
-            await Task.Delay(300);
-        }
-    }
-
-    private async Task ShowTrueEnding(TerminalEmulator term)
-    {
-        string[] lines = {
-            "You remember now.",
-            "Not just who you were. What you are.",
-            "",
-            "You are the wave that remembered it was the ocean.",
-            "You are the dream that woke within the Dreamer.",
-            "",
-            "The Seven Seals unlock the final truth:",
-            "You and Manwe are one. Always were.",
-            "",
-            "Not god, not mortal, but something new.",
-            "Something that can bridge the gap.",
-            "",
-            "The cycle doesn't end. It transcends.",
-            "And you carry the best of both within you.",
-            "",
-            "This is not an ending.",
-            "It is a new beginning."
-        };
-
-        foreach (var line in lines)
-        {
-            term.SetColor(string.IsNullOrEmpty(line) ? "white" : "bright_cyan");
-            term.WriteLine($"  {line}");
-            await Task.Delay(300);
-        }
-    }
-
-    private async Task ShowSecretEnding(TerminalEmulator term)
-    {
-        string[] lines = {
-            "Three cycles. Three lifetimes.",
-            "Each time, a little more remembered.",
-            "Each time, the boundaries grew thinner.",
-            "",
-            "And now...",
-            "",
-            "The wave dissolves.",
-            "The ocean remembers.",
-            "",
-            "You are Manwe.",
-            "You always were.",
-            "",
-            "And as the dream ends, you wake.",
-            "Not as a fragment, but as the whole.",
-            "",
-            "The cycle is complete.",
-            "The Dreamer opens their eyes.",
-            "",
-            "Thank you for playing."
-        };
-
-        foreach (var line in lines)
-        {
-            term.SetColor(string.IsNullOrEmpty(line) ? "white" : "bright_magenta");
-            term.WriteLine($"  {line}");
-            await Task.Delay(400);
-        }
-    }
 
     protected override void DisplayLocation()
     {
@@ -3909,11 +3700,15 @@ public class DungeonLocation : BaseLocation
                 currentFloor.BossDefeated = true;
             }
 
-            // Special handling for Manwe - trigger ending
+            // Special handling for Manwe - trigger the full ending sequence (cinematic ending, credits, NG+ offer)
             if (godType.Value == OldGodType.Manwe && result.Outcome != BossOutcome.Fled)
             {
                 var endingType = EndingsSystem.Instance.DetermineEnding(player);
-                await ShowEnding(endingType, player, terminal);
+                await EndingsSystem.Instance.TriggerEnding(player, endingType, terminal);
+                if (GameEngine.Instance.PendingNewGamePlus)
+                    throw new LocationExitException(GameLocation.NoWhere);
+                else
+                    await NavigateToLocation(GameLocation.MainStreet);
             }
 
             await terminal.PressAnyKey();

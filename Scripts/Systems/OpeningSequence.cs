@@ -416,8 +416,8 @@ namespace UsurperRemake.Systems
             player.Chivalry += bonuses.ChivalryBonus;
             player.Darkness += bonuses.DarknessBonus;
 
-            // Store exp multiplier in a way combat can use it
-            // (Could add ExpMultiplier property to Character)
+            // Store exp multiplier on character so CombatEngine can apply it
+            player.CycleExpMultiplier = bonuses.ExpMultiplier;
 
             if (bonuses.StartWithKey)
             {
@@ -428,6 +428,16 @@ namespace UsurperRemake.Systems
             {
                 StoryProgressionSystem.Instance.SetStoryFlag("knows_artifact_locations", true);
             }
+        }
+
+        /// <summary>
+        /// Apply cycle bonuses to a fresh NG+ character (called from CreateNewGame)
+        /// </summary>
+        public void ApplyCycleBonusesToNewCharacter(Character player, int cycle, EndingType lastEnding)
+        {
+            // cycle is already incremented (e.g., 2 for first NG+), use cycle-1 for bonus calculation
+            var bonuses = CalculateCycleBonuses(player, lastEnding, cycle - 1);
+            ApplyCycleBonuses(player, bonuses);
         }
 
         /// <summary>

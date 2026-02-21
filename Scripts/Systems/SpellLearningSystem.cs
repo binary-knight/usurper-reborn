@@ -54,7 +54,9 @@ public static class SpellLearningSystem
                         terminal.SetColor("yellow");
                         terminal.Write($"{spell.Name,-22}");
                         terminal.SetColor("cyan");
-                        terminal.WriteLine($" ({manaCost} MP) {spell.SpellType}");
+                        terminal.Write($" ({manaCost} MP) ");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine(spell.Description);
                     }
                     else
                     {
@@ -98,7 +100,9 @@ public static class SpellLearningSystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.WriteLine($"{knownUnequipped[i].Name,-22} ({manaCost} MP) Lv{knownUnequipped[i].Level} {knownUnequipped[i].SpellType}");
+                    terminal.Write($"{knownUnequipped[i].Name,-22} ({manaCost} MP) ");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(knownUnequipped[i].Description);
                 }
             }
 
@@ -114,8 +118,13 @@ public static class SpellLearningSystem
                 foreach (var spell in unknownLearnable)
                 {
                     int manaCost = SpellSystem.CalculateManaCost(spell, player);
+                    string learnKey = $"L{spell.Level}";
+                    terminal.SetColor("darkgray");
+                    terminal.Write($"  [{learnKey,-3}] ");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"      {spell.Name,-22} ({manaCost} MP) Lv{spell.Level} - Type 'L{spell.Level}' to learn");
+                    terminal.Write($"{spell.Name,-22} ({manaCost} MP) ");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(spell.Description);
                 }
             }
 
@@ -131,7 +140,7 @@ public static class SpellLearningSystem
                 {
                     int reqLevel = SpellSystem.GetLevelRequired(player.Class, spell.Level);
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"      {spell.Name,-22} Requires Lv{reqLevel}");
+                    terminal.WriteLine($"       {spell.Name,-22} Requires Lv{reqLevel} - {spell.Description}");
                 }
             }
 

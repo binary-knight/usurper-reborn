@@ -3178,6 +3178,12 @@ public partial class CombatEngine
             expReward += (long)(expReward * GameConfig.StudyXPBonus);
         }
 
+        // NG+ cycle XP multiplier
+        if (result.Player.CycleExpMultiplier > 1.0f)
+        {
+            expReward = (long)(expReward * result.Player.CycleExpMultiplier);
+        }
+
         result.Player.Experience += expReward;
         result.Player.Gold += goldReward;
         result.Player.MKills++;
@@ -8961,6 +8967,12 @@ public partial class CombatEngine
             adjustedExp += (long)(adjustedExp * GameConfig.StudyXPBonus);
         }
 
+        // NG+ cycle XP multiplier
+        if (result.Player.CycleExpMultiplier > 1.0f)
+        {
+            adjustedExp = (long)(adjustedExp * result.Player.CycleExpMultiplier);
+        }
+
         // Apply rewards
         result.Player.Experience += adjustedExp;
         result.Player.Gold += adjustedGold;
@@ -9125,6 +9137,18 @@ public partial class CombatEngine
         if (teamXPMult < 1.0f)
         {
             adjustedExp = (long)(adjustedExp * teamXPMult);
+        }
+
+        // Study/Library XP bonus (Home upgrade)
+        if (result.Player.HasStudy)
+        {
+            adjustedExp += (long)(adjustedExp * GameConfig.StudyXPBonus);
+        }
+
+        // NG+ cycle XP multiplier
+        if (result.Player.CycleExpMultiplier > 1.0f)
+        {
+            adjustedExp = (long)(adjustedExp * result.Player.CycleExpMultiplier);
         }
 
         result.Player.Experience += adjustedExp;

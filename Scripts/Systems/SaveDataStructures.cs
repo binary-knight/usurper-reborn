@@ -60,6 +60,7 @@ namespace UsurperRemake.Systems
         // Story progression flags
         public Dictionary<string, bool> StoryFlags { get; set; } = new();
         public int CurrentCycle { get; set; } = 1;
+        public List<int> CompletedEndings { get; set; } = new();
 
         // Collected artifacts (ArtifactType as int)
         public List<int> CollectedArtifacts { get; set; } = new();
@@ -454,6 +455,7 @@ namespace UsurperRemake.Systems
         public int HerbsGatheredToday { get; set; } = 0;
         public int WellRestedCombats { get; set; } = 0;
         public float WellRestedBonus { get; set; } = 0f;
+        public float CycleExpMultiplier { get; set; } = 1.0f;
         public List<InventoryItemData>? ChestContents { get; set; }
 
         // Faction consumable properties (v0.40.2)

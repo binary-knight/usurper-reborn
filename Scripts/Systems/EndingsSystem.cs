@@ -1301,6 +1301,8 @@ namespace UsurperRemake.Systems
             if (response.ToUpper() == "Y")
             {
                 await CycleSystem.Instance.StartNewCycle(player, ending, terminal);
+                // Signal the game to restart with a new character
+                GameEngine.Instance.PendingNewGamePlus = true;
             }
             else
             {

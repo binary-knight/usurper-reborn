@@ -692,6 +692,7 @@ namespace UsurperRemake.Systems
                 HerbsGatheredToday = player.HerbsGatheredToday,
                 WellRestedCombats = player.WellRestedCombats,
                 WellRestedBonus = player.WellRestedBonus,
+                CycleExpMultiplier = player.CycleExpMultiplier,
                 ChestContents = SerializeChestContents(player),
 
                 // Faction consumable properties (v0.40.2)
@@ -1452,7 +1453,8 @@ namespace UsurperRemake.Systems
                 data.CurrentCycle = story.CurrentCycle;
                 data.CollectedSeals = story.CollectedSeals.Select(s => (int)s).ToList();
                 data.CollectedArtifacts = story.CollectedArtifacts.Select(a => (int)a).ToList();
-                data.StoryFlags = new Dictionary<string, bool>(story.StoryFlags);
+                data.StoryFlags = story.ExportStringFlags();
+                data.CompletedEndings = story.CompletedEndings.Select(e => (int)e).ToList();
 
                 // Save Old God defeat states (critical for permanent boss defeats)
                 data.OldGodStates = story.OldGodStates.ToDictionary(
@@ -1883,13 +1885,17 @@ namespace UsurperRemake.Systems
                 }
 
                 // Restore story flags
-                foreach (var kvp in data.StoryFlags)
-                {
-                    story.SetStoryFlag(kvp.Key, kvp.Value);
-                }
+                story.ImportStringFlags(data.StoryFlags);
 
                 // Restore cycle count
                 story.CurrentCycle = data.CurrentCycle;
+
+                // Restore completed endings
+                if (data.CompletedEndings != null)
+                {
+                    foreach (var e in data.CompletedEndings)
+                        story.AddCompletedEnding((EndingType)e);
+                }
 
                 // Restore Old God defeat states (critical for permanent boss defeats)
                 if (data.OldGodStates != null && data.OldGodStates.Count > 0)
