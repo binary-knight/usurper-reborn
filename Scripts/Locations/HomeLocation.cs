@@ -18,7 +18,8 @@ namespace UsurperRemake.Locations;
 public class HomeLocation : BaseLocation
 {
     // Static chest storage per player id (real name is unique key)
-    private static readonly Dictionary<string, List<ModelItem>> PlayerChests = new();
+    // Public so SaveSystem can serialize/restore chest contents
+    public static readonly Dictionary<string, List<ModelItem>> PlayerChests = new();
     private List<ModelItem> Chest => PlayerChests[playerKey];
     private string playerKey;
 
@@ -90,22 +91,57 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine($"{currentPlayer.Healing}");
         terminal.WriteLine("");
 
-        // Description
+        // Description based on home level
         terminal.SetColor("white");
-        terminal.WriteLine("You stand in the warm comfort of your home. A crackling fire");
-        terminal.WriteLine("illuminates the cozy interior, and your belongings are arranged");
-        terminal.WriteLine("just how you like them.");
+        switch (currentPlayer.HomeLevel)
+        {
+            case 0:
+                terminal.WriteLine("You stand in a drafty, dilapidated shack. The walls are thin,");
+                terminal.WriteLine("the roof leaks, and the only furniture is a moth-eaten straw pile.");
+                break;
+            case 1:
+                terminal.WriteLine("Your home has seen some repairs. The walls are patched, keeping");
+                terminal.WriteLine("out the worst of the wind. A simple hearth provides some warmth.");
+                break;
+            case 2:
+                terminal.WriteLine("A sturdy cottage with solid walls and a proper door. It feels");
+                terminal.WriteLine("like a real home, with decent furniture and a warm atmosphere.");
+                break;
+            case 3:
+                terminal.WriteLine("A comfortable home with good furniture and warm light. The rooms");
+                terminal.WriteLine("are well-appointed and you feel truly safe here.");
+                break;
+            case 4:
+                terminal.WriteLine("A fine manor with quality furnishings. Your home is the envy of");
+                terminal.WriteLine("many townsfolk, with elegant decor and spacious rooms.");
+                break;
+            default:
+                terminal.WriteLine("A grand estate befitting a hero. Every room is beautifully");
+                terminal.WriteLine("appointed, and the atmosphere is one of luxury and serenity.");
+                break;
+        }
         terminal.WriteLine("");
 
-        // Show storage info
+        // Show storage & rest info
+        int maxRests = GameConfig.HomeRestsPerDay[Math.Clamp(currentPlayer.HomeLevel, 0, 5)];
+        int restsLeft = Math.Max(0, maxRests - currentPlayer.HomeRestsToday);
+        int recoveryPct = (int)(GameConfig.HomeRecoveryPercent[Math.Clamp(currentPlayer.HomeLevel, 0, 5)] * 100);
         terminal.SetColor("gray");
-        terminal.Write("  Chest: ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Chest.Count} item{(Chest.Count != 1 ? "s" : "")}");
+        terminal.Write("  Rest: ");
+        terminal.SetColor(restsLeft > 0 ? "bright_green" : "red");
+        terminal.Write($"{restsLeft}/{maxRests} today ({recoveryPct}%)");
+        if (currentPlayer.ChestLevel > 0)
+        {
+            int maxCapacity = GameConfig.ChestCapacity[Math.Clamp(currentPlayer.ChestLevel, 0, 5)];
+            terminal.SetColor("gray");
+            terminal.Write("  |  Chest: ");
+            terminal.SetColor("cyan");
+            terminal.Write($"{Chest.Count}/{maxCapacity}");
+        }
         terminal.SetColor("gray");
-        terminal.Write("  |  Inventory: ");
-        terminal.SetColor("cyan");
-        terminal.WriteLine($"{currentPlayer.Inventory.Count} item{(currentPlayer.Inventory.Count != 1 ? "s" : "")}");
+        terminal.Write("  |  Potions: ");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"{currentPlayer.Healing}");
         terminal.WriteLine("");
 
         // Show family info if applicable
@@ -183,156 +219,82 @@ public class HomeLocation : BaseLocation
 
     private void ShowHomeMenu()
     {
+        bool hasChest = currentPlayer.ChestLevel > 0;
+        bool hasGarden = currentPlayer.GardenLevel > 0;
+        bool hasTrophies = currentPlayer.HasTrophyRoom;
+
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("--- Home Activities ---");
         terminal.WriteLine("");
 
-        // Row 1 - Rest & Storage
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("E");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(" Rest & Recover ");
+        // Row 1: Core actions
+        WriteMenuCol(" ", "E", "Rest & Recover", true);
+        WriteMenuCol("", "U", "Upgrades", true);
+        WriteMenuNL("", "S", "Status", true);
 
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("D");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("eposit Item    ");
+        // Row 2: Chest operations (dimmed if no chest)
+        WriteMenuCol(" ", "D", "Deposit Item", hasChest);
+        WriteMenuCol("", "W", "Withdraw Item", hasChest);
+        WriteMenuNL("", "L", "List Chest", hasChest);
 
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("W");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine("ithdraw Item");
+        // Row 3: Garden, Trophies, Family
+        WriteMenuCol(" ", "A", "Gather Herbs", hasGarden);
+        WriteMenuCol("", "T", "Trophies", hasTrophies);
+        WriteMenuNL("", "F", "Family", true);
 
-        // Row 2 - View
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("L");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("ist Chest       ");
+        // Row 4: Romance
+        WriteMenuCol(" ", "P", "Partner Time", true);
+        WriteMenuCol("", "B", "Bedroom", true);
+        WriteMenuNL("", "!", "Resurrect", true);
 
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("T");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("rophies        ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("F");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine("amily");
-
-        // Row 3 - Romance
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("P");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("artner Time     ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("B");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("edroom         ");
-
-terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("!");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("Resurrect    ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("H");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine("eal (Potion)");
-
-        // Row 4 - Inventory & Equipment
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("I");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("nventory       ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("G");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine("ear Up Partner");
+        // Row 5: Items
+        WriteMenuCol(" ", "I", "Inventory", true);
+        WriteMenuCol("", "G", "Gear Partner", true);
+        WriteMenuNL("", "H", "Heal (Potion)", true);
 
         terminal.WriteLine("");
 
-        // Navigation
-        terminal.SetColor("gray");
-        terminal.WriteLine("--- Navigation ---");
-
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("S");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("tatus          ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("R");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write("eturn to Main St ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("Q");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine("uit");
+        // Navigation row
+        WriteMenuCol(" ", "R", "Return", true);
+        WriteMenuNL("", "Q", "Quit", true);
 
         terminal.WriteLine("");
+    }
+
+    // Write a menu option padded to a fixed 26-char column width
+    private void WriteMenuOption(string prefix, string key, string label, bool available, int width)
+    {
+        string keyColor = available ? "bright_yellow" : "dark_gray";
+        string textColor = available ? "white" : "dark_gray";
+        terminal.Write(prefix);
+        terminal.SetColor("dark_gray");
+        terminal.Write("[");
+        terminal.SetColor(keyColor);
+        terminal.Write(key);
+        terminal.SetColor("dark_gray");
+        terminal.Write("]");
+        terminal.SetColor(textColor);
+        // [X] = 3 chars, label needs to fill remaining width minus prefix
+        int labelWidth = width - prefix.Length - 3;
+        terminal.Write(label.PadRight(Math.Max(0, labelWidth)));
+    }
+
+    private void WriteMenuCol(string prefix, string key, string label, bool available)
+        => WriteMenuOption(prefix, key, label, available, 26);
+
+    private void WriteMenuNL(string prefix, string key, string label, bool available)
+    {
+        string keyColor = available ? "bright_yellow" : "dark_gray";
+        string textColor = available ? "white" : "dark_gray";
+        terminal.Write(prefix);
+        terminal.SetColor("dark_gray");
+        terminal.Write("[");
+        terminal.SetColor(keyColor);
+        terminal.Write(key);
+        terminal.SetColor("dark_gray");
+        terminal.Write("]");
+        terminal.SetColor(textColor);
+        terminal.WriteLine($" {label}");
     }
 
     /// <summary>
@@ -343,21 +305,31 @@ terminal.SetColor("darkgray");
         terminal.ClearScreen();
         ShowBBSHeader("YOUR HOME");
 
-        // 1-line description
+        // 1-line description based on home level
         terminal.SetColor("white");
-        terminal.WriteLine(" A crackling fire warms your cozy home. Your belongings are arranged neatly.");
+        string bbsDesc = currentPlayer.HomeLevel switch
+        {
+            0 => " A drafty shack with a leaky roof and moth-eaten straw pile.",
+            1 => " A patched-up home. The walls keep out the worst of the wind.",
+            2 => " A sturdy cottage with solid walls. Feels like a real home.",
+            3 => " A comfortable home with good furniture and warm light.",
+            4 => " A fine manor with elegant decor. The envy of townsfolk.",
+            _ => " A grand estate befitting a hero. Luxury and serenity abound."
+        };
+        terminal.WriteLine(bbsDesc);
 
-        // Compact storage info
+        // Compact info
+        int bbsMaxRests = GameConfig.HomeRestsPerDay[Math.Clamp(currentPlayer.HomeLevel, 0, 5)];
+        int bbsRestsLeft = Math.Max(0, bbsMaxRests - currentPlayer.HomeRestsToday);
+        int bbsRecovery = (int)(GameConfig.HomeRecoveryPercent[Math.Clamp(currentPlayer.HomeLevel, 0, 5)] * 100);
         terminal.SetColor("gray");
-        terminal.Write(" Chest:");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Chest.Count}");
-        terminal.SetColor("gray");
-        terminal.Write(" items  Inv:");
-        terminal.SetColor("cyan");
-        terminal.Write($"{currentPlayer.Inventory.Count}");
-        terminal.SetColor("gray");
-        terminal.Write(" items  Potions:");
+        terminal.Write($" Rest:{bbsRestsLeft}/{bbsMaxRests}({bbsRecovery}%)");
+        if (currentPlayer.ChestLevel > 0)
+        {
+            int maxCap = GameConfig.ChestCapacity[Math.Clamp(currentPlayer.ChestLevel, 0, 5)];
+            terminal.Write($"  Chest:{Chest.Count}/{maxCap}");
+        }
+        terminal.Write($"  Potions:");
         terminal.SetColor("bright_green");
         terminal.WriteLine($"{currentPlayer.Healing}");
 
@@ -392,10 +364,12 @@ terminal.SetColor("darkgray");
 
         terminal.WriteLine("");
 
-        // Menu rows
-        ShowBBSMenuRow(("E", "bright_yellow", "Rest"), ("D", "bright_yellow", "Deposit"), ("W", "bright_yellow", "Withdraw"), ("L", "bright_yellow", "List Chest"));
-        ShowBBSMenuRow(("T", "bright_yellow", "Trophies"), ("F", "bright_yellow", "Family"), ("P", "bright_yellow", "Partner"), ("B", "bright_yellow", "Bedroom"));
-        ShowBBSMenuRow(("I", "bright_yellow", "Inventory"), ("G", "bright_yellow", "GearPartner"), ("H", "bright_yellow", "Heal(Pot)"), ("!", "bright_yellow", "Resurrect"));
+        // Menu rows - consistent layout regardless of upgrades
+        ShowBBSMenuRow(("E", "bright_yellow", "Rest"), ("U", "bright_yellow", "Upgrades"), ("S", "bright_yellow", "Status"));
+        ShowBBSMenuRow(("D", "bright_yellow", "Deposit"), ("W", "bright_yellow", "Withdraw"), ("L", "bright_yellow", "List Chest"));
+        ShowBBSMenuRow(("A", "bright_yellow", "Herbs"), ("T", "bright_yellow", "Trophies"), ("F", "bright_yellow", "Family"));
+        ShowBBSMenuRow(("P", "bright_yellow", "Partner"), ("B", "bright_yellow", "Bedroom"), ("!", "bright_yellow", "Resurrect"));
+        ShowBBSMenuRow(("I", "bright_yellow", "Inventory"), ("G", "bright_yellow", "Gear"), ("H", "bright_yellow", "Heal(Pot)"));
         ShowBBSMenuRow(("R", "bright_yellow", "Return"), ("Q", "bright_yellow", "Quit"));
 
         ShowBBSFooter();
@@ -425,14 +399,37 @@ terminal.SetColor("darkgray");
                 await DoRest();
                 return false;
             case "D":
-                await DepositItem();
+                if (currentPlayer.ChestLevel <= 0)
+                {
+                    terminal.WriteLine("You don't have a chest yet. Visit [U]pgrades to buy one.", "yellow");
+                    await terminal.WaitForKey();
+                }
+                else
+                    await DepositItem();
                 return false;
             case "W":
-                await WithdrawItem();
+                if (currentPlayer.ChestLevel <= 0)
+                {
+                    terminal.WriteLine("You don't have a chest yet. Visit [U]pgrades to buy one.", "yellow");
+                    await terminal.WaitForKey();
+                }
+                else
+                    await WithdrawItem();
                 return false;
             case "L":
-                ShowChestContents();
-                await terminal.WaitForKey();
+                if (currentPlayer.ChestLevel <= 0)
+                {
+                    terminal.WriteLine("You don't have a chest yet. Visit [U]pgrades to buy one.", "yellow");
+                    await terminal.WaitForKey();
+                }
+                else
+                {
+                    ShowChestContents();
+                    await terminal.WaitForKey();
+                }
+                return false;
+            case "A":
+                await GatherHerbs();
                 return false;
             case "T":
                 ShowTrophies();
@@ -477,30 +474,85 @@ terminal.SetColor("darkgray");
 
     private async Task DoRest()
     {
-        terminal.WriteLine("You relax in your comfortable bed...", "gray");
+        int homeLevel = Math.Clamp(currentPlayer.HomeLevel, 0, 5);
+        int maxRests = GameConfig.HomeRestsPerDay[homeLevel];
+        float recoveryPercent = GameConfig.HomeRecoveryPercent[homeLevel];
+
+        // Check daily rest limit
+        if (currentPlayer.HomeRestsToday >= maxRests)
+        {
+            terminal.SetColor("yellow");
+            if (homeLevel == 0)
+                terminal.WriteLine("Your straw pile is too uncomfortable to rest on again today.");
+            else
+                terminal.WriteLine("You've already rested as much as you can today.");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"Rests used: {currentPlayer.HomeRestsToday}/{maxRests}. Try again tomorrow.");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        // Flavor text based on home level
+        switch (homeLevel)
+        {
+            case 0:
+                terminal.WriteLine("You curl up on the moth-eaten straw pile...", "gray");
+                break;
+            case 1:
+                terminal.WriteLine("You lie down on your simple cot...", "gray");
+                break;
+            case 2:
+                terminal.WriteLine("You rest in your wooden bed...", "gray");
+                break;
+            default:
+                terminal.WriteLine("You relax in the comfort of your bed...", "gray");
+                break;
+        }
         await Task.Delay(1500);
 
-        // Blood Price rest penalty — dark memories reduce rest effectiveness
-        float restEfficiency = 1.0f;
-        if (currentPlayer.MurderWeight >= 6f) restEfficiency = 0.50f;
-        else if (currentPlayer.MurderWeight >= 3f) restEfficiency = 0.75f;
+        // Blood Price rest penalty — dark memories reduce rest effectiveness (multiplicative)
+        float restEfficiency = recoveryPercent;
+        if (currentPlayer.MurderWeight >= 6f) restEfficiency *= 0.50f;
+        else if (currentPlayer.MurderWeight >= 3f) restEfficiency *= 0.75f;
 
-        if (restEfficiency < 1.0f)
+        long healAmount = (long)((currentPlayer.MaxHP - currentPlayer.HP) * restEfficiency);
+        long manaAmount = (long)((currentPlayer.MaxMana - currentPlayer.Mana) * restEfficiency);
+        currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
+        currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + manaAmount);
+
+        if (currentPlayer.MurderWeight >= 3f)
         {
-            long healAmount = (long)((currentPlayer.MaxHP - currentPlayer.HP) * restEfficiency);
-            long manaAmount = (long)((currentPlayer.MaxMana - currentPlayer.Mana) * restEfficiency);
-            currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
-            currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + manaAmount);
             terminal.WriteLine("You rest, but dark memories haunt your sleep...", "dark_red");
-            terminal.SetColor("green");
-            terminal.WriteLine($"Recovered {healAmount} HP and {manaAmount} mana.");
+        }
+
+        if (restEfficiency >= 1.0f)
+        {
+            terminal.WriteLine("You feel completely rejuvenated!", "bright_green");
         }
         else
         {
-            currentPlayer.HP = currentPlayer.MaxHP;
-            currentPlayer.Mana = currentPlayer.MaxMana;
-            terminal.WriteLine("You feel completely rejuvenated!", "bright_green");
+            terminal.SetColor("green");
+            terminal.WriteLine($"Recovered {healAmount} HP and {manaAmount} mana. ({(int)(restEfficiency * 100)}% recovery)");
         }
+
+        currentPlayer.HomeRestsToday++;
+
+        // Apply Well-Rested buff from Hearth
+        int hearthLevel = Math.Clamp(currentPlayer.HearthLevel, 0, 5);
+        if (hearthLevel > 0)
+        {
+            float bonus = GameConfig.HearthDamageBonus[hearthLevel];
+            int combats = GameConfig.HearthCombatDuration[hearthLevel];
+            currentPlayer.WellRestedCombats = combats;
+            currentPlayer.WellRestedBonus = bonus;
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"The warmth of your hearth invigorates you! (+{(int)(bonus * 100)}% damage/defense for {combats} combats)");
+        }
+
+        // Show remaining rests
+        int restsLeft = maxRests - currentPlayer.HomeRestsToday;
+        terminal.SetColor("gray");
+        terminal.WriteLine($"Rests remaining today: {restsLeft}/{maxRests}");
 
         // Check for dreams during rest at home (nightmares take priority)
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
@@ -538,6 +590,45 @@ terminal.SetColor("darkgray");
         await terminal.WaitForKey();
     }
 
+    private async Task GatherHerbs()
+    {
+        int gardenLevel = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
+        int maxHerbs = GameConfig.HerbsPerDay[gardenLevel];
+
+        if (gardenLevel <= 0)
+        {
+            terminal.WriteLine("You don't have a herb garden. Visit [U]pgrades to build one.", "yellow");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        int herbsLeft = Math.Max(0, maxHerbs - currentPlayer.HerbsGatheredToday);
+        if (herbsLeft <= 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("You've already gathered all the herbs your garden can produce today.");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"Herbs gathered: {currentPlayer.HerbsGatheredToday}/{maxHerbs}. Try again tomorrow.");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"You gather healing herbs from your garden...");
+        await Task.Delay(1000);
+
+        // Gather all available herbs at once
+        currentPlayer.Healing += herbsLeft;
+        currentPlayer.HerbsGatheredToday += herbsLeft;
+
+        terminal.SetColor("green");
+        terminal.WriteLine($"Collected {herbsLeft} healing herb{(herbsLeft != 1 ? "s" : "")}! (Potions: {currentPlayer.Healing})");
+        terminal.SetColor("gray");
+        terminal.WriteLine("Each herb works just like a healing potion in combat.");
+
+        await terminal.WaitForKey();
+    }
+
     private async Task DepositItem()
     {
         if (!currentPlayer.Inventory.Any())
@@ -546,7 +637,17 @@ terminal.SetColor("darkgray");
             await terminal.WaitForKey();
             return;
         }
-        terminal.WriteLine("Select item number to deposit (or 0 to cancel):", "cyan");
+        int maxCapacity = GameConfig.ChestCapacity[Math.Clamp(currentPlayer.ChestLevel, 0, 5)];
+        if (Chest.Count >= maxCapacity)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Your chest is full! ({Chest.Count}/{maxCapacity} items)");
+            terminal.SetColor("gray");
+            terminal.WriteLine("Upgrade your chest to store more items.");
+            await terminal.WaitForKey();
+            return;
+        }
+        terminal.WriteLine($"Select item to deposit ({Chest.Count}/{maxCapacity} stored, or 0 to cancel):", "cyan");
         for (int i = 0; i < currentPlayer.Inventory.Count; i++)
         {
             terminal.WriteLine($"  {i + 1}. {currentPlayer.Inventory[i].GetDisplayName()}");
@@ -557,7 +658,7 @@ terminal.SetColor("darkgray");
             var item = currentPlayer.Inventory[idx - 1];
             currentPlayer.Inventory.RemoveAt(idx - 1);
             Chest.Add(item);
-            terminal.WriteLine($"Stored {item.GetDisplayName()} in your chest.", "green");
+            terminal.WriteLine($"Stored {item.GetDisplayName()} in your chest. ({Chest.Count}/{maxCapacity})", "green");
         }
         else
         {
@@ -2995,105 +3096,95 @@ terminal.SetColor("darkgray");
         }
     }
 
-    #region Home Upgrade System - End Game Gold Sink
+    #region Home Upgrade System - v0.44.0 Overhaul
 
-    /// <summary>
-    /// Home upgrades - expensive purchases for late-game gold sinks
-    /// </summary>
+    private static readonly string[] LivingQuartersNames = { "Dilapidated Shack", "Patched Walls", "Sturdy Cottage", "Comfortable Home", "Fine Manor", "Grand Estate" };
+    private static readonly string[] BedNames = { "Moth-Eaten Straw Pile", "Simple Cot", "Wooden Bed Frame", "Feather Mattress", "Four-Poster Bed", "Royal Canopy Bed" };
+    private static readonly string[] ChestNames = { "No Chest", "Wooden Crate", "Iron-Bound Chest", "Reinforced Vault", "Enchanted Vault", "Dimensional Vault" };
+    private static readonly string[] HearthNames = { "Cold Firepit", "Simple Hearth", "Stone Fireplace", "Iron Stove", "Grand Fireplace", "Eternal Flame" };
+    private static readonly string[] GardenNames = { "Bare Dirt", "Small Herb Patch", "Tended Garden", "Flourishing Garden", "Alchemist's Garden", "Enchanted Greenhouse" };
+
     private async Task ShowHomeUpgrades()
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                    HOME IMPROVEMENTS                          ║");
-        terminal.WriteLine("║          Master Craftsman's Renovation Services               ║");
+        terminal.WriteLine("║              MASTER CRAFTSMAN'S RENOVATIONS                   ║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════╝");
         terminal.WriteLine();
 
         terminal.SetColor("gray");
-        terminal.WriteLine($"Your gold: {currentPlayer.Gold:N0}");
+        terminal.WriteLine($"  Your gold: {currentPlayer.Gold:N0}");
         terminal.WriteLine();
 
-        // Get current upgrade levels from player
-        int homeLevel = currentPlayer.HomeLevel;
-        int chestLevel = currentPlayer.ChestLevel;
-        int trainingLevel = currentPlayer.TrainingRoomLevel;
-        int gardenLevel = currentPlayer.GardenLevel;
-
-        // Define upgrade costs (exponentially increasing)
-        var upgrades = new[]
-        {
-            ("Estate Expansion", "Larger home with better rest bonuses", GetEstateUpgradeCost(homeLevel), homeLevel, 5, "Home"),
-            ("Reinforced Vault", "Store more items in your chest", GetChestUpgradeCost(chestLevel), chestLevel, 5, "Chest"),
-            ("Training Room", "Permanent stat bonuses", GetTrainingRoomCost(trainingLevel), trainingLevel, 10, "Training"),
-            ("Mystical Garden", "Daily passive bonuses", GetGardenCost(gardenLevel), gardenLevel, 5, "Garden")
-        };
-
-        int optionNum = 1;
-        foreach (var (name, desc, cost, level, maxLevel, type) in upgrades)
-        {
-            bool maxed = level >= maxLevel;
-            bool affordable = currentPlayer.Gold >= cost;
-
-            if (maxed)
-            {
-                terminal.SetColor("bright_green");
-                terminal.WriteLine($"[{optionNum}] {name} - MAXED (Level {level}/{maxLevel})");
-                terminal.SetColor("gray");
-                terminal.WriteLine($"    {desc}");
-            }
-            else
-            {
-                terminal.SetColor(affordable ? "white" : "dark_gray");
-                terminal.WriteLine($"[{optionNum}] {name} (Level {level} -> {level + 1})");
-                terminal.SetColor(affordable ? "yellow" : "dark_gray");
-                terminal.WriteLine($"    Cost: {cost:N0} gold - {desc}");
-            }
-            terminal.WriteLine();
-            optionNum++;
-        }
-
-        // Special one-time purchases
+        // Tiered upgrades
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("─── Special Purchases ───");
+        terminal.WriteLine("--- Room Upgrades ---");
+        int opt = 1;
+
+        // Living Quarters
+        int hlCur = Math.Clamp(currentPlayer.HomeLevel, 0, 5);
+        int hlNext = Math.Clamp(currentPlayer.HomeLevel + 1, 0, 5);
+        ShowTieredOption(opt++, "Living Quarters", LivingQuartersNames, currentPlayer.HomeLevel, 5, GetLivingQuartersCost(currentPlayer.HomeLevel),
+            $"{(int)(GameConfig.HomeRecoveryPercent[hlCur] * 100)}% rest, {GameConfig.HomeRestsPerDay[hlCur]}x/day",
+            $"{(int)(GameConfig.HomeRecoveryPercent[hlNext] * 100)}% rest, {GameConfig.HomeRestsPerDay[hlNext]}x/day");
+
+        // Bed
+        int blCur = Math.Clamp(currentPlayer.BedLevel, 0, 5);
+        int blNext = Math.Clamp(currentPlayer.BedLevel + 1, 0, 5);
+        string bedCurStr = blCur == 0 ? "-50% fertility" : (GameConfig.BedFertilityModifier[blCur] == 0f ? "No modifier" : $"+{(int)(GameConfig.BedFertilityModifier[blCur] * 100)}% fertility");
+        string bedNextStr = GameConfig.BedFertilityModifier[blNext] == 0f ? "No penalty" : $"+{(int)(GameConfig.BedFertilityModifier[blNext] * 100)}% fertility";
+        ShowTieredOption(opt++, "Bed", BedNames, currentPlayer.BedLevel, 5, GetBedCost(currentPlayer.BedLevel), bedCurStr, bedNextStr);
+
+        // Storage Chest
+        int clCur = Math.Clamp(currentPlayer.ChestLevel, 0, 5);
+        int clNext = Math.Clamp(currentPlayer.ChestLevel + 1, 0, 5);
+        ShowTieredOption(opt++, "Storage Chest", ChestNames, currentPlayer.ChestLevel, 5, GetChestUpgradeCost(currentPlayer.ChestLevel),
+            $"{GameConfig.ChestCapacity[clCur]} items",
+            $"{GameConfig.ChestCapacity[clNext]} items");
+
+        // Hearth
+        int heCur = Math.Clamp(currentPlayer.HearthLevel, 0, 5);
+        int heNext = Math.Clamp(currentPlayer.HearthLevel + 1, 0, 5);
+        string hearthCurStr = heCur == 0 ? "No buff" : $"+{(int)(GameConfig.HearthDamageBonus[heCur] * 100)}% dmg/def, {GameConfig.HearthCombatDuration[heCur]} combats";
+        string hearthNextStr = $"+{(int)(GameConfig.HearthDamageBonus[heNext] * 100)}% dmg/def, {GameConfig.HearthCombatDuration[heNext]} combats";
+        ShowTieredOption(opt++, "Hearth", HearthNames, currentPlayer.HearthLevel, 5, GetHearthCost(currentPlayer.HearthLevel), hearthCurStr, hearthNextStr);
+
+        // Herb Garden
+        int glCur = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
+        int glNext = Math.Clamp(currentPlayer.GardenLevel + 1, 0, 5);
+        ShowTieredOption(opt++, "Herb Garden", GardenNames, currentPlayer.GardenLevel, 5, GetGardenCost(currentPlayer.GardenLevel),
+            $"{GameConfig.HerbsPerDay[glCur]} herbs/day",
+            $"{GameConfig.HerbsPerDay[glNext]} herbs/day");
+
+        // Training Room
+        int trCur = currentPlayer.TrainingRoomLevel;
+        int trNext = Math.Min(trCur + 1, 10);
+        ShowTieredOption(opt++, "Training Room", null, trCur, 10, GetTrainingRoomCost(trCur),
+            $"+{trCur} all stats",
+            $"+{trNext} all stats");
+
         terminal.WriteLine();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("--- Special Purchases ---");
 
         // Trophy Room
-        bool hasTrophyRoom = currentPlayer.HasTrophyRoom;
         long trophyRoomCost = 500_000;
-        terminal.SetColor(hasTrophyRoom ? "dark_gray" : (currentPlayer.Gold >= trophyRoomCost ? "white" : "dark_gray"));
-        terminal.WriteLine($"[5] Trophy Room - {(hasTrophyRoom ? "OWNED" : $"{trophyRoomCost:N0} gold")}");
-        terminal.SetColor("gray");
-        terminal.WriteLine("    Display your achievements and defeated bosses");
-        terminal.WriteLine();
-
-        // Teleportation Circle
-        bool hasTeleport = currentPlayer.HasTeleportCircle;
-        long teleportCost = 1_000_000;
-        terminal.SetColor(hasTeleport ? "dark_gray" : (currentPlayer.Gold >= teleportCost ? "white" : "dark_gray"));
-        terminal.WriteLine($"[6] Teleportation Circle - {(hasTeleport ? "OWNED" : $"{teleportCost:N0} gold")}");
-        terminal.SetColor("gray");
-        terminal.WriteLine("    Instantly return home from anywhere");
-        terminal.WriteLine();
-
+        ShowOneTimePurchase(opt++, "Trophy Room", currentPlayer.HasTrophyRoom, trophyRoomCost, "Display achievements & bosses");
+        // Study / Library
+        long studyCost = 750_000;
+        ShowOneTimePurchase(opt++, "Study / Library", currentPlayer.HasStudy, studyCost, "+5% XP from combat");
+        // Servants' Quarters
+        long servantsCost = 500_000;
+        ShowOneTimePurchase(opt++, "Servants' Quarters", currentPlayer.HasServants, servantsCost, $"Daily gold income ({GameConfig.ServantsDailyGoldBase}+lvl*{GameConfig.ServantsDailyGoldPerLevel})");
         // Legendary Armory
-        bool hasArmory = currentPlayer.HasLegendaryArmory;
         long armoryCost = 2_500_000;
-        terminal.SetColor(hasArmory ? "dark_gray" : (currentPlayer.Gold >= armoryCost ? "white" : "dark_gray"));
-        terminal.WriteLine($"[7] Legendary Armory - {(hasArmory ? "OWNED" : $"{armoryCost:N0} gold")}");
-        terminal.SetColor("gray");
-        terminal.WriteLine("    +5% damage and +5% defense permanently");
-        terminal.WriteLine();
-
+        ShowOneTimePurchase(opt++, "Legendary Armory", currentPlayer.HasLegendaryArmory, armoryCost, "+5% damage & defense permanently");
         // Fountain of Vitality
-        bool hasFountain = currentPlayer.HasVitalityFountain;
         long fountainCost = 5_000_000;
-        terminal.SetColor(hasFountain ? "dark_gray" : (currentPlayer.Gold >= fountainCost ? "white" : "dark_gray"));
-        terminal.WriteLine($"[8] Fountain of Vitality - {(hasFountain ? "OWNED" : $"{fountainCost:N0} gold")}");
-        terminal.SetColor("gray");
-        terminal.WriteLine("    +10% max HP permanently");
-        terminal.WriteLine();
+        ShowOneTimePurchase(opt++, "Fountain of Vitality", currentPlayer.HasVitalityFountain, fountainCost, "+10% max HP permanently");
 
+        terminal.WriteLine();
         terminal.SetColor("bright_yellow");
         terminal.Write("[0]");
         terminal.SetColor("white");
@@ -3102,89 +3193,170 @@ terminal.SetColor("darkgray");
 
         var input = await terminal.GetInput("Select upgrade: ");
         if (!int.TryParse(input, out int choice) || choice < 1)
-        {
             return;
-        }
 
         switch (choice)
         {
             case 1:
-                await PurchaseUpgrade("Estate Expansion", GetEstateUpgradeCost(homeLevel),
-                    homeLevel < 5, () => { currentPlayer.HomeLevel++; ApplyEstateBonus(); });
+                await PurchaseUpgrade("Living Quarters", GetLivingQuartersCost(currentPlayer.HomeLevel),
+                    currentPlayer.HomeLevel < 5, () => {
+                        currentPlayer.HomeLevel++;
+                        int lvl = Math.Clamp(currentPlayer.HomeLevel, 0, 5);
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"Upgraded to {LivingQuartersNames[lvl]}!");
+                        terminal.WriteLine($"Rest now recovers {(int)(GameConfig.HomeRecoveryPercent[lvl] * 100)}% HP/Mana, {GameConfig.HomeRestsPerDay[lvl]}x per day.");
+                    });
                 break;
             case 2:
-                await PurchaseUpgrade("Reinforced Vault", GetChestUpgradeCost(chestLevel),
-                    chestLevel < 5, () => { currentPlayer.ChestLevel++; });
+                await PurchaseUpgrade("Bed", GetBedCost(currentPlayer.BedLevel),
+                    currentPlayer.BedLevel < 5, () => {
+                        currentPlayer.BedLevel++;
+                        int lvl = Math.Clamp(currentPlayer.BedLevel, 0, 5);
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"Upgraded to {BedNames[lvl]}!");
+                        float mod = GameConfig.BedFertilityModifier[lvl];
+                        terminal.WriteLine(mod <= 0 ? "Fertility penalty removed!" : $"Fertility bonus: +{(int)(mod * 100)}%");
+                    });
                 break;
             case 3:
-                await PurchaseUpgrade("Training Room", GetTrainingRoomCost(trainingLevel),
-                    trainingLevel < 10, () => { currentPlayer.TrainingRoomLevel++; ApplyTrainingBonus(); });
+                await PurchaseUpgrade("Storage Chest", GetChestUpgradeCost(currentPlayer.ChestLevel),
+                    currentPlayer.ChestLevel < 5, () => {
+                        currentPlayer.ChestLevel++;
+                        int lvl = Math.Clamp(currentPlayer.ChestLevel, 0, 5);
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"Upgraded to {ChestNames[lvl]}!");
+                        terminal.WriteLine($"Chest now holds up to {GameConfig.ChestCapacity[lvl]} items.");
+                    });
                 break;
             case 4:
-                await PurchaseUpgrade("Mystical Garden", GetGardenCost(gardenLevel),
-                    gardenLevel < 5, () => { currentPlayer.GardenLevel++; });
+                await PurchaseUpgrade("Hearth", GetHearthCost(currentPlayer.HearthLevel),
+                    currentPlayer.HearthLevel < 5, () => {
+                        currentPlayer.HearthLevel++;
+                        int lvl = Math.Clamp(currentPlayer.HearthLevel, 0, 5);
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"Upgraded to {HearthNames[lvl]}!");
+                        terminal.WriteLine($"Well-Rested buff: +{(int)(GameConfig.HearthDamageBonus[lvl] * 100)}% damage/defense for {GameConfig.HearthCombatDuration[lvl]} combats after resting.");
+                    });
                 break;
             case 5:
-                await PurchaseUpgrade("Trophy Room", trophyRoomCost,
-                    !hasTrophyRoom, () => { currentPlayer.HasTrophyRoom = true; });
+                await PurchaseUpgrade("Herb Garden", GetGardenCost(currentPlayer.GardenLevel),
+                    currentPlayer.GardenLevel < 5, () => {
+                        currentPlayer.GardenLevel++;
+                        int lvl = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"Upgraded to {GardenNames[lvl]}!");
+                        terminal.WriteLine($"Gather up to {GameConfig.HerbsPerDay[lvl]} healing herbs per day.");
+                    });
                 break;
             case 6:
-                await PurchaseUpgrade("Teleportation Circle", teleportCost,
-                    !hasTeleport, () => { currentPlayer.HasTeleportCircle = true; });
+                await PurchaseUpgrade("Training Room", GetTrainingRoomCost(currentPlayer.TrainingRoomLevel),
+                    currentPlayer.TrainingRoomLevel < 10, () => { currentPlayer.TrainingRoomLevel++; ApplyTrainingBonus(); });
                 break;
             case 7:
-                await PurchaseUpgrade("Legendary Armory", armoryCost,
-                    !hasArmory, () => { currentPlayer.HasLegendaryArmory = true; ApplyArmoryBonus(); });
+                await PurchaseUpgrade("Trophy Room", trophyRoomCost,
+                    !currentPlayer.HasTrophyRoom, () => { currentPlayer.HasTrophyRoom = true; });
                 break;
             case 8:
+                await PurchaseUpgrade("Study / Library", studyCost,
+                    !currentPlayer.HasStudy, () => {
+                        currentPlayer.HasStudy = true;
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine("A magnificent study lined with ancient tomes!");
+                        terminal.WriteLine($"+{(int)(GameConfig.StudyXPBonus * 100)}% XP from all combat.");
+                    });
+                break;
+            case 9:
+                await PurchaseUpgrade("Servants' Quarters", servantsCost,
+                    !currentPlayer.HasServants, () => {
+                        currentPlayer.HasServants = true;
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine("A loyal staff moves into the servants' quarters!");
+                        terminal.WriteLine($"They'll collect {GameConfig.ServantsDailyGoldBase} + (your level * {GameConfig.ServantsDailyGoldPerLevel}) gold daily.");
+                    });
+                break;
+            case 10:
+                await PurchaseUpgrade("Legendary Armory", armoryCost,
+                    !currentPlayer.HasLegendaryArmory, () => { currentPlayer.HasLegendaryArmory = true; ApplyArmoryBonus(); });
+                break;
+            case 11:
                 await PurchaseUpgrade("Fountain of Vitality", fountainCost,
-                    !hasFountain, () => { currentPlayer.HasVitalityFountain = true; ApplyFountainBonus(); });
+                    !currentPlayer.HasVitalityFountain, () => { currentPlayer.HasVitalityFountain = true; ApplyFountainBonus(); });
                 break;
         }
     }
 
-    private long GetEstateUpgradeCost(int level) => level switch
+    private void ShowTieredOption(int num, string name, string[]? tierNames, int level, int maxLevel, long cost, string currentBonus, string nextBonus)
     {
-        0 => 50_000,
-        1 => 150_000,
-        2 => 400_000,
-        3 => 1_000_000,
-        4 => 2_500_000,
-        _ => long.MaxValue
+        bool maxed = level >= maxLevel;
+        bool affordable = currentPlayer.Gold >= cost;
+        string currentTierName = tierNames != null && level < tierNames.Length ? tierNames[level] : "";
+        string nextTierName = tierNames != null && level + 1 < tierNames.Length ? tierNames[level + 1] : "";
+
+        if (maxed)
+        {
+            terminal.SetColor("bright_green");
+            terminal.Write($"  [{num}] {name}");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($" MAXED - {currentTierName} (Lv {level}) [{currentBonus}]");
+        }
+        else
+        {
+            terminal.SetColor(affordable ? "bright_yellow" : "dark_gray");
+            terminal.Write($"  [{num}]");
+            terminal.SetColor(affordable ? "white" : "dark_gray");
+            string tierText = nextTierName != "" ? $": {nextTierName}" : "";
+            terminal.Write($" {name} Lv {level + 1}{tierText}");
+            terminal.SetColor(affordable ? "yellow" : "dark_gray");
+            terminal.WriteLine($"  {cost:N0}g  [{nextBonus}]");
+        }
+    }
+
+    private void ShowOneTimePurchase(int num, string name, bool owned, long cost, string desc)
+    {
+        if (owned)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  [{num}] {name} - OWNED");
+        }
+        else
+        {
+            bool affordable = currentPlayer.Gold >= cost;
+            terminal.SetColor(affordable ? "white" : "dark_gray");
+            terminal.Write($"  [{num}] {name}");
+            terminal.SetColor(affordable ? "yellow" : "dark_gray");
+            terminal.WriteLine($"  {cost:N0}g - {desc}");
+        }
+    }
+
+    private long GetLivingQuartersCost(int level) => level switch
+    {
+        0 => 25_000, 1 => 75_000, 2 => 200_000, 3 => 500_000, 4 => 1_500_000, _ => long.MaxValue
+    };
+
+    private long GetBedCost(int level) => level switch
+    {
+        0 => 10_000, 1 => 50_000, 2 => 150_000, 3 => 400_000, 4 => 1_000_000, _ => long.MaxValue
     };
 
     private long GetChestUpgradeCost(int level) => level switch
     {
-        0 => 25_000,
-        1 => 75_000,
-        2 => 200_000,
-        3 => 500_000,
-        4 => 1_200_000,
-        _ => long.MaxValue
+        0 => 15_000, 1 => 60_000, 2 => 200_000, 3 => 500_000, 4 => 1_200_000, _ => long.MaxValue
     };
 
-    private long GetTrainingRoomCost(int level) => level switch
+    private long GetHearthCost(int level) => level switch
     {
-        0 => 100_000,
-        1 => 200_000,
-        2 => 350_000,
-        3 => 550_000,
-        4 => 800_000,
-        5 => 1_100_000,
-        6 => 1_500_000,
-        7 => 2_000_000,
-        8 => 2_700_000,
-        9 => 3_500_000,
-        _ => long.MaxValue
+        0 => 20_000, 1 => 80_000, 2 => 250_000, 3 => 750_000, 4 => 1_500_000, _ => long.MaxValue
     };
 
     private long GetGardenCost(int level) => level switch
     {
-        0 => 75_000,
-        1 => 250_000,
-        2 => 600_000,
-        3 => 1_500_000,
-        4 => 3_000_000,
+        0 => 30_000, 1 => 100_000, 2 => 300_000, 3 => 800_000, 4 => 2_000_000, _ => long.MaxValue
+    };
+
+    private long GetTrainingRoomCost(int level) => level switch
+    {
+        0 => 100_000, 1 => 200_000, 2 => 350_000, 3 => 550_000, 4 => 800_000,
+        5 => 1_100_000, 6 => 1_500_000, 7 => 2_000_000, 8 => 2_700_000, 9 => 3_500_000,
         _ => long.MaxValue
     };
 
@@ -3214,6 +3386,7 @@ terminal.SetColor("darkgray");
         if (confirm.Trim().ToUpperInvariant() == "Y")
         {
             currentPlayer.Gold -= cost;
+            currentPlayer.Statistics.RecordGoldSpent(cost);
             applyUpgrade();
             currentPlayer.RecalculateStats();
 
@@ -3230,18 +3403,8 @@ terminal.SetColor("darkgray");
         await terminal.WaitForKey();
     }
 
-    private void ApplyEstateBonus()
-    {
-        // Each estate level gives +2% HP regen when resting at home
-        // (Already handled by rest function checking HomeLevel)
-        terminal.SetColor("cyan");
-        terminal.WriteLine($"Estate upgraded to level {currentPlayer.HomeLevel}!");
-        terminal.WriteLine($"Rest at home now restores {100 + currentPlayer.HomeLevel * 5}% HP!");
-    }
-
     private void ApplyTrainingBonus()
     {
-        // Each training room level gives +1 to all base stats
         currentPlayer.BaseStrength++;
         currentPlayer.BaseDexterity++;
         currentPlayer.BaseConstitution++;
@@ -3256,7 +3419,6 @@ terminal.SetColor("darkgray");
 
     private void ApplyArmoryBonus()
     {
-        // Permanent damage and defense bonus
         currentPlayer.PermanentDamageBonus += 5;
         currentPlayer.PermanentDefenseBonus += 5;
         terminal.SetColor("cyan");
@@ -3266,7 +3428,6 @@ terminal.SetColor("darkgray");
 
     private void ApplyFountainBonus()
     {
-        // Permanent HP bonus
         long hpBonus = currentPlayer.MaxHP / 10;
         currentPlayer.BonusMaxHP += hpBonus;
         terminal.SetColor("cyan");

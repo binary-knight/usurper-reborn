@@ -434,18 +434,27 @@ namespace UsurperRemake.Systems
         // Player achievements
         public PlayerAchievementsData? AchievementsData { get; set; }
 
-        // Home Upgrade System (Gold Sinks)
+        // Home Upgrade System (v0.44.0 overhaul)
         public int HomeLevel { get; set; } = 0;
         public int ChestLevel { get; set; } = 0;
         public int TrainingRoomLevel { get; set; } = 0;
         public int GardenLevel { get; set; } = 0;
+        public int BedLevel { get; set; } = 0;
+        public int HearthLevel { get; set; } = 0;
         public bool HasTrophyRoom { get; set; } = false;
         public bool HasTeleportCircle { get; set; } = false;
         public bool HasLegendaryArmory { get; set; } = false;
         public bool HasVitalityFountain { get; set; } = false;
+        public bool HasStudy { get; set; } = false;
+        public bool HasServants { get; set; } = false;
         public int PermanentDamageBonus { get; set; } = 0;
         public int PermanentDefenseBonus { get; set; } = 0;
         public long BonusMaxHP { get; set; } = 0;
+        public int HomeRestsToday { get; set; } = 0;
+        public int HerbsGatheredToday { get; set; } = 0;
+        public int WellRestedCombats { get; set; } = 0;
+        public float WellRestedBonus { get; set; } = 0f;
+        public List<InventoryItemData>? ChestContents { get; set; }
 
         // Faction consumable properties (v0.40.2)
         public int PoisonCoatingCombats { get; set; }

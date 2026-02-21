@@ -357,18 +357,26 @@ public class Character
         CraftingMaterials[materialId] += count;
     }
 
-    // Home Upgrade System - Gold sinks
-    public int HomeLevel { get; set; } = 0;
-    public int ChestLevel { get; set; } = 0;
-    public int TrainingRoomLevel { get; set; } = 0;
-    public int GardenLevel { get; set; } = 0;
+    // Home Upgrade System - Gold sinks (v0.44.0 overhaul)
+    public int HomeLevel { get; set; } = 0;       // Living Quarters tier 0-5
+    public int ChestLevel { get; set; } = 0;       // Storage Chest tier 0-5
+    public int TrainingRoomLevel { get; set; } = 0; // Training Room 0-10
+    public int GardenLevel { get; set; } = 0;       // Herb Garden tier 0-5
+    public int BedLevel { get; set; } = 0;           // Bed tier 0-5
+    public int HearthLevel { get; set; } = 0;        // Hearth tier 0-5
     public bool HasTrophyRoom { get; set; } = false;
-    public bool HasTeleportCircle { get; set; } = false;
+    public bool HasTeleportCircle { get; set; } = false; // Legacy, no longer purchasable
     public bool HasLegendaryArmory { get; set; } = false;
     public bool HasVitalityFountain { get; set; } = false;
+    public bool HasStudy { get; set; } = false;       // +5% XP bonus
+    public bool HasServants { get; set; } = false;     // Daily gold income
     public int PermanentDamageBonus { get; set; } = 0;
     public int PermanentDefenseBonus { get; set; } = 0;
     public long BonusMaxHP { get; set; } = 0;
+    public int HomeRestsToday { get; set; } = 0;       // Daily rest counter
+    public int HerbsGatheredToday { get; set; } = 0;   // Daily herb counter
+    public int WellRestedCombats { get; set; } = 0;    // Combats remaining with Well-Rested buff
+    public float WellRestedBonus { get; set; } = 0f;   // Damage/defense % bonus from hearth
 
     // Faction consumable properties (v0.40.2)
     public int PoisonCoatingCombats { get; set; } = 0;  // Combats remaining with poison coating (+20% dmg)
@@ -754,6 +762,12 @@ public class Character
         if (King)
         {
             MaxHP = (long)(MaxHP * GameConfig.KingCombatHPBonus);
+        }
+
+        // Apply Fountain of Vitality bonus HP
+        if (BonusMaxHP > 0)
+        {
+            MaxHP += BonusMaxHP;
         }
 
         // Restore saved HP/Mana and clamp to final MaxHP/MaxMana

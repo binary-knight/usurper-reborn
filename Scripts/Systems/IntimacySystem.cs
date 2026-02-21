@@ -238,6 +238,11 @@ namespace UsurperRemake.Systems
             // Base pregnancy chance: 15% for spouses, 5% for lovers
             float pregnancyChance = romanceType == RomanceRelationType.Spouse ? 0.15f : 0.05f;
 
+            // Bed quality modifier (v0.44.0): level 0 = -50%, level 5 = +50%
+            int bedLevel = Math.Clamp(player!.BedLevel, 0, 5);
+            float bedModifier = GameConfig.BedFertilityModifier[bedLevel];
+            pregnancyChance *= (1f + bedModifier);
+
             float roll = (float)random.NextDouble();
 
             if (roll < pregnancyChance)

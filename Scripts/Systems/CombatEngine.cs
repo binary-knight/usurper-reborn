@@ -149,6 +149,7 @@ public partial class CombatEngine
         // Reset per-combat faction flags
         attacker.DivineFavorTriggeredThisCombat = false;
         if (attacker.PoisonCoatingCombats > 0) attacker.PoisonCoatingCombats--;
+        if (attacker.WellRestedCombats > 0) attacker.WellRestedCombats--;
 
         // Ensure abilities are learned based on current level (fixes abilities not showing in quickbar)
         if (!ClassAbilitySystem.IsSpellcaster(attacker.Class))
@@ -244,8 +245,9 @@ public partial class CombatEngine
 
         // Reset per-combat faction flags
         player.DivineFavorTriggeredThisCombat = false;
-        // Decrement poison coating (per combat, not per round)
+        // Decrement poison coating and well-rested (per combat, not per round)
         if (player.PoisonCoatingCombats > 0) player.PoisonCoatingCombats--;
+        if (player.WellRestedCombats > 0) player.WellRestedCombats--;
 
         // Ensure abilities are learned based on current level (fixes abilities not showing)
         if (!ClassAbilitySystem.IsSpellcaster(player.Class))
@@ -1966,6 +1968,18 @@ public partial class CombatEngine
             attackPower += poisonBonus;
         }
 
+        // Well-Rested bonus damage (Home Hearth buff)
+        if (attacker.WellRestedCombats > 0 && attacker.WellRestedBonus > 0f)
+        {
+            attackPower += (long)(attackPower * attacker.WellRestedBonus);
+        }
+
+        // Legendary Armory permanent damage bonus
+        if (attacker.PermanentDamageBonus > 0)
+        {
+            attackPower += (long)(attackPower * (attacker.PermanentDamageBonus / 100.0));
+        }
+
         // Show critical hit message
         if (attackRoll.IsCriticalSuccess)
         {
@@ -2717,6 +2731,18 @@ public partial class CombatEngine
             monster.Distracted = false;
         }
 
+        // Well-Rested defense bonus (Home Hearth buff)
+        if (player.WellRestedCombats > 0 && player.WellRestedBonus > 0f)
+        {
+            playerDefense += (long)(playerDefense * player.WellRestedBonus);
+        }
+
+        // Legendary Armory permanent defense bonus
+        if (player.PermanentDefenseBonus > 0)
+        {
+            playerDefense += (long)(playerDefense * (player.PermanentDefenseBonus / 100.0));
+        }
+
         long actualDamage = Math.Max(1, monsterAttack - playerDefense);
 
         // Cap non-boss monster damage at 75% of player max HP to prevent one-shots
@@ -3144,6 +3170,12 @@ public partial class CombatEngine
         if (teamXPMult < 1.0f)
         {
             expReward = (long)(expReward * teamXPMult);
+        }
+
+        // Study/Library XP bonus (Home upgrade)
+        if (result.Player.HasStudy)
+        {
+            expReward += (long)(expReward * GameConfig.StudyXPBonus);
         }
 
         result.Player.Experience += expReward;
@@ -8921,6 +8953,12 @@ public partial class CombatEngine
         if (teamXPMult < 1.0f)
         {
             adjustedExp = (long)(adjustedExp * teamXPMult);
+        }
+
+        // Study/Library XP bonus (Home upgrade)
+        if (result.Player.HasStudy)
+        {
+            adjustedExp += (long)(adjustedExp * GameConfig.StudyXPBonus);
         }
 
         // Apply rewards

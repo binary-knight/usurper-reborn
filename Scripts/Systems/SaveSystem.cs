@@ -672,18 +672,27 @@ namespace UsurperRemake.Systems
                 // Player achievements
                 AchievementsData = SerializeAchievements(player),
 
-                // Home Upgrade System (Gold Sinks)
+                // Home Upgrade System (v0.44.0 overhaul)
                 HomeLevel = player.HomeLevel,
                 ChestLevel = player.ChestLevel,
                 TrainingRoomLevel = player.TrainingRoomLevel,
                 GardenLevel = player.GardenLevel,
+                BedLevel = player.BedLevel,
+                HearthLevel = player.HearthLevel,
                 HasTrophyRoom = player.HasTrophyRoom,
                 HasTeleportCircle = player.HasTeleportCircle,
                 HasLegendaryArmory = player.HasLegendaryArmory,
                 HasVitalityFountain = player.HasVitalityFountain,
+                HasStudy = player.HasStudy,
+                HasServants = player.HasServants,
                 PermanentDamageBonus = player.PermanentDamageBonus,
                 PermanentDefenseBonus = player.PermanentDefenseBonus,
                 BonusMaxHP = player.BonusMaxHP,
+                HomeRestsToday = player.HomeRestsToday,
+                HerbsGatheredToday = player.HerbsGatheredToday,
+                WellRestedCombats = player.WellRestedCombats,
+                WellRestedBonus = player.WellRestedBonus,
+                ChestContents = SerializeChestContents(player),
 
                 // Faction consumable properties (v0.40.2)
                 PoisonCoatingCombats = player.PoisonCoatingCombats,
@@ -805,6 +814,35 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Serialize player achievements for saving
         /// </summary>
+        private List<InventoryItemData>? SerializeChestContents(Character player)
+        {
+            var playerKey = (player is Player p ? p.RealName : player.Name2) ?? player.Name2;
+            if (!UsurperRemake.Locations.HomeLocation.PlayerChests.TryGetValue(playerKey, out var chest) || chest.Count == 0)
+                return null;
+
+            return chest.Select(item => new InventoryItemData
+            {
+                Name = item.Name,
+                Value = item.Value,
+                Type = item.Type,
+                Attack = item.Attack,
+                Armor = item.Armor,
+                Strength = item.Strength,
+                Dexterity = item.Dexterity,
+                Wisdom = item.Wisdom,
+                Defence = item.Defence,
+                HP = item.HP,
+                Mana = item.Mana,
+                Charisma = item.Charisma,
+                MinLevel = item.MinLevel,
+                IsCursed = item.IsCursed,
+                IsIdentified = item.IsIdentified,
+                Shop = item.Shop,
+                Dungeon = item.Dungeon,
+                Description = item.Description?.ToList() ?? new List<string>()
+            }).ToList();
+        }
+
         private PlayerAchievementsData SerializeAchievements(Character player)
         {
             return new PlayerAchievementsData

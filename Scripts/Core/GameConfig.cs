@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.43.3";
-    public const string VersionName = "Kings and Queens";
+    public const string Version = "0.44.0";
+    public const string VersionName = "Home Sweet Home";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -590,6 +590,26 @@ public static partial class GameConfig
     // Training Respec (v0.43.3)
     public const int RespecBaseGoldCost = 500;                // Base gold cost to reset skill proficiency
     public const int RespecGoldPerLevel = 100;                // Additional gold cost per player level
+
+    // Home Overhaul (v0.44.0)
+    // Living Quarters: recovery % and uses/day per level
+    public static readonly float[] HomeRecoveryPercent = { 0.25f, 0.40f, 0.55f, 0.70f, 0.85f, 1.00f };
+    public static readonly int[] HomeRestsPerDay = { 1, 2, 2, 3, 4, 5 };
+    // Bed: fertility modifier per level (negative = penalty)
+    public static readonly float[] BedFertilityModifier = { -0.50f, 0f, 0.10f, 0.20f, 0.35f, 0.50f };
+    // Chest: capacity per level (0 = no chest)
+    public static readonly int[] ChestCapacity = { 0, 10, 25, 50, 75, 100 };
+    // Hearth: damage/defense bonus % and combat duration per level
+    public static readonly float[] HearthDamageBonus = { 0f, 0.03f, 0.05f, 0.07f, 0.10f, 0.12f };
+    public static readonly int[] HearthCombatDuration = { 0, 3, 5, 8, 12, 15 };
+    // Herb Garden: herbs per day per level
+    public static readonly int[] HerbsPerDay = { 0, 1, 2, 3, 4, 5 };
+    public const float HerbHealPercent = 0.20f;               // Each herb heals 20% of max HP
+    // Study / Library
+    public const float StudyXPBonus = 0.05f;                  // +5% XP from combat
+    // Servants' Quarters
+    public const int ServantsDailyGoldBase = 100;              // Base daily gold income
+    public const int ServantsDailyGoldPerLevel = 10;           // Additional gold per player level
 
     // Gambling Den (v0.30.9)
     public const int GamblingMaxDoubleDown = 3;               // Max double-or-nothing rounds in High-Low

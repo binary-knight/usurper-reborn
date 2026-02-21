@@ -306,6 +306,18 @@ public class DailySystemManager
             player.LastInnerSanctumRealDate = DateTime.MinValue;
             player.LastBindingOfSoulsRealDate = DateTime.MinValue;
 
+            // Reset home daily counters (v0.44.0)
+            player.HomeRestsToday = 0;
+            player.HerbsGatheredToday = 0;
+
+            // Servants' Quarters daily gold income (v0.44.0)
+            if (player.HasServants)
+            {
+                long servantsGold = GameConfig.ServantsDailyGoldBase + (player.Level * GameConfig.ServantsDailyGoldPerLevel);
+                player.Gold += servantsGold;
+                terminal?.WriteLine($"Your servants collected {servantsGold:N0} gold in rent and services.", "bright_yellow");
+            }
+
             terminal?.WriteLine($"Your daily limits have been restored! ({turnsToRestore} turns)", "bright_green");
         }
         else

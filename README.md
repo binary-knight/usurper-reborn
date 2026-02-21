@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.43.3** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.44.0** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,34 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.44.0 - Home Sweet Home
+
+**Tiered Home Upgrades:**
+- Complete overhaul of the Home location with 5 upgradable systems, each with 5 levels
+- Living Quarters: Rest recovery scales from 25% (1x/day) to 100% (5x/day)
+- Bed: Fertility modifier from -50% (straw pile) to +50% (Royal Canopy Bed)
+- Storage Chest: 0 to 100 items, chest contents now persist across saves (previously lost on logout)
+- Hearth: Well-Rested combat buff (+3-12% damage/defense for 3-15 combats)
+- Herb Garden: Gather 1-5 free healing potions per day
+
+**New Special Purchases:**
+- Study / Library (750,000g) — +5% XP from all combat
+- Servants' Quarters (500,000g) — Daily passive gold income
+
+**Bug Fixes:**
+- Fountain of Vitality HP bonus was never applied in stat calculations
+- Legendary Armory damage/defense bonuses were never applied in combat
+- Home chest contents were lost every time you logged out
+
+**Balance Changes:**
+- Home rest limited to 1-5 uses per day (was unlimited), recovery starts at 25% (was 100%)
+- Teleportation Circle removed (was purchasable but non-functional)
+
+### Completed in v0.43.3 - ANSI Art Portraits
+
+- ANSI art portraits during character creation for race and class selection (side-by-side layout)
+- Training respec system: unlearn skill proficiencies and reclaim training points at the Level Master
 
 ### Completed in v0.40.0 - The Price of Power
 
@@ -862,7 +890,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.40.0)
+### Known Issues (Alpha v0.44.0)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -877,4 +905,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.40.0 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.44.0 — The world is running. [Watch it live.](https://usurper-reborn.net)

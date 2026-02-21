@@ -2956,18 +2956,58 @@ public partial class GameEngine : Node
         // Initialize achievement system
         AchievementSystem.Initialize();
 
-        // Restore Home Upgrade System (Gold Sinks)
+        // Restore Home Upgrade System (v0.44.0 overhaul)
         player.HomeLevel = playerData.HomeLevel;
         player.ChestLevel = playerData.ChestLevel;
         player.TrainingRoomLevel = playerData.TrainingRoomLevel;
         player.GardenLevel = playerData.GardenLevel;
+        player.BedLevel = playerData.BedLevel;
+        player.HearthLevel = playerData.HearthLevel;
         player.HasTrophyRoom = playerData.HasTrophyRoom;
         player.HasTeleportCircle = playerData.HasTeleportCircle;
         player.HasLegendaryArmory = playerData.HasLegendaryArmory;
         player.HasVitalityFountain = playerData.HasVitalityFountain;
+        player.HasStudy = playerData.HasStudy;
+        player.HasServants = playerData.HasServants;
         player.PermanentDamageBonus = playerData.PermanentDamageBonus;
         player.PermanentDefenseBonus = playerData.PermanentDefenseBonus;
         player.BonusMaxHP = playerData.BonusMaxHP;
+        player.HomeRestsToday = playerData.HomeRestsToday;
+        player.HerbsGatheredToday = playerData.HerbsGatheredToday;
+        player.WellRestedCombats = playerData.WellRestedCombats;
+        player.WellRestedBonus = playerData.WellRestedBonus;
+
+        // Restore chest contents
+        var playerKey = (player is Player pp ? pp.RealName : player.Name2) ?? player.Name2;
+        if (playerData.ChestContents != null && playerData.ChestContents.Count > 0)
+        {
+            var chestItems = playerData.ChestContents.Select(data => new global::Item
+            {
+                Name = data.Name,
+                Value = data.Value,
+                Type = data.Type,
+                Attack = data.Attack,
+                Armor = data.Armor,
+                Strength = data.Strength,
+                Dexterity = data.Dexterity,
+                Wisdom = data.Wisdom,
+                Defence = data.Defence,
+                HP = data.HP,
+                Mana = data.Mana,
+                Charisma = data.Charisma,
+                MinLevel = data.MinLevel,
+                IsCursed = data.IsCursed,
+                IsIdentified = data.IsIdentified,
+                Shop = data.Shop,
+                Dungeon = data.Dungeon,
+                Description = data.Description?.ToList() ?? new List<string>()
+            }).ToList();
+            UsurperRemake.Locations.HomeLocation.PlayerChests[playerKey] = chestItems;
+        }
+        else
+        {
+            UsurperRemake.Locations.HomeLocation.PlayerChests[playerKey] = new List<global::Item>();
+        }
 
         // Faction consumable properties (v0.40.2)
         player.PoisonCoatingCombats = playerData.PoisonCoatingCombats;
