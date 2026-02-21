@@ -509,6 +509,10 @@ public class MudServer
             if (!kvp.Value.IsInGame)
                 continue;
 
+            // Don't send broadcasts to spectators (they see the target's output)
+            if (kvp.Value.IsSpectating)
+                continue;
+
             kvp.Value.EnqueueMessage(message);
         }
     }
@@ -546,6 +550,11 @@ public class MudServer
                 foreach (var kvp in ActiveSessions)
                 {
                     var session = kvp.Value;
+
+                    // Spectators don't produce input — exempt from idle timeout
+                    if (session.IsSpectating)
+                        continue;
+
                     var idleTime = now - session.LastActivityTime;
                     if (idleTime >= IdleTimeout)
                     {

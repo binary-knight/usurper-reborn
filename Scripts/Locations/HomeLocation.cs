@@ -255,8 +255,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine("");
 
         // Navigation row
-        WriteMenuCol(" ", "R", "Return", true);
-        WriteMenuNL("", "Q", "Quit", true);
+        WriteMenuNL(" ", "R", "Return", true);
 
         terminal.WriteLine("");
     }
@@ -370,7 +369,7 @@ public class HomeLocation : BaseLocation
         ShowBBSMenuRow(("A", "bright_yellow", "Herbs"), ("T", "bright_yellow", "Trophies"), ("F", "bright_yellow", "Family"));
         ShowBBSMenuRow(("P", "bright_yellow", "Partner"), ("B", "bright_yellow", "Bedroom"), ("!", "bright_yellow", "Resurrect"));
         ShowBBSMenuRow(("I", "bright_yellow", "Inventory"), ("G", "bright_yellow", "Gear"), ("H", "bright_yellow", "Heal(Pot)"));
-        ShowBBSMenuRow(("R", "bright_yellow", "Return"), ("Q", "bright_yellow", "Quit"));
+        ShowBBSMenuRow(("R", "bright_yellow", "Return"));
 
         ShowBBSFooter();
     }

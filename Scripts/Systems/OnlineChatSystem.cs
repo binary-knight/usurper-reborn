@@ -125,6 +125,18 @@ namespace UsurperRemake.Systems
 
                     var viaTag = FormatConnectionType(player.ConnectionType);
 
+                    // Check if this player is spectating or being spectated
+                    var specTag = "";
+                    var mudServer = UsurperRemake.Server.MudServer.Instance;
+                    if (mudServer != null && mudServer.ActiveSessions.TryGetValue(
+                        player.DisplayName.ToLowerInvariant(), out var session))
+                    {
+                        if (session.IsSpectating && session.SpectatingSession != null)
+                            specTag = $" [watching {session.SpectatingSession.Username}]";
+                        else if (session.Spectators.Count > 0)
+                            specTag = $" [{session.Spectators.Count} watching]";
+                    }
+
                     terminal.SetColor("white");
                     terminal.Write($"  {player.DisplayName,-18} ");
                     terminal.SetColor("green");
@@ -132,7 +144,13 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("darkgray");
                     terminal.Write($"{viaTag,-5} ");
                     terminal.SetColor("gray");
-                    terminal.WriteLine(durationStr);
+                    terminal.Write(durationStr);
+                    if (!string.IsNullOrEmpty(specTag))
+                    {
+                        terminal.SetColor("bright_magenta");
+                        terminal.Write(specTag);
+                    }
+                    terminal.WriteLine("");
                 }
             }
 

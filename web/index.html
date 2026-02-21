@@ -2233,11 +2233,16 @@
             html += '<th>Player</th><th>Class</th><th>Level</th><th>Location</th><th>Via</th>';
             html += '</tr></thead><tbody>';
             for (const p of data.online) {
+                const isSpectating = p.location && p.location.startsWith('Spectating ');
                 html += '<tr>';
                 html += '<td class="player-name">' + escapeHtml(p.name) + '</td>';
                 html += '<td class="player-class">' + escapeHtml(p.className) + '</td>';
                 html += '<td>' + p.level + '</td>';
-                html += '<td>' + escapeHtml(p.location) + '</td>';
+                if (isSpectating) {
+                    html += '<td style="color:#c084fc;font-style:italic">' + escapeHtml(p.location) + '</td>';
+                } else {
+                    html += '<td>' + escapeHtml(p.location) + '</td>';
+                }
                 html += '<td class="player-via">' + escapeHtml(p.connectionType || 'Unknown') + '</td>';
                 html += '</tr>';
             }

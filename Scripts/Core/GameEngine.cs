@@ -425,6 +425,17 @@ public partial class GameEngine : Node
                 terminal.SetColor("white");
                 terminal.WriteLine("Screen Reader Mode: OFF");
             }
+            if (UsurperRemake.Server.SessionContext.IsActive)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_magenta");
+                terminal.Write("S");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Spectate a Player");
+            }
             terminal.SetColor("darkgray");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
@@ -518,6 +529,15 @@ public partial class GameEngine : Node
                     await RunBBSDoorMode();
                     return;
 
+                case "S":
+                    if (UsurperRemake.Server.SessionContext.IsActive)
+                    {
+                        await RunSpectatorModeUI();
+                        await RunBBSDoorMode();
+                        return;
+                    }
+                    break;
+
                 case "Q":
                     IsIntentionalExit = true;
                     terminal.WriteLine("Goodbye!", "cyan");
@@ -607,6 +627,17 @@ public partial class GameEngine : Node
                 terminal.SetColor("white");
                 terminal.WriteLine("Screen Reader Mode: OFF");
             }
+            if (UsurperRemake.Server.SessionContext.IsActive)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_magenta");
+                terminal.Write("S");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Spectate a Player");
+            }
             terminal.SetColor("darkgray");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
@@ -621,6 +652,15 @@ public partial class GameEngine : Node
 
             switch (choice.ToUpper())
             {
+                case "S":
+                    if (UsurperRemake.Server.SessionContext.IsActive)
+                    {
+                        await RunSpectatorModeUI();
+                        await RunBBSDoorMode();
+                        return;
+                    }
+                    break;
+
                 case "C":
                     if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
                     {
@@ -1334,6 +1374,256 @@ public partial class GameEngine : Node
         terminal.SetColor(success ? "bright_green" : "red");
         terminal.WriteLine(message);
         await terminal.GetInputAsync("Press Enter to continue...");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // SPECTATOR MODE
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Spectator mode UI: select a player to watch, request consent, enter spectator loop.
+    /// Called from the main menu before loading a character.
+    /// </summary>
+    private async Task RunSpectatorModeUI()
+    {
+        var server = UsurperRemake.Server.MudServer.Instance;
+        if (server == null) return;
+
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        if (ctx == null) return;
+
+        var myUsername = ctx.Username;
+        var mySession = server.ActiveSessions.TryGetValue(myUsername.ToLowerInvariant(), out var s) ? s : null;
+        if (mySession == null) return;
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.SetColor("bright_white");
+        terminal.WriteLine("║                          Spectator Mode                                     ║");
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        // Get list of in-game players (exclude self, invisible wizards, other spectators)
+        var candidates = server.ActiveSessions.Values
+            .Where(p => p.IsInGame && !p.IsSpectating
+                        && !p.Username.Equals(myUsername, StringComparison.OrdinalIgnoreCase)
+                        && !p.IsWizInvisible)
+            .OrderBy(p => p.Username)
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  No players are currently in-game to watch.");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("  Players available to watch:");
+        terminal.WriteLine("");
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            var p = candidates[i];
+            var spectatorCount = p.Spectators.Count;
+            var watching = spectatorCount > 0 ? $" ({spectatorCount} watching)" : "";
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  [{i + 1}] ");
+            terminal.SetColor("white");
+            terminal.WriteLine($"{p.Username} [{p.ConnectionType}]{watching}");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine("  The selected player must accept your request before you can watch.");
+        terminal.WriteLine("");
+
+        var input = await terminal.GetInput("  Select player # (or Q to cancel): ");
+        if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "Q")
+            return;
+
+        if (!int.TryParse(input.Trim(), out int selection) || selection < 1 || selection > candidates.Count)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  Invalid selection.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        var target = candidates[selection - 1];
+
+        // Check if target already has a pending request
+        if (target.PendingSpectateRequest != null && !target.PendingSpectateRequest.IsExpired)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  That player already has a pending spectate request. Try again later.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Send the spectate request
+        var request = new UsurperRemake.Server.SpectateRequest { Requester = mySession };
+        target.PendingSpectateRequest = request;
+
+        // Notify the target
+        target.EnqueueMessage(
+            $"\u001b[1;35m  * {myUsername} wants to watch your session (Spectator Mode).\u001b[0m");
+        target.EnqueueMessage(
+            $"\u001b[1;35m  * Type /accept to allow or /deny to refuse.\u001b[0m");
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"  Spectate request sent to {target.Username}.");
+        terminal.WriteLine("  Waiting for their response (60 second timeout)...");
+
+        // Wait for response with timeout
+        bool accepted;
+        try
+        {
+            var responseTask = request.Response.Task;
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(60));
+            var completedTask = await Task.WhenAny(responseTask, timeoutTask);
+
+            if (completedTask == responseTask)
+            {
+                accepted = responseTask.Result;
+            }
+            else
+            {
+                accepted = false;
+                request.Response.TrySetResult(false);
+                target.PendingSpectateRequest = null;
+            }
+        }
+        catch
+        {
+            accepted = false;
+            request.Response.TrySetResult(false);
+            target.PendingSpectateRequest = null;
+        }
+
+        if (!accepted)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  Request was denied or timed out.");
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Accepted — enter spectator mode
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  {target.Username} accepted your request!");
+        terminal.WriteLine("");
+        await Task.Delay(1000);
+
+        await RunSpectatorLoop(mySession, target);
+    }
+
+    /// <summary>
+    /// The spectator viewing loop. Registers as a spectator on the target's terminal,
+    /// then waits in a simple input loop until the spectator types Q or the target disconnects.
+    /// </summary>
+    private async Task RunSpectatorLoop(
+        UsurperRemake.Server.PlayerSession mySession,
+        UsurperRemake.Server.PlayerSession targetSession)
+    {
+        // Register as spectator
+        targetSession.Spectators.Add(mySession);
+        mySession.SpectatingSession = targetSession;
+        mySession.IsSpectating = true;
+
+        // Update online location to show spectating status
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        ctx?.OnlineState?.UpdateLocation($"Spectating {targetSession.Username}");
+
+        // Add our stream writer to the target's terminal for output forwarding
+        var myStreamWriter = terminal.StreamWriterInternal;
+        if (myStreamWriter != null)
+        {
+            targetSession.Context?.Terminal?.AddSpectatorStream(myStreamWriter);
+        }
+
+        // Disable message pump so forwarded output isn't interleaved with prompt redraws
+        var savedMessageSource = terminal.MessageSource;
+        terminal.MessageSource = null;
+
+        // Notify the target
+        targetSession.EnqueueMessage(
+            $"\u001b[1;33m  * {mySession.Username} is now watching your session.\u001b[0m");
+
+        // Show spectator header
+        terminal.ClearScreen();
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("  ══════════════════════════════════════════════════════════════════════════");
+        terminal.SetColor("bright_white");
+        terminal.WriteLine($"  SPECTATING: {targetSession.Username}");
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("  ══════════════════════════════════════════════════════════════════════════");
+        terminal.SetColor("gray");
+        terminal.WriteLine("  Type Q + Enter to stop watching.");
+        terminal.WriteLine("");
+
+        // Spectator input loop
+        try
+        {
+            while (true)
+            {
+                var input = await terminal.GetInput("");
+
+                if (!string.IsNullOrEmpty(input) && input.Trim().ToUpper() == "Q")
+                    break;
+
+                // Check if target is still connected
+                if (targetSession.Context == null ||
+                    !UsurperRemake.Server.MudServer.Instance!.ActiveSessions.ContainsKey(
+                        targetSession.Username.ToLowerInvariant()))
+                {
+                    terminal.WriteLine("");
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  The player you were watching has disconnected.");
+                    break;
+                }
+
+                // Keep the session alive (update activity time)
+                mySession.LastActivityTime = DateTime.UtcNow;
+            }
+        }
+        catch
+        {
+            // Spectator disconnected or error
+        }
+        finally
+        {
+            // Cleanup
+            targetSession.Spectators.Remove(mySession);
+            if (myStreamWriter != null)
+            {
+                targetSession.Context?.Terminal?.RemoveSpectatorStream(myStreamWriter);
+            }
+            mySession.SpectatingSession = null;
+            mySession.IsSpectating = false;
+            terminal.MessageSource = savedMessageSource;
+
+            // Notify target (if still connected)
+            try
+            {
+                if (UsurperRemake.Server.MudServer.Instance?.ActiveSessions.ContainsKey(
+                    targetSession.Username.ToLowerInvariant()) == true)
+                {
+                    targetSession.EnqueueMessage(
+                        $"\u001b[1;33m  * {mySession.Username} stopped watching your session.\u001b[0m");
+                }
+            }
+            catch { }
+        }
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("");
+        terminal.WriteLine("  Spectator mode ended.");
+        await Task.Delay(1500);
     }
 
     /// <summary>

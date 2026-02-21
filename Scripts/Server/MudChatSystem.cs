@@ -98,6 +98,20 @@ public static class MudChatSystem
             case "w":
                 return HandleWho(username, terminal);
 
+            case "accept":
+                return HandleAcceptSpectate(username, terminal);
+
+            case "deny":
+            case "reject":
+                return HandleDenySpectate(username, terminal);
+
+            case "spectators":
+                return HandleListSpectators(username, terminal);
+
+            case "nospec":
+            case "nospectate":
+                return HandleKickAllSpectators(username, terminal);
+
             default:
                 return false; // Not a MUD chat command
         }
@@ -269,13 +283,18 @@ public static class MudChatSystem
                     ? $" [{WizardConstants.GetTitle(session.WizardLevel)}]" : "";
                 var invisTag = session.IsWizInvisible && myWizLevel >= session.WizardLevel
                     ? " [INVIS]" : "";
+                var specTag = "";
+                if (session.IsSpectating && session.SpectatingSession != null)
+                    specTag = $" [watching {session.SpectatingSession.Username}]";
+                else if (session.Spectators.Count > 0)
+                    specTag = $" [{session.Spectators.Count} watching]";
 
                 if (session.WizardLevel > WizardLevel.Mortal)
                     terminal.SetColor(WizardConstants.GetColor(session.WizardLevel));
                 else
                     terminal.SetColor(string.IsNullOrEmpty(isYou) ? "white" : "bright_green");
 
-                var line = $"  {session.Username}{wizTag}{isYou}{invisTag} - {locName} [{session.ConnectionType}]";
+                var line = $"  {session.Username}{wizTag}{isYou}{invisTag}{specTag} - {locName} [{session.ConnectionType}]";
                 terminal.WriteLine($"║{line.PadRight(78)}║");
             }
         }
@@ -287,6 +306,104 @@ public static class MudChatSystem
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
 
+        return true;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // SPECTATOR CONSENT COMMANDS
+    // ═══════════════════════════════════════════════════════════════════
+
+    private static bool HandleAcceptSpectate(string username, TerminalEmulator terminal)
+    {
+        var session = MudServer.Instance?.ActiveSessions
+            .TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
+        if (session?.PendingSpectateRequest == null)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  No pending spectate request.");
+            return true;
+        }
+
+        var request = session.PendingSpectateRequest;
+        if (request.IsExpired)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  That spectate request has expired.");
+            session.PendingSpectateRequest = null;
+            request.Response.TrySetResult(false);
+            return true;
+        }
+
+        session.PendingSpectateRequest = null;
+        request.Response.TrySetResult(true);
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  You accepted {request.Requester.Username}'s spectate request.");
+        return true;
+    }
+
+    private static bool HandleDenySpectate(string username, TerminalEmulator terminal)
+    {
+        var session = MudServer.Instance?.ActiveSessions
+            .TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
+        if (session?.PendingSpectateRequest == null)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  No pending spectate request.");
+            return true;
+        }
+
+        var request = session.PendingSpectateRequest;
+        session.PendingSpectateRequest = null;
+        request.Response.TrySetResult(false);
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  You denied {request.Requester.Username}'s spectate request.");
+        return true;
+    }
+
+    private static bool HandleListSpectators(string username, TerminalEmulator terminal)
+    {
+        var session = MudServer.Instance?.ActiveSessions
+            .TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
+        if (session == null || session.Spectators.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  No one is watching your session.");
+            return true;
+        }
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("  Current spectators:");
+        foreach (var spectator in session.Spectators.ToArray())
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine($"    - {spectator.Username}");
+        }
+        return true;
+    }
+
+    private static bool HandleKickAllSpectators(string username, TerminalEmulator terminal)
+    {
+        var session = MudServer.Instance?.ActiveSessions
+            .TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
+        if (session == null || session.Spectators.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  No one is watching your session.");
+            return true;
+        }
+
+        foreach (var spectator in session.Spectators.ToArray())
+        {
+            spectator.EnqueueMessage(
+                $"\u001b[1;33m  * {username} has ended the spectator session.\u001b[0m");
+            spectator.SpectatingSession = null;
+            spectator.IsSpectating = false;
+            session.Context?.Terminal?.RemoveSpectatorStream(spectator);
+        }
+        session.Spectators.Clear();
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("  All spectators have been removed.");
         return true;
     }
 }

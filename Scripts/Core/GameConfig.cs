@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.44.2";
-    public const string VersionName = "Home Sweet Home";
+    public const string Version = "0.44.3";
+    public const string VersionName = "Spectator Mode";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

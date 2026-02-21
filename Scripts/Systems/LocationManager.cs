@@ -271,7 +271,15 @@ public class LocationManager
             }
             else
             {
-                // NoWhere means quit game - mark as intentional exit
+                // NoWhere means quit game - force save before exiting
+                try
+                {
+                    await GameEngine.Instance.SaveCurrentGame();
+                }
+                catch (Exception saveEx)
+                {
+                    Console.Error.WriteLine($"[LocationManager] Save on quit failed: {saveEx.Message}");
+                }
                 GameEngine.MarkIntentionalExit();
                 terminal.WriteLine("Returning to main menu...", "yellow");
                 await Task.Delay(1000);

@@ -64,6 +64,18 @@ public class PlayerSession : IDisposable
     /// <summary>Wizards currently snooping this session's output.</summary>
     public List<PlayerSession> SnoopedBy { get; } = new();
 
+    /// <summary>Sessions currently spectating this player's terminal output.</summary>
+    public List<PlayerSession> Spectators { get; } = new();
+
+    /// <summary>The session this player is currently spectating (null if not spectating).</summary>
+    public PlayerSession? SpectatingSession { get; set; }
+
+    /// <summary>True while this session is in spectator mode (no game loaded).</summary>
+    public bool IsSpectating { get; set; }
+
+    /// <summary>Pending spectate request awaiting this player's /accept or /deny.</summary>
+    public SpectateRequest? PendingSpectateRequest { get; set; }
+
     /// <summary>Commands injected by a wizard via /force. Processed before normal input.</summary>
     public ConcurrentQueue<string> ForcedCommands { get; } = new();
 
@@ -199,14 +211,14 @@ public class PlayerSession : IDisposable
         }
         finally
         {
-            // Emergency save on disconnect
+            // Emergency save on disconnect — save to main player key so it persists
             try
             {
                 var player = ctx.Engine?.CurrentPlayer;
                 if (player != null)
                 {
                     Console.Error.WriteLine($"[MUD] [{Username}] Performing emergency save...");
-                    await SaveSystem.Instance.SaveGame($"emergency_{Username.ToLowerInvariant()}", player);
+                    await SaveSystem.Instance.SaveGame(Username.ToLowerInvariant(), player);
                     Console.Error.WriteLine($"[MUD] [{Username}] Emergency save completed");
                 }
             }
@@ -247,6 +259,32 @@ public class PlayerSession : IDisposable
                     snooper.EnqueueMessage($"\u001b[90m  [Snoop] {Username} has disconnected.\u001b[0m");
                 }
                 SnoopedBy.Clear();
+            }
+            catch { }
+
+            // Clean up spectator references
+            try
+            {
+                // Notify anyone spectating us that we disconnected
+                foreach (var spectator in Spectators.ToArray())
+                {
+                    spectator.EnqueueMessage($"\u001b[1;33m  * The player you were watching has disconnected.\u001b[0m");
+                    spectator.SpectatingSession = null;
+                    spectator.IsSpectating = false;
+                }
+                ctx.Terminal?.ClearSpectatorStreams();
+                Spectators.Clear();
+
+                // If we were spectating someone, remove ourselves
+                if (SpectatingSession != null)
+                {
+                    SpectatingSession.Spectators.Remove(this);
+                    SpectatingSession.Context?.Terminal?.RemoveSpectatorStream(this);
+                    SpectatingSession.EnqueueMessage(
+                        $"\u001b[1;33m  * {Username} stopped watching your session.\u001b[0m");
+                    SpectatingSession = null;
+                    IsSpectating = false;
+                }
             }
             catch { }
 
@@ -323,4 +361,17 @@ public class PlayerSession : IDisposable
         _sessionCts?.Dispose();
         try { _tcpClient.Close(); } catch { }
     }
+}
+
+/// <summary>
+/// A pending spectate request from one player to another.
+/// The requester waits on Response.Task; the target resolves it via /accept or /deny.
+/// </summary>
+public class SpectateRequest
+{
+    public PlayerSession Requester { get; init; } = null!;
+    public TaskCompletionSource<bool> Response { get; } = new();
+    public DateTime RequestedAt { get; } = DateTime.UtcNow;
+    /// <summary>Auto-expire after 60 seconds.</summary>
+    public bool IsExpired => (DateTime.UtcNow - RequestedAt).TotalSeconds > 60;
 }

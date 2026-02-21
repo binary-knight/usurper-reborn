@@ -72,6 +72,13 @@ public partial class TerminalEmulator : Control
     /// <summary>Returns true when this terminal is backed by a TCP stream (MUD mode).</summary>
     public bool IsStreamBacked => _streamWriter != null;
 
+    /// <summary>Internal accessor for the stream writer, used by spectator mode to register streams.</summary>
+    internal StreamWriter? StreamWriterInternal => _streamWriter;
+
+    // Spectator mode: output is duplicated to all spectator stream writers in real-time
+    private readonly List<StreamWriter> _spectatorStreams = new();
+    private readonly object _spectatorLock = new object();
+
     /// <summary>
     /// When set, GetInput() runs a background pump that calls this function every ~100ms
     /// to check for incoming messages. Returns a pre-formatted ANSI string, or null if empty.
@@ -468,6 +475,7 @@ public partial class TerminalEmulator : Control
         if (_streamWriter != null)
         {
             _streamWriter.Write(text);
+            ForwardToSpectators(text);
         }
         else if (display != null)
         {
@@ -657,8 +665,10 @@ public partial class TerminalEmulator : Control
         if (_streamWriter != null)
         {
             // MUD stream mode — ANSI clear screen
-            _streamWriter.Write("\x1b[2J\x1b[H");
+            var clearAnsi = "\x1b[2J\x1b[H";
+            _streamWriter.Write(clearAnsi);
             _streamWriter.Flush();
+            ForwardToSpectators(clearAnsi);
         }
         else if (display != null)
         {
@@ -1723,6 +1733,120 @@ public partial class TerminalEmulator : Control
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // SPECTATOR OUTPUT FORWARDING
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Add a spectator's stream writer to receive duplicated output.</summary>
+    public void AddSpectatorStream(StreamWriter writer)
+    {
+        lock (_spectatorLock)
+        {
+            if (!_spectatorStreams.Contains(writer))
+                _spectatorStreams.Add(writer);
+        }
+    }
+
+    /// <summary>Remove a spectator's stream writer.</summary>
+    public void RemoveSpectatorStream(StreamWriter writer)
+    {
+        lock (_spectatorLock)
+        {
+            _spectatorStreams.Remove(writer);
+        }
+    }
+
+    /// <summary>Remove spectator by PlayerSession reference.</summary>
+    public void RemoveSpectatorStream(UsurperRemake.Server.PlayerSession session)
+    {
+        var sw = session.Context?.Terminal?.StreamWriterInternal;
+        if (sw != null) RemoveSpectatorStream(sw);
+    }
+
+    /// <summary>Remove all spectator streams.</summary>
+    public void ClearSpectatorStreams()
+    {
+        lock (_spectatorLock)
+        {
+            _spectatorStreams.Clear();
+        }
+    }
+
+    /// <summary>Forward raw ANSI output to all spectator streams.</summary>
+    private void ForwardToSpectators(string rawAnsi)
+    {
+        List<StreamWriter> snapshot;
+        lock (_spectatorLock)
+        {
+            if (_spectatorStreams.Count == 0) return;
+            snapshot = new List<StreamWriter>(_spectatorStreams);
+        }
+
+        foreach (var sw in snapshot)
+        {
+            try
+            {
+                sw.Write(rawAnsi);
+                sw.Flush();
+            }
+            catch
+            {
+                // Spectator disconnected — remove silently
+                lock (_spectatorLock) { _spectatorStreams.Remove(sw); }
+            }
+        }
+    }
+
+    /// <summary>Render markup text to a StringBuilder (for spectator forwarding).</summary>
+    private void RenderMarkupToStringBuilder(StringBuilder sb, string text)
+    {
+        int pos = 0;
+        while (pos < text.Length)
+        {
+            var tagMatch = System.Text.RegularExpressions.Regex.Match(
+                text.Substring(pos), @"^\[([a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (tagMatch.Success)
+            {
+                string colorName = tagMatch.Groups[1].Value;
+                pos += tagMatch.Length;
+                int depth = 1;
+                int contentStart = pos;
+                int contentEnd = pos;
+
+                while (pos < text.Length && depth > 0)
+                {
+                    if (pos + 2 <= text.Length - 1 && text[pos] == '[' && text[pos + 1] == '/' && text[pos + 2] == ']')
+                    {
+                        depth--;
+                        if (depth == 0) { contentEnd = pos; pos += 3; break; }
+                        pos += 3;
+                        continue;
+                    }
+                    var nestedMatch = System.Text.RegularExpressions.Regex.Match(
+                        text.Substring(pos), @"^\[([a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (nestedMatch.Success) { depth++; pos += nestedMatch.Length; continue; }
+                    pos++;
+                }
+
+                string content = text.Substring(contentStart, contentEnd - contentStart);
+                sb.Append($"\x1b[{GetAnsiColorCode(colorName)}m");
+                RenderMarkupToStringBuilder(sb, content);
+                sb.Append("\x1b[0m");
+                continue;
+            }
+
+            if (pos + 2 <= text.Length - 1 && text[pos] == '[' && text[pos + 1] == '/' && text[pos + 2] == ']')
+            {
+                pos += 3;
+                continue;
+            }
+
+            sb.Append(text[pos]);
+            pos++;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // MUD STREAM I/O HELPERS
     // ═══════════════════════════════════════════════════════════════════
 
@@ -1734,15 +1858,16 @@ public partial class TerminalEmulator : Control
         if (string.IsNullOrEmpty(text))
         {
             _streamWriter.WriteLine();
+            ForwardToSpectators("\r\n");
             return;
         }
 
         // Check for inline color tags
         if (!text.Contains("[") || !text.Contains("[/]"))
         {
-            _streamWriter.Write($"\x1b[{GetAnsiColorCode(baseColor)}m");
-            _streamWriter.WriteLine(text);
-            _streamWriter.Write("\x1b[0m");
+            var ansi = $"\x1b[{GetAnsiColorCode(baseColor)}m{text}\r\n\x1b[0m";
+            _streamWriter.Write(ansi);
+            ForwardToSpectators(ansi);
         }
         else
         {
@@ -1750,6 +1875,16 @@ public partial class TerminalEmulator : Control
             WriteMarkupToStream(text);
             _streamWriter.WriteLine();
             _streamWriter.Write("\x1b[0m");
+
+            // Reconstruct for spectators
+            if (_spectatorStreams.Count > 0)
+            {
+                var sb = new StringBuilder();
+                sb.Append($"\x1b[{GetAnsiColorCode(baseColor)}m");
+                RenderMarkupToStringBuilder(sb, text);
+                sb.Append("\r\n\x1b[0m");
+                ForwardToSpectators(sb.ToString());
+            }
         }
     }
 
@@ -1757,8 +1892,9 @@ public partial class TerminalEmulator : Control
     private void WriteToStream(string text, string color)
     {
         if (_streamWriter == null) return;
-        _streamWriter.Write($"\x1b[{GetAnsiColorCode(color)}m");
-        _streamWriter.Write(text);
+        var ansi = $"\x1b[{GetAnsiColorCode(color)}m{text}";
+        _streamWriter.Write(ansi);
+        ForwardToSpectators(ansi);
     }
 
     /// <summary>Parse [colorname]text[/] markup and write to the MUD TCP stream using ANSI codes.</summary>
