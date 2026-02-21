@@ -458,7 +458,34 @@ public partial class TerminalEmulator : Control
 
         cursorX += text.Length;
     }
-    
+
+    /// <summary>
+    /// Write raw ANSI escape-coded text directly to the output stream.
+    /// Used for pre-rendered ANSI art (e.g. race/class portraits).
+    /// </summary>
+    public void WriteRawAnsi(string text)
+    {
+        if (_streamWriter != null)
+        {
+            _streamWriter.Write(text);
+        }
+        else if (display != null)
+        {
+            // Godot mode can't render raw ANSI — output as plain text
+            display.AppendText(text);
+        }
+        else if (ShouldUseBBSAdapter())
+        {
+            // BBS adapter: use Write with neutral color; the ANSI codes in text override it
+            BBSTerminalAdapter.Instance!.Write(text, "white");
+        }
+        else
+        {
+            // Console mode — raw ANSI pass-through (VT processing required)
+            Console.Write(text);
+        }
+    }
+
     private ConsoleColor ColorNameToConsole(string colorName)
     {
         var resolved = ColorTheme.Resolve(colorName);

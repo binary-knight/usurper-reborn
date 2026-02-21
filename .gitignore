@@ -58,3 +58,7 @@ CLAUDE.md
 # Telemetry config (contains webhook URLs - never commit)
 telemetry_config.txt
 nul
+tools/ans_to_csharp.py
+.gitignore
+tools/wizard_portrait_output.txt
+tools/orc_portrait_output.txt

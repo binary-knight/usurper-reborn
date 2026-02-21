@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.43.2";
+    public const string Version = "0.43.3";
     public const string VersionName = "Kings and Queens";
 
     // From Pascal global_maxXX constants
@@ -586,6 +586,10 @@ public static partial class GameConfig
     // Stat Training (v0.30.9)
     public const int StatTrainingBaseCostPerLevel = 500;      // Base gold cost = playerLevel * this value
     public const int MaxStatTrainingsPerStat = 5;             // Max times each stat can be trained for gold
+
+    // Training Respec (v0.43.3)
+    public const int RespecBaseGoldCost = 500;                // Base gold cost to reset skill proficiency
+    public const int RespecGoldPerLevel = 100;                // Additional gold cost per player level
 
     // Gambling Den (v0.30.9)
     public const int GamblingMaxDoubleDown = 3;               // Max double-or-nothing rounds in High-Low

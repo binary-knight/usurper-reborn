@@ -537,6 +537,337 @@ public static class TrainingSystem
     }
 
     /// <summary>
+    /// Calculate the gold cost to reset training proficiencies
+    /// </summary>
+    public static long CalculateRespecGoldCost(Character player)
+    {
+        return GameConfig.RespecBaseGoldCost + (player.Level * GameConfig.RespecGoldPerLevel);
+    }
+
+    /// <summary>
+    /// Calculate total training points invested in a skill above its default level.
+    /// Class skills default to Average; non-class skills default to Untrained.
+    /// </summary>
+    public static int CalculateTotalPointsInvested(Character player, string skillId)
+    {
+        var currentLevel = GetSkillProficiency(player, skillId);
+        var currentProgress = GetTrainingProgress(player, skillId);
+
+        // Determine default level (class skills start at Average for free)
+        var defaultLevel = IsClassSkill(player.Class, skillId)
+            ? ProficiencyLevel.Average
+            : ProficiencyLevel.Untrained;
+
+        if (currentLevel <= defaultLevel && currentProgress == 0)
+            return 0; // Nothing invested
+
+        int totalCost = 0;
+
+        // Sum cost of each completed tier above default
+        for (var tier = defaultLevel; tier < currentLevel; tier++)
+        {
+            totalCost += GetPointsForNextLevel(tier) * GetTrainingCostPerPoint(tier);
+        }
+
+        // Add cost of partial progress at current tier
+        if (currentLevel < ProficiencyLevel.Legendary)
+        {
+            totalCost += currentProgress * GetTrainingCostPerPoint(currentLevel);
+        }
+
+        return totalCost;
+    }
+
+    /// <summary>
+    /// Reset a single skill's proficiency back to its default level.
+    /// Returns the number of training points refunded.
+    /// </summary>
+    public static int ResetSkillProficiency(Character player, string skillId)
+    {
+        int pointsRefunded = CalculateTotalPointsInvested(player, skillId);
+        if (pointsRefunded == 0)
+            return 0;
+
+        // Reset to default level
+        var defaultLevel = IsClassSkill(player.Class, skillId)
+            ? ProficiencyLevel.Average
+            : ProficiencyLevel.Untrained;
+
+        player.SkillProficiencies[skillId] = defaultLevel;
+        player.SkillTrainingProgress.Remove(skillId);
+
+        return pointsRefunded;
+    }
+
+    /// <summary>
+    /// Reset ALL skill proficiencies back to defaults.
+    /// Returns total training points refunded.
+    /// </summary>
+    public static int ResetAllProficiencies(Character player)
+    {
+        int totalRefunded = 0;
+
+        // Iterate over a copy since we're modifying the dictionary
+        var skillIds = new List<string>(player.SkillProficiencies.Keys);
+        foreach (var skillId in skillIds)
+        {
+            totalRefunded += ResetSkillProficiency(player, skillId);
+        }
+
+        return totalRefunded;
+    }
+
+    /// <summary>
+    /// Show the reset training submenu
+    /// </summary>
+    private static async Task ShowResetMenu(Character player, TerminalEmulator terminal)
+    {
+        long goldCost = CalculateRespecGoldCost(player);
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            terminal.WriteLine("═══ RESET TRAINING ═══", "bright_yellow");
+            terminal.WriteLine("");
+            terminal.WriteLine("The Level Master leans forward, studying you carefully.", "white");
+            terminal.WriteLine("");
+            terminal.WriteLine("\"Ah, you seek the Unmaking? To have your training", "bright_cyan");
+            terminal.WriteLine("unraveled and your potential restored? It can be done...\"", "bright_cyan");
+            terminal.WriteLine("");
+            terminal.WriteLine("He gestures to a shelf of shimmering silver vials.", "white");
+            terminal.WriteLine("");
+            terminal.WriteLine("\"The Draught of Forgetting does not come cheap.\"", "bright_cyan");
+            terminal.WriteLine("");
+            terminal.WriteLine($"Service fee: {goldCost:N0} gold", "yellow");
+            terminal.WriteLine($"Your gold: {player.Gold:N0}", player.Gold >= goldCost ? "bright_green" : "red");
+            terminal.WriteLine("");
+            terminal.WriteLine("[1] Reset a single skill", "white");
+            terminal.WriteLine("[2] Reset ALL skill proficiencies", "white");
+            terminal.WriteLine("[X] Cancel", "yellow");
+            terminal.WriteLine("");
+
+            var input = await terminal.GetInput("> ");
+            if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X")
+                return;
+
+            if (input.Trim() == "1")
+            {
+                await ShowResetSingleSkillMenu(player, terminal, goldCost);
+                return;
+            }
+            else if (input.Trim() == "2")
+            {
+                await ShowResetAllMenu(player, terminal, goldCost);
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Show menu to reset a single skill's proficiency
+    /// </summary>
+    private static async Task ShowResetSingleSkillMenu(Character player, TerminalEmulator terminal, long goldCost)
+    {
+        // Find skills that have been trained above default
+        var trainedSkills = new List<(string skillId, string skillName, int pointsInvested)>();
+        var allSkills = GetTrainableSkills(player);
+
+        foreach (var (skillId, skillName) in allSkills)
+        {
+            int invested = CalculateTotalPointsInvested(player, skillId);
+            if (invested > 0)
+            {
+                trainedSkills.Add((skillId, skillName, invested));
+            }
+        }
+
+        if (trainedSkills.Count == 0)
+        {
+            terminal.WriteLine("You have no trained skills to reset!", "yellow");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.WriteLine("═══ RESET SINGLE SKILL ═══", "bright_yellow");
+        terminal.WriteLine($"Service fee: {goldCost:N0} gold", "yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine("Num  Skill                    Level         Points Invested", "cyan");
+        terminal.WriteLine("─────────────────────────────────────────────────────────────", "cyan");
+
+        int index = 1;
+        foreach (var (skillId, skillName, pointsInvested) in trainedSkills)
+        {
+            var proficiency = GetSkillProficiency(player, skillId);
+            string profName = GetProficiencyName(proficiency);
+            string profColor = GetProficiencyColor(proficiency);
+            terminal.WriteLine($" {index,2}  {skillName,-24} [{profColor}]{profName,-13}[/] {pointsInvested} pts");
+            index++;
+        }
+
+        terminal.WriteLine("");
+        terminal.WriteLine("Enter skill number to reset, or X to cancel.", "yellow");
+
+        var input = await terminal.GetInput("> ");
+        if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X")
+            return;
+
+        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= trainedSkills.Count)
+        {
+            var (skillId, skillName, pointsInvested) = trainedSkills[choice - 1];
+
+            if (player.Gold < goldCost)
+            {
+                terminal.WriteLine($"You need {goldCost:N0} gold but only have {player.Gold:N0}!", "red");
+                await Task.Delay(1500);
+                return;
+            }
+
+            // Confirm
+            var defaultLevel = IsClassSkill(player.Class, skillId)
+                ? ProficiencyLevel.Average
+                : ProficiencyLevel.Untrained;
+
+            terminal.WriteLine("");
+            terminal.WriteLine($"Reset {skillName} to {GetProficiencyName(defaultLevel)}?", "bright_yellow");
+            terminal.WriteLine($"  Cost: {goldCost:N0} gold", "yellow");
+            terminal.WriteLine($"  Refund: {pointsInvested} training points", "bright_green");
+            terminal.WriteLine("");
+            var confirm = await terminal.GetInput("Confirm? (Y/N) > ");
+            if (confirm?.Trim().ToUpper() != "Y")
+                return;
+
+            // Execute reset with lore flavor
+            player.Gold -= goldCost;
+            int refunded = ResetSkillProficiency(player, skillId);
+            player.TrainingPoints += refunded;
+
+            terminal.ClearScreen();
+            terminal.WriteLine("");
+            terminal.WriteLine("The Level Master nods slowly and reaches for a vial of", "white");
+            terminal.WriteLine("shimmering silver liquid on the shelf behind him.", "white");
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+            terminal.WriteLine("\"Drink this. It will feel... strange.\"", "bright_cyan");
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+            terminal.WriteLine("As the liquid touches your lips, the Level Master presses", "white");
+            terminal.WriteLine("his thumb to your forehead and whispers ancient words.", "white");
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+            terminal.WriteLine($"\"Oblivius... tractum... {skillName.ToLower()}...\"", "bright_magenta");
+            await Task.Delay(1500);
+            terminal.WriteLine("");
+            terminal.WriteLine("A chill runs through your body. The countless hours of", "white");
+            terminal.WriteLine($"training in {skillName} dissolve like morning frost.", "white");
+            terminal.WriteLine("Your muscles forget. Your instincts unravel.", "white");
+            terminal.WriteLine("But the potential remains, waiting to be reshaped.", "white");
+            await Task.Delay(2000);
+            terminal.WriteLine("");
+            terminal.WriteLine($"═══ SKILL RESET ═══", "bright_yellow");
+            terminal.WriteLine($"{skillName} has been reset to {GetProficiencyName(defaultLevel)}.", "white");
+            terminal.WriteLine($"  -{goldCost:N0} gold", "red");
+            terminal.WriteLine($"  +{refunded} training points refunded", "bright_green");
+            terminal.WriteLine($"  Total training points: {player.TrainingPoints}", "bright_cyan");
+
+            await SaveSystem.Instance.AutoSave(player);
+            await terminal.PressAnyKey();
+        }
+    }
+
+    /// <summary>
+    /// Show menu to reset all skill proficiencies
+    /// </summary>
+    private static async Task ShowResetAllMenu(Character player, TerminalEmulator terminal, long goldCost)
+    {
+        // Calculate total refund
+        int totalRefund = 0;
+        var allSkills = GetTrainableSkills(player);
+        foreach (var (skillId, _) in allSkills)
+        {
+            totalRefund += CalculateTotalPointsInvested(player, skillId);
+        }
+
+        // Also check any skills in SkillProficiencies not in the trainable list
+        foreach (var skillId in player.SkillProficiencies.Keys)
+        {
+            if (!allSkills.Any(s => s.skillId == skillId))
+            {
+                totalRefund += CalculateTotalPointsInvested(player, skillId);
+            }
+        }
+
+        if (totalRefund == 0)
+        {
+            terminal.WriteLine("You have no trained skills to reset!", "yellow");
+            await Task.Delay(1500);
+            return;
+        }
+
+        if (player.Gold < goldCost)
+        {
+            terminal.WriteLine($"You need {goldCost:N0} gold but only have {player.Gold:N0}!", "red");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.WriteLine("═══ RESET ALL TRAINING ═══", "bright_yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine("This will reset ALL skill proficiencies to their defaults.", "white");
+        terminal.WriteLine("");
+        terminal.WriteLine($"  Cost: {goldCost:N0} gold", "yellow");
+        terminal.WriteLine($"  Refund: {totalRefund} training points", "bright_green");
+        terminal.WriteLine("");
+        terminal.WriteLine("Are you sure? This cannot be undone!", "red");
+
+        var confirm = await terminal.GetInput("Confirm? (Y/N) > ");
+        if (confirm?.Trim().ToUpper() != "Y")
+            return;
+
+        // Execute reset with lore flavor
+        player.Gold -= goldCost;
+        int refunded = ResetAllProficiencies(player);
+        player.TrainingPoints += refunded;
+
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        terminal.WriteLine("The Level Master draws a circle of salt around you", "white");
+        terminal.WriteLine("and places candles at the four cardinal points.", "white");
+        await Task.Delay(1500);
+        terminal.WriteLine("");
+        terminal.WriteLine("\"This is no small thing you ask. To unmake all that", "bright_cyan");
+        terminal.WriteLine("you have learned... it requires a deeper forgetting.\"", "bright_cyan");
+        await Task.Delay(2000);
+        terminal.WriteLine("");
+        terminal.WriteLine("He pours an entire flask of silver liquid over your head.", "white");
+        terminal.WriteLine("Both hands press against your temples.", "white");
+        await Task.Delay(1500);
+        terminal.WriteLine("");
+        terminal.WriteLine("\"Oblivius... totalus... anima... revertum!\"", "bright_magenta");
+        await Task.Delay(1500);
+        terminal.WriteLine("");
+        terminal.WriteLine("A wave of cold fire washes through you. Every technique,", "white");
+        terminal.WriteLine("every practiced motion, every honed instinct — all of it", "white");
+        terminal.WriteLine("stripped away in an instant. You gasp, feeling lighter.", "white");
+        terminal.WriteLine("Empty. But full of possibility.", "white");
+        await Task.Delay(2000);
+        terminal.WriteLine("");
+        terminal.WriteLine("The Level Master catches you as you stumble.", "white");
+        terminal.WriteLine("\"Easy now. You are a blank slate once more.\"", "bright_cyan");
+        await Task.Delay(1500);
+        terminal.WriteLine("");
+        terminal.WriteLine($"═══ ALL TRAINING RESET ═══", "bright_yellow");
+        terminal.WriteLine($"All skill proficiencies have been reset.", "white");
+        terminal.WriteLine($"  -{goldCost:N0} gold", "red");
+        terminal.WriteLine($"  +{refunded} training points refunded", "bright_green");
+        terminal.WriteLine($"  Total training points: {player.TrainingPoints}", "bright_cyan");
+
+        await SaveSystem.Instance.AutoSave(player);
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
     /// Display training menu at Level Master
     /// </summary>
     public static async Task ShowTrainingMenu(Character player, TerminalEmulator terminal)
@@ -576,11 +907,17 @@ public static class TrainingSystem
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine("Enter skill number to train, or X to exit.", "yellow");
+            terminal.WriteLine("Enter skill number to train, [R] Reset training, or X to exit.", "yellow");
 
             var input = await terminal.GetInput("> ");
             if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X")
                 break;
+
+            if (input.Trim().ToUpper() == "R")
+            {
+                await ShowResetMenu(player, terminal);
+                continue;
+            }
 
             if (int.TryParse(input, out int choice) && choice >= 1 && choice <= trainableSkills.Count)
             {

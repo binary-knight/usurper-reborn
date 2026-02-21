@@ -1,9 +1,11 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 using UsurperRemake.BBS;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Godot;
 
@@ -126,9 +128,15 @@ public class CharacterCreationSystem
             
             return character;
         }
+        catch (OperationCanceledException)
+        {
+            // User chose to abort — not an error
+            return null;
+        }
         catch (Exception ex)
         {
             terminal.WriteLine($"Error during character creation: {ex.Message}", "red");
+            DebugLogger.Instance?.LogError("CHARCREATE", $"{ex}");
             return null;
         }
     }
@@ -576,6 +584,274 @@ public class CharacterCreationSystem
         if (GameConfig.ScreenReaderMode)
             return await ShowRacePreviewScreenReader(race);
 
+        // Try side-by-side portrait layout if a portrait exists for this race
+        var portrait = RacePortraits.GetCroppedPortrait(race, 38);
+        if (portrait != null)
+            return await ShowRacePreviewSideBySide(race, portrait);
+
+        // Fallback: original card layout (no portrait)
+        return await ShowRacePreviewCard(race);
+    }
+
+    /// <summary>
+    /// Side-by-side race preview: ANSI art portrait (left) + stats panel (right).
+    /// Fits in 80x25 (79 chars wide, 25 rows).
+    /// </summary>
+    private async Task<bool> ShowRacePreviewSideBySide(CharacterRace race, string[] portraitLines)
+    {
+        terminal.Clear();
+
+        const int TOTAL_W = 79;   // total box width (matches standard location headers)
+        const int LEFT_W = 38;    // portrait panel interior width
+        const int RIGHT_W = 38;   // stats panel interior width  (1+38+1+38+1 = 79)
+        const int CONTENT_ROWS = 18; // rows of portrait + stats content (18 fits 24-row BBS)
+
+        var raceAttrib = GameConfig.RaceAttributes[race];
+        string raceName = GameConfig.RaceNames[(int)race];
+
+        // ── Row 1: Top border with race name ──
+        string title = $" {raceName.ToUpper()} ";
+        int leftPad = (TOTAL_W - 2 - title.Length) / 2;
+        int rightPad = TOTAL_W - 2 - title.Length - leftPad;
+        terminal.Write("╔", "gray");
+        terminal.Write(new string('═', leftPad), "gray");
+        terminal.Write(title, "bright_yellow");
+        terminal.Write(new string('═', rightPad), "gray");
+        terminal.WriteLine("╗", "gray");
+
+        // ── Row 2: Split separator ──
+        terminal.Write("╠", "gray");
+        terminal.Write(new string('═', LEFT_W), "gray");
+        terminal.Write("╦", "gray");
+        terminal.Write(new string('═', RIGHT_W), "gray");
+        terminal.WriteLine("╣", "gray");
+
+        // ── Build stats panel lines (RIGHT_W chars each, with [color] tags) ──
+        var statsLines = BuildStatsPanel(race, raceAttrib, RIGHT_W);
+
+        // ── Rows 3-20: Side-by-side content ──
+        for (int row = 0; row < CONTENT_ROWS; row++)
+        {
+            // Left border
+            terminal.Write("║", "gray");
+
+            // Portrait (raw ANSI)
+            if (row < portraitLines.Length)
+                terminal.WriteRawAnsi(portraitLines[row]);
+            else
+            {
+                terminal.Write(new string(' ', LEFT_W));
+                terminal.WriteRawAnsi("\x1b[0m");
+            }
+
+            // Middle divider
+            terminal.Write("║", "gray");
+
+            // Stats panel (uses [color] tags via WriteLine markup)
+            if (row < statsLines.Count)
+                WriteStatsPanelLine(statsLines[row], RIGHT_W);
+            else
+                terminal.Write(new string(' ', RIGHT_W));
+
+            // Right border
+            terminal.WriteLine("║", "gray");
+        }
+
+        // ── Row 21: Merge separator ──
+        terminal.Write("╠", "gray");
+        terminal.Write(new string('═', LEFT_W), "gray");
+        terminal.Write("╩", "gray");
+        terminal.Write(new string('═', RIGHT_W), "gray");
+        terminal.WriteLine("╣", "gray");
+
+        // ── Row 22: Confirm prompt ──
+        var raceDesc = GameConfig.RaceDescriptions[race];
+        string prompt = $" Be {raceDesc}? [Y]es [N]o";
+        terminal.Write("║", "gray");
+        terminal.Write(prompt.PadRight(TOTAL_W - 2), "white");
+        terminal.WriteLine("║", "gray");
+
+        // ── Row 23: Bottom border ──
+        terminal.Write("╚", "gray");
+        terminal.Write(new string('═', TOTAL_W - 2), "gray");
+        terminal.WriteLine("╝", "gray");
+
+        var response = await terminal.GetInputAsync("");
+
+        return !string.IsNullOrEmpty(response) &&
+               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+    }
+
+    /// <summary>
+    /// Build the stats panel content lines for the right side of the portrait view.
+    /// Each entry is either a plain string or a tuple of (text, color) write instructions.
+    /// Returns a list of action delegates that write one stats line.
+    /// </summary>
+    private List<Action> BuildStatsPanel(CharacterRace race, RaceAttributes raceAttrib, int panelWidth)
+    {
+        var lines = new List<Action>();
+
+        // Stat bars
+        void AddStatBar(string label, int value, int maxValue)
+        {
+            lines.Add(() =>
+            {
+                const int barWidth = 12;
+                int filled = (int)Math.Round((float)value / maxValue * barWidth);
+                filled = Math.Clamp(filled, 1, barWidth);
+
+                string lbl = $" {label,-9}";
+                string fill = new string('\u2588', filled);
+                string empty = new string('\u2591', barWidth - filled);
+                string bonus = $" +{value}";
+
+                terminal.Write(lbl, "cyan");
+                terminal.Write(fill, "bright_green");
+                terminal.Write(empty, "gray");
+                terminal.Write(bonus, "white");
+
+                int used = lbl.Length + barWidth + bonus.Length;
+                if (used < panelWidth)
+                    terminal.Write(new string(' ', panelWidth - used));
+            });
+        }
+
+        void AddBlank()
+        {
+            lines.Add(() => terminal.Write(new string(' ', panelWidth)));
+        }
+
+        void AddSeparator()
+        {
+            lines.Add(() => terminal.Write(new string('─', panelWidth), "gray"));
+        }
+
+        void AddText(string text, string color = "white")
+        {
+            lines.Add(() =>
+            {
+                int visLen = Math.Min(text.Length, panelWidth - 1);
+                terminal.Write(" " + text.Substring(0, visLen).PadRight(panelWidth - 1), color);
+            });
+        }
+
+        // ── Stat bars ──
+        AddStatBar("HP", raceAttrib.HPBonus, 17);
+        AddStatBar("Strength", raceAttrib.StrengthBonus, 5);
+        AddStatBar("Defence", raceAttrib.DefenceBonus, 5);
+        AddStatBar("Stamina", raceAttrib.StaminaBonus, 5);
+
+        // ── Separator ──
+        AddSeparator();
+
+        // ── Description ──
+        string desc = GetRaceDescription(race);
+        // Word-wrap description into panelWidth-2 chars (1 margin each side)
+        var descWords = desc.Split(' ');
+        var descLine = new StringBuilder();
+        foreach (var word in descWords)
+        {
+            if (descLine.Length + word.Length + 1 > panelWidth - 2)
+            {
+                AddText(descLine.ToString(), "bright_yellow");
+                descLine.Clear();
+            }
+            if (descLine.Length > 0) descLine.Append(' ');
+            descLine.Append(word);
+        }
+        if (descLine.Length > 0) AddText(descLine.ToString(), "bright_yellow");
+
+        // ── Separator ──
+        AddSeparator();
+
+        // ── Available classes ──
+        var allClasses = new[] {
+            CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Ranger,
+            CharacterClass.Assassin, CharacterClass.Bard, CharacterClass.Jester,
+            CharacterClass.Alchemist, CharacterClass.Magician, CharacterClass.Cleric,
+            CharacterClass.Sage, CharacterClass.Barbarian
+        };
+        var restricted = GameConfig.InvalidCombinations.ContainsKey(race)
+            ? GameConfig.InvalidCombinations[race]
+            : Array.Empty<CharacterClass>();
+        var available = allClasses.Where(c => !restricted.Contains(c)).ToList();
+
+        if (available.Count == allClasses.Length)
+        {
+            AddText("Classes: All", "cyan");
+        }
+        else
+        {
+            AddText("Classes:", "cyan");
+            // Word-wrap class list
+            var classList = new StringBuilder();
+            foreach (var cls in available)
+            {
+                string name = cls.ToString();
+                if (classList.Length + name.Length + 2 > panelWidth - 2)
+                {
+                    AddText(classList.ToString(), "white");
+                    classList.Clear();
+                }
+                if (classList.Length > 0) classList.Append(", ");
+                classList.Append(name);
+            }
+            if (classList.Length > 0) AddText(classList.ToString(), "white");
+        }
+
+        // ── Restricted note (word-wrapped) ──
+        if (restricted.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
+        {
+            string reason = GameConfig.RaceRestrictionReasons[race];
+            var reasonWords = reason.Split(' ');
+            var reasonLine = new StringBuilder();
+            foreach (var word in reasonWords)
+            {
+                if (reasonLine.Length + word.Length + 1 > panelWidth - 2)
+                {
+                    AddText(reasonLine.ToString(), "red");
+                    reasonLine.Clear();
+                }
+                if (reasonLine.Length > 0) reasonLine.Append(' ');
+                reasonLine.Append(word);
+            }
+            if (reasonLine.Length > 0) AddText(reasonLine.ToString(), "red");
+        }
+
+        // ── Separator ──
+        AddSeparator();
+
+        // ── Special trait ──
+        string special = race switch
+        {
+            CharacterRace.Troll => "Regeneration",
+            CharacterRace.Gnoll => "Poisonous Bite",
+            _ => "None"
+        };
+        AddText($"Special: {special}", "cyan");
+        if (race == CharacterRace.Troll) AddText("Heals HP each round", "gray");
+        else if (race == CharacterRace.Gnoll) AddText("Chance to poison foes", "gray");
+
+        // Pad remaining rows with blanks (18 = CONTENT_ROWS for BBS fit)
+        while (lines.Count < 18)
+            AddBlank();
+
+        return lines;
+    }
+
+    /// <summary>
+    /// Write a single stats panel line using the action delegate.
+    /// </summary>
+    private void WriteStatsPanelLine(Action writeAction, int panelWidth)
+    {
+        writeAction();
+    }
+
+    /// <summary>
+    /// Original card layout (no portrait). Used when no ANSI art is available.
+    /// </summary>
+    private async Task<bool> ShowRacePreviewCard(CharacterRace race)
+    {
         terminal.Clear();
 
         const int W = 76; // card width (centered in 80 cols, 2-char margin each side)
@@ -838,6 +1114,237 @@ public class CharacterCreationSystem
         if (GameConfig.ScreenReaderMode)
             return await ShowClassPreviewScreenReader(characterClass);
 
+        // Try side-by-side portrait layout if a portrait exists for this class
+        var portrait = RacePortraits.GetCroppedClassPortrait(characterClass, 38);
+        if (portrait != null)
+            return await ShowClassPreviewSideBySide(characterClass, portrait);
+
+        // Fallback: original card layout (no portrait)
+        return await ShowClassPreviewCard(characterClass);
+    }
+
+    /// <summary>
+    /// Side-by-side class preview: ANSI art portrait (left) + stats panel (right).
+    /// Fits in 80x24 (79 chars wide, 23 rows + 1 input).
+    /// </summary>
+    private async Task<bool> ShowClassPreviewSideBySide(CharacterClass characterClass, string[] portraitLines)
+    {
+        terminal.Clear();
+
+        const int TOTAL_W = 79;
+        const int LEFT_W = 38;
+        const int RIGHT_W = 38;
+        const int CONTENT_ROWS = 18;
+
+        string className = characterClass.ToString();
+
+        // ── Row 1: Top border with class name ──
+        string title = $" {className.ToUpper()} ";
+        int leftPad = (TOTAL_W - 2 - title.Length) / 2;
+        int rightPad = TOTAL_W - 2 - title.Length - leftPad;
+        terminal.Write("╔", "gray");
+        terminal.Write(new string('═', leftPad), "gray");
+        terminal.Write(title, "bright_yellow");
+        terminal.Write(new string('═', rightPad), "gray");
+        terminal.WriteLine("╗", "gray");
+
+        // ── Row 2: Split separator ──
+        terminal.Write("╠", "gray");
+        terminal.Write(new string('═', LEFT_W), "gray");
+        terminal.Write("╦", "gray");
+        terminal.Write(new string('═', RIGHT_W), "gray");
+        terminal.WriteLine("╣", "gray");
+
+        // ── Build stats panel ──
+        var statsLines = BuildClassStatsPanel(characterClass, RIGHT_W);
+
+        // ── Rows 3-20: Side-by-side content ──
+        for (int row = 0; row < CONTENT_ROWS; row++)
+        {
+            terminal.Write("║", "gray");
+
+            if (row < portraitLines.Length)
+                terminal.WriteRawAnsi(portraitLines[row]);
+            else
+            {
+                terminal.Write(new string(' ', LEFT_W));
+                terminal.WriteRawAnsi("\x1b[0m");
+            }
+
+            terminal.Write("║", "gray");
+
+            if (row < statsLines.Count)
+                WriteStatsPanelLine(statsLines[row], RIGHT_W);
+            else
+                terminal.Write(new string(' ', RIGHT_W));
+
+            terminal.WriteLine("║", "gray");
+        }
+
+        // ── Row 21: Merge separator ──
+        terminal.Write("╠", "gray");
+        terminal.Write(new string('═', LEFT_W), "gray");
+        terminal.Write("╩", "gray");
+        terminal.Write(new string('═', RIGHT_W), "gray");
+        terminal.WriteLine("╣", "gray");
+
+        // ── Row 22: Confirm prompt ──
+        var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
+        string prompt = $" Be {article} {className}? [Y]es [N]o";
+        terminal.Write("║", "gray");
+        terminal.Write(prompt.PadRight(TOTAL_W - 2), "white");
+        terminal.WriteLine("║", "gray");
+
+        // ── Row 23: Bottom border ──
+        terminal.Write("╚", "gray");
+        terminal.Write(new string('═', TOTAL_W - 2), "gray");
+        terminal.WriteLine("╝", "gray");
+
+        var response = await terminal.GetInputAsync("");
+
+        return !string.IsNullOrEmpty(response) &&
+               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+    }
+
+    /// <summary>
+    /// Build class stats panel content for the right side of the portrait view.
+    /// Shows category, stat bars (paired), mana, strengths, description.
+    /// </summary>
+    private List<Action> BuildClassStatsPanel(CharacterClass characterClass, int panelWidth)
+    {
+        var lines = new List<Action>();
+        var attrs = GameConfig.ClassStartingAttributes[characterClass];
+
+        void AddStatBarPair(string label1, int val1, string label2, int val2, int maxVal)
+        {
+            lines.Add(() =>
+            {
+                const int barW = 6;
+                int filled1 = (int)Math.Round((float)val1 / maxVal * barW);
+                filled1 = Math.Clamp(filled1, 0, barW);
+                int filled2 = (int)Math.Round((float)val2 / maxVal * barW);
+                filled2 = Math.Clamp(filled2, 0, barW);
+
+                string lbl1 = $" {label1,-4}";
+                string fill1 = new string('\u2588', filled1);
+                string empty1 = new string('\u2591', barW - filled1);
+                string val1Str = $"{val1,2}";
+
+                string lbl2 = $" {label2,-4}";
+                string fill2 = new string('\u2588', filled2);
+                string empty2 = new string('\u2591', barW - filled2);
+                string val2Str = $"{val2,2}";
+
+                terminal.Write(lbl1, "cyan");
+                terminal.Write(fill1, "bright_green");
+                terminal.Write(empty1, "gray");
+                terminal.Write(val1Str, "white");
+
+                terminal.Write(lbl2, "cyan");
+                terminal.Write(fill2, "bright_green");
+                terminal.Write(empty2, "gray");
+                terminal.Write(val2Str, "white");
+
+                // Pad to panelWidth: lbl1(5) + barW(6) + val1(2) + lbl2(5) + barW(6) + val2(2) = 26
+                int used = 5 + barW + 2 + 5 + barW + 2;
+                if (used < panelWidth)
+                    terminal.Write(new string(' ', panelWidth - used));
+            });
+        }
+
+        void AddBlank()
+        {
+            lines.Add(() => terminal.Write(new string(' ', panelWidth)));
+        }
+
+        void AddSeparator()
+        {
+            lines.Add(() => terminal.Write(new string('─', panelWidth), "gray"));
+        }
+
+        void AddText(string text, string color = "white")
+        {
+            lines.Add(() =>
+            {
+                int visLen = Math.Min(text.Length, panelWidth - 1);
+                terminal.Write(" " + text.Substring(0, visLen).PadRight(panelWidth - 1), color);
+            });
+        }
+
+        // ── Category ──
+        string category = characterClass switch
+        {
+            CharacterClass.Warrior or CharacterClass.Barbarian or CharacterClass.Paladin => "Melee Fighter",
+            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester => "Hybrid Class",
+            CharacterClass.Magician or CharacterClass.Sage or CharacterClass.Cleric or CharacterClass.Alchemist => "Magic User",
+            _ => "Adventurer"
+        };
+        AddText(category, "cyan");
+
+        // ── Separator ──
+        AddSeparator();
+
+        // ── Stat bars (paired, 5 rows) ──
+        AddStatBarPair("HP",  attrs.HP,           "AGI", attrs.Agility, 5);
+        AddStatBarPair("STR", attrs.Strength,     "CHA", attrs.Charisma, 5);
+        AddStatBarPair("DEF", attrs.Defence,      "DEX", attrs.Dexterity, 5);
+        AddStatBarPair("STA", attrs.Stamina,      "WIS", attrs.Wisdom, 5);
+        AddStatBarPair("CON", attrs.Constitution, "INT", attrs.Intelligence, 5);
+
+        // ── Separator ──
+        AddSeparator();
+
+        // ── Mana ──
+        string manaText = attrs.Mana > 0 ? $"Mana: {attrs.Mana}" : "Mana: None";
+        AddText(manaText, attrs.Mana > 0 ? "bright_green" : "gray");
+
+        // ── Strengths ──
+        string strengths = GetClassStrengths(characterClass);
+        var strengthWords = strengths.Split(' ');
+        var strengthLine = new StringBuilder();
+        foreach (var word in strengthWords)
+        {
+            if (strengthLine.Length + word.Length + 1 > panelWidth - 2)
+            {
+                AddText(strengthLine.ToString(), "white");
+                strengthLine.Clear();
+            }
+            if (strengthLine.Length > 0) strengthLine.Append(' ');
+            strengthLine.Append(word);
+        }
+        if (strengthLine.Length > 0) AddText(strengthLine.ToString(), "white");
+
+        // ── Separator ──
+        AddSeparator();
+
+        // ── Description (word-wrapped) ──
+        string desc = GetClassDescription(characterClass);
+        var descWords = desc.Split(' ');
+        var descLine = new StringBuilder();
+        foreach (var word in descWords)
+        {
+            if (descLine.Length + word.Length + 1 > panelWidth - 2)
+            {
+                AddText(descLine.ToString(), "bright_yellow");
+                descLine.Clear();
+            }
+            if (descLine.Length > 0) descLine.Append(' ');
+            descLine.Append(word);
+        }
+        if (descLine.Length > 0) AddText(descLine.ToString(), "bright_yellow");
+
+        // Pad remaining rows
+        while (lines.Count < 18)
+            AddBlank();
+
+        return lines;
+    }
+
+    /// <summary>
+    /// Original card layout for class preview (no portrait).
+    /// </summary>
+    private async Task<bool> ShowClassPreviewCard(CharacterClass characterClass)
+    {
         terminal.Clear();
 
         const int W = 76;

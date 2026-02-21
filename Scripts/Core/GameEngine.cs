@@ -4408,6 +4408,12 @@ public partial class GameEngine : Node
         terminal.WriteLine("    Built with C# / .NET 8.0");
         terminal.WriteLine("");
 
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("  ANSI ART:");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("    xbit (x-bit.org)          - Race & Class Portrait Art");
+        terminal.WriteLine("");
+
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("  SPECIAL THANKS:");
         terminal.SetColor("gray");
