@@ -47,7 +47,6 @@ namespace UsurperRemake.Systems
             TroubledMarriage,
             MatchmakerRequest,
             CustodyDispute,
-            FactionMission,
             RoyalPetition,
             DyingWish,
             MissingPerson,
@@ -127,7 +126,6 @@ namespace UsurperRemake.Systems
                 TryTroubledMarriage,
                 TryMatchmakerRequest,
                 TryCustodyDispute,
-                TryFactionMission,
                 TryRoyalPetition,
                 TryDyingWish,
                 TryMissingPerson,
@@ -273,41 +271,6 @@ namespace UsurperRemake.Systems
             return null;
         }
 
-        private (PetitionType, NPC)? TryFactionMission(Character player, GameLocation location, List<NPC> npcs)
-        {
-            var factionSystem = FactionSystem.Instance;
-            if (factionSystem == null) return null;
-
-            // Find a faction-aligned NPC to approach the player
-            Faction? targetFaction = null;
-
-            if (factionSystem.PlayerFaction == null)
-            {
-                // Recruit player to a faction based on alignment
-                if (player.Chivalry > 300) targetFaction = Faction.TheCrown;
-                else if (player.Darkness > 150) targetFaction = Faction.TheShadows;
-                else if (player.Wisdom > 20) targetFaction = Faction.TheFaith;
-            }
-            else
-            {
-                // Promotion mission for existing faction member
-                targetFaction = factionSystem.PlayerFaction;
-            }
-
-            if (targetFaction == null) return null;
-
-            // Find NPC belonging to target faction
-            var factionNpc = npcs.FirstOrDefault(n =>
-                IsEligiblePetitioner(n, player) &&
-                n.NPCFaction == targetFaction &&
-                n.Level >= 5);
-
-            if (factionNpc == null) return null;
-
-            GetPlayerState(player.Name2).PetitionedNPCs.Add(factionNpc.Name2);
-            return (PetitionType.FactionMission, factionNpc);
-        }
-
         private (PetitionType, NPC)? TryRoyalPetition(Character player, GameLocation location, List<NPC> npcs)
         {
             if (!player.King) return null;
@@ -449,9 +412,6 @@ namespace UsurperRemake.Systems
                     break;
                 case PetitionType.CustodyDispute:
                     await ExecuteCustodyDispute(npc, player, terminal);
-                    break;
-                case PetitionType.FactionMission:
-                    await ExecuteFactionMission(npc, player, terminal);
                     break;
                 case PetitionType.RoyalPetition:
                     await ExecuteRoyalPetition(npc, player, terminal);
@@ -1082,182 +1042,7 @@ namespace UsurperRemake.Systems
 
         #endregion
 
-        #region Petition 4: Faction Mission
-
-        private async Task ExecuteFactionMission(NPC factionNpc, Character player, TerminalEmulator terminal)
-        {
-            var faction = factionNpc.NPCFaction ?? Faction.TheCrown;
-            string factionName = faction switch
-            {
-                Faction.TheCrown => "The Crown",
-                Faction.TheShadows => "The Shadows",
-                Faction.TheFaith => "The Faith",
-                _ => "our organization"
-            };
-
-            bool isRecruit = FactionSystem.Instance?.PlayerFaction != faction;
-
-            // Pick a mission based on faction
-            string missionDesc;
-            string missionTarget;
-            int goldReward;
-
-            // Collect NPC names already targeted by the player's active quests to avoid duplicates
-            var existingTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (player is Player p2)
-            {
-                foreach (var q in p2.ActiveQuests)
-                {
-                    if (!string.IsNullOrEmpty(q.TargetNPCName))
-                        existingTargets.Add(q.TargetNPCName);
-                }
-            }
-
-            switch (faction)
-            {
-                case Faction.TheCrown:
-                    var criminal = NPCSpawnSystem.Instance?.ActiveNPCs?
-                        .Where(n => !n.IsDead && n.Darkness > 100 && n.Level >= 5
-                            && !existingTargets.Contains(n.Name2))
-                        .OrderBy(_ => _random.Next())
-                        .FirstOrDefault();
-                    missionTarget = criminal?.Name2 ?? "a known criminal";
-                    missionDesc = $"A villain named {missionTarget} has been terrorizing honest citizens. Bring them to justice.";
-                    goldReward = 300 + player.Level * 25;
-                    break;
-                case Faction.TheShadows:
-                    int shadowRank = FactionSystem.Instance?.FactionRank ?? 0;
-                    bool isAssassination = shadowRank >= GameConfig.AssassinContractMinRank
-                        && _random.NextDouble() < GameConfig.AssassinContractChance;
-
-                    if (isAssassination)
-                    {
-                        var teamName = (player as Player)?.TeamName;
-                        var target = NPCSpawnSystem.Instance?.ActiveNPCs?
-                            .Where(n => !n.IsDead && n.Level >= 5 && !n.IsStoryNPC && !n.King
-                                && (string.IsNullOrEmpty(teamName) || n.TeamName != teamName)
-                                && !existingTargets.Contains(n.Name2))
-                            .OrderBy(_ => _random.Next())
-                            .FirstOrDefault();
-
-                        if (target != null)
-                        {
-                            missionTarget = target.Name2;
-                            missionDesc = $"We need {target.Name2} taken care of. Permanently.";
-                            goldReward = 500 + player.Level * 40;
-                            if (player.Class == CharacterClass.Assassin)
-                                goldReward = (int)(goldReward * (1.0f + GameConfig.AssassinClassGoldBonus));
-                        }
-                        else
-                        {
-                            missionTarget = "a valuable contact";
-                            missionDesc = "We need someone with your skills for a delicate retrieval. Details on acceptance.";
-                            goldReward = 400 + player.Level * 30;
-                        }
-                    }
-                    else
-                    {
-                        missionTarget = "a valuable contact";
-                        missionDesc = "We need someone with your skills for a delicate retrieval. Details on acceptance.";
-                        goldReward = 400 + player.Level * 30;
-                    }
-                    break;
-                default: // Faith
-                    var lostSoul = NPCSpawnSystem.Instance?.ActiveNPCs?
-                        .Where(n => !n.IsDead && n.Darkness > 50 && n.Level >= 3
-                            && !existingTargets.Contains(n.Name2))
-                        .OrderBy(_ => _random.Next())
-                        .FirstOrDefault();
-                    missionTarget = lostSoul?.Name2 ?? "a lost soul";
-                    missionDesc = $"{missionTarget} has strayed from the path. Bring them back to the light.";
-                    goldReward = 250 + player.Level * 20;
-                    break;
-            }
-
-            terminal.ClearScreen();
-            UIHelper.DrawBoxTop(terminal, "FACTION APPROACH", "bright_cyan");
-            UIHelper.DrawBoxEmpty(terminal, "bright_cyan");
-            UIHelper.DrawBoxLine(terminal, $"  {factionNpc.Name2} catches your eye and approaches purposefully.", "bright_cyan", "white");
-            UIHelper.DrawBoxEmpty(terminal, "bright_cyan");
-
-            if (isRecruit)
-            {
-                UIHelper.DrawBoxLine(terminal, $"  \"I represent {factionName}. We've been watching you, {player.Name2}.\"", "bright_cyan", "bright_yellow");
-                UIHelper.DrawBoxLine(terminal, $"  \"Weve noticed what youve been doing. We like it.\"", "bright_cyan", "cyan");
-            }
-            else
-            {
-                UIHelper.DrawBoxLine(terminal, $"  \"{factionName} has a job for you, {player.Name2}.\"", "bright_cyan", "bright_yellow");
-            }
-
-            UIHelper.DrawBoxLine(terminal, $"  \"{missionDesc}\"", "bright_cyan", "cyan");
-            UIHelper.DrawBoxLine(terminal, $"  \"Reward: {goldReward} gold and our gratitude.\"", "bright_cyan", "yellow");
-            UIHelper.DrawBoxEmpty(terminal, "bright_cyan");
-            UIHelper.DrawBoxSeparator(terminal, "bright_cyan");
-            UIHelper.DrawMenuOption(terminal, "A", "Accept the mission", "bright_cyan", "bright_yellow", "bright_green");
-            UIHelper.DrawMenuOption(terminal, "D", "Decline respectfully", "bright_cyan", "bright_yellow", "gray");
-            UIHelper.DrawBoxBottom(terminal, "bright_cyan");
-
-            var choice = await terminal.GetInput("\n  Your response? ");
-
-            if (choice.ToUpper() == "A")
-            {
-                terminal.SetColor("bright_green");
-                terminal.WriteLine($"\n  \"Excellent. {factionName} won't forget this.\"");
-
-                // Give half the reward as advance payment
-                int advancePayment = goldReward / 2;
-                player.Gold += advancePayment;
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"  You receive {advancePayment} gold as advance payment.");
-                terminal.SetColor("white");
-                terminal.WriteLine($"  The remaining {goldReward - advancePayment} gold will be paid on completion.");
-
-                // Create a real quest
-                var quest = QuestSystem.CreateFactionMission(player, faction, missionTarget, missionDesc, goldReward);
-                if (quest != null)
-                {
-                    terminal.SetColor("bright_cyan");
-                    terminal.WriteLine($"\n  New quest added: {quest.Title}");
-                    terminal.SetColor("gray");
-                    terminal.WriteLine($"  Complete the objective and turn in at the Quest Hall for your reward.");
-                }
-
-                if (isRecruit)
-                {
-                    var factionSystem = FactionSystem.Instance;
-                    if (factionSystem != null && factionSystem.PlayerFaction == null)
-                    {
-                        terminal.SetColor("bright_cyan");
-                        terminal.WriteLine($"\n  \"You should think about joining {factionName}. We could use you.\"");
-                        terminal.SetColor("white");
-                        terminal.WriteLine($"  (Visit the faction headquarters to officially join.)");
-                    }
-                }
-
-                factionNpc.Memory?.RecordEvent(new MemoryEvent
-                {
-                    Type = MemoryType.Helped,
-                    Description = $"{player.Name2} accepted a mission for {factionName}",
-                    InvolvedCharacter = player.Name2, Importance = 0.7f, EmotionalImpact = 0.4f
-                });
-
-                NewsSystem.Instance?.Newsy($"{player.Name2} undertook a mission for {factionName}.");
-            }
-            else
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine($"\n  \"Suit yourself. You know where to find us.\"");
-                terminal.SetColor("white");
-                terminal.WriteLine($"  {factionNpc.Name2} nods and disappears into the crowd.");
-            }
-
-            await terminal.PressAnyKey();
-        }
-
-        #endregion
-
-        #region Petition 5: Royal Petition
+        #region Petition 4: Royal Petition
 
         private async Task ExecuteRoyalPetition(NPC petitioner, Character player, TerminalEmulator terminal)
         {

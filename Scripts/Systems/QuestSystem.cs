@@ -1109,10 +1109,6 @@ public partial class QuestSystem : Node
                     // Mark the DefeatNPC objective as complete
                     quest.UpdateObjectiveProgress(QuestObjectiveType.DefeatNPC, 1, npcName);
 
-                    // Faith "Redeem" quests use TalkToNPC objective — defeating the NPC also counts
-                    // (you've "brought them to the light" through combat, purging their darkness)
-                    quest.UpdateObjectiveProgress(QuestObjectiveType.TalkToNPC, 1, npcName);
-
                     // Also mark the quest as having activity (for legacy validation)
                     quest.OccupiedDays = Math.Max(1, quest.OccupiedDays);
                 }
@@ -1793,103 +1789,6 @@ public partial class QuestSystem : Node
         questDatabase.Add(quest);
 
         // Also add to player's active quests if they're a Player
-        if (player is Player p)
-        {
-            p.ActiveQuests.Add(quest);
-        }
-
-        return quest;
-    }
-
-    /// <summary>
-    /// Create a faction mission quest and assign it to the player.
-    /// Crown: defeat a criminal NPC. Shadows: collect gold. Faith: talk to a lost soul.
-    /// </summary>
-    public static Quest CreateFactionMission(Character player, Faction faction, string targetNPCName, string missionDesc, int goldReward)
-    {
-        string factionInitiator = faction switch
-        {
-            Faction.TheCrown => GameConfig.FactionInitiatorCrown,
-            Faction.TheShadows => GameConfig.FactionInitiatorShadows,
-            Faction.TheFaith => GameConfig.FactionInitiatorFaith,
-            _ => "Faction"
-        };
-
-        QuestTarget questTarget;
-        QuestObjectiveType objectiveType;
-        string objectiveDesc;
-        int targetValue = 1;
-
-        switch (faction)
-        {
-            case Faction.TheCrown:
-                questTarget = QuestTarget.DefeatNPC;
-                objectiveType = QuestObjectiveType.DefeatNPC;
-                objectiveDesc = $"Defeat {targetNPCName}";
-                break;
-            case Faction.TheShadows:
-                // If targetNPCName is a real NPC name (assassination), create DefeatNPC quest
-                // Otherwise it's "a valuable contact" (retrieval), create CollectGold quest
-                if (targetNPCName != null && targetNPCName != "a valuable contact")
-                {
-                    questTarget = QuestTarget.DefeatNPC;
-                    objectiveType = QuestObjectiveType.DefeatNPC;
-                    objectiveDesc = $"Eliminate {targetNPCName}";
-                }
-                else
-                {
-                    questTarget = QuestTarget.ClaimTown;
-                    objectiveType = QuestObjectiveType.CollectGold;
-                    objectiveDesc = $"Collect {goldReward * 2} gold";
-                    targetValue = goldReward * 2;
-                }
-                break;
-            default: // Faith
-                questTarget = QuestTarget.DefeatNPC; // Reuse; objective type distinguishes
-                objectiveType = QuestObjectiveType.TalkToNPC;
-                objectiveDesc = $"Talk to {targetNPCName}";
-                break;
-        }
-
-        var quest = new Quest
-        {
-            Title = faction switch
-            {
-                Faction.TheCrown => $"{factionInitiator} Mission: Eliminate {targetNPCName}",
-                Faction.TheShadows when objectiveType == QuestObjectiveType.DefeatNPC =>
-                    $"{factionInitiator} Contract: {targetNPCName}",
-                Faction.TheShadows => $"{factionInitiator} Mission: Delicate Retrieval",
-                _ => $"{factionInitiator} Mission: Redeem {targetNPCName}"
-            },
-            Initiator = factionInitiator,
-            QuestType = QuestType.SingleQuest,
-            QuestTarget = questTarget,
-            Difficulty = (byte)Math.Min(4, Math.Max(1, player.Level / 15 + 1)),
-            Comment = missionDesc,
-            Date = DateTime.Now,
-            MinLevel = 1,
-            MaxLevel = 9999,
-            DaysToComplete = 14,
-            Reward = (byte)Math.Min(255, goldReward / 100),
-            RewardType = QuestRewardType.Money,
-            TargetNPCName = (faction == Faction.TheShadows && objectiveType != QuestObjectiveType.DefeatNPC) ? null : targetNPCName,
-            Occupier = player.Name2,
-            OccupierRace = player.Race,
-            OccupierSex = (byte)((int)player.Sex),
-            OccupiedDays = 0,
-            OfferedTo = player.Name2
-        };
-
-        quest.Objectives.Add(new QuestObjective(
-            objectiveType,
-            objectiveDesc,
-            targetValue,
-            targetNPCName ?? "",
-            targetNPCName ?? ""
-        ));
-
-        questDatabase.Add(quest);
-
         if (player is Player p)
         {
             p.ActiveQuests.Add(quest);

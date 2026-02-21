@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.44.1";
-    public const string VersionName = "The Eternal Cycle";
+    public const string Version = "0.44.2";
+    public const string VersionName = "Home Sweet Home";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -487,12 +487,10 @@ public static partial class GameConfig
     public const long BloodConfessionBaseCost = 500;            // Base gold cost for blood absolution
     public const long BloodConfessionCostPerWeight = 200;       // Extra gold per weight point
 
-    // Faction Mission System (v0.40.2)
+    // Faction System (v0.40.2)
     public const string FactionInitiatorCrown = "The Crown";
     public const string FactionInitiatorShadows = "The Shadows";
     public const string FactionInitiatorFaith = "The Faith";
-
-    // Faction System Expansion (v0.40.2)
     public const float BlackMarketRankDiscount = 0.05f;     // 5% price discount per rank at Black Market
     public const float DivineFavorBaseChance = 0.05f;        // 5% divine favor at rank 0
     public const float DivineFavorMaxChance = 0.25f;         // 25% divine favor at rank 8
@@ -502,9 +500,6 @@ public static partial class GameConfig
     public const int InnerSanctumCost = 500;                 // Gold cost for Inner Sanctum meditation
     public const int InformantCost = 100;                    // Gold cost for Shadows informant
     public const float CrownTaxExemptionRate = 0.20f;        // 20% gold loss reduction on death for Crown
-    public const int AssassinContractMinRank = 3;             // Shadows rank 3+ for assassination contracts
-    public const float AssassinContractChance = 0.50f;        // 50% chance to get assassination vs retrieval
-    public const float AssassinClassGoldBonus = 0.50f;        // +50% gold reward for Assassin class contracts
 
     // Dark Alley Overhaul (v0.41.0)
     // Shop Caps

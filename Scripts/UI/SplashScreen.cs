@@ -4,82 +4,64 @@ using System.Threading.Tasks;
 namespace UsurperRemake.UI
 {
     /// <summary>
-    /// Displays the USURPER REBORN ASCII art splash screen.
-    /// Inspired by the original 1993 Usurper title screen with fire effects and dramatic block letters.
+    /// Displays the USURPER REBORN ANSI art splash screen.
+    /// Full-color ANSI art with embedded title text, followed by credits.
     /// Fits within 80x25 BBS terminal (SyncTERM compatible).
     /// </summary>
     public static class SplashScreen
     {
+        // 80-column ANSI art splash — converted from usurper-reborn3.ans
+        private static readonly string[] SplashArt = new string[]
+        {
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;31m\u2584\u2584\x1b[41m\u2588\u2584\x1b[33m\u2584\u2584\x1b[31;43m\u2580\x1b[33m\u2588\u2588\u2588\x1b[37m\u2580\x1b[33m\u2588\x1b[37m\u2584\x1b[33;47m\u2580\u2580\x1b[37m\u2588\u2588\u2588\x1b[33m\u2580\x1b[37;43m\u2584\u2584\x1b[33m\u2588\x1b[31;47m\u2580\u2580\x1b[37m\u2588\x1b[43m\u258c\x1b[33m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[41m\u2580\u2580\u2580\u2580\x1b[31m\u2580\x1b[0;31;41m\u2588\x1b[1;30;40m\u258c\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2584\u25a0\x1b[31m\u2590\x1b[41m\u2588\x1b[33m\u2584\u2584\x1b[43m\u2588\u2588\u2588\x1b[31m\u2584\x1b[37m\u2584\u2584\x1b[33;47m\u2580\x1b[37m\u2588\u2588\x1b[43m\u258c\x1b[31;47m\u2584\u2584\x1b[37m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[31m\u2584\u2584\x1b[37;41m\u2580\x1b[31;43m\u2584\x1b[33m\u2588\u2588\u2588\u2588\x1b[31;47m\u2584\x1b[33;41m\u25a0\x1b[31m\u2584\x1b[0;31;41m\u2588\x1b[1;30m\u2584\x1b[31;40m\u2580\u2580\u2580\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u25a0\u2588\x1b[33m\u2590\x1b[43m\u2588\x1b[31;41m\u2588\u2588\x1b[33m\u2580\x1b[31m\u2588\x1b[47m\u2580\x1b[37m\u2588\u2588\u2580\x1b[30m\u2584\x1b[37m\u2588\u2588\u2588\u2584\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258c\x1b[31m\u2580\x1b[41m\u25a0\u2588\u2588\u2588\x1b[43m\u2584\x1b[33m\u2588\x1b[31m\u2590\x1b[41m\u2580\x1b[0;31;41m\u2588\x1b[1;30m\u2590\x1b[40m\u258c\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\x1b[1;31m\u2590\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2584\x1b[31m\u2584\x1b[33;43m\u2588\u2588\u2588\x1b[31m\u2590\x1b[41m\u2588\u2588\x1b[0;47m\u2588\u2588\x1b[1;31m\u25a0\x1b[0;47m\u2588\x1b[1m\u2580\u2588\u2588\x1b[40m\u2584\x1b[47m\u2588\u2588\u2588\u2580\u2588\u2588\u2588\u2588\u2588\u2580\x1b[0;47m\u2588\u2588\x1b[1;31;43m\u2580\x1b[41m\u258c\x1b[30m\u2584\x1b[0;31;41m\u2588\x1b[1m\u2590\u2588\x1b[43m\u2590\x1b[41m\u2584\x1b[30m\u2590\u2580\x1b[40m\u258c\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\x1b[1;31m\u2580\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;33m\u2590\x1b[43m\u2588\u2588\u2588\u2588\x1b[31m\u2590\x1b[41m\u2588\x1b[47m\u258c\x1b[0;47m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2580\x1b[0;30;47m\u2580\x1b[1;37m\u2588\u2588\u2580\u2580\u2580\u2580\x1b[0;47m\u2588\u2588\u2588\x1b[1;30m\u2584\x1b[40m\u2580\u2590\u25a0\u2588\x1b[31;41m\u2590\u2588\x1b[33;43m\u2588\x1b[31;41m\u2588\u2588\x1b[30m\u2590\x1b[40m\u2580\x1b[0;31m\u2584\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2584\x1b[33m\u2580\x1b[31;43m\u2584\x1b[33m\u2588\u2588\x1b[31;41m\u2588\u2588\x1b[47m\u258c\x1b[0;47m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;30m\u2590\x1b[40m\u2588\u2584\x1b[0;30m\u2588\x1b[1m\u2588\x1b[31;41m\u2590\u2580\u2590\x1b[33;43m\u2588\x1b[31;41m\u2588\u2584\x1b[30m\u2580\x1b[31;40m\u258c\x1b[0;30m\u2588\u2588\x1b[1;31m\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;31m\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\x1b[1;31m\u2584\x1b[41m\u2588\x1b[33m\u258c\u258c\x1b[0;31m\u2580\x1b[1;47m\u2584\x1b[0;47m\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2590\u2588\u2584\u2584\x1b[0;47m\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2584\u2588\u2588\u258c\x1b[30m\u2584\x1b[40m\u2588\u2588\x1b[0;30m\u2588\x1b[31m\u2590\u2580\x1b[1;30m\u2580\x1b[31;41m\u2588\x1b[43m\u2580\x1b[33;41m\u2580\x1b[31m\u2580\x1b[30m\u25a0\u2580\x1b[40m\u258c\x1b[0;30m\u2588\x1b[1;31m\u2590\u258c\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;31m\u2580\x1b[41m\u2588\x1b[40m\u258c\x1b[30m\u2584\u2584\u2588\x1b[0;31;41m\u2588\x1b[1m\u2588\x1b[33m\u258c\x1b[31m\u2588\x1b[30;40m\u2584\x1b[31;41m\u2588\x1b[37;47m\u2584\u2584\x1b[0;47m\u2588\u2588\x1b[1;30m\u2584\x1b[0m\u2580\u2580\x1b[1;47m\u2580\u2580\u25a0\x1b[0;47m\u2588\x1b[30m\u258c\x1b[1;37m\u2590\u25a0\u2580\x1b[0m\u2580\x1b[1;30m\u2580\u2580\u2588\x1b[47m\u25a0\x1b[0;47m\u2588\x1b[1m\u2584\x1b[0;47m\u2588\x1b[1;31;40m\u258c\x1b[0;31m\u2590\x1b[1;41m\u2588\x1b[33;43m\u2588\x1b[41m\u2584\x1b[31m\u2588\x1b[33m\u2584\u2584\x1b[40m\u2584\u25a0\u2580\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;33;41m\u2590\x1b[43m\u2588\x1b[30;41m\u2580\u2580\x1b[0;31;41m\u2588\u2588\u2588\x1b[1;33m\u2580\x1b[31m\u258c\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2580\u2580\x1b[0m\u2584\x1b[1m\u2584\x1b[30m\u2590\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;31;41m\u2588\x1b[33;43m\u2588\u2588\u2588\u2588\x1b[41m\u2580\x1b[30;40m\u2588\u258c\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;31m\u2590\x1b[33;41m\u2590\x1b[43m\u2588\u2588\x1b[41m\u2584\u2584\x1b[31m\u2588\u2588\x1b[33m\u2584\u2584\x1b[31;40m\u258c\x1b[0m\u258c\x1b[30m\u2588\u2588\u2588\u2588\x1b[1;31m\u25a0\x1b[0;30m\u2588\u2588\u2588\x1b[37m\u2590\x1b[1;30;47m\u258c\x1b[37;40m\u2580\u2580\x1b[0m\u2590\u258c\x1b[1;30m\u258c\x1b[0;30m\u2588\u2588\u2588\x1b[31m\u25a0\x1b[30m\u2588\u2588\u2588\u2588\u2588\x1b[1;31;41m\u2588\x1b[33m\u2584\x1b[43m\u2588\x1b[37m\u258c\x1b[33m\u2588\u2588\x1b[0;31;41m\u2588\x1b[1;30m\u2580\x1b[40m\u258c\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2588\x1b[31m\u25a0\x1b[33;43m\u2588\u2588\u2588\u2588\x1b[47m\u2584\x1b[37m\u2588\x1b[33;41m\u2580\x1b[31m\u2588\x1b[47m\u2580\x1b[37m\u2580\x1b[40m\u2584\x1b[0m\u2584\u2584\x1b[30m\u2588\u2588\x1b[1;37m\u2584\u2584\u2584\x1b[0;47m\u2588\x1b[30;40m\u2588\u2588\u2588\u2588\x1b[1m\u2590\x1b[47m\u258c\x1b[0m\u2584\x1b[1m\u2584\x1b[0;30m\u2588\u2588\u2588\x1b[1m\u2584\u2584\x1b[37m\u2584\x1b[47m\u25a0\x1b[30;40m\u2580\x1b[31;41m\u2588\x1b[37m\u2580\x1b[43m\u2580\x1b[33m\u2588\u2588\x1b[41m\u258c\x1b[30m\u2584\x1b[40m\u2588\u2580\x1b[0;30m\u2588\u2588\u2588\x1b[1m\u2584\x1b[0;30m\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2588\u2588\x1b[41m\u2590\x1b[31;40m\u2580\x1b[33;41m\u2580\x1b[43m\u2588\x1b[37m\u2580\x1b[31m\u2580\x1b[41m\u2588\x1b[47m\u2584\x1b[30;40m\u2588\x1b[0m\u2580\u2580\u2580\u2580\u2580\u2580\x1b[1;30;47m\u2584\x1b[0;47m\u2588\x1b[40m\u258c\x1b[30m\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2580\x1b[0m\u2580\u2580\u2580\x1b[1;30m\u2580\x1b[0m\u2580\u2580\u2580\x1b[1;30m\u2588\u2584\x1b[0;30m\u2588\x1b[1;31;41m\u2588\x1b[33;43m\u2588\u2588\u2588\u2588\x1b[40m\u258c\x1b[30m\u2588\u2584\u2584\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2584\u2588\u2588\x1b[31;41m\u2580\x1b[33m\u2580\x1b[43m\u2588\u2588\x1b[40m\u2584\x1b[30m\u25a0\x1b[31m\u2584\x1b[0;31m\u2584\x1b[30m\u2588\u2588\u2588\u2588\x1b[1;31m\u2584\x1b[0;47m\u2588\x1b[40m\u2584\x1b[30m\u2588\u2588\x1b[1;37m\u258c\x1b[0m\u2584\x1b[30m\u2588\x1b[1m\u2588\u2588\u2588\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\x1b[1;33m\u2584\x1b[30m\u2584\x1b[33m\u2584\x1b[43m\u2588\u2588\u2588\x1b[41m\u2580\x1b[31;40m\u2580\x1b[30;41m\u2580\x1b[40m\u25a0\u2580\u2580\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\x1b[1;37m\u2590\u2584\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\x1b[1;47m\u2580\u2580\x1b[40m\u2588\u2588\u2588\x1b[37;41m\u2584\u2584\x1b[31m\u2584\u2588\x1b[33m\u2580\u2580\u2580\u258c\x1b[31m\u258c\x1b[40m\u2590\u2580\x1b[37m\u2584\x1b[31;41m\u258c\x1b[37;47m\u2588\u2588\u2584\x1b[0;47m\u2588\x1b[40m\u2590\u25a0\x1b[1;30;47m\u2580\x1b[37m\u2584\x1b[40m\u258c\x1b[0m\u2590\x1b[1m\u2584\u25a0\u2584\u2584\x1b[31;41m\u2584\x1b[33m\u2580\u2580\u2580\x1b[37m\u2584\x1b[31m\u2580\x1b[37m\u2584\u2584\x1b[31;40m\u2580\x1b[0;30m\u2588\x1b[1;37m\u2584\u2584\u2584\u2584\u2584\u2584\u2584\x1b[0;30m\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\x1b[1;37;47m\u2588\u2588\x1b[0;30m\u2588\u2588\u2588\u2588\x1b[1;37;47m\u2588\u2588\x1b[30;40m\u2580\x1b[37;47m\u2588\x1b[40m\u258c\x1b[0;30m\u2588\u2588\x1b[1;37m\u2580\x1b[30;41m\u2584\x1b[37;47m\u2590\u2588\x1b[31;41m\u2580\u2580\u2580\x1b[0;31;41m\u2588\x1b[1;37;47m\u2588\u2588\x1b[0;31m\u258c\x1b[1;30;47m\u258c\x1b[37m\u2588\u2588\u2580\u2580\u2588\u2588\x1b[40m\u2584\x1b[0m\u25a0\x1b[1;30m\u2580\x1b[37;47m\u2588\x1b[40m\u258c\u2580\u2580\x1b[47m\u2588\u2588\x1b[31;40m\u2580\x1b[37;47m\u2588\u2588\x1b[0;30m\u2588\x1b[1;37m\u2580\u2580\u2580\x1b[0;30m\u2588\x1b[1;37m\u2590\x1b[47m\u2588\x1b[40m\u258c\x1b[0;30m\u2588\x1b[1;37m\u2580\x1b[47m\u2588\u2588\x1b[0;30m\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\x1b[1;37;47m\u2588\u2588\x1b[0;30m\u2588\u2588\u2588\u2588\x1b[1;37;47m\u2580\u2580\x1b[0;30m\u2588\x1b[1;37m\u2580\x1b[47m\u2580\u2580\x1b[0m\u2584\x1b[30m\u2588\u2588\x1b[1;37m\u2590\x1b[47m\u2588\x1b[0;30m\u2588\x1b[31m\u2580\u2580\x1b[41m\u2588\x1b[1;37;47m\u2590\u25a0\x1b[0;31;41m\u2588\x1b[30m\u25a0\x1b[1;37;47m\u2588\u2588\x1b[40m\u2584\x1b[47m\u2584\u2588\u2588\x1b[40m\u2580\x1b[30m\u258c\x1b[0;31m\u2584\x1b[1;37;47m\u2588\u2580\x1b[0;31m\u2584\x1b[41m\u2588\x1b[1;37;47m\u2580\u2588\x1b[0;30m\u2588\x1b[1;37m\u2590\x1b[47m\u2588\x1b[0m\u2584\x1b[1m\u2584\u258c\x1b[0;30m\u2588\u2588\x1b[1;37m\u2590\x1b[47m\u2588\x1b[40m\u258c\x1b[0;30m\u2584\x1b[37m\u2584\x1b[1;47m\u2588\x1b[40m\u2580\x1b[0;30m\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\x1b[1;47m\u2584\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\x1b[1;47m\u2584\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\x1b[37m\u2580\x1b[47m\u2588\x1b[40m\u258c\u2590\x1b[47m\u2588\x1b[40m\u258c\x1b[30m\u2588\u2588\u2588\x1b[37;47m\u2588\u2588\x1b[1;31;41m\u2584\u258c\x1b[0;31;47m\u258c\x1b[1;37m\u2580\x1b[0;30;41m\u25a0\x1b[37m\u2580\x1b[1;47m\u2580\x1b[0;31;47m\u2580\x1b[41m\u2588\u2588\x1b[1m\u2584\x1b[0;47m\u2588\u2588\x1b[31m\u2584\u2584\x1b[30;40m\u2588\u2588\u2588\x1b[37m\u2590\x1b[47m\u2588\x1b[30;40m\u2588\u2588\u2588\u2588\u2588\x1b[37m\u2590\x1b[47m\u2588\x1b[40m\u258c\u2580\x1b[47m\u2588\x1b[40m\u2584\x1b[30m\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\x1b[1m\u2580\u2580\u2584\u25a0\u2580\u2580\x1b[0;30m\u2588\u2588\x1b[1m\u2580\u2580\u2584\u25a0\u2580\x1b[0;30m\u2588\u2588\u2588\x1b[37m\u2580\x1b[1;30m\u25a0\u2584\x1b[0m\u2580\u2580\x1b[30m\u2588\x1b[1;31;41m\u25a0\x1b[0;30;41m\u2584\x1b[31;47m\u258c\x1b[1;30m\u2584\x1b[31;41m\u2584\u2584\u2584\x1b[0;41m\u2580\x1b[1;30m\u2584\x1b[0;31;41m\u2588\x1b[1m\u2584\x1b[30;47m\u2584\u2584\x1b[0;31m\u2580\x1b[30m\u2588\u2588\u2588\u2588\x1b[37m\u2580\u2580\u2580\u2580\u2580 \x1b[30m\u2588\x1b[1m\u2590\u2580\u25a0\x1b[0;30m\u2588\u2588\x1b[1m\u2580\u2580\u2584\x1b[0;30m\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;37m\u25a0\u2584\u2584\u2584\u2584\u2584\u2584\x1b[0;30m\u2588\u2588\x1b[1;37m\u2584\u2584\u2584\u2584\u2584\u2584\x1b[0;30m\u2588\x1b[1;37m\u2584\u2584\u2584\u2584\u2584\u2584\x1b[0;30m\u2588\x1b[1;31;41m\u2580\u258c\u2584\x1b[37m\u2584\u2584\x1b[40m\u2584\x1b[41m\u2584\x1b[0;30m\u2588\u2588\u2588\x1b[1;37m\u2584\u2584\u2584\u2584\u2584\x1b[0;30m\u2588\u2588\x1b[1;37m\u25a0\u2584\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\x1b[1;37m\u2590\u2584\u25a0\x1b[0;30m\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1;37;47m\u2588\x1b[40m\u258c\x1b[0;30m\u2588\u2588\x1b[1;37m\u2590\x1b[47m\u2588\x1b[40m\u258c\x1b[0;30m\u2588\x1b[37m\u2590\x1b[47m\u2588\x1b[30;40m\u2588\u2588\u2588\u2588\u2588\x1b[1;37m\u2590\x1b[47m\u2580\x1b[0m\u258c\x1b[30m\u2588\x1b[37m\u2590\x1b[1;47m\u2580\x1b[0m\u258c\x1b[30m\u2588\x1b[1;37;47m\u2588\x1b[40m\u2580\x1b[0;30m\u2588\u2588\u2588\x1b[1;37m\u2580\x1b[47m\u2580\x1b[0m\u2584\x1b[30m\u2588\x1b[1;37;47m\u2588\x1b[0m\u258c\x1b[30m\u2588\u2588\x1b[1;37;47m\u2588\u2580\x1b[0;30m\u2588\u2588\x1b[1;37;47m\u2588\u2588\u2588\x1b[40m\u2584\x1b[0;30m\u2588\u2588\x1b[1;37m\u2590\x1b[47m\u2588\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37;47m\u2588\u2588\x1b[40m\u2584\u2584\u2580\u2580\x1b[30m\u2588\u2588\x1b[37m\u2590\x1b[47m\u2588\x1b[40m\u2584\u2584\u2584\x1b[30m\u2588\u2588\x1b[37m\u2590\x1b[47m\u2588\x1b[40m\u258c\u25a0\x1b[47m\u2588\u2588\x1b[40m\u2584\u2590\x1b[47m\u2588\x1b[31;40m\u2584\u2584\x1b[30m\u2588\u2588\u2588\u2588\x1b[37;47m\u2588\x1b[30;40m\u2588\x1b[37;47m\u2588\u2588\x1b[40m\u2584\u2584\u2580\u2580\x1b[30m\u2588\u2588\x1b[37;47m\u2588\u2588\x1b[30m\u2584\x1b[37m\u2588\u2588\x1b[30m\u2580\u258c\x1b[37m\u2588\x1b[30;40m\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2588\u258c\x1b[0;30m\u2588\x1b[37m\u2580\x1b[1;30m\u2588\u2584\x1b[0;30m\u2588\u2588\x1b[1m\u2590\u2588\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2590\u2588\u258c\x1b[0;30m\u2588\u2588\x1b[1m\u2590\u2588\x1b[0;30m\u2588\x1b[1m\u2588\u2588\x1b[37m\u2580\x1b[0;30m\u2588\x1b[31m\u2590\x1b[1m\u2584\x1b[30m\u2590\u2580\x1b[0;30m\u2588\x1b[1;47m\u2584\x1b[40m\u258c\x1b[0;30m\u2588\x1b[37m\u2580\x1b[1;30m\u2588\x1b[0;30m\u2588\u2588\u2588\x1b[1;47m\u2584\x1b[40m\u2588\x1b[0;30m\u2588\u2588\x1b[37m\u2580\x1b[1;30;47m\u2584\u2584\u2584\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[1m\u2580\u2580\x1b[0;30m\u2588\u2588\u2588\x1b[1m\u2580\x1b[0;30m\u2588\u2588\x1b[1m\u2580\u2580\u2580\u2580\u2580\u2580\x1b[0;30m\u2588\u2588\x1b[1m\u2580\u2580\u2580\u2580\x1b[0;31m\u2584\x1b[1m\u2584\x1b[0;30m\u2588\u2588\u2588\x1b[31m\u2584\x1b[30m\u2588\x1b[1m\u25a0\u2580\x1b[0;30m\u2588\u2588\u2588\x1b[1m\u2580\u2580\x1b[0;30m\u2588\u2588\u2588\x1b[1m\u2580\u25a0\x1b[0;30m\u2588\x1b[1m\u2580\u2580\x1b[0;30m\u2588\u2588\u2588\u2588\x1b[1m\u2580\u2580\x1b[0;30m\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+            "\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[31m\u2590\x1b[1;41m\u2590\x1b[40m\u2584\x1b[41m\u2588\x1b[0;31m\u2580\x1b[30m\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\x1b[37m                    ",
+        };
+
         public static async Task Show(dynamic terminal)
         {
             terminal.ClearScreen();
 
-            // === FIRE TOP (3 rows — base/dense/tips, hanging down) ===          Lines 1-3
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("████████████████████████████████████████████████████████████████████████████████");
-            terminal.SetColor("red");
-            terminal.WriteLine("▓▒░▒▓██▓▒░▒▓███▓▒░▒▓██▓▒░▒▓███▓▒░▒▓██▓▒░▒▓███▓▒░▒▓██▓▒░▒▓███▓▒░▒▓██▓▒░▒▓█");
-            terminal.SetColor("dark_red");
-            terminal.WriteLine("░  ░▒░  ░░  ░▒▒░ ░  ░▒░  ░░  ░▒░  ░ ░▒░  ░░  ░▒▒░ ░  ░▒░  ░░  ░▒░  ░░  ░");
+            // Render each line of ANSI art
+            foreach (var line in SplashArt)
+            {
+                terminal.WriteRawAnsi("          " + line.TrimEnd() + "\r\n");
+            }
 
-            // === USURPER — 5 rows, bright_red, centered ===                     Lines 4-8
-            string p1 = "           "; // ~11 char left pad to center ~57-char text in 80 cols
-            terminal.SetColor("bright_red");
-            terminal.WriteLine(p1 + "██  ██ ▄█████▄ ██  ██ ██████▄ ██████▄ ██████ ██████▄");
-            await Task.Delay(40);
-            terminal.WriteLine(p1 + "██  ██ ██▀▀▀▀▀ ██  ██ ██   ██ ██   ██ ██     ██   ██");
-            await Task.Delay(40);
-            terminal.WriteLine(p1 + "██  ██  ▀████▄ ██  ██ ██████▀ ██████▀ █████  ██████▀");
-            await Task.Delay(40);
-            terminal.WriteLine(p1 + "██  ██      ██ ██  ██ ██  ▀█▄ ██      ██     ██  ▀█▄");
-            await Task.Delay(40);
-            terminal.WriteLine(p1 + " ▀████▀ ▀████▀▀ ▀████▀ ██   ▀█ ██      ██████ ██   ▀█");
-            await Task.Delay(40);
+            // Reset colors after art
+            terminal.WriteRawAnsi("\x1b[0m");
 
-            terminal.WriteLine("");                                             // Line 9
-
-            // === REBORN — 3 rows, bright_yellow, centered ===                   Lines 10-12
-            // R distinct from B: R has closed top + separated leg at bottom
-            string p2 = "                        "; // ~24 char left pad to center ~32-char text
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine(p2 + "█▀▀█ █▀▀▀ █▀▀▄  ▄▀▀▄  █▀▀█ █▄  █");
-            await Task.Delay(40);
-            terminal.WriteLine(p2 + "█▄▄▀ █▄▄  █▀▀▄  █  █  █▄▄▀ █ ▀▄█");
-            await Task.Delay(40);
-            terminal.WriteLine(p2 + "█  █ █▄▄▄ █▄▄▀  ▀▄▄▀  █  █ █   █");
-            await Task.Delay(40);
-
-            // === SEPARATOR ===                                                  Line 13
-            terminal.SetColor("dark_red");
-            terminal.WriteLine("    ════════════════════════════════════════════════════════════════════════");
-
-            // === TAGLINE ===                                                    Lines 14-15
-            terminal.SetColor("bright_white");
-            terminal.WriteLine("          Face death, kill your friends, pump on 'roids and");
-            terminal.WriteLine("          claim the throne, and ultimately find yourself.");
-
-            terminal.WriteLine("");                                             // Line 16
-
-            // === INSPIRED BY + CREDITS ===                                      Lines 17-20
-            terminal.SetColor("cyan");
-            terminal.WriteLine("                    Inspired by the 1993 Classic.");
+            // Version info and press any key
+            string version = $"v{GameConfig.Version} \"{GameConfig.VersionName}\"";
+            int pad = (80 - version.Length) / 2;
             terminal.SetColor("gray");
-            terminal.WriteLine("          1993 - Original by Jakob Dangarden (JAS Software)");
-            terminal.WriteLine("          2026 - Reborn by Jason Knight");
-            terminal.SetColor("dark_green");
-            terminal.WriteLine($"                         v{GameConfig.Version} \"{GameConfig.VersionName}\"");
-
-            // === FIRE BOTTOM (3 rows — tips/dense/base, reaching up) ===        Lines 21-23
-            terminal.SetColor("dark_red");
-            terminal.WriteLine("░  ░▒░  ░░  ░▒▒░ ░  ░▒░  ░░  ░▒░  ░ ░▒░  ░░  ░▒▒░ ░  ░▒░  ░░  ░▒░  ░░  ░");
-            terminal.SetColor("red");
-            terminal.WriteLine("▓▒░▒▓██▓▒░▒▓███▓▒░▒▓██▓▒░▒▓███▓▒░▒▓██▓▒░▒▓███▓▒░▒▓██▓▒░▒▓███▓▒░▒▓██▓▒░▒▓█");
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("████████████████████████████████████████████████████████████████████████████████");
-
-            // === PRESS ANY KEY ===                                              Line 25
+            terminal.Write(new string(' ', pad) + version);
+            terminal.WriteLine("");
             terminal.SetColor("bright_white");
-            terminal.Write("                           Press any key...");
+            string prompt = "Press any key...";
+            int promptPad = (80 - prompt.Length) / 2;
+            terminal.Write(new string(' ', promptPad) + prompt);
             terminal.SetColor("white");
 
             await terminal.WaitForKey("");
