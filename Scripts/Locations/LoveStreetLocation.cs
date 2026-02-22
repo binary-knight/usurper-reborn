@@ -951,7 +951,7 @@ public class LoveStreetLocation : BaseLocation
                 RomanceRelationType.Spouse => " [Spouse]",
                 RomanceRelationType.Lover => " [Lover]",
                 RomanceRelationType.FWB => " [FWB]",
-                _ => relationLevel <= 40 ? " [Friend]" : relationLevel <= 70 ? "" : " [Stranger]"
+                _ => relationLevel <= 40 ? " [Friend]" : relationLevel <= 70 ? "" : " [Wary]"
             };
             if (!string.IsNullOrEmpty(tag))
             {

@@ -1462,12 +1462,18 @@ namespace UsurperRemake.Systems
                         ScaleCompanionStatsToLevel(companion);
                     }
 
-                    // Restore equipment
+                    // Restore equipment (with ID remapping for MUD mode collision avoidance)
                     companion.EquippedItems.Clear();
                     if (save.EquippedItemsSave != null)
                     {
+                        var remap = GameEngine.Instance?.DynamicEquipIdRemap;
                         foreach (var kvp in save.EquippedItemsSave)
-                            companion.EquippedItems[(EquipmentSlot)kvp.Key] = kvp.Value;
+                        {
+                            int equipId = kvp.Value;
+                            if (remap != null && remap.TryGetValue(equipId, out int newId))
+                                equipId = newId;
+                            companion.EquippedItems[(EquipmentSlot)kvp.Key] = equipId;
+                        }
                     }
 
                     // Restore disabled abilities

@@ -237,121 +237,123 @@ namespace UsurperRemake.Systems
         private void DisplayConsole()
         {
             terminal.ClearScreen();
-            terminal.SetColor("bright_red");
-            terminal.WriteLine(" ═══ SysOp Console ═══");
+            ShowSysOpHeader("SysOp Console");
             terminal.SetColor("yellow");
             if (DoorMode.SessionInfo != null)
-            {
                 terminal.WriteLine($" {DoorMode.SessionInfo.UserName} (Lv {DoorMode.SessionInfo.SecurityLevel})  BBS: {DoorMode.SessionInfo.BBSName}");
-            }
-
             if (_updateCheckComplete && _updateAvailable)
             {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($" ★ UPDATE: v{_latestVersion} available (current: {GameConfig.Version})");
             }
+            terminal.WriteLine("");
 
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(" Players");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [1] View All Players   [2] Delete Player");
-            terminal.WriteLine("  [3] Reset Game         [P] Pardon Player");
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.WriteLine(" Players:");
+            SysOpMenuRow(("1", "ViewAll"), ("2", "Delete"), ("3", "Reset"), ("P", "Pardon"));
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(" Settings");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [4] Difficulty          [5] Set MOTD");
-            terminal.WriteLine($"  [I] Idle Timeout: {DoorMode.IdleTimeoutMinutes} min");
-            terminal.WriteLine($"  [T] Color Theme: {ColorTheme.GetThemeName(GameConfig.DefaultColorTheme)}");
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.WriteLine(" Settings:");
+            SysOpMenuRow(("4", "Difficulty"), ("5", "MOTD"), ("I", $"Idle:{DoorMode.IdleTimeoutMinutes}m"), ("T", "Theme"));
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(" Monitoring");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [6] Statistics          [7] Debug Log");
-            terminal.WriteLine("  [8] Active NPCs");
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.WriteLine(" Monitoring:");
+            SysOpMenuRow(("6", "Stats"), ("7", "DebugLog"), ("8", "NPCs"));
             if (_updateCheckComplete && _updateAvailable)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine("  [9] Updates ★ NEW       [Q] Quit");
+                terminal.Write(" ");
+                terminal.SetColor("darkgray"); terminal.Write("[");
+                terminal.SetColor("bright_green"); terminal.Write("9");
+                terminal.SetColor("darkgray"); terminal.Write("]");
+                terminal.SetColor("bright_green"); terminal.Write("Updates★ ");
             }
             else
             {
-                terminal.SetColor("white");
-                terminal.WriteLine("  [9] Check for Updates   [Q] Quit");
+                SysOpMenuRow(("9", "Updates"));
             }
+            terminal.SetColor("white");
+            terminal.SetColor("darkgray"); terminal.Write("[");
+            terminal.SetColor("bright_yellow"); terminal.Write("Q");
+            terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.WriteLine("Quit");
             terminal.WriteLine("");
         }
 
         private void DisplayOnlineConsole()
         {
             terminal.ClearScreen();
-            terminal.SetColor("bright_red");
-            terminal.WriteLine(" ═══ SysOp Console (Online) ═══");
+            ShowSysOpHeader("SysOp Console (Online)");
             terminal.SetColor("yellow");
             if (DoorMode.SessionInfo != null)
-            {
                 terminal.WriteLine($" {DoorMode.SessionInfo.UserName} (Lv {DoorMode.SessionInfo.SecurityLevel})  BBS: {DoorMode.SessionInfo.BBSName}");
-            }
-
             if (_updateCheckComplete && _updateAvailable)
             {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($" ★ UPDATE: v{_latestVersion} available (current: {GameConfig.Version})");
             }
+            terminal.WriteLine("");
 
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(" Players");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [1] List/Edit Players  [2] Ban Player");
-            terminal.WriteLine("  [3] Unban Player       [4] Delete Player");
-            terminal.WriteLine("  [P] Pardon Player");
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.WriteLine(" Players:");
+            SysOpMenuRow(("1", "List/Edit"), ("2", "Ban"), ("3", "Unban"), ("4", "Delete"), ("P", "Pardon"));
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(" Settings");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [5] Difficulty          [6] Set MOTD");
-            terminal.WriteLine($"  [I] Idle Timeout: {DoorMode.IdleTimeoutMinutes} min");
-            terminal.WriteLine($"  [T] Color Theme: {ColorTheme.GetThemeName(GameConfig.DefaultColorTheme)}");
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.WriteLine(" Settings:");
+            SysOpMenuRow(("5", "Difficulty"), ("6", "MOTD"), ("I", $"Idle:{DoorMode.IdleTimeoutMinutes}m"), ("T", "Theme"));
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(" Monitoring");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [7] Online Players      [8] Statistics");
-            terminal.WriteLine("  [K] Kick Player         [D] Debug Log");
-            terminal.WriteLine("  [N] Active NPCs");
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.WriteLine(" Monitoring:");
+            SysOpMenuRow(("7", "Online"), ("8", "Stats"), ("K", "Kick"), ("D", "DebugLog"), ("N", "NPCs"));
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(" World");
-            terminal.SetColor("white");
-            terminal.WriteLine("  [V] View News           [C] Clear News");
-            terminal.WriteLine("  [B] Broadcast");
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine(" ──────────────────────────────────────");
+            terminal.WriteLine(" World:");
+            SysOpMenuRow(("V", "News"), ("C", "ClearNews"), ("B", "Broadcast"));
             if (_updateCheckComplete && _updateAvailable)
             {
-                terminal.SetColor("bright_green");
-                terminal.Write("  [U] Updates ★ NEW");
+                terminal.Write(" ");
+                terminal.SetColor("darkgray"); terminal.Write("[");
+                terminal.SetColor("bright_green"); terminal.Write("U");
+                terminal.SetColor("darkgray"); terminal.Write("]");
+                terminal.SetColor("bright_green"); terminal.Write("Updates★ ");
             }
             else
             {
-                terminal.SetColor("white");
-                terminal.Write("  [U] Updates");
+                terminal.Write(" ");
+                terminal.SetColor("darkgray"); terminal.Write("[");
+                terminal.SetColor("bright_yellow"); terminal.Write("U");
+                terminal.SetColor("darkgray"); terminal.Write("]");
+                terminal.SetColor("white"); terminal.Write("Updates ");
             }
-            terminal.SetColor("red");
-            terminal.Write("             [W] Wipe");
-            terminal.SetColor("gray");
-            terminal.WriteLine("   [Q] Quit");
+            terminal.SetColor("darkgray"); terminal.Write("[");
+            terminal.SetColor("red"); terminal.Write("W");
+            terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("red"); terminal.Write("Wipe ");
+            terminal.SetColor("darkgray"); terminal.Write("[");
+            terminal.SetColor("bright_yellow"); terminal.Write("Q");
+            terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.WriteLine("Quit");
+            terminal.WriteLine("");
+        }
+
+        private void ShowSysOpHeader(string title)
+        {
+            terminal.SetColor("bright_red");
+            int padLen = Math.Max(0, (76 - title.Length) / 2);
+            string padL = new string('═', padLen);
+            string padR = new string('═', 76 - title.Length - padLen);
+            terminal.Write("╔" + padL + " ");
+            terminal.SetColor("bright_white");
+            terminal.Write(title);
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(" " + padR + "╗");
+        }
+
+        private void SysOpMenuRow(params (string key, string label)[] items)
+        {
+            terminal.Write(" ");
+            foreach (var (key, label) in items)
+            {
+                terminal.SetColor("darkgray"); terminal.Write("[");
+                terminal.SetColor("bright_yellow"); terminal.Write(key);
+                terminal.SetColor("darkgray"); terminal.Write("]");
+                terminal.SetColor("white"); terminal.Write(label + " ");
+            }
             terminal.WriteLine("");
         }
 

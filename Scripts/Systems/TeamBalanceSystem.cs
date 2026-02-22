@@ -177,7 +177,8 @@ namespace UsurperRemake.Systems
             foreach (var teammate in teammates)
             {
                 // Check all character types - NPCs added to party are NPC instances
-                if (!teammate.IsCompanion && teammate.IsAlive)
+                // Skip grouped players (they have their own independent XP calculation)
+                if (!teammate.IsCompanion && !teammate.IsGroupedPlayer && teammate.IsAlive)
                 {
                     highestTeammateLevel = Math.Max(highestTeammateLevel, teammate.Level);
                 }

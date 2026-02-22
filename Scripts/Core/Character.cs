@@ -45,6 +45,24 @@ public class Character
     public int TeamRec { get; set; }                // team record, days had town
     public int BGuard { get; set; }                 // type of guard
     public bool CTurf { get; set; }                 // is team in control of town
+
+    // Group dungeon system (v0.45.0) — transient, not serialized
+    /// <summary>If set, this character is a grouped player whose combat I/O goes through this terminal.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public TerminalEmulator? RemoteTerminal { get; set; }
+    /// <summary>True if this character is a grouped player (has a RemoteTerminal assigned).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsGroupedPlayer => RemoteTerminal != null;
+    /// <summary>The player's username (for group XP/gold tracking).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? GroupPlayerUsername { get; set; }
+    /// <summary>Channel for receiving combat input from the follower's terminal loop.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public System.Threading.Channels.Channel<string>? CombatInputChannel { get; set; }
+    /// <summary>True when the combat engine is waiting for this grouped player's input.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsAwaitingCombatInput { get; set; }
+
     public int GnollP { get; set; }                 // gnoll poison, temporary
     public int Mental { get; set; }                 // mental health
     public int Addict { get; set; }                 // drug addiction level (0-100)
@@ -626,6 +644,11 @@ public class Character
     /// <summary>
     /// Convert Equipment to legacy Item for inventory storage
     /// </summary>
+    /// <summary>
+    /// Public accessor for converting Equipment back to a legacy Item (for backpack storage).
+    /// </summary>
+    public global::Item ConvertEquipmentToLegacyItem(Equipment equipment) => ConvertEquipmentToItem(equipment);
+
     private global::Item ConvertEquipmentToItem(Equipment equipment)
     {
         // Determine the item type based on handedness/weapon type first, then slot

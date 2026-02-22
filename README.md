@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.44.3** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.45.0** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,12 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.45.0 - Band of Brothers
+
+**Group Dungeons (Online MUD):** Form a group with `/group <player>`, enter the dungeon together, and fight side by side. Each player controls their own character in combat with the full action set — attack, spells (C1/C2/C3 with target selection), power attack, precise strike, taunt, disarm, hide, defend, heal ally, and quickbar abilities. Round-by-round status broadcasts keep everyone aware of the battle state. Individual retreat lets one player flee while the party fights on. Leader death doesn't end the fight — surviving players continue and can still win. Monster special abilities target all party members. Dice-roll loot system with visible rolls and item comparison.
+
+**Full Follower Experience:** Followers see room descriptions, trap triggers, room events, feature interactions, combat introductions, status effects, victory sequences, and loot drops — the same info the leader sees. Between combats: inventory management, potion use, character stats, and `/party` command for real-time group status.
 
 ### Completed in v0.44.3 - Spectator Mode
 
@@ -921,4 +927,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.44.3 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.45.0 — The world is running. [Watch it live.](https://usurper-reborn.net)

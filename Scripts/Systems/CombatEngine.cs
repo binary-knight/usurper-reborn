@@ -3,9 +3,11 @@ using UsurperRemake.Data;
 using UsurperRemake.Systems;
 using UsurperRemake.UI;
 using UsurperRemake.BBS;
+using UsurperRemake.Server;
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Linq;
 
@@ -352,6 +354,38 @@ public partial class CombatEngine
         int floorEstimate = monsters.Max(m => m.Level);
         DebugLogger.Instance.LogCombatStart(player.Name, player.Level, monsterNames, floorEstimate);
 
+        // Broadcast combat introduction to group followers
+        if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
+        {
+            var introSb = new System.Text.StringBuilder();
+            introSb.AppendLine("\u001b[1;31m  ═══ COMBAT ═══\u001b[0m");
+            if (monsters.Count == 1)
+            {
+                var m = monsters[0];
+                if (!string.IsNullOrEmpty(m.Phrase))
+                {
+                    if (m.CanSpeak)
+                        introSb.AppendLine($"\u001b[33m  The {m.Name} says: \"{m.Phrase}\"\u001b[0m");
+                    else
+                        introSb.AppendLine($"\u001b[33m  The {m.Name} {m.Phrase}\u001b[0m");
+                }
+                introSb.AppendLine($"\u001b[37m  Facing: {m.GetDisplayInfo()}\u001b[0m");
+            }
+            else
+            {
+                foreach (var m in monsters)
+                    introSb.AppendLine($"\u001b[37m  - {m.Name} (Lv{m.Level}, {m.HP} HP)\u001b[0m");
+            }
+            var teammateList = result.Teammates.Where(t => t.IsAlive).ToList();
+            if (teammateList.Count > 0)
+            {
+                introSb.AppendLine($"\u001b[37m  Fighting alongside you:\u001b[0m");
+                foreach (var tm in teammateList)
+                    introSb.AppendLine($"\u001b[37m    - {tm.DisplayName} (Lv{tm.Level})\u001b[0m");
+            }
+            BroadcastGroupCombatEvent(result, introSb.ToString());
+        }
+
         // Ambush: monsters get a free attack round before the player can act
         if (isAmbush && player.IsAlive && monsters.Any(m => m.IsAlive))
         {
@@ -359,6 +393,13 @@ public partial class CombatEngine
             terminal.WriteLine("*** AMBUSH! The monsters strike before you can react! ***");
             terminal.WriteLine("");
             result.CombatLog.Add("Ambush! Monsters attack first!");
+            // Broadcast ambush warning to followers
+            bool hasGroupAmbush = result.Teammates?.Any(t => t.IsGroupedPlayer) == true;
+            BroadcastGroupCombatEvent(result,
+                "\u001b[1;31m  *** AMBUSH! Monsters strike before the party can react! ***\u001b[0m");
+
+            // Capture ambush attacks for group broadcast
+            if (hasGroupAmbush) terminal.StartCapture();
 
             foreach (var ambushMonster in monsters.Where(m => m.IsAlive))
             {
@@ -372,14 +413,26 @@ public partial class CombatEngine
                 terminal.WriteLine("You were slain in the ambush!");
             }
 
+            // Broadcast ambush attacks to followers
+            if (hasGroupAmbush)
+            {
+                string? ambushOutput = terminal.StopCapture();
+                if (!string.IsNullOrWhiteSpace(ambushOutput))
+                    BroadcastGroupCombatEvent(result,
+                        ConvertToThirdPerson(ambushOutput, player.DisplayName));
+            }
+
             await Task.Delay(GetCombatDelay(1500));
         }
 
         // Main combat loop
         int roundNumber = 0;
         bool autoCombat = false; // Auto-combat toggle
+        bool leaderDeathAnnounced = false;
 
-        while (player.IsAlive && monsters.Any(m => m.IsAlive) && !globalEscape)
+        // Combat continues as long as ANY party member is alive (not just leader)
+        bool anyGroupedAlive() => result.Teammates?.Any(t => t.IsGroupedPlayer && t.IsAlive) == true;
+        while ((player.IsAlive || anyGroupedAlive()) && monsters.Any(m => m.IsAlive) && !globalEscape)
         {
             roundNumber++;
 
@@ -389,6 +442,39 @@ public partial class CombatEngine
 
             // Display combat status at start of each round
             DisplayCombatStatus(monsters, player);
+
+            // Check if group has real players (for output capture/broadcasting)
+            // (declared early so boss phase transitions can broadcast)
+            bool hasGroupEarly = result.Teammates?.Any(t => t.IsGroupedPlayer) == true;
+
+            // Broadcast round number and compact combat status to all followers
+            if (hasGroupEarly)
+            {
+                var statusSb = new System.Text.StringBuilder();
+                statusSb.AppendLine($"\u001b[90m  ── Round {roundNumber} ──\u001b[0m");
+                // Monster status line
+                var aliveMonsters = monsters.Where(m => m.IsAlive).ToList();
+                foreach (var m in aliveMonsters)
+                {
+                    int hpPct = (int)(m.HP * 100 / Math.Max(1, m.MaxHP));
+                    string hpColor = hpPct > 50 ? "\u001b[32m" : hpPct > 25 ? "\u001b[33m" : "\u001b[31m";
+                    statusSb.AppendLine($"\u001b[37m  {m.Name}: {hpColor}{hpPct}%\u001b[0m");
+                }
+                // Party status line
+                statusSb.Append($"\u001b[36m  Party: ");
+                var partyMembers = new List<string>();
+                int ldrPct = (int)(player.HP * 100 / Math.Max(1, player.MaxHP));
+                string ldrColor = ldrPct > 50 ? "\u001b[32m" : ldrPct > 25 ? "\u001b[33m" : "\u001b[31m";
+                partyMembers.Add($"{ldrColor}{player.DisplayName} {player.HP}/{player.MaxHP}\u001b[0m");
+                foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                {
+                    int tmPct = (int)(tm.HP * 100 / Math.Max(1, tm.MaxHP));
+                    string tmColor = tmPct > 50 ? "\u001b[32m" : tmPct > 25 ? "\u001b[33m" : "\u001b[31m";
+                    partyMembers.Add($"{tmColor}{tm.DisplayName} {tm.HP}/{tm.MaxHP}\u001b[0m");
+                }
+                statusSb.AppendLine(string.Join("\u001b[90m | \u001b[0m", partyMembers));
+                BroadcastGroupCombatEvent(result, statusSb.ToString());
+            }
 
             // Boss phase transition check
             if (BossContext != null)
@@ -401,6 +487,13 @@ public partial class CombatEngine
                     {
                         await PlayBossPhaseTransition(BossContext, bossMonster, newPhase);
                         BossContext.CurrentPhase = newPhase;
+                        // Broadcast boss phase transition to followers
+                        if (hasGroupEarly)
+                        {
+                            int hpPctBoss = (int)(bossMonster.HP * 100 / Math.Max(1, bossMonster.MaxHP));
+                            BroadcastGroupCombatEvent(result,
+                                $"\u001b[1;35m  *** {bossMonster.Name} enters Phase {newPhase}! ({hpPctBoss}% HP) ***\u001b[0m");
+                        }
 
                         // Maelketh spawns minions on phase 2
                         if (BossContext.GodType == OldGodType.Maelketh && newPhase == 2)
@@ -426,6 +519,12 @@ public partial class CombatEngine
                     }
                 }
             }
+
+            // Check if group has real players (for output capture/broadcasting)
+            bool hasGroup = result.Teammates?.Any(t => t.IsGroupedPlayer) == true;
+
+            // Capture status effects for group broadcast
+            if (hasGroup) terminal.StartCapture();
 
             // Process status effects for player and display messages
             var statusMessages = player.ProcessStatusEffects();
@@ -471,17 +570,31 @@ public partial class CombatEngine
                 }
             }
 
+            // Broadcast status effects / regen / drug drain to followers
+            if (hasGroup)
+            {
+                string? statusOutput = terminal.StopCapture();
+                if (!string.IsNullOrWhiteSpace(statusOutput))
+                    BroadcastGroupCombatEvent(result,
+                        ConvertToThirdPerson(statusOutput, player.DisplayName));
+            }
+
             // Check if player died from status effects or plague
             if (!player.IsAlive)
             {
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("You succumb to your wounds!");
+                BroadcastGroupCombatEvent(result,
+                    $"\u001b[1;31m  {player.DisplayName} has succumbed to status effects!\u001b[0m");
                 break;
             }
 
-            // === PLAYER TURN ===
+            // === PLAYER (LEADER) TURN ===
             if (player.IsAlive && monsters.Any(m => m.IsAlive))
             {
+                // Announce leader's turn to group followers
+                BroadcastGroupCombatEvent(result, $"\u001b[1;36m  ── {player.DisplayName}'s turn ──\u001b[0m");
+
                 CombatAction playerAction;
 
                 if (autoCombat)
@@ -543,7 +656,19 @@ public partial class CombatEngine
                     if (enableAuto) autoCombat = true;
                 }
 
+                // Capture output during leader's action for broadcasting to followers
+                if (hasGroup) terminal.StartCapture();
+
                 await ProcessPlayerActionMultiMonster(playerAction, player, monsters, result);
+
+                // Broadcast captured combat output to group followers
+                // Convert "You attack" → "Rage attacks" for third-person perspective
+                if (hasGroup)
+                {
+                    string? leaderOutput = terminal.StopCapture();
+                    if (!string.IsNullOrWhiteSpace(leaderOutput))
+                        BroadcastGroupCombatEvent(result, ConvertToThirdPerson(leaderOutput, player.DisplayName));
+                }
             }
 
             // Check if all monsters defeated
@@ -559,7 +684,22 @@ public partial class CombatEngine
             {
                 if (monsters.Any(m => m.IsAlive))
                 {
-                    await ProcessTeammateActionMultiMonster(teammate, monsters, result);
+                    if (teammate.IsGroupedPlayer && teammate.RemoteTerminal != null)
+                    {
+                        await ProcessGroupedPlayerTurn(teammate, player, monsters, result);
+                    }
+                    else
+                    {
+                        // NPC teammate — capture output for group broadcast
+                        if (hasGroup) terminal.StartCapture();
+                        await ProcessTeammateActionMultiMonster(teammate, monsters, result);
+                        if (hasGroup)
+                        {
+                            string? npcOutput = terminal.StopCapture();
+                            if (!string.IsNullOrWhiteSpace(npcOutput))
+                                BroadcastGroupCombatEvent(result, npcOutput);
+                        }
+                    }
                 }
             }
 
@@ -568,11 +708,13 @@ public partial class CombatEngine
                 break;
 
             // === ALL MONSTERS' TURNS ===
+            if (hasGroup) terminal.StartCapture();
             var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
             foreach (var monster in livingMonsters)
             {
-                if (!player.IsAlive)
-                    break; // Stop if player died
+                // Stop if entire party is dead (not just leader)
+                if (!player.IsAlive && !anyGroupedAlive())
+                    break;
 
                 int attacks = 1;
                 if (BossContext != null && monster.IsBoss)
@@ -580,7 +722,7 @@ public partial class CombatEngine
 
                 for (int atk = 0; atk < attacks; atk++)
                 {
-                    if (!player.IsAlive || !monster.IsAlive) break;
+                    if ((!player.IsAlive && !anyGroupedAlive()) || !monster.IsAlive) break;
 
                     // Boss confused check (from dialogue modifiers)
                     if (BossContext != null && monster.IsBoss && BossContext.BossConfused && random.NextDouble() < 0.25)
@@ -610,13 +752,36 @@ public partial class CombatEngine
                     await Task.Delay(GetCombatDelay(800));
                 }
             }
+            // Broadcast all monster actions to followers (convert "You" to leader's name)
+            if (hasGroup)
+            {
+                string? monsterOutput = terminal.StopCapture();
+                if (!string.IsNullOrWhiteSpace(monsterOutput))
+                    BroadcastGroupCombatEvent(result,
+                        ConvertToThirdPerson(monsterOutput, player.DisplayName));
+            }
 
-            // Check for player death
+            // Check for player death — only end combat if no grouped players survive
             if (!player.IsAlive)
-                break;
+            {
+                if (!anyGroupedAlive())
+                {
+                    BroadcastGroupCombatEvent(result,
+                        $"\u001b[1;31m  {player.DisplayName} has been slain!\u001b[0m");
+                    break;
+                }
+                // Leader died but grouped players carry on — announce once (via flag)
+                if (!leaderDeathAnnounced)
+                {
+                    leaderDeathAnnounced = true;
+                    BroadcastGroupCombatEvent(result,
+                        $"\u001b[1;31m  {player.DisplayName} has fallen! The party fights on!\u001b[0m");
+                }
+            }
 
             // Process end-of-round effects: decrement ability cooldowns and buff durations
-            ProcessEndOfRoundAbilityEffects(player);
+            if (player.IsAlive)
+                ProcessEndOfRoundAbilityEffects(player);
 
             // Short pause between rounds
             await Task.Delay(GetCombatDelay(1000));
@@ -629,6 +794,10 @@ public partial class CombatEngine
             UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} fled from combat!");
             terminal.SetColor("yellow");
             terminal.WriteLine("You escaped from combat!");
+
+            // Broadcast flee to group followers
+            BroadcastGroupCombatEvent(result,
+                $"\u001b[1;33m  ══ RETREAT ══\u001b[0m\n\u001b[33m  The party retreats from combat!\u001b[0m");
 
             // Show NPC teammate reactions to fleeing
             if (result.Teammates != null && result.Teammates.Count > 0)
@@ -668,6 +837,25 @@ public partial class CombatEngine
                 await HandlePartialVictory(result, offerMonkEncounter);
             }
         }
+        else if (!monsters.Any(m => m.IsAlive))
+        {
+            // All monsters dead — victory! (Even if leader died, grouped players carried the fight)
+            result.Outcome = CombatOutcome.Victory;
+            if (!player.IsAlive)
+            {
+                // Leader died but party won — handle leader death first, then victory rewards
+                result.Outcome = CombatOutcome.Victory; // Still a win for the group
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("");
+                terminal.WriteLine($"  {player.DisplayName} has fallen, but the party is victorious!");
+                terminal.WriteLine("");
+                BroadcastGroupCombatEvent(result,
+                    $"\u001b[1;33m  {player.DisplayName} fell in battle, but the party prevails!\u001b[0m");
+                await HandlePlayerDeath(result);
+                CheckGroupLeaderDeath(result);
+            }
+            await HandleVictoryMultiMonster(result, offerMonkEncounter);
+        }
         else if (!player.IsAlive)
         {
             // Wizard godmode: restore HP/Mana so wizard cannot die
@@ -703,16 +891,15 @@ public partial class CombatEngine
 
                 if (!divineSaved)
                 {
+                    // Leader died and no grouped players survived — total defeat
                     result.Outcome = CombatOutcome.PlayerDied;
                     UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} has fallen in combat!");
                     await HandlePlayerDeath(result);
+
+                    // If leader died, disband the group so followers return to town
+                    CheckGroupLeaderDeath(result);
                 }
             }
-        }
-        else if (!monsters.Any(m => m.IsAlive))
-        {
-            result.Outcome = CombatOutcome.Victory;
-            await HandleVictoryMultiMonster(result, offerMonkEncounter);
         }
 
         // Wizard godmode: ensure HP/Mana fully restored after combat
@@ -1087,7 +1274,7 @@ public partial class CombatEngine
     /// Compact dungeon combat action menu for BBS 80x25 terminals (multi-monster combat).
     /// Fits on 2-3 lines. Quickbar skills shown as "[1-9]Skills" shortcut.
     /// </summary>
-    private void ShowDungeonCombatMenuBBS(Character player, bool hasInjuredTeammates, bool canHealAlly, List<(string key, string name, bool available)> classInfo)
+    private void ShowDungeonCombatMenuBBS(Character player, bool hasInjuredTeammates, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false)
     {
         // Row 1: Core actions
         terminal.SetColor("bright_yellow");
@@ -1139,18 +1326,43 @@ public partial class CombatEngine
         terminal.Write("etreat");
         terminal.WriteLine("");
 
-        // Row 2: Utility
+        // Row 2: Tactical actions + utility
+        terminal.Write(" ");
         terminal.SetColor("bright_yellow");
-        terminal.Write(" [AUTO] ");
-        string speedLabel = player.CombatSpeed switch
-        {
-            CombatSpeed.Instant => "Inst",
-            CombatSpeed.Fast => "Fast",
-            _ => "Nrml"
-        };
-        terminal.Write("[SPD]");
+        terminal.Write("[P]");
         terminal.SetColor("darkgray");
-        terminal.Write($"{speedLabel}");
+        terminal.Write("ower ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[E]");
+        terminal.SetColor("darkgray");
+        terminal.Write("xact ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[T]");
+        terminal.SetColor("darkgray");
+        terminal.Write("aunt ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[W]");
+        terminal.SetColor("darkgray");
+        terminal.Write("Disarm ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("[L]");
+        terminal.SetColor("darkgray");
+        terminal.Write("Hide ");
+
+        if (!isFollower)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[AUTO] ");
+            string speedLabel = player.CombatSpeed switch
+            {
+                CombatSpeed.Instant => "Inst",
+                CombatSpeed.Fast => "Fast",
+                _ => "Nrml"
+            };
+            terminal.Write("[SPD]");
+            terminal.SetColor("darkgray");
+            terminal.Write($"{speedLabel}");
+        }
 
         // Boss save option
         if (BossContext?.CanSave == true)
@@ -2573,8 +2785,17 @@ public partial class CombatEngine
                 await MonsterAttacksCompanion(monster, targetChoice, result);
                 return;
             }
-            // If targetChoice is player, fall through to normal player attack
+            // If targetChoice is player but player is dead, redirect to a random alive teammate
+            if (!player.IsAlive && aliveTeammates.Count > 0)
+            {
+                var fallbackTarget = aliveTeammates[random.Next(aliveTeammates.Count)];
+                await MonsterAttacksCompanion(monster, fallbackTarget, result);
+                return;
+            }
         }
+
+        // If leader is dead and no teammates, skip (shouldn't happen — loop should have exited)
+        if (!player.IsAlive) return;
 
         // === MONSTER SPECIAL ABILITIES ===
         // Chance for monster to use a special ability instead of normal attack
@@ -3716,10 +3937,22 @@ public partial class CombatEngine
         if (player.Healing <= 0 || player.HP >= player.MaxHP)
             return;
 
+        // Don't waste a potion if the deficit is trivial — only auto-heal
+        // when missing at least half a potion's average healing value
+        long avgPotionHeal = 30 + player.Level * 5 + 20; // midpoint of random(10,30)
+        long hpDeficit = player.MaxHP - player.HP;
+        if (hpDeficit < avgPotionHeal / 2)
+            return;
+
         long totalHealed = 0;
         int potionsUsed = 0;
         while (player.Healing > 0 && player.HP < player.MaxHP)
         {
+            // Stop using potions once the remaining deficit is trivial
+            long remaining = player.MaxHP - player.HP;
+            if (potionsUsed > 0 && remaining < avgPotionHeal / 2)
+                break;
+
             long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
@@ -3750,9 +3983,23 @@ public partial class CombatEngine
             return;
 
         long manaPerPotion = 30 + player.Level * 5;
+
+        // Don't waste a mana potion if the deficit is trivial
+        long manaDeficit = player.MaxMana - player.Mana;
+        if (manaDeficit < manaPerPotion / 2)
+            return;
+
         long manaNeeded = player.MaxMana - player.Mana;
         int potionsNeeded = (int)Math.Ceiling((double)manaNeeded / manaPerPotion);
         int potionsUsed = (int)Math.Min(potionsNeeded, player.ManaPotions);
+
+        // Don't use the last potion if it would mostly overheal
+        if (potionsUsed > 1)
+        {
+            long afterPrevious = player.Mana + (potionsUsed - 1) * manaPerPotion;
+            if (player.MaxMana - afterPrevious < manaPerPotion / 2)
+                potionsUsed--;
+        }
 
         long totalRestored = 0;
         for (int i = 0; i < potionsUsed; i++)
@@ -3890,6 +4137,17 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
 
+        // Build loot broadcast for group followers
+        var lootBroadcastSb = new System.Text.StringBuilder();
+        string rarityTag = rarity switch
+        {
+            LootGenerator.ItemRarity.Legendary or LootGenerator.ItemRarity.Artifact => "\u001b[1;33m*** LEGENDARY DROP! ***",
+            LootGenerator.ItemRarity.Epic => "\u001b[1;35m** EPIC DROP! **",
+            LootGenerator.ItemRarity.Rare => "\u001b[1;36m* RARE DROP! *",
+            _ => "\u001b[1;37mITEM FOUND!"
+        };
+        lootBroadcastSb.AppendLine($"  {rarityTag}\u001b[0m");
+
         if (lootItem.IsIdentified)
         {
             // Identified - show full details
@@ -3897,16 +4155,25 @@ public partial class CombatEngine
             terminal.WriteLine($"  {lootItem.Name}");
             terminal.SetColor("white");
 
+            lootBroadcastSb.AppendLine($"\u001b[37m  {lootItem.Name}\u001b[0m");
+
             if (lootItem.Type == global::ObjType.Weapon)
+            {
                 terminal.WriteLine($"  Attack Power: +{lootItem.Attack}");
+                lootBroadcastSb.AppendLine($"\u001b[37m  Attack Power: +{lootItem.Attack}\u001b[0m");
+            }
             else if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
             {
                 // Accessories don't have armor — show item type instead
                 string itemTypeName = lootItem.Type == global::ObjType.Fingers ? "Ring" : "Necklace";
                 terminal.WriteLine($"  Type: {itemTypeName}");
+                lootBroadcastSb.AppendLine($"\u001b[37m  Type: {itemTypeName}\u001b[0m");
             }
             else
+            {
                 terminal.WriteLine($"  Armor Power: +{lootItem.Armor}");
+                lootBroadcastSb.AppendLine($"\u001b[37m  Armor Power: +{lootItem.Armor}\u001b[0m");
+            }
 
             var bonuses = new List<string>();
             if (lootItem.Strength != 0) bonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
@@ -3920,6 +4187,7 @@ public partial class CombatEngine
             {
                 terminal.SetColor("cyan");
                 terminal.WriteLine($"  Bonuses: {string.Join(", ", bonuses)}");
+                lootBroadcastSb.AppendLine($"\u001b[36m  Bonuses: {string.Join(", ", bonuses)}\u001b[0m");
             }
 
             terminal.SetColor("yellow");
@@ -3931,6 +4199,7 @@ public partial class CombatEngine
                 terminal.WriteLine("");
                 terminal.WriteLine("  WARNING: This item is CURSED!");
                 terminal.WriteLine("  Visit the Magic Shop to remove the curse.");
+                lootBroadcastSb.AppendLine("\u001b[31m  WARNING: CURSED!\u001b[0m");
             }
 
             await ShowEquipmentComparison(lootItem, player);
@@ -3944,10 +4213,243 @@ public partial class CombatEngine
             terminal.SetColor("gray");
             terminal.WriteLine("  The item's properties are unknown.");
             terminal.WriteLine("  Take it to the Magic Shop to have it identified.");
+            lootBroadcastSb.AppendLine($"\u001b[35m  {unidName} (Unidentified)\u001b[0m");
         }
 
         terminal.WriteLine("");
 
+        // Broadcast loot details to group followers
+        {
+            var ctx = SessionContext.Current;
+            var lootGroup = ctx != null ? GroupSystem.Instance?.GetGroupFor(ctx.Username) : null;
+            if (lootGroup != null)
+                GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
+                    lootBroadcastSb.ToString(), excludeUsername: ctx!.Username);
+        }
+
+        // GROUP LOOT: All eligible party members roll, highest roll wins
+        var groupedPlayers = currentTeammates?.Where(t => t.IsGroupedPlayer && t.IsAlive && t.RemoteTerminal != null).ToList();
+        if (groupedPlayers != null && groupedPlayers.Count > 0)
+        {
+            var ctx = SessionContext.Current;
+            var lootGroup = ctx != null ? GroupSystem.Instance?.GetGroupFor(ctx.Username) : null;
+
+            if (!lootItem.IsIdentified)
+            {
+                // Unidentified items — all players eligible, roll for it
+                var unidCandidates = new List<(Character character, bool isLeader, bool isGroupedPlayer)>();
+                unidCandidates.Add((player, true, false));
+                foreach (var gp in groupedPlayers)
+                    unidCandidates.Add((gp, false, true));
+                // NPCs don't roll for unidentified items — they can't use unid shops
+
+                string unidName = LootGenerator.GetUnidentifiedName(lootItem);
+                if (unidCandidates.Count == 1)
+                {
+                    // Only leader eligible
+                    player.Inventory.Add(lootItem);
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"  Added {unidName} to your inventory for identification.");
+                    if (lootGroup != null)
+                        GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
+                            $"\u001b[36m  {player.DisplayName} picks up {unidName} for identification.\u001b[0m",
+                            excludeUsername: ctx!.Username);
+                }
+                else
+                {
+                    // Multiple players — roll
+                    var rollSb = new System.Text.StringBuilder();
+                    rollSb.AppendLine("\u001b[1;33m  ── LOOT ROLL ──\u001b[0m");
+                    var rolls = new List<(Character character, int roll, bool isLeader, bool isGroupedPlayer)>();
+                    foreach (var c in unidCandidates)
+                    {
+                        int roll = random.Next(1, 101);
+                        rolls.Add((c.character, roll, c.isLeader, c.isGroupedPlayer));
+                        string name = c.character.DisplayName ?? c.character.Name2 ?? "Unknown";
+                        rollSb.AppendLine($"\u001b[37m  {name} rolls {roll}\u001b[0m");
+                    }
+                    var unidWinner = rolls.OrderByDescending(r => r.roll).First();
+                    string unidWinnerName = unidWinner.character.DisplayName ?? unidWinner.character.Name2 ?? "Unknown";
+                    rollSb.AppendLine($"\u001b[1;32m  >> {unidWinnerName} wins {unidName}! <<\u001b[0m");
+
+                    // Show rolls on leader terminal
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("  ── LOOT ROLL ──");
+                    foreach (var r in rolls)
+                    {
+                        string rName = r.character.DisplayName ?? r.character.Name2 ?? "Unknown";
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"  {rName} rolls {r.roll}");
+                    }
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  >> {unidWinnerName} wins {unidName}! <<");
+
+                    // Add to winner's inventory
+                    if (unidWinner.isLeader)
+                        player.Inventory.Add(lootItem);
+                    else
+                        unidWinner.character.Inventory?.Add(lootItem);
+
+                    // Broadcast rolls to group
+                    if (lootGroup != null)
+                        GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
+                            rollSb.ToString(), excludeUsername: ctx!.Username);
+                }
+
+                await Task.Delay(GetCombatDelay(1500));
+                return;
+            }
+
+            // Identified items — gather eligible candidates with comparison info
+            var candidates = new List<(Character character, int upgradeValue, string currentItemName, int currentPower, bool isLeader, bool isGroupedPlayer)>();
+
+            // Helper to get current equipped item info for comparison display
+            EquipmentSlot compareSlot = lootItem.Type switch
+            {
+                global::ObjType.Weapon => EquipmentSlot.MainHand,
+                global::ObjType.Shield => EquipmentSlot.OffHand,
+                global::ObjType.Body => EquipmentSlot.Body,
+                global::ObjType.Head => EquipmentSlot.Head,
+                global::ObjType.Arms => EquipmentSlot.Arms,
+                global::ObjType.Hands => EquipmentSlot.Hands,
+                global::ObjType.Legs => EquipmentSlot.Legs,
+                global::ObjType.Feet => EquipmentSlot.Feet,
+                global::ObjType.Waist => EquipmentSlot.Waist,
+                global::ObjType.Neck => EquipmentSlot.Neck,
+                global::ObjType.Face => EquipmentSlot.Face,
+                global::ObjType.Fingers => EquipmentSlot.LFinger,
+                global::ObjType.Abody => EquipmentSlot.Cloak,
+                _ => EquipmentSlot.Body
+            };
+
+            void AddCandidate(Character c, bool isLdr, bool isGrp)
+            {
+                if (!lootItem.CanUse(c)) return;
+                int val = CalculateItemUpgradeValue(lootItem, c);
+                var curEquip = c.GetEquipment(compareSlot);
+                string curName = curEquip?.Name ?? "(empty)";
+                int curPower = lootItem.Type == global::ObjType.Weapon
+                    ? (curEquip?.WeaponPower ?? 0)
+                    : (curEquip?.ArmorClass ?? 0);
+                candidates.Add((c, val, curName, curPower, isLdr, isGrp));
+            }
+
+            // Leader
+            AddCandidate(player, true, false);
+            // Grouped players
+            foreach (var gp in groupedPlayers)
+                AddCandidate(gp, false, true);
+            // NPC teammates
+            if (currentTeammates != null)
+                foreach (var npc in currentTeammates.Where(t => t.IsAlive && !t.IsGroupedPlayer))
+                    AddCandidate(npc, false, false);
+
+            if (candidates.Count == 0)
+            {
+                // No one can use it
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  No one in the party can use this item. Left behind.");
+                if (lootGroup != null)
+                    GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
+                        $"\u001b[90m  No one in the party can use {lootItem.Name}. Left behind.\u001b[0m",
+                        excludeUsername: ctx?.Username ?? "");
+                await Task.Delay(GetCombatDelay(1500));
+                return;
+            }
+
+            // Build comparison display and roll results
+            bool isWeapon = lootItem.Type == global::ObjType.Weapon;
+            string powerLabel = isWeapon ? "Atk" : "AC";
+            int newPower = isWeapon ? lootItem.Attack : lootItem.Armor;
+
+            var rollSb2 = new System.Text.StringBuilder();
+            rollSb2.AppendLine("\u001b[1;33m  ── LOOT ROLL ──\u001b[0m");
+
+            // Show each candidate's current item vs. the drop, then their roll
+            var rolls2 = new List<(Character character, int roll, int upgradeValue, bool isLeader, bool isGroupedPlayer)>();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  ── LOOT ROLL ──");
+
+            foreach (var c in candidates)
+            {
+                int roll = random.Next(1, 101);
+                rolls2.Add((c.character, roll, c.upgradeValue, c.isLeader, c.isGroupedPlayer));
+                string cName = c.character.DisplayName ?? c.character.Name2 ?? "Unknown";
+                string upgradeStr = c.upgradeValue > 0 ? $"\u001b[32m+{c.upgradeValue}" : c.upgradeValue == 0 ? "\u001b[33m=0" : $"\u001b[31m{c.upgradeValue}";
+
+                // Leader terminal: comparison + roll
+                terminal.SetColor("white");
+                terminal.Write($"  {cName}");
+                terminal.SetColor("gray");
+                terminal.Write($" [{c.currentItemName} {powerLabel}:{c.currentPower} → {newPower}]");
+                terminal.SetColor(c.upgradeValue > 0 ? "green" : c.upgradeValue == 0 ? "yellow" : "red");
+                terminal.Write($" ({(c.upgradeValue >= 0 ? "+" : "")}{c.upgradeValue})");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  rolls {roll}");
+
+                // Broadcast string
+                rollSb2.AppendLine($"\u001b[37m  {cName} \u001b[90m[{c.currentItemName} {powerLabel}:{c.currentPower} → {newPower}] {upgradeStr}\u001b[0m \u001b[1;36m rolls {roll}\u001b[0m");
+            }
+
+            // Determine winner (highest roll)
+            var lootWinner = rolls2.OrderByDescending(r => r.roll).First();
+            string winnerName = lootWinner.character.DisplayName ?? lootWinner.character.Name2 ?? "Unknown";
+
+            // Try to equip on the winner
+            var winnerEquip = ConvertLootItemToEquipment(lootItem);
+            if (winnerEquip != null)
+            {
+                EquipmentDatabase.RegisterDynamic(winnerEquip);
+                if (lootWinner.character.EquipItem(winnerEquip, out _))
+                {
+                    lootWinner.character.RecalculateStats();
+                    string equipMsg = lootWinner.upgradeValue > 0
+                        ? $"  >> {winnerName} rolls {lootWinner.roll} — wins and equips {lootItem.Name}! (+{lootWinner.upgradeValue} upgrade) <<"
+                        : $"  >> {winnerName} rolls {lootWinner.roll} — wins and equips {lootItem.Name}! <<";
+
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine(equipMsg);
+                    rollSb2.AppendLine($"\u001b[1;32m{equipMsg}\u001b[0m");
+                }
+                else
+                {
+                    // Equip failed — add to inventory if possible
+                    if (lootWinner.isLeader)
+                    {
+                        player.Inventory.Add(lootItem);
+                        string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins {lootItem.Name}! (added to inventory) <<";
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine(msg);
+                        rollSb2.AppendLine($"\u001b[1;32m{msg}\u001b[0m");
+                    }
+                    else if (lootWinner.isGroupedPlayer)
+                    {
+                        lootWinner.character.Inventory?.Add(lootItem);
+                        string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins {lootItem.Name}! (added to inventory) <<";
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine(msg);
+                        rollSb2.AppendLine($"\u001b[1;32m{msg}\u001b[0m");
+                    }
+                    else
+                    {
+                        string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins but can't equip {lootItem.Name}. Left behind. <<";
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine(msg);
+                        rollSb2.AppendLine($"\u001b[33m{msg}\u001b[0m");
+                    }
+                }
+            }
+
+            // Broadcast the full roll sequence to group
+            if (lootGroup != null)
+                GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
+                    rollSb2.ToString(), excludeUsername: ctx?.Username ?? "");
+
+            await Task.Delay(GetCombatDelay(2000));
+            return;
+        }
+
+        // Solo loot (no grouped players) — original behavior
         // Ask player what to do
         terminal.SetColor("white");
         terminal.WriteLine($"You found this on the {monster.Name}'s corpse.");
@@ -4222,6 +4724,200 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// Prompt the loot roll winner to equip/take/leave the item.
+    /// Uses the winner's terminal for input, leader's terminal for group announcements.
+    /// </summary>
+    private async Task PromptLootWinner(Item lootItem, Monster monster, Character winner, TerminalEmulator winnerTerm)
+    {
+        winnerTerm.SetColor("white");
+        winnerTerm.WriteLine($"You won the roll for loot from {monster.Name}!");
+        winnerTerm.WriteLine("");
+        if (lootItem.IsIdentified)
+        {
+            winnerTerm.WriteLine("(E)quip immediately");
+        }
+        winnerTerm.WriteLine("(T)ake to inventory");
+        winnerTerm.WriteLine("(L)eave it");
+        winnerTerm.WriteLine("");
+
+        // Read input with a 30-second timeout
+        string choice = "L";
+        try
+        {
+            winnerTerm.Write("Your choice: ");
+            var inputTask = winnerTerm.GetKeyInput();
+            var completed = await Task.WhenAny(inputTask, Task.Delay(30000));
+            if (completed == inputTask)
+                choice = inputTask.Result;
+            else
+            {
+                winnerTerm.SetColor("yellow");
+                winnerTerm.WriteLine("(Timed out — item taken to inventory)");
+                choice = "T";
+            }
+        }
+        catch { choice = "T"; }
+
+        switch (choice.ToUpper())
+        {
+            case "E":
+                if (!lootItem.IsIdentified)
+                {
+                    winnerTerm.SetColor("yellow");
+                    winnerTerm.WriteLine("You can't equip an unidentified item. Taking it to your inventory instead.");
+                    winner.Inventory.Add(lootItem);
+                    string unidName = LootGenerator.GetUnidentifiedName(lootItem);
+                    winnerTerm.SetColor("cyan");
+                    winnerTerm.WriteLine($"Added {unidName} to your inventory.");
+                    break;
+                }
+
+                // Convert Item to Equipment and equip
+                Equipment equipment;
+                if (lootItem.Type == global::ObjType.Weapon)
+                {
+                    var knownEquip = EquipmentDatabase.GetByName(lootItem.Name);
+                    var lootHandedness = knownEquip?.Handedness ?? WeaponHandedness.OneHanded;
+                    var lootWeaponType = knownEquip?.WeaponType ?? WeaponType.Sword;
+
+                    equipment = Equipment.CreateWeapon(
+                        id: 10000 + random.Next(10000),
+                        name: lootItem.Name,
+                        handedness: lootHandedness,
+                        weaponType: lootWeaponType,
+                        power: lootItem.Attack,
+                        value: lootItem.Value,
+                        rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
+                    );
+                }
+                else
+                {
+                    EquipmentSlot itemSlot = lootItem.Type switch
+                    {
+                        global::ObjType.Shield => EquipmentSlot.OffHand,
+                        global::ObjType.Body => EquipmentSlot.Body,
+                        global::ObjType.Head => EquipmentSlot.Head,
+                        global::ObjType.Arms => EquipmentSlot.Arms,
+                        global::ObjType.Hands => EquipmentSlot.Hands,
+                        global::ObjType.Legs => EquipmentSlot.Legs,
+                        global::ObjType.Feet => EquipmentSlot.Feet,
+                        global::ObjType.Waist => EquipmentSlot.Waist,
+                        global::ObjType.Neck => EquipmentSlot.Neck,
+                        global::ObjType.Face => EquipmentSlot.Face,
+                        global::ObjType.Fingers => EquipmentSlot.LFinger,
+                        global::ObjType.Abody => EquipmentSlot.Cloak,
+                        _ => EquipmentSlot.Body
+                    };
+
+                    if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
+                    {
+                        equipment = Equipment.CreateAccessory(
+                            id: 10000 + random.Next(10000),
+                            name: lootItem.Name,
+                            slot: itemSlot,
+                            value: lootItem.Value,
+                            rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
+                        );
+                    }
+                    else
+                    {
+                        equipment = Equipment.CreateArmor(
+                            id: 10000 + random.Next(10000),
+                            name: lootItem.Name,
+                            slot: itemSlot,
+                            armorType: ArmorType.Chain,
+                            ac: lootItem.Armor,
+                            value: lootItem.Value,
+                            rarity: ConvertRarityToEquipmentRarity(LootGenerator.GetItemRarity(lootItem))
+                        );
+                    }
+                }
+
+                equipment.MinLevel = lootItem.MinLevel;
+                if (lootItem.Strength != 0) equipment = equipment.WithStrength(lootItem.Strength);
+                if (lootItem.Dexterity != 0) equipment = equipment.WithDexterity(lootItem.Dexterity);
+                if (lootItem.Wisdom != 0) equipment = equipment.WithWisdom(lootItem.Wisdom);
+                if (lootItem.HP != 0) equipment = equipment.WithMaxHP(lootItem.HP);
+                if (lootItem.Mana != 0) equipment = equipment.WithMaxMana(lootItem.Mana);
+                if (lootItem.Defence != 0) equipment = equipment.WithDefence(lootItem.Defence);
+                if (lootItem.IsCursed) equipment.IsCursed = true;
+
+                if (lootItem.LootEffects != null)
+                {
+                    foreach (var (effectType, value) in lootItem.LootEffects)
+                    {
+                        var effect = (LootGenerator.SpecialEffect)effectType;
+                        switch (effect)
+                        {
+                            case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
+                            case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
+                            case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
+                            case LootGenerator.SpecialEffect.PoisonDamage: equipment.HasPoisonEnchant = true; equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value); break;
+                            case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
+                            case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
+                            case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
+                            case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
+                            case LootGenerator.SpecialEffect.CriticalStrike: equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
+                            case LootGenerator.SpecialEffect.CriticalDamage: equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
+                            case LootGenerator.SpecialEffect.ArmorPiercing: equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
+                            case LootGenerator.SpecialEffect.Thorns: equipment.Thorns = Math.Max(equipment.Thorns, value); break;
+                            case LootGenerator.SpecialEffect.Regeneration: equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
+                            case LootGenerator.SpecialEffect.ManaRegen: equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
+                            case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
+                        }
+                    }
+                }
+
+                equipment.EnforceMinLevelFromPower();
+                EquipmentDatabase.RegisterDynamic(equipment);
+
+                if (winner.EquipItem(equipment, out string equipMsg))
+                {
+                    if (lootItem.IsCursed)
+                    {
+                        winnerTerm.SetColor("red");
+                        winnerTerm.WriteLine("You equip the item... and feel a dark presence bind to you!");
+                    }
+                    else
+                    {
+                        winnerTerm.SetColor("green");
+                        winnerTerm.WriteLine(equipMsg);
+                    }
+                }
+                else
+                {
+                    winner.Inventory.Add(lootItem);
+                    winnerTerm.SetColor("yellow");
+                    winnerTerm.WriteLine($"Could not equip: {equipMsg}");
+                    winnerTerm.WriteLine($"Added {lootItem.Name} to your inventory.");
+                }
+                break;
+
+            case "T":
+                winner.Inventory.Add(lootItem);
+                winnerTerm.SetColor("cyan");
+                string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
+                winnerTerm.WriteLine($"Added {invName} to your inventory.");
+                break;
+
+            default:
+                winnerTerm.SetColor("gray");
+                winnerTerm.WriteLine("You leave the item behind.");
+                break;
+        }
+
+        // Announce to the group what the winner chose
+        string itemName = lootItem.IsIdentified ? lootItem.Name : "an unidentified item";
+        if (choice.ToUpper() == "E" || choice.ToUpper() == "T")
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {winner.DisplayName} takes {itemName}.");
+        }
+
+        await Task.Delay(GetCombatDelay(1500));
+    }
+
+    /// <summary>
     /// Convert LootGenerator rarity to Equipment rarity
     /// </summary>
     private EquipmentRarity ConvertRarityToEquipmentRarity(LootGenerator.ItemRarity rarity)
@@ -4305,6 +5001,60 @@ public partial class CombatEngine
             return (bestCandidate, bestUpgradePercent);
 
         return null;
+    }
+
+    /// <summary>
+    /// Calculate how much of an upgrade this item would be for a character.
+    /// Returns a positive value for upgrades, 0 or negative for downgrades/sidegrades.
+    /// Handles weapons (attack power), armor (armor class), and accessories (stat totals).
+    /// </summary>
+    private int CalculateItemUpgradeValue(Item lootItem, Character character)
+    {
+        EquipmentSlot targetSlot = lootItem.Type switch
+        {
+            global::ObjType.Weapon => EquipmentSlot.MainHand,
+            global::ObjType.Shield => EquipmentSlot.OffHand,
+            global::ObjType.Body => EquipmentSlot.Body,
+            global::ObjType.Head => EquipmentSlot.Head,
+            global::ObjType.Arms => EquipmentSlot.Arms,
+            global::ObjType.Hands => EquipmentSlot.Hands,
+            global::ObjType.Legs => EquipmentSlot.Legs,
+            global::ObjType.Feet => EquipmentSlot.Feet,
+            global::ObjType.Waist => EquipmentSlot.Waist,
+            global::ObjType.Neck => EquipmentSlot.Neck,
+            global::ObjType.Face => EquipmentSlot.Face,
+            global::ObjType.Fingers => EquipmentSlot.LFinger,
+            global::ObjType.Abody => EquipmentSlot.Cloak,
+            _ => EquipmentSlot.Body
+        };
+
+        var currentEquip = character.GetEquipment(targetSlot);
+
+        if (lootItem.Type == global::ObjType.Weapon)
+        {
+            int currentPower = currentEquip?.WeaponPower ?? 0;
+            return lootItem.Attack - currentPower;
+        }
+        else if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
+        {
+            // Accessories: compare total stat value
+            int currentStatTotal = 0;
+            if (currentEquip != null)
+            {
+                currentStatTotal = currentEquip.StrengthBonus + currentEquip.DexterityBonus +
+                    currentEquip.WisdomBonus + currentEquip.MaxHPBonus + currentEquip.MaxManaBonus +
+                    currentEquip.DefenceBonus + currentEquip.AgilityBonus + currentEquip.ConstitutionBonus +
+                    currentEquip.IntelligenceBonus + currentEquip.CharismaBonus;
+            }
+            int newStatTotal = lootItem.Strength + lootItem.Dexterity + lootItem.Wisdom +
+                lootItem.HP + lootItem.Mana + lootItem.Defence;
+            return newStatTotal - currentStatTotal;
+        }
+        else
+        {
+            int currentAC = currentEquip?.ArmorClass ?? 0;
+            return lootItem.Armor - currentAC;
+        }
     }
 
     /// <summary>
@@ -5484,6 +6234,10 @@ public partial class CombatEngine
             // Use new colored death message
             var deathMessage = CombatMessages.GetDeathMessage(target.Name, target.MonsterColor);
             terminal.WriteLine(deathMessage);
+
+            // Broadcast monster death to group
+            string killerName = attacker?.DisplayName ?? "Someone";
+            BroadcastGroupCombatEvent(result, $"\u001b[1;32m  {killerName} slays the {target.Name}!\u001b[0m");
 
             result.DefeatedMonsters.Add(target);
 
@@ -8645,6 +9399,50 @@ public partial class CombatEngine
         terminal.WriteLine($"The {monster.Name} turns its attention to {companion.DisplayName}!");
         await Task.Delay(GetCombatDelay(500));
 
+        // Monster special abilities can also fire against companions
+        if (monster.SpecialAbilities != null && monster.SpecialAbilities.Count > 0)
+        {
+            int abilityChance = 30 + (monster.Level / 5);
+            if (random.Next(100) < abilityChance)
+            {
+                string abilityName = monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+                if (Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType))
+                {
+                    var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, companion);
+                    if (!string.IsNullOrEmpty(abilityResult.Message))
+                    {
+                        terminal.SetColor(abilityResult.MessageColor ?? "red");
+                        terminal.WriteLine(abilityResult.Message);
+                    }
+                    if (abilityResult.DirectDamage > 0)
+                    {
+                        long actualDmg = Math.Max(1, abilityResult.DirectDamage - (companion.Defence / 3));
+                        companion.HP -= actualDmg;
+                        terminal.WriteLine($"{companion.DisplayName} takes {actualDmg} damage from {abilityName}!", "red");
+                        result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {actualDmg}");
+                    }
+                    if (abilityResult.ManaDrain > 0)
+                    {
+                        companion.Mana = Math.Max(0, companion.Mana - abilityResult.ManaDrain);
+                    }
+                    if (abilityResult.InflictStatus != StatusEffect.None && abilityResult.StatusChance > 0)
+                    {
+                        if (random.Next(100) < abilityResult.StatusChance)
+                        {
+                            companion.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
+                            terminal.WriteLine($"{companion.DisplayName} is afflicted with {abilityResult.InflictStatus}!", "yellow");
+                        }
+                    }
+                    await Task.Delay(GetCombatDelay(800));
+                    // Fall through to death check below if companion died from ability
+                    if (companion.IsAlive) return;
+                }
+            }
+        }
+
+        // Skip normal attack if companion already died from special ability above
+        if (!companion.IsAlive) goto CompanionDeathCheck;
+
         // Calculate monster damage
         long monsterAttack = monster.GetAttackPower();
         monsterAttack += random.Next(0, 10);
@@ -8663,11 +9461,46 @@ public partial class CombatEngine
         terminal.SetColor("yellow");
         terminal.WriteLine($"{companion.DisplayName} takes {actualDamage} damage! ({companion.HP}/{companion.MaxHP} HP)");
 
+        // Broadcast to grouped players: tell the target they got hit, tell others what happened
+        if (companion.IsGroupedPlayer && companion.GroupPlayerUsername != null)
+        {
+            var group = GroupSystem.Instance?.GetGroupFor(companion.GroupPlayerUsername);
+            if (group != null)
+            {
+                GroupSystem.Instance!.BroadcastToGroupSessions(group,
+                    companion.GroupPlayerUsername,
+                    $"\u001b[31m  {monster.Name} hits you for {actualDamage} damage! ({companion.HP}/{companion.MaxHP} HP)\u001b[0m",
+                    $"\u001b[31m  {monster.Name} hits {companion.DisplayName} for {actualDamage} damage!\u001b[0m");
+            }
+        }
+
         result.CombatLog.Add($"{monster.Name} attacks {companion.DisplayName} for {actualDamage} damage");
 
+        CompanionDeathCheck:
         // Check if teammate died
         if (!companion.IsAlive)
         {
+            // Send death notification to the dying grouped player
+            if (companion.IsGroupedPlayer && companion.GroupPlayerUsername != null)
+            {
+                var deathGroup = GroupSystem.Instance?.GetGroupFor(companion.GroupPlayerUsername);
+                if (deathGroup != null)
+                {
+                    // Tell the dying player they died
+                    GroupSystem.Instance!.BroadcastToGroupSessions(deathGroup,
+                        companion.GroupPlayerUsername,
+                        $"\u001b[1;31m  ══ YOU HAVE FALLEN ══\u001b[0m\n\u001b[31m  {monster.Name} has struck you down!\u001b[0m",
+                        $"\u001b[1;31m  {companion.DisplayName} has been slain by {monster.Name}!\u001b[0m");
+                }
+            }
+
+            // Broadcast NPC/companion death to all group followers
+            if (!companion.IsGroupedPlayer)
+            {
+                BroadcastGroupCombatEvent(result,
+                    $"\u001b[1;31m  ═══ {companion.DisplayName} has fallen in battle! ═══\u001b[0m");
+            }
+
             if (companion.IsEcho)
             {
                 // Player echo "death" - just dissipates, no permanent effect
@@ -8687,6 +9520,22 @@ public partial class CombatEngine
             {
                 // Story companion death
                 await HandleCompanionDeath(companion, monster.Name, result);
+            }
+            else if (companion.IsGroupedPlayer)
+            {
+                // Grouped player death — remove from combat but DON'T do NPC-specific cleanup
+                terminal.SetColor("dark_red");
+                terminal.WriteLine($"  {companion.DisplayName} has fallen in battle!");
+                result.Teammates?.Remove(companion);
+                result.CombatLog.Add($"{companion.DisplayName} was slain by {monster.Name}");
+
+                // Close their combat input channel so ProcessGroupedPlayerTurn doesn't hang
+                if (companion.CombatInputChannel != null)
+                {
+                    companion.CombatInputChannel.Writer.TryComplete();
+                    companion.CombatInputChannel = null;
+                }
+                companion.IsAwaitingCombatInput = false;
             }
             else
             {
@@ -8886,6 +9735,20 @@ public partial class CombatEngine
         terminal.WriteLine("═══════════════════════════");
         terminal.WriteLine("");
 
+        // Broadcast victory to group followers with details
+        if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
+        {
+            var vicSb = new System.Text.StringBuilder();
+            vicSb.AppendLine("\u001b[1;32m  ═══════════════════════════\u001b[0m");
+            vicSb.AppendLine($"\u001b[1;32m      {victoryMessage}\u001b[0m");
+            vicSb.AppendLine("\u001b[1;32m  ═══════════════════════════\u001b[0m");
+            if (result.DefeatedMonsters.Count == 1)
+                vicSb.AppendLine($"\u001b[37m  Defeated: {result.DefeatedMonsters[0].Name}\u001b[0m");
+            else
+                vicSb.AppendLine($"\u001b[37m  Defeated {result.DefeatedMonsters.Count} enemies\u001b[0m");
+            BroadcastGroupCombatEvent(result, vicSb.ToString());
+        }
+
         // Calculate total rewards from all defeated monsters
         long totalExp = 0;
         long totalGold = 0;
@@ -9003,6 +9866,9 @@ public partial class CombatEngine
         // Award experience to NPC teammates (spouses/lovers) - 50% of player's XP
         AwardTeammateExperience(result.Teammates, adjustedExp, terminal);
 
+        // Distribute rewards to grouped players (independent XP calculation per player)
+        await DistributeGroupRewards(result, totalExp, totalGold);
+
         // Track gold collection for quests
         QuestSystem.OnGoldCollected(result.Player, adjustedGold);
 
@@ -9038,9 +9904,10 @@ public partial class CombatEngine
         }
         terminal.WriteLine("");
 
-        // Show NPC teammate reactions after combat victory
+        // Show NPC teammate reactions after combat victory — broadcast to group
         if (result.Teammates != null && result.Teammates.Count > 0)
         {
+            var reactionSb = new System.Text.StringBuilder();
             foreach (var teammate in result.Teammates)
             {
                 if (teammate is NPC npc && npc.IsAlive)
@@ -9050,9 +9917,12 @@ public partial class CombatEngine
                     {
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"  {npc.Name2}: \"{reaction}\"");
+                        reactionSb.AppendLine($"\u001b[36m  {npc.Name2}: \"{reaction}\"\u001b[0m");
                     }
                 }
             }
+            if (reactionSb.Length > 0)
+                BroadcastGroupCombatEvent(result, reactionSb.ToString());
             terminal.WriteLine("");
         }
 
@@ -9076,6 +9946,29 @@ public partial class CombatEngine
         AutoHealWithPotions(result.Player);
         AutoRestoreManaWithPotions(result.Player);
 
+        // Auto-heal grouped followers with their own potions
+        if (result.Teammates != null)
+        {
+            foreach (var teammate in result.Teammates.Where(t => t.IsGroupedPlayer && t.IsAlive))
+            {
+                var savedTerminal = terminal;
+                var savedPlayer = currentPlayer;
+                try
+                {
+                    if (teammate.RemoteTerminal != null)
+                        terminal = teammate.RemoteTerminal;
+                    currentPlayer = teammate;
+                    AutoHealWithPotions(teammate);
+                    AutoRestoreManaWithPotions(teammate);
+                }
+                finally
+                {
+                    terminal = savedTerminal;
+                    currentPlayer = savedPlayer;
+                }
+            }
+        }
+
         // Monk encounter ONLY if requested
         if (offerMonkEncounter)
         {
@@ -9086,6 +9979,10 @@ public partial class CombatEngine
 
         // Log combat end
         DebugLogger.Instance.LogCombatEnd("Victory", adjustedExp, adjustedGold, result.CombatLog.Count);
+
+        // Signal combat over to followers — lets them know the leader is back in exploration mode
+        BroadcastGroupCombatEvent(result,
+            $"\u001b[90m  ── Combat over. Waiting for {result.Player.DisplayName} to continue... ──\u001b[0m");
 
         // Auto-save after combat victory
         await SaveSystem.Instance.AutoSave(result.Player);
@@ -11860,11 +12757,11 @@ public partial class CombatEngine
         long teammateXP = (long)(playerXP * 0.75);
         if (teammateXP <= 0) return;
 
-        // Count eligible teammates first (echoes don't get XP but still count for team bonus)
+        // Count eligible teammates first (echoes and grouped players don't get XP here)
         int eligibleCount = 0;
         foreach (var t in teammates)
         {
-            if (t != null && t.IsAlive && !t.IsCompanion && !t.IsEcho && t.Level < 100)
+            if (t != null && t.IsAlive && !t.IsCompanion && !t.IsEcho && !t.IsGroupedPlayer && t.Level < 100)
                 eligibleCount++;
         }
         if (eligibleCount == 0) return;
@@ -11878,6 +12775,7 @@ public partial class CombatEngine
             if (teammate == null || !teammate.IsAlive) continue;
             if (teammate.IsCompanion) continue; // Companions are handled separately by CompanionSystem
             if (teammate.IsEcho) continue; // Player echoes don't gain XP (loaded from DB)
+            if (teammate.IsGroupedPlayer) continue; // Grouped players get XP via DistributeGroupRewards
             if (teammate.Level >= 100) continue; // Max level cap
 
             // Award XP
@@ -12673,6 +13571,687 @@ public partial class CombatEngine
 
         return true;
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // GROUP DUNGEON SYSTEM — Player-controlled grouped teammates
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Process a grouped player's combat turn by temporarily swapping the terminal
+    /// and current player to route I/O to the follower's RemoteTerminal.
+    /// Uses the same GetPlayerActionMultiMonster + ProcessPlayerActionMultiMonster flow.
+    /// </summary>
+    private async Task ProcessGroupedPlayerTurn(Character teammate, Character leader, List<Monster> monsters, CombatResult result)
+    {
+        var remoteTerminal = teammate.RemoteTerminal;
+        var channel = teammate.CombatInputChannel;
+        if (remoteTerminal == null || channel == null)
+        {
+            // Fallback to AI if RemoteTerminal/channel was lost (disconnect)
+            await ProcessTeammateActionMultiMonster(teammate, monsters, result);
+            return;
+        }
+
+        // Announce this player's turn to the leader (on their terminal) and other followers
+        string turnAnnounce = $"\u001b[1;36m  ── {teammate.DisplayName}'s turn ──\u001b[0m";
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"  ── {teammate.DisplayName}'s turn ──");
+        BroadcastGroupCombatEvent(result, turnAnnounce);
+
+        // Swap terminal to follower's BEFORE display so full combat UI renders on their screen
+        var savedTerminal = terminal;
+        var savedPlayer = currentPlayer;
+        try
+        {
+            terminal = remoteTerminal;
+            currentPlayer = teammate;
+
+            // Show the full combat display — same as what the leader sees
+            DisplayCombatStatus(monsters, teammate);
+            bool hasInjuredTeammates = currentTeammates?.Any(t => t.IsAlive && t.HP < t.MaxHP) ?? false;
+            bool canHealAlly = hasInjuredTeammates && (teammate.Healing > 0 ||
+                (ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0));
+            var classInfo = GetClassSpecificActions(teammate);
+            ShowDungeonCombatMenuBBS(teammate, hasInjuredTeammates, canHealAlly, classInfo, isFollower: true);
+
+            // Show available spells so followers know their C# options
+            if (ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0)
+            {
+                var availSpells = SpellSystem.GetAvailableSpells(teammate)
+                    .Where(s => teammate.Mana >= SpellSystem.CalculateManaCost(s, teammate))
+                    .ToList();
+                if (availSpells.Count > 0)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.Write(" Spells: ");
+                    for (int si = 0; si < availSpells.Count; si++)
+                    {
+                        var sp = availSpells[si];
+                        int cost = SpellSystem.CalculateManaCost(sp, teammate);
+                        terminal.SetColor("bright_yellow");
+                        terminal.Write($"C{si + 1}");
+                        terminal.SetColor("darkgray");
+                        terminal.Write($"={sp.Name}({cost}mp) ");
+                    }
+                    terminal.WriteLine("");
+                }
+            }
+
+            // Signal the follower loop that we need combat input
+            teammate.IsAwaitingCombatInput = true;
+
+            CombatAction action;
+            try
+            {
+                // Read input from channel (follower loop forwards keystrokes from their stream)
+                using var cts = new CancellationTokenSource(
+                    TimeSpan.FromSeconds(GameConfig.GroupCombatInputTimeoutSeconds));
+
+                string input;
+                try
+                {
+                    input = await channel.Reader.ReadAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Timeout — auto-attack weakest
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  (Timed out — auto-attacking!)");
+                    input = "A";
+                }
+                catch
+                {
+                    // Channel closed (disconnect) — auto-attack
+                    input = "A";
+                }
+
+                action = ParseGroupCombatInput(input, teammate, monsters, result);
+            }
+            finally
+            {
+                teammate.IsAwaitingCombatInput = false;
+            }
+
+            // Individual retreat for followers — handle BEFORE ProcessPlayerActionMultiMonster
+            // so it doesn't set globalEscape which would end combat for everyone
+            if (action.Type == CombatActionType.Retreat)
+            {
+                int retreatChance = Math.Min(75, 30 + (int)(teammate.Dexterity / 2));
+                retreatChance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
+                int retreatRoll = random.Next(1, 101);
+
+                if (retreatRoll <= retreatChance)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  You successfully retreat from combat!");
+                    // Remove from combat
+                    result.Teammates?.Remove(teammate);
+                    if (teammate.CombatInputChannel != null)
+                    {
+                        teammate.CombatInputChannel.Writer.TryComplete();
+                        teammate.CombatInputChannel = null;
+                    }
+                    teammate.IsAwaitingCombatInput = false;
+                    // Broadcast to group
+                    BroadcastGroupedPlayerAction(
+                        $"\u001b[33m  {teammate.DisplayName} retreats from combat!\u001b[0m", teammate);
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("  You failed to retreat!");
+                    BroadcastGroupedPlayerAction(
+                        $"\u001b[31m  {teammate.DisplayName} tries to retreat but fails!\u001b[0m", teammate);
+                }
+                return; // Don't fall through to ProcessPlayerActionMultiMonster
+            }
+
+            // Execute the action with output capture — terminal is already swapped
+            terminal.StartCapture();
+            await ProcessPlayerActionMultiMonster(action, teammate, monsters, result);
+            string? capturedOutput = terminal.StopCapture();
+
+            // Broadcast the captured combat output to leader and other followers
+            // Convert "You attack" → "Ted attacks" for third-person perspective
+            if (!string.IsNullOrWhiteSpace(capturedOutput))
+            {
+                BroadcastGroupedPlayerAction(
+                    ConvertToThirdPerson(capturedOutput, teammate.DisplayName), teammate);
+            }
+        }
+        finally
+        {
+            terminal = savedTerminal;
+            currentPlayer = savedPlayer;
+        }
+    }
+
+    /// <summary>
+    /// Show a simplified combat status and menu on a grouped player's terminal.
+    /// </summary>
+    private void ShowGroupCombatMenu(TerminalEmulator followerTerm, Character teammate,
+        List<Monster> monsters, CombatResult result)
+    {
+        followerTerm.SetColor("bright_cyan");
+        followerTerm.WriteLine($"\n  ═══ YOUR TURN ({teammate.DisplayName}) ═══");
+
+        // Show alive monsters
+        followerTerm.SetColor("yellow");
+        var aliveMonsters = monsters.Where(m => m.IsAlive).ToList();
+        for (int i = 0; i < monsters.Count; i++)
+        {
+            if (!monsters[i].IsAlive) continue;
+            var m = monsters[i];
+            int hpPct = (int)(m.HP * 100 / Math.Max(1, m.MaxHP));
+            string hpColor = hpPct > 50 ? "\u001b[32m" : hpPct > 25 ? "\u001b[33m" : "\u001b[31m";
+            followerTerm.WriteLine($"  [{i + 1}] {m.Name} {hpColor}{hpPct}% HP\u001b[0m");
+        }
+
+        // Show player status
+        followerTerm.SetColor("cyan");
+        followerTerm.WriteLine($"  HP: {teammate.HP}/{teammate.MaxHP}  MP: {teammate.Mana}/{teammate.MaxMana}");
+
+        // Show available actions
+        followerTerm.SetColor("white");
+        var actions = new List<string> { "[A]ttack" };
+        if (teammate.Mana > 0 && SpellSystem.GetAvailableSpells(teammate).Count > 0)
+            actions.Add("[C]ast");
+        if (teammate.Healing > 0 && teammate.HP < teammate.MaxHP)
+            actions.Add("[I]tem");
+        actions.Add("[D]efend");
+        followerTerm.WriteLine($"  {string.Join("  ", actions)}");
+
+        followerTerm.SetColor("gray");
+        followerTerm.Write("  Action: ");
+    }
+
+    /// <summary>
+    /// Parse a grouped player's single-line combat input into a CombatAction.
+    /// Supports the full combat action set: A (attack), C (cast spell), I (use potion),
+    /// D (defend), H (heal ally), R (retreat), 1-9 (quickbar), AUTO, SPD,
+    /// and all class-specific abilities.
+    /// </summary>
+    private CombatAction ParseGroupCombatInput(string input, Character teammate,
+        List<Monster> monsters, CombatResult result)
+    {
+        var trimmed = input.Trim().ToUpperInvariant();
+        var action = new CombatAction();
+
+        // Attack (with optional target number: A2 = attack monster #2)
+        if (trimmed.StartsWith("A") && trimmed != "AUTO")
+        {
+            action.Type = CombatActionType.Attack;
+            if (trimmed.Length > 1 && int.TryParse(trimmed.Substring(1), out int targetNum))
+            {
+                int idx = targetNum - 1;
+                if (idx >= 0 && idx < monsters.Count && monsters[idx].IsAlive)
+                    action.TargetIndex = idx;
+                else
+                    action.TargetIndex = null;
+            }
+            return action;
+        }
+
+        // Cast spell: C = cast best offensive, C# = cast spell by number, C#T# = spell # on target #
+        if (trimmed.StartsWith("C"))
+        {
+            var spells = SpellSystem.GetAvailableSpells(teammate)
+                .Where(s => teammate.Mana >= SpellSystem.CalculateManaCost(s, teammate))
+                .ToList();
+
+            if (spells.Count == 0)
+            {
+                action.Type = CombatActionType.Attack;
+                return action;
+            }
+
+            // Try to parse C#, C#T# for specific spell selection
+            if (trimmed.Length > 1)
+            {
+                string rest = trimmed.Substring(1);
+                int spellNum = -1;
+                int targetNum = -1;
+
+                if (rest.Contains("T"))
+                {
+                    var parts = rest.Split('T');
+                    int.TryParse(parts[0], out spellNum);
+                    if (parts.Length > 1) int.TryParse(parts[1], out targetNum);
+                }
+                else
+                {
+                    int.TryParse(rest, out spellNum);
+                }
+
+                if (spellNum >= 1 && spellNum <= spells.Count)
+                {
+                    var spell = spells[spellNum - 1];
+                    action.Type = CombatActionType.CastSpell;
+                    action.SpellIndex = spell.Level;
+
+                    if (spell.IsMultiTarget)
+                        action.TargetAllMonsters = true;
+                    else if (spell.SpellType == "Buff" || spell.SpellType == "Heal")
+                        action.TargetIndex = null;
+                    else if (targetNum >= 1 && targetNum <= monsters.Count && monsters[targetNum - 1].IsAlive)
+                        action.TargetIndex = targetNum - 1;
+                    else
+                    {
+                        var strongest = monsters.Where(m => m.IsAlive).OrderByDescending(m => m.HP).FirstOrDefault();
+                        action.TargetIndex = strongest != null ? monsters.IndexOf(strongest) : 0;
+                    }
+                    return action;
+                }
+                // Invalid C# — fall through to auto-cast best
+            }
+
+            // Bare "C" — auto-cast best offensive spell at strongest monster
+            var bestSpell = spells
+                .Where(s => s.SpellType == "Attack")
+                .OrderByDescending(s => s.Level)
+                .FirstOrDefault();
+            if (bestSpell != null)
+            {
+                action.Type = CombatActionType.CastSpell;
+                action.SpellIndex = bestSpell.Level;
+                var strongest = monsters.Where(m => m.IsAlive).OrderByDescending(m => m.HP).FirstOrDefault();
+                action.TargetIndex = strongest != null ? monsters.IndexOf(strongest) : 0;
+                if (bestSpell.IsMultiTarget) action.TargetAllMonsters = true;
+                return action;
+            }
+            action.Type = CombatActionType.Attack;
+            return action;
+        }
+
+        // Use item (healing or mana potion)
+        if (trimmed == "I")
+        {
+            bool hasHealPots = teammate.Healing > 0 && teammate.HP < teammate.MaxHP;
+            bool hasManaPots = teammate.ManaPotions > 0 && teammate.Mana < teammate.MaxMana;
+            if (hasHealPots || hasManaPots)
+            {
+                action.Type = CombatActionType.UseItem;
+                return action;
+            }
+            action.Type = CombatActionType.Attack;
+            return action;
+        }
+
+        // Defend
+        if (trimmed == "D")
+        {
+            action.Type = CombatActionType.Defend;
+            return action;
+        }
+
+        // Heal ally (potion or heal spell on teammate)
+        if (trimmed == "H")
+        {
+            bool hasInjuredTeammates = currentTeammates?.Any(t => t.IsAlive && t.HP < t.MaxHP) ?? false;
+            bool canHealAlly = hasInjuredTeammates && (teammate.Healing > 0 ||
+                (ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0));
+            if (canHealAlly)
+            {
+                action.Type = CombatActionType.Heal;
+                return action;
+            }
+            action.Type = CombatActionType.Attack;
+            return action;
+        }
+
+        // Power Attack (with optional target: P2 = power attack monster #2)
+        if (trimmed.StartsWith("P"))
+        {
+            action.Type = CombatActionType.PowerAttack;
+            if (trimmed.Length > 1 && int.TryParse(trimmed.Substring(1), out int pTarget))
+            {
+                int idx = pTarget - 1;
+                if (idx >= 0 && idx < monsters.Count && monsters[idx].IsAlive)
+                    action.TargetIndex = idx;
+            }
+            return action;
+        }
+
+        // Precise Strike (with optional target: E2)
+        if (trimmed.StartsWith("E"))
+        {
+            action.Type = CombatActionType.PreciseStrike;
+            if (trimmed.Length > 1 && int.TryParse(trimmed.Substring(1), out int eTarget))
+            {
+                int idx = eTarget - 1;
+                if (idx >= 0 && idx < monsters.Count && monsters[idx].IsAlive)
+                    action.TargetIndex = idx;
+            }
+            return action;
+        }
+
+        // Taunt (debuff enemy defense)
+        if (trimmed.StartsWith("T"))
+        {
+            action.Type = CombatActionType.Taunt;
+            if (trimmed.Length > 1 && int.TryParse(trimmed.Substring(1), out int tTarget))
+            {
+                int idx = tTarget - 1;
+                if (idx >= 0 && idx < monsters.Count && monsters[idx].IsAlive)
+                    action.TargetIndex = idx;
+            }
+            return action;
+        }
+
+        // Disarm (with optional target)
+        if (trimmed == "W" || trimmed.StartsWith("W"))
+        {
+            action.Type = CombatActionType.Disarm;
+            if (trimmed.Length > 1 && int.TryParse(trimmed.Substring(1), out int wTarget))
+            {
+                int idx = wTarget - 1;
+                if (idx >= 0 && idx < monsters.Count && monsters[idx].IsAlive)
+                    action.TargetIndex = idx;
+            }
+            return action;
+        }
+
+        // Hide (stealth)
+        if (trimmed == "L")
+        {
+            action.Type = CombatActionType.Hide;
+            return action;
+        }
+
+        // Retreat
+        if (trimmed == "R")
+        {
+            action.Type = CombatActionType.Retreat;
+            return action;
+        }
+
+        // Boss Save (Old God encounters)
+        if (trimmed == "V" && BossContext?.CanSave == true)
+        {
+            action.Type = CombatActionType.BossSave;
+            return action;
+        }
+
+        // Auto-combat (just attack this round, leader can't toggle auto for followers)
+        if (trimmed == "AUTO")
+        {
+            action.Type = CombatActionType.Attack;
+            action.TargetIndex = null;
+            return action;
+        }
+
+        // Quickbar slots 1-9 (spells and abilities)
+        if (trimmed.Length == 1 && trimmed[0] >= '1' && trimmed[0] <= '9')
+        {
+            var quickbarActions = GetQuickbarActions(teammate);
+            var matched = quickbarActions.FirstOrDefault(a => a.key == trimmed);
+
+            if (!string.IsNullOrEmpty(matched.slotId) && matched.available)
+            {
+                var spellLevel = SpellSystem.ParseQuickbarSpellLevel(matched.slotId);
+                if (spellLevel.HasValue)
+                {
+                    // Spell — target strongest alive monster
+                    action.Type = CombatActionType.CastSpell;
+                    action.SpellIndex = spellLevel.Value;
+                    var strongest = monsters.Where(m => m.IsAlive).OrderByDescending(m => m.HP).FirstOrDefault();
+                    action.TargetIndex = strongest != null ? monsters.IndexOf(strongest) : 0;
+
+                    // Check if multi-target — default to targeting all
+                    var spellInfo = SpellSystem.GetSpellInfo(teammate.Class, spellLevel.Value);
+                    if (spellInfo?.IsMultiTarget == true)
+                        action.TargetAllMonsters = true;
+
+                    // Check if buff/heal — target self
+                    if (spellInfo?.SpellType == "Buff" || spellInfo?.SpellType == "Heal")
+                        action.TargetIndex = null;
+
+                    return action;
+                }
+                else
+                {
+                    // Ability
+                    action.Type = CombatActionType.ClassAbility;
+                    action.AbilityId = matched.slotId;
+                    return action;
+                }
+            }
+            // Slot empty or unavailable — fall through to default attack
+            action.Type = CombatActionType.Attack;
+            return action;
+        }
+
+        // Default: attack weakest monster
+        action.Type = CombatActionType.Attack;
+        var weakest = monsters.Where(m => m.IsAlive).OrderBy(m => m.HP).FirstOrDefault();
+        action.TargetIndex = weakest != null ? monsters.IndexOf(weakest) : null;
+        return action;
+    }
+
+    /// <summary>
+    /// Broadcast captured combat output from a grouped player's action to the leader
+    /// and other grouped players. The output contains the actual damage/spell/heal text
+    /// that was rendered on the actor's terminal (with "You" references — reads naturally
+    /// since the turn header already identifies whose turn it was).
+    /// </summary>
+    private void BroadcastGroupedPlayerAction(string capturedOutput, Character teammate)
+    {
+        var group = UsurperRemake.Server.GroupSystem.Instance?.GetGroupFor(
+            teammate.GroupPlayerUsername ?? "");
+        if (group == null) return;
+
+        UsurperRemake.Server.GroupSystem.Instance!.BroadcastToAllGroupSessions(
+            group, capturedOutput, excludeUsername: teammate.GroupPlayerUsername);
+    }
+
+    /// <summary>
+    /// Convert captured combat output from first person ("You attack") to third person
+    /// ("Rage attacks") so it reads correctly when broadcast to other group members.
+    /// </summary>
+    private static string ConvertToThirdPerson(string capturedOutput, string playerName)
+    {
+        // Replace "You verb" at start of lines (after optional ANSI codes) with "Name verbs"
+        return System.Text.RegularExpressions.Regex.Replace(
+            capturedOutput,
+            @"^((?:\x1b\[\d+(?:;\d+)*m)*)You (\S+)",
+            match =>
+            {
+                string prefix = match.Groups[1].Value;
+                string verb = match.Groups[2].Value;
+                return $"{prefix}{playerName} {ConjugateThirdPerson(verb)}";
+            },
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+    }
+
+    /// <summary>
+    /// Conjugate an English verb from second person ("attack") to third person ("attacks").
+    /// Handles emphasis markers (***VERB***) and all-caps verbs.
+    /// </summary>
+    private static string ConjugateThirdPerson(string verb)
+    {
+        // Handle emphasis markers (***VERB***)
+        if (verb.StartsWith("***") && verb.EndsWith("***") && verb.Length > 6)
+        {
+            string inner = verb.Substring(3, verb.Length - 6);
+            return "***" + ConjugateThirdPerson(inner) + "***";
+        }
+
+        bool isUpper = verb.Length > 1 && verb == verb.ToUpperInvariant();
+
+        // Past tense — don't change ("missed", "attempted")
+        if (verb.EndsWith("ed", StringComparison.OrdinalIgnoreCase)) return verb;
+
+        // Adverbs — don't change ("critically")
+        if (verb.EndsWith("ly", StringComparison.OrdinalIgnoreCase)) return verb;
+
+        // Sibilant endings — add "es" (miss→misses, slash→slashes, crush→crushes)
+        string lower = verb.ToLowerInvariant();
+        if (lower.EndsWith("ss") || lower.EndsWith("sh") || lower.EndsWith("ch") ||
+            lower.EndsWith("x") || lower.EndsWith("z"))
+            return verb + (isUpper ? "ES" : "es");
+
+        // Default — add "s" (attack→attacks, wound→wounds, strike→strikes)
+        return verb + (isUpper ? "S" : "s");
+    }
+
+    /// <summary>
+    /// Distribute XP and gold to grouped players independently.
+    /// Each grouped player calculates XP based on their own level vs monster level,
+    /// with a group level gap penalty applied on top.
+    /// Gold is split evenly among all players in the group.
+    /// </summary>
+    private async Task DistributeGroupRewards(CombatResult result, long totalBaseExp, long totalBaseGold)
+    {
+        if (result.Teammates == null) return;
+
+        var groupedPlayers = result.Teammates.Where(t => t.IsGroupedPlayer && t.IsAlive).ToList();
+        if (groupedPlayers.Count == 0) return;
+
+        // Find highest level in the group (leader + all grouped players)
+        int highestLevel = result.Player.Level;
+        foreach (var gp in groupedPlayers)
+        {
+            if (gp.Level > highestLevel) highestLevel = gp.Level;
+        }
+
+        // Count total party members for gold split (leader + all alive teammates including NPCs)
+        var aliveTeammates = result.Teammates.Where(t => t.IsAlive && !t.IsCompanion && !t.IsEcho).ToList();
+        int totalPartyMembers = 1 + aliveTeammates.Count;
+
+        // Calculate gold share (leader already got full gold above,
+        // so we need to reduce leader's gold and give shares to followers)
+        long goldPerPlayer = totalBaseGold / totalPartyMembers;
+
+        // Reduce leader's gold to their share (they got full gold above)
+        long leaderGoldReduction = totalBaseGold - goldPerPlayer;
+        result.Player.Gold -= leaderGoldReduction;
+        result.GoldGained = goldPerPlayer;
+
+        // Award NPC teammates their gold share
+        foreach (var npc in aliveTeammates.Where(t => !t.IsGroupedPlayer))
+        {
+            npc.Gold += goldPerPlayer;
+        }
+
+        foreach (var groupedPlayer in groupedPlayers)
+        {
+            // Calculate independent XP for this grouped player
+            long playerExp = 0;
+            foreach (var monster in result.DefeatedMonsters)
+            {
+                long baseExp = monster.Experience;
+                long levelDiff = monster.Level - groupedPlayer.Level;
+                double levelMultiplier = 1.0 + (levelDiff * 0.15);
+                levelMultiplier = Math.Clamp(levelMultiplier, 0.25, 2.0);
+                playerExp += Math.Max(10, (long)(baseExp * levelMultiplier));
+            }
+
+            // Apply standard multipliers
+            playerExp = WorldEventSystem.Instance.GetAdjustedXP(playerExp);
+            float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
+            playerExp = (long)(playerExp * xpMult);
+
+            // Team bonus (+15%)
+            playerExp = (long)(playerExp * 1.15);
+
+            // NG+ cycle multiplier
+            if (groupedPlayer.CycleExpMultiplier > 1.0f)
+                playerExp = (long)(playerExp * groupedPlayer.CycleExpMultiplier);
+
+            // Group level gap penalty
+            float groupXPMult = GroupSystem.GetGroupXPMultiplier(groupedPlayer.Level, highestLevel);
+            if (groupXPMult < 1.0f)
+                playerExp = (long)(playerExp * groupXPMult);
+
+            // Apply rewards
+            int levelBefore = groupedPlayer.Level;
+            groupedPlayer.Experience += playerExp;
+            groupedPlayer.Gold += goldPerPlayer;
+
+            // Check for level up (same formula as NPC teammates)
+            long xpForNextLevel = GetExperienceForLevel(groupedPlayer.Level + 1);
+            while (groupedPlayer.Experience >= xpForNextLevel && groupedPlayer.Level < 100)
+            {
+                groupedPlayer.Level++;
+                var random = new Random();
+                groupedPlayer.BaseMaxHP += 10 + random.Next(5, 15);
+                groupedPlayer.BaseStrength += random.Next(1, 3);
+                groupedPlayer.BaseDefence += random.Next(1, 2);
+                groupedPlayer.RecalculateStats();
+                groupedPlayer.HP = groupedPlayer.MaxHP;
+                groupedPlayer.Statistics.RecordLevelUp(groupedPlayer.Level);
+                NewsSystem.Instance?.Newsy(true, $"{groupedPlayer.DisplayName} has achieved Level {groupedPlayer.Level}!");
+                xpForNextLevel = GetExperienceForLevel(groupedPlayer.Level + 1);
+            }
+
+            // Track monster kills on the grouped player
+            foreach (var monster in result.DefeatedMonsters)
+            {
+                groupedPlayer.MKills++;
+                groupedPlayer.Statistics.RecordMonsterKill(playerExp / Math.Max(1, result.DefeatedMonsters.Count),
+                    goldPerPlayer / Math.Max(1, result.DefeatedMonsters.Count),
+                    monster.IsBoss, monster.IsUnique);
+            }
+            groupedPlayer.Statistics.RecordGoldChange(groupedPlayer.Gold);
+
+            // Show rewards to the grouped player via EnqueueMessage
+            var gpSession = GroupSystem.GetSession(groupedPlayer.GroupPlayerUsername ?? "");
+            if (gpSession != null)
+            {
+                string rewardMsg = $"\u001b[1;32m\n  ═══ YOUR REWARDS ({groupedPlayer.DisplayName}) ═══\u001b[0m\n" +
+                    $"\u001b[33m  Experience gained: {playerExp:N0}\u001b[0m\n" +
+                    $"\u001b[33m  Gold gained: {goldPerPlayer:N0}\u001b[0m";
+                if (groupXPMult < 1.0f)
+                    rewardMsg += $"\n\u001b[33m  (Group level gap penalty: {(int)(groupXPMult * 100)}% XP rate)\u001b[0m";
+
+                // Level-up notification
+                if (groupedPlayer.Level > levelBefore)
+                {
+                    int levelsGained = groupedPlayer.Level - levelBefore;
+                    rewardMsg += $"\n\u001b[1;35m  ★ LEVEL UP! You are now Level {groupedPlayer.Level}! ★\u001b[0m";
+                    rewardMsg += $"\n\u001b[35m  HP restored to full. Stats increased!\u001b[0m";
+
+                    // Broadcast level-up to the whole group
+                    BroadcastGroupCombatEvent(result,
+                        $"\u001b[1;35m  ★ {groupedPlayer.DisplayName} has reached Level {groupedPlayer.Level}! ★\u001b[0m");
+                }
+
+                gpSession.EnqueueMessage(rewardMsg);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Check if the leader died in combat and handle group disbanding.
+    /// Called after combat resolution.
+    /// </summary>
+    private void CheckGroupLeaderDeath(CombatResult result)
+    {
+        if (result.Player.IsAlive) return;
+
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null || !group.IsLeader(ctx.Username)) return;
+
+        // Leader died — disband the group
+        GroupSystem.Instance!.DisbandGroup(ctx.Username, "leader fell in combat");
+    }
+
+    /// <summary>
+    /// Broadcast a combat event message to all grouped followers (not the leader who sees it on their terminal).
+    /// Only active when in a group dungeon session.
+    /// </summary>
+    private void BroadcastGroupCombatEvent(CombatResult result, string message)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null) return;
+        GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message, excludeUsername: ctx.Username);
+    }
+
 }
 
 /// <summary>

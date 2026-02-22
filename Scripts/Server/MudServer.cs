@@ -83,6 +83,10 @@ public class MudServer
         var roomRegistry = new RoomRegistry();
         Console.Error.WriteLine("[MUD] Room registry initialized");
 
+        // Initialize the group system for cooperative dungeon play
+        var groupSystem = new GroupSystem();
+        Console.Error.WriteLine("[MUD] Group system initialized");
+
         // Start the world simulator as an in-process background task
         // This replaces the separate usurper-world.service process
         var worldSimService = new WorldSimService(
@@ -513,6 +517,10 @@ public class MudServer
             if (kvp.Value.IsSpectating)
                 continue;
 
+            // Don't send broadcasts to group followers (they see the leader's output)
+            if (kvp.Value.IsGroupFollower)
+                continue;
+
             kvp.Value.EnqueueMessage(message);
         }
     }
@@ -551,8 +559,8 @@ public class MudServer
                 {
                     var session = kvp.Value;
 
-                    // Spectators don't produce input — exempt from idle timeout
-                    if (session.IsSpectating)
+                    // Spectators and group followers don't produce input — exempt from idle timeout
+                    if (session.IsSpectating || session.IsGroupFollower)
                         continue;
 
                     var idleTime = now - session.LastActivityTime;

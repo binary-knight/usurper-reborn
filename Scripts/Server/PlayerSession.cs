@@ -76,6 +76,15 @@ public class PlayerSession : IDisposable
     /// <summary>Pending spectate request awaiting this player's /accept or /deny.</summary>
     public SpectateRequest? PendingSpectateRequest { get; set; }
 
+    /// <summary>Pending group invite awaiting this player's /accept or /deny.</summary>
+    public GroupInvite? PendingGroupInvite { get; set; }
+
+    /// <summary>True while this session is in the GroupFollowerLoop (passively following the leader).</summary>
+    public bool IsGroupFollower { get; set; }
+
+    /// <summary>The session of the group leader this player is following (null if not following).</summary>
+    public PlayerSession? GroupLeaderSession { get; set; }
+
     /// <summary>Commands injected by a wizard via /force. Processed before normal input.</summary>
     public ConcurrentQueue<string> ForcedCommands { get; } = new();
 
@@ -259,6 +268,23 @@ public class PlayerSession : IDisposable
                     snooper.EnqueueMessage($"\u001b[90m  [Snoop] {Username} has disconnected.\u001b[0m");
                 }
                 SnoopedBy.Clear();
+            }
+            catch { }
+
+            // Clean up group references
+            try
+            {
+                var group = GroupSystem.Instance?.GetGroupFor(Username);
+                if (group != null)
+                {
+                    if (group.IsLeader(Username))
+                        GroupSystem.Instance?.DisbandGroup(Username, "leader disconnected");
+                    else
+                        GroupSystem.Instance?.RemoveMember(Username, "disconnected");
+                }
+                IsGroupFollower = false;
+                GroupLeaderSession = null;
+                PendingGroupInvite = null;
             }
             catch { }
 

@@ -33,6 +33,12 @@ public partial class TerminalEmulator : Control
     private int _consecutiveEmptyInputs = 0;
     private const int MAX_CONSECUTIVE_EMPTY_INPUTS = 5;
 
+    // Output capture — when enabled, Write/WriteLine append ANSI text to this buffer
+    // Used by group combat to capture action output for broadcasting to other players
+    private StringBuilder? _captureBuffer;
+    public void StartCapture() => _captureBuffer = new StringBuilder();
+    public string? StopCapture() { var result = _captureBuffer?.ToString(); _captureBuffer = null; return result; }
+
     /// <summary>
     /// Show "-- More --" prompt and wait for keypress in BBS door mode.
     /// Resets the line counter so the next page of output can begin.
@@ -68,6 +74,8 @@ public partial class TerminalEmulator : Control
     // Stream-based I/O for MUD server mode (each session gets its own reader/writer)
     private StreamReader? _streamReader;
     private StreamWriter? _streamWriter;
+    internal readonly object _streamWriterLock = new object(); // Protects all _streamWriter.Write calls
+    private readonly SemaphoreSlim _streamReadLock = new(1, 1); // Serializes all _streamReader reads
 
     /// <summary>Returns true when this terminal is backed by a TCP stream (MUD mode).</summary>
     public bool IsStreamBacked => _streamWriter != null;
@@ -75,8 +83,8 @@ public partial class TerminalEmulator : Control
     /// <summary>Internal accessor for the stream writer, used by spectator mode to register streams.</summary>
     internal StreamWriter? StreamWriterInternal => _streamWriter;
 
-    // Spectator mode: output is duplicated to all spectator stream writers in real-time
-    private readonly List<StreamWriter> _spectatorStreams = new();
+    // Spectator mode: output is duplicated to all spectator terminals in real-time
+    private readonly List<TerminalEmulator> _spectatorTerminals = new();
     private readonly object _spectatorLock = new object();
 
     /// <summary>
@@ -224,6 +232,21 @@ public partial class TerminalEmulator : Control
     
     public void WriteLine(string text, string color = "white")
     {
+        // Capture output for group combat broadcasting
+        if (_captureBuffer != null)
+        {
+            if (text.Contains("[") && text.Contains("[/]"))
+            {
+                _captureBuffer.Append($"\x1b[{GetAnsiColorCode(color)}m");
+                RenderMarkupToStringBuilder(_captureBuffer, text);
+                _captureBuffer.AppendLine("\x1b[0m");
+            }
+            else
+            {
+                _captureBuffer.AppendLine($"\x1b[{GetAnsiColorCode(color)}m{text}\x1b[0m");
+            }
+        }
+
         // BBS 80x25 pagination — pause before overflow (only in BBS door mode, not MUD stream or Godot)
         if (_streamWriter == null && display == null && DoorMode.IsInDoorMode && _bbsLineCount >= BBS_PAGE_LIMIT)
         {
@@ -430,6 +453,20 @@ public partial class TerminalEmulator : Control
         // Use current color if no color specified
         string effectiveColor = color ?? currentColor;
 
+        // Capture output for group combat broadcasting
+        if (_captureBuffer != null)
+        {
+            if (text.Contains("[") && text.Contains("[/]"))
+            {
+                _captureBuffer.Append($"\x1b[{GetAnsiColorCode(effectiveColor)}m");
+                RenderMarkupToStringBuilder(_captureBuffer, text);
+            }
+            else
+            {
+                _captureBuffer.Append($"\x1b[{GetAnsiColorCode(effectiveColor)}m{text}");
+            }
+        }
+
         if (_streamWriter != null)
         {
             // MUD stream mode — write ANSI-colored output to TCP stream
@@ -474,7 +511,11 @@ public partial class TerminalEmulator : Control
     {
         if (_streamWriter != null)
         {
-            _streamWriter.Write(text);
+            lock (_streamWriterLock)
+            {
+                _streamWriter.Write(text);
+                _streamWriter.Flush();
+            }
             ForwardToSpectators(text);
         }
         else if (display != null)
@@ -653,12 +694,14 @@ public partial class TerminalEmulator : Control
         // section announced in order.
         if (GameConfig.ScreenReaderMode)
         {
+            // Reset line count FIRST so the separator lines don't trigger
+            // BBS pagination ("-- More --") which interrupts the screen reader
+            _bbsLineCount = 0;
+            cursorX = 0;
+            cursorY = 0;
             WriteLine("");
             WriteLine("────────────────────────────────────────");
             WriteLine("");
-            cursorX = 0;
-            cursorY = 0;
-            _bbsLineCount = 0;
             return;
         }
 
@@ -666,8 +709,11 @@ public partial class TerminalEmulator : Control
         {
             // MUD stream mode — ANSI clear screen
             var clearAnsi = "\x1b[2J\x1b[H";
-            _streamWriter.Write(clearAnsi);
-            _streamWriter.Flush();
+            lock (_streamWriterLock)
+            {
+                _streamWriter.Write(clearAnsi);
+                _streamWriter.Flush();
+            }
             ForwardToSpectators(clearAnsi);
         }
         else if (display != null)
@@ -717,25 +763,35 @@ public partial class TerminalEmulator : Control
         {
             Write(prompt, "bright_white");
 
+            // Serialize reads — prevents concurrent ReadLineAsync from
+            // GroupFollowerLoop and CombatEngine.ProcessGroupedPlayerTurn
+            await _streamReadLock.WaitAsync();
             string? line;
-            if (MessageSource != null)
+            try
             {
-                // Run message pump concurrently with input reading for real-time chat
-                using var pumpCts = new CancellationTokenSource();
-                var pumpTask = RunMessagePumpAsync(prompt, pumpCts.Token);
-                try
+                if (MessageSource != null)
+                {
+                    // Run message pump concurrently with input reading for real-time chat
+                    using var pumpCts = new CancellationTokenSource();
+                    var pumpTask = RunMessagePumpAsync(prompt, pumpCts.Token);
+                    try
+                    {
+                        line = await _streamReader.ReadLineAsync();
+                    }
+                    finally
+                    {
+                        pumpCts.Cancel();
+                        try { await pumpTask; } catch (OperationCanceledException) { }
+                    }
+                }
+                else
                 {
                     line = await _streamReader.ReadLineAsync();
                 }
-                finally
-                {
-                    pumpCts.Cancel();
-                    try { await pumpTask; } catch (OperationCanceledException) { }
-                }
             }
-            else
+            finally
             {
-                line = await _streamReader.ReadLineAsync();
+                _streamReadLock.Release();
             }
 
             // Update idle timeout tracker
@@ -1208,7 +1264,10 @@ public partial class TerminalEmulator : Control
         currentColor = color;
         if (_streamWriter != null)
         {
-            _streamWriter.Write($"\x1b[{GetAnsiColorCode(color)}m");
+            lock (_streamWriterLock)
+            {
+                _streamWriter.Write($"\x1b[{GetAnsiColorCode(color)}m");
+            }
         }
         else if (ShouldUseBBSAdapter())
         {
@@ -1301,44 +1360,61 @@ public partial class TerminalEmulator : Control
             if (!string.IsNullOrEmpty(prompt))
                 Write(prompt, "bright_white");
 
-            var buffer = new System.Text.StringBuilder();
-            var charBuf = new char[1];
-
-            while (true)
+            await _streamReadLock.WaitAsync();
+            try
             {
-                int read = await _streamReader.ReadAsync(charBuf, 0, 1);
-                if (read == 0) break; // EOF
+                var buffer = new System.Text.StringBuilder();
+                var charBuf = new char[1];
 
-                char ch = charBuf[0];
-                if (ch == '\r' || ch == '\n')
+                while (true)
                 {
-                    // Consume trailing \n after \r if present
-                    if (ch == '\r' && !_streamReader.EndOfStream)
+                    int read = await _streamReader.ReadAsync(charBuf, 0, 1);
+                    if (read == 0) break; // EOF
+
+                    char ch = charBuf[0];
+                    if (ch == '\r' || ch == '\n')
                     {
-                        char[] peek = new char[1];
-                        // Can't easily peek StreamReader, just break on \r
+                        // Consume trailing \n after \r if present
+                        if (ch == '\r' && !_streamReader.EndOfStream)
+                        {
+                            char[] peek = new char[1];
+                            // Can't easily peek StreamReader, just break on \r
+                        }
+                        lock (_streamWriterLock)
+                        {
+                            _streamWriter.Write("\r\n");
+                            _streamWriter.Flush();
+                        }
+                        break;
                     }
-                    _streamWriter.Write("\r\n");
-                    _streamWriter.Flush();
-                    break;
-                }
-                else if (ch == (char)0x7F || ch == (char)0x08) // DEL or BS
-                {
-                    if (buffer.Length > 0)
+                    else if (ch == (char)0x7F || ch == (char)0x08) // DEL or BS
                     {
-                        buffer.Remove(buffer.Length - 1, 1);
-                        _streamWriter.Write("\b \b");
-                        _streamWriter.Flush();
+                        if (buffer.Length > 0)
+                        {
+                            buffer.Remove(buffer.Length - 1, 1);
+                            lock (_streamWriterLock)
+                            {
+                                _streamWriter.Write("\b \b");
+                                _streamWriter.Flush();
+                            }
+                        }
+                    }
+                    else if (ch >= ' ') // Printable
+                    {
+                        buffer.Append(ch);
+                        lock (_streamWriterLock)
+                        {
+                            _streamWriter.Write('*');
+                            _streamWriter.Flush();
+                        }
                     }
                 }
-                else if (ch >= ' ') // Printable
-                {
-                    buffer.Append(ch);
-                    _streamWriter.Write('*');
-                    _streamWriter.Flush();
-                }
+                return buffer.ToString();
             }
-            return buffer.ToString();
+            finally
+            {
+                _streamReadLock.Release();
+            }
         }
 
         // BBS socket mode - delegate to BBSTerminalAdapter
@@ -1715,17 +1791,23 @@ public partial class TerminalEmulator : Control
                 while ((msg = MessageSource()) != null)
                 {
                     // Erase the prompt line, write the message
-                    _streamWriter.Write("\r\x1b[2K"); // CR + erase entire line
-                    _streamWriter.Write(msg);
-                    _streamWriter.Write("\r\n\x1b[0m"); // newline + reset color
+                    lock (_streamWriterLock)
+                    {
+                        _streamWriter.Write("\r\x1b[2K"); // CR + erase entire line
+                        _streamWriter.Write(msg);
+                        _streamWriter.Write("\r\n\x1b[0m"); // newline + reset color
+                    }
                     anyWritten = true;
                 }
 
                 if (anyWritten)
                 {
                     // Redraw the prompt
-                    _streamWriter.Write($"\x1b[{GetAnsiColorCode("bright_white")}m{prompt}");
-                    _streamWriter.Flush();
+                    lock (_streamWriterLock)
+                    {
+                        _streamWriter.Write($"\x1b[{GetAnsiColorCode("bright_white")}m{prompt}");
+                        _streamWriter.Flush();
+                    }
                 }
             }
         }
@@ -1737,29 +1819,38 @@ public partial class TerminalEmulator : Control
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>Add a spectator's stream writer to receive duplicated output.</summary>
-    public void AddSpectatorStream(StreamWriter writer)
+    public void AddSpectatorStream(TerminalEmulator spectatorTerminal)
     {
         lock (_spectatorLock)
         {
-            if (!_spectatorStreams.Contains(writer))
-                _spectatorStreams.Add(writer);
+            if (!_spectatorTerminals.Contains(spectatorTerminal))
+                _spectatorTerminals.Add(spectatorTerminal);
         }
     }
 
-    /// <summary>Remove a spectator's stream writer.</summary>
+    /// <summary>Remove a spectator terminal.</summary>
+    public void RemoveSpectatorStream(TerminalEmulator spectatorTerminal)
+    {
+        lock (_spectatorLock)
+        {
+            _spectatorTerminals.Remove(spectatorTerminal);
+        }
+    }
+
+    /// <summary>Remove a spectator's stream writer (backward compat).</summary>
     public void RemoveSpectatorStream(StreamWriter writer)
     {
         lock (_spectatorLock)
         {
-            _spectatorStreams.Remove(writer);
+            _spectatorTerminals.RemoveAll(t => t.StreamWriterInternal == writer);
         }
     }
 
     /// <summary>Remove spectator by PlayerSession reference.</summary>
     public void RemoveSpectatorStream(UsurperRemake.Server.PlayerSession session)
     {
-        var sw = session.Context?.Terminal?.StreamWriterInternal;
-        if (sw != null) RemoveSpectatorStream(sw);
+        var term = session.Context?.Terminal;
+        if (term != null) RemoveSpectatorStream(term);
     }
 
     /// <summary>Remove all spectator streams.</summary>
@@ -1767,31 +1858,36 @@ public partial class TerminalEmulator : Control
     {
         lock (_spectatorLock)
         {
-            _spectatorStreams.Clear();
+            _spectatorTerminals.Clear();
         }
     }
 
-    /// <summary>Forward raw ANSI output to all spectator streams.</summary>
+    /// <summary>Forward raw ANSI output to all spectator streams (thread-safe).</summary>
     private void ForwardToSpectators(string rawAnsi)
     {
-        List<StreamWriter> snapshot;
+        List<TerminalEmulator> snapshot;
         lock (_spectatorLock)
         {
-            if (_spectatorStreams.Count == 0) return;
-            snapshot = new List<StreamWriter>(_spectatorStreams);
+            if (_spectatorTerminals.Count == 0) return;
+            snapshot = new List<TerminalEmulator>(_spectatorTerminals);
         }
 
-        foreach (var sw in snapshot)
+        foreach (var spectator in snapshot)
         {
             try
             {
-                sw.Write(rawAnsi);
-                sw.Flush();
+                var sw = spectator.StreamWriterInternal;
+                if (sw == null) continue;
+                lock (spectator._streamWriterLock)
+                {
+                    sw.Write(rawAnsi);
+                    sw.Flush();
+                }
             }
             catch
             {
                 // Spectator disconnected — remove silently
-                lock (_spectatorLock) { _spectatorStreams.Remove(sw); }
+                lock (_spectatorLock) { _spectatorTerminals.Remove(spectator); }
             }
         }
     }
@@ -1857,7 +1953,10 @@ public partial class TerminalEmulator : Control
 
         if (string.IsNullOrEmpty(text))
         {
-            _streamWriter.WriteLine();
+            lock (_streamWriterLock)
+            {
+                _streamWriter.WriteLine();
+            }
             ForwardToSpectators("\r\n");
             return;
         }
@@ -1866,25 +1965,28 @@ public partial class TerminalEmulator : Control
         if (!text.Contains("[") || !text.Contains("[/]"))
         {
             var ansi = $"\x1b[{GetAnsiColorCode(baseColor)}m{text}\r\n\x1b[0m";
-            _streamWriter.Write(ansi);
+            lock (_streamWriterLock)
+            {
+                _streamWriter.Write(ansi);
+            }
             ForwardToSpectators(ansi);
         }
         else
         {
-            _streamWriter.Write($"\x1b[{GetAnsiColorCode(baseColor)}m");
-            WriteMarkupToStream(text);
-            _streamWriter.WriteLine();
-            _streamWriter.Write("\x1b[0m");
+            // Build the full ANSI string, then write atomically
+            var sb = new StringBuilder();
+            sb.Append($"\x1b[{GetAnsiColorCode(baseColor)}m");
+            RenderMarkupToStringBuilder(sb, text);
+            sb.Append("\r\n\x1b[0m");
+            var fullAnsi = sb.ToString();
 
-            // Reconstruct for spectators
-            if (_spectatorStreams.Count > 0)
+            lock (_streamWriterLock)
             {
-                var sb = new StringBuilder();
-                sb.Append($"\x1b[{GetAnsiColorCode(baseColor)}m");
-                RenderMarkupToStringBuilder(sb, text);
-                sb.Append("\r\n\x1b[0m");
-                ForwardToSpectators(sb.ToString());
+                _streamWriter.Write(fullAnsi);
             }
+
+            // Forward to spectators
+            ForwardToSpectators(fullAnsi);
         }
     }
 
@@ -1893,7 +1995,10 @@ public partial class TerminalEmulator : Control
     {
         if (_streamWriter == null) return;
         var ansi = $"\x1b[{GetAnsiColorCode(color)}m{text}";
-        _streamWriter.Write(ansi);
+        lock (_streamWriterLock)
+        {
+            _streamWriter.Write(ansi);
+        }
         ForwardToSpectators(ansi);
     }
 

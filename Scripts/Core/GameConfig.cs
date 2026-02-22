@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.44.3";
-    public const string VersionName = "Spectator Mode";
+    public const string Version = "0.45.0";
+    public const string VersionName = "Band of Brothers";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -486,6 +486,22 @@ public static partial class GameConfig
     public const int CompanionLossPerMurder = 15;               // Companion loyalty loss per deliberate murder
     public const long BloodConfessionBaseCost = 500;            // Base gold cost for blood absolution
     public const long BloodConfessionCostPerWeight = 200;       // Extra gold per weight point
+
+    // Group Dungeon System (v0.45.0)
+    public const int GroupMaxSize = 5;                          // Max players in a group (leader + 4)
+    public const int GroupMinLevel = 5;                         // Minimum level to form/join a group
+    public const int GroupInviteTimeoutSeconds = 60;            // Seconds before a group invite expires
+    public const int GroupCombatInputTimeoutSeconds = 30;       // Seconds before auto-attack in group combat
+    // Group XP penalty tiers: gap = highestLevelInGroup - thisPlayer.Level
+    public static readonly (int MaxGap, float Multiplier)[] GroupXPPenaltyTiers = new[]
+    {
+        (5,  1.00f),   // 0-5 level gap: 100% XP
+        (10, 0.75f),   // 6-10 level gap: 75% XP
+        (15, 0.50f),   // 11-15 level gap: 50% XP
+        (20, 0.25f),   // 16-20 level gap: 25% XP
+        (30, 0.15f),   // 21-30 level gap: 15% XP
+    };
+    public const float GroupXPPenaltyMinimum = 0.10f;           // 31+ level gap: 10% XP (floor)
 
     // Faction System (v0.40.2)
     public const string FactionInitiatorCrown = "The Crown";

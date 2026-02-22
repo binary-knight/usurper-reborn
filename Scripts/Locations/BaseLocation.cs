@@ -1233,7 +1233,7 @@ public abstract class BaseLocation
             <= GameConfig.RelationFriendship => ("bright_cyan", "Friends", ""),   // 40 - Friendship
             <= GameConfig.RelationTrust => ("cyan", "Trusted", ""),               // 50 - Trust
             <= GameConfig.RelationRespect => ("bright_green", "Respected", ""),   // 60 - Respect
-            <= GameConfig.RelationNormal => ("gray", "Stranger", ""),             // 70 - Normal/Neutral
+            <= GameConfig.RelationNormal => ("gray", "Neutral", ""),              // 70 - Normal/Neutral
             <= GameConfig.RelationSuspicious => ("yellow", "Wary", ""),           // 80 - Suspicious
             <= GameConfig.RelationAnger => ("bright_yellow", "Hostile", ""),      // 90 - Anger
             <= GameConfig.RelationEnemy => ("red", "Enemy", ""),                  // 100 - Enemy

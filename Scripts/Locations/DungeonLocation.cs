@@ -2,9 +2,12 @@ using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.Data;
 using UsurperRemake.BBS;
+using UsurperRemake.Server;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -13,7 +16,7 @@ using System.Threading.Tasks;
 /// </summary>
 public class DungeonLocation : BaseLocation
 {
-    private List<Character> teammates = new();
+    internal List<Character> teammates = new();
     private int currentDungeonLevel = 1;
     private int maxDungeonLevel = 100;
     private Random dungeonRandom = new Random();
@@ -46,6 +49,35 @@ public class DungeonLocation : BaseLocation
 
     public override async Task EnterLocation(Character player, TerminalEmulator term)
     {
+        // GROUP FOLLOWER CHECK: If this player is in a group but not the leader,
+        // and the leader is already in the dungeon, enter as a follower instead.
+        var group = GroupSystem.Instance?.GetGroupFor(player?.Name2 ?? "");
+        if (group == null)
+        {
+            // Also check by username from session context
+            var ctx = SessionContext.Current;
+            if (ctx != null)
+                group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        }
+        if (group != null && !group.IsLeader(player?.Name2 ?? "") && !group.IsLeader(SessionContext.Current?.Username ?? ""))
+        {
+            if (group.IsInDungeon)
+            {
+                await EnterAsGroupFollower(player!, term, group);
+                // After leaving the group dungeon, redirect to Main Street
+                // (bare return would unwind the entire call stack and disconnect)
+                throw new LocationExitException(GameLocation.MainStreet);
+            }
+            else
+            {
+                term.SetColor("yellow");
+                term.WriteLine("  Your group leader hasn't entered the dungeon yet.");
+                term.WriteLine("  Wait for your leader to enter first, then follow them in.");
+                await term.PressAnyKey();
+                throw new LocationExitException(GameLocation.MainStreet);
+            }
+        }
+
         // CRITICAL: Clear teammates list at the start to prevent leaking from other saves
         // The list will be rebuilt by AddCompanionsToParty() and RestoreNPCTeammates()
         teammates.Clear();
@@ -135,6 +167,9 @@ public class DungeonLocation : BaseLocation
         // Player can always enter - unaffordable allies simply stay behind
         await CheckAndPayEntryFees(player, term);
 
+        // Setup group dungeon mode: notify followers, mark group in-dungeon
+        await SetupGroupDungeon(player, term);
+
         // Show contextual hint for new players on their first dungeon entry
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown);
 
@@ -156,6 +191,9 @@ public class DungeonLocation : BaseLocation
             {
                 if (mate is NPC npcMate) npcMate.IsInConversation = false;
             }
+
+            // Clean up group dungeon state when leader leaves
+            CleanupGroupDungeonOnLeaderExit(player);
         }
     }
 
@@ -2035,6 +2073,19 @@ public class DungeonLocation : BaseLocation
         };
     }
 
+    private static string GetAnsiThemeColor(DungeonTheme theme) => theme switch
+    {
+        DungeonTheme.Catacombs => "\u001b[37m",
+        DungeonTheme.Sewers => "\u001b[32m",
+        DungeonTheme.Caverns => "\u001b[36m",
+        DungeonTheme.AncientRuins => "\u001b[33m",
+        DungeonTheme.DemonLair => "\u001b[31m",
+        DungeonTheme.FrozenDepths => "\u001b[96m",
+        DungeonTheme.VolcanicPit => "\u001b[91m",
+        DungeonTheme.AbyssalVoid => "\u001b[35m",
+        _ => "\u001b[37m"
+    };
+
     /// <summary>
     /// Display floor overview before entering
     /// </summary>
@@ -2969,7 +3020,11 @@ public class DungeonLocation : BaseLocation
         if (targetRoom == null) return;
 
         // Moving transition
-        terminal.ClearScreen();
+        // In screen reader mode, skip the ClearScreen here — the transition text flows
+        // naturally in the buffer, and DisplayLocation's single ClearScreen (separator)
+        // will cleanly introduce the room view. Double separators confuse screen readers.
+        if (!GameConfig.ScreenReaderMode)
+            terminal.ClearScreen();
         terminal.SetColor("gray");
         terminal.WriteLine("You move through the passage...");
         await Task.Delay(800);
@@ -2989,6 +3044,9 @@ public class DungeonLocation : BaseLocation
         {
             targetRoom.IsCleared = true;
         }
+
+        // Always push room view to followers (they need to see every room the leader enters)
+        PushRoomToFollowers(targetRoom);
 
         if (!targetRoom.IsExplored)
         {
@@ -3234,6 +3292,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("red");
         terminal.WriteLine("*** TRAP! ***");
+        BroadcastDungeonEvent("\u001b[1;31m  *** TRAP! ***\u001b[0m");
         await Task.Delay(500);
 
         // Check for evasion based on agility
@@ -3242,6 +3301,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("green");
             terminal.WriteLine("Your quick reflexes save you!");
             terminal.WriteLine($"You nimbly avoid the trap! (Agility: {player.Agility})");
+            BroadcastDungeonEvent($"\u001b[32m  {player!.Name2}'s quick reflexes avoid the trap!\u001b[0m");
             await Task.Delay(1500);
             return;
         }
@@ -3256,6 +3316,7 @@ public class DungeonLocation : BaseLocation
                 var pitDmg = currentDungeonLevel * 3 + dungeonRandom.Next(10);
                 player.HP -= pitDmg;
                 terminal.WriteLine($"The floor gives way! You fall into a pit for {pitDmg} damage!");
+                BroadcastDungeonEvent($"\u001b[31m  The floor gives way! {player!.Name2} falls into a pit for {pitDmg} damage!\u001b[0m");
                 break;
 
             case 1:
@@ -3263,24 +3324,28 @@ public class DungeonLocation : BaseLocation
                 player.HP -= dartDmg;
                 player.Poison = Math.Max(player.Poison, 1);
                 terminal.WriteLine($"Poison darts! You take {dartDmg} damage and are poisoned!");
+                BroadcastDungeonEvent($"\u001b[31m  Poison darts! {player!.Name2} takes {dartDmg} damage and is poisoned!\u001b[0m");
                 break;
 
             case 2:
                 var fireDmg = currentDungeonLevel * 4 + dungeonRandom.Next(12);
                 player.HP -= fireDmg;
                 terminal.WriteLine($"A gout of flame! You take {fireDmg} fire damage!");
+                BroadcastDungeonEvent($"\u001b[31m  A gout of flame! {player!.Name2} takes {fireDmg} fire damage!\u001b[0m");
                 break;
 
             case 3:
                 var goldLost = player.Gold / 10;
                 player.Gold -= goldLost;
                 terminal.WriteLine($"Acid sprays your belongings! You lose {goldLost} gold!");
+                BroadcastDungeonEvent($"\u001b[33m  Acid sprays the party! {player!.Name2} loses {goldLost} gold!\u001b[0m");
                 break;
 
             case 4:
                 var expLost = currentDungeonLevel * 50;
                 player.Experience = Math.Max(0, player.Experience - expLost);
                 terminal.WriteLine($"A curse drains you! You lose {expLost} experience!");
+                BroadcastDungeonEvent($"\u001b[35m  A dark curse washes over the room! {player!.Name2} loses {expLost} experience!\u001b[0m");
                 break;
 
             case 5:
@@ -3289,6 +3354,7 @@ public class DungeonLocation : BaseLocation
                 long bonusGold = currentDungeonLevel * 20;
                 player.Gold += bonusGold;
                 terminal.WriteLine($"You salvage {bonusGold} gold from the trap parts.");
+                BroadcastDungeonEvent($"\u001b[32m  The trap mechanism is broken! {player!.Name2} salvages {bonusGold} gold.\u001b[0m");
                 break;
         }
 
@@ -3302,7 +3368,8 @@ public class DungeonLocation : BaseLocation
     {
         var player = GetCurrentPlayer();
 
-        terminal.ClearScreen();
+        if (!GameConfig.ScreenReaderMode)
+            terminal.ClearScreen();
         terminal.SetColor("red");
 
         if (room.IsBossRoom)
@@ -3438,6 +3505,16 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
+
+        // Broadcast combat encounter to group followers
+        {
+            var monsterSummary = string.Join(", ", monsters.GroupBy(m => m.Name)
+                .Select(g => g.Count() > 1 ? $"{g.Count()} {GetPluralName(g.Key)}" : g.Key));
+            BroadcastDungeonEvent(room.IsBossRoom
+                ? $"\u001b[1;31m  *** BOSS ENCOUNTER: {monsterSummary} ***\u001b[0m"
+                : $"\u001b[1;33m  Combat! The group faces {monsterSummary}!\u001b[0m");
+        }
+
         await Task.Delay(1500);
 
         // Check for divine punishment before combat
@@ -3500,10 +3577,18 @@ public class DungeonLocation : BaseLocation
                 // Bonus rewards for boss
                 long bossGold = currentDungeonLevel * 500 + dungeonRandom.Next(1000);
                 long bossExp = currentDungeonLevel * 300;
-                player.Gold += bossGold;
-                player.Experience += bossExp;
 
-                terminal.WriteLine($"Bonus: {bossGold} gold, {bossExp} experience!");
+                var (bossXPShare, bossGoldShare) = AwardDungeonReward(bossExp, bossGold, "Boss Defeated");
+
+                if (teammates.Count > 0)
+                {
+                    terminal.WriteLine($"Bonus: {bossGold} gold, {bossExp} XP (your share: {bossGoldShare:N0}g, {bossXPShare:N0} XP)");
+                    BroadcastDungeonEvent($"\u001b[1;33m  *** BOSS DEFEATED! ***\u001b[0m");
+                }
+                else
+                {
+                    terminal.WriteLine($"Bonus: {bossGold} gold, {bossExp} experience!");
+                }
 
                 // Artifact drop chance for specific floor bosses
                 await CheckArtifactDrop(player, currentDungeonLevel);
@@ -3750,11 +3835,19 @@ public class DungeonLocation : BaseLocation
         long goldFound = currentDungeonLevel * 100 + dungeonRandom.Next(currentDungeonLevel * 200);
         long expFound = currentDungeonLevel * 50 + dungeonRandom.Next(100);
 
-        player!.Gold += goldFound;
-        player.Experience += expFound;
+        var (actualXP, actualGold) = AwardDungeonReward(expFound, goldFound, "Treasure");
 
-        terminal.WriteLine($"You find {goldFound} gold pieces!");
-        terminal.WriteLine($"You gain {expFound} experience!");
+        if (teammates.Count > 0)
+        {
+            terminal.WriteLine($"The party finds {goldFound} gold and {expFound} XP!");
+            terminal.WriteLine($"Your share: {actualGold:N0} gold, {actualXP:N0} XP");
+            BroadcastDungeonEvent($"\u001b[93m  The party found treasure!\u001b[0m");
+        }
+        else
+        {
+            terminal.WriteLine($"You find {goldFound} gold pieces!");
+            terminal.WriteLine($"You gain {expFound} experience!");
+        }
 
         // Chance for bonus items
         if (dungeonRandom.NextDouble() < 0.3)
@@ -3778,6 +3871,25 @@ public class DungeonLocation : BaseLocation
     private async Task HandleRoomEvent(DungeonRoom room)
     {
         room.EventCompleted = true;
+
+        // Broadcast room event type to followers
+        string? eventDesc = room.EventType switch
+        {
+            DungeonEventType.TreasureChest => "discovers a treasure chest",
+            DungeonEventType.Merchant => "encounters a wandering merchant",
+            DungeonEventType.Shrine => "finds a mysterious shrine",
+            DungeonEventType.NPCEncounter => "encounters someone in the darkness",
+            DungeonEventType.Puzzle => "discovers a puzzle mechanism",
+            DungeonEventType.RestSpot => "finds a safe resting spot",
+            DungeonEventType.MysteryEvent => "senses something unusual",
+            DungeonEventType.Riddle => "encounters a riddle gate",
+            DungeonEventType.LoreDiscovery => "discovers ancient writings",
+            DungeonEventType.MemoryFlash => "experiences a strange vision",
+            DungeonEventType.SecretBoss => "disturbs something powerful",
+            _ => "discovers something interesting"
+        };
+        var player = GetCurrentPlayer();
+        BroadcastDungeonEvent($"\u001b[96m  {player?.Name2} {eventDesc}...\u001b[0m");
 
         switch (room.EventType)
         {
@@ -3882,13 +3994,86 @@ public class DungeonLocation : BaseLocation
         };
 
         // Use the new comprehensive feature interaction system
-        await FeatureInteractionSystem.Instance.InteractWithFeature(
+        var outcome = await FeatureInteractionSystem.Instance.InteractWithFeature(
             feature,
             player!,
             currentDungeonLevel,
             theme,
             terminal
         );
+
+        // Post-hoc reward split: FeatureInteractionSystem already awarded full amount to leader.
+        // Reduce leader to their share and distribute to teammates.
+        if (teammates.Count > 0 && (outcome.GoldGained > 0 || outcome.ExperienceGained > 0))
+        {
+            int totalMembers = 1 + teammates.Count;
+            long goldPerMember = outcome.GoldGained > 0 ? outcome.GoldGained / totalMembers : 0;
+
+            // Split gold: reduce leader to their share, give rest to teammates
+            if (outcome.GoldGained > 0)
+            {
+                player!.Gold -= (outcome.GoldGained - goldPerMember);
+                foreach (var t in teammates.Where(t => t != null && t.IsAlive))
+                    t.Gold += goldPerMember;
+            }
+
+            // Split XP and send personalized reward notifications
+            int highestLevel = Math.Max(player!.Level, teammates.Max(t => t.Level));
+            foreach (var t in teammates.Where(t => t != null && t.IsAlive))
+            {
+                if (t.IsGroupedPlayer)
+                {
+                    long xpShare = 0;
+                    if (outcome.ExperienceGained > 0)
+                    {
+                        float mult = GroupSystem.GetGroupXPMultiplier(t.Level, highestLevel);
+                        xpShare = (long)(outcome.ExperienceGained * mult);
+                        t.Experience += xpShare;
+                    }
+
+                    // Notify grouped player of their share (gold, XP, or both)
+                    var parts = new System.Collections.Generic.List<string>();
+                    if (goldPerMember > 0) parts.Add($"+{goldPerMember:N0} gold");
+                    if (xpShare > 0) parts.Add($"+{xpShare:N0} XP");
+                    if (parts.Count > 0)
+                    {
+                        var session = GroupSystem.GetSession(t.GroupPlayerUsername ?? "");
+                        session?.EnqueueMessage(
+                            $"\u001b[1;32m  ═══ {feature.Name} (Your Share) ═══\u001b[0m\n" +
+                            $"\u001b[33m  {string.Join("  ", parts)}\u001b[0m");
+                    }
+                }
+                else if (!t.IsCompanion && !t.IsEcho)
+                {
+                    if (outcome.ExperienceGained > 0)
+                        t.Experience += (long)(outcome.ExperienceGained * 0.75);
+                }
+            }
+
+            // Broadcast interaction narrative with outcome details
+            var featureSb = new System.Text.StringBuilder();
+            featureSb.AppendLine($"\u001b[96m  {player?.Name2} examines {feature.Name}...\u001b[0m");
+            if (outcome.LoreDiscovered)
+                featureSb.AppendLine("\u001b[35m  Ancient lore discovered!\u001b[0m");
+            if (outcome.DamageTaken > 0)
+                featureSb.AppendLine($"\u001b[31m  It was dangerous! {player?.Name2} took {outcome.DamageTaken} damage.\u001b[0m");
+            if (outcome.OceanInsightGained)
+                featureSb.AppendLine("\u001b[36m  A moment of spiritual insight...\u001b[0m");
+            BroadcastDungeonEvent(featureSb.ToString());
+        }
+        else if (teammates.Count > 0)
+        {
+            // No rewards, but still broadcast what happened
+            var featureSb = new System.Text.StringBuilder();
+            featureSb.AppendLine($"\u001b[96m  {player?.Name2} examines {feature.Name}...\u001b[0m");
+            if (outcome.LoreDiscovered)
+                featureSb.AppendLine("\u001b[35m  Ancient lore discovered!\u001b[0m");
+            if (outcome.DamageTaken > 0)
+                featureSb.AppendLine($"\u001b[31m  It was dangerous! {player?.Name2} took {outcome.DamageTaken} damage.\u001b[0m");
+            if (outcome.OceanInsightGained)
+                featureSb.AppendLine("\u001b[36m  A moment of spiritual insight...\u001b[0m");
+            BroadcastDungeonEvent(featureSb.ToString());
+        }
     }
 
     // Floors that require full clear before leaving
@@ -4354,8 +4539,7 @@ public class DungeonLocation : BaseLocation
         int goldBonus = (int)(baseGold * multiplier);
 
         // Award the bonus
-        player.Experience += xpBonus;
-        player.Gold += goldBonus;
+        var (clearXP, clearGold) = AwardDungeonReward(xpBonus, goldBonus, "Floor Cleared");
 
         // Display the bonus
         terminal.WriteLine("");
@@ -4371,8 +4555,17 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("═══ FLOOR CLEARED ═══", "bright_green");
             terminal.WriteLine("You have vanquished all foes on this level!", "green");
         }
-        terminal.WriteLine($"  Bonus XP: +{xpBonus:N0}", "bright_cyan");
-        terminal.WriteLine($"  Bonus Gold: +{goldBonus:N0}", "bright_yellow");
+        if (teammates.Count > 0)
+        {
+            terminal.WriteLine($"  Bonus XP: +{xpBonus:N0} (your share: {clearXP:N0})", "bright_cyan");
+            terminal.WriteLine($"  Bonus Gold: +{goldBonus:N0} (your share: {clearGold:N0})", "bright_yellow");
+            BroadcastDungeonEvent($"\u001b[1;33m  ═══ FLOOR CLEARED ═══\u001b[0m");
+        }
+        else
+        {
+            terminal.WriteLine($"  Bonus XP: +{xpBonus:N0}", "bright_cyan");
+            terminal.WriteLine($"  Bonus Gold: +{goldBonus:N0}", "bright_yellow");
+        }
         terminal.WriteLine("");
 
         // Track telemetry
@@ -4444,7 +4637,10 @@ public class DungeonLocation : BaseLocation
         // MUD mode: broadcast dungeon descent
         UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} descends deeper into the dungeon.");
 
-        terminal.ClearScreen();
+        // Screen reader mode: skip ClearScreen to avoid double separators.
+        // Transition text flows naturally; DisplayLocation adds one clean separator.
+        if (!GameConfig.ScreenReaderMode)
+            terminal.ClearScreen();
         terminal.SetColor("blue");
         terminal.WriteLine("You descend the ancient stairs...");
         terminal.WriteLine("The darkness grows deeper.");
@@ -4496,6 +4692,15 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine($"You arrive at Level {currentDungeonLevel}");
         terminal.WriteLine($"Theme: {currentFloor.Theme}");
+        BroadcastDungeonEvent($"\u001b[34m  The group descends to Floor {currentDungeonLevel} ({currentFloor.Theme}).\u001b[0m");
+
+        // Keep group state in sync
+        var descGroup = GroupSystem.Instance?.GetGroupFor(SessionContext.Current?.Username ?? "");
+        if (descGroup != null) descGroup.CurrentFloor = currentDungeonLevel;
+
+        // Show followers the entrance room on the new floor
+        var newFloorRoom = currentFloor.GetRoom(currentFloor.CurrentRoomId);
+        if (newFloorRoom != null) PushRoomToFollowers(newFloorRoom);
 
         // Show restoration status
         if (floorResult.WasRestored && !floorResult.DidRespawn)
@@ -4527,11 +4732,11 @@ public class DungeonLocation : BaseLocation
     {
         var player = GetCurrentPlayer();
 
-        terminal.ClearScreen();
+        if (!GameConfig.ScreenReaderMode)
+            terminal.ClearScreen();
         terminal.SetColor("green");
         terminal.WriteLine("You find a defensible corner and rest...");
         terminal.WriteLine("");
-
         await Task.Delay(1500);
 
         // Blood Price rest penalty — dark memories reduce rest effectiveness
@@ -4556,6 +4761,43 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine($"You recover {manaAmount} mana.");
         if (staminaAmount > 0)
             terminal.WriteLine($"You recover {staminaAmount} stamina.");
+
+        // Heal grouped followers (+25% HP/MP/ST, no blood price penalty)
+        if (teammates.Count > 0)
+        {
+            List<Character> teamSnap;
+            lock (teammates) { teamSnap = new List<Character>(teammates); }
+
+            foreach (var mate in teamSnap)
+            {
+                if (mate == null || !mate.IsAlive) continue;
+
+                long mateHeal = mate.MaxHP / 4;
+                long mateMana = mate.MaxMana / 4;
+                long mateSta = mate.MaxCombatStamina / 4;
+
+                mate.HP = Math.Min(mate.MaxHP, mate.HP + mateHeal);
+                mate.Mana = Math.Min(mate.MaxMana, mate.Mana + mateMana);
+                mate.CurrentCombatStamina = Math.Min(mate.MaxCombatStamina, mate.CurrentCombatStamina + mateSta);
+
+                if (mate.IsGroupedPlayer)
+                {
+                    var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
+                    if (session != null)
+                    {
+                        var sb = new System.Text.StringBuilder();
+                        sb.AppendLine("\u001b[32m  The group rests in a defensible position...\u001b[0m");
+                        sb.AppendLine($"\u001b[32m  You recover {mateHeal:N0} hit points.\u001b[0m");
+                        if (mateMana > 0)
+                            sb.AppendLine($"\u001b[32m  You recover {mateMana:N0} mana.\u001b[0m");
+                        if (mateSta > 0)
+                            sb.AppendLine($"\u001b[32m  You recover {mateSta:N0} stamina.\u001b[0m");
+                        sb.Append($"\u001b[36m  HP: {mate.HP}/{mate.MaxHP}  MP: {mate.Mana}/{mate.MaxMana}  ST: {mate.CurrentCombatStamina}/{mate.MaxCombatStamina}\u001b[0m");
+                        session.EnqueueMessage(sb.ToString());
+                    }
+                }
+            }
+        }
 
         if (restEfficiency < 1.0f)
         {
@@ -4746,7 +4988,8 @@ public class DungeonLocation : BaseLocation
 
         // No turn/fight limits in the new persistent system - explore freely!
 
-        terminal.ClearScreen();
+        if (!GameConfig.ScreenReaderMode)
+            terminal.ClearScreen();
         terminal.SetColor("yellow");
         terminal.WriteLine("═══ EXPLORING ═══");
         terminal.WriteLine("");
@@ -5822,11 +6065,20 @@ public class DungeonLocation : BaseLocation
 
                 terminal.SetColor("green");
                 terminal.WriteLine("The chest opens to reveal glittering treasure!");
-                terminal.WriteLine($"You find {goldFound} gold pieces!");
-                terminal.WriteLine($"You gain {expGained} experience!");
 
-                currentPlayer.Gold += goldFound;
-                currentPlayer.Experience += expGained;
+                var (chestXP, chestGold) = AwardDungeonReward(expGained, goldFound, "Treasure Chest");
+
+                if (teammates.Count > 0)
+                {
+                    terminal.WriteLine($"The party finds {goldFound} gold and {expGained} XP!");
+                    terminal.WriteLine($"Your share: {chestGold:N0} gold, {chestXP:N0} XP");
+                    BroadcastDungeonEvent($"\u001b[93m  The party opens a treasure chest!\u001b[0m");
+                }
+                else
+                {
+                    terminal.WriteLine($"You find {goldFound} gold pieces!");
+                    terminal.WriteLine($"You gain {expGained} experience!");
+                }
 
                 // Crafting material chance from treasure chests
                 var eligibleMaterials = GameConfig.GetMaterialsForFloor(currentDungeonLevel);
@@ -5846,6 +6098,7 @@ public class DungeonLocation : BaseLocation
                 // Trap!
                 terminal.SetColor("red");
                 terminal.WriteLine("CLICK! It's a trap!");
+                BroadcastDungeonEvent("\u001b[91m  The chest was trapped!\u001b[0m");
 
                 // Check for evasion based on agility
                 if (TryEvadeTrap(currentPlayer))
@@ -5885,6 +6138,7 @@ public class DungeonLocation : BaseLocation
                 // Mimic! (triggers combat)
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("The chest MOVES! It's a MIMIC!");
+                BroadcastDungeonEvent("\u001b[91m  The chest was a MIMIC!\u001b[0m");
                 await Task.Delay(1500);
 
                 var mimic = Monster.CreateMonster(
@@ -7748,7 +8002,10 @@ public class DungeonLocation : BaseLocation
         {
             var tm = teammates[i];
             string status = tm.IsAlive ? $"HP: {tm.HP}/{tm.MaxHP}" : "[INJURED]";
-            terminal.WriteLine($"  {i + 2}. {tm.DisplayName} - Level {tm.Level} {tm.Class} - {status}");
+            string tag = tm.IsGroupedPlayer ? " [Player]" : "";
+            if (tm.IsGroupedPlayer) terminal.SetColor("bright_green");
+            terminal.WriteLine($"  {i + 2}. {tm.DisplayName}{tag} - Level {tm.Level} {tm.Class} - {status}");
+            if (tm.IsGroupedPlayer) terminal.SetColor("cyan");
         }
         terminal.WriteLine("");
 
@@ -8095,6 +8352,16 @@ public class DungeonLocation : BaseLocation
         {
             int index = partyNumber - 2;
             var member = teammates[index];
+
+            // Grouped players cannot be removed via party management — they must /leave
+            if (member.IsGroupedPlayer)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"{member.DisplayName} is a grouped player — they must type /leave to exit the group.");
+                await Task.Delay(2000);
+                return;
+            }
+
             teammates.RemoveAt(index);
 
             // Handle companion removal - put them on standby, not "return to town"
@@ -11848,6 +12115,1059 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("red");
         terminal.WriteLine("You are severely weakened. Survival is not guaranteed...");
+    }
+
+    #endregion
+
+    #region Group Dungeon System
+
+    /// <summary>
+    /// Broadcast a dungeon event message to all group followers (not the leader).
+    /// Leader sees the event via their own terminal; followers get it via EnqueueMessage.
+    /// </summary>
+    private void BroadcastDungeonEvent(string message)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null || !group.IsLeader(ctx.Username)) return;
+        GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message, excludeUsername: ctx.Username);
+    }
+
+    /// <summary>
+    /// Push a full room view to each group follower's terminal, clearing their screen first.
+    /// Each follower gets a personalized display with their own HP/gold status bar.
+    /// Called from the leader's thread when the leader moves to a new room or descends floors.
+    /// </summary>
+    private void PushRoomToFollowers(DungeonRoom room)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null || !group.IsLeader(ctx.Username)) return;
+
+        // Build the shared room portion (same for all followers)
+        string roomAnsi = BuildRoomAnsi(room, ctx.Username);
+
+        // Snapshot teammates for thread safety
+        List<Character> teamSnap;
+        lock (teammates) { teamSnap = new List<Character>(teammates); }
+
+        foreach (var mate in teamSnap)
+        {
+            if (mate == null || !mate.IsGroupedPlayer) continue;
+            PushRoomToSingleFollower(mate, roomAnsi, ctx.Username);
+        }
+    }
+
+    /// <summary>
+    /// Push a room view to a single follower's terminal. Clear screen + room + personal status.
+    /// </summary>
+    private static void PushRoomToSingleFollower(Character follower, string roomAnsi, string leaderName)
+    {
+        var followerTerm = follower.RemoteTerminal;
+        if (followerTerm == null) return;
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("\x1b[2J\x1b[H"); // Clear screen + cursor home
+
+        // Room content (shared)
+        sb.Append(roomAnsi);
+
+        // Personal status bar
+        sb.AppendLine($"\u001b[90m  {new string('─', 55)}\u001b[0m");
+        int hpPct = follower.MaxHP > 0 ? (int)(follower.HP * 20 / follower.MaxHP) : 0;
+        hpPct = Math.Clamp(hpPct, 0, 20);
+        string hpBar = new string('#', hpPct) + new string('.', 20 - hpPct);
+        sb.AppendLine($"\u001b[37m  HP: \u001b[31m[{hpBar}]\u001b[37m {follower.HP}/{follower.MaxHP}  \u001b[33mGold: {follower.Gold:N0}  \u001b[32mPotions: {follower.Healing}/{follower.MaxPotions}\u001b[0m");
+        sb.AppendLine($"\u001b[90m  Following \u001b[97m{leaderName}\u001b[90m | [I]nv [P]ot [=]Stats [Q]Leave | /party /help /say\u001b[0m");
+        sb.AppendLine();
+
+        followerTerm.WriteRawAnsi(sb.ToString());
+    }
+
+    /// <summary>
+    /// Build the ANSI room description string shared by all followers.
+    /// </summary>
+    private string BuildRoomAnsi(DungeonRoom room, string leaderName)
+    {
+        var sb = new System.Text.StringBuilder();
+        string tc = GetAnsiThemeColor(currentFloor.Theme);
+
+        // Room header
+        sb.AppendLine($"{tc}  ╔{new string('═', 55)}╗\u001b[0m");
+        sb.AppendLine($"{tc}  ║  {room.Name,-52} ║\u001b[0m");
+        sb.AppendLine($"{tc}  ╚{new string('═', 55)}╝\u001b[0m");
+
+        // Floor/theme/danger/status line
+        string stars = new string('*', room.DangerRating) + new string('.', 3 - room.DangerRating);
+        string dc = room.DangerRating >= 3 ? "\u001b[91m" : room.DangerRating >= 2 ? "\u001b[93m" : "\u001b[92m";
+        string status = room.IsBossRoom ? " \u001b[91m[BOSS]\u001b[0m"
+            : room.IsCleared ? " \u001b[92m[CLEARED]\u001b[0m"
+            : room.HasMonsters ? " \u001b[91m[DANGER]\u001b[0m" : "";
+        sb.AppendLine($"\u001b[90m  Floor {currentDungeonLevel} | {tc}{currentFloor.Theme}\u001b[90m | {dc}{stars}\u001b[0m{status}");
+        sb.AppendLine();
+
+        // Description + atmosphere
+        if (!string.IsNullOrEmpty(room.Description))
+            sb.AppendLine($"\u001b[37m  {room.Description}\u001b[0m");
+        if (!string.IsNullOrEmpty(room.AtmosphereText))
+            sb.AppendLine($"\u001b[90m  {room.AtmosphereText}\u001b[0m");
+        sb.AppendLine();
+
+        // Room contents
+        if (room.HasMonsters && !room.IsCleared)
+            sb.AppendLine(room.IsBossRoom
+                ? "\u001b[91m  >> A powerful presence dominates this room! <<\u001b[0m"
+                : "\u001b[91m  >> Hostile creatures lurk in the shadows <<\u001b[0m");
+        if (room.HasTreasure && !room.TreasureLooted)
+            sb.AppendLine("\u001b[93m  >> Something valuable glints in the darkness <<\u001b[0m");
+        if (room.HasEvent && !room.EventCompleted)
+            sb.AppendLine($"\u001b[96m  >> {GetEventHint(room.EventType).Replace(">>", "").Replace("<<", "").Trim()} <<\u001b[0m");
+        if (room.HasStairsDown)
+            sb.AppendLine("\u001b[94m  >> Stairs lead down to a deeper level <<\u001b[0m");
+
+        // Unexamined features
+        var unexamined = room.Features?.Where(f => !f.IsInteracted).ToList();
+        if (unexamined != null && unexamined.Count > 0)
+        {
+            sb.AppendLine("\u001b[96m  You notice:\u001b[0m");
+            foreach (var f in unexamined)
+                sb.AppendLine($"\u001b[37m    - {f.Name}\u001b[0m");
+        }
+
+        // Exits
+        if (room.Exits.Count > 0)
+        {
+            sb.Append("\u001b[37m  Exits:");
+            foreach (var exit in room.Exits)
+            {
+                var target = currentFloor.GetRoom(exit.Value.TargetRoomId);
+                string dirKey = GetDirectionKey(exit.Key);
+                string st = target == null ? "" : target.IsCleared ? " clr" : target.IsExplored ? " exp" : " ?";
+                sb.Append($" \u001b[90m[\u001b[96m{dirKey}\u001b[90m{st}\u001b[90m]");
+            }
+            sb.AppendLine("\u001b[0m");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Split dungeon rewards among all party members (leader + teammates including NPCs).
+    /// Gold: divided evenly by party size.
+    /// XP for grouped players: full XP with level gap penalty.
+    /// XP for NPC teammates: 75% of total XP (matches AwardTeammateExperience rate).
+    /// Companions are skipped (handled by CompanionSystem).
+    /// Returns (leaderXP, leaderGold).
+    /// </summary>
+    private (long leaderXP, long leaderGold) SplitPartyRewards(long totalXP, long totalGold, string source)
+    {
+        var player = GetCurrentPlayer();
+        if (player == null) return (totalXP, totalGold);
+
+        // Snapshot teammates for thread safety
+        List<Character> teamSnap;
+        lock (teammates) { teamSnap = new List<Character>(teammates); }
+
+        int totalMembers = 1 + teamSnap.Count;
+        if (totalMembers <= 1) return (totalXP, totalGold);
+
+        long goldPerMember = totalGold / totalMembers;
+
+        // Find highest level for gap penalty
+        int highestLevel = player.Level;
+        foreach (var t in teamSnap)
+            if (t.Level > highestLevel) highestLevel = t.Level;
+
+        // Award each teammate
+        foreach (var teammate in teamSnap)
+        {
+            if (teammate == null || !teammate.IsAlive) continue;
+
+            // Gold share for everyone
+            teammate.Gold += goldPerMember;
+
+            if (teammate.IsGroupedPlayer)
+            {
+                // Real players: full XP with level gap penalty
+                float groupXPMult = GroupSystem.GetGroupXPMultiplier(teammate.Level, highestLevel);
+                long memberXP = (long)(totalXP * groupXPMult);
+                teammate.Experience += memberXP;
+                teammate.Statistics.RecordGoldChange(teammate.Gold);
+
+                var session = GroupSystem.GetSession(teammate.GroupPlayerUsername ?? "");
+                if (session != null)
+                {
+                    string penalty = groupXPMult < 1.0f ? $" ({(int)(groupXPMult * 100)}%)" : "";
+                    session.EnqueueMessage(
+                        $"\u001b[1;32m  ═══ {source} (Your Share) ═══\u001b[0m\n" +
+                        $"\u001b[33m  Gold: +{goldPerMember:N0}  XP: +{memberXP:N0}{penalty}\u001b[0m");
+                }
+            }
+            else if (!teammate.IsCompanion && !teammate.IsEcho)
+            {
+                // NPC teammates (spouses, mercenaries): 75% XP
+                long npcXP = (long)(totalXP * 0.75);
+                teammate.Experience += npcXP;
+            }
+        }
+
+        // Leader's share
+        float leaderMult = GroupSystem.GetGroupXPMultiplier(player.Level, highestLevel);
+        long leaderXP = (long)(totalXP * leaderMult);
+
+        return (leaderXP, goldPerMember);
+    }
+
+    /// <summary>
+    /// Award XP and gold to the leader, splitting among party if in a group.
+    /// Returns actual (xp, gold) awarded to the leader.
+    /// </summary>
+    private (long xp, long gold) AwardDungeonReward(long xp, long gold, string source)
+    {
+        var player = GetCurrentPlayer();
+        if (player == null) return (xp, gold);
+
+        if (teammates.Count > 0)
+        {
+            var (leaderXP, leaderGold) = SplitPartyRewards(xp, gold, source);
+            player.Gold += leaderGold;
+            player.Experience += leaderXP;
+            return (leaderXP, leaderGold);
+        }
+        else
+        {
+            player.Gold += gold;
+            player.Experience += xp;
+            return (xp, gold);
+        }
+    }
+
+    /// <summary>
+    /// Called by the leader's EnterLocation() to mark the group as in-dungeon and notify followers.
+    /// </summary>
+    private async Task SetupGroupDungeon(Character player, TerminalEmulator term)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null || !group.IsLeader(ctx.Username)) return;
+
+        group.IsInDungeon = true;
+        group.CurrentFloor = currentDungeonLevel;
+
+        // Notify group followers that leader has entered the dungeon
+        GroupSystem.Instance!.NotifyGroup(group,
+            $"\u001b[1;33m  * Your group leader {ctx.Username} has entered the dungeon (Floor {currentDungeonLevel})!\u001b[0m" +
+            $"\n\u001b[1;33m  * Go to the Dungeons to join them!\u001b[0m",
+            excludeUsername: ctx.Username);
+
+        // Show leader how many slots are available for NPCs
+        List<string> members;
+        lock (group.MemberUsernames)
+        {
+            members = new List<string>(group.MemberUsernames);
+        }
+
+        int groupedPlayerCount = members.Count - 1; // exclude leader
+        int npcSlots = 4 - groupedPlayerCount; // 4 teammate cap
+
+        // Cap existing NPC teammates if group members take up slots
+        if (groupedPlayerCount > 0 && teammates.Count > npcSlots)
+        {
+            var excess = teammates.Count - npcSlots;
+            var removed = teammates.GetRange(teammates.Count - excess, excess);
+            teammates.RemoveRange(teammates.Count - excess, excess);
+            if (removed.Count > 0)
+            {
+                term.SetColor("yellow");
+                foreach (var r in removed)
+                    term.WriteLine($"  {r.Name2} stays behind to make room for group members.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Enter the dungeon as a group follower. Attaches to the leader's session,
+    /// adds this player's Character to the leader's teammates, sets up output forwarding,
+    /// and enters a simple follower loop.
+    /// </summary>
+    private async Task EnterAsGroupFollower(Character player, TerminalEmulator term, DungeonGroup group)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+
+        var mySession = GroupSystem.GetSession(ctx.Username);
+        if (mySession == null) return;
+
+        // Find the leader's session and dungeon location
+        var leaderSession = GroupSystem.GetSession(group.LeaderUsername);
+        if (leaderSession?.Context?.LocationManager == null)
+        {
+            term.SetColor("red");
+            term.WriteLine("  Could not connect to your group leader's dungeon session.");
+            await term.PressAnyKey();
+            return;
+        }
+
+        var leaderDungeon = leaderSession.Context.LocationManager.GetLocation(GameLocation.Dungeons) as DungeonLocation;
+        if (leaderDungeon == null)
+        {
+            term.SetColor("red");
+            term.WriteLine("  Your group leader is not in the dungeon.");
+            await term.PressAnyKey();
+            return;
+        }
+
+        // Check if leader's party is full (4 teammates max)
+        bool partyFull;
+        lock (leaderDungeon.teammates)
+        {
+            partyFull = leaderDungeon.teammates.Count >= 4;
+        }
+        if (partyFull)
+        {
+            term.SetColor("yellow");
+            term.WriteLine("  Your group leader's party is full (4 allies maximum).");
+            await term.PressAnyKey();
+            return;
+        }
+
+        // Set up this player's Character for group combat
+        player.RemoteTerminal = term;
+        player.GroupPlayerUsername = ctx.Username;
+        player.CombatInputChannel = System.Threading.Channels.Channel.CreateBounded<string>(1);
+
+        // Add to leader's teammates list
+        lock (leaderDungeon.teammates)
+        {
+            leaderDungeon.teammates.Add(player);
+        }
+
+        // Mark this session as a group follower
+        mySession.IsGroupFollower = true;
+        mySession.GroupLeaderSession = leaderSession;
+
+        // Update online location
+        ctx.OnlineState?.UpdateLocation($"Dungeon (Group: {group.LeaderUsername})");
+
+        // Notify leader and group
+        leaderSession.EnqueueMessage(
+            $"\u001b[1;32m  * {ctx.Username} has joined your dungeon group!\u001b[0m");
+        GroupSystem.Instance?.NotifyGroup(group,
+            $"\u001b[1;32m  * {ctx.Username} has entered the dungeon with the group.\u001b[0m",
+            excludeUsername: ctx.Username);
+
+        // Show the current room the leader is in (so follower immediately feels "in" the dungeon)
+        var leaderRoom = leaderDungeon.currentFloor?.GetCurrentRoom();
+        if (leaderRoom != null)
+        {
+            string roomAnsi = leaderDungeon.BuildRoomAnsi(leaderRoom, group.LeaderUsername);
+            PushRoomToSingleFollower(player, roomAnsi, group.LeaderUsername);
+        }
+        else
+        {
+            // Fallback if room not available
+            term.ClearScreen();
+            term.SetColor("gray");
+            term.WriteLine($"  You join {group.LeaderUsername}'s group in the dungeon...");
+            term.WriteLine("");
+        }
+
+        try
+        {
+            await GroupFollowerLoop(player, term, group, mySession, leaderSession, leaderDungeon);
+        }
+        finally
+        {
+            // Clean up: remove from leader's party
+            CleanupGroupFollower(player, term, mySession, leaderSession, leaderDungeon);
+        }
+    }
+
+    /// <summary>
+    /// Follower loop — active input loop (MUD model).
+    /// The follower reads from their own terminal. During combat, input is forwarded
+    /// to the CombatInputChannel which the combat engine reads. Between combats,
+    /// the follower sees dungeon events via EnqueueMessage broadcasts and can use
+    /// slash commands or Q to leave.
+    /// </summary>
+    private async Task GroupFollowerLoop(
+        Character player, TerminalEmulator term, DungeonGroup group,
+        PlayerSession mySession, PlayerSession leaderSession,
+        DungeonLocation leaderDungeon)
+    {
+        try
+        {
+            while (mySession.IsGroupFollower && leaderSession.Context != null)
+            {
+                // Active read from follower's own terminal — message pump is active,
+                // so EnqueueMessage broadcasts appear at the prompt
+                string? input;
+                try
+                {
+                    input = await term.GetInput("");
+                }
+                catch
+                {
+                    break; // disconnect or stream error
+                }
+
+                if (input == null) break; // disconnect
+
+                var trimmed = input.Trim();
+
+                // Q = leave group dungeon
+                if (trimmed.Equals("Q", StringComparison.OrdinalIgnoreCase))
+                    break;
+
+                // If combat engine is waiting for this player's input, forward to channel
+                if (player.IsAwaitingCombatInput && player.CombatInputChannel != null)
+                {
+                    try
+                    {
+                        await player.CombatInputChannel.Writer.WriteAsync(trimmed);
+                    }
+                    catch { /* channel closed */ }
+                    continue;
+                }
+
+                // Slash commands — both chat and game commands
+                if (trimmed.StartsWith("/"))
+                {
+                    bool handled = await ProcessFollowerSlashCommand(trimmed, player, term);
+                    if (!handled)
+                        await MudChatSystem.TryProcessCommand(trimmed, term);
+                    continue;
+                }
+
+                // I = Inventory (with equip/unequip)
+                if (trimmed.Equals("I", StringComparison.OrdinalIgnoreCase))
+                {
+                    await ShowFollowerInventory(player, term);
+                    RePushRoomToFollower(player, leaderDungeon, group);
+                    continue;
+                }
+
+                // P = Use potion (healing or mana)
+                if (trimmed.Equals("P", StringComparison.OrdinalIgnoreCase))
+                {
+                    await UseFollowerPotion(player, term);
+                    RePushRoomToFollower(player, leaderDungeon, group);
+                    continue;
+                }
+
+                // = = Character status
+                if (trimmed == "=")
+                {
+                    await ShowFollowerStatus(player, term);
+                    RePushRoomToFollower(player, leaderDungeon, group);
+                    continue;
+                }
+
+                // Invalid input feedback (between combats)
+                if (trimmed.Length > 0)
+                {
+                    term.SetColor("gray");
+                    term.WriteLine($"  Unknown command '{trimmed}'. Use I/P/=/Q or /help");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[MUD] [{mySession.Username}] GroupFollowerLoop error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Re-push the current room view to a single follower (after they dismiss an overlay like inventory/status).
+    /// </summary>
+    private static void RePushRoomToFollower(Character follower, DungeonLocation leaderDungeon, DungeonGroup group)
+    {
+        var room = leaderDungeon.currentFloor?.GetCurrentRoom();
+        if (room != null)
+        {
+            string roomAnsi = leaderDungeon.BuildRoomAnsi(room, group.LeaderUsername);
+            PushRoomToSingleFollower(follower, roomAnsi, group.LeaderUsername);
+        }
+    }
+
+    /// <summary>
+    /// Process game-specific slash commands for a group follower.
+    /// Returns true if the command was handled, false to fall through to MudChatSystem.
+    /// </summary>
+    private static async Task<bool> ProcessFollowerSlashCommand(string input, Character player, TerminalEmulator term)
+    {
+        var command = input.Substring(1).ToLower().Trim();
+        switch (command)
+        {
+            case "":
+            case "?":
+            case "help":
+            case "commands":
+                term.SetColor("bright_cyan");
+                term.WriteLine("  ═══ FOLLOWER COMMANDS ═══");
+                term.SetColor("white");
+                term.WriteLine("  Between combats:");
+                term.SetColor("yellow");
+                term.Write("    I");
+                term.SetColor("gray");
+                term.WriteLine("  - Inventory (equip/unequip)");
+                term.SetColor("yellow");
+                term.Write("    P");
+                term.SetColor("gray");
+                term.WriteLine("  - Use potion (HP or Mana)");
+                term.SetColor("yellow");
+                term.Write("    =");
+                term.SetColor("gray");
+                term.WriteLine("  - Character status");
+                term.SetColor("yellow");
+                term.Write("    Q");
+                term.SetColor("gray");
+                term.WriteLine("  - Leave dungeon");
+                term.SetColor("white");
+                term.WriteLine("  In combat:");
+                term.SetColor("yellow");
+                term.Write("    A");
+                term.SetColor("gray");
+                term.WriteLine("  - Attack (A2=target #2)");
+                term.SetColor("yellow");
+                term.Write("    C");
+                term.SetColor("gray");
+                term.WriteLine("  - Cast best spell");
+                term.SetColor("yellow");
+                term.Write("    D");
+                term.SetColor("gray");
+                term.WriteLine("  - Defend");
+                term.SetColor("yellow");
+                term.Write("    I");
+                term.SetColor("gray");
+                term.WriteLine("  - Use potion");
+                term.SetColor("yellow");
+                term.Write("    H");
+                term.SetColor("gray");
+                term.WriteLine("  - Heal ally");
+                term.SetColor("yellow");
+                term.Write("    R");
+                term.SetColor("gray");
+                term.WriteLine("  - Retreat");
+                term.SetColor("yellow");
+                term.Write("    1-9");
+                term.SetColor("gray");
+                term.WriteLine(" - Quickbar (spells/abilities)");
+                term.SetColor("white");
+                term.WriteLine("  Slash commands:");
+                term.SetColor("gray");
+                term.WriteLine("    /party  /stats  /health  /gold  /quests");
+                term.WriteLine("    /say  /tell  /who  /help");
+                term.WriteLine("");
+                return true;
+
+            case "s":
+            case "st":
+            case "stats":
+            case "status":
+                term.SetColor("bright_cyan");
+                term.WriteLine($"  {player.DisplayName} — Level {player.Level} {player.Race} {player.Class}");
+                term.SetColor("white");
+                term.WriteLine($"  HP: {player.HP}/{player.MaxHP}  Mana: {player.Mana}/{player.MaxMana}  Sta: {player.CurrentCombatStamina}/{player.Stamina}");
+                term.SetColor("gray");
+                term.WriteLine($"  STR:{player.Strength} DEF:{player.Defense} DEX:{player.Dexterity} AGI:{player.Agility}");
+                term.WriteLine($"  CON:{player.Constitution} INT:{player.Intelligence} WIS:{player.Wisdom} CHA:{player.Charisma}");
+                term.WriteLine($"  XP: {player.Experience:N0}  Gold: {player.Gold:N0}");
+                return true;
+
+            case "h":
+            case "hp":
+            case "health":
+                int hpPct = player.MaxHP > 0 ? (int)(player.HP * 100 / player.MaxHP) : 0;
+                int mpPct = player.MaxMana > 0 ? (int)(player.Mana * 100 / player.MaxMana) : 0;
+                string hpColor = hpPct > 50 ? "green" : hpPct > 25 ? "yellow" : "red";
+                term.SetColor(hpColor);
+                term.WriteLine($"  HP: {player.HP}/{player.MaxHP} ({hpPct}%)");
+                term.SetColor("blue");
+                term.WriteLine($"  MP: {player.Mana}/{player.MaxMana} ({mpPct}%)");
+                term.SetColor("yellow");
+                term.WriteLine($"  Potions: HP={player.Healing}  MP={player.ManaPotions}");
+                return true;
+
+            case "g":
+            case "gold":
+                term.SetColor("yellow");
+                term.WriteLine($"  Gold on hand: {player.Gold:N0}");
+                term.SetColor("gray");
+                term.WriteLine($"  Bank balance: {player.BankGold:N0}");
+                return true;
+
+            case "p":
+            case "party":
+            case "group":
+            {
+                var partyGroup = GroupSystem.Instance?.GetGroupFor(player.GroupPlayerUsername ?? player.DisplayName);
+                if (partyGroup == null)
+                {
+                    term.SetColor("gray");
+                    term.WriteLine("  You are not in a group.");
+                    return true;
+                }
+                term.SetColor("bright_cyan");
+                term.WriteLine("  ═══ GROUP STATUS ═══");
+                // Show all members (snapshot list to avoid lock issues)
+                List<string> memberSnapshot;
+                lock (partyGroup.MemberUsernames)
+                    memberSnapshot = new List<string>(partyGroup.MemberUsernames);
+                foreach (var memberName in memberSnapshot)
+                {
+                    bool isLeader = string.Equals(memberName, partyGroup.LeaderUsername, StringComparison.OrdinalIgnoreCase);
+                    bool isMe = string.Equals(memberName, player.GroupPlayerUsername ?? player.DisplayName, StringComparison.OrdinalIgnoreCase);
+                    var memberSession = GroupSystem.GetSession(memberName);
+                    var memberPlayer = memberSession?.Context?.Engine?.CurrentPlayer;
+                    if (memberPlayer != null)
+                    {
+                        int mhpPct = memberPlayer.MaxHP > 0 ? (int)(memberPlayer.HP * 100 / memberPlayer.MaxHP) : 0;
+                        string mhpColor = mhpPct > 50 ? "32" : mhpPct > 25 ? "33" : "31";
+                        string prefix = isLeader ? "\u001b[1;33m★\u001b[0m" : "·";
+                        string suffix = isMe ? " \u001b[36m(you)\u001b[0m" : "";
+                        term.WriteLine($"  {prefix} \u001b[{mhpColor}m{memberPlayer.DisplayName}\u001b[0m Lv{memberPlayer.Level} {memberPlayer.Class} — HP:{memberPlayer.HP}/{memberPlayer.MaxHP} ({mhpPct}%) MP:{memberPlayer.Mana}/{memberPlayer.MaxMana}{suffix}");
+                    }
+                }
+                return true;
+            }
+
+            case "q":
+            case "quest":
+            case "quests":
+                var activeQuests = QuestSystem.GetActiveQuestsForPlayer(player.DisplayName);
+                if (activeQuests == null || activeQuests.Count == 0)
+                {
+                    term.SetColor("gray");
+                    term.WriteLine("  No active quests.");
+                }
+                else
+                {
+                    term.SetColor("bright_cyan");
+                    term.WriteLine($"  Active Quests ({activeQuests.Count}):");
+                    foreach (var quest in activeQuests.Take(5))
+                    {
+                        term.SetColor("yellow");
+                        term.Write($"    - {quest.Title}");
+                        term.SetColor("gray");
+                        term.WriteLine($" ({quest.GetDifficultyString()})");
+                    }
+                    if (activeQuests.Count > 5)
+                    {
+                        term.SetColor("gray");
+                        term.WriteLine($"    ... and {activeQuests.Count - 5} more");
+                    }
+                }
+                return true;
+
+            default:
+                return false; // Not a game command, let MudChatSystem try
+        }
+    }
+
+    /// <summary>
+    /// Show a follower's equipped items and backpack on their terminal.
+    /// </summary>
+    private static async Task ShowFollowerInventory(Character player, TerminalEmulator term)
+    {
+        while (true)
+        {
+            term.ClearScreen();
+            term.SetColor("bright_cyan");
+            term.WriteLine("  ═══ INVENTORY ═══");
+            term.WriteLine("");
+
+            // Equipped items
+            term.SetColor("white");
+            term.WriteLine("  Equipped:");
+            var slotNames = new (EquipmentSlot slot, string name)[]
+            {
+                (EquipmentSlot.MainHand, "Weapon"),
+                (EquipmentSlot.OffHand, "Off-Hand"),
+                (EquipmentSlot.Head, "Head"),
+                (EquipmentSlot.Body, "Body"),
+                (EquipmentSlot.Arms, "Arms"),
+                (EquipmentSlot.Hands, "Hands"),
+                (EquipmentSlot.Legs, "Legs"),
+                (EquipmentSlot.Feet, "Feet"),
+                (EquipmentSlot.Cloak, "Cloak"),
+                (EquipmentSlot.Waist, "Waist"),
+                (EquipmentSlot.Neck, "Neck"),
+                (EquipmentSlot.LFinger, "L.Ring"),
+                (EquipmentSlot.RFinger, "R.Ring"),
+            };
+
+            var equippedList = new List<(EquipmentSlot slot, string name, Equipment equip)>();
+            foreach (var (slot, name) in slotNames)
+            {
+                if (player.EquippedItems.TryGetValue(slot, out var id) && id > 0)
+                {
+                    var equip = EquipmentDatabase.GetById(id);
+                    if (equip != null)
+                        equippedList.Add((slot, name, equip));
+                }
+            }
+
+            if (equippedList.Count == 0)
+            {
+                term.SetColor("gray");
+                term.WriteLine("    (nothing equipped)");
+            }
+            else
+            {
+                foreach (var (slot, name, equip) in equippedList)
+                {
+                    term.SetColor("gray");
+                    term.Write($"    {name,-10}");
+                    term.SetColor("yellow");
+                    term.WriteLine($"{equip.Name}");
+                }
+            }
+
+            // Backpack
+            term.WriteLine("");
+            term.SetColor("white");
+            term.WriteLine("  Backpack:");
+            if (player.Inventory.Count == 0)
+            {
+                term.SetColor("gray");
+                term.WriteLine("    (empty)");
+            }
+            else
+            {
+                for (int i = 0; i < player.Inventory.Count; i++)
+                {
+                    term.SetColor("gray");
+                    term.Write($"    {i + 1}. ");
+                    term.SetColor("cyan");
+                    term.WriteLine(player.Inventory[i].Name);
+                }
+            }
+
+            term.WriteLine("");
+            term.SetColor("yellow");
+            term.WriteLine($"  Gold: {player.Gold:N0}    HP Potions: {player.Healing}  MP Potions: {player.ManaPotions}");
+
+            // Show equip/unequip options
+            bool hasBackpackItems = player.Inventory.Count > 0;
+            bool hasEquippedItems = equippedList.Count > 0;
+
+            if (hasBackpackItems || hasEquippedItems)
+            {
+                term.WriteLine("");
+                term.SetColor("white");
+                if (hasBackpackItems)
+                    term.Write("  [#] Equip item");
+                if (hasEquippedItems)
+                {
+                    if (hasBackpackItems) term.Write("  ");
+                    term.Write("[U] Unequip");
+                }
+                term.WriteLine("");
+            }
+
+            term.SetColor("gray");
+            term.WriteLine("  [Enter] Close");
+            term.Write("  > ");
+            var choice = await term.GetInput("");
+            var trimChoice = choice.Trim();
+
+            if (string.IsNullOrEmpty(trimChoice))
+                break;
+
+            // Equip from backpack by number
+            if (int.TryParse(trimChoice, out int itemNum) && itemNum >= 1 && itemNum <= player.Inventory.Count)
+            {
+                var item = player.Inventory[itemNum - 1];
+                if (!item.CanUse(player))
+                {
+                    term.SetColor("red");
+                    term.WriteLine($"  You cannot equip {item.Name}.");
+                    await Task.Delay(1500);
+                    continue;
+                }
+
+                // Look up as Equipment in the database
+                var knownEquip = EquipmentDatabase.GetByName(item.Name);
+                if (knownEquip != null)
+                {
+                    // Use Character.EquipItem which handles slot detection, unequip old, etc.
+                    if (player.EquipItem(knownEquip, out string equipMsg))
+                    {
+                        player.Inventory.RemoveAt(itemNum - 1);
+                        term.SetColor("bright_green");
+                        term.WriteLine($"  Equipped {knownEquip.Name}!");
+                        if (!string.IsNullOrEmpty(equipMsg))
+                        {
+                            term.SetColor("gray");
+                            term.WriteLine($"  {equipMsg}");
+                        }
+                    }
+                    else
+                    {
+                        term.SetColor("red");
+                        term.WriteLine($"  Cannot equip: {equipMsg}");
+                    }
+                }
+                else
+                {
+                    term.SetColor("red");
+                    term.WriteLine($"  {item.Name} cannot be equipped.");
+                }
+                await Task.Delay(1500);
+                continue;
+            }
+
+            // Unequip
+            if (trimChoice.Equals("U", StringComparison.OrdinalIgnoreCase) && hasEquippedItems)
+            {
+                term.SetColor("white");
+                term.WriteLine("  Choose slot to unequip:");
+                for (int i = 0; i < equippedList.Count; i++)
+                {
+                    term.SetColor("gray");
+                    term.Write($"    {i + 1}. ");
+                    term.SetColor("yellow");
+                    term.Write($"{equippedList[i].name}: ");
+                    term.SetColor("cyan");
+                    term.WriteLine(equippedList[i].equip.Name);
+                }
+                term.SetColor("gray");
+                term.Write("  Unequip #: ");
+                var unequipChoice = await term.GetInput("");
+                if (int.TryParse(unequipChoice.Trim(), out int slotNum) &&
+                    slotNum >= 1 && slotNum <= equippedList.Count)
+                {
+                    var (uSlot, _, uEquip) = equippedList[slotNum - 1];
+                    var unequipped = player.UnequipSlot(uSlot);
+                    if (unequipped != null)
+                    {
+                        var legacyItem = player.ConvertEquipmentToLegacyItem(unequipped);
+                        player.Inventory.Add(legacyItem);
+                        player.RecalculateStats();
+
+                        term.SetColor("bright_yellow");
+                        term.WriteLine($"  Unequipped {unequipped.Name} to backpack.");
+                    }
+                    else
+                    {
+                        term.SetColor("red");
+                        term.WriteLine("  Cannot unequip (item may be cursed).");
+                    }
+                    await Task.Delay(1000);
+                }
+                continue;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Use a healing or mana potion for a group follower.
+    /// If player has both types, prompts for choice; otherwise auto-uses the available type.
+    /// </summary>
+    private static async Task UseFollowerPotion(Character player, TerminalEmulator term)
+    {
+        term.WriteLine("");
+        bool hasHealPots = player.Healing > 0 && player.HP < player.MaxHP;
+        bool hasManaPots = player.ManaPotions > 0 && player.Mana < player.MaxMana;
+
+        if (!hasHealPots && !hasManaPots)
+        {
+            if (player.Healing <= 0 && player.ManaPotions <= 0)
+            {
+                term.SetColor("red");
+                term.WriteLine("  You have no potions.");
+            }
+            else
+            {
+                term.SetColor("green");
+                term.WriteLine("  HP and Mana are already full.");
+            }
+            await Task.Delay(1500);
+            return;
+        }
+
+        bool useMana = false;
+        if (hasHealPots && hasManaPots)
+        {
+            term.SetColor("white");
+            term.WriteLine($"  [H] Healing potion ({player.Healing} left)  [M] Mana potion ({player.ManaPotions} left)");
+            term.SetColor("gray");
+            term.Write("  Choose: ");
+            var choice = await term.GetInput("");
+            useMana = choice.Trim().Equals("M", StringComparison.OrdinalIgnoreCase);
+        }
+        else if (hasManaPots)
+        {
+            useMana = true;
+        }
+
+        if (useMana)
+        {
+            long oldMana = player.Mana;
+            int manaAmount = 20 + player.Level * 3 + Random.Shared.Next(5, 21);
+            player.Mana = Math.Min(player.MaxMana, player.Mana + manaAmount);
+            long actualMana = player.Mana - oldMana;
+            player.ManaPotions--;
+
+            term.SetColor("bright_blue");
+            term.WriteLine($"  You drink a mana potion and recover {actualMana:N0} MP!");
+            term.SetColor("cyan");
+            term.WriteLine($"  Mana: {player.Mana}/{player.MaxMana}    Mana Potions: {player.ManaPotions}");
+        }
+        else
+        {
+            long oldHP = player.HP;
+            int healAmount = 30 + player.Level * 5 + Random.Shared.Next(10, 31);
+            player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
+            long actualHeal = player.HP - oldHP;
+            player.Healing--;
+            player.Statistics.RecordPotionUsed(actualHeal);
+
+            term.SetColor("bright_green");
+            term.WriteLine($"  You drink a healing potion and recover {actualHeal:N0} HP!");
+            term.SetColor("cyan");
+            term.WriteLine($"  HP: {player.HP}/{player.MaxHP}    Potions: {player.Healing}/{player.MaxPotions}");
+        }
+        await Task.Delay(1500);
+    }
+
+    /// <summary>
+    /// Show a follower's character status on their terminal.
+    /// </summary>
+    private static async Task ShowFollowerStatus(Character player, TerminalEmulator term)
+    {
+        term.ClearScreen();
+        term.SetColor("bright_cyan");
+        term.WriteLine("  ═══ CHARACTER STATUS ═══");
+        term.WriteLine("");
+
+        term.SetColor("white");
+        term.WriteLine($"  {player.DisplayName}");
+        term.SetColor("gray");
+        term.WriteLine($"  Level {player.Level} {player.Race} {player.Class}");
+        term.WriteLine("");
+
+        // HP bar
+        int hpPct = player.MaxHP > 0 ? (int)(player.HP * 20 / player.MaxHP) : 0;
+        hpPct = Math.Clamp(hpPct, 0, 20);
+        string hpBar = new string('#', hpPct) + new string('.', 20 - hpPct);
+        term.SetColor("white");
+        term.Write("  HP:   ");
+        term.SetColor("red");
+        term.Write($"[{hpBar}]");
+        term.SetColor("white");
+        term.WriteLine($" {player.HP}/{player.MaxHP}");
+
+        // MP bar
+        int mpPct = player.MaxMana > 0 ? (int)(player.Mana * 20 / player.MaxMana) : 0;
+        mpPct = Math.Clamp(mpPct, 0, 20);
+        string mpBar = new string('#', mpPct) + new string('.', 20 - mpPct);
+        term.Write("  Mana: ");
+        term.SetColor("blue");
+        term.Write($"[{mpBar}]");
+        term.SetColor("white");
+        term.WriteLine($" {player.Mana}/{player.MaxMana}");
+
+        // Stamina bar
+        int stPct = player.MaxCombatStamina > 0 ? (int)(player.CurrentCombatStamina * 20 / player.MaxCombatStamina) : 0;
+        stPct = Math.Clamp(stPct, 0, 20);
+        string stBar = new string('#', stPct) + new string('.', 20 - stPct);
+        term.Write("  Stam: ");
+        term.SetColor("green");
+        term.Write($"[{stBar}]");
+        term.SetColor("white");
+        term.WriteLine($" {player.CurrentCombatStamina}/{player.MaxCombatStamina}");
+
+        term.WriteLine("");
+        term.SetColor("gray");
+        term.WriteLine($"  STR: {player.Strength,-5} DEF: {player.Defence,-5} DEX: {player.Dexterity,-5} AGI: {player.Agility}");
+        term.WriteLine($"  CON: {player.Constitution,-5} INT: {player.Intelligence,-5} WIS: {player.Wisdom,-5} CHA: {player.Charisma}");
+        term.WriteLine("");
+        term.SetColor("yellow");
+        term.WriteLine($"  Gold: {player.Gold:N0}    XP: {player.Experience:N0}");
+        term.SetColor("green");
+        term.WriteLine($"  Potions: {player.Healing}/{player.MaxPotions}");
+        term.WriteLine("");
+        await term.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Clean up when a group follower exits the dungeon (voluntarily, disconnect, or group disband).
+    /// </summary>
+    private void CleanupGroupFollower(
+        Character player, TerminalEmulator term,
+        PlayerSession mySession, PlayerSession leaderSession,
+        DungeonLocation? leaderDungeon)
+    {
+        // Remove from leader's teammates
+        if (leaderDungeon != null)
+        {
+            lock (leaderDungeon.teammates)
+            {
+                leaderDungeon.teammates.Remove(player);
+            }
+        }
+
+        // Clear group follower state
+        player.RemoteTerminal = null;
+        player.GroupPlayerUsername = null;
+        player.CombatInputChannel = null;
+        player.IsAwaitingCombatInput = false;
+        mySession.IsGroupFollower = false;
+        mySession.GroupLeaderSession = null;
+
+        // Notify leader (follower left the dungeon, not necessarily the group)
+        leaderSession.EnqueueMessage(
+            $"\u001b[1;33m  * {mySession.Username} has left the dungeon.\u001b[0m");
+    }
+
+    /// <summary>
+    /// Clean up group state when the leader exits the dungeon.
+    /// Returns followers to town but keeps the group intact for regrouping.
+    /// </summary>
+    private void CleanupGroupDungeonOnLeaderExit(Character player)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null || !group.IsLeader(ctx.Username)) return;
+
+        if (group.IsInDungeon)
+        {
+            // Snapshot grouped followers before removing from teammates
+            List<Character> groupedFollowers;
+            lock (teammates)
+            {
+                groupedFollowers = teammates.Where(t => t.IsGroupedPlayer).ToList();
+                teammates.RemoveAll(t => t.IsGroupedPlayer);
+            }
+
+            group.IsInDungeon = false;
+
+            // Signal each follower to exit the dungeon (breaks their GroupFollowerLoop)
+            // but do NOT disband the group — they stay grouped for regrouping later
+            foreach (var follower in groupedFollowers)
+            {
+                var followerSession = GroupSystem.GetSession(follower.GroupPlayerUsername ?? "");
+                if (followerSession != null)
+                {
+                    followerSession.IsGroupFollower = false; // breaks the while loop
+                    followerSession.EnqueueMessage(
+                        "\u001b[1;33m  * The leader has left the dungeon. Returning to town...\u001b[0m");
+                }
+            }
+
+            // Notify group (including non-dungeon members)
+            GroupSystem.Instance?.NotifyGroup(group,
+                $"\u001b[1;33m  * {ctx.Username} has left the dungeon. The dungeon run is over.\u001b[0m",
+                excludeUsername: ctx.Username);
+        }
     }
 
     #endregion

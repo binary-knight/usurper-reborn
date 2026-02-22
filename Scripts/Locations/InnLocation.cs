@@ -990,6 +990,17 @@ public class InnLocation : BaseLocation
     }
     
     /// <summary>
+    /// Override base TalkToNPC so the global [0] command routes through the Inn's
+    /// patron interaction flow instead of the generic base location Talk screen.
+    /// Without this, [0] in TryProcessGlobalCommand calls base TalkToNPC() directly,
+    /// bypassing the Inn's TalkToPatrons() and showing stale relationship labels.
+    /// </summary>
+    protected override async Task TalkToNPC()
+    {
+        await TalkToPatrons();
+    }
+
+    /// <summary>
     /// Talk to other patrons - now with interactive NPC selection
     /// </summary>
     private async Task TalkToPatrons()

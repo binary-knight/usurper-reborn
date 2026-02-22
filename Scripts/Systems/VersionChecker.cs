@@ -513,8 +513,8 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogInfo("UPDATE", "Extracting update...");
                 ZipFile.ExtractToDirectory(zipPath, extractDir, overwriteFiles: true);
 
-                // Create the updater script
-                var updaterPath = CreateUpdaterScript(appDir, extractDir, tempDir);
+                // Create the updater script (skip relaunch in BBS door mode — BBS handles restarts)
+                var updaterPath = CreateUpdaterScript(appDir, extractDir, tempDir, BBS.DoorMode.IsInDoorMode);
                 if (string.IsNullOrEmpty(updaterPath))
                 {
                     DownloadError = "Failed to create updater script.";
@@ -542,17 +542,17 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Create a platform-specific updater script
         /// </summary>
-        private string? CreateUpdaterScript(string appDir, string extractDir, string tempDir)
+        private string? CreateUpdaterScript(string appDir, string extractDir, string tempDir, bool skipRelaunch = false)
         {
             try
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    return CreateWindowsUpdater(appDir, extractDir, tempDir);
+                    return CreateWindowsUpdater(appDir, extractDir, tempDir, skipRelaunch);
                 }
                 else
                 {
-                    return CreateUnixUpdater(appDir, extractDir, tempDir);
+                    return CreateUnixUpdater(appDir, extractDir, tempDir, skipRelaunch);
                 }
             }
             catch (Exception ex)
@@ -562,11 +562,18 @@ namespace UsurperRemake.Systems
             }
         }
 
-        private string CreateWindowsUpdater(string appDir, string extractDir, string tempDir)
+        private string CreateWindowsUpdater(string appDir, string extractDir, string tempDir, bool skipRelaunch = false)
         {
             var updaterPath = Path.Combine(tempDir, "updater.bat");
             var exeName = "UsurperReborn.exe";
             var exePath = Path.Combine(appDir, exeName);
+
+            var relaunchSection = skipRelaunch
+                ? @"echo.
+echo Update complete! The BBS will launch the new version on next connection."
+                : $@"echo.
+echo Update complete! Starting game...
+start """" ""{exePath}""";
 
             var script = $@"@echo off
 echo Usurper Reborn Auto-Updater
@@ -594,9 +601,7 @@ if errorlevel 1 (
     goto cleanup
 )
 
-echo.
-echo Update complete! Starting game...
-start """" ""{exePath}""
+{relaunchSection}
 
 :cleanup
 echo.
@@ -608,7 +613,7 @@ rd /S /Q ""{tempDir}"" 2>nul
             return updaterPath;
         }
 
-        private string CreateUnixUpdater(string appDir, string extractDir, string tempDir)
+        private string CreateUnixUpdater(string appDir, string extractDir, string tempDir, bool skipRelaunch = false)
         {
             var updaterPath = Path.Combine(tempDir, "updater.sh");
             var exeName = "UsurperReborn";
@@ -617,7 +622,7 @@ rd /S /Q ""{tempDir}"" 2>nul
             // Build script with explicit \n to avoid CRLF issues when compiled on Windows.
             // C# verbatim strings embed the source file's line endings (CRLF on Windows),
             // which causes "bad interpreter" errors when bash tries to run the script on Linux.
-            var lines = new[]
+            var lines = new List<string>
             {
                 "#!/bin/bash",
                 "echo \"Usurper Reborn Auto-Updater\"",
@@ -647,15 +652,25 @@ rd /S /Q ""{tempDir}"" 2>nul
                 "# Make the executable runnable",
                 $"chmod +x \"{exePath}\"",
                 "",
-                "echo \"\"",
-                "echo \"Update complete! Starting game...\"",
-                $"\"{exePath}\" &",
-                "",
-                "echo \"\"",
-                "echo \"Cleaning up...\"",
-                $"rm -rf \"{tempDir}\"",
-                ""
             };
+
+            if (skipRelaunch)
+            {
+                lines.Add("echo \"\"");
+                lines.Add("echo \"Update complete! The BBS will launch the new version on next connection.\"");
+            }
+            else
+            {
+                lines.Add("echo \"\"");
+                lines.Add("echo \"Update complete! Starting game...\"");
+                lines.Add($"\"{exePath}\" &");
+            }
+
+            lines.Add("");
+            lines.Add("echo \"\"");
+            lines.Add("echo \"Cleaning up...\"");
+            lines.Add($"rm -rf \"{tempDir}\"");
+            lines.Add("");
             var script = string.Join("\n", lines);
 
             File.WriteAllText(updaterPath, script, new System.Text.UTF8Encoding(false));
@@ -674,14 +689,17 @@ rd /S /Q ""{tempDir}"" 2>nul
         {
             try
             {
+                // In BBS door mode, hide the updater window — no console to show it on
+                bool hideWindow = BBS.DoorMode.IsInDoorMode;
+
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = "cmd.exe",
                         Arguments = $"/c \"{updaterPath}\"",
-                        UseShellExecute = true,
-                        CreateNoWindow = false
+                        UseShellExecute = !hideWindow,
+                        CreateNoWindow = hideWindow
                     });
                 }
                 else

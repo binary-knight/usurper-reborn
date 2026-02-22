@@ -92,9 +92,9 @@ public class Item
         if (RequiresEvil && character.Darkness <= 0)
             return false;
             
-        // Check class restrictions
+        // Check class restrictions (all-false = unrestricted, i.e. no class limits set)
         var classIndex = (int)character.Class;
-        if (classIndex < ClassRestrictions.Count && !ClassRestrictions[classIndex])
+        if (ClassRestrictions.Any(r => r) && classIndex < ClassRestrictions.Count && !ClassRestrictions[classIndex])
             return false;
             
         // Check level requirements (for dungeon items)

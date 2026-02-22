@@ -23,6 +23,13 @@ public partial class GameEngine : Node
     private Character? currentPlayer;
 
     /// <summary>
+    /// Temporary remap of dynamic equipment IDs from save → fresh IDs (MUD mode only).
+    /// Used during RestorePlayer to avoid ID collisions between players in shared EquipmentDatabase.
+    /// Also applied during companion equipment restore in CompanionSystem.
+    /// </summary>
+    internal Dictionary<int, int>? DynamicEquipIdRemap { get; set; }
+
+    /// <summary>
     /// Pending notifications to show the player (team events, important world events, etc.)
     /// In MUD mode, stored per-session in SessionContext. In single-player, uses static queue.
     /// </summary>
@@ -1539,11 +1546,10 @@ public partial class GameEngine : Node
         var ctx = UsurperRemake.Server.SessionContext.Current;
         ctx?.OnlineState?.UpdateLocation($"Spectating {targetSession.Username}");
 
-        // Add our stream writer to the target's terminal for output forwarding
-        var myStreamWriter = terminal.StreamWriterInternal;
-        if (myStreamWriter != null)
+        // Add our terminal to the target's terminal for output forwarding
+        if (targetSession.Context?.Terminal != null)
         {
-            targetSession.Context?.Terminal?.AddSpectatorStream(myStreamWriter);
+            targetSession.Context.Terminal.AddSpectatorStream(terminal);
         }
 
         // Disable message pump so forwarded output isn't interleaved with prompt redraws
@@ -1599,10 +1605,7 @@ public partial class GameEngine : Node
         {
             // Cleanup
             targetSession.Spectators.Remove(mySession);
-            if (myStreamWriter != null)
-            {
-                targetSession.Context?.Terminal?.RemoveSpectatorStream(myStreamWriter);
-            }
+            targetSession.Context?.Terminal?.RemoveSpectatorStream(terminal);
             mySession.SpectatingSession = null;
             mySession.IsSpectating = false;
             terminal.MessageSource = savedMessageSource;
@@ -3025,6 +3028,13 @@ public partial class GameEngine : Node
             EquipmentDatabase.ClearDynamicEquipment();
         }
 
+        // In MUD mode, we must remap dynamic equipment IDs to fresh unique IDs.
+        // Multiple players can have overlapping saved IDs (e.g., both have ID 100000),
+        // and RegisterDynamicWithId would overwrite one player's equipment with another's.
+        // This caused equipment to vanish or have wrong stats on save/reload.
+        var equipIdRemap = new Dictionary<int, int>();
+        DynamicEquipIdRemap = equipIdRemap;
+
         if (playerData.DynamicEquipment != null && playerData.DynamicEquipment.Count > 0)
         {
             foreach (var equipData in playerData.DynamicEquipment)
@@ -3073,35 +3083,43 @@ public partial class GameEngine : Node
                     HPRegen = equipData.HPRegen,
                     ManaRegen = equipData.ManaRegen
                 };
-                // Register with the original ID so EquippedItems references still work
-                EquipmentDatabase.RegisterDynamicWithId(equipment, equipData.Id);
+
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    // MUD mode: assign fresh unique ID to avoid collisions with other players
+                    int newId = EquipmentDatabase.RegisterDynamic(equipment);
+                    if (newId != equipData.Id)
+                    {
+                        equipIdRemap[equipData.Id] = newId;
+                    }
+                }
+                else
+                {
+                    // Single-player: use original IDs (no collision risk)
+                    EquipmentDatabase.RegisterDynamicWithId(equipment, equipData.Id);
+                }
             }
-            // GD.Print($"[GameEngine] Restored {playerData.DynamicEquipment.Count} dynamic equipment items");
         }
 
-        // NEW: Restore equipment system
+        // Restore equipment system — remap IDs if needed (MUD mode collision avoidance)
         if (playerData.EquippedItems != null && playerData.EquippedItems.Count > 0)
         {
             player.EquippedItems = playerData.EquippedItems.ToDictionary(
                 kvp => (EquipmentSlot)kvp.Key,
-                kvp => kvp.Value
+                kvp => equipIdRemap.TryGetValue(kvp.Value, out int newId) ? newId : kvp.Value
             );
         }
 
-        // Enforce power-based MinLevel on all equipped items and unequip any that
-        // exceed the player's level (prevents overpowered gear from old saves/trades)
+        // Safety check: if any equipped item can't be found in the database, remove it
+        // (this catches corrupted saves where equipment definitions were lost)
         var slotsToUnequip = new List<EquipmentSlot>();
         foreach (var kvp in player.EquippedItems)
         {
             var equip = EquipmentDatabase.GetById(kvp.Value);
-            if (equip != null)
+            if (equip == null)
             {
-                equip.EnforceMinLevelFromPower();
-                if (player.Level < equip.MinLevel)
-                {
-                    slotsToUnequip.Add(kvp.Key);
-                    DebugLogger.Instance?.LogInfo("EQUIP", $"Unequipping {equip.Name} from {kvp.Key} - requires level {equip.MinLevel}, player is {player.Level}");
-                }
+                slotsToUnequip.Add(kvp.Key);
+                DebugLogger.Instance?.LogWarning("EQUIP", $"Removing orphaned equipment reference from {kvp.Key} (ID {kvp.Value} not found in database)");
             }
         }
         foreach (var slot in slotsToUnequip)
