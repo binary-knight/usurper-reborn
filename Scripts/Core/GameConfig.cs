@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.46.0";
+    public const string Version = "0.46.1";
     public const string VersionName = "Ascension";
 
     // From Pascal global_maxXX constants

@@ -2086,10 +2086,11 @@ public partial class CombatEngine
         if (attacker.HasStatus(StatusEffect.Weakened))
             attackPower = Math.Max(1, attackPower - attacker.Level / 10 - 4);
 
-        // Add weapon power with level scaling
+        // Add weapon power with level scaling (soft cap prevents extreme stacking)
         if (attacker.WeapPow > 0)
         {
-            long weaponBonus = attacker.WeapPow + (attacker.Level / 10);
+            long effectiveWeap = GetEffectiveWeapPow(attacker.WeapPow);
+            long weaponBonus = effectiveWeap + (attacker.Level / 10);
             attackPower += weaponBonus + random.Next(0, (int)Math.Min(int.MaxValue, weaponBonus + 1));
         }
 
@@ -2248,8 +2249,9 @@ public partial class CombatEngine
 
         if (target.ArmPow > 0)
         {
-            // Guard against integer overflow when ArmPow is very large
-            int armPowMax = (int)Math.Min(target.ArmPow, int.MaxValue - 1);
+            // Apply soft cap to armor power (prevents extreme armor stacking)
+            long effectiveArm = GetEffectiveArmPow(target.ArmPow);
+            int armPowMax = (int)Math.Min(effectiveArm, int.MaxValue - 1);
             defense += random.Next(0, armPowMax + 1);
         }
 
@@ -2443,8 +2445,8 @@ public partial class CombatEngine
         terminal.WriteLine("You attempt to backstab!");
         await Task.Delay(GetCombatDelay(1000));
         
-        // Backstab calculation (Pascal-compatible)
-        long backstabPower = player.Strength + player.WeapPow;
+        // Backstab calculation (Pascal-compatible, with weapon soft cap)
+        long backstabPower = player.Strength + GetEffectiveWeapPow(player.WeapPow);
         backstabPower = (long)(backstabPower * GameConfig.BackstabMultiplier); // 3x damage
 
         // Backstab success chance based on dexterity
@@ -3284,8 +3286,8 @@ public partial class CombatEngine
         }
         else
         {
-            // Attack
-            long attackPower = teammate.Strength + teammate.WeapPow + random.Next(1, 16);
+            // Attack (with weapon soft cap)
+            long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
             long defense = monster.GetDefensePower();
             long damage = Math.Max(1, attackPower - defense);
             
@@ -6640,10 +6642,11 @@ public partial class CombatEngine
                         if (player.HasStatus(StatusEffect.Weakened))
                             attackPower = Math.Max(1, attackPower - player.Level / 10 - 4);
 
-                        // Weapon power with level scaling and random
+                        // Weapon power with level scaling and random (soft cap prevents extreme stacking)
                         if (player.WeapPow > 0)
                         {
-                            long weaponBonus = player.WeapPow + (player.Level / 10);
+                            long effectiveWeap = GetEffectiveWeapPow(player.WeapPow);
+                            long weaponBonus = effectiveWeap + (player.Level / 10);
                             attackPower += weaponBonus + random.Next(0, (int)Math.Min(int.MaxValue, weaponBonus + 1));
                         }
 
@@ -6903,7 +6906,7 @@ public partial class CombatEngine
         int successChance = Math.Min(95, 50 + (int)(effectiveDex / 2));
         if (random.Next(100) < successChance)
         {
-            long backstabDamage = (player.Strength + player.WeapPow) * 3;
+            long backstabDamage = (player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 3;
             backstabDamage += random.Next(1, 20);
             backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage);
 
@@ -6930,8 +6933,8 @@ public partial class CombatEngine
         terminal.WriteLine($"You wind up for a powerful strike at {target.Name}!");
         await Task.Delay(GetCombatDelay(500));
 
-        // Power Attack: +50% damage
-        long powerDamage = (long)((player.Strength + player.WeapPow) * 1.5);
+        // Power Attack: +50% damage (with weapon soft cap)
+        long powerDamage = (long)((player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 1.5);
         powerDamage += random.Next(5, 25);
         powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage);
 
@@ -6951,8 +6954,8 @@ public partial class CombatEngine
         terminal.WriteLine($"You carefully aim at {target.Name}'s weak point!");
         await Task.Delay(GetCombatDelay(500));
 
-        // Precise Strike: normal damage but ignores 50% armor
-        long damage = player.Strength + player.WeapPow + random.Next(1, 15);
+        // Precise Strike: normal damage but ignores 50% armor (with weapon soft cap)
+        long damage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
         damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
 
         terminal.SetColor("bright_cyan");
@@ -7041,8 +7044,8 @@ public partial class CombatEngine
         terminal.WriteLine($"You call upon divine wrath against {target.Name}!");
         await Task.Delay(GetCombatDelay(500));
 
-        // Smite: 150% damage + level bonus
-        long smiteDamage = (long)((player.Strength + player.WeapPow) * 1.5) + player.Level;
+        // Smite: 150% damage + level bonus (with weapon soft cap)
+        long smiteDamage = (long)((player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 1.5) + player.Level;
         smiteDamage += random.Next(10, 25);
         smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage);
 
@@ -8853,8 +8856,8 @@ public partial class CombatEngine
             terminal.WriteLine($"{teammate.DisplayName} attacks {weakestMonster.Name}!");
             await Task.Delay(GetCombatDelay(500));
 
-            // Calculate teammate attack damage
-            long attackPower = teammate.Strength + teammate.WeapPow + random.Next(1, 16);
+            // Calculate teammate attack damage (with weapon soft cap)
+            long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
 
             // Apply weapon configuration damage modifier (includes alignment bonuses)
             double damageModifier = GetWeaponConfigDamageModifier(teammate);
@@ -10706,8 +10709,8 @@ public partial class CombatEngine
 
             for (int i = 0; i < rageAttacks && monster.HP > 0; i++)
             {
-                // Berserker attack - base damage * 2, ignore defense partially
-                long berserkerPower = player.Strength * 2 + player.WeapPow * 2 + random.Next(1, 31);
+                // Berserker attack - base damage * 2, ignore defense partially (with weapon soft cap)
+                long berserkerPower = player.Strength * 2 + GetEffectiveWeapPow(player.WeapPow) * 2 + random.Next(1, 31);
 
                 // Apply drug effects (stacks with rage)
                 var drugEffects = DrugSystem.GetDrugEffects(player);
@@ -11805,7 +11808,7 @@ public partial class CombatEngine
     /// </summary>
     private async Task ExecutePvPAttack(Character attacker, Character defender, CombatResult result)
     {
-        long attackPower = attacker.Strength + attacker.WeapPow + random.Next(1, 16);
+        long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.WeapPow) + random.Next(1, 16);
 
         // Apply weapon configuration damage modifier
         double damageModifier = GetWeaponConfigDamageModifier(attacker);
@@ -12183,8 +12186,8 @@ public partial class CombatEngine
             }
         }
 
-        // 3. Default attack
-        long attackPower = computer.Strength + computer.WeapPow + random.Next(1, 16);
+        // 3. Default attack (with weapon soft cap)
+        long attackPower = computer.Strength + GetEffectiveWeapPow(computer.WeapPow) + random.Next(1, 16);
 
         // Apply weapon configuration damage modifier
         double damageModifier = GetWeaponConfigDamageModifier(computer);
@@ -12741,7 +12744,8 @@ public partial class CombatEngine
 
         if (attacker.WeapPow > 0)
         {
-            attackPower += (long)(attacker.WeapPow * 1.5) + random.Next(0, (int)attacker.WeapPow + 1);
+            long effectiveWeap = GetEffectiveWeapPow(attacker.WeapPow);
+            attackPower += (long)(effectiveWeap * 1.5) + random.Next(0, (int)Math.Min(effectiveWeap + 1, int.MaxValue));
         }
 
         attackPower += random.Next(1, 21); // variation
@@ -12755,8 +12759,8 @@ public partial class CombatEngine
         defense = (long)(defense * 1.25); // built-in accuracy penalty
         if (target.ArmPow > 0)
         {
-            // Guard against integer overflow when ArmPow is very large
-            int armPowMax = (int)Math.Min(target.ArmPow, int.MaxValue - 1);
+            long effectiveArm = GetEffectiveArmPow(target.ArmPow);
+            int armPowMax = (int)Math.Min(effectiveArm, int.MaxValue - 1);
             defense += random.Next(0, armPowMax + 1);
         }
 
@@ -12781,11 +12785,12 @@ public partial class CombatEngine
             return;
         }
 
-        // Higher accuracy (+25 %) but normal damage.
+        // Higher accuracy (+25 %) but normal damage (with weapon soft cap).
         long attackPower = attacker.Strength;
         if (attacker.WeapPow > 0)
         {
-            attackPower += attacker.WeapPow + random.Next(0, (int)attacker.WeapPow + 1);
+            long effectiveWeap = GetEffectiveWeapPow(attacker.WeapPow);
+            attackPower += effectiveWeap + random.Next(0, (int)Math.Min(effectiveWeap + 1, int.MaxValue));
         }
         attackPower += random.Next(1, 21);
 
@@ -12798,8 +12803,8 @@ public partial class CombatEngine
         defense = (long)(defense * 0.75);
         if (target.ArmPow > 0)
         {
-            // Guard against integer overflow when ArmPow is very large
-            int armPowMax = (int)Math.Min(target.ArmPow, int.MaxValue - 1);
+            long effectiveArm = GetEffectiveArmPow(target.ArmPow);
+            int armPowMax = (int)Math.Min(effectiveArm, int.MaxValue - 1);
             defense += random.Next(0, armPowMax + 1);
         }
 
@@ -12870,10 +12875,10 @@ public partial class CombatEngine
 
         player.SmiteChargesRemaining--;
 
-        // Smite damage: 150 % of normal attack plus level bonus
+        // Smite damage: 150 % of normal attack plus level bonus (with weapon soft cap)
         long damage = (long)(player.Strength * 1.5) + player.Level;
         if (player.WeapPow > 0)
-            damage += (long)(player.WeapPow * 1.5);
+            damage += (long)(GetEffectiveWeapPow(player.WeapPow) * 1.5);
         damage += random.Next(1, 21);
 
         // Apply weapon configuration damage modifier (2H bonus)
@@ -13155,6 +13160,32 @@ public partial class CombatEngine
         attacks = Math.Min(attacks, 8);
 
         return attacks;
+    }
+
+    /// <summary>
+    /// Apply diminishing returns to weapon power for combat calculations.
+    /// First 500 WeapPow has full effect; above that, only 30% effectiveness.
+    /// This prevents extreme weapon stacking from producing absurd damage.
+    /// Display/UI code should still show raw WeapPow.
+    /// </summary>
+    private static long GetEffectiveWeapPow(long weapPow)
+    {
+        const long SoftCap = 500;
+        const float DiminishingRate = 0.30f;
+        if (weapPow <= SoftCap) return weapPow;
+        return SoftCap + (long)((weapPow - SoftCap) * DiminishingRate);
+    }
+
+    /// <summary>
+    /// Apply diminishing returns to armor power for combat calculations.
+    /// Same soft cap as weapon power for consistency.
+    /// </summary>
+    private static long GetEffectiveArmPow(long armPow)
+    {
+        const long SoftCap = 500;
+        const float DiminishingRate = 0.30f;
+        if (armPow <= SoftCap) return armPow;
+        return SoftCap + (long)((armPow - SoftCap) * DiminishingRate);
     }
 
     /// <summary>

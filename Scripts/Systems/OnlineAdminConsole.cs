@@ -129,6 +129,9 @@ namespace UsurperRemake.Systems
                     case "P":
                         await ResetPlayerPassword();
                         break;
+                    case "I":
+                        await ImmortalizePlayer();
+                        break;
                     case "W":
                         await FullGameReset();
                         break;
@@ -176,6 +179,12 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("  [8] View Online Players");
             terminal.WriteLine("  [9] Clear News Feed");
             terminal.WriteLine("  [A] Broadcast System Message");
+            terminal.WriteLine("");
+
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("═══ GOD MANAGEMENT ═══");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [I] Immortalize Player (Grant Godhood)");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_red");
@@ -744,6 +753,140 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("cyan");
             terminal.WriteLine("  (Live session updated)");
+        }
+
+        internal async Task ImmortalizePlayer()
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══ IMMORTALIZE PLAYER ═══");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  Grant godhood to a player. Their mortal character will become");
+            terminal.WriteLine("  an immortal god in the Pantheon, and they will earn an alt slot.");
+            terminal.WriteLine("");
+
+            var username = await ReadInput("Enter username to immortalize (or blank to cancel): ");
+            if (string.IsNullOrWhiteSpace(username))
+                return;
+
+            username = username.ToLowerInvariant();
+
+            // Block immortalizing alt characters
+            if (SqlSaveBackend.IsAltCharacter(username))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  Cannot immortalize an alt character. Use the main account.");
+                await ReadInput("Press Enter to continue...");
+                return;
+            }
+
+            var saveData = await backend.ReadGameData(username);
+            if (saveData?.Player == null)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  No save data found for '{username}'.");
+                await ReadInput("Press Enter to continue...");
+                return;
+            }
+
+            var player = saveData.Player;
+
+            if (player.IsImmortal)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {player.Name2} is already immortal ({player.DivineName}).");
+                await ReadInput("Press Enter to continue...");
+                return;
+            }
+
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Player: {player.Name2} — Level {player.Level} {GetClassName((int)player.Class)}");
+            terminal.WriteLine("");
+
+            // Get divine name
+            string divineName = "";
+            while (true)
+            {
+                divineName = await ReadInput("  Divine Name (3-30 chars): ");
+                if (divineName.Length >= 3 && divineName.Length <= 30)
+                    break;
+                terminal.SetColor("red");
+                terminal.WriteLine("  Name must be 3-30 characters.");
+                terminal.SetColor("white");
+            }
+
+            // Get alignment
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine("  [1] Light    [2] Dark    [3] Balance");
+            var alignChoice = await ReadInput("  Alignment: ");
+            string alignment = alignChoice switch
+            {
+                "1" => "Light",
+                "2" => "Dark",
+                _ => "Balance"
+            };
+
+            // Confirm
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Ascend {player.Name2} as '{divineName}', {alignment} god?");
+            var confirm = await ReadInput("  Type 'YES' to confirm: ");
+            if (confirm != "YES")
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  Cancelled.");
+                await Task.Delay(1500);
+                return;
+            }
+
+            // Apply immortality
+            player.IsImmortal = true;
+            player.DivineName = divineName;
+            player.GodLevel = 1;
+            player.GodExperience = 0;
+            player.DeedsLeft = GameConfig.GodDeedsPerDay[0];
+            player.GodAlignment = alignment;
+            player.AscensionDate = DateTime.UtcNow;
+            player.HasEarnedAltSlot = true;
+
+            saveData.Player = player;
+            var success = await backend.WriteGameData(username, saveData);
+            if (success)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {player.Name2} has ascended as {divineName}, Lesser Spirit of {alignment}!");
+                terminal.WriteLine("  Alt slot has been granted.");
+                DebugLogger.Instance.LogInfo("ADMIN", $"Player '{player.Name2}' immortalized as '{divineName}' by {DoorMode.OnlineUsername}");
+
+                // Apply to live session if online
+                var server = MudServer.Instance;
+                if (server != null && server.ActiveSessions.TryGetValue(username, out var session))
+                {
+                    var livePlayer = session.Context?.Engine?.CurrentPlayer;
+                    if (livePlayer != null)
+                    {
+                        livePlayer.IsImmortal = true;
+                        livePlayer.DivineName = divineName;
+                        livePlayer.GodLevel = 1;
+                        livePlayer.GodExperience = 0;
+                        livePlayer.DeedsLeft = GameConfig.GodDeedsPerDay[0];
+                        livePlayer.GodAlignment = alignment;
+                        livePlayer.AscensionDate = DateTime.UtcNow;
+                        livePlayer.HasEarnedAltSlot = true;
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine("  (Live session updated)");
+                    }
+                }
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  Failed to save changes!");
+            }
+            await ReadInput("Press Enter to continue...");
         }
 
         private async Task<long> PromptNumericEdit(string fieldName, long currentValue, long min, long max)

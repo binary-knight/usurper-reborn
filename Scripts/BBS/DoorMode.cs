@@ -119,26 +119,39 @@ namespace UsurperRemake.BBS
 
         /// <summary>
         /// The username for the online session (from --user flag, SSH, or in-game auth).
-        /// In MUD mode, returns the per-session username from SessionContext.
+        /// In MUD mode, returns CharacterKey from SessionContext (which reflects alt character
+        /// switching). Falls back to account Username, then the static field.
         /// </summary>
         public static string? OnlineUsername
         {
             get
             {
                 var ctx = UsurperRemake.Server.SessionContext.Current;
-                if (ctx != null && !string.IsNullOrEmpty(ctx.Username))
-                    return ctx.Username;
+                if (ctx != null)
+                {
+                    // CharacterKey is the active save key (e.g. "rage__alt" for alt characters)
+                    if (!string.IsNullOrEmpty(ctx.CharacterKey))
+                        return ctx.CharacterKey;
+                    if (!string.IsNullOrEmpty(ctx.Username))
+                        return ctx.Username;
+                }
                 return _onlineUsername;
             }
         }
 
         /// <summary>
-        /// Set the online username after in-game authentication.
-        /// Also updates the session info so the game engine uses the correct name.
+        /// Set the online username after in-game authentication or alt character switch.
+        /// Updates the per-session CharacterKey (for save routing in MUD mode) and
+        /// the static fallback (for SSH-per-process mode).
         /// </summary>
         public static void SetOnlineUsername(string username)
         {
             _onlineUsername = username;
+            // In MUD mode, also update the session's CharacterKey so GetPlayerName()
+            // and AutoSave use the correct key for alt characters
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null)
+                ctx.CharacterKey = username;
             if (_sessionInfo != null)
             {
                 _sessionInfo.UserName = username;
@@ -810,10 +823,16 @@ namespace UsurperRemake.BBS
         /// </summary>
         public static string GetPlayerName()
         {
-            // In MUD mode, each session has its own username via SessionContext
+            // In MUD mode, each session has its own save key via SessionContext.CharacterKey
+            // CharacterKey reflects alt character switching (e.g. "rage__alt")
             var ctx = UsurperRemake.Server.SessionContext.Current;
-            if (ctx != null && !string.IsNullOrEmpty(ctx.Username))
-                return ctx.Username;
+            if (ctx != null)
+            {
+                if (!string.IsNullOrEmpty(ctx.CharacterKey))
+                    return ctx.CharacterKey;
+                if (!string.IsNullOrEmpty(ctx.Username))
+                    return ctx.Username;
+            }
 
             if (_sessionInfo == null)
                 return "Player";

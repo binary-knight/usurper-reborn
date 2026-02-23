@@ -11,11 +11,11 @@ using System.Linq;
 /// - Cursed items (5-10% chance on rare+ items)
 /// - Level-appropriate stats that feel exciting and rewarding
 ///
-/// Power Philosophy:
+/// Power Philosophy (v0.46.1: reduced scaling from level/40 to level/80):
 /// - Level 1 common weapon: ~5-10 attack
-/// - Level 50 epic weapon: ~200-400 attack
-/// - Level 100 legendary weapon: ~800-1200 attack
-/// - Artifacts can exceed 1500+ attack with unique effects
+/// - Level 50 epic weapon: ~120-240 attack
+/// - Level 100 legendary weapon: ~400-700 attack
+/// - Artifacts can exceed 900+ attack with unique effects
 /// </summary>
 public static class LootGenerator
     {
@@ -674,9 +674,9 @@ public static class LootGenerator
         {
             var stats = RarityStats[rarity];
 
-            // Calculate power with level scaling (v0.41.4: reduced from level/25 to level/40)
-            // Base formula: basePower * (1 + level/40) * rarityMult
-            float levelScale = 1.0f + (level / 40.0f);
+            // Calculate power with level scaling (v0.46.1: reduced from level/40 to level/80)
+            // Base formula: basePower * (1 + level/80) * rarityMult
+            float levelScale = 1.0f + (level / 80.0f);
             int basePower = (int)(template.BasePower * levelScale * stats.PowerMult);
 
             // Add randomness (±15%)
@@ -734,7 +734,7 @@ public static class LootGenerator
         {
             var stats = RarityStats[rarity];
 
-            float levelScale = 1.0f + (level / 40.0f);
+            float levelScale = 1.0f + (level / 80.0f);
             int basePower = (int)(template.BasePower * levelScale * stats.PowerMult);
 
             int variance = (int)(basePower * 0.15f);
@@ -784,7 +784,7 @@ public static class LootGenerator
         {
             var stats = RarityStats[rarity];
 
-            float levelScale = 1.0f + (level / 40.0f);
+            float levelScale = 1.0f + (level / 80.0f);
             int basePower = (int)(template.BasePower * levelScale * stats.PowerMult);
 
             int variance = (int)(basePower * 0.15f);

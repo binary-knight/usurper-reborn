@@ -333,7 +333,13 @@ public partial class GameEngine : Node
     {
         InitializeGame();
 
-        var playerName = UsurperRemake.BBS.DoorMode.GetPlayerName();
+        // In MUD mode, use the immutable account username from SessionContext.
+        // GetPlayerName() can return alt keys or corrupted values after character switching.
+        // In BBS door mode, fall back to GetPlayerName() (reads from drop file).
+        var ctx0 = UsurperRemake.Server.SessionContext.Current;
+        var playerName = (ctx0 != null && !string.IsNullOrEmpty(ctx0.Username))
+            ? ctx0.Username
+            : UsurperRemake.BBS.DoorMode.GetPlayerName();
         UsurperRemake.BBS.DoorMode.Log($"BBS Door mode: Looking for save for '{playerName}'");
 
         // Show the title screen (once per session)
@@ -353,15 +359,18 @@ public partial class GameEngine : Node
             terminal.WriteLine("");
         }
 
-        terminal.SetColor("white");
-        terminal.WriteLine($"Welcome, {playerName}!");
-        terminal.WriteLine("");
-
         // Check if this account has existing characters (main + alt)
         var accountName = playerName;
         var altKey = SqlSaveBackend.GetAltKey(accountName);
         var mainSave = SaveSystem.Instance.GetMostRecentSave(accountName);
         var altSave = SaveSystem.Instance.GetMostRecentSave(altKey);
+
+        // Show welcome with display name from save (if available), otherwise capitalize account name
+        var welcomeName = mainSave?.PlayerName ?? altSave?.PlayerName
+            ?? (char.ToUpper(playerName[0]) + playerName.Substring(1));
+        terminal.SetColor("white");
+        terminal.WriteLine($"Welcome, {welcomeName}!");
+        terminal.WriteLine("");
         bool isSysOp = UsurperRemake.BBS.DoorMode.IsSysOp;
         bool isOnlineAdmin = UsurperRemake.Server.SessionContext.IsActive
             ? (UsurperRemake.Server.SessionContext.Current?.WizardLevel ?? UsurperRemake.Server.WizardLevel.Mortal) >= UsurperRemake.Server.WizardLevel.God
@@ -492,7 +501,7 @@ public partial class GameEngine : Node
                 }
                 else if (altSave != null)
                 {
-                    await SwitchToAltCharacter(altKey);
+                    await SwitchToAltCharacter(altKey, altSave.PlayerName);
                     await LoadSaveByFileName(altKey);
                 }
                 break;
@@ -500,7 +509,7 @@ public partial class GameEngine : Node
             case "2":
                 if (altSave != null)
                 {
-                    await SwitchToAltCharacter(altKey);
+                    await SwitchToAltCharacter(altKey, altSave.PlayerName);
                     await LoadSaveByFileName(altKey);
                 }
                 else if (mainSave != null)
@@ -665,7 +674,7 @@ public partial class GameEngine : Node
                 }
                 else if (altSave != null)
                 {
-                    await SwitchToAltCharacter(altKey);
+                    await SwitchToAltCharacter(altKey, altSave.PlayerName);
                     await LoadSaveByFileName(altKey);
                 }
                 else
@@ -4244,8 +4253,11 @@ public partial class GameEngine : Node
     public async Task SaveCurrentGame()
     {
         if (currentPlayer == null) return;
-        
-        var playerName = currentPlayer.Name2 ?? currentPlayer.Name1;
+
+        // In online mode, use the session's character key (handles alt characters correctly)
+        var playerName = UsurperRemake.BBS.DoorMode.IsOnlineMode
+            ? (UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? currentPlayer.Name2 ?? currentPlayer.Name1)
+            : (currentPlayer.Name2 ?? currentPlayer.Name1);
         terminal.WriteLine("Saving game...", "yellow");
         
         var success = await SaveSystem.Instance.SaveGame(playerName, currentPlayer);
@@ -4787,7 +4799,9 @@ public partial class GameEngine : Node
     }
 
     /// <summary>Switch session identity to an alt character key for save/load routing.</summary>
-    private async Task SwitchToAltCharacter(string altKey)
+    /// <param name="altKey">The alt character DB key (e.g. "rage__alt")</param>
+    /// <param name="displayName">Optional display name for online presence (from save info). Falls back to altKey.</param>
+    private async Task SwitchToAltCharacter(string altKey, string? displayName = null)
     {
         UsurperRemake.BBS.DoorMode.SetOnlineUsername(altKey);
         var ctx = UsurperRemake.Server.SessionContext.Current;
@@ -4798,7 +4812,9 @@ public partial class GameEngine : Node
         if (osm != null)
         {
             var connType = ctx?.ConnectionType ?? "Unknown";
-            await osm.SwitchIdentity(altKey, altKey, connType);
+            // Use the character's display name (not the raw __alt key) for online presence
+            var onlineName = !string.IsNullOrEmpty(displayName) ? displayName : altKey;
+            await osm.SwitchIdentity(altKey, onlineName, connType);
         }
     }
 
