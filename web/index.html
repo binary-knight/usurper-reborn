@@ -1242,6 +1242,18 @@
         .leaderboard-table .lb-losses { color: var(--red); text-align: center; }
         .leaderboard-table .lb-gold { color: var(--gold); text-align: right; }
 
+        .leaderboard-section.immortals { margin-top: 0; margin-bottom: 16px; }
+        .leaderboard-section.immortals h3 { color: #ffd700; }
+        .leaderboard-table .lb-divine { color: #ffd700; }
+        .leaderboard-table .lb-title { color: #ccc; }
+        .leaderboard-table .lb-alignment { color: #aaa; text-align: center; }
+        .leaderboard-table .lb-believers { color: var(--green); text-align: center; }
+        .leaderboard-table .lb-status { text-align: center; }
+        .leaderboard-table .lb-status.online { color: #0f0; }
+        .leaderboard-table .lb-status.offline { color: #666; }
+        .online-players-table .immortal-name { color: #ffd700; }
+        .online-players-table .immortal-class { color: #ffd700; }
+
         .stats-refresh {
             text-align: center;
             margin-top: 16px;
@@ -1979,6 +1991,11 @@
                 <div class="credit-role">ANSI Art</div>
                 <p>Race and class portrait art seen during character creation. Beautiful ANSI art from <a href="https://x-bit.org/" target="_blank" style="color:var(--cyan-dim);">x-bit.org</a>.</p>
             </div>
+            <div class="credit-card">
+                <h3>fastfinge</h3>
+                <div class="credit-role">Code Contributions</div>
+                <p>Community contributor helping improve the codebase.</p>
+            </div>
         </div>
 
         <div style="text-align:center;margin-top:32px;color:var(--text-dim);font-size:14px;">
@@ -2235,9 +2252,15 @@
             for (const p of data.online) {
                 const isSpectating = p.location && p.location.startsWith('Spectating ');
                 html += '<tr>';
-                html += '<td class="player-name">' + escapeHtml(p.name) + '</td>';
-                html += '<td class="player-class">' + escapeHtml(p.className) + '</td>';
-                html += '<td>' + p.level + '</td>';
+                if (p.isImmortal && p.divineName) {
+                    html += '<td class="player-name immortal-name">' + escapeHtml(p.divineName) + '</td>';
+                    html += '<td class="player-class immortal-class">Immortal</td>';
+                    html += '<td>' + p.godLevel + '</td>';
+                } else {
+                    html += '<td class="player-name">' + escapeHtml(p.name) + '</td>';
+                    html += '<td class="player-class">' + escapeHtml(p.className) + '</td>';
+                    html += '<td>' + p.level + '</td>';
+                }
                 if (isSpectating) {
                     html += '<td style="color:#c084fc;font-style:italic">' + escapeHtml(p.location) + '</td>';
                 } else {
@@ -2299,7 +2322,26 @@
         }
         html += '</div>';
 
-        // Player leaderboard
+        // Immortals section (ascended player-gods)
+        if (data.immortals && data.immortals.length > 0) {
+            html += '<div class="leaderboard-section immortals"><h3>// THE PANTHEON</h3>';
+            html += '<table class="leaderboard-table"><thead><tr>';
+            html += '<th>Divine Name</th><th>Title</th><th class="lb-alignment">Alignment</th><th class="lb-believers">Believers</th><th class="lb-status">Status</th>';
+            html += '</tr></thead><tbody>';
+            for (const g of data.immortals) {
+                const onlineDot = g.isOnline ? '<span class="online-indicator">&#9679;</span>' : '';
+                html += '<tr>';
+                html += '<td class="lb-divine">' + onlineDot + escapeHtml(g.divineName) + '</td>';
+                html += '<td class="lb-title">' + escapeHtml(g.godTitle) + ' (Lv ' + g.godLevel + ')</td>';
+                html += '<td class="lb-alignment">' + escapeHtml(g.godAlignment) + '</td>';
+                html += '<td class="lb-believers">' + g.believers + '</td>';
+                html += '<td class="lb-status ' + (g.isOnline ? 'online' : 'offline') + '">' + (g.isOnline ? 'ONLINE' : 'OFFLINE') + '</td>';
+                html += '</tr>';
+            }
+            html += '</tbody></table></div>';
+        }
+
+        // Player leaderboard (mortal players only)
         if (data.leaderboard && data.leaderboard.length > 0) {
             html += '<div class="leaderboard-section"><h3>// HALL OF FAME</h3>';
             html += '<table class="leaderboard-table"><thead><tr>';

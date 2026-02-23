@@ -192,7 +192,7 @@ public class GodSystem
     {
         if (level >= 1 && level <= GameConfig.MaxGodLevel)
         {
-            return GameConfig.GodTitles[level];
+            return GameConfig.GodTitles[Math.Clamp(level - 1, 0, GameConfig.GodTitles.Length - 1)];
         }
         return "Lesser Spirit";
     }

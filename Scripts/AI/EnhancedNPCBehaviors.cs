@@ -1100,18 +1100,19 @@ public class AffairState
 }
 
 /// <summary>
-/// Singleton registry for tracking NPC-NPC marriages and player affairs
+/// Singleton registry for tracking NPC-NPC marriages and player affairs.
+/// Thread-safe: accessed concurrently by world sim and multiple player sessions in MUD mode.
 /// </summary>
 public class NPCMarriageRegistry
 {
     private static NPCMarriageRegistry? _instance;
     public static NPCMarriageRegistry Instance => _instance ??= new NPCMarriageRegistry();
 
-    // NPC ID -> Spouse NPC ID
-    private Dictionary<string, string> marriages = new();
+    // NPC ID -> Spouse NPC ID (thread-safe for concurrent MUD access)
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> marriages = new();
 
-    // Married NPC ID -> AffairState (player seducing them)
-    private Dictionary<string, AffairState> affairs = new();
+    // "marriedNpcId:seducerId" -> AffairState (thread-safe)
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AffairState> affairs = new();
 
     public void RegisterMarriage(string npc1Id, string npc2Id, string npc1Name, string npc2Name)
     {
@@ -1123,10 +1124,9 @@ public class NPCMarriageRegistry
 
     public void EndMarriage(string npcId)
     {
-        if (marriages.TryGetValue(npcId, out var spouseId))
+        if (marriages.TryRemove(npcId, out var spouseId))
         {
-            marriages.Remove(npcId);
-            marriages.Remove(spouseId);
+            marriages.TryRemove(spouseId, out _);
             GD.Print($"[MarriageRegistry] Ended marriage for {npcId}");
         }
     }
@@ -1144,16 +1144,11 @@ public class NPCMarriageRegistry
     public AffairState GetOrCreateAffair(string marriedNpcId, string seducerId)
     {
         var key = $"{marriedNpcId}:{seducerId}";
-        if (!affairs.TryGetValue(key, out var affair))
+        return affairs.GetOrAdd(key, _ => new AffairState
         {
-            affair = new AffairState
-            {
-                MarriedNpcId = marriedNpcId,
-                SeducerId = seducerId
-            };
-            affairs[key] = affair;
-        }
-        return affair;
+            MarriedNpcId = marriedNpcId,
+            SeducerId = seducerId
+        });
     }
 
     public AffairState? GetAffair(string marriedNpcId, string seducerId)
@@ -1165,11 +1160,11 @@ public class NPCMarriageRegistry
     public void ClearAffair(string marriedNpcId, string seducerId)
     {
         var key = $"{marriedNpcId}:{seducerId}";
-        affairs.Remove(key);
+        affairs.TryRemove(key, out _);
     }
 
     /// <summary>
-    /// Get all current NPC-NPC marriages for saving
+    /// Get all current NPC-NPC marriages for saving (snapshot)
     /// </summary>
     public List<NPCMarriageData> GetAllMarriages()
     {
@@ -1194,7 +1189,7 @@ public class NPCMarriageRegistry
     }
 
     /// <summary>
-    /// Get all affairs for saving
+    /// Get all affairs for saving (snapshot)
     /// </summary>
     public List<AffairState> GetAllAffairs()
     {
@@ -1202,7 +1197,8 @@ public class NPCMarriageRegistry
     }
 
     /// <summary>
-    /// Restore marriages from save data
+    /// Restore marriages from save data (replaces all entries).
+    /// Only called by world sim on startup and single-player save/load.
     /// </summary>
     public void RestoreMarriages(List<NPCMarriageData>? data)
     {
@@ -1217,7 +1213,8 @@ public class NPCMarriageRegistry
     }
 
     /// <summary>
-    /// Restore affairs from save data
+    /// Restore affairs from save data (replaces all entries).
+    /// Only called by world sim on startup and single-player save/load.
     /// </summary>
     public void RestoreAffairs(List<AffairState>? data)
     {

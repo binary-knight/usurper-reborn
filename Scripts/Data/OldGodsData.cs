@@ -55,8 +55,8 @@ namespace UsurperRemake.Data
                 Name = "Maelketh, The Broken Blade",
                 Title = "God of War and Conquest",
                 Level = 28,           // Slightly above floor 25 - requires preparation
-                HP = 2500,            // Requires full team to take down
-                MaxHP = 2500,
+                HP = 15000,           // God of War — a brutal, drawn-out battle
+                MaxHP = 15000,
                 Strength = 120,       // Hits hard - need good armor
                 Defence = 80,
                 Agility = 60,
@@ -141,8 +141,8 @@ namespace UsurperRemake.Data
                 Name = "Veloura, The Withered Heart",
                 Title = "Goddess of Love and Passion",
                 Level = 44,           // Above floor 40 - requires preparation
-                HP = 3500,            // Lower HP but dangerous charm abilities
-                MaxHP = 3500,
+                HP = 25000,           // Goddess of Love — deceptively resilient
+                MaxHP = 25000,
                 Strength = 90,
                 Defence = 85,
                 Agility = 110,
@@ -246,8 +246,8 @@ namespace UsurperRemake.Data
                 Name = "Thorgrim, The Hollow Judge",
                 Title = "God of Law and Order",
                 Level = 60,           // Above floor 55 - requires preparation
-                HP = 5000,            // Very tanky - need sustained damage
-                MaxHP = 5000,
+                HP = 40000,           // God of Law — immovable judge, endurance fight
+                MaxHP = 40000,
                 Strength = 140,
                 Defence = 160,        // High defense - need armor penetration
                 Agility = 50,
@@ -335,8 +335,8 @@ namespace UsurperRemake.Data
                 Name = "Noctura, The Shadow Weaver",
                 Title = "Goddess of Shadow and Secrets",
                 Level = 75,           // Above floor 70 - requires preparation
-                HP = 5500,            // Elusive but deadly
-                MaxHP = 5500,
+                HP = 50000,           // Goddess of Shadow — elusive but deadly
+                MaxHP = 50000,
                 Strength = 130,
                 Defence = 100,
                 Agility = 180,        // Very fast - hard to hit
@@ -446,8 +446,8 @@ namespace UsurperRemake.Data
                 Name = "Aurelion, The Fading Light",
                 Title = "God of Light and Truth",
                 Level = 90,           // Above floor 85 - requires preparation
-                HP = 10000,           // Radiant but fading power — divine armor makes enchanted weapons essential
-                MaxHP = 10000,
+                HP = 75000,           // God of Light — radiant divine armor, enchanted weapons essential
+                MaxHP = 75000,
                 Strength = 160,
                 Defence = 120,
                 Agility = 100,
@@ -554,8 +554,8 @@ namespace UsurperRemake.Data
                 Name = "Terravok, The Sleeping Mountain",
                 Title = "God of Earth and Endurance",
                 Level = 98,           // Near floor 95 - penultimate challenge
-                HP = 16000,           // Massive HP pool — divine stone skin demands preparation
-                MaxHP = 16000,
+                HP = 100000,          // God of Earth — massive stone skin, demands full preparation
+                MaxHP = 100000,
                 Strength = 200,       // Devastating slow hits
                 Defence = 250,        // Incredibly tanky
                 Agility = 25,
@@ -663,8 +663,8 @@ namespace UsurperRemake.Data
                 Name = "Manwe, The Weary Creator",
                 Title = "Supreme God of Creation and Balance",
                 Level = 100,          // Final boss - the ultimate challenge
-                HP = 22000,           // The Creator — requires full enchants and artifacts to overcome
-                MaxHP = 22000,
+                HP = 150000,          // The Creator — the ultimate battle, requires everything you've got
+                MaxHP = 150000,
                 Strength = 220,
                 Defence = 200,
                 Agility = 180,

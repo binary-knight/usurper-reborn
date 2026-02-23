@@ -27,6 +27,7 @@ namespace UsurperRemake.Systems
         private TerminalEmulator? terminal;
         private Character? player;
         private Random random = new();
+        private int _matchCount = 0;
 
         public IntimacySystem()
         {
@@ -94,7 +95,8 @@ namespace UsurperRemake.Systems
             foreach (var p in partners)
             {
                 RelationshipSystem.UpdateRelationship(player, p, 1, adjustedSteps, false, false);
-                RelationshipSystem.UpdateRelationship(p, player, 1, adjustedSteps, false, false);
+                // NPC's feeling toward player can deepen past Friendship through intimacy
+                RelationshipSystem.UpdateRelationship(p, player, 1, adjustedSteps, false, true);
             }
 
             // Check for pregnancy
@@ -108,6 +110,9 @@ namespace UsurperRemake.Systems
         {
             var primaryPartner = partners.First();
             var profile = primaryPartner.Brain?.Personality;
+
+            // Reset personality match tracking for this scene
+            _matchCount = 0;
 
             // Determine if this is their first time together
             isFirstTime = !RomanceTracker.Instance.EncounterHistory.Any(e => e.PartnerIds.Contains(primaryPartner.ID));
@@ -154,17 +159,59 @@ namespace UsurperRemake.Systems
             };
             RomanceTracker.Instance.RecordEncounter(encounter);
 
-            // Relationship boost from intimacy - modest gain, no longer bypasses friendship cap
-            // Steps are affected by difficulty: Easy = more gain, Hard/Nightmare = less gain
-            // Reduced from 10 to 3 base steps for balance (v0.26 relationship rebalance)
-            int baseSteps = 3;
+            // Relationship boost from intimacy — varies by personality match quality
+            // 0 matches = 2 steps, 1 = 3, 2 = 5, 3 (perfect) = 7 + Lover's Bliss combat buff
+            int baseSteps = _matchCount switch
+            {
+                0 => 2,
+                1 => 3,
+                2 => 5,
+                3 => 7,
+                _ => 3
+            };
             int adjustedSteps = DifficultySystem.ApplyRelationshipMultiplier(baseSteps);
+
+            // Show connection quality summary (only for full scenes, not fade-to-black)
+            if (player?.SkipIntimateScenes != true && _matchCount >= 0)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("  ════════════════════════════════════════════════════════════════");
+                switch (_matchCount)
+                {
+                    case 3:
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  A perfect connection. You and {primaryPartner.Name2} are in complete harmony.");
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine("  You feel empowered by your bond. (Lover's Bliss: +10% damage/defense for 5 combats)");
+                        player!.LoversBlissCombats = 5;
+                        player.LoversBlissBonus = 0.10f;
+                        break;
+                    case 2:
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  A strong connection. You and {primaryPartner.Name2} understand each other well.");
+                        break;
+                    case 1:
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"  A pleasant encounter. You're still learning what {primaryPartner.Name2} likes.");
+                        break;
+                    default:
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  An awkward encounter. You and {primaryPartner.Name2} aren't quite in sync yet.");
+                        break;
+                }
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("  ════════════════════════════════════════════════════════════════");
+                terminal.WriteLine("");
+                await terminal.GetInput("  Press Enter to continue...");
+            }
+
             foreach (var partner in partners)
             {
                 // Update player's feeling toward partner
                 RelationshipSystem.UpdateRelationship(player!, partner, 1, adjustedSteps, false, false);
-                // Also update partner's feeling toward player (bidirectional)
-                RelationshipSystem.UpdateRelationship(partner, player!, 1, adjustedSteps, false, false);
+                // NPC's feeling toward player can deepen past Friendship through intimacy
+                RelationshipSystem.UpdateRelationship(partner, player!, 1, adjustedSteps, false, true);
             }
 
             // Check for pregnancy (only for opposite-sex spouse encounters)
@@ -342,6 +389,78 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Evaluate whether the player's choice matches the NPC's personality preferences.
+        /// Returns true if matched, and increments _matchCount.
+        /// </summary>
+        private bool EvaluateChoice(NPC partner, int phase, string choice)
+        {
+            var profile = partner.Brain?.Personality;
+            if (profile == null) return false;
+
+            bool matched = false;
+
+            switch (phase)
+            {
+                case 1: // Anticipation: How do you begin?
+                    matched = choice switch
+                    {
+                        "1" => profile.Tenderness > 0.5f || profile.Romanticism > 0.5f,      // Take it slow
+                        "2" => profile.Passion > 0.5f || profile.Sensuality > 0.5f,           // Pull them close
+                        "3" => profile.IntimateStyle == RomanceStyle.Dominant ||                // Let them lead
+                               profile.IntimateStyle == RomanceStyle.Switch,
+                        _ => false
+                    };
+                    break;
+
+                case 3: // Escalation: What do you whisper?
+                    matched = choice switch
+                    {
+                        "1" => profile.Romanticism > 0.5f || profile.Tenderness > 0.5f,      // "You're so beautiful"
+                        "2" => profile.Passion > 0.5f || profile.Adventurousness > 0.5f,      // "I need you. Now."
+                        "3" => profile.Sensuality > 0.5f ||                                    // "Tell me what you want"
+                               profile.IntimateStyle == RomanceStyle.Dominant,
+                        _ => false
+                    };
+                    break;
+
+                case 5: // Afterglow: What do you say?
+                    matched = choice switch
+                    {
+                        "1" => profile.Commitment > 0.5f || profile.Romanticism > 0.5f,      // "Stay with me tonight"
+                        "2" => profile.Passion > 0.5f || profile.Sensuality > 0.5f,           // "That was amazing"
+                        "3" => profile.Tenderness > 0.5f || profile.Patience > 0.5f,          // Hold them close
+                        _ => false
+                    };
+                    break;
+            }
+
+            if (matched) _matchCount++;
+            return matched;
+        }
+
+        /// <summary>
+        /// Show colored feedback after a player choice so they learn the NPC's preferences.
+        /// </summary>
+        private void ShowChoiceReaction(NPC partner, bool matched)
+        {
+            string their = partner.Sex == CharacterSex.Female ? "she" : "he";
+            terminal!.WriteLine("");
+
+            if (matched)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  * {partner.Name2}'s eyes light up. This is exactly what {their} wanted.");
+            }
+            else
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  * {partner.Name2} smiles, going along with your lead.");
+            }
+
+            terminal.SetColor("white");
+        }
+
+        /// <summary>
         /// Display scene header
         /// </summary>
         private async Task ShowSceneHeader(NPC partner, IntimacyMood mood)
@@ -427,6 +546,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             string choice = await terminal.GetInput("  Your choice: ");
+
+            bool phase1Match = EvaluateChoice(partner, 1, choice);
+            ShowChoiceReaction(partner, phase1Match);
 
             terminal.ClearScreen();
             await ShowSceneHeader(partner, mood);
@@ -623,6 +745,9 @@ namespace UsurperRemake.Systems
 
             string choice = await terminal.GetInput("  Your choice: ");
 
+            bool phase3Match = EvaluateChoice(partner, 3, choice);
+            ShowChoiceReaction(partner, phase3Match);
+
             terminal.ClearScreen();
             await ShowSceneHeader(partner, mood);
 
@@ -793,6 +918,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             string choice = await terminal.GetInput("  Your choice: ");
+
+            bool phase5Match = EvaluateChoice(partner, 5, choice);
+            ShowChoiceReaction(partner, phase5Match);
 
             terminal.WriteLine("");
 

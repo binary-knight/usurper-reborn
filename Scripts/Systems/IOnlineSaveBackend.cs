@@ -127,6 +127,35 @@ namespace UsurperRemake.Systems
         /// Update player login/logout timestamps and playtime.
         /// </summary>
         Task UpdatePlayerSession(string username, bool isLogin);
+
+        // === Divine System (God-Mortal Interactions) ===
+
+        /// <summary>Get all immortal (ascended) players.</summary>
+        Task<List<ImmortalPlayerInfo>> GetImmortalPlayers();
+
+        /// <summary>Get mortal (non-immortal) players for divine deed targeting.</summary>
+        Task<List<MortalPlayerInfo>> GetMortalPlayers(int limit = 30);
+
+        /// <summary>Count mortal players who worship a specific god.</summary>
+        Task<int> CountPlayerBelievers(string divineName);
+
+        /// <summary>Atomically apply a divine blessing to an offline player.</summary>
+        Task ApplyDivineBlessing(string username, int combats, float bonus);
+
+        /// <summary>Atomically reduce an offline player's HP by a percentage (never kills).</summary>
+        Task ApplyDivineSmite(string username, float damagePercent);
+
+        /// <summary>Atomically set an offline player's WorshippedGod field.</summary>
+        Task SetPlayerWorshippedGod(string username, string divineName);
+
+        /// <summary>Add god experience to an immortal player identified by divine name.</summary>
+        Task AddGodExperience(string divineName, long amount);
+
+        /// <summary>Get an immortal god's boon configuration by their divine name.</summary>
+        Task<string> GetGodBoonConfig(string divineName);
+
+        /// <summary>Atomically update a god's boon configuration.</summary>
+        Task SetGodBoonConfig(string username, string boonConfig);
     }
 
     /// <summary>
@@ -333,5 +362,34 @@ namespace UsurperRemake.Systems
         public string UpgradeType { get; set; } = "";
         public int Level { get; set; }
         public long InvestedGold { get; set; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Divine System (God-Mortal Interactions)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public class ImmortalPlayerInfo
+    {
+        public string MortalName { get; set; } = "";
+        public string Username { get; set; } = "";
+        public string DivineName { get; set; } = "";
+        public int GodLevel { get; set; }
+        public long GodExperience { get; set; }
+        public string GodAlignment { get; set; } = "";
+        public bool IsOnline { get; set; }
+        public string DivineBoonConfig { get; set; } = "";  // Configured boons for followers
+    }
+
+    public class MortalPlayerInfo
+    {
+        public string DisplayName { get; set; } = "";
+        public string Username { get; set; } = "";
+        public int Level { get; set; }
+        public int ClassId { get; set; }
+        public string WorshippedGod { get; set; } = "";
+        public int BlessingCombats { get; set; }
+        public long HP { get; set; }
+        public long MaxHP { get; set; }
+        public bool IsOnline { get; set; }
     }
 }

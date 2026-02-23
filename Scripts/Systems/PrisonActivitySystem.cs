@@ -151,8 +151,9 @@ public class PrisonActivitySystem
 
     private string PerformShadowBoxing(Character prisoner)
     {
-        prisoner.WeapPow += 1;
-        prisoner.Defence += 1;
+        prisoner.BonusWeapPow += 1;
+        prisoner.BaseDefence += 1;
+        prisoner.RecalculateStats();
 
         return "You practice fighting an imaginary opponent. Attack +1, Defence +1!";
     }
@@ -244,8 +245,8 @@ public class PrisonActivitySystem
                 prisoner.HP = Math.Min(prisoner.HP + prisoner.MaxHP / 10, prisoner.MaxHP);
                 break;
             case PrisonActivity.ShadowBoxing:
-                prisoner.WeapPow += 1;
-                prisoner.Defence += 1;
+                prisoner.BonusWeapPow += 1;
+                prisoner.BaseDefence += 1;
                 break;
             case PrisonActivity.Stretching:
                 prisoner.MaxHP += random.Next(3, 6);

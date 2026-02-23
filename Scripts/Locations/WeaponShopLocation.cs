@@ -660,6 +660,10 @@ public class WeaponShopLocation : BaseLocation
         // Apply faction discount (The Crown gets 10% off at shops)
         adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
 
+        // Apply divine boon shop discount
+        if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
+            adjustedPrice = (long)(adjustedPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
+
         // Calculate total with tax
         var (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
 
@@ -860,6 +864,10 @@ public class WeaponShopLocation : BaseLocation
 
         // Apply city control discount
         long adjustedWeaponPrice = CityControlSystem.Instance.ApplyDiscount(selectedWeapon.Value, currentPlayer);
+
+        // Apply divine boon shop discount
+        if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
+            adjustedWeaponPrice = (long)(adjustedWeaponPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
 
         // Calculate total with tax
         var (_, _, dualWieldTotal) = CityControlSystem.CalculateTaxedPrice(adjustedWeaponPrice);

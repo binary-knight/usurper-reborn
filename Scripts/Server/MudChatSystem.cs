@@ -127,6 +127,25 @@ public static class MudChatSystem
         }
     }
 
+    /// <summary>
+    /// Returns the display name for chat messages, with god title prefix if immortal.
+    /// Mortals: "PlayerName", Gods: "DivineName the Lesser Spirit"
+    /// </summary>
+    private static string GetChatDisplayName(string username)
+    {
+        var server = MudServer.Instance;
+        if (server != null && server.ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))
+        {
+            var playerObj = session.Context?.Engine?.CurrentPlayer;
+            if (playerObj?.IsImmortal == true && !string.IsNullOrEmpty(playerObj.DivineName))
+            {
+                int godIdx = Math.Clamp(playerObj.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
+                return $"{playerObj.DivineName} the {GameConfig.GodTitles[godIdx]}";
+            }
+        }
+        return username;
+    }
+
     private static bool HandleSay(string username, string message, TerminalEmulator terminal)
     {
         if (string.IsNullOrWhiteSpace(message))
@@ -146,9 +165,10 @@ public static class MudChatSystem
         terminal.WriteLine($"  You say: {message}");
 
         // Broadcast to others in the room
+        var displayName = GetChatDisplayName(username);
         RoomRegistry.Instance.BroadcastToRoom(
             location.Value,
-            $"\u001b[1;37m  {username} says: {message}\u001b[0m",
+            $"\u001b[1;37m  {displayName} says: {message}\u001b[0m",
             excludeUsername: username);
 
         return true;
@@ -168,8 +188,9 @@ public static class MudChatSystem
         terminal.WriteLine($"  You shout: {message}");
 
         // Broadcast to ALL connected players
+        var displayName = GetChatDisplayName(username);
         RoomRegistry.Instance!.BroadcastGlobal(
-            $"\u001b[1;33m  {username} shouts: {message}\u001b[0m",
+            $"\u001b[1;33m  {displayName} shouts: {message}\u001b[0m",
             excludeUsername: username);
 
         return true;
@@ -197,9 +218,10 @@ public static class MudChatSystem
         }
 
         // Try to send in-memory first
+        var displayName = GetChatDisplayName(username);
         var server = MudServer.Instance;
         if (server != null && server.SendToPlayer(targetName,
-            $"\u001b[35m  {username} tells you: {message}\u001b[0m"))
+            $"\u001b[35m  {displayName} tells you: {message}\u001b[0m"))
         {
             terminal.SetColor("magenta");
             terminal.WriteLine($"  You tell {targetName}: {message}");
@@ -227,13 +249,14 @@ public static class MudChatSystem
             return true;
 
         // Show to sender
+        var displayName = GetChatDisplayName(username);
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"  * {username} {action}");
+        terminal.WriteLine($"  * {displayName} {action}");
 
         // Broadcast to others in the room
         RoomRegistry.Instance.BroadcastToRoom(
             location.Value,
-            $"\u001b[1;36m  * {username} {action}\u001b[0m",
+            $"\u001b[1;36m  * {displayName} {action}\u001b[0m",
             excludeUsername: username);
 
         return true;
@@ -253,8 +276,9 @@ public static class MudChatSystem
         terminal.WriteLine($"  [Gossip] You: {message}");
 
         // Broadcast to ALL connected players (global out-of-character channel)
+        var displayName = GetChatDisplayName(username);
         RoomRegistry.Instance!.BroadcastGlobal(
-            $"\u001b[92m  [Gossip] {username}: {message}\u001b[0m",
+            $"\u001b[92m  [Gossip] {displayName}: {message}\u001b[0m",
             excludeUsername: username);
 
         return true;
@@ -309,12 +333,25 @@ public static class MudChatSystem
                         groupTag = $" [Group: {playerGroup.LeaderUsername}]";
                 }
 
-                if (session.WizardLevel > WizardLevel.Mortal)
+                // Immortal god tag (v0.45.0)
+                var godTag = "";
+                var playerObj = session.Context?.Engine?.CurrentPlayer;
+                if (playerObj?.IsImmortal == true && !string.IsNullOrEmpty(playerObj.DivineName))
+                {
+                    int godIdx = Math.Clamp(playerObj.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
+                    godTag = $" [{GameConfig.GodTitles[godIdx]}]";
+                }
+
+                if (playerObj?.IsImmortal == true)
+                    terminal.SetColor("bright_yellow");
+                else if (session.WizardLevel > WizardLevel.Mortal)
                     terminal.SetColor(WizardConstants.GetColor(session.WizardLevel));
                 else
                     terminal.SetColor(string.IsNullOrEmpty(isYou) ? "white" : "bright_green");
 
-                var line = $"  {session.Username}{wizTag}{isYou}{invisTag}{specTag}{groupTag} - {locName} [{session.ConnectionType}]";
+                var displayName = (playerObj?.IsImmortal == true && !string.IsNullOrEmpty(playerObj.DivineName))
+                    ? playerObj.DivineName : session.Username;
+                var line = $"  {displayName}{godTag}{wizTag}{isYou}{invisTag}{specTag}{groupTag} - {locName} [{session.ConnectionType}]";
                 terminal.WriteLine($"║{line.PadRight(78)}║");
             }
         }

@@ -185,7 +185,10 @@ namespace UsurperRemake.Systems
                     return true; // Pretend success, save will happen soon
             }
 
-            var playerName = player.Name2 ?? player.Name1;
+            // In online mode, use the session's character key (handles alt characters correctly)
+            var playerName = UsurperRemake.BBS.DoorMode.IsOnlineMode
+                ? (UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? player.Name2 ?? player.Name1)
+                : (player.Name2 ?? player.Name1);
 
             // In online/MUD mode, use per-session day state to avoid shared singleton cross-contamination
             var engine2 = GameEngine.Instance;
@@ -569,6 +572,20 @@ namespace UsurperRemake.Systems
                 PermakillLog = player.PermakillLog ?? new(),
                 LastMurderWeightDecay = player.LastMurderWeightDecay,
 
+                // Immortal Ascension System
+                HasEarnedAltSlot = player.HasEarnedAltSlot,
+                IsImmortal = player.IsImmortal,
+                DivineName = player.DivineName,
+                GodLevel = player.GodLevel,
+                GodExperience = player.GodExperience,
+                DeedsLeft = player.DeedsLeft,
+                GodAlignment = player.GodAlignment,
+                AscensionDate = player.AscensionDate,
+                WorshippedGod = player.WorshippedGod,
+                DivineBlessingCombats = player.DivineBlessingCombats,
+                DivineBlessingBonus = player.DivineBlessingBonus,
+                DivineBoonConfig = player.DivineBoonConfig ?? "",
+
                 // Combat statistics (kill/death counts)
                 MKills = (int)player.MKills,
                 MDefeats = (int)player.MDefeats,
@@ -688,10 +705,14 @@ namespace UsurperRemake.Systems
                 PermanentDamageBonus = player.PermanentDamageBonus,
                 PermanentDefenseBonus = player.PermanentDefenseBonus,
                 BonusMaxHP = player.BonusMaxHP,
+                BonusWeapPow = player.BonusWeapPow,
+                BonusArmPow = player.BonusArmPow,
                 HomeRestsToday = player.HomeRestsToday,
                 HerbsGatheredToday = player.HerbsGatheredToday,
                 WellRestedCombats = player.WellRestedCombats,
                 WellRestedBonus = player.WellRestedBonus,
+                LoversBlissCombats = player.LoversBlissCombats,
+                LoversBlissBonus = player.LoversBlissBonus,
                 CycleExpMultiplier = player.CycleExpMultiplier,
                 ChestContents = SerializeChestContents(player),
 
@@ -949,6 +970,9 @@ namespace UsurperRemake.Systems
 
                     // Faction affiliation
                     NPCFaction = npc.NPCFaction.HasValue ? (int)npc.NPCFaction.Value : -1,
+
+                    // Divine worship
+                    WorshippedGod = npc.WorshippedGod ?? "",
 
                     // Alignment
                     Chivalry = npc.Chivalry,
@@ -1776,36 +1800,41 @@ namespace UsurperRemake.Systems
                 GD.PrintErr($"[SaveSystem] Failed to save dream system: {ex.Message}");
             }
 
-            // NPC Marriage Registry
-            try
+            // NPC Marriage Registry — only save to individual player saves in single-player mode.
+            // In online/MUD mode, marriages are world_state managed by the world sim.
+            // Saving global registry into per-player saves causes cross-player contamination.
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
-                var marriages = NPCMarriageRegistry.Instance.GetAllMarriages();
-                data.NPCMarriages = marriages.Select(m => new NPCMarriageSaveData
+                try
                 {
-                    Npc1Id = m.Npc1Id,
-                    Npc2Id = m.Npc2Id
-                }).ToList();
+                    var marriages = NPCMarriageRegistry.Instance.GetAllMarriages();
+                    data.NPCMarriages = marriages.Select(m => new NPCMarriageSaveData
+                    {
+                        Npc1Id = m.Npc1Id,
+                        Npc2Id = m.Npc2Id
+                    }).ToList();
 
-                var affairs = NPCMarriageRegistry.Instance.GetAllAffairs();
-                data.Affairs = affairs.Select(a => new AffairSaveData
-                {
-                    MarriedNpcId = a.MarriedNpcId,
-                    SeducerId = a.SeducerId,
-                    AffairProgress = a.AffairProgress,
-                    SecretMeetings = a.SecretMeetings,
-                    SpouseSuspicion = a.SpouseSuspicion,
-                    IsActive = a.IsActive,
-                    LastInteraction = a.LastInteraction
-                }).ToList();
+                    var affairs = NPCMarriageRegistry.Instance.GetAllAffairs();
+                    data.Affairs = affairs.Select(a => new AffairSaveData
+                    {
+                        MarriedNpcId = a.MarriedNpcId,
+                        SeducerId = a.SeducerId,
+                        AffairProgress = a.AffairProgress,
+                        SecretMeetings = a.SecretMeetings,
+                        SpouseSuspicion = a.SpouseSuspicion,
+                        IsActive = a.IsActive,
+                        LastInteraction = a.LastInteraction
+                    }).ToList();
 
-                if (data.NPCMarriages.Count > 0 || data.Affairs.Count > 0)
-                {
-                    GD.Print($"[SaveSystem] Saved {data.NPCMarriages.Count} NPC marriages, {data.Affairs.Count} affairs");
+                    if (data.NPCMarriages.Count > 0 || data.Affairs.Count > 0)
+                    {
+                        GD.Print($"[SaveSystem] Saved {data.NPCMarriages.Count} NPC marriages, {data.Affairs.Count} affairs");
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"[SaveSystem] Failed to save NPC marriages/affairs: {ex.Message}");
+                catch (Exception ex)
+                {
+                    GD.PrintErr($"[SaveSystem] Failed to save NPC marriages/affairs: {ex.Message}");
+                }
             }
 
             // Cultural Meme System (Social Emergence)
@@ -2341,41 +2370,45 @@ namespace UsurperRemake.Systems
                 GD.PrintErr($"[SaveSystem] Failed to restore dream system: {ex.Message}");
             }
 
-            // NPC Marriage Registry
-            try
+            // NPC Marriage Registry — only restore from individual saves in single-player mode.
+            // In online/MUD mode, marriages are world_state managed by the world sim.
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
-                // Restore marriages
-                if (data.NPCMarriages != null && data.NPCMarriages.Count > 0)
+                try
                 {
-                    var marriageData = data.NPCMarriages.Select(m => new NPCMarriageData
+                    // Restore marriages
+                    if (data.NPCMarriages != null && data.NPCMarriages.Count > 0)
                     {
-                        Npc1Id = m.Npc1Id,
-                        Npc2Id = m.Npc2Id
-                    }).ToList();
-                    NPCMarriageRegistry.Instance.RestoreMarriages(marriageData);
-                    GD.Print($"[SaveSystem] Restored {data.NPCMarriages.Count} NPC marriages");
-                }
+                        var marriageData = data.NPCMarriages.Select(m => new NPCMarriageData
+                        {
+                            Npc1Id = m.Npc1Id,
+                            Npc2Id = m.Npc2Id
+                        }).ToList();
+                        NPCMarriageRegistry.Instance.RestoreMarriages(marriageData);
+                        GD.Print($"[SaveSystem] Restored {data.NPCMarriages.Count} NPC marriages");
+                    }
 
-                // Restore affairs
-                if (data.Affairs != null && data.Affairs.Count > 0)
-                {
-                    var affairData = data.Affairs.Select(a => new AffairState
+                    // Restore affairs
+                    if (data.Affairs != null && data.Affairs.Count > 0)
                     {
-                        MarriedNpcId = a.MarriedNpcId,
-                        SeducerId = a.SeducerId,
-                        AffairProgress = a.AffairProgress,
-                        SecretMeetings = a.SecretMeetings,
-                        SpouseSuspicion = a.SpouseSuspicion,
-                        IsActive = a.IsActive,
-                        LastInteraction = a.LastInteraction
-                    }).ToList();
-                    NPCMarriageRegistry.Instance.RestoreAffairs(affairData);
-                    GD.Print($"[SaveSystem] Restored {data.Affairs.Count} affairs");
+                        var affairData = data.Affairs.Select(a => new AffairState
+                        {
+                            MarriedNpcId = a.MarriedNpcId,
+                            SeducerId = a.SeducerId,
+                            AffairProgress = a.AffairProgress,
+                            SecretMeetings = a.SecretMeetings,
+                            SpouseSuspicion = a.SpouseSuspicion,
+                            IsActive = a.IsActive,
+                            LastInteraction = a.LastInteraction
+                        }).ToList();
+                        NPCMarriageRegistry.Instance.RestoreAffairs(affairData);
+                        GD.Print($"[SaveSystem] Restored {data.Affairs.Count} affairs");
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                GD.PrintErr($"[SaveSystem] Failed to restore NPC marriages/affairs: {ex.Message}");
+                catch (Exception ex)
+                {
+                    GD.PrintErr($"[SaveSystem] Failed to restore NPC marriages/affairs: {ex.Message}");
+                }
             }
 
             // Cultural Meme System (Social Emergence)

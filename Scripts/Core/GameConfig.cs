@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.45.0";
-    public const string VersionName = "Band of Brothers";
+    public const string Version = "0.46.0";
+    public const string VersionName = "Ascension";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -622,6 +622,43 @@ public static partial class GameConfig
     public const int ServantsDailyGoldBase = 100;              // Base daily gold income
     public const int ServantsDailyGoldPerLevel = 10;           // Additional gold per player level
 
+    // Immortal Ascension System (v0.45.0) — from original 1993 Usurper GodRec
+    public const int GodMaxLevel = 9;
+    public static readonly long[] GodExpThresholds = { 0, 5_000, 15_000, 50_000, 90_000, 150_000, 300_000, 600_000, 1_000_000 };
+    public static readonly int[] GodDeedsPerDay = { 3, 4, 5, 6, 7, 8, 10, 12, 15 };
+    public static readonly string[] GodTitles = { "Lesser Spirit", "Minor Spirit", "Spirit", "Major Spirit", "Minor Deity", "Deity", "Major Deity", "DemiGod", "God" };
+    public const int GodBelieverExpPerLevel = 5;          // Each believer grants level * this per daily reset
+    public const int GodRecruitPaganExp = 150;            // Exp for converting a pagan
+    public const int GodRecruitStealExp = 50;             // Exp for stealing a rival's believer
+    public const int GodBlessExp = 10;                    // Exp per blessing bestowed
+    public const int GodSmiteExp = 20;                    // Exp for smiting a mortal
+    public const int GodPoisonRelationshipExp = 20;       // Exp for poisoning a relationship
+    public const int GodFreePrisonerExp = 10;             // Exp for freeing a prisoner
+    public const int GodProclamationExp = 5;              // Exp for divine proclamation
+    public const float GodRecruitPaganChance = 0.33f;     // 33% chance to recruit a pagan
+    public const float GodBlessBonusPercent = 0.10f;      // 10% damage/defense buff
+    public const int GodBlessCombatDuration = 10;         // Blessing lasts 10 combats
+    public const float GodSmiteMinPercent = 0.10f;        // Smite deals 10-25% of target MaxHP
+    public const float GodSmiteMaxPercent = 0.25f;
+    public const float GodRecruitPlayerMultiplier = 0.75f;     // Players are harder to recruit than NPCs
+    public const float GodRecruitPlayerExpMultiplier = 2.0f;   // But more rewarding
+    public const float GodBlessPlayerExpMultiplier = 3.0f;     // Blessing players = 3x exp
+    public const float GodSmitePlayerExpMultiplier = 2.5f;     // Smiting players = 2.5x exp
+    public const int GodSmitePlayerCooldownMinutes = 30;       // Anti-grief: can't smite same player within 30min
+    public const float GodPoisonRelationshipChance = 0.33f;  // 33% chance to poison relationship
+    public const float GodBelieverKillXPPercent = 0.05f;  // 5% of believer's combat XP goes to their god
+    // Alt Character System — immortals can create a second mortal character
+    public const string AltCharacterSuffix = "__alt";    // Appended to account username for alt save key
+    // Divine Boon System — gods configure boons for their followers
+    public const int GodBoonBudgetPerLevel = 10;         // Budget points per god level (Level 1 = 10, Level 9 = 90)
+    public const int GodBoonConcentrationMax = 20;       // Max concentration bonus (at 0 believers)
+    public const int GodBoonConcentrationPerBeliever = 2; // Budget points lost per believer
+    public const float GodBoonPrayerMultiplier = 2.0f;   // Prayer doubles passive boon effects
+    public const int GodBoonPrayerDurationMinutes = 120;  // Prayer buff lasts 2 hours
+    // Sacrifice power scale (from original GodRec)
+    public static readonly long[] SacrificeTiers = { 20, 2_000, 45_000, 150_000, 900_000 };
+    public static readonly int[] SacrificePower = { 1, 2, 3, 4, 5, 6 };
+
     // Gambling Den (v0.30.9)
     public const int GamblingMaxDoubleDown = 3;               // Max double-or-nothing rounds in High-Low
     public const double HighLowPayoutMultiplier = 1.8;        // High-Low correct guess payout
@@ -883,47 +920,31 @@ public static partial class GameConfig
     public const int HeavenLocationId = 400;         // onloc_heaven from CMS.PAS
     public const int HeavenBossLocationId = 401;     // onloc_heaven_boss from CMS.PAS
     
-    // God System Configuration
+    // God System Configuration (legacy Pascal constants used by God.cs / GodSystem.cs)
     public const int MaxGodRecords = 50;              // Maximum gods that can exist
     public const int DefaultGodDeedsLeft = 3;         // config.gods_deedsleft - daily deeds for gods
     public const int MaxGodLevel = 9;                 // Maximum god level
     public const int MinGodAge = 2;                   // Minimum god age (random(5) + 2)
     public const int MaxGodAge = 6;                   // Maximum god age (random(5) + 2)
-    
-    // God Level Experience Thresholds (from Pascal God_Level_Raise function)
-    public const long GodLevel2Experience = 5000;     // Level 2: Minor Spirit
-    public const long GodLevel3Experience = 15000;    // Level 3: Spirit
-    public const long GodLevel4Experience = 50000;    // Level 4: Major Spirit
-    public const long GodLevel5Experience = 70000;    // Level 5: Minor Deity
-    public const long GodLevel6Experience = 90000;    // Level 6: Deity
-    public const long GodLevel7Experience = 110000;   // Level 7: Major Deity
-    public const long GodLevel8Experience = 550000;   // Level 8: DemiGod
-    public const long GodLevel9Experience = 1000500;  // Level 9: God
-    
-    // God Titles (from Pascal God_Title function)
-    public static readonly string[] GodTitles = 
-    {
-        "",                 // Index 0 - unused
-        "Lesser Spirit",    // Level 1
-        "Minor Spirit",     // Level 2
-        "Spirit",           // Level 3
-        "Major Spirit",     // Level 4
-        "Minor Deity",      // Level 5
-        "Deity",            // Level 6
-        "Major Deity",      // Level 7
-        "DemiGod",          // Level 8
-        "God"               // Level 9
-    };
-    
-    // Sacrifice Gold Return Tiers (from Pascal Sacrifice_Gold_Return function)
-    public const long SacrificeGoldTier1Max = 20;           // Returns 1 power
-    public const long SacrificeGoldTier2Max = 2000;         // Returns 2 power
-    public const long SacrificeGoldTier3Max = 45000;        // Returns 3 power
-    public const long SacrificeGoldTier4Max = 150000;       // Returns 4 power
-    public const long SacrificeGoldTier5Max = 900000;       // Returns 5 power
-    public const long SacrificeGoldTier6Max = 15000000;     // Returns 6 power
-    public const long SacrificeGoldTier7Max = 110000000;    // Returns 7 power
-    // Above 110000000 returns 8 power
+
+    // God Level Experience Thresholds (from Pascal God_Level_Raise function — used by God.cs)
+    public const long GodLevel2Experience = 5000;
+    public const long GodLevel3Experience = 15000;
+    public const long GodLevel4Experience = 50000;
+    public const long GodLevel5Experience = 70000;
+    public const long GodLevel6Experience = 90000;
+    public const long GodLevel7Experience = 110000;
+    public const long GodLevel8Experience = 550000;
+    public const long GodLevel9Experience = 1000500;
+
+    // Sacrifice Gold Return Tiers (from Pascal Sacrifice_Gold_Return — used by God.cs)
+    public const long SacrificeGoldTier1Max = 20;
+    public const long SacrificeGoldTier2Max = 2000;
+    public const long SacrificeGoldTier3Max = 45000;
+    public const long SacrificeGoldTier4Max = 150000;
+    public const long SacrificeGoldTier5Max = 900000;
+    public const long SacrificeGoldTier6Max = 15000000;
+    public const long SacrificeGoldTier7Max = 110000000;
     
     // Divine Intervention Settings
     public const int DivineInterventionCost = 1;            // Deeds cost per intervention
@@ -1671,6 +1692,9 @@ public enum GameLocation
 
     // PvP Arena (online mode only)
     Arena = 501,         // PvP combat arena
+
+    // Immortal Pantheon (god ascension system)
+    Pantheon = 502,      // The Divine Realm (immortals only)
 
     Closed = 30000       // onloc_closed (for fake players)
 }

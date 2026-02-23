@@ -632,6 +632,18 @@ public static class AchievementSystem
             UnlockMessage = "All hail the new ruler!"
         });
 
+        Register(new Achievement
+        {
+            Id = "ascended",
+            Name = "Ascended",
+            Description = "Ascend to godhood",
+            Category = AchievementCategory.Social,
+            Tier = AchievementTier.Platinum,
+            PointValue = 200,
+            GoldReward = 50000,
+            UnlockMessage = "You have transcended mortality and joined the Divine Realm!"
+        });
+
         // ============ CHALLENGE ACHIEVEMENTS ============
 
         Register(new Achievement

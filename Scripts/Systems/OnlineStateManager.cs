@@ -27,7 +27,7 @@ namespace UsurperRemake.Systems
             UsurperRemake.Server.SessionContext.Current?.OnlineState ?? _fallbackInstance;
 
         private readonly IOnlineSaveBackend backend;
-        private readonly string username;
+        private string username;
 
         private readonly JsonSerializerOptions jsonOptions;
 
@@ -1010,6 +1010,20 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Stop online tracking and clean up. Called on game exit.
         /// </summary>
+        /// <summary>
+        /// Switch online identity (e.g., when player switches from main to alt character).
+        /// Unregisters old key and registers new key in online_players.
+        /// </summary>
+        public async Task SwitchIdentity(string newKey, string displayName, string connectionType)
+        {
+            var oldKey = username;
+            try { await backend.UnregisterOnline(oldKey); } catch { }
+            username = newKey;
+            await backend.RegisterOnline(newKey, displayName, currentLocation, connectionType);
+            await backend.UpdatePlayerSession(newKey, isLogin: true);
+            DebugLogger.Instance.LogInfo("ONLINE", $"Switched identity from '{oldKey}' to '{newKey}'");
+        }
+
         public async Task Shutdown()
         {
             isDisposed = true;

@@ -17,6 +17,15 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class SqlSaveBackend : IOnlineSaveBackend
     {
+        // --- Alt Character Helpers ---
+        public static string GetAltKey(string accountUsername) =>
+            accountUsername.ToLower() + GameConfig.AltCharacterSuffix;
+        public static string GetAccountUsername(string key) =>
+            key.EndsWith(GameConfig.AltCharacterSuffix, StringComparison.OrdinalIgnoreCase)
+                ? key[..^GameConfig.AltCharacterSuffix.Length] : key;
+        public static bool IsAltCharacter(string key) =>
+            key.EndsWith(GameConfig.AltCharacterSuffix, StringComparison.OrdinalIgnoreCase);
+
         private readonly string databasePath;
         private readonly string connectionString;
         private readonly JsonSerializerOptions jsonOptions;
@@ -1383,6 +1392,275 @@ namespace UsurperRemake.Systems
             return summaries;
         }
 
+        // --- Divine System (God-Mortal Interactions) ---
+
+        public async Task<List<ImmortalPlayerInfo>> GetImmortalPlayers()
+        {
+            var immortals = new List<ImmortalPlayerInfo>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT
+                        p.display_name,
+                        p.username,
+                        json_extract(p.player_data, '$.player.divineName') as divine_name,
+                        json_extract(p.player_data, '$.player.godLevel') as god_level,
+                        json_extract(p.player_data, '$.player.godExperience') as god_exp,
+                        json_extract(p.player_data, '$.player.godAlignment') as god_align,
+                        CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online,
+                        json_extract(p.player_data, '$.player.divineBoonConfig') as boon_config
+                    FROM players p
+                    LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
+                        AND op.last_heartbeat >= datetime('now', '-120 seconds')
+                    WHERE p.is_banned = 0
+                        AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
+                        AND json_extract(p.player_data, '$.player.isImmortal') = 1
+                        AND json_extract(p.player_data, '$.player.divineName') IS NOT NULL
+                        AND p.username NOT LIKE 'emergency_%';
+                ";
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    immortals.Add(new ImmortalPlayerInfo
+                    {
+                        MortalName = reader.GetString(0),
+                        Username = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        DivineName = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                        GodLevel = reader.IsDBNull(3) ? 1 : Convert.ToInt32(reader.GetValue(3)),
+                        GodExperience = reader.IsDBNull(4) ? 0 : Convert.ToInt64(reader.GetValue(4)),
+                        GodAlignment = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                        IsOnline = reader.GetInt32(6) == 1,
+                        DivineBoonConfig = reader.IsDBNull(7) ? "" : reader.GetString(7)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get immortal players: {ex.Message}");
+            }
+            return immortals;
+        }
+
+        public async Task<List<MortalPlayerInfo>> GetMortalPlayers(int limit = 30)
+        {
+            var mortals = new List<MortalPlayerInfo>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT
+                        p.display_name,
+                        p.username,
+                        json_extract(p.player_data, '$.player.level') as level,
+                        json_extract(p.player_data, '$.player.class') as class_id,
+                        json_extract(p.player_data, '$.player.worshippedGod') as worshipped_god,
+                        json_extract(p.player_data, '$.player.divineBlessingCombats') as blessing_combats,
+                        json_extract(p.player_data, '$.player.hp') as hp,
+                        json_extract(p.player_data, '$.player.maxHP') as max_hp,
+                        CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online
+                    FROM players p
+                    LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
+                        AND op.last_heartbeat >= datetime('now', '-120 seconds')
+                    WHERE p.is_banned = 0
+                        AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
+                        AND (json_extract(p.player_data, '$.player.isImmortal') IS NULL
+                             OR json_extract(p.player_data, '$.player.isImmortal') = 0)
+                        AND json_extract(p.player_data, '$.player.level') IS NOT NULL
+                        AND p.username NOT LIKE 'emergency_%'
+                    ORDER BY COALESCE(json_extract(p.player_data, '$.player.level'), 0) DESC
+                    LIMIT @limit;
+                ";
+                cmd.Parameters.AddWithValue("@limit", limit);
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    mortals.Add(new MortalPlayerInfo
+                    {
+                        DisplayName = reader.GetString(0),
+                        Username = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        Level = reader.IsDBNull(2) ? 1 : Convert.ToInt32(reader.GetValue(2)),
+                        ClassId = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3)),
+                        WorshippedGod = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                        BlessingCombats = reader.IsDBNull(5) ? 0 : Convert.ToInt32(reader.GetValue(5)),
+                        HP = reader.IsDBNull(6) ? 0 : Convert.ToInt64(reader.GetValue(6)),
+                        MaxHP = reader.IsDBNull(7) ? 0 : Convert.ToInt64(reader.GetValue(7)),
+                        IsOnline = reader.GetInt32(8) == 1
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get mortal players: {ex.Message}");
+            }
+            return mortals;
+        }
+
+        public async Task<int> CountPlayerBelievers(string divineName)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT COUNT(*) FROM players
+                    WHERE json_extract(player_data, '$.player.worshippedGod') = @divineName
+                    AND (json_extract(player_data, '$.player.isImmortal') IS NULL
+                         OR json_extract(player_data, '$.player.isImmortal') = 0)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2
+                    AND is_banned = 0 AND username NOT LIKE 'emergency_%';
+                ";
+                cmd.Parameters.AddWithValue("@divineName", divineName);
+                var result = await Task.Run(() => cmd.ExecuteScalar());
+                return Convert.ToInt32(result);
+            }
+            catch { return 0; }
+        }
+
+        public async Task ApplyDivineBlessing(string username, int combats, float bonus)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players SET player_data = json_set(player_data,
+                        '$.player.divineBlessingCombats', @combats,
+                        '$.player.divineBlessingBonus', @bonus)
+                    WHERE LOWER(username) = LOWER(@username)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@combats", combats);
+                cmd.Parameters.AddWithValue("@bonus", (double)bonus);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to apply divine blessing to {username}: {ex.Message}");
+            }
+        }
+
+        public async Task ApplyDivineSmite(string username, float damagePercent)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players SET player_data = json_set(player_data,
+                        '$.player.hp',
+                        MAX(1, CAST(json_extract(player_data, '$.player.hp') AS INTEGER)
+                            - MAX(1, CAST(CAST(json_extract(player_data, '$.player.maxHP') AS INTEGER) * @pct AS INTEGER))))
+                    WHERE LOWER(username) = LOWER(@username)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@pct", (double)damagePercent);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to apply divine smite to {username}: {ex.Message}");
+            }
+        }
+
+        public async Task SetPlayerWorshippedGod(string username, string divineName)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players SET player_data = json_set(player_data,
+                        '$.player.worshippedGod', @god)
+                    WHERE LOWER(username) = LOWER(@username)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@god", divineName);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to set worshipped god for {username}: {ex.Message}");
+            }
+        }
+
+        public async Task AddGodExperience(string divineName, long amount)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players SET player_data = json_set(player_data,
+                        '$.player.godExperience',
+                        CAST(json_extract(player_data, '$.player.godExperience') AS INTEGER) + @amount)
+                    WHERE json_extract(player_data, '$.player.divineName') = @divineName
+                    AND json_extract(player_data, '$.player.isImmortal') = 1
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@divineName", divineName);
+                cmd.Parameters.AddWithValue("@amount", amount);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to add god experience for {divineName}: {ex.Message}");
+            }
+        }
+
+        public async Task<string> GetGodBoonConfig(string divineName)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT json_extract(player_data, '$.player.divineBoonConfig')
+                    FROM players
+                    WHERE json_extract(player_data, '$.player.divineName') = @divineName
+                    AND json_extract(player_data, '$.player.isImmortal') = 1
+                    AND player_data != '{}' AND LENGTH(player_data) > 2
+                    AND username NOT LIKE 'emergency_%'
+                    LIMIT 1;
+                ";
+                cmd.Parameters.AddWithValue("@divineName", divineName);
+                var result = await Task.Run(() => cmd.ExecuteScalar());
+                return result != null && result != DBNull.Value ? result.ToString() ?? "" : "";
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get boon config for {divineName}: {ex.Message}");
+                return "";
+            }
+        }
+
+        public async Task SetGodBoonConfig(string username, string boonConfig)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players SET player_data = json_set(player_data,
+                        '$.player.divineBoonConfig', @config)
+                    WHERE LOWER(username) = LOWER(@username)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@config", boonConfig ?? "");
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to set boon config for {username}: {ex.Message}");
+            }
+        }
+
         // --- Player Management ---
 
         public async Task<bool> IsPlayerBanned(string username)
@@ -1839,6 +2117,10 @@ namespace UsurperRemake.Systems
 
                 if (password.Length < 4)
                     return (false, "Password must be at least 4 characters.");
+
+                // Block reserved alt character suffix
+                if (username.Contains(GameConfig.AltCharacterSuffix, StringComparison.OrdinalIgnoreCase))
+                    return (false, "Username contains reserved characters.");
 
                 // Check for valid characters (alphanumeric, spaces, hyphens, underscores)
                 foreach (char c in username)

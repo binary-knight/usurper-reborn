@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 
 /// <summary>
 /// Player-selectable color themes. Remaps game color names before ANSI/Console output.
@@ -18,18 +19,19 @@ public static class ColorTheme
 {
     /// <summary>
     /// The currently active color theme. Set from player preferences on load.
-    /// In MUD mode this is per-session via ThreadStatic to avoid cross-player bleed.
+    /// In MUD mode this is per-session via AsyncLocal to avoid cross-player bleed.
+    /// (ThreadStatic is unsafe — async tasks can hop threads, causing theme leakage.)
     /// </summary>
-    [ThreadStatic] private static ColorThemeType? _currentThread;
+    private static readonly AsyncLocal<ColorThemeType?> _currentAsync = new();
     private static ColorThemeType _currentGlobal = ColorThemeType.Default;
 
     public static ColorThemeType Current
     {
-        get => _currentThread ?? _currentGlobal;
+        get => _currentAsync.Value ?? _currentGlobal;
         set
         {
             if (UsurperRemake.Server.SessionContext.IsActive)
-                _currentThread = value;
+                _currentAsync.Value = value;
             else
                 _currentGlobal = value;
         }

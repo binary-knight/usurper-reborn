@@ -1565,9 +1565,10 @@ let prevNpcPositions = {};
 function updateWorldMap() {
     const mapEl = document.getElementById('world-map');
 
-    // Normalize and group NPCs by location
+    // Normalize and group LIVING NPCs by location (exclude permadead)
     const byLoc = {};
     allNpcs.forEach(n => {
+        if (isPermaDead(n)) return;
         const raw = n.location || n.Location || 'Unknown';
         const loc = normalizeLocation(raw);
         if (!byLoc[loc]) byLoc[loc] = [];
@@ -2662,6 +2663,7 @@ function showLocationPopup(locKey, screenX, screenY) {
 
     const byLoc = {};
     allNpcs.forEach(n => {
+        if (isPermaDead(n)) return; // Don't show permadead in location popup
         const raw = n.location || n.Location || 'Unknown';
         const loc = normalizeLocation(raw);
         if (!byLoc[loc]) byLoc[loc] = [];
@@ -2968,9 +2970,10 @@ const _origUpdateWorldMap = updateWorldMap;
 updateWorldMap = function() {
     const mapEl = document.getElementById('world-map');
 
-    // Normalize and group NPCs by location
+    // Normalize and group LIVING NPCs by location (exclude permadead)
     const byLoc = {};
     allNpcs.forEach(n => {
+        if (isPermaDead(n)) return; // Don't show permadead on world map
         const raw = n.location || n.Location || 'Unknown';
         const loc = normalizeLocation(raw);
         if (!byLoc[loc]) byLoc[loc] = [];

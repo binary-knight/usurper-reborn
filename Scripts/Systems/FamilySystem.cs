@@ -432,6 +432,20 @@ namespace UsurperRemake.Systems
             "Ingrid", "Juliana", "Katarina", "Lucinda", "Morgana", "Nerissa", "Ondine", "Rosalind"
         };
 
+        // Fantasy surnames for children whose fathers have no extractable surname
+        // (alias NPCs, single-name NPCs, title-only NPCs, etc.)
+        private static readonly string[] GeneratedSurnames = new[]
+        {
+            "Ashford", "Blackthorn", "Copperfield", "Dunmore", "Everhart",
+            "Fairwind", "Greymane", "Holloway", "Ironwood", "Kettleburn",
+            "Larkwood", "Mossgrove", "Northgate", "Oakshield", "Pennywhistle",
+            "Quickwater", "Ravenswood", "Silverbrook", "Thornbury", "Underhill",
+            "Whitmore", "Yarrow", "Ashwick", "Bramblewood", "Coldstream",
+            "Dewberry", "Emberglow", "Foxglove", "Greystone", "Hawkridge",
+            "Ivywood", "Juniper", "Kingsmill", "Larkspur", "Meadowbrook",
+            "Nighthollow", "Oldfield", "Pinecrest", "Ravenscroft", "Stoneleigh"
+        };
+
         /// <summary>
         /// Create a child from two NPC parents. Uses the existing Child class and aging system.
         /// When the child reaches ADULT_AGE (18 game-years), ConvertChildToNPC() will
@@ -442,9 +456,16 @@ namespace UsurperRemake.Systems
             var rng = new Random();
             var sex = rng.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
 
+            var firstName = GenerateNPCChildFirstName(sex);
+            var fatherSurname = ExtractSurname(father.Name2 ?? father.Name);
+            // If father has no extractable surname, generate one deterministically
+            if (fatherSurname == null)
+                fatherSurname = GenerateSurnameForParent(father.Name2 ?? father.Name);
+            var childName = $"{firstName} {fatherSurname}";
+
             var child = new Child
             {
-                Name = GenerateNPCChildName(sex),
+                Name = childName,
                 Mother = mother.Name2 ?? mother.Name,
                 Father = father.Name2 ?? father.Name,
                 MotherID = mother.ID ?? "",
@@ -470,41 +491,78 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Generate a unique fantasy name for an NPC child, checking against existing NPCs and children.
+        /// Pick a random first name for an NPC child.
+        /// Surnames provide uniqueness, so first names can repeat across families.
         /// </summary>
-        private string GenerateNPCChildName(CharacterSex sex)
+        private string GenerateNPCChildFirstName(CharacterSex sex)
         {
             var rng = new Random();
             var names = sex == CharacterSex.Female ? FemaleNames : MaleNames;
-
-            // Collect all existing names to avoid duplicates
-            var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (NPCSpawnSystem.Instance?.ActiveNPCs != null)
-            {
-                foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
-                    existingNames.Add(npc.Name2 ?? npc.Name1);
-            }
-            foreach (var child in _children.Where(c => !c.Deleted))
-                existingNames.Add(child.Name);
-
-            // Try to find a unique name from the pool
-            var available = names.Where(n => !existingNames.Contains(n)).ToArray();
-            if (available.Length > 0)
-                return available[rng.Next(available.Length)];
-
-            // All pool names taken - generate a suffixed name
-            var baseName = names[rng.Next(names.Length)];
-            int suffix = 2;
-            while (existingNames.Contains($"{baseName} {ToRomanNumeral(suffix)}"))
-                suffix++;
-            return $"{baseName} {ToRomanNumeral(suffix)}";
+            return names[rng.Next(names.Length)];
         }
 
-        private static string ToRomanNumeral(int num) => num switch
+        /// <summary>
+        /// Generate a deterministic surname for a parent who has no extractable one.
+        /// Uses a stable hash (not GetHashCode which is randomized per-process in .NET Core).
+        /// Same parent name always produces the same surname across restarts.
+        /// </summary>
+        private static string GenerateSurnameForParent(string parentName)
         {
-            2 => "II", 3 => "III", 4 => "IV", 5 => "V",
-            6 => "VI", 7 => "VII", 8 => "VIII", 9 => "IX", 10 => "X",
-            _ => num.ToString()
+            // DJB2 hash — stable and deterministic across all runs
+            uint hash = 5381;
+            foreach (char c in parentName)
+                hash = ((hash << 5) + hash) + c;
+            return GeneratedSurnames[hash % (uint)GeneratedSurnames.Length];
+        }
+
+        /// <summary>
+        /// Extract a surname from an NPC name for children to inherit.
+        /// Returns null for single names, titles ("The X"), epithets ("X the Y"),
+        /// and alias-style names ("Nimble Nick", "Scarface Sam").
+        /// Examples: "Borin Hammerhand" → "Hammerhand", "Shadow" → null,
+        /// "The Stranger" → null, "Nimble Nick" → null.
+        /// </summary>
+        private static string? ExtractSurname(string fullName)
+        {
+            if (string.IsNullOrWhiteSpace(fullName)) return null;
+
+            // Alias-style names where the last word is a first name, not a surname.
+            // These are criminal/rogue NPCs known by nicknames, not real names.
+            if (AliasNames.Contains(fullName)) return null;
+
+            var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2) return null;
+
+            // Skip title-style names: "The Stranger", "The Executioner"
+            if (parts[0].Equals("The", StringComparison.OrdinalIgnoreCase)) return null;
+
+            // Skip epithet-style names: "Vex the Merciless", "Sir Cedric the Pure"
+            for (int i = 1; i < parts.Length - 1; i++)
+            {
+                if (parts[i].Equals("the", StringComparison.OrdinalIgnoreCase)) return null;
+            }
+
+            // Skip "Sir/Lady/Brother/Sister/Mother/Father/Master" prefix + single word
+            // e.g. "Sir Galahad" has no surname, but "Aldric Stormcaller" does
+            var titlePrefixes = new[] { "Sir", "Lady", "Brother", "Sister", "Mother", "Father", "Master", "Lord", "Archpriest", "Zen" };
+            if (titlePrefixes.Any(t => parts[0].Equals(t, StringComparison.OrdinalIgnoreCase)))
+            {
+                // "Sir Darius the Lost" already caught above by "the" check
+                // "Archpriest Aldwyn" — only 2 parts with title prefix, no surname
+                if (parts.Length == 2) return null;
+                // "Sir Borin Hammerhand" → "Hammerhand"
+                return parts[^1];
+            }
+
+            // Standard "FirstName LastName" → take the last part
+            return parts[^1];
+        }
+
+        // NPC names that are aliases/nicknames — the last word is a first name, not a surname.
+        private static readonly HashSet<string> AliasNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Nimble Nick", "Gold Tooth Gary", "Scarface Sam", "Quicksilver Quinn",
+            "Pickpocket Pete", "Slick Rick", "Lucky Lou", "Dagger Dee"
         };
 
         #endregion
@@ -580,6 +638,41 @@ namespace UsurperRemake.Systems
             }
 
             // GD.Print($"[Family] Loaded {_children.Count} children from save");
+
+            // Migration: add father's surname to children who don't have one yet
+            MigrateChildSurnames();
+        }
+
+        /// <summary>
+        /// Migration: compute correct name for each child — first name + father's
+        /// surname (extracted or generated). Strips all Roman numerals. Every child
+        /// ends up with a two-part name. Safe to run multiple times (idempotent).
+        /// </summary>
+        private void MigrateChildSurnames()
+        {
+            foreach (var child in _children)
+            {
+                if (child.Deleted) continue;
+                if (string.IsNullOrWhiteSpace(child.Father)) continue;
+
+                // Extract first name (always the first word)
+                var nameParts = child.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (nameParts.Length == 0) continue;
+                var firstName = nameParts[0];
+
+                // Compute the correct surname from father (extract or generate)
+                var surname = ExtractSurname(child.Father) ?? GenerateSurnameForParent(child.Father);
+
+                var correctName = $"{firstName} {surname}";
+
+                if (!child.Name.Equals(correctName, StringComparison.Ordinal))
+                {
+                    var oldName = child.Name;
+                    child.Name = correctName;
+                    DebugLogger.Instance.LogInfo("FAMILY",
+                        $"Migrated child name: '{oldName}' → '{child.Name}' (father: {child.Father})");
+                }
+            }
         }
 
         /// <summary>

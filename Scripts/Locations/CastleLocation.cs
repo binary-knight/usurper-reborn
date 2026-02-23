@@ -6411,6 +6411,88 @@ public class CastleLocation : BaseLocation
     /// Called when the current king dies. Vacates the throne and posts news.
     /// Static so it can be called from WorldSimulator without a CastleLocation instance.
     /// </summary>
+    /// <summary>
+    /// Automatically abdicate the throne for a player who is ascending to godhood or rerolling.
+    /// Static so it can be called from EndingsSystem and PantheonLocation.
+    /// </summary>
+    public static void AbdicatePlayerThrone(Character player, string reason)
+    {
+        if (player == null || !player.King) return;
+
+        var king = GetCurrentKing();
+
+        // Record monarch history
+        if (king != null)
+        {
+            monarchHistory.Add(new MonarchRecord
+            {
+                Name = king.Name,
+                Title = king.GetTitle(),
+                DaysReigned = (int)king.TotalReign,
+                CoronationDate = king.CoronationDate,
+                EndReason = reason
+            });
+            while (monarchHistory.Count > MaxMonarchHistory)
+                monarchHistory.RemoveAt(0);
+
+            ClearRoyalMarriage(king);
+            king.IsActive = false;
+        }
+
+        // Clear player state
+        player.King = false;
+        player.RoyalMercenaries?.Clear();
+        player.RecalculateStats();
+
+        currentKing = null;
+
+        // News
+        NewsSystem.Instance?.Newsy(true, $"{player.DisplayName} has {reason}! The kingdom is in chaos!");
+
+        // Trigger NPC succession (uses only static fields + singletons)
+        var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (npcs != null && npcs.Count > 0)
+        {
+            var candidates = npcs
+                .Where(npc => npc.IsAlive && npc.Level >= GameConfig.MinLevelKing)
+                .OrderByDescending(npc => npc.Level * 10 + (int)(npc.Charisma / 2))
+                .ToList();
+
+            if (candidates.Count > 0)
+            {
+                var newMonarch = candidates.First();
+                currentKing = new King
+                {
+                    Name = newMonarch.DisplayName,
+                    AI = CharacterAI.Computer,
+                    Sex = newMonarch.Sex,
+                    IsActive = true,
+                    CoronationDate = DateTime.Now,
+                    Treasury = Math.Max(10000, newMonarch.Gold / 2),
+                    TotalReign = 0
+                };
+                NewsSystem.Instance?.Newsy(true, $"{newMonarch.DisplayName} has claimed the throne!");
+            }
+        }
+
+        // Persist to world_state in online mode
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            var osm = OnlineStateManager.Instance;
+            if (osm != null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await osm.SaveRoyalCourtToWorldState(); }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.Instance.LogError("CASTLE", $"Failed to persist abdication: {ex.Message}");
+                    }
+                });
+            }
+        }
+    }
+
     public static void VacateThrone(string reason)
     {
         var king = GetCurrentKing();

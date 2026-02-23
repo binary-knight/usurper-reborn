@@ -172,6 +172,20 @@ public partial class TempleLocation : BaseLocation
                         await VisitInnerSanctum();
                         break;
 
+                    case "J": // Join an immortal god's flock
+                        await WorshipImmortalGod();
+                        refreshMenu = true;
+                        break;
+
+                    case "$": // Sacrifice gold to immortal god
+                        await SacrificeToImmortalGod();
+                        break;
+
+                    case "L": // Leave immortal god's faith
+                        await LeaveImmortalFaith();
+                        refreshMenu = true;
+                        break;
+
                     case GameConfig.TempleMenuReturn: // "R"
                         exitLocation = true;
                         break;
@@ -205,20 +219,24 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine($"You worship {playerGod}.", "cyan");
         }
+        else if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+        {
+            terminal.WriteLine($"You follow the immortal {currentPlayer.WorshippedGod}.", "bright_yellow");
+        }
         else
         {
             terminal.WriteLine("You are not a believer.", "gray");
         }
-        
+
         await Task.Delay(1500);
     }
     
     /// <summary>
     /// Display temple menu (Pascal TEMPLE.PAS Meny procedure)
     /// </summary>
-    private Task DisplayMenu(bool forceDisplay)
+    private async Task DisplayMenu(bool forceDisplay)
     {
-        if (!forceDisplay && currentPlayer.Expert) return Task.CompletedTask;
+        if (!forceDisplay && currentPlayer.Expert) return;
         
         terminal.ClearScreen();
 
@@ -250,6 +268,10 @@ public partial class TempleLocation : BaseLocation
         if (!string.IsNullOrEmpty(playerGod))
         {
             terminal.WriteLine($"You worship {playerGod}.", "cyan");
+        }
+        else if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+        {
+            terminal.WriteLine($"You follow the immortal {currentPlayer.WorshippedGod}.", "bright_yellow");
         }
         else
         {
@@ -486,6 +508,57 @@ public partial class TempleLocation : BaseLocation
             }
         }
 
+        // Immortal Worship section — only show if any ascended gods exist
+        var immortalGods = await GetImmortalGodsAsync();
+        if (immortalGods.Count > 0)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(" ── Ascended Gods ──");
+
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("J");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.Write("oin Immortal's Flock ");
+            if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"(Following: {currentPlayer.WorshippedGod})");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("(unaffiliated)");
+            }
+
+            if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("$");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.Write("acrifice Gold       ");
+                terminal.SetColor("gray");
+                terminal.WriteLine("(to your immortal god)");
+
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("L");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.WriteLine("eave Immortal's Faith");
+            }
+        }
+
         terminal.SetColor("darkgray");
         terminal.Write(" [");
         terminal.SetColor("bright_yellow");
@@ -495,7 +568,6 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("eturn");
         terminal.WriteLine("");
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -508,11 +580,44 @@ public partial class TempleLocation : BaseLocation
         
         string currentGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         bool goAhead = true;
-        
-        if (!string.IsNullOrEmpty(currentGod))
+
+        // Also check if following an immortal player-god
+        if (string.IsNullOrEmpty(currentGod) && !string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+        {
+            terminal.WriteLine($"You currently follow the immortal {currentPlayer.WorshippedGod}.", "bright_yellow");
+            var choice = await terminal.GetInputAsync($"Abandon {currentPlayer.WorshippedGod} for an elder god? (Y/N) ");
+            if (choice.ToUpper() == "Y")
+            {
+                string oldGod = currentPlayer.WorshippedGod;
+                currentPlayer.WorshippedGod = "";
+
+                // Persist to DB
+                if (DoorMode.IsOnlineMode)
+                {
+                    try
+                    {
+                        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                        var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
+                        if (backend != null && !string.IsNullOrEmpty(sessionUsername))
+                            await backend.SetPlayerWorshippedGod(sessionUsername, "");
+                    }
+                    catch { }
+                }
+
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"You renounce {oldGod}. Their divine presence fades from your mind.");
+            }
+            else
+            {
+                terminal.WriteLine("You remain faithful to your immortal patron.", "green");
+                goAhead = false;
+            }
+        }
+        else if (!string.IsNullOrEmpty(currentGod))
         {
             terminal.WriteLine($"You currently worship {currentGod}.", "white");
-            
+
             var choice = await terminal.GetInputAsync($"Have you lost your faith in {currentGod}? (Y/N) ");
             if (choice.ToUpper() == "Y")
             {
@@ -520,7 +625,7 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine($"You don't believe in {currentGod} anymore.", "white");
                 terminal.WriteLine($"{currentGod}'s powers diminish...", "yellow");
-                
+
                 var noteChoice = await terminal.GetInputAsync($"Send a note to {currentGod}? (Y/N) ");
                 string note = "";
                 if (noteChoice.ToUpper() == "Y")
@@ -528,10 +633,10 @@ public partial class TempleLocation : BaseLocation
                     note = await terminal.GetInputAsync("Note: ");
                     terminal.WriteLine("Done!", "green");
                 }
-                
+
                 if (string.IsNullOrEmpty(note))
                 {
-                    var randomNotes = new[] 
+                    var randomNotes = new[]
                     {
                         "You are not my God!",
                         "farewell..",
@@ -539,10 +644,10 @@ public partial class TempleLocation : BaseLocation
                     };
                     note = randomNotes[new Random().Next(randomNotes.Length)];
                 }
-                
+
                 // Remove from god system
                 godSystem.SetPlayerGod(currentPlayer.Name2, "");
-                
+
                 // In Pascal, this would send mail to the god and news
                 terminal.WriteLine("");
                 terminal.WriteLine("You are no longer a believer.", "yellow");
@@ -553,7 +658,7 @@ public partial class TempleLocation : BaseLocation
                 goAhead = false;
             }
         }
-        
+
         if (goAhead)
         {
             var selectedGod = await SelectGod("Choose a god to worship");
@@ -563,7 +668,7 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine($"You raise your hands and pray to the almighty {selectedGod.Name}", "white");
                 terminal.Write("for forgiveness", "white");
-                
+
                 // Delay dots animation (Pascal Make_Delay_Dots)
                 for (int i = 0; i < 15; i++)
                 {
@@ -571,18 +676,37 @@ public partial class TempleLocation : BaseLocation
                     await Task.Delay(300);
                 }
                 terminal.WriteLine("");
-                
+
                 terminal.WriteLine($"You are now a believer in {selectedGod.Name}!", "yellow");
-                
+
                 // Set in god system
                 godSystem.SetPlayerGod(currentPlayer.Name2, selectedGod.Name);
-                
+
+                // Clear any immortal player-god worship (can only follow one type)
+                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"Your bond with the immortal {currentPlayer.WorshippedGod} is severed.");
+                    currentPlayer.WorshippedGod = "";
+                    if (DoorMode.IsOnlineMode)
+                    {
+                        try
+                        {
+                            var backend2 = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                            var sessionUsername2 = UsurperRemake.Server.SessionContext.Current?.Username;
+                            if (backend2 != null && !string.IsNullOrEmpty(sessionUsername2))
+                                await backend2.SetPlayerWorshippedGod(sessionUsername2, "");
+                        }
+                        catch { }
+                    }
+                }
+
                 // In Pascal, this would send mail to god and news
                 terminal.WriteLine("");
                 terminal.WriteLine("The gods smile upon your faith!", "cyan");
             }
         }
-        
+
         await Task.Delay(2000);
     }
     
@@ -1931,8 +2055,9 @@ public partial class TempleLocation : BaseLocation
     private async Task ProcessDailyPrayer()
     {
         string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
+        string worshippedImmortal = currentPlayer.WorshippedGod ?? "";
 
-        if (string.IsNullOrEmpty(playerGod))
+        if (string.IsNullOrEmpty(playerGod) && string.IsNullOrEmpty(worshippedImmortal))
         {
             terminal.WriteLine("");
             terminal.WriteLine("You must worship a god before you can pray for blessings.", "yellow");
@@ -1950,6 +2075,110 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
+        // === Prayer to an immortal player-god ===
+        if (!string.IsNullOrEmpty(worshippedImmortal))
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"You kneel before the altar of {worshippedImmortal}...");
+            await Task.Delay(1000);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("Your prayers rise to the immortal realm...");
+            await Task.Delay(1000);
+
+            // Mark prayer as done for today (set LastPrayerRealDate for online mode)
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                currentPlayer.LastPrayerRealDate = DateTime.UtcNow;
+
+            // Calculate boon effects and double them for prayer
+            var baseEffects = currentPlayer.CachedBoonEffects;
+            if (baseEffects != null && baseEffects.HasAnyEffect)
+            {
+                var boosted = baseEffects.Multiply(GameConfig.GodBoonPrayerMultiplier);
+
+                // Apply as temporary DivineBlessingCombats/Bonus using the strongest buff
+                // The prayer buff lasts for a time-based duration simulated as combat count
+                int prayerCombats = 20; // ~20 combats ≈ 2 hours of active play
+                float prayerBonus = Math.Max(boosted.DamagePercent, boosted.DefensePercent);
+                if (prayerBonus > 0)
+                {
+                    currentPlayer.DivineBlessingCombats = Math.Max(currentPlayer.DivineBlessingCombats, prayerCombats);
+                    currentPlayer.DivineBlessingBonus = Math.Max(currentPlayer.DivineBlessingBonus, prayerBonus);
+                }
+
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  {worshippedImmortal}'s divine power surges through you!");
+                terminal.WriteLine("");
+
+                // Show boosted boon effects
+                var boonLines = DivineBoonRegistry.GetEffectSummaryLines(currentPlayer.DivineBoonConfig);
+                // Recalculate from worshipped god's config
+                string godConfig = "";
+                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                if (backend != null && DoorMode.IsOnlineMode)
+                {
+                    try { godConfig = await backend.GetGodBoonConfig(worshippedImmortal); } catch { }
+                }
+                boonLines = DivineBoonRegistry.GetEffectSummaryLines(godConfig);
+
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("  Prayer amplifies your patron's boons:");
+                foreach (var line in boonLines)
+                {
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"    • {line} (x{GameConfig.GodBoonPrayerMultiplier:0.#})");
+                }
+
+                if (prayerBonus > 0)
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"  Combat blessing: +{(int)(prayerBonus * 100)}% damage/defense for {prayerCombats} combats");
+                }
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {worshippedImmortal} has not yet configured divine favors.");
+                terminal.SetColor("white");
+                terminal.WriteLine("  Your prayer is heard, but no boons flow.");
+            }
+
+            // Grant the god experience from the prayer
+            if (DoorMode.IsOnlineMode)
+            {
+                try
+                {
+                    var prayerBackend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                    if (prayerBackend != null)
+                        await prayerBackend.AddGodExperience(worshippedImmortal, 10);
+                }
+                catch { }
+            }
+
+            // Notify the god if online
+            if (DoorMode.IsOnlineMode && UsurperRemake.Server.MudServer.Instance != null)
+            {
+                foreach (var kvp in UsurperRemake.Server.MudServer.Instance.ActiveSessions)
+                {
+                    var p = kvp.Value.Context?.Engine?.CurrentPlayer;
+                    if (p != null && p.DivineName == worshippedImmortal)
+                    {
+                        kvp.Value.EnqueueMessage(
+                            $"\u001b[1;33m  ✦ {currentPlayer.Name2} prayed to you! +10 divine experience. ✦\u001b[0m");
+                        break;
+                    }
+                }
+            }
+
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+            refreshMenu = true;
+            return;
+        }
+
+        // === Prayer to an NPC god (existing system) ===
         var god = godSystem.GetGod(playerGod);
         if (god == null)
         {
@@ -2582,6 +2811,361 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
 
         await terminal.PressAnyKey();
+    }
+
+    #endregion
+
+    #region Immortal God Worship (v0.45.0)
+
+    /// <summary>Get all ascended immortal gods (from NPCSpawnSystem or online DB)</summary>
+    private async Task<List<ImmortalGodInfo>> GetImmortalGodsAsync()
+    {
+        var gods = new List<ImmortalGodInfo>();
+
+        // In MUD mode, query all immortals from the DB
+        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+        if (backend != null && DoorMode.IsOnlineMode)
+        {
+            try
+            {
+                var immortals = await backend.GetImmortalPlayers();
+                foreach (var god in immortals)
+                {
+                    // Don't show the current mortal player as a god they can worship
+                    var ctx = UsurperRemake.Server.SessionContext.Current;
+                    if (ctx != null && god.Username.Equals(ctx.Username, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    gods.Add(new ImmortalGodInfo
+                    {
+                        DivineName = god.DivineName,
+                        GodLevel = god.GodLevel,
+                        GodAlignment = god.GodAlignment,
+                        Believers = PantheonLocation.CountBelievers(god.DivineName),
+                        IsOnline = god.IsOnline,
+                        Username = god.Username,
+                        DivineBoonConfig = god.DivineBoonConfig ?? ""
+                    });
+                }
+            }
+            catch { /* DB unavailable */ }
+        }
+        else
+        {
+            // Single-player: only the current player (if they've ascended, which shouldn't happen in Temple)
+            var player = GameEngine.Instance?.CurrentPlayer;
+            if (player != null && player.IsImmortal && !string.IsNullOrEmpty(player.DivineName))
+            {
+                gods.Add(new ImmortalGodInfo
+                {
+                    DivineName = player.DivineName,
+                    GodLevel = player.GodLevel,
+                    GodAlignment = player.GodAlignment,
+                    Believers = PantheonLocation.CountBelievers(player.DivineName),
+                    IsOnline = true
+                });
+            }
+        }
+
+        return gods;
+    }
+
+    private async Task WorshipImmortalGod()
+    {
+        var gods = await GetImmortalGodsAsync();
+        if (gods.Count == 0)
+        {
+            terminal.WriteLine("  There are no ascended gods to worship.", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("╔═════════════════════════════════════════════════════════════════════════════╗");
+        terminal.WriteLine($"║{"ALTARS OF THE ASCENDED".PadLeft((77 + 22) / 2).PadRight(77)}║");
+        terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+
+        for (int i = 0; i < gods.Count; i++)
+        {
+            var god = gods[i];
+            string title = PantheonLocation.GetGodTitle(god.GodLevel);
+            terminal.SetColor("white");
+            terminal.Write($"  {i + 1}. ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"{god.DivineName}");
+            terminal.SetColor("gray");
+            terminal.Write($" the {title}  ");
+            terminal.SetColor(god.IsOnline ? "bright_green" : "gray");
+            terminal.Write(god.IsOnline ? "[ONLINE]" : "[OFFLINE]");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  ({god.GodAlignment}, {god.Believers} believers)");
+
+            // Show boon description
+            string desc = DivineBoonRegistry.GenerateDescription(god.DivineBoonConfig, god.GodAlignment);
+            terminal.SetColor("gray");
+            terminal.WriteLine($"     {desc}");
+
+            // Show individual boons
+            var boonLines = DivineBoonRegistry.GetEffectSummaryLines(god.DivineBoonConfig);
+            foreach (var line in boonLines)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"     • {line}");
+            }
+
+            if (i < gods.Count - 1) terminal.WriteLine("");
+        }
+
+        terminal.WriteLine("");
+        string input = await terminal.GetInputAsync("  Worship which god? (0 to cancel): ");
+        if (!int.TryParse(input, out int idx) || idx < 1 || idx > gods.Count) return;
+
+        var chosen = gods[idx - 1];
+
+        // Check if already following this god
+        if (currentPlayer.WorshippedGod == chosen.DivineName)
+        {
+            terminal.WriteLine($"  You already follow {chosen.DivineName}.", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // If already following another player god, warn
+        if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+        {
+            terminal.WriteLine($"  You currently follow {currentPlayer.WorshippedGod}.", "yellow");
+            string confirm = await terminal.GetInputAsync("  Abandon them? (Y/N): ");
+            if (confirm.Trim().ToUpper() != "Y") return;
+        }
+
+        // If following an NPC god, renounce them — the elder god may punish apostasy
+        string oldNpcGod = godSystem.GetPlayerGod(currentPlayer.Name2);
+        if (!string.IsNullOrEmpty(oldNpcGod))
+        {
+            terminal.WriteLine($"  You currently worship the elder god {oldNpcGod}.", "yellow");
+            string confirm = await terminal.GetInputAsync($"  Abandon {oldNpcGod} for a mortal-born god? (Y/N): ");
+            if (confirm.Trim().ToUpper() != "Y") return;
+
+            godSystem.SetPlayerGod(currentPlayer.Name2, "");
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine($"  You renounce {oldNpcGod}!");
+
+            // Divine retribution — the elder god may smite the apostate
+            var rng = new Random();
+            if (rng.NextDouble() < 0.6) // 60% chance of punishment
+            {
+                long smiteDamage = Math.Max(1, (long)(currentPlayer.MaxHP * (0.1 + rng.NextDouble() * 0.2)));
+                currentPlayer.HP = Math.Max(1, currentPlayer.HP - smiteDamage);
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"  {oldNpcGod} strikes you down for your betrayal!");
+                terminal.SetColor("white");
+                terminal.WriteLine($"  You take {smiteDamage} damage! (HP: {currentPlayer.HP}/{currentPlayer.MaxHP})");
+                await Task.Delay(1500);
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {oldNpcGod} watches silently as you walk away...");
+                await Task.Delay(1000);
+            }
+        }
+
+        currentPlayer.WorshippedGod = chosen.DivineName;
+
+        // Cache boon effects from the chosen god
+        currentPlayer.CachedBoonEffects = DivineBoonRegistry.CalculateEffects(chosen.DivineBoonConfig);
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"  You kneel before the altar of {chosen.DivineName}.");
+        terminal.SetColor("white");
+        terminal.WriteLine("  You feel a divine presence acknowledge you.");
+
+        // Show boon effects the player will receive
+        var effects = currentPlayer.CachedBoonEffects;
+        if (effects != null && effects.HasAnyEffect)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  You feel their divine favors flow into you:");
+            foreach (var line in DivineBoonRegistry.GetEffectSummaryLines(chosen.DivineBoonConfig))
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine($"    • {line}");
+            }
+        }
+
+        // Notify the god if online
+        if (DoorMode.IsOnlineMode && chosen.IsOnline && UsurperRemake.Server.MudServer.Instance != null)
+        {
+            UsurperRemake.Server.MudServer.Instance.SendToPlayer(chosen.Username,
+                $"\u001b[1;33m  ✦ A mortal named {currentPlayer.Name2} now worships you! ✦\u001b[0m");
+        }
+
+        // Persist worship atomically to DB so believer counts update immediately
+        if (DoorMode.IsOnlineMode)
+        {
+            try
+            {
+                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
+                if (backend != null && !string.IsNullOrEmpty(sessionUsername))
+                    await backend.SetPlayerWorshippedGod(sessionUsername, chosen.DivineName);
+            }
+            catch { }
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    private async Task SacrificeToImmortalGod()
+    {
+        if (string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+        {
+            terminal.WriteLine("  You must worship an immortal god first. Use [J] to join a flock.", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  Sacrifice gold to {currentPlayer.WorshippedGod}");
+        terminal.SetColor("white");
+        terminal.WriteLine($"  Gold on hand: {currentPlayer.Gold:N0}");
+        terminal.WriteLine("");
+
+        string input = await terminal.GetInputAsync("  Amount to sacrifice (0 to cancel): ");
+        if (!long.TryParse(input, out long amount) || amount <= 0) return;
+
+        if (amount > currentPlayer.Gold)
+        {
+            terminal.WriteLine("  You don't have that much gold.", "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        currentPlayer.Gold -= amount;
+        int power = PantheonLocation.GetSacrificePower(amount);
+
+        // Deliver experience to the god
+        bool delivered = false;
+
+        // Check if the god is online (in-memory delivery)
+        if (DoorMode.IsOnlineMode && UsurperRemake.Server.MudServer.Instance != null)
+        {
+            foreach (var kvp in UsurperRemake.Server.MudServer.Instance.ActiveSessions)
+            {
+                var godPlayer = kvp.Value.Context?.Engine?.CurrentPlayer;
+                if (godPlayer != null && godPlayer.IsImmortal && godPlayer.DivineName == currentPlayer.WorshippedGod)
+                {
+                    godPlayer.GodExperience += power;
+                    kvp.Value.EnqueueMessage(
+                        $"\u001b[1;33m  ✦ {currentPlayer.Name2} sacrificed {amount:N0} gold at your altar! +{power} divine experience. ✦\u001b[0m");
+                    delivered = true;
+                    break;
+                }
+            }
+        }
+
+        // Offline god: atomic DB update + message
+        if (!delivered && DoorMode.IsOnlineMode)
+        {
+            var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+            if (backend != null)
+            {
+                try
+                {
+                    await backend.AddGodExperience(currentPlayer.WorshippedGod, power);
+                    // Find the god's username for the message
+                    var immortals = await backend.GetImmortalPlayers();
+                    var godInfo = immortals.FirstOrDefault(g => g.DivineName == currentPlayer.WorshippedGod);
+                    if (godInfo != null)
+                    {
+                        await backend.SendMessage("Temple", godInfo.Username, "divine",
+                            $"{currentPlayer.Name2} sacrificed {amount:N0} gold at your altar! +{power} divine experience.");
+                    }
+                    delivered = true;
+                }
+                catch { /* DB unavailable */ }
+            }
+        }
+
+        // Single-player fallback
+        if (!delivered)
+        {
+            var player = GameEngine.Instance?.CurrentPlayer;
+            if (player != null && player.IsImmortal && player.DivineName == currentPlayer.WorshippedGod)
+            {
+                player.GodExperience += power;
+            }
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  You place {amount:N0} gold upon the altar of {currentPlayer.WorshippedGod}.");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"  The offering burns with divine fire! (Power: {power})");
+
+        // Small blessing for the worshipper
+        if (power >= 3)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  You feel a warm glow of divine favor.");
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    private async Task LeaveImmortalFaith()
+    {
+        if (string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+        {
+            terminal.WriteLine("  You don't follow any immortal god.", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        string godName = currentPlayer.WorshippedGod;
+        string confirm = await terminal.GetInputAsync($"  Abandon your faith in {godName}? (Y/N): ");
+        if (confirm.Trim().ToUpper() != "Y") return;
+
+        currentPlayer.WorshippedGod = "";
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  You turn away from {godName}'s altar.");
+        terminal.SetColor("gray");
+        terminal.WriteLine("  You are once again without divine patronage.");
+
+        // Persist atomically to DB so believer counts update immediately
+        if (DoorMode.IsOnlineMode)
+        {
+            try
+            {
+                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
+                if (backend != null && !string.IsNullOrEmpty(sessionUsername))
+                    await backend.SetPlayerWorshippedGod(sessionUsername, "");
+            }
+            catch { }
+        }
+
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    private class ImmortalGodInfo
+    {
+        public string DivineName { get; set; } = "";
+        public int GodLevel { get; set; }
+        public string GodAlignment { get; set; } = "";
+        public int Believers { get; set; }
+        public bool IsOnline { get; set; }
+        public string Username { get; set; } = "";
+        public string DivineBoonConfig { get; set; } = "";
     }
 
     #endregion

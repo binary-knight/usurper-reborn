@@ -451,10 +451,14 @@ namespace UsurperRemake.Systems
         public int PermanentDamageBonus { get; set; } = 0;
         public int PermanentDefenseBonus { get; set; } = 0;
         public long BonusMaxHP { get; set; } = 0;
+        public long BonusWeapPow { get; set; } = 0;
+        public long BonusArmPow { get; set; } = 0;
         public int HomeRestsToday { get; set; } = 0;
         public int HerbsGatheredToday { get; set; } = 0;
         public int WellRestedCombats { get; set; } = 0;
         public float WellRestedBonus { get; set; } = 0f;
+        public int LoversBlissCombats { get; set; } = 0;
+        public float LoversBlissBonus { get; set; } = 0f;
         public float CycleExpMultiplier { get; set; } = 1.0f;
         public List<InventoryItemData>? ChestContents { get; set; }
 
@@ -496,6 +500,20 @@ namespace UsurperRemake.Systems
 
         // Hint system - tracks which contextual hints have been shown to the player
         public HashSet<string> HintsShown { get; set; } = new();
+
+        // Immortal Ascension System (v0.45.0)
+        public bool IsImmortal { get; set; }
+        public string DivineName { get; set; } = "";
+        public int GodLevel { get; set; }
+        public long GodExperience { get; set; }
+        public int DeedsLeft { get; set; }
+        public string GodAlignment { get; set; } = "";
+        public DateTime AscensionDate { get; set; }
+        public bool HasEarnedAltSlot { get; set; }  // Account has earned the alt character slot
+        public string WorshippedGod { get; set; } = "";  // Mortal worship: DivineName of an immortal player-god
+        public int DivineBlessingCombats { get; set; }
+        public float DivineBlessingBonus { get; set; }
+        public string DivineBoonConfig { get; set; } = "";  // Gods: comma-separated "boonId:tier" boon configuration
     }
 
     /// <summary>
@@ -598,6 +616,9 @@ namespace UsurperRemake.Systems
 
         // Faction affiliation (nullable - -1 means no faction)
         public int NPCFaction { get; set; } = -1;
+
+        // Divine worship - which immortal player-god this NPC follows
+        public string WorshippedGod { get; set; } = "";
 
         // Alignment
         public long Chivalry { get; set; }

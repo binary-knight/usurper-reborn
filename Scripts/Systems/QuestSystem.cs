@@ -748,6 +748,20 @@ public partial class QuestSystem : Node
     }
     
     /// <summary>
+    /// Abandon a quest - player voluntarily gives up with no penalty
+    /// </summary>
+    public static void AbandonQuest(Character player, string questId)
+    {
+        var quest = questDatabase.FirstOrDefault(q => q.Id == questId);
+        if (quest != null)
+        {
+            quest.Deleted = true;
+            quest.Occupier = "";
+        }
+        player.ActiveQuests.RemoveAll(q => q.Id == questId);
+    }
+
+    /// <summary>
     /// Apply quest failure penalty
     /// </summary>
     private static void ApplyQuestPenalty(Quest quest)
@@ -910,6 +924,78 @@ public partial class QuestSystem : Node
         }
 
         // GD.Print($"[QuestSystem] Restored {questDatabase.Count} quests from save data");
+    }
+
+    /// <summary>
+    /// Merge unclaimed world/board quests into the database without clearing existing player quests.
+    /// Used in single-player mode after player quests have already been loaded.
+    /// </summary>
+    public static void MergeWorldQuests(List<QuestData> savedQuests)
+    {
+        if (savedQuests == null || savedQuests.Count == 0) return;
+
+        // Remove existing unclaimed quests (they'll be replaced by saved data)
+        questDatabase.RemoveAll(q => string.IsNullOrEmpty(q.Occupier));
+
+        foreach (var questData in savedQuests)
+        {
+            // Skip if this quest ID already exists (player quest with same ID)
+            if (questDatabase.Any(q => q.Id == questData.Id)) continue;
+
+            var quest = new Quest
+            {
+                Id = questData.Id,
+                Title = questData.Title,
+                Initiator = questData.Initiator,
+                Comment = questData.Comment,
+                Date = questData.StartTime,
+                QuestType = (QuestType)questData.QuestType,
+                QuestTarget = (QuestTarget)questData.QuestTarget,
+                Difficulty = (byte)questData.Difficulty,
+                Occupier = questData.Occupier,
+                OccupiedDays = questData.OccupiedDays,
+                DaysToComplete = questData.DaysToComplete,
+                MinLevel = questData.MinLevel,
+                MaxLevel = questData.MaxLevel,
+                Reward = (byte)questData.Reward,
+                RewardType = (QuestRewardType)questData.RewardType,
+                Penalty = (byte)questData.Penalty,
+                PenaltyType = (QuestRewardType)questData.PenaltyType,
+                OfferedTo = questData.OfferedTo,
+                Forced = questData.Forced,
+                TargetNPCName = questData.TargetNPCName ?? "",
+                Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed
+            };
+
+            foreach (var objData in questData.Objectives)
+            {
+                quest.Objectives.Add(new QuestObjective
+                {
+                    Id = objData.Id,
+                    Description = objData.Description,
+                    ObjectiveType = (QuestObjectiveType)objData.ObjectiveType,
+                    TargetId = objData.TargetId,
+                    TargetName = objData.TargetName,
+                    RequiredProgress = objData.RequiredProgress,
+                    CurrentProgress = objData.CurrentProgress,
+                    IsOptional = objData.IsOptional,
+                    BonusReward = objData.BonusReward
+                });
+            }
+
+            foreach (var monsterData in questData.Monsters)
+            {
+                quest.Monsters.Add(new QuestMonster(
+                    monsterData.MonsterType,
+                    monsterData.Count,
+                    monsterData.MonsterName
+                ));
+            }
+
+            questDatabase.Add(quest);
+        }
+
+        DebugLogger.Instance.LogDebug("QUEST", $"Merged {savedQuests.Count} world quests (total: {questDatabase.Count})");
     }
 
     /// <summary>

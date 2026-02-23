@@ -225,6 +225,10 @@ namespace UsurperRemake.Systems
             // Play credits
             await PlayCredits(player, ending, terminal);
 
+            // Offer Immortal Ascension (before NG+)
+            bool ascended = await OfferImmortality(player, ending, terminal);
+            if (ascended) return; // Player became a god — skip NG+
+
             // Offer New Game+
             await OfferNewGamePlus(player, ending, terminal);
         }
@@ -719,7 +723,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_cyan");
             terminal.WriteLine("");
             terminal.WriteLine("                        U S U R P E R", "bright_yellow");
-            terminal.WriteLine("                          REMAKE", "yellow");
+            terminal.WriteLine("                          REBORN", "yellow");
             terminal.WriteLine("");
             terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_cyan");
             terminal.WriteLine("");
@@ -731,7 +735,7 @@ namespace UsurperRemake.Systems
                 ("ORIGINAL CONCEPT", "bright_yellow"),
                 ("Usurper BBS Door Game", "white"),
                 ("", "white"),
-                ("REMAKE DEVELOPED BY", "bright_yellow"),
+                ("REBORN BY", "bright_yellow"),
                 ($"With love for the classics", "white"),
                 ("", "white"),
                 ("STORY & NARRATIVE", "bright_yellow"),
@@ -1251,6 +1255,140 @@ namespace UsurperRemake.Systems
                 EndingType.TrueEnding => "The True Ending (Balance)",
                 _ => "Unknown"
             };
+        }
+
+        #endregion
+
+        #region Immortal Ascension
+
+        private async Task<bool> OfferImmortality(Character player, EndingType ending, TerminalEmulator terminal)
+        {
+            terminal.Clear();
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_yellow");
+            terminal.WriteLine("              T H E   C O S M O S   A W A I T S", "bright_yellow");
+            terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_yellow");
+            terminal.WriteLine("");
+
+            await Task.Delay(1000);
+
+            terminal.WriteLine("  You feel the power of creation flowing through your veins.", "white");
+            terminal.WriteLine("  The mortal coil loosens. The divine realm beckons.", "white");
+            terminal.WriteLine("");
+
+            await Task.Delay(800);
+
+            terminal.WriteLine("  \"You have proven yourself,\" Manwe whispers.", "bright_magenta");
+            terminal.WriteLine("  \"Few mortals earn this choice.\"", "bright_magenta");
+            terminal.WriteLine("  \"Will you transcend mortality and become a god?\"", "bright_magenta");
+            terminal.WriteLine("");
+
+            await Task.Delay(800);
+
+            terminal.WriteLine("  As a god, you will:", "bright_cyan");
+            terminal.WriteLine("  - Appear in the Temple for mortals to worship", "white");
+            terminal.WriteLine("  - Manage followers and perform divine deeds", "white");
+            terminal.WriteLine("  - Compete with other gods for believers", "white");
+            terminal.WriteLine("  - Gain divine ranks from Lesser Spirit to God", "white");
+            terminal.WriteLine("");
+            terminal.WriteLine("  (You can renounce immortality at any time to reroll)", "gray");
+            terminal.WriteLine("");
+
+            var response = await terminal.GetInputAsync("  Ascend to godhood? (Y/N): ");
+            if (response.Trim().ToUpper() != "Y") return false;
+
+            // Choose divine name
+            terminal.WriteLine("");
+            terminal.WriteLine("  Choose your divine name (3-30 characters):", "bright_cyan");
+            string divineName = "";
+            while (true)
+            {
+                divineName = (await terminal.GetInputAsync("  Divine Name: ")).Trim();
+                if (divineName.Length >= 3 && divineName.Length <= 30)
+                    break;
+                terminal.WriteLine("  Name must be 3-30 characters.", "red");
+            }
+
+            // Determine alignment from ending
+            string alignment = ending switch
+            {
+                EndingType.Savior => "Light",
+                EndingType.Usurper => "Dark",
+                EndingType.Defiant => "Balance",
+                EndingType.TrueEnding => "Balance",
+                _ => "Balance"
+            };
+
+            // Auto-abdicate if player is the king
+            if (player.King)
+            {
+                CastleLocation.AbdicatePlayerThrone(player, "abdicated the throne to ascend to godhood");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  The throne has been abdicated as you transcend mortal affairs.", "bright_yellow");
+                terminal.WriteLine("");
+                await Task.Delay(1500);
+            }
+
+            // Block alt characters from ascending
+            if (SqlSaveBackend.IsAltCharacter(UsurperRemake.BBS.DoorMode.GetPlayerName() ?? ""))
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine("  Alt characters cannot ascend to immortality.", "red");
+                terminal.WriteLine("  Only your main character may become a god.", "gray");
+                await Task.Delay(2000);
+                return false;
+            }
+
+            // Mark the alt slot as earned (persists even if they renounce)
+            player.HasEarnedAltSlot = true;
+
+            // Convert to immortal
+            player.IsImmortal = true;
+            player.DivineName = divineName;
+            player.GodLevel = 1;
+            player.GodExperience = 0;
+            player.DeedsLeft = GameConfig.GodDeedsPerDay[0];
+            player.GodAlignment = alignment;
+            player.AscensionDate = DateTime.UtcNow;
+
+            terminal.WriteLine("");
+            await Task.Delay(500);
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  ════════════════════════════════════════════════════════════");
+            terminal.WriteLine("");
+            terminal.WriteLine($"  {divineName}, Lesser Spirit of {alignment}", "bright_yellow");
+            terminal.WriteLine("  has ascended to the Divine Realm!", "bright_yellow");
+            terminal.WriteLine("");
+            terminal.WriteLine("  ════════════════════════════════════════════════════════════");
+
+            await Task.Delay(1000);
+
+            // Write news
+            NewsSystem.Instance?.Newsy(true,
+                $"[DIVINE] {player.Name2} has ascended to godhood as {divineName}!");
+
+            // Achievement
+            AchievementSystem.TryUnlock(player, "ascended");
+
+            // Save immediately
+            try
+            {
+                await SaveSystem.Instance.AutoSave(player);
+            }
+            catch { /* best effort */ }
+
+            terminal.WriteLine("");
+            terminal.WriteLine("  You will now enter the Pantheon — your eternal domain.", "bright_cyan");
+            terminal.WriteLine("");
+
+            await terminal.GetInputAsync("  Press Enter to enter the Divine Realm...");
+
+            // Route to Pantheon
+            GameEngine.Instance.PendingImmortalAscension = true;
+
+            return true;
         }
 
         #endregion

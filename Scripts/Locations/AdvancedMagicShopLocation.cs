@@ -243,6 +243,10 @@ public class AdvancedMagicShopLocation : BaseLocation
         // Apply city control discount if player's team controls the city
         long adjustedCost = CityControlSystem.Instance.ApplyDiscount(identifyCost, player);
 
+        // Apply divine boon shop discount
+        if (player.CachedBoonEffects?.ShopDiscountPercent > 0)
+            adjustedCost = (long)(adjustedCost * (1.0 - player.CachedBoonEffects.ShopDiscountPercent));
+
         // Calculate total with tax
         var (idKingTax, idCityTax, idTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedCost);
 
@@ -376,6 +380,10 @@ public class AdvancedMagicShopLocation : BaseLocation
         // Apply city control discount if player's team controls the city
         long adjustedCost = CityControlSystem.Instance.ApplyDiscount(totalCost, player);
 
+        // Apply divine boon shop discount
+        if (player.CachedBoonEffects?.ShopDiscountPercent > 0)
+            adjustedCost = (long)(adjustedCost * (1.0 - player.CachedBoonEffects.ShopDiscountPercent));
+
         // Calculate total with tax
         var (potionKingTax, potionCityTax, potionTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedCost);
 
@@ -489,6 +497,10 @@ public class AdvancedMagicShopLocation : BaseLocation
 
         // Apply city control discount if player's team controls the city
         long adjustedPrice = CityControlSystem.Instance.ApplyDiscount(selectedItem.Price, player);
+
+        // Apply divine boon shop discount
+        if (player.CachedBoonEffects?.ShopDiscountPercent > 0)
+            adjustedPrice = (long)(adjustedPrice * (1.0 - player.CachedBoonEffects.ShopDiscountPercent));
 
         // Calculate total with tax
         var (buyKingTax, buyCityTax, buyTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
@@ -852,7 +864,7 @@ public class AdvancedMagicShopLocation : BaseLocation
         switch (item.Type)
         {
             case ObjType.Weapon:
-                player.WeapPow += item.Power;
+                player.BonusWeapPow += item.Power;
                 break;
             case ObjType.Shield:
             case ObjType.Body:
@@ -861,7 +873,7 @@ public class AdvancedMagicShopLocation : BaseLocation
             case ObjType.Hands:
             case ObjType.Legs:
             case ObjType.Feet:
-                player.ArmPow += item.Power;
+                player.BonusArmPow += item.Power;
                 break;
             case ObjType.Neck:
             case ObjType.Fingers:

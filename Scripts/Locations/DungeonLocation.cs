@@ -1657,19 +1657,29 @@ public class DungeonLocation : BaseLocation
         string? hint = null;
         string color = "gray";
 
-        // Seal floors
+        // Seal and boss floors
         if (floor == 15 && !story.CollectedSeals.Contains(SealType.FirstWar))
         { hint = "LORE: Second Seal awaits here"; color = "bright_cyan"; }
         else if (floor == 25 && !story.HasStoryFlag("maelketh_encountered"))
         { hint = "BOSS: Maelketh, God of War awaits!"; color = "bright_red"; }
         else if (floor == 30 && !story.CollectedSeals.Contains(SealType.Corruption))
         { hint = "LORE: Third Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 40 && !story.HasStoryFlag("veloura_encountered"))
+        { hint = "BOSS: Veloura, Goddess of Desire awaits!"; color = "bright_magenta"; }
         else if (floor == 45 && !story.CollectedSeals.Contains(SealType.Imprisonment))
         { hint = "LORE: Fourth Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 55 && !story.HasStoryFlag("thorgrim_encountered"))
+        { hint = "BOSS: Thorgrim, God of Law awaits!"; color = "bright_cyan"; }
         else if (floor == 60 && !story.CollectedSeals.Contains(SealType.Prophecy))
         { hint = "LORE: Fifth Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 70 && !story.HasStoryFlag("noctura_encountered"))
+        { hint = "BOSS: Noctura, Goddess of Shadow awaits!"; color = "bright_magenta"; }
         else if (floor == 80 && !story.CollectedSeals.Contains(SealType.Regret))
         { hint = "LORE: Sixth Seal awaits here"; color = "bright_cyan"; }
+        else if (floor == 85 && !story.HasStoryFlag("aurelion_encountered"))
+        { hint = "BOSS: Aurelion, God of Light awaits!"; color = "bright_yellow"; }
+        else if (floor == 95 && !story.HasStoryFlag("terravok_encountered"))
+        { hint = "BOSS: Terravok, God of Earth slumbers here!"; color = "bright_yellow"; }
         else if (floor == 99 && !story.CollectedSeals.Contains(SealType.Truth))
         { hint = "LORE: Final Seal awaits here"; color = "bright_cyan"; }
         else if (floor == 100)
@@ -2256,19 +2266,24 @@ public class DungeonLocation : BaseLocation
             hint = "LORE: The Third Seal reveals how Manwe corrupted his own children.";
             color = "bright_cyan";
         }
+        else if (floor == 40 && !story.HasStoryFlag("veloura_encountered"))
+        {
+            hint = "BOSS: Veloura, Goddess of Desire, beckons from within this floor!";
+            color = "bright_magenta";
+        }
         else if (floor == 45 && !story.CollectedSeals.Contains(SealType.Imprisonment))
         {
             hint = "LORE: The Fourth Seal tells of the eternal chains that bind the gods.";
             color = "bright_cyan";
         }
+        else if (floor == 55 && !story.HasStoryFlag("thorgrim_encountered"))
+        {
+            hint = "BOSS: Thorgrim, God of Law, holds court on this floor!";
+            color = "bright_cyan";
+        }
         else if (floor == 60)
         {
-            if (!story.HasStoryFlag("maelketh_encountered"))
-            {
-                hint = "BOSS: Maelketh, God of War, can be challenged on this floor!";
-                color = "bright_red";
-            }
-            else if (!story.CollectedSeals.Contains(SealType.Prophecy))
+            if (!story.CollectedSeals.Contains(SealType.Prophecy))
             {
                 hint = "LORE: The Fifth Seal contains a prophecy about your coming.";
                 color = "bright_cyan";
@@ -2293,28 +2308,39 @@ public class DungeonLocation : BaseLocation
                 }
             }
         }
+        else if (floor == 70 && !story.HasStoryFlag("noctura_encountered"))
+        {
+            hint = "BOSS: Noctura, Goddess of Shadow, lurks in the darkness of this floor!";
+            color = "bright_magenta";
+        }
         else if (floor == 75)
         {
             hint = "MEMORY: Your forgotten past will surface here. Pay attention to dreams.";
             color = "bright_blue";
         }
-        else if (floor == 80)
+        else if (floor == 80 && !story.CollectedSeals.Contains(SealType.Regret))
         {
-            if (!story.HasStoryFlag("terravok_encountered"))
+            hint = "LORE: The Sixth Seal shows Manwe's regret - his tears crystallized.";
+            color = "bright_cyan";
+        }
+        else if (floor == 85 && !story.HasStoryFlag("aurelion_encountered"))
+        {
+            hint = "BOSS: Aurelion, God of Light, radiates from within this floor!";
+            color = "bright_yellow";
+        }
+        else if (floor == 95)
+        {
+            var player95 = GetCurrentPlayer();
+            if (player95 != null && MoralParadoxSystem.Instance.IsParadoxAvailable("destroy_darkness", player95))
+            {
+                hint = "EVENT: The Destroy Darkness paradox awaits those with the Sunforged Blade.";
+                color = "bright_magenta";
+            }
+            else if (!story.HasStoryFlag("terravok_encountered"))
             {
                 hint = "BOSS: Terravok, God of Earth, slumbers here. Will you wake him?";
                 color = "bright_yellow";
             }
-            else if (!story.CollectedSeals.Contains(SealType.Regret))
-            {
-                hint = "LORE: The Sixth Seal shows Manwe's regret - his tears crystallized.";
-                color = "bright_cyan";
-            }
-        }
-        else if (floor == 95)
-        {
-            hint = "EVENT: The Destroy Darkness paradox awaits those with the Sunforged Blade.";
-            color = "bright_magenta";
         }
         else if (floor == 99 && !story.CollectedSeals.Contains(SealType.Truth))
         {
@@ -7346,9 +7372,10 @@ public class DungeonLocation : BaseLocation
                 }
                 else
                 {
-                    // Fallback: add power directly if equip fails
-                    p.WeapPow += weaponPower;
-                    terminal?.WriteLine($"Weapon power increased by {weaponPower}!", "yellow");
+                    // Fallback: add permanent bonus if equip fails
+                    p.BonusWeapPow += weaponPower;
+                    p.RecalculateStats();
+                    terminal?.WriteLine($"Weapon power permanently increased by {weaponPower}!", "yellow");
                 }
             }
         });
@@ -7383,9 +7410,10 @@ public class DungeonLocation : BaseLocation
                 }
                 else
                 {
-                    // Fallback: add power directly if equip fails
-                    p.ArmPow += armorPower;
-                    terminal?.WriteLine($"Armor power increased by {armorPower}!", "yellow");
+                    // Fallback: add permanent bonus if equip fails
+                    p.BonusArmPow += armorPower;
+                    p.RecalculateStats();
+                    terminal?.WriteLine($"Armor power permanently increased by {armorPower}!", "yellow");
                 }
                 await Task.CompletedTask; // Make method async
             }
@@ -7455,12 +7483,13 @@ public class DungeonLocation : BaseLocation
                         // Fallback: apply stats directly
                         switch (ringName)
                         {
-                            case "Ring of Might": p.Strength += 5; break;
-                            case "Ring of Vitality": p.MaxHP += 50; p.HP += 50; break;
-                            case "Ring of the Thief": p.Dexterity += 5; break;
-                            case "Ring of Wisdom": p.Intelligence += 5; break;
-                            case "Ring of Protection": p.ArmPow += 3; break;
+                            case "Ring of Might": p.BaseStrength += 5; p.Strength += 5; break;
+                            case "Ring of Vitality": p.BonusMaxHP += 50; break;
+                            case "Ring of the Thief": p.BaseDexterity += 5; p.Dexterity += 5; break;
+                            case "Ring of Wisdom": p.BaseIntelligence += 5; p.Intelligence += 5; break;
+                            case "Ring of Protection": p.BonusArmPow += 3; break;
                         }
+                        p.RecalculateStats();
                         terminal?.WriteLine($"Ring power applied!", "yellow");
                     }
                 }
@@ -12329,7 +12358,11 @@ public class DungeonLocation : BaseLocation
         var player = GetCurrentPlayer();
         if (player == null) return (xp, gold);
 
-        if (teammates.Count > 0)
+        // Only split rewards when there are actual grouped human players
+        // NPC teammates (mercenaries, spouse) don't reduce the leader's non-combat rewards
+        bool hasGroupedPlayers;
+        lock (teammates) { hasGroupedPlayers = teammates.Any(t => t.IsGroupedPlayer); }
+        if (hasGroupedPlayers)
         {
             var (leaderXP, leaderGold) = SplitPartyRewards(xp, gold, source);
             player.Gold += leaderGold;

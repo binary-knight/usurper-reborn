@@ -37,6 +37,7 @@ public class SessionContext : IDisposable
     public Stream InputStream { get; init; } = null!;
     public Stream OutputStream { get; init; } = null!;
     public string Username { get; init; } = "";
+    public string CharacterKey { get; set; } = "";  // Save key — same as Username unless playing alt character
     public string ConnectionType { get; init; } = "Unknown"; // Web, SSH, BBS
     public CancellationToken CancellationToken { get; init; }
 

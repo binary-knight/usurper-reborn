@@ -40,8 +40,6 @@ public static class WizardCommandSystem
                 return HandleWizChat(username, wizLevel, args, terminal);
             case "wizwho":
                 return HandleWizWho(terminal);
-            case "holylight":
-                return HandleHolyLight(username, terminal);
             case "stat":
                 return await HandleStat(wizLevel, args, terminal);
             case "where":
@@ -63,9 +61,6 @@ public static class WizardCommandSystem
             case "restore":
                 if (wizLevel < WizardLevel.Immortal) return NotEnoughPower(terminal);
                 return HandleRestore(username, args, terminal);
-            case "peace":
-                if (wizLevel < WizardLevel.Immortal) return NotEnoughPower(terminal);
-                return HandlePeace(username, terminal);
             case "echo":
                 if (wizLevel < WizardLevel.Immortal) return NotEnoughPower(terminal);
                 return HandleEcho(username, args, terminal);
@@ -105,10 +100,6 @@ public static class WizardCommandSystem
             case "unmute":
                 if (wizLevel < WizardLevel.Wizard) return NotEnoughPower(terminal);
                 return await HandleUnmute(username, args, terminal);
-            case "purge":
-                if (wizLevel < WizardLevel.Wizard) return NotEnoughPower(terminal);
-                return HandlePurge(username, terminal);
-
             // ── Archwizard+ (Level 4) ───────────────────────────────
             case "ban":
                 if (wizLevel < WizardLevel.Archwizard) return NotEnoughPower(terminal);
@@ -188,7 +179,6 @@ public static class WizardCommandSystem
         terminal.WriteLine("║  /wizhelp              - Show this help                                    ║");
         terminal.WriteLine("║  /wiznet <msg> /wiz    - Wizard chat channel                               ║");
         terminal.WriteLine("║  /wizwho               - Show online wizards                               ║");
-        terminal.WriteLine("║  /holylight            - Toggle enhanced vision                            ║");
         terminal.WriteLine("║  /stat <player>        - Inspect a player's stats                          ║");
         terminal.WriteLine("║  /where                - Show all player locations                         ║");
 
@@ -202,7 +192,6 @@ public static class WizardCommandSystem
             terminal.WriteLine("║  /godmode              - Toggle invulnerability                             ║");
             terminal.WriteLine("║  /heal [player]        - Heal self or player                               ║");
             terminal.WriteLine("║  /restore [player]     - Full HP + Mana restore                            ║");
-            terminal.WriteLine("║  /peace                - Stop all combat in room                           ║");
             terminal.WriteLine("║  /echo <message>       - Send room message as narrator                     ║");
         }
 
@@ -219,7 +208,6 @@ public static class WizardCommandSystem
             terminal.WriteLine("║  /slay <player>        - Instantly kill a player                            ║");
             terminal.WriteLine("║  /freeze / /thaw <p>   - Freeze/unfreeze a player                          ║");
             terminal.WriteLine("║  /mute / /unmute <p>   - Mute/unmute a player                              ║");
-            terminal.WriteLine("║  /purge                - Clear room of items/NPCs                          ║");
         }
 
         if (level >= WizardLevel.Archwizard)
@@ -309,15 +297,6 @@ public static class WizardCommandSystem
         return true;
     }
 
-    private static bool HandleHolyLight(string username, TerminalEmulator terminal)
-    {
-        // Holylight is a toggle that lets wizards see hidden info
-        // For now, just acknowledge the toggle
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("  Holy light toggled. You see all that is hidden.");
-        return true;
-    }
-
     private static async Task<bool> HandleStat(WizardLevel wizLevel, string args, TerminalEmulator terminal)
     {
         if (string.IsNullOrWhiteSpace(args))
@@ -331,7 +310,7 @@ public static class WizardCommandSystem
 
         // Try online first
         var session = FindSession(targetName);
-        Character? player = session?.Context?.Player;
+        Character? player = session?.Context?.Engine?.CurrentPlayer;
         UsurperRemake.Systems.PlayerData? offlineData = null;
 
         if (player == null)
@@ -509,14 +488,14 @@ public static class WizardCommandSystem
     {
         var targetName = string.IsNullOrWhiteSpace(args) ? username : args.Trim();
         var session = FindSession(targetName);
-        if (session?.Context?.Player == null)
+        var player = session?.Context?.Engine?.CurrentPlayer;
+        if (player == null)
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"  Player '{targetName}' not found online.");
             return true;
         }
 
-        var player = session.Context.Player;
         player.HP = player.MaxHP;
         terminal.SetColor("bright_green");
         terminal.WriteLine($"  {targetName} has been healed to full HP ({player.MaxHP}).");
@@ -533,14 +512,14 @@ public static class WizardCommandSystem
     {
         var targetName = string.IsNullOrWhiteSpace(args) ? username : args.Trim();
         var session = FindSession(targetName);
-        if (session?.Context?.Player == null)
+        var player = session?.Context?.Engine?.CurrentPlayer;
+        if (player == null)
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"  Player '{targetName}' not found online.");
             return true;
         }
 
-        var player = session.Context.Player;
         player.HP = player.MaxHP;
         player.Mana = player.MaxMana;
         terminal.SetColor("bright_green");
@@ -551,26 +530,6 @@ public static class WizardCommandSystem
             session.EnqueueMessage($"\u001b[1;32m  Divine energy floods through you. You feel completely restored.\u001b[0m");
             LogAction(username, "restore", targetName, $"HP: {player.MaxHP}, Mana: {player.MaxMana}");
         }
-        return true;
-    }
-
-    private static bool HandlePeace(string username, TerminalEmulator terminal)
-    {
-        // Peace stops combat in the current room
-        // Since combat is processed within the location loop, this sends a message
-        // to all players in the room and sets a flag
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("  A wave of tranquility washes over the area. All combat ceases.");
-
-        var loc = RoomRegistry.Instance?.GetPlayerLocation(username);
-        if (loc.HasValue)
-        {
-            RoomRegistry.Instance!.BroadcastToRoom(loc.Value,
-                $"\u001b[1;33m  A wave of divine tranquility washes over the area.\u001b[0m",
-                excludeUsername: username);
-        }
-
-        LogAction(username, "peace", null, loc.HasValue ? $"At {BaseLocation.GetLocationName(loc.Value)}" : null);
         return true;
     }
 
@@ -723,8 +682,8 @@ public static class WizardCommandSystem
         }
 
         // Teleport the target to our location
-        if (targetSession.Context?.LocationManager != null && targetSession.Context.Player != null)
-            await targetSession.Context.LocationManager.NavigateTo(myLoc.Value, targetSession.Context.Player);
+        if (targetSession.Context?.LocationManager != null && targetSession.Context.Engine?.CurrentPlayer != null)
+            await targetSession.Context.LocationManager.NavigateTo(myLoc.Value, targetSession.Context.Engine.CurrentPlayer);
         targetSession.EnqueueMessage($"\u001b[1;35m  A powerful force pulls you through the void...\u001b[0m");
 
         terminal.SetColor("bright_magenta");
@@ -764,8 +723,8 @@ public static class WizardCommandSystem
             return true;
         }
 
-        if (targetSession.Context?.LocationManager != null && targetSession.Context.Player != null)
-            await targetSession.Context.LocationManager.NavigateTo(location.Value, targetSession.Context.Player);
+        if (targetSession.Context?.LocationManager != null && targetSession.Context.Engine?.CurrentPlayer != null)
+            await targetSession.Context.LocationManager.NavigateTo(location.Value, targetSession.Context.Engine.CurrentPlayer);
         targetSession.EnqueueMessage($"\u001b[1;35m  You are whisked away by a divine force...\u001b[0m");
 
         terminal.SetColor("bright_magenta");
@@ -782,10 +741,11 @@ public static class WizardCommandSystem
 
         if (string.IsNullOrWhiteSpace(args) || args.Trim().Equals("off", StringComparison.OrdinalIgnoreCase))
         {
-            // Turn off all snooping
+            // Turn off all snooping — remove from both SnoopedBy and spectator streams
             foreach (var session in MudServer.Instance?.ActiveSessions.Values ?? Enumerable.Empty<PlayerSession>())
             {
-                session.SnoopedBy.Remove(mySession);
+                if (session.SnoopedBy.Remove(mySession))
+                    session.Context?.Terminal?.RemoveSpectatorStream(terminal);
             }
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("  Snoop disabled.");
@@ -805,14 +765,19 @@ public static class WizardCommandSystem
         if (targetSession.SnoopedBy.Contains(mySession))
         {
             targetSession.SnoopedBy.Remove(mySession);
+            targetSession.Context?.Terminal?.RemoveSpectatorStream(terminal);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine($"  Stopped snooping {targetSession.Username}.");
         }
         else
         {
             targetSession.SnoopedBy.Add(mySession);
+            // Wire into spectator output forwarding so we actually see their screen
+            targetSession.Context?.Terminal?.AddSpectatorStream(terminal);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine($"  Now snooping {targetSession.Username}.");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  (Their output will appear inline with yours. /snoop off to stop.)");
             LogAction(username, "snoop", targetSession.Username, "Started snooping");
             WizNet.ActionNotify(username, $"started snooping {targetSession.Username}");
         }
@@ -882,7 +847,7 @@ public static class WizardCommandSystem
 
         // Find player (online or offline)
         var session = FindSession(targetName);
-        Character? player = session?.Context?.Player;
+        Character? player = session?.Context?.Engine?.CurrentPlayer;
         bool isOnline = player != null;
         UsurperRemake.Systems.SaveGameData? offlineSaveData = null;
 
@@ -982,7 +947,8 @@ public static class WizardCommandSystem
 
         var targetName = args.Trim();
         var session = FindSession(targetName);
-        if (session?.Context?.Player == null)
+        var player = session?.Context?.Engine?.CurrentPlayer;
+        if (player == null)
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"  Player '{targetName}' not found online.");
@@ -990,14 +956,12 @@ public static class WizardCommandSystem
         }
 
         // Can't slay higher-level wizards
-        if (session.WizardLevel >= FindSession(username)?.WizardLevel)
+        if (session!.WizardLevel >= FindSession(username)?.WizardLevel)
         {
             terminal.SetColor("bright_red");
             terminal.WriteLine($"  You cannot slay a wizard of equal or higher rank.");
             return true;
         }
-
-        var player = session.Context.Player;
         player.HP = 0;
 
         session.EnqueueMessage($"\u001b[1;31m  The hand of a god reaches down and smites you!\u001b[0m");
@@ -1131,23 +1095,6 @@ public static class WizardCommandSystem
         terminal.WriteLine($"  {targetName} has been unmuted.");
         LogAction(username, "unmute", targetName, null);
         WizNet.ActionNotify(username, $"unmuted {targetName}");
-        return true;
-    }
-
-    private static bool HandlePurge(string username, TerminalEmulator terminal)
-    {
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("  The area is cleansed by divine power.");
-
-        var loc = RoomRegistry.Instance?.GetPlayerLocation(username);
-        if (loc.HasValue)
-        {
-            RoomRegistry.Instance!.BroadcastToRoom(loc.Value,
-                $"\u001b[1;33m  A blinding light washes over the area, cleansing it.\u001b[0m",
-                excludeUsername: username);
-        }
-
-        LogAction(username, "purge", null, loc.HasValue ? $"At {BaseLocation.GetLocationName(loc.Value)}" : null);
         return true;
     }
 

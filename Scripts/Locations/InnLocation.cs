@@ -3083,8 +3083,43 @@ public class InnLocation : BaseLocation
         terminal.Write($"  {label,-12}: ");
         if (item != null)
         {
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(item.Name);
+            if (!item.IsIdentified)
+            {
+                terminal.SetColor("magenta");
+                terminal.WriteLine($"{item.Name} (unidentified)");
+            }
+            else
+            {
+                terminal.SetColor(item.GetRarityColor());
+                terminal.Write(item.Name);
+
+                // Build compact stat summary
+                var stats = new List<string>();
+                if (item.WeaponPower > 0) stats.Add($"Atk:{item.WeaponPower}");
+                if (item.ArmorClass > 0) stats.Add($"AC:{item.ArmorClass}");
+                if (item.ShieldBonus > 0) stats.Add($"Shield:{item.ShieldBonus}");
+                if (item.DefenceBonus > 0) stats.Add($"Def:{item.DefenceBonus}");
+                if (item.StrengthBonus != 0) stats.Add($"Str:{item.StrengthBonus:+#;-#}");
+                if (item.DexterityBonus != 0) stats.Add($"Dex:{item.DexterityBonus:+#;-#}");
+                if (item.AgilityBonus != 0) stats.Add($"Agi:{item.AgilityBonus:+#;-#}");
+                if (item.ConstitutionBonus != 0) stats.Add($"Con:{item.ConstitutionBonus:+#;-#}");
+                if (item.IntelligenceBonus != 0) stats.Add($"Int:{item.IntelligenceBonus:+#;-#}");
+                if (item.WisdomBonus != 0) stats.Add($"Wis:{item.WisdomBonus:+#;-#}");
+                if (item.CharismaBonus != 0) stats.Add($"Cha:{item.CharismaBonus:+#;-#}");
+                if (item.MaxHPBonus > 0) stats.Add($"HP:{item.MaxHPBonus:+#}");
+                if (item.MaxManaBonus > 0) stats.Add($"MP:{item.MaxManaBonus:+#}");
+                if (item.CriticalChanceBonus > 0) stats.Add($"Crit:{item.CriticalChanceBonus}%");
+                if (item.LifeSteal > 0) stats.Add($"Leech:{item.LifeSteal}%");
+                if (item.MagicResistance > 0) stats.Add($"MRes:{item.MagicResistance}%");
+                if (item.PoisonDamage > 0) stats.Add($"Psn:{item.PoisonDamage}");
+
+                if (stats.Count > 0)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.Write($" [{string.Join(" ", stats)}]");
+                }
+                terminal.WriteLine("");
+            }
         }
         else
         {
@@ -3140,30 +3175,41 @@ public class InnLocation : BaseLocation
             var (item, isEquipped, fromSlot) = equipmentItems[i];
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1}. ");
-            terminal.SetColor("white");
-            terminal.Write($"{item.Name} ");
 
-            // Show item stats
-            terminal.SetColor("gray");
-            if (item.WeaponPower > 0)
-                terminal.Write($"[Atk:{item.WeaponPower}] ");
-            if (item.ArmorClass > 0)
-                terminal.Write($"[AC:{item.ArmorClass}] ");
-            if (item.ShieldBonus > 0)
-                terminal.Write($"[Shield:{item.ShieldBonus}] ");
-
-            // Show if currently equipped by player
-            if (isEquipped)
+            if (!item.IsIdentified)
             {
-                terminal.SetColor("cyan");
-                terminal.Write($"(your {fromSlot?.GetDisplayName()})");
+                terminal.SetColor("magenta");
+                terminal.Write($"{item.Name} ");
+                terminal.SetColor("darkgray");
+                terminal.Write("(unidentified)");
             }
-
-            // Check if target can use it
-            if (!item.CanEquip(target, out string reason))
+            else
             {
-                terminal.SetColor("red");
-                terminal.Write($" [{reason}]");
+                terminal.SetColor("white");
+                terminal.Write($"{item.Name} ");
+
+                // Show item stats
+                terminal.SetColor("gray");
+                if (item.WeaponPower > 0)
+                    terminal.Write($"[Atk:{item.WeaponPower}] ");
+                if (item.ArmorClass > 0)
+                    terminal.Write($"[AC:{item.ArmorClass}] ");
+                if (item.ShieldBonus > 0)
+                    terminal.Write($"[Shield:{item.ShieldBonus}] ");
+
+                // Show if currently equipped by player
+                if (isEquipped)
+                {
+                    terminal.SetColor("cyan");
+                    terminal.Write($"(your {fromSlot?.GetDisplayName()})");
+                }
+
+                // Check if target can use it
+                if (!item.CanEquip(target, out string reason))
+                {
+                    terminal.SetColor("red");
+                    terminal.Write($" [{reason}]");
+                }
             }
 
             terminal.WriteLine("");
@@ -3184,6 +3230,15 @@ public class InnLocation : BaseLocation
         }
 
         var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+
+        // Block unidentified items
+        if (!selectedItem.IsIdentified)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("You must identify this item before giving it to a companion.");
+            await Task.Delay(2000);
+            return;
+        }
 
         // Check if target can equip
         if (!selectedItem.CanEquip(target, out string equipReason))
@@ -4401,9 +4456,10 @@ public class InnLocation : BaseLocation
     private async Task RentRoom()
     {
         long roomCost = (long)(currentPlayer.Level * GameConfig.InnRoomCostPerLevel);
-        if (currentPlayer.Gold < roomCost)
+        long totalAvailable = currentPlayer.Gold + currentPlayer.BankGold;
+        if (totalAvailable < roomCost)
         {
-            terminal.WriteLine($"You need {roomCost:N0} gold for a room. You have {currentPlayer.Gold:N0}.", "red");
+            terminal.WriteLine($"You need {roomCost:N0} gold for a room. You have {currentPlayer.Gold:N0} on hand and {currentPlayer.BankGold:N0} in the bank.", "red");
             await Task.Delay(1500);
             return;
         }
@@ -4442,7 +4498,7 @@ public class InnLocation : BaseLocation
                 var opt = GuardOptions[i];
                 int cost = GetGuardCost(opt.baseCost, levelMultiplier, hiredGuards.Count);
                 int hp = (int)(opt.baseHp * levelMultiplier);
-                bool canAfford = currentPlayer.Gold - roomCost - totalGuardCost >= cost;
+                bool canAfford = currentPlayer.Gold + currentPlayer.BankGold - roomCost - totalGuardCost >= cost;
                 terminal.SetColor(canAfford ? "white" : "dark_red");
                 terminal.WriteLine($"  [{i + 1}] {opt.name,-16} {cost,6:N0}g  (HP: {hp})");
             }
@@ -4451,7 +4507,7 @@ public class InnLocation : BaseLocation
             terminal.SetColor("bright_green");
             terminal.WriteLine(" Done hiring");
             terminal.SetColor("white");
-            terminal.WriteLine($"\n  Your gold: {currentPlayer.Gold:N0}  |  Room: {roomCost:N0}  |  Guards: {totalGuardCost:N0}  |  Total: {roomCost + totalGuardCost:N0}");
+            terminal.WriteLine($"\n  Your gold: {currentPlayer.Gold:N0} (bank: {currentPlayer.BankGold:N0})  |  Room: {roomCost:N0}  |  Guards: {totalGuardCost:N0}  |  Total: {roomCost + totalGuardCost:N0}");
 
             var input = await terminal.GetInput("\n  Choice: ");
             if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "D")
@@ -4463,7 +4519,7 @@ public class InnLocation : BaseLocation
                 int cost = GetGuardCost(chosen.baseCost, levelMultiplier, hiredGuards.Count);
                 int hp = (int)(chosen.baseHp * levelMultiplier);
 
-                if (currentPlayer.Gold - roomCost - totalGuardCost < cost)
+                if (currentPlayer.Gold + currentPlayer.BankGold - roomCost - totalGuardCost < cost)
                 {
                     terminal.WriteLine("  You can't afford that guard.", "red");
                     await Task.Delay(1000);
@@ -4495,14 +4551,25 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        if (currentPlayer.Gold < totalCost)
+        if (currentPlayer.Gold + currentPlayer.BankGold < totalCost)
         {
             terminal.WriteLine("  You can't afford this!", "red");
             await Task.Delay(1500);
             return;
         }
 
-        currentPlayer.Gold -= totalCost;
+        // Pay from gold on hand first, then bank
+        if (currentPlayer.Gold >= totalCost)
+        {
+            currentPlayer.Gold -= totalCost;
+        }
+        else
+        {
+            long shortfall = totalCost - currentPlayer.Gold;
+            currentPlayer.Gold = 0;
+            currentPlayer.BankGold -= shortfall;
+            terminal.WriteLine($"  ({shortfall:N0}g withdrawn from your bank account)", "gray");
+        }
 
         // Remove Groggo's Shadow Blessing on rest (v0.41.0)
         if (currentPlayer.GroggoShadowBlessingDex > 0)

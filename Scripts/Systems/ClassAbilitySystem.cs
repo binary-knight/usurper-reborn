@@ -1120,10 +1120,10 @@ public static class ClassAbilitySystem
         // BALANCE: Abilities should always be stronger than basic attacks to reward
         // using special moves. Scale is 3% per level and stats contribute significantly
         // to make stat investment feel impactful.
+        // Stat scale capped at 5.0x to prevent exponential damage at high stats (600+ STR).
         double levelScale = 1.0 + (user.Level * 0.03); // 3% per level
 
-        // Stat scaling based on ability type - stats are now major contributors
-        // Similar to spell scaling where INT gives 4% per point above 10
+        // Stat scaling based on ability type - stats are major contributors up to the cap
         double statScale = 1.0;
         if (ability.Type == AbilityType.Attack)
         {
@@ -1154,6 +1154,9 @@ public static class ClassAbilitySystem
             // Intelligence affects debuff potency
             statScale += Math.Max(0, (user.Intelligence - 10) * 0.025);
         }
+
+        // Cap stat scaling to prevent exponential damage at endgame stat levels
+        statScale = Math.Min(statScale, 5.0);
 
         double totalScale = levelScale * statScale;
 

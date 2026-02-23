@@ -2829,12 +2829,16 @@ namespace UsurperRemake.Systems
             terminal.SetColor("bright_red");
             terminal.WriteLine("🔥 INFERNAL FORGE 🔥");
             terminal.WriteLine("");
-            terminal.WriteLine("Demonic weapons are crafted here.", "white");
-            terminal.WriteLine("You could enhance your equipment...");
+            terminal.WriteLine("You stumble upon the smoldering remains of a", "white");
+            terminal.WriteLine("demonic forge, its hellfire still burning bright.", "white");
+            terminal.WriteLine("An anvil pulses with infernal energy. You hold", "white");
+            terminal.WriteLine("your weapon to the flames and feel it grow stronger.", "white");
+            terminal.WriteLine("");
 
-            player.WeapPow += 5;
+            player.BonusWeapPow += 5;
+            player.RecalculateStats();
             terminal.SetColor("yellow");
-            terminal.WriteLine("+5 Weapon Power!");
+            terminal.WriteLine("Your weapon has been permanently tempered! +5 Weapon Power!");
             await terminal.PressAnyKey();
         }
 

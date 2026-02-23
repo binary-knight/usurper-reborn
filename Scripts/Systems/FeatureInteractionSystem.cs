@@ -456,15 +456,19 @@ public class FeatureInteractionSystem
         await Task.Delay(600);
 
         // Determine difficulty based on dungeon level
-        int difficulty = 10 + (level / 2);
+        // DC scales gently: 8 at floor 1, 20 at floor 50, 33 at floor 100
+        int difficulty = 8 + (level / 4);
         int roll = random.Next(1, 21);
-        int total = roll + (statValue / 10);
+        // Cap stat bonus at 20 to keep checks meaningful at endgame
+        // (raw stat / 10 gives 50+ at high stats, trivializing all checks)
+        int statBonus = Math.Min(statValue / 10, 20);
+        int total = roll + statBonus;
         bool success = total >= difficulty;
 
         terminal.SetColor("yellow");
         terminal.WriteLine($"[{statName} Check - DC {difficulty}]");
         terminal.SetColor("white");
-        terminal.WriteLine($"You rolled {roll} + {statValue / 10} ({statName} bonus) = {total}");
+        terminal.WriteLine($"You rolled {roll} + {statBonus} ({statName} bonus) = {total}");
         await Task.Delay(800);
         terminal.WriteLine("");
 

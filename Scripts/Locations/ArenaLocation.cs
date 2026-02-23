@@ -184,8 +184,12 @@ public class ArenaLocation : BaseLocation
 
         // Get eligible opponents
         var allPlayers = await backend.GetAllPlayerSummaries();
+        // Determine this account's base username (strip __alt suffix if present)
+        string myAccount = SqlSaveBackend.GetAccountUsername(myUsername);
         var eligible = allPlayers
             .Where(p => !string.Equals(p.DisplayName, myName, StringComparison.OrdinalIgnoreCase))
+            // Block same-account PvP (main vs alt)
+            .Where(p => !string.Equals(SqlSaveBackend.GetAccountUsername(p.DisplayName.ToLower()), myAccount, StringComparison.OrdinalIgnoreCase))
             .Where(p => Math.Abs(p.Level - currentPlayer.Level) <= GameConfig.PvPLevelRangeLimit)
             .Where(p => p.Level >= GameConfig.MinPvPLevel)
             .Where(p => !backend.HasAttackedPlayerToday(myUsername, p.DisplayName.ToLower()))

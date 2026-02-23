@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using UsurperRemake.BBS;
+using UsurperRemake.Server;
 using UsurperRemake.Utils;
 
 namespace UsurperRemake.Systems
@@ -682,6 +683,10 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("green");
                             terminal.WriteLine($"Changes saved for '{player.Name2}'!");
                             DebugLogger.Instance.LogInfo("ADMIN", $"Player '{player.Name2}' edited by {DoorMode.OnlineUsername}");
+
+                            // Apply changes to live in-memory session if player is online
+                            // Without this, their next autosave would overwrite our DB changes
+                            ApplyEditsToLiveSession(username, player);
                         }
                         else
                         {
@@ -701,6 +706,44 @@ namespace UsurperRemake.Systems
                         return;
                 }
             }
+        }
+
+        /// <summary>
+        /// Apply admin edits to a live in-memory player session.
+        /// Without this, the player's next autosave would overwrite DB changes.
+        /// </summary>
+        private void ApplyEditsToLiveSession(string username, PlayerData edited)
+        {
+            var server = MudServer.Instance;
+            if (server == null) return;
+
+            var key = username.ToLowerInvariant();
+            if (!server.ActiveSessions.TryGetValue(key, out var session)) return;
+
+            var livePlayer = session.Context?.Engine?.CurrentPlayer;
+            if (livePlayer == null) return;
+
+            livePlayer.Level = edited.Level;
+            livePlayer.Experience = edited.Experience;
+            livePlayer.Gold = edited.Gold;
+            livePlayer.BankGold = edited.BankGold;
+            livePlayer.BaseMaxHP = edited.MaxHP;
+            livePlayer.HP = edited.HP;
+            livePlayer.BaseMaxMana = edited.MaxMana;
+            livePlayer.Mana = edited.Mana;
+            livePlayer.BaseStrength = edited.Strength;
+            livePlayer.BaseDefence = edited.Defence;
+            livePlayer.Stamina = edited.Stamina;
+            livePlayer.BaseAgility = edited.Agility;
+            livePlayer.Charisma = edited.Charisma;
+            livePlayer.BaseDexterity = edited.Dexterity;
+            livePlayer.Wisdom = edited.Wisdom;
+            livePlayer.Intelligence = edited.Intelligence;
+            livePlayer.Constitution = edited.Constitution;
+            livePlayer.RecalculateStats();
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  (Live session updated)");
         }
 
         private async Task<long> PromptNumericEdit(string fieldName, long currentValue, long min, long max)

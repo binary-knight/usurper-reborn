@@ -401,14 +401,24 @@ public class DormitoryLocation : BaseLocation
         if (!confirm.Equals("Y", StringComparison.OrdinalIgnoreCase))
             return;
 
-        if (currentPlayer.Gold < cost)
+        if (currentPlayer.Gold >= cost)
+        {
+            currentPlayer.Gold -= cost;
+        }
+        else if (currentPlayer.Gold + currentPlayer.BankGold >= cost)
+        {
+            long shortfall = cost - currentPlayer.Gold;
+            currentPlayer.Gold = 0;
+            currentPlayer.BankGold -= shortfall;
+            terminal.WriteLine($"  ({shortfall:N0}g withdrawn from your bank account)", "gray");
+        }
+        else
         {
             terminal.WriteLine("You can't afford even this flea-ridden bunk.", "red");
+            terminal.WriteLine($"  (Checked gold on hand: {currentPlayer.Gold:N0} and bank: {currentPlayer.BankGold:N0})", "gray");
             await Task.Delay(1500);
             return;
         }
-
-        currentPlayer.Gold -= cost;
 
         terminal.ClearScreen();
         terminal.SetColor("white");

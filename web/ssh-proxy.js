@@ -56,6 +56,11 @@ const FACTION_NAMES = {
   '-1': 'None', 0: 'The Crown', 1: 'The Shadows', 2: 'The Faith'
 };
 
+const GOD_TITLES = [
+  'Lesser Spirit', 'Minor Spirit', 'Spirit', 'Major Spirit',
+  'Minor Deity', 'Deity', 'Major Deity', 'DemiGod', 'God'
+];
+
 const ALLOWED_ORIGINS = [
   'https://usurper-reborn.net',
   'https://www.usurper-reborn.net',
@@ -553,24 +558,33 @@ function getStats() {
   }
 
   try {
-    // Online players with class/level
+    // Online players with class/level + immortal data
     const online = db.prepare(`
       SELECT op.username, op.display_name, op.location, op.connected_at,
              json_extract(p.player_data, '$.player.level') as level,
              json_extract(p.player_data, '$.player.class') as class_id,
-             COALESCE(op.connection_type, 'Unknown') as connection_type
+             COALESCE(op.connection_type, 'Unknown') as connection_type,
+             json_extract(p.player_data, '$.player.isImmortal') as is_immortal,
+             json_extract(p.player_data, '$.player.divineName') as divine_name,
+             json_extract(p.player_data, '$.player.godLevel') as god_level
       FROM online_players op
       LEFT JOIN players p ON LOWER(op.username) = LOWER(p.username)
       WHERE op.last_heartbeat >= datetime('now', '-120 seconds')
       ORDER BY op.display_name
-    `).all().map(row => ({
-      name: row.display_name || row.username,
-      level: row.level || 1,
-      className: CLASS_NAMES[row.class_id] || 'Unknown',
-      location: row.location || 'Unknown',
-      connectedAt: row.connected_at,
-      connectionType: row.connection_type || 'Unknown'
-    }));
+    `).all().map(row => {
+      const isImmortal = row.is_immortal === 1 || row.is_immortal === true;
+      return {
+        name: row.display_name || row.username,
+        level: isImmortal ? (row.god_level || 1) : (row.level || 1),
+        className: isImmortal ? 'Immortal' : (CLASS_NAMES[row.class_id] || 'Unknown'),
+        location: row.location || 'Unknown',
+        connectedAt: row.connected_at,
+        connectionType: row.connection_type || 'Unknown',
+        isImmortal: isImmortal,
+        divineName: row.divine_name || null,
+        godLevel: row.god_level || 0
+      };
+    });
 
     // Aggregate stats
     const agg = db.prepare(`
@@ -585,12 +599,14 @@ function getStats() {
       FROM players WHERE is_banned = 0 AND username NOT LIKE 'emergency_%'
     `).get();
 
-    // Top player
+    // Top player (exclude immortals — they have their own section)
     const topPlayer = db.prepare(`
       SELECT display_name,
              json_extract(player_data, '$.player.level') as level,
              json_extract(player_data, '$.player.class') as class_id
       FROM players WHERE is_banned = 0 AND username NOT LIKE 'emergency_%'
+        AND (json_extract(player_data, '$.player.isImmortal') IS NULL
+             OR json_extract(player_data, '$.player.isImmortal') != 1)
       ORDER BY json_extract(player_data, '$.player.level') DESC LIMIT 1
     `).get();
 
@@ -667,7 +683,60 @@ function getStats() {
       }
     } catch (e) { /* king may not exist */ }
 
-    // Player leaderboard (all players, ranked by level then XP)
+    // Immortals (ascended player-gods)
+    let immortals = [];
+    try {
+      immortals = db.prepare(`
+        SELECT
+          p.display_name,
+          json_extract(p.player_data, '$.player.divineName') as divine_name,
+          json_extract(p.player_data, '$.player.godLevel') as god_level,
+          json_extract(p.player_data, '$.player.godExperience') as god_xp,
+          json_extract(p.player_data, '$.player.godAlignment') as god_alignment,
+          json_extract(p.player_data, '$.player.worshippedGod') as worshipped_god,
+          CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online
+        FROM players p
+        LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
+          AND op.last_heartbeat >= datetime('now', '-120 seconds')
+        WHERE p.is_banned = 0
+          AND p.player_data != '{}'
+          AND LENGTH(p.player_data) > 2
+          AND json_extract(p.player_data, '$.player.isImmortal') = 1
+          AND p.username NOT LIKE 'emergency_%'
+        ORDER BY json_extract(p.player_data, '$.player.godExperience') DESC
+      `).all().map(row => {
+        const lvl = Math.max(1, Math.min(row.god_level || 1, 9));
+        // Count NPC believers worshipping this god
+        let believers = 0;
+        try {
+          const npcData = getDashNpcs();
+          if (npcData && npcData.length > 0) {
+            believers = npcData.filter(n => n.worshippedGod === row.divine_name || n.WorshippedGod === row.divine_name).length;
+          }
+        } catch (e) { /* npc data may not be available */ }
+        // Count player believers
+        try {
+          const pCount = db.prepare(`
+            SELECT COUNT(*) as cnt FROM players
+            WHERE is_banned = 0 AND username NOT LIKE 'emergency_%'
+              AND json_extract(player_data, '$.player.worshippedGod') = ?
+          `).get(row.divine_name);
+          believers += (pCount ? pCount.cnt : 0);
+        } catch (e) { /* player believer count may fail */ }
+        return {
+          mortalName: row.display_name,
+          divineName: row.divine_name || row.display_name,
+          godLevel: lvl,
+          godTitle: GOD_TITLES[lvl - 1] || 'Spirit',
+          godExperience: row.god_xp || 0,
+          godAlignment: row.god_alignment || 'Balance',
+          believers: believers,
+          isOnline: row.is_online === 1
+        };
+      });
+    } catch (e) { /* immortals query may fail */ }
+
+    // Player leaderboard (mortal players only, ranked by level then XP)
     let leaderboard = [];
     try {
       leaderboard = db.prepare(`
@@ -685,6 +754,8 @@ function getStats() {
           AND LENGTH(p.player_data) > 2
           AND json_extract(p.player_data, '$.player.level') IS NOT NULL
           AND p.username NOT LIKE 'emergency_%'
+          AND (json_extract(p.player_data, '$.player.isImmortal') IS NULL
+               OR json_extract(p.player_data, '$.player.isImmortal') != 1)
         ORDER BY json_extract(p.player_data, '$.player.level') DESC,
                  json_extract(p.player_data, '$.player.experience') DESC
         LIMIT 25
@@ -815,6 +886,7 @@ function getStats() {
         popularClass: popClass ? CLASS_NAMES[popClass.class_id] || 'Unknown' : null,
         mostWanted: mostWanted
       },
+      immortals: immortals,
       leaderboard: leaderboard,
       pvpLeaderboard: pvpLeaderboard,
       economy: economy,

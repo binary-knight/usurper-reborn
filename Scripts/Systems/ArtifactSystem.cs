@@ -390,7 +390,7 @@ namespace UsurperRemake.Systems
                         player.Mana += bonus.Value;
                         break;
                     case "weappow":
-                        player.WeapPow += bonus.Value;
+                        player.BonusWeapPow += bonus.Value;
                         break;
                     case "chivalry":
                         player.Chivalry += bonus.Value;
@@ -410,7 +410,7 @@ namespace UsurperRemake.Systems
                 }
             }
 
-            // GD.Print($"[Artifacts] Applied bonuses from {artifact.Name}");
+            player.RecalculateStats();
         }
 
         /// <summary>

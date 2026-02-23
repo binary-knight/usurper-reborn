@@ -84,6 +84,11 @@ public class QuestHallLocation : BaseLocation
         terminal.Write("ounty Board            ", "white");
 
         terminal.Write("[", "white");
+        terminal.Write("X", "bright_yellow");
+        terminal.Write("]", "white");
+        terminal.WriteLine(" Abandon Quest", "white");
+
+        terminal.Write(" [", "white");
         terminal.Write("R", "bright_yellow");
         terminal.Write("]", "white");
         terminal.WriteLine("eturn to Street", "white");
@@ -108,6 +113,9 @@ public class QuestHallLocation : BaseLocation
                 break;
             case "B":
                 await ViewBountyBoard();
+                break;
+            case "X":
+                await AbandonQuest();
                 break;
             case "R":
             case "":
@@ -310,6 +318,60 @@ public class QuestHallLocation : BaseLocation
             else
             {
                 terminal.WriteLine($"Cannot complete quest: {result}", "red");
+            }
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    private async Task AbandonQuest()
+    {
+        terminal.WriteLine("");
+        var quests = QuestSystem.GetPlayerQuests(currentPlayer.Name2);
+
+        if (quests.Count == 0)
+        {
+            terminal.WriteLine("You have no active quests to abandon.", "yellow");
+            await Task.Delay(1000);
+            return;
+        }
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("Select a quest to abandon:");
+        terminal.SetColor("white");
+
+        for (int i = 0; i < quests.Count; i++)
+        {
+            var quest = quests[i];
+            var progress = QuestSystem.GetQuestProgressSummary(quest);
+            terminal.Write(" [", "white");
+            terminal.Write($"{i + 1}", "bright_yellow");
+            terminal.WriteLine($"] {quest.Title ?? quest.GetTargetDescription()}", "white");
+            terminal.WriteLine($"     {progress}", "gray");
+        }
+
+        terminal.Write(" [", "white");
+        terminal.Write("0", "bright_yellow");
+        terminal.WriteLine("] Cancel", "white");
+        terminal.WriteLine("");
+
+        var input = await terminal.GetInput("Select: ");
+        if (int.TryParse(input, out int selection) && selection > 0 && selection <= quests.Count)
+        {
+            var quest = quests[selection - 1];
+            terminal.WriteLine("");
+            terminal.WriteLine($"Abandon \"{quest.Title ?? quest.GetTargetDescription()}\"?", "yellow");
+            terminal.WriteLine("All progress will be lost.", "gray");
+            var confirm = await terminal.GetInput("Are you sure? (Y/N): ");
+
+            if (confirm.Trim().ToUpper() == "Y")
+            {
+                QuestSystem.AbandonQuest(currentPlayer, quest.Id);
+                terminal.WriteLine("Quest abandoned.", "yellow");
+            }
+            else
+            {
+                terminal.WriteLine("Cancelled.", "gray");
             }
         }
 

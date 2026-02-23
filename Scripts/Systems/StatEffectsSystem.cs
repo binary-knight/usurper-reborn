@@ -64,12 +64,13 @@ public static class StatEffectsSystem
 
     /// <summary>
     /// Critical hit damage multiplier
-    /// Base 1.5x + 0.02x per Dexterity above 10 (so 20 DEX = 1.7x)
+    /// Base 1.5x + 0.02x per Dexterity above 10 (so 20 DEX = 1.7x), capped at 3.0x
     /// Equipment crit damage bonus adds directly (e.g., +10% = +0.1x)
     /// </summary>
     public static float GetCriticalDamageMultiplier(long dexterity, int equipmentCritDamageBonus = 0)
     {
-        return 1.5f + Math.Max(0, (dexterity - 10) * 0.02f) + (equipmentCritDamageBonus / 100f);
+        float multiplier = 1.5f + Math.Max(0, (dexterity - 10) * 0.02f) + (equipmentCritDamageBonus / 100f);
+        return Math.Min(multiplier, 3.0f); // Cap at 3x to prevent exponential damage at high DEX
     }
 
     /// <summary>
@@ -148,7 +149,8 @@ public static class StatEffectsSystem
     /// </summary>
     public static float GetSpellDamageMultiplier(long intelligence)
     {
-        return 1.0f + Math.Max(0, (intelligence - 10) * 0.04f);
+        float multiplier = 1.0f + Math.Max(0, (intelligence - 10) * 0.04f);
+        return Math.Min(multiplier, 4.0f); // Cap at 4x to prevent exponential damage at high INT
     }
 
     /// <summary>
@@ -157,7 +159,7 @@ public static class StatEffectsSystem
     /// </summary>
     public static int GetSpellCriticalChance(long intelligence)
     {
-        return Math.Max(0, (int)((intelligence - 10) / 2));
+        return Math.Clamp((int)((intelligence - 10) / 2), 0, 50); // Cap at 50% like physical crits
     }
 
     /// <summary>
@@ -207,7 +209,8 @@ public static class StatEffectsSystem
     /// </summary>
     public static float GetHealingMultiplier(long wisdom)
     {
-        return 1.0f + Math.Max(0, (wisdom - 10) * 0.015f);
+        float multiplier = 1.0f + Math.Max(0, (wisdom - 10) * 0.015f);
+        return Math.Min(multiplier, 3.0f); // Cap at 3x to prevent excessive healing at high WIS
     }
 
     /// <summary>
@@ -379,6 +382,10 @@ public static class StatEffectsSystem
         // Apply drug CritBonus directly to crit chance (e.g., QuickSilver: +15)
         if (drugEffects.CritBonus > 0)
             critChance = Math.Clamp(critChance + drugEffects.CritBonus, 5, 50);
+
+        // Divine Boon crit bonus (from worshipped player-god)
+        if (attacker.CachedBoonEffects?.CritPercent > 0)
+            critChance = Math.Clamp(critChance + (int)(attacker.CachedBoonEffects.CritPercent * 100), 5, 50);
 
         return _random.Next(100) < critChance;
     }

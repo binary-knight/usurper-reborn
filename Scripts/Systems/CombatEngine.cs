@@ -152,6 +152,8 @@ public partial class CombatEngine
         attacker.DivineFavorTriggeredThisCombat = false;
         if (attacker.PoisonCoatingCombats > 0) attacker.PoisonCoatingCombats--;
         if (attacker.WellRestedCombats > 0) attacker.WellRestedCombats--;
+        if (attacker.LoversBlissCombats > 0) attacker.LoversBlissCombats--;
+        if (attacker.DivineBlessingCombats > 0) attacker.DivineBlessingCombats--;
 
         // Ensure abilities are learned based on current level (fixes abilities not showing in quickbar)
         if (!ClassAbilitySystem.IsSpellcaster(attacker.Class))
@@ -250,6 +252,8 @@ public partial class CombatEngine
         // Decrement poison coating and well-rested (per combat, not per round)
         if (player.PoisonCoatingCombats > 0) player.PoisonCoatingCombats--;
         if (player.WellRestedCombats > 0) player.WellRestedCombats--;
+        if (player.LoversBlissCombats > 0) player.LoversBlissCombats--;
+        if (player.DivineBlessingCombats > 0) player.DivineBlessingCombats--;
 
         // Ensure abilities are learned based on current level (fixes abilities not showing)
         if (!ClassAbilitySystem.IsSpellcaster(player.Class))
@@ -2186,10 +2190,30 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * attacker.WellRestedBonus);
         }
 
+        // Lover's Bliss bonus damage (perfect intimacy match)
+        if (attacker.LoversBlissCombats > 0 && attacker.LoversBlissBonus > 0f)
+        {
+            attackPower += (long)(attackPower * attacker.LoversBlissBonus);
+        }
+
+        // Divine Blessing bonus damage (god's blessing on a mortal)
+        if (attacker.DivineBlessingCombats > 0 && attacker.DivineBlessingBonus > 0f)
+        {
+            attackPower += (long)(attackPower * attacker.DivineBlessingBonus);
+        }
+
         // Legendary Armory permanent damage bonus
         if (attacker.PermanentDamageBonus > 0)
         {
             attackPower += (long)(attackPower * (attacker.PermanentDamageBonus / 100.0));
+        }
+
+        // Divine Boon passive damage bonus (from worshipped player-god's configured boons)
+        var boons = attacker.CachedBoonEffects;
+        if (boons != null && (boons.DamagePercent > 0 || boons.FlatAttack > 0))
+        {
+            attackPower += (long)(attackPower * boons.DamagePercent);
+            attackPower += boons.FlatAttack;
         }
 
         // Show critical hit message
@@ -2278,6 +2302,14 @@ public partial class CombatEngine
             long stolen = Math.Max(1, actualDamage * equipLifeSteal / 100);
             attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + stolen);
             terminal.WriteLine($"Your weapon drains {stolen} life! (Lifedrinker)", "dark_green");
+        }
+
+        // Divine Boon lifesteal (from worshipped player-god)
+        if (attacker.CachedBoonEffects?.LifestealPercent > 0 && actualDamage > 0)
+        {
+            long boonSteal = Math.Max(1, (long)(actualDamage * attacker.CachedBoonEffects.LifestealPercent));
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + boonSteal);
+            terminal.WriteLine($"Divine power drains {boonSteal} life! (Boon)", "dark_cyan");
         }
 
         // Elemental enchant procs (v0.30.9)
@@ -2509,6 +2541,10 @@ public partial class CombatEngine
 
         // Shadows faction escape bonus
         escapeChance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
+
+        // Divine boon flee bonus
+        if (player.CachedBoonEffects?.FleePercent > 0)
+            escapeChance += (int)(player.CachedBoonEffects.FleePercent * 100);
 
         // Cap at 75% to prevent guaranteed escapes
         escapeChance = Math.Min(75, escapeChance);
@@ -2958,10 +2994,30 @@ public partial class CombatEngine
             playerDefense += (long)(playerDefense * player.WellRestedBonus);
         }
 
+        // Lover's Bliss defense bonus (perfect intimacy match)
+        if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
+        {
+            playerDefense += (long)(playerDefense * player.LoversBlissBonus);
+        }
+
+        // Divine Blessing defense bonus (god's blessing on a mortal)
+        if (player.DivineBlessingCombats > 0 && player.DivineBlessingBonus > 0f)
+        {
+            playerDefense += (long)(playerDefense * player.DivineBlessingBonus);
+        }
+
         // Legendary Armory permanent defense bonus
         if (player.PermanentDefenseBonus > 0)
         {
             playerDefense += (long)(playerDefense * (player.PermanentDefenseBonus / 100.0));
+        }
+
+        // Divine Boon passive defense bonus (from worshipped player-god's configured boons)
+        var defBoons = player.CachedBoonEffects;
+        if (defBoons != null && (defBoons.DefensePercent > 0 || defBoons.FlatDefense > 0))
+        {
+            playerDefense += (long)(playerDefense * defBoons.DefensePercent);
+            playerDefense += defBoons.FlatDefense;
         }
 
         long actualDamage = Math.Max(1, monsterAttack - playerDefense);
@@ -3405,6 +3461,16 @@ public partial class CombatEngine
             expReward = (long)(expReward * result.Player.CycleExpMultiplier);
         }
 
+        // Divine Boon passive XP and gold bonuses (from worshipped player-god)
+        var victoryBoons = result.Player.CachedBoonEffects;
+        if (victoryBoons != null)
+        {
+            if (victoryBoons.XPPercent > 0)
+                expReward += (long)(expReward * victoryBoons.XPPercent);
+            if (victoryBoons.GoldPercent > 0)
+                goldReward += (long)(goldReward * victoryBoons.GoldPercent);
+        }
+
         result.Player.Experience += expReward;
         result.Player.Gold += goldReward;
         result.Player.MKills++;
@@ -3414,6 +3480,9 @@ public partial class CombatEngine
 
         // Award experience to NPC teammates (spouses/lovers) - 50% of player's XP
         AwardTeammateExperience(result.Teammates, expReward, terminal);
+
+        // Grant god XP share from believer kill
+        GrantGodKillXP(result.Player, expReward, result.Monster?.Name ?? "a monster");
 
         // Track statistics
         result.Player.Statistics.RecordMonsterKill(expReward, goldReward, isBoss, result.Monster.IsUnique);
@@ -4072,7 +4141,12 @@ public partial class CombatEngine
             // Regular monsters - drop chance scales with level
             // Drop chance: 12% base + 0.5% per monster level, capped at 30%
             double dropChance = 0.12 + (monster.Level * 0.005);
-            dropChance = Math.Min(0.30, dropChance);
+
+            // Divine boon luck bonus increases drop chance
+            if (result.Player.CachedBoonEffects?.LuckPercent > 0)
+                dropChance += result.Player.CachedBoonEffects.LuckPercent;
+
+            dropChance = Math.Min(0.45, dropChance);
 
             // Named monsters (Lords, Chiefs, Kings) have better drop chance (v0.41.4: 60% → 35%)
             if (monster.Name.Contains("Boss") || monster.Name.Contains("Chief") ||
@@ -4395,48 +4469,51 @@ public partial class CombatEngine
             var lootWinner = rolls2.OrderByDescending(r => r.roll).First();
             string winnerName = lootWinner.character.DisplayName ?? lootWinner.character.Name2 ?? "Unknown";
 
-            // Try to equip on the winner
-            var winnerEquip = ConvertLootItemToEquipment(lootItem);
-            if (winnerEquip != null)
+            // Try to equip on the winner — only auto-equip if it's actually an upgrade
+            bool equipped = false;
+            if (lootWinner.upgradeValue > 0)
             {
-                EquipmentDatabase.RegisterDynamic(winnerEquip);
-                if (lootWinner.character.EquipItem(winnerEquip, out _))
+                var winnerEquip = ConvertLootItemToEquipment(lootItem);
+                if (winnerEquip != null)
                 {
-                    lootWinner.character.RecalculateStats();
-                    string equipMsg = lootWinner.upgradeValue > 0
-                        ? $"  >> {winnerName} rolls {lootWinner.roll} — wins and equips {lootItem.Name}! (+{lootWinner.upgradeValue} upgrade) <<"
-                        : $"  >> {winnerName} rolls {lootWinner.roll} — wins and equips {lootItem.Name}! <<";
+                    EquipmentDatabase.RegisterDynamic(winnerEquip);
+                    if (lootWinner.character.EquipItem(winnerEquip, out _))
+                    {
+                        lootWinner.character.RecalculateStats();
+                        string equipMsg = $"  >> {winnerName} rolls {lootWinner.roll} — wins and equips {lootItem.Name}! (+{lootWinner.upgradeValue} upgrade) <<";
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine(equipMsg);
+                        rollSb2.AppendLine($"\u001b[1;32m{equipMsg}\u001b[0m");
+                        equipped = true;
+                    }
+                }
+            }
 
+            if (!equipped)
+            {
+                // Not an upgrade or equip failed — add to inventory for human players, leave behind for NPCs
+                if (lootWinner.isLeader)
+                {
+                    player.Inventory.Add(lootItem);
+                    string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins {lootItem.Name}! (added to inventory) <<";
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine(equipMsg);
-                    rollSb2.AppendLine($"\u001b[1;32m{equipMsg}\u001b[0m");
+                    terminal.WriteLine(msg);
+                    rollSb2.AppendLine($"\u001b[1;32m{msg}\u001b[0m");
+                }
+                else if (lootWinner.isGroupedPlayer)
+                {
+                    lootWinner.character.Inventory?.Add(lootItem);
+                    string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins {lootItem.Name}! (added to inventory) <<";
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine(msg);
+                    rollSb2.AppendLine($"\u001b[1;32m{msg}\u001b[0m");
                 }
                 else
                 {
-                    // Equip failed — add to inventory if possible
-                    if (lootWinner.isLeader)
-                    {
-                        player.Inventory.Add(lootItem);
-                        string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins {lootItem.Name}! (added to inventory) <<";
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(msg);
-                        rollSb2.AppendLine($"\u001b[1;32m{msg}\u001b[0m");
-                    }
-                    else if (lootWinner.isGroupedPlayer)
-                    {
-                        lootWinner.character.Inventory?.Add(lootItem);
-                        string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins {lootItem.Name}! (added to inventory) <<";
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(msg);
-                        rollSb2.AppendLine($"\u001b[1;32m{msg}\u001b[0m");
-                    }
-                    else
-                    {
-                        string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins but can't equip {lootItem.Name}. Left behind. <<";
-                        terminal.SetColor("yellow");
-                        terminal.WriteLine(msg);
-                        rollSb2.AppendLine($"\u001b[33m{msg}\u001b[0m");
-                    }
+                    string msg = $"  >> {winnerName} rolls {lootWinner.roll} — wins but can't use {lootItem.Name}. Left behind. <<";
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(msg);
+                    rollSb2.AppendLine($"\u001b[33m{msg}\u001b[0m");
                 }
             }
 
@@ -6208,6 +6285,13 @@ public partial class CombatEngine
             result.TotalDamageDealt += actualDamage; // Track for telemetry
         }
 
+        // Divine boon lifesteal (multi-monster path — applied on every hit)
+        if (attacker != null && attacker.CachedBoonEffects?.LifestealPercent > 0 && actualDamage > 0)
+        {
+            long boonSteal = Math.Max(1, (long)(actualDamage * attacker.CachedBoonEffects.LifestealPercent));
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + boonSteal);
+        }
+
         // Use new colored combat messages - different message for player vs allies
         string attackMessage;
         if (attacker != null && attacker != currentPlayer && attacker.IsCompanion)
@@ -6539,17 +6623,105 @@ public partial class CombatEngine
                         }
                         await Task.Delay(GetCombatDelay(500));
 
-                        // Calculate player attack damage (v0.41.4: added Level and STR/4 to match single combat)
-                        long attackPower = player.Strength + player.WeapPow + random.Next(1, 16);
+                        // Calculate player attack damage (unified with single-combat formula)
+                        long attackPower = player.Strength;
                         attackPower += StatEffectsSystem.GetStrengthDamageBonus(player.Strength); // STR/4
-                        attackPower += player.Level; // Level scaling (single combat uses Level too)
+                        attackPower += player.Level;
 
-                        // Apply temporary attack bonus from abilities
+                        // Status modifiers
+                        if (player.IsRaging)
+                            attackPower = (long)(attackPower * 1.5);
+                        if (player.HasStatus(StatusEffect.PowerStance))
+                            attackPower = (long)(attackPower * 1.5);
+                        if (player.HasStatus(StatusEffect.Blessed))
+                            attackPower += player.Level / 5 + 2;
+                        if (player.HasStatus(StatusEffect.RoyalBlessing))
+                            attackPower = (long)(attackPower * 1.10);
+                        if (player.HasStatus(StatusEffect.Weakened))
+                            attackPower = Math.Max(1, attackPower - player.Level / 10 - 4);
+
+                        // Weapon power with level scaling and random
+                        if (player.WeapPow > 0)
+                        {
+                            long weaponBonus = player.WeapPow + (player.Level / 10);
+                            attackPower += weaponBonus + random.Next(0, (int)Math.Min(int.MaxValue, weaponBonus + 1));
+                        }
+
+                        // Random attack variation
+                        int variationMax = Math.Max(21, player.Level / 2);
+                        attackPower += random.Next(1, variationMax);
+
+                        // Temporary attack bonus from abilities
                         attackPower += player.TempAttackBonus;
 
-                        // Apply weapon configuration damage modifier
+                        // Weapon configuration modifier (2H bonus, dual-wield off-hand penalty)
                         double damageModifier = GetWeaponConfigDamageModifier(player, isOffHandAttack);
                         attackPower = (long)(attackPower * damageModifier);
+
+                        // Proficiency multiplier
+                        var basicProf = TrainingSystem.GetSkillProficiency(player, "basic_attack");
+                        float profMult = TrainingSystem.GetEffectMultiplier(basicProf);
+                        attackPower = (long)(attackPower * profMult);
+
+                        // Critical hit chance
+                        float rollMult = 1.0f;
+                        bool isCrit = random.Next(1, 21) == 20; // natural 20
+                        bool dexCrit = !isCrit && StatEffectsSystem.RollCriticalHit(player);
+                        if (isCrit)
+                        {
+                            rollMult = 1.5f + (float)(random.NextDouble() * 0.5); // 1.5-2.0
+                            terminal.WriteLine("CRITICAL HIT!", "bright_red");
+                        }
+                        else if (dexCrit)
+                        {
+                            rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                            terminal.WriteLine($"Precision strike!", "bright_yellow");
+                        }
+                        attackPower = (long)(attackPower * rollMult);
+
+                        // Difficulty modifier
+                        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+
+                        // Grief effects
+                        var griefFx = GriefSystem.Instance.GetCurrentEffects();
+                        if (griefFx.DamageModifier != 0 || griefFx.CombatModifier != 0 || griefFx.AllStatModifier != 0)
+                        {
+                            float totalGriefMod = 1.0f + griefFx.DamageModifier + griefFx.CombatModifier + griefFx.AllStatModifier;
+                            attackPower = (long)(attackPower * totalGriefMod);
+                        }
+
+                        // Royal Authority bonus
+                        if (player is Player attackingKing && attackingKing.King)
+                            attackPower = (long)(attackPower * GameConfig.KingCombatStrengthBonus);
+
+                        // Buff bonuses (well-rested, lover's bliss, divine blessing, poison coating)
+                        if (player.WellRestedCombats > 0 && player.WellRestedBonus > 0f)
+                            attackPower += (long)(attackPower * player.WellRestedBonus);
+                        if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
+                            attackPower += (long)(attackPower * player.LoversBlissBonus);
+                        if (player.DivineBlessingCombats > 0 && player.DivineBlessingBonus > 0f)
+                            attackPower += (long)(attackPower * player.DivineBlessingBonus);
+                        if (player.PoisonCoatingCombats > 0)
+                            attackPower += (long)(attackPower * GameConfig.PoisonCoatingDamageBonus);
+                        if (player.PermanentDamageBonus > 0)
+                            attackPower += (long)(attackPower * (player.PermanentDamageBonus / 100.0));
+
+                        // Divine boon damage bonus (multi-monster path)
+                        var mmBoons = player.CachedBoonEffects;
+                        if (mmBoons != null && (mmBoons.DamagePercent > 0 || mmBoons.FlatAttack > 0))
+                        {
+                            attackPower += (long)(attackPower * mmBoons.DamagePercent);
+                            attackPower += mmBoons.FlatAttack;
+                        }
+
+                        // Sunforged Blade vs undead/demons
+                        if (ArtifactSystem.Instance.HasSunforgedBlade() && target is Monster multiTarget &&
+                            (multiTarget.MonsterClass == MonsterClass.Undead || multiTarget.MonsterClass == MonsterClass.Demon || multiTarget.Undead > 0))
+                        {
+                            float holyMult = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 3.0f : 2.0f;
+                            attackPower = (long)(attackPower * holyMult);
+                            terminal.WriteLine("The Sunforged Blade blazes with holy fire!", "bright_yellow");
+                        }
 
                         long damage = Math.Max(1, attackPower);
                         await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player);
@@ -6617,6 +6789,11 @@ public partial class CombatEngine
 
                 // Shadows faction escape bonus
                 retreatChance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
+
+                // Divine boon flee bonus
+                if (player.CachedBoonEffects?.FleePercent > 0)
+                    retreatChance += (int)(player.CachedBoonEffects.FleePercent * 100);
+
                 retreatChance = Math.Min(75, retreatChance);
 
                 int retreatRoll = random.Next(1, 101);
@@ -9830,6 +10007,14 @@ public partial class CombatEngine
             adjustedExp += (long)(adjustedExp * GameConfig.StudyXPBonus);
         }
 
+        // Divine boon XP/gold bonus (multi-monster path)
+        var mmVictoryBoons = result.Player.CachedBoonEffects;
+        if (mmVictoryBoons != null)
+        {
+            if (mmVictoryBoons.XPPercent > 0) adjustedExp += (long)(adjustedExp * mmVictoryBoons.XPPercent);
+            if (mmVictoryBoons.GoldPercent > 0) adjustedGold += (long)(adjustedGold * mmVictoryBoons.GoldPercent);
+        }
+
         // NG+ cycle XP multiplier
         if (result.Player.CycleExpMultiplier > 1.0f)
         {
@@ -9844,6 +10029,12 @@ public partial class CombatEngine
 
         // Track peak gold
         result.Player.Statistics.RecordGoldChange(result.Player.Gold);
+
+        // Grant god XP share from believer kill (multi-monster path)
+        string mmMonsterDesc = result.DefeatedMonsters.Count == 1
+            ? result.DefeatedMonsters[0].Name
+            : $"{result.DefeatedMonsters.Count} monsters";
+        GrantGodKillXP(result.Player, adjustedExp, mmMonsterDesc);
 
         // Track telemetry for multi-monster combat victory
         bool hasBoss = result.DefeatedMonsters.Any(m => m.IsBoss);
@@ -10042,6 +10233,14 @@ public partial class CombatEngine
             adjustedExp += (long)(adjustedExp * GameConfig.StudyXPBonus);
         }
 
+        // Divine boon XP/gold bonus (berserker/special multi-monster path)
+        var berserkBoons = result.Player.CachedBoonEffects;
+        if (berserkBoons != null)
+        {
+            if (berserkBoons.XPPercent > 0) adjustedExp += (long)(adjustedExp * berserkBoons.XPPercent);
+            if (berserkBoons.GoldPercent > 0) adjustedGold += (long)(adjustedGold * berserkBoons.GoldPercent);
+        }
+
         // NG+ cycle XP multiplier
         if (result.Player.CycleExpMultiplier > 1.0f)
         {
@@ -10050,6 +10249,12 @@ public partial class CombatEngine
 
         result.Player.Experience += adjustedExp;
         result.Player.Gold += adjustedGold;
+
+        // Grant god XP share from believer kill (partial victory path)
+        string pvMonsterDesc = result.DefeatedMonsters.Count == 1
+            ? result.DefeatedMonsters[0].Name
+            : $"{result.DefeatedMonsters.Count} monsters";
+        GrantGodKillXP(result.Player, adjustedExp, pvMonsterDesc);
 
         // Award experience to active companions (50% of player's XP)
         CompanionSystem.Instance?.AwardCompanionExperience(adjustedExp, terminal);
@@ -12746,6 +12951,84 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// Grant a share of combat XP to the player's worshipped god (online mode only).
+    /// Shows a sacrifice message and persists XP via DB. If the god is online, updates in-memory too.
+    /// </summary>
+    private void GrantGodKillXP(Character player, long xpGained, string monsterDesc)
+    {
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+        if (string.IsNullOrEmpty(player.WorshippedGod)) return;
+        if (player.IsImmortal) return; // Gods don't worship gods
+        if (xpGained <= 0) return;
+
+        long godXP = Math.Max(1, (long)(xpGained * GameConfig.GodBelieverKillXPPercent));
+
+        // Show sacrifice flavor message
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  You sacrifice the remains to {player.WorshippedGod}, granting them {godXP:N0} divine power.");
+
+        // Persist to DB (works for both online and offline gods)
+        try
+        {
+            var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+            backend?.AddGodExperience(player.WorshippedGod, godXP).ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    DebugLogger.Instance.LogError("GOD_XP", $"Failed to grant god XP: {t.Exception?.InnerException?.Message}");
+            });
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("GOD_XP", $"Failed to grant god XP to {player.WorshippedGod}: {ex.Message}");
+        }
+
+        // If god is online, update their in-memory XP too
+        try
+        {
+            if (UsurperRemake.Server.MudServer.Instance != null)
+            {
+                foreach (var kvp in UsurperRemake.Server.MudServer.Instance.ActiveSessions)
+                {
+                    var session = kvp.Value;
+                    var godPlayer = session.Context?.Engine?.CurrentPlayer;
+                    if (godPlayer != null && godPlayer.IsImmortal && godPlayer.DivineName == player.WorshippedGod)
+                    {
+                        godPlayer.GodExperience += godXP;
+                        // Check for level up
+                        int newLevel = 1;
+                        for (int i = GameConfig.GodExpThresholds.Length - 1; i >= 0; i--)
+                        {
+                            if (godPlayer.GodExperience >= GameConfig.GodExpThresholds[i])
+                            {
+                                newLevel = i + 1;
+                                break;
+                            }
+                        }
+                        if (newLevel > godPlayer.GodLevel)
+                        {
+                            godPlayer.GodLevel = newLevel;
+                            int titleIdx = Math.Clamp(newLevel - 1, 0, GameConfig.GodTitles.Length - 1);
+                            session.EnqueueMessage(
+                                $"\u001b[1;36m  ✦ Your divine power grows! You are now a {GameConfig.GodTitles[titleIdx]}! ✦\u001b[0m");
+                            NewsSystem.Instance?.Newsy(true, $"{godPlayer.DivineName} has ascended to the rank of {GameConfig.GodTitles[titleIdx]}!");
+                        }
+                        else
+                        {
+                            session.EnqueueMessage(
+                                $"\u001b[33m  ✦ {player.DisplayName} sacrificed {monsterDesc} in your name (+{godXP:N0} divine power) ✦\u001b[0m");
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("GOD_XP", $"Failed to notify online god: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Award experience to NPC teammates (spouses, lovers, team members)
     /// NPCs get 75% of the player's XP and can level up during combat (v0.41.4: raised from 50%)
     /// </summary>
@@ -12867,6 +13150,9 @@ public partial class CombatEngine
         // Slow halves attacks (rounded down)
         if (attacker.HasStatus(StatusEffect.Slow))
             attacks = Math.Max(1, attacks / 2);
+
+        // Hard cap: no more than 8 attacks per round regardless of stacking
+        attacks = Math.Min(attacks, 8);
 
         return attacks;
     }
@@ -14154,6 +14440,13 @@ public partial class CombatEngine
             // Team bonus (+15%)
             playerExp = (long)(playerExp * 1.15);
 
+            // Divine boon XP/gold bonus (group path)
+            if (groupedPlayer.CachedBoonEffects?.XPPercent > 0)
+                playerExp += (long)(playerExp * groupedPlayer.CachedBoonEffects.XPPercent);
+            long playerGold = goldPerPlayer;
+            if (groupedPlayer.CachedBoonEffects?.GoldPercent > 0)
+                playerGold += (long)(playerGold * groupedPlayer.CachedBoonEffects.GoldPercent);
+
             // NG+ cycle multiplier
             if (groupedPlayer.CycleExpMultiplier > 1.0f)
                 playerExp = (long)(playerExp * groupedPlayer.CycleExpMultiplier);
@@ -14166,7 +14459,7 @@ public partial class CombatEngine
             // Apply rewards
             int levelBefore = groupedPlayer.Level;
             groupedPlayer.Experience += playerExp;
-            groupedPlayer.Gold += goldPerPlayer;
+            groupedPlayer.Gold += playerGold;
 
             // Check for level up (same formula as NPC teammates)
             long xpForNextLevel = GetExperienceForLevel(groupedPlayer.Level + 1);
@@ -14217,6 +14510,80 @@ public partial class CombatEngine
                 }
 
                 gpSession.EnqueueMessage(rewardMsg);
+            }
+
+            // Grant god XP share for grouped player's kill (each believer feeds their own god)
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode
+                && !string.IsNullOrEmpty(groupedPlayer.WorshippedGod)
+                && !groupedPlayer.IsImmortal
+                && playerExp > 0)
+            {
+                long gpGodXP = Math.Max(1, (long)(playerExp * GameConfig.GodBelieverKillXPPercent));
+                string gpMonsterDesc = result.DefeatedMonsters.Count == 1
+                    ? result.DefeatedMonsters[0].Name
+                    : $"{result.DefeatedMonsters.Count} monsters";
+
+                // Show sacrifice message to the grouped player
+                gpSession?.EnqueueMessage(
+                    $"\u001b[1;33m  You sacrifice the remains to {groupedPlayer.WorshippedGod}, granting them {gpGodXP:N0} divine power.\u001b[0m");
+
+                // Persist to DB
+                try
+                {
+                    var gpBackend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                    gpBackend?.AddGodExperience(groupedPlayer.WorshippedGod, gpGodXP).ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            DebugLogger.Instance.LogError("GOD_XP", $"Failed to grant god XP (group): {t.Exception?.InnerException?.Message}");
+                    });
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Instance.LogError("GOD_XP", $"Failed to grant god XP (group): {ex.Message}");
+                }
+
+                // Notify online god
+                try
+                {
+                    if (UsurperRemake.Server.MudServer.Instance != null)
+                    {
+                        foreach (var kvp2 in UsurperRemake.Server.MudServer.Instance.ActiveSessions)
+                        {
+                            var godPlayer = kvp2.Value.Context?.Engine?.CurrentPlayer;
+                            if (godPlayer != null && godPlayer.IsImmortal && godPlayer.DivineName == groupedPlayer.WorshippedGod)
+                            {
+                                godPlayer.GodExperience += gpGodXP;
+                                int gpNewLevel = 1;
+                                for (int i = GameConfig.GodExpThresholds.Length - 1; i >= 0; i--)
+                                {
+                                    if (godPlayer.GodExperience >= GameConfig.GodExpThresholds[i])
+                                    {
+                                        gpNewLevel = i + 1;
+                                        break;
+                                    }
+                                }
+                                if (gpNewLevel > godPlayer.GodLevel)
+                                {
+                                    godPlayer.GodLevel = gpNewLevel;
+                                    int titleIdx = Math.Clamp(gpNewLevel - 1, 0, GameConfig.GodTitles.Length - 1);
+                                    kvp2.Value.EnqueueMessage(
+                                        $"\u001b[1;36m  ✦ Your divine power grows! You are now a {GameConfig.GodTitles[titleIdx]}! ✦\u001b[0m");
+                                    NewsSystem.Instance?.Newsy(true, $"{godPlayer.DivineName} has ascended to the rank of {GameConfig.GodTitles[titleIdx]}!");
+                                }
+                                else
+                                {
+                                    kvp2.Value.EnqueueMessage(
+                                        $"\u001b[33m  ✦ {groupedPlayer.DisplayName} sacrificed {gpMonsterDesc} in your name (+{gpGodXP:N0} divine power) ✦\u001b[0m");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Instance.LogWarning("GOD_XP", $"Failed to notify online god (group): {ex.Message}");
+                }
             }
         }
     }

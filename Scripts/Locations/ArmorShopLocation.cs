@@ -551,6 +551,10 @@ public class ArmorShopLocation : BaseLocation
         // Apply faction discount (The Crown gets 10% off at shops)
         adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
 
+        // Apply divine boon shop discount
+        if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
+            adjustedPrice = (long)(adjustedPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
+
         // Calculate total with tax
         var (armorKingTax, armorCityTax, armorTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
 
@@ -828,10 +832,12 @@ public class ArmorShopLocation : BaseLocation
                 .ThenBy(i => i.Value)
                 .ToList();
 
-            // Filter to only affordable items based on current gold (include faction discount)
+            // Filter to only affordable items based on current gold (include faction + boon discount)
             var factionMod = FactionSystem.Instance.GetShopPriceModifier();
+            var boonDiscount = currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0
+                ? (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent) : 1.0;
             var currentlyAffordable = affordableArmor
-                .Where(i => (long)(CityControlSystem.Instance.ApplyDiscount(i.Value, currentPlayer) * factionMod) <= currentPlayer.Gold)
+                .Where(i => (long)(CityControlSystem.Instance.ApplyDiscount(i.Value, currentPlayer) * factionMod * boonDiscount) <= currentPlayer.Gold)
                 .ToList();
 
             if (currentlyAffordable.Count == 0)
@@ -859,6 +865,9 @@ public class ArmorShopLocation : BaseLocation
                 long itemPrice = CityControlSystem.Instance.ApplyDiscount(armor.Value, currentPlayer);
                 // Apply faction discount (The Crown gets 10% off at shops)
                 itemPrice = (long)(itemPrice * FactionSystem.Instance.GetShopPriceModifier());
+                // Apply divine boon shop discount
+                if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
+                    itemPrice = (long)(itemPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
 
                 // Calculate total with tax
                 var (_, _, abItemTotal) = CityControlSystem.CalculateTaxedPrice(itemPrice);

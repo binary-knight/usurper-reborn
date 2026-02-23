@@ -236,6 +236,9 @@ public class WorldSimulator
         if (CulturalMemeSystem.Instance == null)
             new CulturalMemeSystem();
 
+        // Clean up orphaned marriages where one or both NPCs are permanently dead
+        CleanUpDeadNPCMarriages();
+
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"WorldSimulator starting - NPCs available: {npcs?.Count ?? 0}");
 
         // Start a background task to periodically run simulation steps. This works even when
@@ -496,6 +499,12 @@ public class WorldSimulator
                 killerName, npc.Name2 ?? npc.Name, WitnessEventType.SawMurder);
 
             DebugLogger.Instance.LogInfo("PERMADEATH", $"{npc.Name} permanently killed by {killerName} (chance was {basePermadeathChance:P0})");
+
+            // Widow the spouse and clear marriage registry
+            if (npc.Married || npc.IsMarried)
+            {
+                HandleSpouseBereavement(npc);
+            }
 
             // Check if this NPC's children are now orphaned (both parents dead)
             CheckForOrphanedChildren(npc);
@@ -838,8 +847,8 @@ public class WorldSimulator
     }
 
     /// <summary>
-    /// Handle a spouse's bereavement when their partner dies of old age.
-    /// Clears marriage state and adds a memory of the loss.
+    /// Handle a spouse's bereavement when their partner dies.
+    /// Clears marriage state on the surviving spouse and removes the registry entry.
     /// </summary>
     private void HandleSpouseBereavement(NPC deceased)
     {
@@ -853,11 +862,66 @@ public class WorldSimulator
             spouse.Brain?.Memory?.AddMemory(
                 $"My beloved {deceased.Name2} has passed away...", "bereavement", DateTime.Now);
 
-            // Clear the marriage in the registry
-            NPCMarriageRegistry.Instance.EndMarriage(deceased.ID);
-
             UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
                 $"{spouse.Name2} is now widowed after {deceased.Name2}'s passing");
+        }
+
+        // Always clear the registry entry, even if the spouse wasn't found
+        // (e.g., spouse already dead, name mismatch, or not loaded)
+        NPCMarriageRegistry.Instance.EndMarriage(deceased.ID);
+
+        // Clear deceased's own marriage flags
+        deceased.Married = false;
+        deceased.IsMarried = false;
+    }
+
+    /// <summary>
+    /// Migration cleanup: remove marriages where one or both NPCs are permanently dead.
+    /// Runs once on world sim startup to fix existing orphaned marriage data.
+    /// </summary>
+    private void CleanUpDeadNPCMarriages()
+    {
+        var registry = NPCMarriageRegistry.Instance;
+        if (registry == null) return;
+
+        var allMarriages = registry.GetAllMarriages();
+        int cleaned = 0;
+
+        foreach (var marriage in allMarriages)
+        {
+            var npc1 = npcs.FirstOrDefault(n => n.ID == marriage.Npc1Id);
+            var npc2 = npcs.FirstOrDefault(n => n.ID == marriage.Npc2Id);
+
+            bool npc1Dead = npc1 == null || npc1.IsDead || npc1.IsPermaDead;
+            bool npc2Dead = npc2 == null || npc2.IsDead || npc2.IsPermaDead;
+
+            if (npc1Dead || npc2Dead)
+            {
+                // End the marriage in registry
+                registry.EndMarriage(marriage.Npc1Id);
+
+                // Clear marriage flags on any surviving NPC
+                if (npc1 != null && !npc1Dead)
+                {
+                    npc1.Married = false;
+                    npc1.IsMarried = false;
+                    npc1.SpouseName = "";
+                }
+                if (npc2 != null && !npc2Dead)
+                {
+                    npc2.Married = false;
+                    npc2.IsMarried = false;
+                    npc2.SpouseName = "";
+                }
+
+                cleaned++;
+            }
+        }
+
+        if (cleaned > 0)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLDSIM",
+                $"Cleaned up {cleaned} orphaned marriage(s) involving dead NPCs");
         }
     }
 

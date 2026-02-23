@@ -761,6 +761,20 @@ public partial class TerminalEmulator : Control
         // MUD stream mode - read from TCP stream
         if (_streamWriter != null && _streamReader != null)
         {
+            // Check for wizard /force injected commands before blocking on input
+            var forceCtx = UsurperRemake.Server.SessionContext.Current;
+            if (forceCtx != null)
+            {
+                var forceServer = UsurperRemake.Server.MudServer.Instance;
+                if (forceServer != null && forceServer.ActiveSessions.TryGetValue(forceCtx.Username.ToLowerInvariant(), out var forceSess)
+                    && forceSess.ForcedCommands.TryDequeue(out var forcedCmd))
+                {
+                    Write(prompt, "bright_white");
+                    WriteLine(forcedCmd, "bright_magenta");
+                    return forcedCmd;
+                }
+            }
+
             Write(prompt, "bright_white");
 
             // Serialize reads — prevents concurrent ReadLineAsync from
@@ -1773,8 +1787,8 @@ public partial class TerminalEmulator : Control
     /// <summary>
     /// Background task that polls MessageSource every 100ms and writes incoming
     /// messages directly to the TCP stream while ReadLineAsync is pending.
-    /// Clears the current prompt line, writes message(s), then redraws the prompt.
-    /// This is standard MUD behavior — messages appear inline during input.
+    /// Moves to a new line (preserving the player's partially-typed input),
+    /// writes message(s), then redraws the prompt below.
     /// </summary>
     private async Task RunMessagePumpAsync(string prompt, CancellationToken ct)
     {
@@ -1790,10 +1804,11 @@ public partial class TerminalEmulator : Control
                 string? msg;
                 while ((msg = MessageSource()) != null)
                 {
-                    // Erase the prompt line, write the message
+                    // Move to a new line instead of erasing — preserves any text the
+                    // player has typed so far (it scrolls up but stays in the PTY buffer)
                     lock (_streamWriterLock)
                     {
-                        _streamWriter.Write("\r\x1b[2K"); // CR + erase entire line
+                        _streamWriter.Write("\r\n");       // new line, preserving current input
                         _streamWriter.Write(msg);
                         _streamWriter.Write("\r\n\x1b[0m"); // newline + reset color
                     }
@@ -1802,7 +1817,7 @@ public partial class TerminalEmulator : Control
 
                 if (anyWritten)
                 {
-                    // Redraw the prompt
+                    // Redraw the prompt on the new line
                     lock (_streamWriterLock)
                     {
                         _streamWriter.Write($"\x1b[{GetAnsiColorCode("bright_white")}m{prompt}");

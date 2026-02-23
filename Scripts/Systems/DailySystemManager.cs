@@ -612,6 +612,12 @@ public class DailySystemManager
             }
         }
 
+        // Immortal god daily maintenance (v0.46.0)
+        if (player != null && player.IsImmortal)
+        {
+            ProcessGodDailyMaintenance(player, terminal);
+        }
+
         await Task.CompletedTask;
     }
 
@@ -851,6 +857,12 @@ public class DailySystemManager
             }
         }
 
+        // Immortal god daily maintenance (v0.46.0)
+        if (player != null && player.IsImmortal)
+        {
+            ProcessGodDailyMaintenance(player, terminal);
+        }
+
         // Special events based on day number
         if (currentDay % 7 == 0) // Weekly events
         {
@@ -862,7 +874,7 @@ public class DailySystemManager
             await ProcessMonthlyEvent();
         }
     }
-    
+
     private async Task ProcessWeeklyEvent()
     {
         // Force a festival or market event on weekly intervals
@@ -941,6 +953,49 @@ public class DailySystemManager
             DailyCycleMode.Endless => TimeSpan.MaxValue, // Never resets
             _ => TimeSpan.Zero
         };
+    }
+
+    /// <summary>
+    /// Process immortal god daily maintenance: reset deeds, grant believer exp, recalculate level (v0.46.0)
+    /// </summary>
+    private void ProcessGodDailyMaintenance(Character god, TerminalUI? terminal)
+    {
+        if (!god.IsImmortal) return;
+
+        int godIdx = Math.Clamp(god.GodLevel - 1, 0, GameConfig.GodDeedsPerDay.Length - 1);
+
+        // Reset daily deeds
+        god.DeedsLeft = GameConfig.GodDeedsPerDay[godIdx];
+
+        // Count believers and grant passive exp
+        int believers = PantheonLocation.CountBelievers(god.DivineName);
+        long believerExp = (long)believers * god.GodLevel * 2;
+        if (believerExp > 0)
+        {
+            god.GodExperience += believerExp;
+            terminal?.WriteLine($"  Your {believers} believer{(believers == 1 ? "" : "s")} grant you {believerExp:N0} divine power.", "bright_yellow");
+        }
+
+        // Recalculate god level from exp thresholds
+        int newLevel = 1;
+        for (int i = GameConfig.GodExpThresholds.Length - 1; i >= 0; i--)
+        {
+            if (god.GodExperience >= GameConfig.GodExpThresholds[i])
+            {
+                newLevel = i + 1;
+                break;
+            }
+        }
+
+        if (newLevel > god.GodLevel)
+        {
+            god.GodLevel = newLevel;
+            int titleIdx = Math.Clamp(newLevel - 1, 0, GameConfig.GodTitles.Length - 1);
+            terminal?.WriteLine($"  Your divine power grows! You are now a {GameConfig.GodTitles[titleIdx]}!", "bright_cyan");
+            NewsSystem.Instance?.Newsy(true, $"{god.DivineName} has ascended to the rank of {GameConfig.GodTitles[titleIdx]}!");
+        }
+
+        terminal?.WriteLine($"  Your deeds have been restored ({god.DeedsLeft} available).", "yellow");
     }
 
     /// <summary>

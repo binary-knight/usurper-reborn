@@ -312,7 +312,8 @@ namespace UsurperRemake.Systems
             var story = StoryProgressionSystem.Instance;
             if (story.HasStoryFlag($"{type.ToString().ToLower()}_ally"))
             {
-                // Allied with the god
+                // Allied with the god — mark as Allied so floor is cleared
+                story.UpdateGodState(type, GodStatus.Allied);
                 return new BossEncounterResult
                 {
                     Success = true,

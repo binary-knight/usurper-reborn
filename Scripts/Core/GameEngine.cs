@@ -95,6 +95,11 @@ public partial class GameEngine : Node
     public bool PendingNewGamePlus { get; set; }
 
     /// <summary>
+    /// Flag indicating the player ascended to immortality after an ending
+    /// </summary>
+    public bool PendingImmortalAscension { get; set; }
+
+    /// <summary>
     /// Thread-safe singleton accessor. In MUD mode, returns the per-session engine.
     /// In single-player/BBS, returns the static fallback instance.
     /// </summary>
@@ -352,388 +357,341 @@ public partial class GameEngine : Node
         terminal.WriteLine($"Welcome, {playerName}!");
         terminal.WriteLine("");
 
-        // Check if this BBS user has an existing save
-        var existingSave = SaveSystem.Instance.GetMostRecentSave(playerName);
+        // Check if this account has existing characters (main + alt)
+        var accountName = playerName;
+        var altKey = SqlSaveBackend.GetAltKey(accountName);
+        var mainSave = SaveSystem.Instance.GetMostRecentSave(accountName);
+        var altSave = SaveSystem.Instance.GetMostRecentSave(altKey);
         bool isSysOp = UsurperRemake.BBS.DoorMode.IsSysOp;
         bool isOnlineAdmin = UsurperRemake.Server.SessionContext.IsActive
             ? (UsurperRemake.Server.SessionContext.Current?.WizardLevel ?? UsurperRemake.Server.WizardLevel.Mortal) >= UsurperRemake.Server.WizardLevel.God
             : UsurperRemake.BBS.DoorMode.IsOnlineMode &&
                 string.Equals(UsurperRemake.BBS.DoorMode.OnlineUsername, "rage", StringComparison.OrdinalIgnoreCase);
 
-        if (existingSave != null)
+        // Peek at main save to check immortal/alt slot status
+        bool mainIsImmortal = false;
+        bool hasAltSlot = false;
+        if (mainSave != null)
         {
-            // Existing character found - offer to load or create new
+            try
+            {
+                var mainData = await SaveSystem.Instance.LoadSaveByFileName(accountName);
+                mainIsImmortal = mainData?.Player?.IsImmortal == true;
+                hasAltSlot = mainData?.Player?.HasEarnedAltSlot == true;
+            }
+            catch { /* Failed to peek, assume no alt slot */ }
+        }
+
+        // Show character slots
+        if (mainSave != null)
+        {
             terminal.SetColor("green");
-            terminal.WriteLine($"Found existing character: {existingSave.PlayerName} — Level {existingSave.Level} {existingSave.ClassName}");
-            terminal.WriteLine($"Last played: {existingSave.SaveTime:yyyy-MM-dd HH:mm}");
+            string mainTag = mainIsImmortal ? " [IMMORTAL]" : "";
+            terminal.WriteLine($"  [1] {mainSave.PlayerName} — Level {mainSave.Level} {mainSave.ClassName}{mainTag}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"      Last played: {mainSave.SaveTime:yyyy-MM-dd HH:mm}");
+        }
+        if (altSave != null)
+        {
+            terminal.SetColor("green");
+            terminal.WriteLine($"  [2] {altSave.PlayerName} — Level {altSave.Level} {altSave.ClassName}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"      Last played: {altSave.SaveTime:yyyy-MM-dd HH:mm}");
+        }
+        if (mainSave != null || altSave != null)
             terminal.WriteLine("");
 
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("L");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_white");
-            terminal.WriteLine("Load existing character");
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("N");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_white");
-            terminal.WriteLine("Create new character (WARNING: Overwrites existing!)");
-            if (isSysOp || isOnlineAdmin)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("%");
-                terminal.SetColor("darkgray");
-                terminal.Write("] ");
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine(isSysOp ? "SysOp Console" : "Admin Console");
-            }
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("C");
-                terminal.SetColor("darkgray");
-                terminal.Write("] ");
-                terminal.SetColor("gray");
-                terminal.WriteLine("Change Password");
-            }
+        // Show menu options
+        if (mainSave != null)
+        {
+            WriteMenuKey("1", $"Play {mainSave.PlayerName}");
+        }
+        if (altSave != null)
+        {
+            WriteMenuKey("2", $"Play {altSave.PlayerName}");
+        }
+        // Show alt creation option if eligible (has alt slot but no alt character yet)
+        bool canCreateAlt = (mainIsImmortal || hasAltSlot) && altSave == null && UsurperRemake.BBS.DoorMode.IsOnlineMode;
+        if (canCreateAlt)
+        {
+            WriteMenuKey("M", "Create Mortal Alt Character");
+        }
+        if (altSave != null)
+        {
+            WriteMenuKey("D", "Delete Alt Character");
+        }
+        if (mainSave == null)
+        {
+            WriteMenuKey("N", "Create new character");
+        }
+        else
+        {
+            WriteMenuKey("N", "New character (WARNING: Overwrites main!)");
+        }
+        if (isSysOp || isOnlineAdmin)
+        {
+            WriteMenuKey("%", isSysOp ? "SysOp Console" : "Admin Console");
+        }
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
+        {
+            WriteMenuKey("C", "Change Password");
+        }
 #if !STEAM_BUILD
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("@");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("Support the Developer");
+        WriteMenuKey("@", "Support the Developer");
 #endif
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_cyan");
-            terminal.Write("A");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            if (GameConfig.ScreenReaderMode)
-            {
-                terminal.SetColor("bright_green");
-                terminal.WriteLine("Screen Reader Mode: ON");
-            }
-            else
-            {
-                terminal.SetColor("white");
-                terminal.WriteLine("Screen Reader Mode: OFF");
-            }
-            if (UsurperRemake.Server.SessionContext.IsActive)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("[");
-                terminal.SetColor("bright_magenta");
-                terminal.Write("S");
-                terminal.SetColor("darkgray");
-                terminal.Write("] ");
-                terminal.SetColor("white");
-                terminal.WriteLine("Spectate a Player");
-            }
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("Q");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_white");
-            terminal.WriteLine("Quit");
-            terminal.WriteLine("");
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_cyan");
+        terminal.Write("A");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        if (GameConfig.ScreenReaderMode)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("Screen Reader Mode: ON");
+        }
+        else
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine("Screen Reader Mode: OFF");
+        }
+        if (UsurperRemake.Server.SessionContext.IsActive)
+        {
+            WriteMenuKey("S", "Spectate a Player");
+        }
+        WriteMenuKey("Q", "Quit");
+        terminal.WriteLine("");
 
-            var choice = await terminal.GetInput("Your choice: ");
+        var choice = await terminal.GetInput("Your choice: ");
 
-            switch (choice.ToUpper())
-            {
-                case "L":
-                    // LoadSaveByFileName enters the game world automatically
-                    await LoadSaveByFileName(existingSave.FileName);
-                    break;
+        switch (choice.ToUpper())
+        {
+            case "1":
+                if (mainSave != null)
+                {
+                    // Ensure identity is set to main account
+                    UsurperRemake.BBS.DoorMode.SetOnlineUsername(accountName);
+                    var ctx1 = UsurperRemake.Server.SessionContext.Current;
+                    if (ctx1 != null) ctx1.CharacterKey = accountName;
+                    await LoadSaveByFileName(mainSave.FileName);
+                }
+                else
+                {
+                    await CreateNewGame(accountName);
+                }
+                break;
 
-                case "N":
+            case "L":
+                // Legacy shortcut — load main character (or alt if only alt exists)
+                if (mainSave != null)
+                {
+                    UsurperRemake.BBS.DoorMode.SetOnlineUsername(accountName);
+                    var ctxL = UsurperRemake.Server.SessionContext.Current;
+                    if (ctxL != null) ctxL.CharacterKey = accountName;
+                    await LoadSaveByFileName(mainSave.FileName);
+                }
+                else if (altSave != null)
+                {
+                    await SwitchToAltCharacter(altKey);
+                    await LoadSaveByFileName(altKey);
+                }
+                break;
+
+            case "2":
+                if (altSave != null)
+                {
+                    await SwitchToAltCharacter(altKey);
+                    await LoadSaveByFileName(altKey);
+                }
+                else if (mainSave != null)
+                {
+                    // Default to loading main
+                    await LoadSaveByFileName(mainSave.FileName);
+                }
+                break;
+
+            case "M":
+                if (canCreateAlt)
+                {
+                    await SwitchToAltCharacter(altKey);
+                    await CreateNewGame(altKey);
+                }
+                else
+                {
+                    terminal.WriteLine("  You must be an immortal to create an alt character.", "red");
+                    await Task.Delay(2000);
+                    await RunBBSDoorMode();
+                    return;
+                }
+                break;
+
+            case "N":
+                if (mainSave != null)
+                {
                     terminal.SetColor("bright_red");
                     terminal.WriteLine("");
-                    terminal.WriteLine("WARNING: This will DELETE your existing character!");
+                    terminal.WriteLine("WARNING: This will DELETE your main character!");
+                    if (altSave != null)
+                        terminal.WriteLine("Your alt character will NOT be affected.");
                     var confirm = await terminal.GetInput("Type 'DELETE' to confirm: ");
                     if (confirm == "DELETE")
                     {
-                        // Delete existing saves for this player
-                        var saves = SaveSystem.Instance.GetPlayerSaves(playerName);
+                        // Delete main character save only (not alt)
+                        var saves = SaveSystem.Instance.GetPlayerSaves(accountName);
                         foreach (var save in saves)
                         {
                             SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
                         }
-                        // CreateNewGame handles character creation and enters the game world
-                        await CreateNewGame(playerName);
+                        // Ensure identity is main account
+                        UsurperRemake.BBS.DoorMode.SetOnlineUsername(accountName);
+                        var ctxN = UsurperRemake.Server.SessionContext.Current;
+                        if (ctxN != null) ctxN.CharacterKey = accountName;
+                        await CreateNewGame(accountName);
                     }
                     else
                     {
                         terminal.WriteLine("Character deletion cancelled.", "yellow");
                         await Task.Delay(2000);
-                        // Recurse to show menu again
-                        await RunBBSDoorMode();
-                    }
-                    break;
-
-                case "C":
-                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-                    {
-                        await ChangePasswordScreen();
                         await RunBBSDoorMode();
                         return;
                     }
-                    else
-                    {
-                        await LoadSaveByFileName(existingSave.FileName);
-                    }
-                    break;
+                }
+                else
+                {
+                    await CreateNewGame(accountName);
+                }
+                break;
 
-                case "%":
-                    if (isSysOp || (isOnlineAdmin && UsurperRemake.BBS.DoorMode.IsInDoorMode))
-                    {
-                        await ShowSysOpConsole();
-                        await RunBBSDoorMode();
-                        return;
-                    }
-                    else if (isOnlineAdmin)
-                    {
-                        await ShowOnlineAdminConsole();
-                        await RunBBSDoorMode();
-                        return;
-                    }
-                    else
-                    {
-                        await LoadSaveByFileName(existingSave.FileName);
-                    }
-                    break;
-
-                case "A":
-                    GameConfig.ScreenReaderMode = !GameConfig.ScreenReaderMode;
-                    terminal.WriteLine("");
-                    if (GameConfig.ScreenReaderMode)
-                    {
-                        terminal.WriteLine("Screen Reader Mode ENABLED", "bright_green");
-                        terminal.WriteLine("Menus will use simplified plain text format.", "white");
-                    }
-                    else
-                    {
-                        terminal.WriteLine("Screen Reader Mode DISABLED", "white");
-                        terminal.WriteLine("Menus will use visual ASCII art format.", "white");
-                    }
-                    await Task.Delay(1500);
+            case "C":
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    await ChangePasswordScreen();
                     await RunBBSDoorMode();
                     return;
+                }
+                else if (mainSave != null)
+                {
+                    await LoadSaveByFileName(mainSave.FileName);
+                }
+                break;
 
-                case "S":
-                    if (UsurperRemake.Server.SessionContext.IsActive)
-                    {
-                        await RunSpectatorModeUI();
-                        await RunBBSDoorMode();
-                        return;
-                    }
-                    break;
+            case "%":
+                if (isSysOp || (isOnlineAdmin && UsurperRemake.BBS.DoorMode.IsInDoorMode))
+                {
+                    await ShowSysOpConsole();
+                    await RunBBSDoorMode();
+                    return;
+                }
+                else if (isOnlineAdmin)
+                {
+                    await ShowOnlineAdminConsole();
+                    await RunBBSDoorMode();
+                    return;
+                }
+                break;
 
-                case "Q":
-                    IsIntentionalExit = true;
-                    terminal.WriteLine("Goodbye!", "cyan");
-                    await Task.Delay(1000);
-                    break;
+            case "A":
+                GameConfig.ScreenReaderMode = !GameConfig.ScreenReaderMode;
+                terminal.WriteLine("");
+                if (GameConfig.ScreenReaderMode)
+                {
+                    terminal.WriteLine("Screen Reader Mode ENABLED", "bright_green");
+                    terminal.WriteLine("Menus will use simplified plain text format.", "white");
+                }
+                else
+                {
+                    terminal.WriteLine("Screen Reader Mode DISABLED", "white");
+                    terminal.WriteLine("Menus will use visual ASCII art format.", "white");
+                }
+                await Task.Delay(1500);
+                await RunBBSDoorMode();
+                return;
+
+            case "S":
+                if (UsurperRemake.Server.SessionContext.IsActive)
+                {
+                    await RunSpectatorModeUI();
+                    await RunBBSDoorMode();
+                    return;
+                }
+                break;
+
+            case "Q":
+                IsIntentionalExit = true;
+                terminal.WriteLine("Goodbye!", "cyan");
+                await Task.Delay(1000);
+                break;
 
 #if !STEAM_BUILD
-                case "@":
-                    await ShowSupportPage();
-                    await RunBBSDoorMode();
-                    return;
+            case "@":
+                await ShowSupportPage();
+                await RunBBSDoorMode();
+                return;
 #endif
 
-                default:
-                    // Default to loading existing character
-                    await LoadSaveByFileName(existingSave.FileName);
-                    break;
-            }
+            case "D":
+                if (altSave != null)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("");
+                    terminal.WriteLine($"  WARNING: This will permanently delete {altSave.PlayerName}!");
+                    var confirmDel = await terminal.GetInput("  Type 'DELETE' to confirm: ");
+                    if (confirmDel == "DELETE")
+                    {
+                        SaveSystem.Instance.DeleteSave(altKey);
+                        // Also clean up sleeping_players entry for the alt
+                        if (SaveSystem.Instance.Backend is SqlSaveBackend sqlDel)
+                        {
+                            try { await sqlDel.UnregisterSleepingPlayer(altKey); } catch { }
+                        }
+                        terminal.WriteLine($"  {altSave.PlayerName} has been deleted.", "yellow");
+                        await Task.Delay(2000);
+                    }
+                    else
+                    {
+                        terminal.WriteLine("  Deletion cancelled.", "gray");
+                        await Task.Delay(1500);
+                    }
+                    await RunBBSDoorMode();
+                    return;
+                }
+                break;
 
-            // Handle NG+ restart in BBS/online mode — after any LoadSaveByFileName path
-            if (PendingNewGamePlus)
-            {
-                PendingNewGamePlus = false;
-                // Delete old save and create fresh character with cycle bonuses
-                var ngpSaves = SaveSystem.Instance.GetPlayerSaves(playerName);
-                foreach (var save in ngpSaves)
-                    SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
-                await CreateNewGame(playerName);
-            }
+            default:
+                // Default: load first available character
+                if (mainSave != null)
+                {
+                    await LoadSaveByFileName(mainSave.FileName);
+                }
+                else if (altSave != null)
+                {
+                    await SwitchToAltCharacter(altKey);
+                    await LoadSaveByFileName(altKey);
+                }
+                else
+                {
+                    await CreateNewGame(accountName);
+                }
+                break;
         }
-        else
+
+        // Handle immortal ascension — player became a god, just re-enter Pantheon
+        if (PendingImmortalAscension)
         {
-            // No existing character - create new one
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("N");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_white");
-            terminal.WriteLine("Create new character");
-            if (isSysOp || isOnlineAdmin)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("%");
-                terminal.SetColor("darkgray");
-                terminal.Write("] ");
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine(isSysOp ? "SysOp Console" : "Admin Console");
-            }
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("C");
-                terminal.SetColor("darkgray");
-                terminal.Write("] ");
-                terminal.SetColor("gray");
-                terminal.WriteLine("Change Password");
-            }
-#if !STEAM_BUILD
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("@");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("Support the Developer");
-#endif
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_cyan");
-            terminal.Write("A");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            if (GameConfig.ScreenReaderMode)
-            {
-                terminal.SetColor("bright_green");
-                terminal.WriteLine("Screen Reader Mode: ON");
-            }
-            else
-            {
-                terminal.SetColor("white");
-                terminal.WriteLine("Screen Reader Mode: OFF");
-            }
-            if (UsurperRemake.Server.SessionContext.IsActive)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("[");
-                terminal.SetColor("bright_magenta");
-                terminal.Write("S");
-                terminal.SetColor("darkgray");
-                terminal.Write("] ");
-                terminal.SetColor("white");
-                terminal.WriteLine("Spectate a Player");
-            }
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("Q");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_white");
-            terminal.WriteLine("Quit");
-            terminal.WriteLine("");
+            PendingImmortalAscension = false;
+            // Save is already updated with IsImmortal=true; next login will route to Pantheon
+        }
 
-            var choice = await terminal.GetInput("Your choice: ");
-
-            switch (choice.ToUpper())
-            {
-                case "S":
-                    if (UsurperRemake.Server.SessionContext.IsActive)
-                    {
-                        await RunSpectatorModeUI();
-                        await RunBBSDoorMode();
-                        return;
-                    }
-                    break;
-
-                case "C":
-                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-                    {
-                        await ChangePasswordScreen();
-                        await RunBBSDoorMode();
-                        return;
-                    }
-                    else
-                    {
-                        await CreateNewGame(playerName);
-                    }
-                    break;
-
-                case "%":
-                    if (isSysOp || (isOnlineAdmin && UsurperRemake.BBS.DoorMode.IsInDoorMode))
-                    {
-                        await ShowSysOpConsole();
-                        await RunBBSDoorMode();
-                        return;
-                    }
-                    else if (isOnlineAdmin)
-                    {
-                        await ShowOnlineAdminConsole();
-                        await RunBBSDoorMode();
-                        return;
-                    }
-                    else
-                    {
-                        await CreateNewGame(playerName);
-                    }
-                    break;
-
-                case "A":
-                    GameConfig.ScreenReaderMode = !GameConfig.ScreenReaderMode;
-                    terminal.WriteLine("");
-                    if (GameConfig.ScreenReaderMode)
-                    {
-                        terminal.WriteLine("Screen Reader Mode ENABLED", "bright_green");
-                        terminal.WriteLine("Menus will use simplified plain text format.", "white");
-                    }
-                    else
-                    {
-                        terminal.WriteLine("Screen Reader Mode DISABLED", "white");
-                        terminal.WriteLine("Menus will use visual ASCII art format.", "white");
-                    }
-                    await Task.Delay(1500);
-                    await RunBBSDoorMode();
-                    return;
-
-#if !STEAM_BUILD
-                case "@":
-                    await ShowSupportPage();
-                    await RunBBSDoorMode();
-                    return;
-#endif
-
-                case "Q":
-                    IsIntentionalExit = true;
-                    terminal.WriteLine("Goodbye!", "cyan");
-                    await Task.Delay(1000);
-                    break;
-
-                default:
-                    await CreateNewGame(playerName);
-                    break;
-            }
+        // Handle NG+ restart in BBS/online mode — after any LoadSaveByFileName path
+        if (PendingNewGamePlus)
+        {
+            PendingNewGamePlus = false;
+            // Use the active character key (could be main or alt)
+            var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
+            var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
+            foreach (var save in ngpSaves)
+                SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
+            await CreateNewGame(activeKey);
         }
     }
 
@@ -2113,8 +2071,29 @@ public partial class GameEngine : Node
                 await dailyManager.CheckDailyReset();
             }
 
-            // Start game at saved location
-            await locationManager.EnterLocation(GameLocation.MainStreet, currentPlayer!);
+            // Online mode: cache divine boon effects for mortals who worship a player-god
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null
+                && !string.IsNullOrEmpty(currentPlayer.WorshippedGod)
+                && SaveSystem.Instance?.Backend is SqlSaveBackend boonBackend)
+            {
+                try
+                {
+                    string boonConfig = await boonBackend.GetGodBoonConfig(currentPlayer.WorshippedGod);
+                    if (!string.IsNullOrEmpty(boonConfig))
+                    {
+                        currentPlayer.CachedBoonEffects = DivineBoonRegistry.CalculateEffects(boonConfig);
+                        DebugLogger.Instance.LogInfo("BOONS", $"Cached boon effects for {currentPlayer.Name2} from god {currentPlayer.WorshippedGod}: {boonConfig}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Instance.LogWarning("BOONS", $"Failed to cache boon effects: {ex.Message}");
+                }
+            }
+
+            // Route immortals directly to the Pantheon; mortals go to Main Street
+            var startLocation = currentPlayer!.IsImmortal ? GameLocation.Pantheon : GameLocation.MainStreet;
+            await locationManager.EnterLocation(startLocation, currentPlayer!);
         }
         catch (Exception ex)
         {
@@ -2189,18 +2168,11 @@ public partial class GameEngine : Node
                 DebugLogger.Instance.LogInfo("ONLINE", $"Children overridden from world_state: {sharedChildren.Count} children");
             }
 
-            // Load marriages from world_state (maintained by WorldSimService)
-            var (marriages, affairs) = await OnlineStateManager.Instance.LoadSharedMarriages();
-            if (marriages != null)
-            {
-                NPCMarriageRegistry.Instance.RestoreMarriages(marriages);
-                DebugLogger.Instance.LogInfo("ONLINE", $"Marriages overridden from world_state: {marriages.Count} marriages");
-            }
-            if (affairs != null)
-            {
-                NPCMarriageRegistry.Instance.RestoreAffairs(affairs);
-                DebugLogger.Instance.LogInfo("ONLINE", $"Affairs overridden from world_state: {affairs.Count} affairs");
-            }
+            // NPC marriages are managed by the world sim (WorldSimService loads them once on startup
+            // and persists them to world_state). Individual player sessions must NOT call
+            // RestoreMarriages/RestoreAffairs, as that clears the global shared registry and
+            // causes cross-player contamination when multiple sessions load concurrently.
+            DebugLogger.Instance.LogInfo("ONLINE", "Skipping marriage registry restore — world sim is authority");
 
             // Load world events from world_state so player sees active plagues, festivals, etc.
             var sharedEvents = await OnlineStateManager.Instance.LoadSharedWorldEvents();
@@ -2819,10 +2791,18 @@ public partial class GameEngine : Node
         }
 
         // Enter main game using location system
-        // If player died and was resurrected, they'll start at the Inn
-        var startLocation = currentPlayer.Location > 0
-            ? (GameLocation)currentPlayer.Location
-            : GameLocation.MainStreet;
+        // Immortals always go to the Pantheon; mortals use saved location or MainStreet
+        GameLocation startLocation;
+        if (currentPlayer.IsImmortal)
+        {
+            startLocation = GameLocation.Pantheon;
+        }
+        else
+        {
+            startLocation = currentPlayer.Location > 0
+                ? (GameLocation)currentPlayer.Location
+                : GameLocation.MainStreet;
+        }
         await locationManager.EnterLocation(startLocation, currentPlayer);
     }
     
@@ -2959,6 +2939,20 @@ public partial class GameEngine : Node
             MurderWeight = playerData.MurderWeight,
             PermakillLog = playerData.PermakillLog ?? new(),
             LastMurderWeightDecay = playerData.LastMurderWeightDecay,
+
+            // Immortal Ascension System
+            HasEarnedAltSlot = playerData.HasEarnedAltSlot,
+            IsImmortal = playerData.IsImmortal,
+            DivineName = playerData.DivineName ?? "",
+            GodLevel = playerData.GodLevel,
+            GodExperience = playerData.GodExperience,
+            DeedsLeft = playerData.DeedsLeft,
+            GodAlignment = playerData.GodAlignment ?? "",
+            AscensionDate = playerData.AscensionDate,
+            WorshippedGod = playerData.WorshippedGod ?? "",
+            DivineBlessingCombats = playerData.DivineBlessingCombats,
+            DivineBlessingBonus = playerData.DivineBlessingBonus,
+            DivineBoonConfig = playerData.DivineBoonConfig ?? "",
 
             // Combat statistics (kill/death counts)
             MKills = playerData.MKills,
@@ -3324,10 +3318,14 @@ public partial class GameEngine : Node
         player.PermanentDamageBonus = playerData.PermanentDamageBonus;
         player.PermanentDefenseBonus = playerData.PermanentDefenseBonus;
         player.BonusMaxHP = playerData.BonusMaxHP;
+        player.BonusWeapPow = playerData.BonusWeapPow;
+        player.BonusArmPow = playerData.BonusArmPow;
         player.HomeRestsToday = playerData.HomeRestsToday;
         player.HerbsGatheredToday = playerData.HerbsGatheredToday;
         player.WellRestedCombats = playerData.WellRestedCombats;
         player.WellRestedBonus = playerData.WellRestedBonus;
+        player.LoversBlissCombats = playerData.LoversBlissCombats;
+        player.LoversBlissBonus = playerData.LoversBlissBonus;
         player.CycleExpMultiplier = playerData.CycleExpMultiplier;
 
         // Restore chest contents
@@ -3425,11 +3423,15 @@ public partial class GameEngine : Node
             DebugLogger.Instance?.LogDebug("LOAD", "No dungeon floor states in save data - starting fresh");
         }
 
-        // Restore player's active quest references from the quest database
+        // Restore player's active quests directly from save data into the quest database.
+        // This runs BEFORE RestoreWorldState, so we merge player quests into the database here.
+        // RestoreWorldState will then add unclaimed board quests. Both paths are needed because
+        // PlayerData.ActiveQuests has claimed quests and WorldState.ActiveQuests has unclaimed ones.
         if (playerData.ActiveQuests != null && playerData.ActiveQuests.Count > 0)
         {
             player.ActiveQuests.Clear();
             var playerName = player.Name2 ?? player.Name1 ?? "";
+            QuestSystem.MergePlayerQuests(playerName, playerData.ActiveQuests);
             var dbQuests = QuestSystem.GetPlayerQuests(playerName);
             foreach (var q in dbQuests)
             {
@@ -3595,15 +3597,20 @@ public partial class GameEngine : Node
         var currentDay = dailyManager?.CurrentDay ?? 1;
         WorldEventSystem.Instance.RestoreFromSaveData(worldState.ActiveEvents, currentDay);
 
-        // Restore active quests from save data
-        // In MUD/online mode, DON'T use RestoreFromSaveData (which clears the entire shared
-        // questDatabase, wiping other concurrent players' quests). Instead, merge is done
-        // per-player in LoadSaveByFileName using MergePlayerQuests.
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        // Restore unclaimed board quests from world state.
+        // Player quests are already loaded via MergePlayerQuests in RestorePlayerFromSaveData,
+        // so we merge world quests additively instead of using RestoreFromSaveData (which
+        // calls questDatabase.Clear() and would wipe the player's quests).
+        if (worldState.ActiveQuests != null && worldState.ActiveQuests.Count > 0)
         {
-            if (worldState.ActiveQuests != null && worldState.ActiveQuests.Count > 0)
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
-                QuestSystem.RestoreFromSaveData(worldState.ActiveQuests);
+                // Online: world quests managed by world sim, skip
+            }
+            else
+            {
+                // Single-player: add unclaimed board quests without clearing player quests
+                QuestSystem.MergeWorldQuests(worldState.ActiveQuests);
             }
         }
 
@@ -3702,6 +3709,9 @@ public partial class GameEngine : Node
 
                 // Faction affiliation
                 NPCFaction = data.NPCFaction >= 0 ? (UsurperRemake.Systems.Faction)data.NPCFaction : null,
+
+                // Divine worship
+                WorshippedGod = data.WorshippedGod ?? "",
 
                 // Alignment
                 Chivalry = data.Chivalry,
@@ -4763,6 +4773,35 @@ public partial class GameEngine : Node
         await terminal.WaitForKey();
     }
 
+    /// <summary>Helper to display a menu key option in the character selection screen.</summary>
+    private void WriteMenuKey(string key, string label)
+    {
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write(key);
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("bright_white");
+        terminal.WriteLine(label);
+    }
+
+    /// <summary>Switch session identity to an alt character key for save/load routing.</summary>
+    private async Task SwitchToAltCharacter(string altKey)
+    {
+        UsurperRemake.BBS.DoorMode.SetOnlineUsername(altKey);
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        if (ctx != null) ctx.CharacterKey = altKey;
+
+        // Switch online presence tracking to the new identity
+        var osm = OnlineStateManager.Instance;
+        if (osm != null)
+        {
+            var connType = ctx?.ConnectionType ?? "Unknown";
+            await osm.SwitchIdentity(altKey, altKey, connType);
+        }
+    }
+
     private async Task ShowCredits()
     {
         terminal.ClearScreen();
@@ -4793,7 +4832,7 @@ public partial class GameEngine : Node
         terminal.WriteLine("");
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine("  THIS REMAKE:");
+        terminal.WriteLine("  USURPER REBORN:");
         terminal.SetColor("cyan");
         terminal.WriteLine("    Jason Knight             - Creator of Usurper Reborn");
         terminal.WriteLine("");
@@ -4805,6 +4844,12 @@ public partial class GameEngine : Node
         terminal.WriteLine("  ANSI ART:");
         terminal.SetColor("cyan");
         terminal.WriteLine("    xbit (x-bit.org)          - Race & Class Portrait Art");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_white");
+        terminal.WriteLine("  CONTRIBUTORS:");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("    fastfinge                 - Code Contributions");
         terminal.WriteLine("");
 
         terminal.SetColor("bright_magenta");

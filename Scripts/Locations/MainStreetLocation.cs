@@ -1783,15 +1783,22 @@ public class MainStreetLocation : BaseLocation
                 return false;
             }
 
-            // Default: Dormitory
-            if (currentPlayer.Gold < dormCost)
+            // Default: Dormitory — check gold on hand first, then bank
+            bool isBroke = false;
+            if (currentPlayer.Gold >= dormCost)
             {
-                terminal.WriteLine("  You can't even afford the dormitory. You collapse on the street.", "red");
-                // Register as dormitory sleeper even if broke (free for broke players)
+                currentPlayer.Gold -= dormCost;
+            }
+            else if (currentPlayer.Gold + currentPlayer.BankGold >= dormCost)
+            {
+                long shortfall = dormCost - currentPlayer.Gold;
+                currentPlayer.Gold = 0;
+                currentPlayer.BankGold -= shortfall;
+                terminal.WriteLine($"  ({shortfall:N0}g withdrawn from your bank account to cover the dormitory fee)", "gray");
             }
             else
             {
-                currentPlayer.Gold -= dormCost;
+                isBroke = true;
             }
 
             // Restore and save
@@ -1809,13 +1816,25 @@ public class MainStreetLocation : BaseLocation
             if (backend != null)
             {
                 var username = UsurperRemake.BBS.DoorMode.OnlineUsername ?? currentPlayer.Name2;
-                await backend.RegisterSleepingPlayer(username, "dormitory", "[]", 0);
+                await backend.RegisterSleepingPlayer(username, isBroke ? "street" : "dormitory", "[]", 0);
             }
 
-            terminal.SetColor("gray");
-            terminal.WriteLine("\n  You stumble to the dormitory and find an empty bunk...");
-            terminal.SetColor("red");
-            terminal.WriteLine("  Sleep well. Or try to.");
+            if (isBroke)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("\n  You can't even afford the dormitory.");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  You find a quiet alley and curl up against the wall...");
+                terminal.SetColor("red");
+                terminal.WriteLine("  It's going to be a long night.");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("\n  You stumble to the dormitory and find an empty bunk...");
+                terminal.SetColor("red");
+                terminal.WriteLine("  Sleep well. Or try to.");
+            }
             await Task.Delay(2000);
             throw new LocationExitException(GameLocation.NoWhere);
         }

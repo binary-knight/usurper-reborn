@@ -120,6 +120,7 @@ public class PlayerSession : IDisposable
             InputStream = _stream,
             OutputStream = _stream,
             Username = Username,
+            CharacterKey = Username,  // Default to account name; updated if playing alt character
             ConnectionType = ConnectionType,
             CancellationToken = _sessionCts.Token
         };
@@ -226,8 +227,9 @@ public class PlayerSession : IDisposable
                 var player = ctx.Engine?.CurrentPlayer;
                 if (player != null)
                 {
-                    Console.Error.WriteLine($"[MUD] [{Username}] Performing emergency save...");
-                    await SaveSystem.Instance.SaveGame(Username.ToLowerInvariant(), player);
+                    var saveKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
+                    Console.Error.WriteLine($"[MUD] [{Username}] Performing emergency save (key: {saveKey})...");
+                    await SaveSystem.Instance.SaveGame(saveKey, player);
                     Console.Error.WriteLine($"[MUD] [{Username}] Emergency save completed");
                 }
             }
@@ -239,12 +241,13 @@ public class PlayerSession : IDisposable
             // This catches disconnects, crashes, and players who just close the terminal
             try
             {
-                var sleepInfo = await _sqlBackend.GetSleepingPlayerInfo(Username);
+                var dormKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
+                var sleepInfo = await _sqlBackend.GetSleepingPlayerInfo(dormKey);
                 if (sleepInfo == null)
                 {
                     // Player wasn't registered as sleeping — force dormitory
-                    await _sqlBackend.RegisterSleepingPlayer(Username, "dormitory", "[]", 0);
-                    Console.Error.WriteLine($"[MUD] [{Username}] Registered as dormitory sleeper (unclean disconnect)");
+                    await _sqlBackend.RegisterSleepingPlayer(dormKey, "dormitory", "[]", 0);
+                    Console.Error.WriteLine($"[MUD] [{Username}] Registered as dormitory sleeper (key: {dormKey}, unclean disconnect)");
                 }
             }
             catch (Exception ex)
@@ -260,12 +263,15 @@ public class PlayerSession : IDisposable
             }
             catch { }
 
-            // Clean up snoop references
+            // Clean up snoop references — remove spectator streams too
             try
             {
                 foreach (var snooper in SnoopedBy.ToArray())
                 {
                     snooper.EnqueueMessage($"\u001b[90m  [Snoop] {Username} has disconnected.\u001b[0m");
+                    // Remove snooper's terminal from our spectator list
+                    if (snooper.Context?.Terminal != null)
+                        Context?.Terminal?.RemoveSpectatorStream(snooper.Context.Terminal);
                 }
                 SnoopedBy.Clear();
             }
@@ -380,6 +386,10 @@ public class PlayerSession : IDisposable
         catch { }
 
         _sessionCts?.Cancel();
+
+        // Close the TCP connection so any blocking ReadLineAsync() unblocks
+        try { _stream.Close(); } catch { }
+        try { _tcpClient.Close(); } catch { }
     }
 
     public void Dispose()

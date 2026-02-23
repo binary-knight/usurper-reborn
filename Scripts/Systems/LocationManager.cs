@@ -103,6 +103,9 @@ public class LocationManager
         // PvP Arena (online mode only)
         locations[GameLocation.Arena] = new ArenaLocation();
 
+        // Immortal Pantheon (god ascension system)
+        locations[GameLocation.Pantheon] = new PantheonLocation();
+
         // Note: Gym removed - stat training doesn't fit single-player endless format
 
         // GD.Print($"[LocationManager] Initialized {locations.Count} locations");
@@ -221,7 +224,13 @@ public class LocationManager
     public async Task EnterLocation(GameLocation locationId, Character player)
     {
         currentPlayer = player;
-        
+
+        // Immortal location lock: gods can only access the Pantheon
+        if (player.IsImmortal && locationId != GameLocation.Pantheon)
+        {
+            locationId = GameLocation.Pantheon;
+        }
+
         if (!locations.ContainsKey(locationId))
         {
             GD.PrintErr($"[LocationManager] Location {locationId} not found!");

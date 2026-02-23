@@ -61,6 +61,19 @@ public class CharacterCreationSystem
                 }
                 character.Name2 = characterName;
             }
+            else if (SqlSaveBackend.IsAltCharacter(playerName))
+            {
+                // Alt character: Name1 = DB key (e.g. "rage__alt"), Name2 = player-chosen display name
+                character.Name1 = playerName;
+                terminal.WriteLine("  Choose a name for your alt character:", "bright_cyan");
+                terminal.WriteLine("");
+                characterName = await SelectCharacterName();
+                if (string.IsNullOrEmpty(characterName))
+                {
+                    return null; // User aborted
+                }
+                character.Name2 = characterName;
+            }
             else if (!string.IsNullOrWhiteSpace(playerName))
             {
                 // Name already provided (from save slot dialog), use it directly

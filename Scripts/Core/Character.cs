@@ -391,10 +391,14 @@ public class Character
     public int PermanentDamageBonus { get; set; } = 0;
     public int PermanentDefenseBonus { get; set; } = 0;
     public long BonusMaxHP { get; set; } = 0;
+    public long BonusWeapPow { get; set; } = 0;  // Permanent weapon power bonus (Infernal Forge, artifacts, etc.)
+    public long BonusArmPow { get; set; } = 0;   // Permanent armor power bonus (Ring of Protection, artifacts, etc.)
     public int HomeRestsToday { get; set; } = 0;       // Daily rest counter
     public int HerbsGatheredToday { get; set; } = 0;   // Daily herb counter
     public int WellRestedCombats { get; set; } = 0;    // Combats remaining with Well-Rested buff
     public float WellRestedBonus { get; set; } = 0f;   // Damage/defense % bonus from hearth
+    public int LoversBlissCombats { get; set; } = 0;   // Combats remaining with Lover's Bliss buff
+    public float LoversBlissBonus { get; set; } = 0f;  // Damage/defense % bonus from perfect intimacy
     public float CycleExpMultiplier { get; set; } = 1.0f; // NG+ XP multiplier (scales with cycle)
 
     // Faction consumable properties (v0.40.2)
@@ -788,10 +792,32 @@ public class Character
             MaxHP = (long)(MaxHP * GameConfig.KingCombatHPBonus);
         }
 
+        // Apply divine boon MaxHP bonus (from worshipped player-god's configured boons)
+        if (CachedBoonEffects?.MaxHPPercent > 0)
+        {
+            MaxHP += (long)(MaxHP * CachedBoonEffects.MaxHPPercent);
+        }
+
+        // Apply divine boon MaxMana bonus
+        if (CachedBoonEffects?.MaxManaPercent > 0 && MaxMana > 0)
+        {
+            MaxMana += (long)(MaxMana * CachedBoonEffects.MaxManaPercent);
+        }
+
         // Apply Fountain of Vitality bonus HP
         if (BonusMaxHP > 0)
         {
             MaxHP += BonusMaxHP;
+        }
+
+        // Apply permanent weapon/armor power bonuses (Infernal Forge, artifacts, etc.)
+        if (BonusWeapPow > 0)
+        {
+            WeapPow += BonusWeapPow;
+        }
+        if (BonusArmPow > 0)
+        {
+            ArmPow += BonusArmPow;
         }
 
         // Restore saved HP/Mana and clamp to final MaxHP/MaxMana
@@ -1012,6 +1038,28 @@ public class Character
     public float MurderWeight { get; set; } = 0f;                              // Accumulated guilt (affects dreams, rest, endings)
     public List<string> PermakillLog { get; set; } = new();                    // Names of permanently killed NPCs (cap 20)
     public DateTime LastMurderWeightDecay { get; set; } = DateTime.MinValue;   // When weight last decayed naturally
+
+    // Immortal Ascension System (v0.45.0) — player becomes a worshippable god
+    public bool IsImmortal { get; set; }                                       // Has ascended to godhood
+    public string DivineName { get; set; } = "";                               // Chosen god alias
+    public int GodLevel { get; set; }                                          // 1-9 rank (Lesser Spirit → God)
+    public long GodExperience { get; set; }                                    // Power points for leveling
+    public int DeedsLeft { get; set; }                                         // Daily divine actions remaining
+    public string GodAlignment { get; set; } = "";                             // "Light" / "Dark" / "Balance"
+    public DateTime AscensionDate { get; set; }                                // When they became immortal
+
+    public bool HasEarnedAltSlot { get; set; }                                  // Account has earned the alt character slot (persists through renounce)
+
+    // Mortal worship field — which immortal player-god this character follows
+    public string WorshippedGod { get; set; } = "";                            // DivineName of their chosen immortal god
+
+    // Divine Blessing buff (granted by an immortal god's Bless deed)
+    public int DivineBlessingCombats { get; set; }                             // Combats remaining with blessing
+    public float DivineBlessingBonus { get; set; }                             // Damage/defense % bonus (0.10 = 10%)
+
+    // Divine Boon System — gods configure boons, mortals receive passive effects
+    public string DivineBoonConfig { get; set; } = "";                         // Gods: comma-separated "boonId:tier" config
+    public ActiveBoonEffects CachedBoonEffects { get; set; }                   // Mortals: runtime-only cache (not serialized)
     
     // Additional compatibility properties
     public int QuestsLeft { get; set; } = 5;
@@ -1493,7 +1541,7 @@ public class Character
     {
         return Class switch
         {
-            CharacterClass.Warrior => new CombatModifiers { AttackBonus = Level / 5, ExtraAttacks = Level / 10 },
+            CharacterClass.Warrior => new CombatModifiers { AttackBonus = Level / 5, ExtraAttacks = Math.Min(3, Level / 10) },
             CharacterClass.Assassin => new CombatModifiers { BackstabMultiplier = 3.0f, PoisonChance = 25 },
             CharacterClass.Barbarian => new CombatModifiers { DamageReduction = 2, RageAvailable = true },
             CharacterClass.Paladin => new CombatModifiers { SmiteCharges = 1 + Level / 10, AuraBonus = 2 },

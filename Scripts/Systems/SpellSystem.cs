@@ -548,6 +548,9 @@ public static class SpellSystem
             statBonus += (caster.Wisdom - 10) * 0.01; // +1% per Wisdom above 10
         }
 
+        // Cap total stat bonus to prevent exponential damage at endgame
+        statBonus = Math.Min(statBonus, 5.0);
+
         // Add some variance (±10%)
         double variance = 0.9 + (random.NextDouble() * 0.2);
 

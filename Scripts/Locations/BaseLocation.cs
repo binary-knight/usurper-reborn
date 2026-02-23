@@ -86,6 +86,17 @@ public abstract class BaseLocation
         // Sync player King/CTurf state with world state (catches background sim changes)
         SyncPlayerWorldState(player);
 
+        // Immortal players are locked to the Pantheon (v0.46.0)
+        if (player.IsImmortal && LocationId != GameLocation.Pantheon)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("");
+            terminal.WriteLine("  You are a being of pure divinity. The mortal realm holds nothing for you.");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            throw new LocationExitException(GameLocation.Pantheon);
+        }
+
         // Check if this establishment has been closed by royal decree
         if (IsClosedByRoyalDecree())
         {
