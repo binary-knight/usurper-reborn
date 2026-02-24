@@ -469,26 +469,28 @@ All game configuration changes made through the SysOp Console are automatically 
 
 ## BBS Online Mode (Shared World)
 
-By default, each BBS caller plays in isolation — separate save files, separate NPCs, no interaction between players. **BBS Online mode** turns your BBS into a shared multiplayer world where all callers share the same NPCs, economy, king, chat, PvP arena, and news feed.
+**BBS door mode automatically enables online/multiplayer mode.** All callers share the same NPCs, economy, king, chat, PvP arena, and news feed. No extra flags needed.
 
 ### How It Works
 
-Instead of file-based saves, BBS Online mode uses a shared SQLite database. All callers read/write to the same database, so changes one player makes (killing an NPC, becoming king, posting chat) are immediately visible to others.
+BBS doors use a shared SQLite database instead of file-based saves. All callers read/write to the same database, so changes one player makes (killing an NPC, becoming king, posting chat) are immediately visible to others.
 
 The **world simulator** runs automatically inside player sessions — no separate process needed. When the first player connects, their session starts the world sim. When they disconnect, the next player's session takes over. NPCs level up, form relationships, get married, have children, and age while players are connected. When nobody's online, the world pauses (just like the original 1993 Usurper).
 
 ### Quick Setup
 
-**Add `--online` to your door command** — that's it:
+**Just use your normal door command** — online mode is automatic:
 
 | BBS Software | Door Command |
 |--------------|-------------|
-| Synchronet | `UsurperReborn --online --door32 %f` |
-| EleBBS | `UsurperReborn --online --door32 *N\door32.sys` |
-| Mystic | `UsurperReborn --online --door32 /mystic/temp%3/door32.sys` |
-| WWIV | `UsurperReborn --online --door32 %T\door32.sys` |
-| GameSrv | `UsurperReborn --online --door32 door32.sys` |
-| ENiGMA | `"--online", "--door32", "{dropFilePath}"` |
+| Synchronet | `UsurperReborn --door32 %f` |
+| EleBBS | `UsurperReborn --door32 *N\door32.sys` |
+| Mystic | `UsurperReborn --door32 /mystic/temp%3/door32.sys` |
+| WWIV | `UsurperReborn --door32 %T\door32.sys` |
+| GameSrv | `UsurperReborn --door32 door32.sys` |
+| ENiGMA | `"--door32", "{dropFilePath}"` |
+
+> **Note:** Existing commands with `--online` still work — the flag is accepted for backwards compatibility.
 
 The database (`usurper_online.db`) is created automatically in the game directory. The world simulator starts automatically in the first player's session. **No background processes, no database setup, no services to configure.**
 
@@ -535,7 +537,7 @@ When a standalone worldsim is running, player sessions detect its active heartbe
 **Add `--no-worldsim` to your door command to disable auto worldsim when running standalone:**
 
 ```
-UsurperReborn --online --no-worldsim --door32 %f
+UsurperReborn --no-worldsim --door32 %f
 ```
 
 #### Linux (systemd)

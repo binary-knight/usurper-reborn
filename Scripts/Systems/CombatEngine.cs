@@ -13164,28 +13164,26 @@ public partial class CombatEngine
 
     /// <summary>
     /// Apply diminishing returns to weapon power for combat calculations.
-    /// First 500 WeapPow has full effect; above that, only 30% effectiveness.
-    /// This prevents extreme weapon stacking from producing absurd damage.
+    /// First 800 WeapPow has full effect; above that, 50% effectiveness.
+    /// This prevents extreme weapon stacking from producing absurd damage
+    /// while preserving normal high-level progression.
     /// Display/UI code should still show raw WeapPow.
     /// </summary>
     private static long GetEffectiveWeapPow(long weapPow)
     {
-        const long SoftCap = 500;
-        const float DiminishingRate = 0.30f;
+        const long SoftCap = 800;
+        const float DiminishingRate = 0.50f;
         if (weapPow <= SoftCap) return weapPow;
         return SoftCap + (long)((weapPow - SoftCap) * DiminishingRate);
     }
 
     /// <summary>
-    /// Apply diminishing returns to armor power for combat calculations.
-    /// Same soft cap as weapon power for consistency.
+    /// Armor power passes through uncapped — defense was never the balance problem.
+    /// Kept as a method so all call sites remain consistent if we need to tune later.
     /// </summary>
     private static long GetEffectiveArmPow(long armPow)
     {
-        const long SoftCap = 500;
-        const float DiminishingRate = 0.30f;
-        if (armPow <= SoftCap) return armPow;
-        return SoftCap + (long)((armPow - SoftCap) * DiminishingRate);
+        return armPow;
     }
 
     /// <summary>

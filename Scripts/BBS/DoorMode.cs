@@ -344,6 +344,7 @@ namespace UsurperRemake.BBS
                 if ((arg == "--door" || arg == "-d") && i + 1 < args.Length)
                 {
                     var dropFilePath = args[i + 1];
+                    _onlineMode = true; // BBS doors default to online/multiplayer mode
                     return InitializeFromDropFile(dropFilePath);
                 }
 
@@ -351,6 +352,7 @@ namespace UsurperRemake.BBS
                 if (arg == "--door32" && i + 1 < args.Length)
                 {
                     var path = args[i + 1];
+                    _onlineMode = true; // BBS doors default to online/multiplayer mode
                     return InitializeFromDoor32Sys(path);
                 }
 
@@ -358,6 +360,7 @@ namespace UsurperRemake.BBS
                 if (arg == "--doorsys" && i + 1 < args.Length)
                 {
                     var path = args[i + 1];
+                    _onlineMode = true; // BBS doors default to online/multiplayer mode
                     return InitializeFromDoorSys(path);
                 }
 
@@ -365,6 +368,7 @@ namespace UsurperRemake.BBS
                 if ((arg == "--node" || arg == "-n") && i + 1 < args.Length)
                 {
                     var nodeDir = args[i + 1];
+                    _onlineMode = true; // BBS doors default to online/multiplayer mode
                     return InitializeFromNodeDirectory(nodeDir);
                 }
 
@@ -914,7 +918,7 @@ namespace UsurperRemake.BBS
             Console.WriteLine("");
             Console.WriteLine("Online Multiplayer Options:");
             Console.WriteLine("  --online             Run in online multiplayer mode (SQLite backend)");
-            Console.WriteLine("  --online --door32 <path>  BBS Online mode (shared world for all callers)");
+            Console.WriteLine("                       (BBS door mode enables online automatically)");
             Console.WriteLine("  --user <name>        Set player username (for SSH ForceCommand)");
             Console.WriteLine("  --db <path>          SQLite database path (default: usurper_online.db next to exe)");
             Console.WriteLine("");
@@ -932,9 +936,9 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  UsurperReborn --online --user PlayerName --stdio");
             Console.WriteLine("  UsurperReborn --online --db /var/usurper/game.db");
             Console.WriteLine("");
-            Console.WriteLine("BBS Online Mode (shared world for all callers):");
-            Console.WriteLine("  UsurperReborn --online --door32 %f          (world sim runs automatically)");
-            Console.WriteLine("  UsurperReborn --online --no-worldsim --door32 %f  (disable auto world sim)");
+            Console.WriteLine("BBS Door Mode (online multiplayer is automatic):");
+            Console.WriteLine("  UsurperReborn --door32 %f                   (world sim runs automatically)");
+            Console.WriteLine("  UsurperReborn --no-worldsim --door32 %f     (disable auto world sim)");
             Console.WriteLine("  UsurperReborn --worldsim                    (optional: 24/7 standalone sim)");
             Console.WriteLine("");
             Console.WriteLine("Drop File Support:");

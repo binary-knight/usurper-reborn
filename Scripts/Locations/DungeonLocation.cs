@@ -1484,7 +1484,15 @@ public class DungeonLocation : BaseLocation
         {
             var targetRoom = currentFloor.GetRoom(exit.Value.TargetRoomId);
             var dirKey = GetDirectionKey(exit.Key);
-            string status = targetRoom == null ? "" : targetRoom.IsCleared ? "(clr)" : targetRoom.IsExplored ? "(exp)" : "(?)";
+            string status;
+            if (targetRoom == null)
+                status = "";
+            else if (targetRoom.IsCleared)
+                status = GameConfig.ScreenReaderMode && IsDirectionFullyCleared(exit.Value.TargetRoomId, room.Id) ? "(all clear)" : "(clr)";
+            else if (targetRoom.IsExplored)
+                status = "(exp)";
+            else
+                status = "(?)";
             terminal.SetColor("darkgray");
             terminal.Write(" [");
             terminal.SetColor("bright_cyan");
@@ -1527,6 +1535,7 @@ public class DungeonLocation : BaseLocation
 
         ShowBBSMenuRow(
             ("M", "bright_yellow", "Map"),
+            ("N", "bright_yellow", "Nav"),
             ("I", "bright_yellow", "Inv"),
             ("P", "bright_yellow", "Potions"),
             ("=", "bright_yellow", "Status"),
@@ -1847,7 +1856,10 @@ public class DungeonLocation : BaseLocation
                 if (targetRoom.IsCleared)
                 {
                     terminal.SetColor("green");
-                    terminal.Write(" (cleared)");
+                    if (GameConfig.ScreenReaderMode && IsDirectionFullyCleared(exit.Value.TargetRoomId, room.Id))
+                        terminal.Write(" (fully cleared)");
+                    else
+                        terminal.Write(" (cleared)");
                 }
                 else if (targetRoom.IsExplored)
                 {
@@ -1958,6 +1970,15 @@ public class DungeonLocation : BaseLocation
         terminal.Write("] ");
         terminal.SetColor("white");
         terminal.Write("Map  ");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("N");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("white");
+        terminal.Write("Nav  ");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
@@ -3013,6 +3034,10 @@ public class DungeonLocation : BaseLocation
                 await ShowDungeonMap();
                 return false;
 
+            case "N":
+                await ShowDungeonNavigator();
+                return false;
+
             case "I":
                 await ShowInventory();
                 return false;
@@ -3061,6 +3086,9 @@ public class DungeonLocation : BaseLocation
             await TriggerTrap(targetRoom);
         }
 
+        // Check for backtrack into fully-cleared branch before updating current room
+        string? previousRoomId = currentFloor.CurrentRoomId;
+
         // Update current room
         currentFloor.CurrentRoomId = targetRoomId;
 
@@ -3069,6 +3097,13 @@ public class DungeonLocation : BaseLocation
         if (!targetRoom.IsCleared && !targetRoom.HasMonsters)
         {
             targetRoom.IsCleared = true;
+        }
+
+        // Companion snarky comment when backtracking into a fully-cleared area
+        if (targetRoom.IsExplored && targetRoom.IsCleared && previousRoomId != null
+            && IsDirectionFullyCleared(targetRoomId, previousRoomId))
+        {
+            await TryCompanionBacktrackComment();
         }
 
         // Always push room view to followers (they need to see every room the leader enters)
@@ -3585,6 +3620,7 @@ public class DungeonLocation : BaseLocation
 
             terminal.SetColor("green");
             terminal.WriteLine("The room is cleared!");
+            await TryCompanionNavigationComment(room);
 
             if (room.IsBossRoom)
             {
@@ -9336,6 +9372,12 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
+        if (GameConfig.ScreenReaderMode)
+        {
+            await ShowDungeonMapScreenReader();
+            return;
+        }
+
         terminal.ClearScreen();
 
         // Build spatial map from room connections
@@ -9507,6 +9549,351 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine(" Press Enter to continue...");
         await terminal.GetInput("");
+    }
+
+    private async Task ShowDungeonMapScreenReader()
+    {
+        await ShowDungeonNavigator();
+    }
+
+    private async Task ShowDungeonNavigator()
+    {
+        if (currentFloor == null)
+        {
+            terminal.WriteLine("No floor data.", "gray");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.ClearScreen();
+
+        int explored = currentFloor!.Rooms.Count(r => r.IsExplored);
+        int cleared = currentFloor.Rooms.Count(r => r.IsCleared);
+        int total = currentFloor.Rooms.Count;
+
+        var current = currentFloor.GetCurrentRoom();
+        terminal.WriteLine($"Dungeon Navigator - Level {currentDungeonLevel}, {currentFloor.Theme}", "bright_yellow");
+        if (current != null)
+        {
+            terminal.Write($"You are in: {current.Name}", "white");
+            terminal.WriteLine($" ({GetRoomStatusText(current)})", "gray");
+            var exitDirs = current.Exits.Keys.OrderBy(d => d).Select(d => d.ToString());
+            terminal.WriteLine($"Exits: {string.Join(", ", exitDirs)}", "gray");
+        }
+        terminal.WriteLine($"{explored}/{total} explored, {cleared}/{total} cleared.", "gray");
+        if (currentFloor.BossDefeated)
+            terminal.WriteLine("Boss defeated.", "bright_green");
+        terminal.WriteLine("");
+
+        // Build BFS parent map from current room through explored rooms
+        var parentMap = new Dictionary<string, (string parentId, Direction direction)>();
+        var bfsQueue = new Queue<string>();
+        var bfsVisited = new HashSet<string>();
+        string startId = current?.Id ?? "";
+        if (!string.IsNullOrEmpty(startId))
+        {
+            bfsVisited.Add(startId);
+            bfsQueue.Enqueue(startId);
+        }
+        while (bfsQueue.Count > 0)
+        {
+            var roomId = bfsQueue.Dequeue();
+            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == roomId);
+            if (room == null) continue;
+            foreach (var kvp in room.Exits)
+            {
+                if (bfsVisited.Contains(kvp.Value.TargetRoomId)) continue;
+                var target = currentFloor.Rooms.FirstOrDefault(r => r.Id == kvp.Value.TargetRoomId);
+                if (target == null) continue;
+                // Allow pathing through explored rooms, and to the first unexplored room
+                if (!target.IsExplored && parentMap.Values.Any(p => !currentFloor.Rooms.First(r => r.Id == kvp.Value.TargetRoomId).IsExplored))
+                    continue; // already found one unexplored via another path — but let BFS find all
+                bfsVisited.Add(kvp.Value.TargetRoomId);
+                parentMap[kvp.Value.TargetRoomId] = (roomId, kvp.Key);
+                if (target.IsExplored)
+                    bfsQueue.Enqueue(kvp.Value.TargetRoomId);
+            }
+        }
+
+        // Find targets
+        string? stairsRoomId = null;
+        string? bossRoomId = null;
+        string? nearestUnexploredId = null;
+        string? nearestUnclearedId = null;
+
+        // BFS order guarantees nearest first, so iterate parentMap keys in insertion order
+        foreach (var roomId in bfsVisited)
+        {
+            if (roomId == startId) continue;
+            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == roomId);
+            if (room == null) continue;
+
+            if (stairsRoomId == null && room.HasStairsDown && room.IsExplored)
+                stairsRoomId = roomId;
+            if (bossRoomId == null && room.IsBossRoom && !room.IsCleared && room.IsExplored)
+                bossRoomId = roomId;
+            if (nearestUnexploredId == null && !room.IsExplored)
+                nearestUnexploredId = roomId;
+            if (nearestUnclearedId == null && room.IsExplored && !room.IsCleared && room.HasMonsters)
+                nearestUnclearedId = roomId;
+        }
+
+        // Menu
+        var options = new List<(string key, string label, string? targetId)>();
+        if (nearestUnexploredId != null)
+            options.Add(("U", "Nearest unexplored room", nearestUnexploredId));
+        if (nearestUnclearedId != null)
+            options.Add(("C", "Nearest uncleared room", nearestUnclearedId));
+        if (stairsRoomId != null)
+            options.Add(("S", "Stairs down", stairsRoomId));
+        if (bossRoomId != null)
+            options.Add(("B", "Boss room", bossRoomId));
+
+        if (options.Count == 0)
+        {
+            terminal.WriteLine("No known destinations. Explore to discover rooms.", "gray");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.WriteLine("Directions to:", "white");
+        foreach (var opt in options)
+        {
+            var path = BuildDirectionPath(opt.targetId!, startId, parentMap);
+            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == opt.targetId);
+            string roomName = room?.Name ?? "unknown";
+            string dist = path != null ? $"{path.Count} room{(path.Count == 1 ? "" : "s")}" : "?";
+            terminal.Write($"  [{opt.key}] {opt.label}", "bright_cyan");
+            terminal.WriteLine($" - {roomName}, {dist} away", "gray");
+        }
+        terminal.WriteLine("  [Enter] Return to dungeon", "gray");
+        terminal.WriteLine("");
+
+        string choice = (await terminal.GetInput("Navigate to: ")).Trim().ToUpperInvariant();
+
+        var selected = options.FirstOrDefault(o => o.key == choice);
+        if (selected.targetId != null)
+        {
+            var path = BuildDirectionPath(selected.targetId, startId, parentMap);
+            if (path != null && path.Count > 0)
+            {
+                terminal.WriteLine("");
+                var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == selected.targetId);
+                terminal.Write($"Path to {room?.Name ?? selected.label}: ", "white");
+                terminal.WriteLine(string.Join(", ", path.Select(d => d.ToString())), "bright_green");
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+            }
+        }
+    }
+
+    private List<Direction>? BuildDirectionPath(string targetId, string startId,
+        Dictionary<string, (string parentId, Direction direction)> parentMap)
+    {
+        if (!parentMap.ContainsKey(targetId)) return null;
+
+        var path = new List<Direction>();
+        string current = targetId;
+        while (current != startId && parentMap.TryGetValue(current, out var parent))
+        {
+            path.Add(parent.direction);
+            current = parent.parentId;
+        }
+        path.Reverse();
+        return path;
+    }
+
+    private string GetRoomStatusText(DungeonRoom room)
+    {
+        if (room.IsBossRoom && !room.IsCleared)
+            return "Boss room, not cleared";
+        if (room.IsBossRoom && room.IsCleared)
+            return "Boss room, cleared";
+        if (room.HasMonsters && !room.IsCleared)
+            return "Monsters present";
+        if (room.HasStairsDown)
+            return room.IsCleared ? "Stairs down, cleared" : "Stairs down";
+        if (room.IsSafeRoom)
+            return "Safe room";
+        if (room.IsCleared)
+            return "Cleared";
+        return "Explored";
+    }
+
+    /// <summary>
+    /// BFS from a room to check if all reachable explored rooms in that direction are cleared.
+    /// Used in screen reader mode to mark exits as "fully cleared" so players know they can skip them.
+    /// </summary>
+    private bool IsDirectionFullyCleared(string startRoomId, string comingFromRoomId)
+    {
+        if (currentFloor == null) return false;
+        var visited = new HashSet<string> { comingFromRoomId }; // don't path back
+        var queue = new Queue<string>();
+        visited.Add(startRoomId);
+        queue.Enqueue(startRoomId);
+
+        while (queue.Count > 0)
+        {
+            var roomId = queue.Dequeue();
+            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == roomId);
+            if (room == null) continue;
+
+            if (!room.IsExplored) return false; // unexplored room reachable — not fully cleared
+            if (!room.IsCleared) return false;   // uncleared room — not fully cleared
+
+            foreach (var exit in room.Exits.Values)
+            {
+                if (!visited.Contains(exit.TargetRoomId))
+                {
+                    visited.Add(exit.TargetRoomId);
+                    queue.Enqueue(exit.TargetRoomId);
+                }
+            }
+        }
+        return true;
+    }
+
+    private static readonly Random _companionCommentRng = new();
+
+    /// <summary>
+    /// After clearing a room, a companion may suggest which direction to go next.
+    /// ~40% chance to fire, picks a random active companion with personality-appropriate lines.
+    /// </summary>
+    private async Task TryCompanionNavigationComment(DungeonRoom clearedRoom)
+    {
+        if (teammates.Count == 0 || currentFloor == null) return;
+        if (_companionCommentRng.Next(100) >= 40) return; // 40% chance
+
+        // Find an uncleared or unexplored exit to suggest
+        Direction? suggestDir = null;
+        foreach (var exit in clearedRoom.Exits)
+        {
+            var target = currentFloor.GetRoom(exit.Value.TargetRoomId);
+            if (target == null) continue;
+            if (!target.IsExplored) { suggestDir = exit.Key; break; }
+            if (!target.IsCleared) { suggestDir = exit.Key; break; }
+        }
+        if (suggestDir == null) return; // all exits cleared/explored, nothing to suggest
+
+        string dir = suggestDir.Value.ToString().ToLower();
+
+        // Pick a companion to speak
+        var speaker = teammates[_companionCommentRng.Next(teammates.Count)];
+        string name = speaker.DisplayName ?? speaker.Name2 ?? "Companion";
+
+        // Personality-based lines
+        string[] lines;
+        var companionId = speaker.CompanionId;
+        if (companionId == CompanionId.Vex)
+        {
+            lines = new[] {
+                $"Obviously we should go {dir} from here.",
+                $"So are we going {dir} or are we just standing around?",
+                $"I vote {dir}. Not that anyone asked.",
+                $"Last one to go {dir} is buying drinks at the Inn.",
+            };
+        }
+        else if (companionId == CompanionId.Lyris)
+        {
+            lines = new[] {
+                $"I sense something to the {dir}...",
+                $"The path {dir} calls to us.",
+                $"To the {dir}, I think. The stars agree.",
+            };
+        }
+        else if (companionId == CompanionId.Aldric)
+        {
+            lines = new[] {
+                $"We should push {dir}. Stay sharp.",
+                $"Form up. We move {dir}.",
+                $"There's more to the {dir}. Let's keep moving.",
+            };
+        }
+        else if (companionId == CompanionId.Mira)
+        {
+            lines = new[] {
+                $"There may be more who need help to the {dir}.",
+                $"I think we should try going {dir}.",
+                $"The {dir} passage... I have a feeling about it.",
+            };
+        }
+        else
+        {
+            // Generic NPC teammates
+            lines = new[] {
+                $"Let's try going {dir}.",
+                $"I say we head {dir} from here.",
+                $"Looks like there's more to the {dir}.",
+            };
+        }
+
+        string line = lines[_companionCommentRng.Next(lines.Length)];
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"{name}: \"{line}\"");
+        await Task.Delay(800);
+    }
+
+    /// <summary>
+    /// When the player backtracks into a fully-cleared branch, a companion may comment.
+    /// ~30% chance to fire.
+    /// </summary>
+    private async Task TryCompanionBacktrackComment()
+    {
+        if (teammates.Count == 0) return;
+        if (_companionCommentRng.Next(100) >= 30) return; // 30% chance
+
+        var speaker = teammates[_companionCommentRng.Next(teammates.Count)];
+        string name = speaker.DisplayName ?? speaker.Name2 ?? "Companion";
+
+        string[] lines;
+        var companionId = speaker.CompanionId;
+        if (companionId == CompanionId.Vex)
+        {
+            lines = new[] {
+                "Are you lost or something? There's nothing left this way.",
+                "We already cleared this area. Did you forget already?",
+                "I know I'm dying, but I'd rather not waste what time I have backtracking.",
+                "Oh good, my favorite activity. Walking through empty rooms.",
+            };
+        }
+        else if (companionId == CompanionId.Lyris)
+        {
+            lines = new[] {
+                "We've been this way before. The path ahead lies elsewhere.",
+                "This area is quiet now. We should seek what remains unseen.",
+                "The echoes here are fading. Our purpose lies in another direction.",
+            };
+        }
+        else if (companionId == CompanionId.Aldric)
+        {
+            lines = new[] {
+                "We've secured this area already. Nothing left to fight here.",
+                "This ground is cleared. We should press forward, not backward.",
+                "I cleared this corridor myself. Trust me, it's empty.",
+            };
+        }
+        else if (companionId == CompanionId.Mira)
+        {
+            lines = new[] {
+                "I don't think there's anything left for us here...",
+                "This area feels... peaceful now. We should look elsewhere.",
+                "We've already helped everyone we could here.",
+            };
+        }
+        else
+        {
+            lines = new[] {
+                "We've already been through here. It's all cleared.",
+                "Nothing left this way. Maybe we should turn around.",
+                "This area's been cleaned out already.",
+            };
+        }
+
+        string line = lines[_companionCommentRng.Next(lines.Length)];
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"{name}: \"{line}\"");
+        await Task.Delay(1000);
     }
 
     /// <summary>
@@ -10799,6 +11186,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("S - View your character status");
         terminal.WriteLine("P - Buy potions from the wandering monk");
         terminal.WriteLine("M - View the dungeon map");
+        terminal.WriteLine("N - Navigator (directions to stairs, unexplored, uncleared, boss)");
         terminal.WriteLine("Q - Quit and return to town");
         terminal.WriteLine("");
         await terminal.PressAnyKey();
