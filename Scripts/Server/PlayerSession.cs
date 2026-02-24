@@ -23,6 +23,13 @@ public class PlayerSession : IDisposable
     public string Username { get; }
     public string ConnectionType { get; }
 
+    /// <summary>
+    /// The display name for the currently active character. Defaults to Username (account name).
+    /// Updated when switching to alt characters so room presence, broadcasts, and "Also here"
+    /// display the correct character name instead of the account name.
+    /// </summary>
+    public string ActiveCharacterName { get; set; }
+
     private readonly TcpClient _tcpClient;
     private readonly NetworkStream _stream;
     private readonly SqlSaveBackend _sqlBackend;
@@ -98,6 +105,7 @@ public class PlayerSession : IDisposable
         CancellationToken cancellationToken)
     {
         Username = username;
+        ActiveCharacterName = username;
         ConnectionType = connectionType;
         _tcpClient = tcpClient;
         _stream = stream;

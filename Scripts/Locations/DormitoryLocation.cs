@@ -486,8 +486,10 @@ public class DormitoryLocation : BaseLocation
         terminal.WriteLine("");
 
         // Build combined target list (skip NPCs on the player's team or spouse/lover)
+        // Level filter: can only attack sleepers within ±5 levels
         string playerTeam = currentPlayer.Team ?? "";
         string playerName = currentPlayer.Name2 ?? currentPlayer.Name1 ?? "";
+        int attackerLevel = currentPlayer.Level;
         var targets = new List<(string name, bool isNPC)>();
         foreach (var npcName in sleepingNPCNames)
         {
@@ -500,13 +502,21 @@ public class DormitoryLocation : BaseLocation
             if (npc != null && (npc.SpouseName.Equals(playerName, StringComparison.OrdinalIgnoreCase)
                 || RelationshipSystem.IsMarriedOrLover(npcName, playerName)))
                 continue;
+            if (npc != null && Math.Abs(npc.Level - attackerLevel) > 5)
+                continue;
             string lvlStr = npc != null ? $" (Lvl {npc.Level})" : "";
             terminal.WriteLine($"  {targets.Count + 1}. {npcName}{lvlStr} [SLEEPING NPC]", "yellow");
             targets.Add((npcName, true));
         }
         foreach (var s in dormPlayerSleepers)
         {
-            terminal.WriteLine($"  {targets.Count + 1}. {s.Username} [SLEEPING PLAYER]", "red");
+            // Level filter: can only attack players within ±5 levels
+            var targetSave = await backend.ReadGameData(s.Username);
+            int targetLevel = targetSave?.Player?.Level ?? 1;
+            if (Math.Abs(targetLevel - attackerLevel) > 5)
+                continue;
+
+            terminal.WriteLine($"  {targets.Count + 1}. {s.Username} (Lvl {targetLevel}) [SLEEPING PLAYER]", "red");
             targets.Add((s.Username, false));
         }
 

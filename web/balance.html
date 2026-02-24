@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Usurper Reborn - Balance Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --text: #c8c8d4;
+    --dim: #666680;
+    --cyan: #00e5ff;
+    --gold: #ffaa00;
+    --red: #ff4444;
+    --green: #44ff88;
+    --purple: #aa66ff;
+    --pink: #ff66aa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Login */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+  }
+  #login-box {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 2rem; border-radius: 8px; width: 320px;
+  }
+  #login-box h2 { color: var(--cyan); margin-bottom: 1rem; font-size: 1rem; }
+  #login-box input {
+    width: 100%; padding: 0.5rem; margin-bottom: 0.75rem;
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 4px; font-family: inherit; font-size: 13px;
+  }
+  #login-box button {
+    width: 100%; padding: 0.5rem; background: var(--cyan); color: var(--bg);
+    border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
+    font-family: inherit;
+  }
+  #login-box button:hover { opacity: 0.85; }
+  #login-error { color: var(--red); margin-top: 0.5rem; font-size: 12px; }
+
+  /* Dashboard */
+  #dashboard { display: none; padding: 1rem; max-width: 1400px; margin: 0 auto; }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;
+  }
+  .header h1 { color: var(--cyan); font-size: 1.1rem; }
+  .header button {
+    padding: 0.3rem 0.8rem; background: transparent; border: 1px solid var(--border);
+    color: var(--dim); cursor: pointer; border-radius: 4px; font-family: inherit; font-size: 12px;
+  }
+  .header button:hover { color: var(--text); border-color: var(--text); }
+  .refresh-info { color: var(--dim); font-size: 11px; }
+
+  /* Overview cards */
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem; margin-bottom: 1.5rem;
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 0.75rem; border-radius: 6px;
+  }
+  .card .label { color: var(--dim); font-size: 11px; text-transform: uppercase; }
+  .card .value { color: var(--cyan); font-size: 1.4rem; font-weight: bold; margin-top: 0.25rem; }
+  .card .value.warn { color: var(--gold); }
+  .card .value.danger { color: var(--red); }
+  .card .value.good { color: var(--green); }
+
+  /* Sections */
+  .section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; margin-bottom: 1.5rem; overflow: hidden;
+  }
+  .section-title {
+    padding: 0.6rem 1rem; border-bottom: 1px solid var(--border);
+    color: var(--gold); font-size: 0.85rem; font-weight: bold;
+  }
+  .section-body { padding: 1rem; }
+
+  /* Charts */
+  .chart-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;
+  }
+  .chart-container { position: relative; height: 280px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border);
+    color: var(--dim); font-weight: normal; text-transform: uppercase; font-size: 10px;
+    cursor: pointer; user-select: none;
+  }
+  th:hover { color: var(--text); }
+  td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #0e0e16; }
+  tr:hover td { background: #16162a; }
+  tr.death td { color: var(--red); }
+  tr.victory td { color: var(--green); }
+  tr.fled td { color: var(--gold); }
+  .tag {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: bold;
+  }
+  .tag-boss { background: #442200; color: var(--gold); }
+  .tag-death { background: #441111; color: var(--red); }
+  .tag-victory { background: #114422; color: var(--green); }
+  .tag-fled { background: #333311; color: var(--gold); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 0.5rem 1rem; cursor: pointer; color: var(--dim);
+    border-bottom: 2px solid transparent; font-size: 12px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Modal overlay */
+  .modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--cyan);
+    padding: 1.5rem; border-radius: 8px; width: 340px;
+  }
+  .modal h3 { color: var(--cyan); margin-bottom: 1rem; font-size: 0.9rem; }
+  .modal input {
+    width: 100%; padding: 0.5rem; margin-bottom: 0.75rem;
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 4px; font-family: inherit; font-size: 13px;
+  }
+  .modal .btn-row { display: flex; gap: 0.5rem; }
+  .modal button {
+    flex: 1; padding: 0.5rem; border: none; border-radius: 4px;
+    cursor: pointer; font-family: inherit; font-weight: bold;
+  }
+  .modal .btn-primary { background: var(--cyan); color: var(--bg); }
+  .modal .btn-cancel { background: transparent; border: 1px solid var(--border); color: var(--dim); }
+  .modal .btn-primary:hover { opacity: 0.85; }
+  .modal .btn-cancel:hover { color: var(--text); border-color: var(--text); }
+  .modal .msg { font-size: 12px; margin-top: 0.5rem; }
+  .modal .msg.error { color: var(--red); }
+  .modal .msg.ok { color: var(--green); }
+
+  /* Warning banner */
+  .password-warning {
+    background: #332200; border: 1px solid var(--gold); color: var(--gold);
+    padding: 0.6rem 1rem; border-radius: 6px; margin-bottom: 1rem;
+    font-size: 12px; display: flex; align-items: center; gap: 0.75rem;
+  }
+  .password-warning button {
+    padding: 0.3rem 0.8rem; background: var(--gold); color: var(--bg);
+    border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
+    font-family: inherit; font-size: 12px; white-space: nowrap;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .chart-grid { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div id="login-box">
+    <h2>Balance Dashboard</h2>
+    <input type="text" id="login-user" placeholder="Username" autocomplete="off">
+    <input type="password" id="login-pass" placeholder="Password">
+    <button onclick="doLogin()">Login</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal">
+    <h3>Change Password</h3>
+    <input type="password" id="pw-new" placeholder="New password (min 6 chars)">
+    <input type="password" id="pw-confirm" placeholder="Confirm new password">
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closePwModal()">Cancel</button>
+      <button class="btn-primary" onclick="doChangePassword()">Save</button>
+    </div>
+    <div class="msg" id="pw-msg"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="header">
+    <h1>Usurper Reborn &mdash; Balance Dashboard</h1>
+    <div>
+      <span class="refresh-info" id="last-refresh"></span>
+      <button onclick="refreshAll()">Refresh</button>
+      <button onclick="openPwModal()">Password</button>
+      <button onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <!-- Default password warning -->
+  <div class="password-warning" id="pw-warning" style="display:none">
+    You're using the default password. Please change it for security.
+    <button onclick="openPwModal()">Change Now</button>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="cards" id="overview-cards"></div>
+
+  <!-- Charts -->
+  <div class="chart-grid">
+    <div class="section">
+      <div class="section-title">Class Win Rate (%)</div>
+      <div class="section-body"><div class="chart-container"><canvas id="classWinChart"></canvas></div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Class Avg Damage (Victory)</div>
+      <div class="section-body"><div class="chart-container"><canvas id="classDmgChart"></canvas></div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">XP Gained by Player Level</div>
+      <div class="section-body"><div class="chart-container"><canvas id="xpCurveChart"></canvas></div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Deaths by Monster Level</div>
+      <div class="section-body"><div class="chart-container"><canvas id="deathFloorChart"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- Tabbed Data Tables -->
+  <div class="section">
+    <div class="tabs">
+      <div class="tab active" data-tab="recent">Recent Events</div>
+      <div class="tab" data-tab="onehit">One-Hit Kills</div>
+      <div class="tab" data-tab="bosses">Boss Fights</div>
+      <div class="tab" data-tab="deaths">Death Hotspots</div>
+      <div class="tab" data-tab="players">Player Activity</div>
+      <div class="tab" data-tab="suspects">Suspects</div>
+    </div>
+
+    <div class="tab-content active" id="tab-recent">
+      <div class="section-body" id="recent-table"></div>
+    </div>
+    <div class="tab-content" id="tab-onehit">
+      <div class="section-body" id="onehit-table"></div>
+    </div>
+    <div class="tab-content" id="tab-bosses">
+      <div class="section-body" id="bosses-table"></div>
+    </div>
+    <div class="tab-content" id="tab-deaths">
+      <div class="section-body" id="deaths-table"></div>
+    </div>
+    <div class="tab-content" id="tab-players">
+      <div class="section-body" id="players-table"></div>
+    </div>
+    <div class="tab-content" id="tab-suspects">
+      <div class="section-body" id="suspects-table"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/balance';
+let token = localStorage.getItem('balance_token') || '';
+let charts = {};
+
+// --- Auth ---
+async function doLogin() {
+  const user = document.getElementById('login-user').value;
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  try {
+    const r = await fetch(`${API}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass })
+    });
+    const d = await r.json();
+    if (r.ok && d.token) {
+      token = d.token;
+      localStorage.setItem('balance_token', token);
+      showDashboard();
+      if (d.mustChangePassword) {
+        document.getElementById('pw-warning').style.display = 'flex';
+      }
+    } else {
+      errEl.textContent = d.error || 'Login failed';
+    }
+  } catch (e) {
+    errEl.textContent = 'Connection error';
+  }
+}
+
+function doLogout() {
+  token = '';
+  localStorage.removeItem('balance_token');
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// --- Password Change ---
+function openPwModal() {
+  document.getElementById('pw-new').value = '';
+  document.getElementById('pw-confirm').value = '';
+  document.getElementById('pw-msg').textContent = '';
+  document.getElementById('pw-modal').classList.add('active');
+  document.getElementById('pw-new').focus();
+}
+
+function closePwModal() {
+  document.getElementById('pw-modal').classList.remove('active');
+}
+
+async function doChangePassword() {
+  const pw = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+  const msg = document.getElementById('pw-msg');
+  msg.className = 'msg'; msg.textContent = '';
+
+  if (pw.length < 6) { msg.className = 'msg error'; msg.textContent = 'Password must be at least 6 characters'; return; }
+  if (pw !== confirm) { msg.className = 'msg error'; msg.textContent = 'Passwords do not match'; return; }
+
+  try {
+    const r = await fetch(`${API}/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ newPassword: pw })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      msg.className = 'msg ok'; msg.textContent = 'Password changed! Closing...';
+      document.getElementById('pw-warning').style.display = 'none';
+      setTimeout(closePwModal, 1500);
+    } else {
+      msg.className = 'msg error'; msg.textContent = d.error || 'Failed';
+    }
+  } catch (e) {
+    msg.className = 'msg error'; msg.textContent = 'Connection error';
+  }
+}
+
+async function apiFetch(endpoint) {
+  const r = await fetch(`${API}${endpoint}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (r.status === 401) { doLogout(); throw new Error('Unauthorized'); }
+  return r.json();
+}
+
+// --- Dashboard Init ---
+function showDashboard() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  refreshAll();
+}
+
+async function refreshAll() {
+  document.getElementById('last-refresh').textContent = 'Refreshing...';
+  try {
+    await Promise.all([
+      loadOverview(),
+      loadClassPerformance(),
+      loadXPEconomy(),
+      loadDeathHotspots(),
+      loadRecent(),
+      loadOneHitKills(),
+      loadBossFights(),
+      loadPlayers(),
+      loadSuspects()
+    ]);
+    document.getElementById('last-refresh').textContent =
+      'Updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('last-refresh').textContent = 'Error: ' + e.message;
+  }
+}
+
+// --- Overview Cards ---
+async function loadOverview() {
+  const d = await apiFetch('/overview');
+  const el = document.getElementById('overview-cards');
+  el.innerHTML = [
+    card('Total Combats', d.totalCombats),
+    card('Win Rate', d.winRate + '%', d.winRate > 80 ? 'good' : d.winRate < 40 ? 'danger' : ''),
+    card('Deaths', d.deaths, d.deaths > 0 ? 'danger' : ''),
+    card('Fled', d.fled, 'warn'),
+    card('Avg Rounds', d.avgRounds),
+    card('Avg Damage', d.avgDamage),
+    card('Players (24h)', d.activePlayers24h, 'good'),
+    card('1-Hit Kills', d.oneHitKills, d.oneHitKills > 10 ? 'warn' : ''),
+    card('1-Hit Deaths', d.oneHitDeaths, d.oneHitDeaths > 0 ? 'danger' : ''),
+  ].join('');
+}
+
+function card(label, value, cls = '') {
+  return `<div class="card"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
+}
+
+// --- Class Performance Charts ---
+async function loadClassPerformance() {
+  const data = await apiFetch('/class-performance');
+  const labels = data.map(r => r.player_class);
+  const winRates = data.map(r => parseFloat(r.winRate));
+  const avgDmg = data.map(r => r.avg_damage);
+
+  updateChart('classWinChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: winRates,
+        backgroundColor: labels.map((_, i) => `hsla(${i * 33}, 70%, 55%, 0.7)`),
+        borderColor: labels.map((_, i) => `hsl(${i * 33}, 70%, 55%)`),
+        borderWidth: 1
+      }]
+    },
+    options: chartOpts('Win Rate %', 0, 100)
+  });
+
+  updateChart('classDmgChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: avgDmg,
+        backgroundColor: labels.map((_, i) => `hsla(${i * 33 + 180}, 70%, 55%, 0.7)`),
+        borderColor: labels.map((_, i) => `hsl(${i * 33 + 180}, 70%, 55%)`),
+        borderWidth: 1
+      }]
+    },
+    options: chartOpts('Avg Damage')
+  });
+}
+
+// --- XP Economy ---
+async function loadXPEconomy() {
+  const data = await apiFetch('/xp-economy');
+  const labels = data.map(r => 'Lv' + r.player_level);
+  const xp = data.map(r => Math.round(r.avg_xp || 0));
+  const gold = data.map(r => Math.round(r.avg_gold || 0));
+
+  updateChart('xpCurveChart', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Avg XP', data: xp, borderColor: '#00e5ff', backgroundColor: 'rgba(0,229,255,0.1)', fill: true, tension: 0.3 },
+        { label: 'Avg Gold', data: gold, borderColor: '#ffaa00', backgroundColor: 'rgba(255,170,0,0.1)', fill: true, tension: 0.3 }
+      ]
+    },
+    options: { ...chartOpts('Rewards'), plugins: { legend: { display: true, labels: { color: '#888' } } } }
+  });
+}
+
+// --- Death Hotspots ---
+async function loadDeathHotspots() {
+  const data = await apiFetch('/death-hotspots');
+  const floors = data.byFloor || [];
+  const labels = floors.map(r => 'Lv' + r.dungeon_floor);
+  const deaths = floors.map(r => r.deaths);
+
+  updateChart('deathFloorChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: deaths,
+        backgroundColor: 'rgba(255,68,68,0.6)',
+        borderColor: '#ff4444',
+        borderWidth: 1
+      }]
+    },
+    options: chartOpts('Deaths')
+  });
+
+  // Also populate deaths tab table
+  const el = document.getElementById('deaths-table');
+  if (data.byMonster && data.byMonster.length > 0) {
+    el.innerHTML = makeTable(
+      ['Monster', 'Level', 'Deaths', 'Avg Player Lv', 'Avg Dmg Taken'],
+      data.byMonster.map(r => [
+        r.monster_name, r.monster_level, r.deaths,
+        Math.round(r.avg_player_level || 0),
+        Math.round(r.avg_damage_taken || 0)
+      ])
+    );
+  } else {
+    el.innerHTML = '<p style="color:var(--dim)">No death data yet</p>';
+  }
+}
+
+// --- Recent Events ---
+async function loadRecent() {
+  const data = await apiFetch('/recent');
+  const el = document.getElementById('recent-table');
+  if (!data.length) { el.innerHTML = '<p style="color:var(--dim)">No combat events yet. Play some games!</p>'; return; }
+  el.innerHTML = makeTable(
+    ['Time', 'Player', 'Class', 'Lv', 'Outcome', 'Monster', 'MLv', 'Rounds', 'Dmg', 'XP', 'Gold'],
+    data.map(r => [
+      fmtTime(r.created_at),
+      r.player_name,
+      r.player_class,
+      r.player_level,
+      outcomeTag(r.outcome),
+      r.monster_name || '-',
+      r.monster_level || '-',
+      r.rounds,
+      r.damage_dealt,
+      r.xp_gained,
+      r.gold_gained
+    ]),
+    data.map(r => r.outcome)
+  );
+}
+
+// --- One-Hit Kills ---
+async function loadOneHitKills() {
+  const data = await apiFetch('/one-hit-kills');
+  const el = document.getElementById('onehit-table');
+  if (!data.length) { el.innerHTML = '<p style="color:var(--dim)">No one-hit kills yet</p>'; return; }
+  el.innerHTML = makeTable(
+    ['Time', 'Outcome', 'Player', 'Class', 'PLv', 'STR', 'WeapPow', 'MaxHP', 'Monster', 'MLv', 'MHPL', 'MSTR', 'MDef', 'Boss', 'Dmg'],
+    data.map(r => [
+      fmtTime(r.created_at),
+      outcomeTag(r.outcome),
+      r.player_name,
+      r.player_class,
+      r.player_level,
+      r.player_str,
+      r.player_weap_pow,
+      r.player_max_hp,
+      r.monster_name || '-',
+      r.monster_level || '-',
+      r.monster_max_hp || '-',
+      r.monster_str || '-',
+      r.monster_def || '-',
+      r.is_boss ? '<span class="tag tag-boss">BOSS</span>' : '',
+      r.damage_dealt
+    ]),
+    data.map(r => r.outcome)
+  );
+}
+
+// --- Boss Fights ---
+async function loadBossFights() {
+  const data = await apiFetch('/boss-fights');
+  const el = document.getElementById('bosses-table');
+  if (!data.length) { el.innerHTML = '<p style="color:var(--dim)">No boss fights yet</p>'; return; }
+  el.innerHTML = makeTable(
+    ['Time', 'Player', 'Class', 'PLv', 'Outcome', 'Boss', 'BLv', 'Rounds', 'DmgDealt', 'DmgTaken'],
+    data.map(r => [
+      fmtTime(r.created_at),
+      r.player_name,
+      r.player_class,
+      r.player_level,
+      outcomeTag(r.outcome),
+      r.monster_name,
+      r.monster_level,
+      r.rounds,
+      r.damage_dealt,
+      r.damage_taken
+    ]),
+    data.map(r => r.outcome)
+  );
+}
+
+// --- Player Activity ---
+async function loadPlayers() {
+  const data = await apiFetch('/player-activity');
+  const el = document.getElementById('players-table');
+  if (!data.length) { el.innerHTML = '<p style="color:var(--dim)">No player data yet</p>'; return; }
+  el.innerHTML = makeTable(
+    ['Player', 'Class', 'Max Lv', 'Combats', 'Wins', 'Deaths', 'Win%', 'Total XP', 'Total Gold', 'Last Fight'],
+    data.map(r => [
+      r.player_name,
+      r.player_class,
+      r.max_level,
+      r.total_combats,
+      r.wins,
+      r.deaths,
+      r.total_combats > 0 ? (r.wins / r.total_combats * 100).toFixed(1) + '%' : '-',
+      fmtNum(r.total_xp),
+      fmtNum(r.total_gold),
+      fmtTime(r.last_combat)
+    ])
+  );
+}
+
+// --- Suspects ---
+async function loadSuspects() {
+  const data = await apiFetch('/suspects');
+  const el = document.getElementById('suspects-table');
+  if (!data.length) { el.innerHTML = '<p style="color:var(--dim)">No suspects (need 10+ combats per player)</p>'; return; }
+  el.innerHTML = makeTable(
+    ['Player', 'Class', 'Max Lv', 'Combats', 'Win%', 'Max Dmg', 'Avg Dmg', 'Avg XP', '1-Hit Kills'],
+    data.map(r => [
+      r.player_name,
+      r.player_class,
+      r.max_level,
+      r.total,
+      r.win_pct + '%',
+      fmtNum(r.max_damage),
+      Math.round(r.avg_damage || 0),
+      Math.round(r.avg_xp || 0),
+      r.one_hit_kills
+    ])
+  );
+}
+
+// --- Helpers ---
+function fmtTime(t) {
+  if (!t) return '-';
+  const d = new Date(t + 'Z');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtNum(n) {
+  if (n == null) return '0';
+  return Number(n).toLocaleString();
+}
+
+function outcomeTag(o) {
+  const cls = o === 'death' ? 'tag-death' : o === 'victory' ? 'tag-victory' : 'tag-fled';
+  return `<span class="tag ${cls}">${o.toUpperCase()}</span>`;
+}
+
+function makeTable(headers, rows, rowClasses) {
+  let h = '<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach((row, i) => {
+    const cls = rowClasses && rowClasses[i] ? rowClasses[i] : '';
+    h += `<tr class="${cls}">` + row.map(c => `<td>${c}</td>`).join('') + '</tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+function chartOpts(yLabel, min, max) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1a1a2e' } },
+      y: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1a1a2e' },
+        title: { display: true, text: yLabel, color: '#666' },
+        min: min, max: max
+      }
+    }
+  };
+}
+
+function updateChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+// --- Tab Switching ---
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// --- Auto-refresh ---
+setInterval(() => {
+  if (token && document.getElementById('dashboard').style.display !== 'none') {
+    refreshAll();
+  }
+}, 60000);
+
+// --- Init ---
+if (token) {
+  apiFetch('/overview').then(() => showDashboard()).catch(() => doLogout());
+} else {
+  document.getElementById('login-screen').style.display = 'flex';
+}
+</script>
+</body>
+</html>

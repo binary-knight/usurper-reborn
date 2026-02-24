@@ -55,16 +55,43 @@ public static class HeadlessCombatResolver
     }
 
     /// <summary>
-    /// Calculate damage for one strike: STR + WeapPow/2 ± 20% variance - target DEF/3.
-    /// Minimum 1 damage per hit.
+    /// Calculate damage for one strike, approximating the real CombatEngine formula.
+    /// Attack: STR + STR/4 bonus + Level + WeapPow (with variance) ± 20%
+    /// Defense: DEF (with variance) + sqrt-scaled ArmPow absorption
+    /// Critical: 10% chance for 1.5x damage
     /// </summary>
     private static long CalculateDamage(Character striker, Character target, Random rng)
     {
-        long baseDmg = striker.Strength + striker.WeapPow / 2;
-        double variance = 0.8 + rng.NextDouble() * 0.4; // 0.8x to 1.2x
-        long damage = (long)(baseDmg * variance);
+        // Attack power: mirrors CombatEngine lines 2178-2210
+        long attackPower = striker.Strength;
+        attackPower += striker.Strength / 4; // STR damage bonus (StatEffectsSystem)
+        attackPower += striker.Level;        // Level scaling
 
-        long defense = target.Defence / 3 + target.ArmPow / 4;
+        // Weapon power with variance (real engine adds weaponBonus + random(0, weaponBonus))
+        if (striker.WeapPow > 0)
+        {
+            long weapBonus = striker.WeapPow + striker.Level / 10;
+            attackPower += weapBonus + rng.Next(0, (int)Math.Min(int.MaxValue, weapBonus + 1));
+        }
+
+        // Random variation scaled with level
+        int variationMax = Math.Max(21, striker.Level / 2);
+        attackPower += rng.Next(1, variationMax);
+
+        // ±20% variance
+        double variance = 0.8 + rng.NextDouble() * 0.4;
+        long damage = (long)(attackPower * variance);
+
+        // Defense: mirrors CombatEngine lines 3212-3222
+        long defense = target.Defence + rng.Next(0, (int)Math.Max(1, target.Defence / 8));
+
+        // Sqrt-scaled armor absorption (v0.41.4 diminishing returns)
+        if (target.ArmPow > 0)
+        {
+            int armAbsorbMax = (int)(Math.Sqrt(target.ArmPow) * 5);
+            defense += rng.Next(0, armAbsorbMax + 1);
+        }
+
         damage -= defense;
 
         // Critical hit: 10% chance for 1.5x damage

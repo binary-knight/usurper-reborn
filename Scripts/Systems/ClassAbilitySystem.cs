@@ -1109,8 +1109,8 @@ public static class ClassAbilitySystem
             return result;
         }
 
-        // Deduct combat stamina
-        user.CurrentCombatStamina -= ability.StaminaCost;
+        // Note: stamina is deducted by the caller (CombatEngine.SpendStamina) before calling UseAbility.
+        // Do NOT deduct here — it was causing double-deduction and negative stamina.
 
         result.Success = true;
         result.AbilityUsed = ability;

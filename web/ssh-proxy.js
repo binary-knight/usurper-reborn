@@ -35,6 +35,70 @@ const FEED_POLL_MS = 5000; // SSE feed polls DB every 5 seconds
 const GITHUB_PAT = process.env.GITHUB_PAT || '';
 const SPONSORS_CACHE_TTL = 3600000; // 1 hour
 
+// Balance dashboard auth
+const BALANCE_USER = process.env.BALANCE_USER || 'admin';
+const BALANCE_DEFAULT_PASS = process.env.BALANCE_PASS || 'changeme';
+const BALANCE_SECRET = process.env.BALANCE_SECRET || crypto.randomBytes(32).toString('hex');
+const BALANCE_TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+// Get stored password hash from DB, or fall back to default
+function getBalancePasswordHash() {
+  if (!dbWrite) return hashPassword(BALANCE_DEFAULT_PASS);
+  try {
+    dbWrite.exec(`CREATE TABLE IF NOT EXISTS balance_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )`);
+    const row = dbWrite.prepare("SELECT value FROM balance_config WHERE key = 'password_hash'").get();
+    if (row) return row.value;
+  } catch (e) {
+    console.error(`[usurper-web] Balance config read error: ${e.message}`);
+  }
+  return hashPassword(BALANCE_DEFAULT_PASS);
+}
+
+function setBalancePasswordHash(hash) {
+  if (!dbWrite) return false;
+  try {
+    dbWrite.exec(`CREATE TABLE IF NOT EXISTS balance_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )`);
+    dbWrite.prepare("INSERT OR REPLACE INTO balance_config (key, value) VALUES ('password_hash', ?)").run(hash);
+    return true;
+  } catch (e) {
+    console.error(`[usurper-web] Balance config write error: ${e.message}`);
+    return false;
+  }
+}
+
+function verifyBalancePassword(password) {
+  return hashPassword(password) === getBalancePasswordHash();
+}
+
+function createBalanceToken() {
+  const payload = JSON.stringify({ user: BALANCE_USER, exp: Date.now() + BALANCE_TOKEN_TTL });
+  const sig = crypto.createHmac('sha256', BALANCE_SECRET).update(payload).digest('hex');
+  return Buffer.from(payload).toString('base64') + '.' + sig;
+}
+
+function verifyBalanceToken(token) {
+  if (!token) return false;
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  try {
+    const payload = Buffer.from(parts[0], 'base64').toString();
+    const sig = crypto.createHmac('sha256', BALANCE_SECRET).update(payload).digest('hex');
+    if (sig !== parts[1]) return false;
+    const data = JSON.parse(payload);
+    return data.exp > Date.now();
+  } catch { return false; }
+}
+
 // Dashboard cache constants
 const DASH_NPC_CACHE_TTL = 10000; // 10 seconds
 const DASH_EVENTS_CACHE_TTL = 5000; // 5 seconds
@@ -967,6 +1031,287 @@ const dashFeedTimer = setInterval(dashPollFeed, FEED_POLL_MS);
 const dashHeartbeatTimer = setInterval(dashHeartbeat, 15000);
 
 // --- Dashboard Route Handler ---
+// --- Balance Dashboard API ---
+async function handleBalanceRequest(req, res) {
+  const url = req.url.split('?')[0];
+  const method = req.method;
+  const query = new URL(req.url, 'http://localhost').searchParams;
+
+  // CORS preflight
+  if (method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  // Login endpoint (no auth required)
+  if (method === 'POST' && url === '/api/balance/login') {
+    try {
+      const body = await readBody(req);
+      if (body.username === BALANCE_USER && verifyBalancePassword(body.password)) {
+        const isDefault = body.password === BALANCE_DEFAULT_PASS;
+        sendJson(res, 200, { token: createBalanceToken(), mustChangePassword: isDefault });
+      } else {
+        sendJson(res, 401, { error: 'Invalid credentials' });
+      }
+    } catch (e) {
+      sendJson(res, 400, { error: 'Invalid request' });
+    }
+    return true;
+  }
+
+  // All other balance endpoints require auth
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!verifyBalanceToken(token)) {
+    sendJson(res, 401, { error: 'Unauthorized' });
+    return true;
+  }
+
+  // POST /api/balance/change-password
+  if (method === 'POST' && url === '/api/balance/change-password') {
+    try {
+      const body = await readBody(req);
+      if (!body.newPassword || body.newPassword.length < 6) {
+        sendJson(res, 400, { error: 'Password must be at least 6 characters' });
+        return true;
+      }
+      if (setBalancePasswordHash(hashPassword(body.newPassword))) {
+        sendJson(res, 200, { success: true });
+      } else {
+        sendJson(res, 500, { error: 'Failed to save password' });
+      }
+    } catch (e) {
+      sendJson(res, 400, { error: 'Invalid request' });
+    }
+    return true;
+  }
+
+  if (!db) {
+    sendJson(res, 503, { error: 'Database not available' });
+    return true;
+  }
+
+  // GET /api/balance/overview
+  if (method === 'GET' && url === '/api/balance/overview') {
+    try {
+      const total = db.prepare('SELECT COUNT(*) as c FROM combat_events').get();
+      const victories = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE outcome = 'victory'").get();
+      const deaths = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE outcome = 'death'").get();
+      const fled = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE outcome = 'fled'").get();
+      const avgRounds = db.prepare("SELECT AVG(rounds) as v FROM combat_events WHERE outcome = 'victory'").get();
+      const avgDmg = db.prepare("SELECT AVG(damage_dealt) as v FROM combat_events WHERE outcome = 'victory'").get();
+      const today = db.prepare("SELECT COUNT(DISTINCT player_name) as c FROM combat_events WHERE created_at >= datetime('now', '-24 hours')").get();
+      const oneHitKills = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE rounds <= 1 AND outcome = 'victory'").get();
+      const oneHitDeaths = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE rounds <= 1 AND outcome = 'death'").get();
+      sendJson(res, 200, {
+        totalCombats: total.c,
+        victories: victories.c,
+        deaths: deaths.c,
+        fled: fled.c,
+        winRate: total.c > 0 ? (victories.c / total.c * 100).toFixed(1) : 0,
+        avgRounds: avgRounds.v ? avgRounds.v.toFixed(1) : 0,
+        avgDamage: avgDmg.v ? Math.round(avgDmg.v) : 0,
+        activePlayers24h: today.c,
+        oneHitKills: oneHitKills.c,
+        oneHitDeaths: oneHitDeaths.c
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/balance/class-performance
+  if (method === 'GET' && url === '/api/balance/class-performance') {
+    try {
+      const rows = db.prepare(`
+        SELECT player_class,
+          COUNT(*) as total,
+          SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
+          SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) as deaths,
+          SUM(CASE WHEN outcome = 'fled' THEN 1 ELSE 0 END) as fled,
+          AVG(CASE WHEN outcome = 'victory' THEN damage_dealt END) as avg_damage,
+          AVG(CASE WHEN outcome = 'victory' THEN xp_gained END) as avg_xp,
+          AVG(CASE WHEN outcome = 'victory' THEN gold_gained END) as avg_gold,
+          AVG(CASE WHEN outcome = 'victory' THEN rounds END) as avg_rounds,
+          MAX(damage_dealt) as max_damage
+        FROM combat_events
+        GROUP BY player_class
+        ORDER BY total DESC
+      `).all();
+      sendJson(res, 200, rows.map(r => ({
+        ...r,
+        winRate: r.total > 0 ? (r.wins / r.total * 100).toFixed(1) : 0,
+        deathRate: r.total > 0 ? (r.deaths / r.total * 100).toFixed(1) : 0,
+        avg_damage: r.avg_damage ? Math.round(r.avg_damage) : 0,
+        avg_xp: r.avg_xp ? Math.round(r.avg_xp) : 0,
+        avg_gold: r.avg_gold ? Math.round(r.avg_gold) : 0,
+        avg_rounds: r.avg_rounds ? r.avg_rounds.toFixed(1) : 0,
+      })));
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/balance/one-hit-kills
+  if (method === 'GET' && url === '/api/balance/one-hit-kills') {
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM combat_events
+        WHERE rounds <= 1 AND (outcome = 'victory' OR outcome = 'death')
+        ORDER BY created_at DESC
+        LIMIT 200
+      `).all();
+      sendJson(res, 200, rows);
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/balance/death-hotspots
+  if (method === 'GET' && url === '/api/balance/death-hotspots') {
+    try {
+      const byMonster = db.prepare(`
+        SELECT monster_name, monster_level, COUNT(*) as deaths,
+          AVG(player_level) as avg_player_level,
+          AVG(damage_taken) as avg_damage_taken
+        FROM combat_events WHERE outcome = 'death' AND monster_name IS NOT NULL
+        GROUP BY monster_name ORDER BY deaths DESC LIMIT 30
+      `).all();
+      const byFloor = db.prepare(`
+        SELECT dungeon_floor, COUNT(*) as deaths,
+          AVG(player_level) as avg_player_level
+        FROM combat_events WHERE outcome = 'death' AND dungeon_floor > 0
+        GROUP BY dungeon_floor ORDER BY dungeon_floor
+      `).all();
+      const byClass = db.prepare(`
+        SELECT player_class, COUNT(*) as deaths
+        FROM combat_events WHERE outcome = 'death'
+        GROUP BY player_class ORDER BY deaths DESC
+      `).all();
+      sendJson(res, 200, { byMonster, byFloor, byClass });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/balance/boss-fights
+  if (method === 'GET' && url === '/api/balance/boss-fights') {
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM combat_events WHERE is_boss = 1
+        ORDER BY created_at DESC LIMIT 100
+      `).all();
+      sendJson(res, 200, rows);
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/balance/player-activity?player=name
+  if (method === 'GET' && url === '/api/balance/player-activity') {
+    const player = query.get('player');
+    if (!player) {
+      // Return player summary list
+      try {
+        const rows = db.prepare(`
+          SELECT player_name, player_class, MAX(player_level) as max_level,
+            COUNT(*) as total_combats,
+            SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) as deaths,
+            SUM(xp_gained) as total_xp,
+            SUM(gold_gained) as total_gold,
+            MAX(created_at) as last_combat
+          FROM combat_events
+          GROUP BY player_name
+          ORDER BY total_combats DESC
+        `).all();
+        sendJson(res, 200, rows);
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+    } else {
+      try {
+        const rows = db.prepare(`
+          SELECT * FROM combat_events WHERE player_name = ?
+          ORDER BY created_at DESC LIMIT 200
+        `).all(player);
+        sendJson(res, 200, rows);
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+    }
+    return true;
+  }
+
+  // GET /api/balance/xp-economy
+  if (method === 'GET' && url === '/api/balance/xp-economy') {
+    try {
+      const rows = db.prepare(`
+        SELECT player_level,
+          AVG(xp_gained) as avg_xp,
+          AVG(gold_gained) as avg_gold,
+          COUNT(*) as combats,
+          AVG(rounds) as avg_rounds
+        FROM combat_events WHERE outcome = 'victory'
+        GROUP BY player_level ORDER BY player_level
+      `).all();
+      sendJson(res, 200, rows);
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/balance/recent
+  if (method === 'GET' && url === '/api/balance/recent') {
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM combat_events ORDER BY created_at DESC LIMIT 100
+      `).all();
+      sendJson(res, 200, rows);
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/balance/suspects
+  if (method === 'GET' && url === '/api/balance/suspects') {
+    try {
+      const rows = db.prepare(`
+        SELECT player_name, player_class, MAX(player_level) as max_level,
+          COUNT(*) as total,
+          SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
+          ROUND(SUM(CASE WHEN outcome = 'victory' THEN 1.0 ELSE 0 END) / COUNT(*) * 100, 1) as win_pct,
+          MAX(damage_dealt) as max_damage,
+          AVG(CASE WHEN outcome = 'victory' THEN damage_dealt END) as avg_damage,
+          AVG(CASE WHEN outcome = 'victory' THEN xp_gained END) as avg_xp,
+          SUM(CASE WHEN rounds <= 1 AND outcome = 'victory' THEN 1 ELSE 0 END) as one_hit_kills
+        FROM combat_events
+        GROUP BY player_name
+        HAVING total >= 10
+        ORDER BY win_pct DESC, avg_damage DESC
+      `).all();
+      sendJson(res, 200, rows);
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  sendJson(res, 404, { error: 'Not found' });
+  return true;
+}
+
 async function handleDashRequest(req, res) {
   const url = req.url;
   const method = req.method;
@@ -1042,6 +1387,15 @@ async function handleDashRequest(req, res) {
 
 // --- HTTP Handler ---
 function handleHttpRequest(req, res) {
+  // Balance dashboard routes
+  if (req.url && req.url.startsWith('/api/balance/')) {
+    handleBalanceRequest(req, res).catch(err => {
+      console.error(`[usurper-web] Balance API error: ${err.message}`);
+      if (!res.headersSent) sendJson(res, 500, { error: 'Internal error' });
+    });
+    return;
+  }
+
   // Dashboard routes
   if (req.url && req.url.startsWith('/api/dash/')) {
     handleDashRequest(req, res).catch(err => {
@@ -1090,7 +1444,7 @@ function handleHttpRequest(req, res) {
   } else if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.writeHead(204);
     res.end();
   } else {
@@ -1107,6 +1461,7 @@ httpServer.listen(WS_PORT, () => {
   console.log(`[usurper-web] HTTP + WebSocket server listening on port ${WS_PORT}`);
   console.log(`[usurper-web] Stats API: http://127.0.0.1:${WS_PORT}/api/stats`);
   console.log(`[usurper-web] Dashboard API: http://127.0.0.1:${WS_PORT}/api/dash/*`);
+  console.log(`[usurper-web] Balance API: http://127.0.0.1:${WS_PORT}/api/balance/*`);
   console.log(`[usurper-web] Proxying SSH to ${SSH_HOST}:${SSH_PORT}`);
 });
 

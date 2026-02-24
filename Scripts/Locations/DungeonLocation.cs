@@ -148,6 +148,9 @@ public class DungeonLocation : BaseLocation
         // Refresh bounty board quests based on player level
         QuestSystem.RefreshBountyBoard(player?.Level ?? 1);
 
+        // Update quest progress for reaching this floor (dungeon entry)
+        QuestSystem.OnDungeonFloorReached(player!, currentDungeonLevel);
+
         // Check for story events at milestone floors
         await CheckFloorStoryEvents(player!, term);
 
@@ -625,7 +628,7 @@ public class DungeonLocation : BaseLocation
                         {
                             var endingType = EndingsSystem.Instance.DetermineEnding(player);
                             await EndingsSystem.Instance.TriggerEnding(player, endingType, term);
-                            if (GameEngine.Instance.PendingNewGamePlus)
+                            if (GameEngine.Instance.PendingNewGamePlus || GameEngine.Instance.PendingImmortalAscension)
                                 throw new LocationExitException(GameLocation.NoWhere);
                             else
                                 await NavigateToLocation(GameLocation.MainStreet);
@@ -656,7 +659,7 @@ public class DungeonLocation : BaseLocation
                             endingType = EndingsSystem.Instance.DetermineEnding(player);
 
                         await EndingsSystem.Instance.TriggerEnding(player, endingType, term);
-                        if (GameEngine.Instance.PendingNewGamePlus)
+                        if (GameEngine.Instance.PendingNewGamePlus || GameEngine.Instance.PendingImmortalAscension)
                             throw new LocationExitException(GameLocation.NoWhere);
                         else
                             await NavigateToLocation(GameLocation.MainStreet);
@@ -3375,14 +3378,14 @@ public class DungeonLocation : BaseLocation
         {
             case 0:
                 var pitDmg = currentDungeonLevel * 3 + dungeonRandom.Next(10);
-                player.HP -= pitDmg;
+                player.HP = Math.Max(1, player.HP - pitDmg);
                 terminal.WriteLine($"The floor gives way! You fall into a pit for {pitDmg} damage!");
                 BroadcastDungeonEvent($"\u001b[31m  The floor gives way! {player!.Name2} falls into a pit for {pitDmg} damage!\u001b[0m");
                 break;
 
             case 1:
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
-                player.HP -= dartDmg;
+                player.HP = Math.Max(1, player.HP - dartDmg);
                 player.Poison = Math.Max(player.Poison, 1);
                 terminal.WriteLine($"Poison darts! You take {dartDmg} damage and are poisoned!");
                 BroadcastDungeonEvent($"\u001b[31m  Poison darts! {player!.Name2} takes {dartDmg} damage and is poisoned!\u001b[0m");
@@ -3390,7 +3393,7 @@ public class DungeonLocation : BaseLocation
 
             case 2:
                 var fireDmg = currentDungeonLevel * 4 + dungeonRandom.Next(12);
-                player.HP -= fireDmg;
+                player.HP = Math.Max(1, player.HP - fireDmg);
                 terminal.WriteLine($"A gout of flame! You take {fireDmg} fire damage!");
                 BroadcastDungeonEvent($"\u001b[31m  A gout of flame! {player!.Name2} takes {fireDmg} fire damage!\u001b[0m");
                 break;
@@ -3506,14 +3509,14 @@ public class DungeonLocation : BaseLocation
         // Generate monsters appropriate for this room
         var monsters = MonsterGenerator.GenerateMonsterGroup(currentDungeonLevel, dungeonRandom);
 
-        // Make boss room monsters tougher
+        // Make boss room monsters tougher (HP only — STR boost removed to prevent
+        // double-dipping with Monster.GetAttackPower()'s 1.3x IsBoss multiplier)
         if (room.IsBossRoom)
         {
             foreach (var m in monsters)
             {
                 m.HP = (long)(m.HP * 1.5);
                 m.MaxHP = m.HP;  // Keep MaxHP in sync with boosted HP
-                m.Strength = (int)(m.Strength * 1.3);
             }
             // Ensure there's a boss
             if (!monsters.Any(m => m.IsBoss))
@@ -3852,7 +3855,7 @@ public class DungeonLocation : BaseLocation
             {
                 var endingType = EndingsSystem.Instance.DetermineEnding(player);
                 await EndingsSystem.Instance.TriggerEnding(player, endingType, terminal);
-                if (GameEngine.Instance.PendingNewGamePlus)
+                if (GameEngine.Instance.PendingNewGamePlus || GameEngine.Instance.PendingImmortalAscension)
                     throw new LocationExitException(GameLocation.NoWhere);
                 else
                     await NavigateToLocation(GameLocation.MainStreet);
@@ -5013,6 +5016,12 @@ public class DungeonLocation : BaseLocation
 
             // Log floor change
             UsurperRemake.Systems.DebugLogger.Instance.LogDungeonFloorChange(player?.Name ?? "Player", previousLevel, currentDungeonLevel);
+
+            // Update quest progress for reaching this floor
+            if (player != null)
+            {
+                QuestSystem.OnDungeonFloorReached(player, currentDungeonLevel);
+            }
 
             terminal.WriteLine($"Dungeon level set to {currentDungeonLevel}.", "green");
 
@@ -6177,14 +6186,14 @@ public class DungeonLocation : BaseLocation
                     {
                         case 0:
                             var poisonDmg = currentDungeonLevel * 5;
-                            currentPlayer.HP -= poisonDmg;
+                            currentPlayer.HP = Math.Max(1, currentPlayer.HP - poisonDmg);
                             terminal.WriteLine($"Poison gas! You take {poisonDmg} damage!");
                             currentPlayer.Poison = Math.Max(currentPlayer.Poison, 1);
                             terminal.WriteLine("You have been poisoned!", "magenta");
                             break;
                         case 1:
                             var spikeDmg = currentDungeonLevel * 8;
-                            currentPlayer.HP -= spikeDmg;
+                            currentPlayer.HP = Math.Max(1, currentPlayer.HP - spikeDmg);
                             terminal.WriteLine($"Spikes shoot out! You take {spikeDmg} damage!");
                             break;
                         case 2:
@@ -6595,7 +6604,7 @@ public class DungeonLocation : BaseLocation
                     break;
                 case 4:
                     var hpLoss = currentPlayer.HP / 4;
-                    currentPlayer.HP -= hpLoss;
+                    currentPlayer.HP = Math.Max(1, currentPlayer.HP - hpLoss);
                     terminal.WriteLine("The shrine drains your life force!", "red");
                     terminal.WriteLine($"You lose {hpLoss} HP!", "red");
                     break;
@@ -6827,20 +6836,20 @@ public class DungeonLocation : BaseLocation
             case 0:
                 terminal.WriteLine("The floor gives way beneath you!", "white");
                 var fallDmg = currentDungeonLevel * 3 + dungeonRandom.Next(10);
-                currentPlayer.HP -= fallDmg;
+                currentPlayer.HP = Math.Max(1, currentPlayer.HP - fallDmg);
                 terminal.WriteLine($"You fall into a pit and take {fallDmg} damage!", "red");
                 break;
             case 1:
                 terminal.WriteLine("Poison darts shoot from the walls!", "white");
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
-                currentPlayer.HP -= dartDmg;
+                currentPlayer.HP = Math.Max(1, currentPlayer.HP - dartDmg);
                 currentPlayer.Poison = Math.Max(currentPlayer.Poison, 1);
                 terminal.WriteLine($"You take {dartDmg} damage and are poisoned!", "magenta");
                 break;
             case 2:
                 terminal.WriteLine("A magical rune explodes beneath your feet!", "bright_magenta");
                 var runeDmg = currentDungeonLevel * 5 + dungeonRandom.Next(15);
-                currentPlayer.HP -= runeDmg;
+                currentPlayer.HP = Math.Max(1, currentPlayer.HP - runeDmg);
                 terminal.WriteLine($"You take {runeDmg} magical damage!", "red");
                 break;
             case 3:
@@ -8012,6 +8021,13 @@ public class DungeonLocation : BaseLocation
         {
             currentDungeonLevel--;
             terminal.WriteLine($"You ascend to dungeon level {currentDungeonLevel}.", "green");
+
+            // Update quest progress for reaching this floor
+            var player = GetCurrentPlayer();
+            if (player != null)
+            {
+                QuestSystem.OnDungeonFloorReached(player, currentDungeonLevel);
+            }
         }
         else
         {
@@ -10382,7 +10398,7 @@ public class DungeonLocation : BaseLocation
             int damage = riddle.FailureDamage * currentDungeonLevel / 5;
             if (damage > 0)
             {
-                player.HP -= damage;
+                player.HP = Math.Max(1, player.HP - damage);
                 terminal.WriteLine($"A trap activates! You take {damage} damage!");
             }
         }
@@ -10485,7 +10501,7 @@ public class DungeonLocation : BaseLocation
             int damage = (int)(player.MaxHP * (puzzle.FailureDamagePercent / 100.0));
             if (damage > 0)
             {
-                player.HP -= damage;
+                player.HP = Math.Max(1, player.HP - damage);
                 terminal.WriteLine($"A trap springs! You take {damage} damage!");
             }
         }
@@ -11220,6 +11236,12 @@ public class DungeonLocation : BaseLocation
             currentDungeonLevel = targetLevel;
             if (currentPlayer != null) currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
             terminal.WriteLine($"You steel your nerves. The dungeon now feels like level {currentDungeonLevel}!", "magenta");
+
+            // Update quest progress for reaching this floor
+            if (currentPlayer != null)
+            {
+                QuestSystem.OnDungeonFloorReached(currentPlayer, currentDungeonLevel);
+            }
         }
 
         await Task.Delay(1500);
@@ -11583,8 +11605,9 @@ public class DungeonLocation : BaseLocation
 
                 terminal.SetColor("red");
                 terminal.WriteLine("The moment your fingers touch it, searing pain shoots through you!");
-                player.HP -= player.MaxHP / 4;
-                terminal.WriteLine($"You take {player.MaxHP / 4} damage!");
+                var orbDmg = player.MaxHP / 4;
+                player.HP = Math.Max(1, player.HP - orbDmg);
+                terminal.WriteLine($"You take {orbDmg} damage!");
                 terminal.WriteLine("");
                 await Task.Delay(1000);
 

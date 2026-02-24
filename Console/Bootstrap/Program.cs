@@ -372,6 +372,11 @@ namespace UsurperConsole
 
                 DoorMode.Log("Shutting down door mode...");
                 DoorMode.Shutdown();
+
+                // Force process exit to ensure BBS regains control immediately.
+                // Without this, background threads (worldsim, timers, heartbeat) can keep
+                // the process alive after the game ends, leaving the BBS caller stuck.
+                Environment.Exit(0);
             }
         }
 

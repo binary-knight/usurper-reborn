@@ -77,6 +77,48 @@ public partial class CombatEngine
         };
     }
 
+    /// <summary>
+    /// Log a combat event to the balance dashboard database table.
+    /// Fire-and-forget — only active in online mode.
+    /// </summary>
+    private void LogCombatEventToDb(CombatResult result, string outcome, long xpGained = 0, long goldGained = 0)
+    {
+        if (!OnlineStateManager.IsActive) return;
+        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+        if (backend == null) return;
+
+        var p = result.Player;
+        var m = result.Monster;
+        int mCount = result.DefeatedMonsters?.Count > 0 ? result.DefeatedMonsters.Count : (m != null ? 1 : 0);
+        bool hasTeam = result.Teammates != null && result.Teammates.Count > 0;
+
+        _ = backend.LogCombatEvent(
+            playerName: p?.DisplayName ?? "Unknown",
+            playerLevel: p?.Level ?? 0,
+            playerClass: p?.Class.ToString() ?? "Unknown",
+            playerMaxHP: p?.MaxHP ?? 0,
+            playerSTR: p?.Strength ?? 0,
+            playerDEX: p?.Dexterity ?? 0,
+            playerWeapPow: p?.WeapPow ?? 0,
+            playerArmPow: p?.ArmPow ?? 0,
+            monsterName: m?.Name,
+            monsterLevel: m?.Level ?? 0,
+            monsterMaxHP: m?.MaxHP ?? 0,
+            monsterSTR: m?.Strength ?? 0,
+            monsterDEF: m?.Defence ?? 0,
+            isBoss: m?.IsBoss ?? false,
+            outcome: outcome,
+            rounds: result.CurrentRound,
+            damageDealt: result.TotalDamageDealt,
+            damageTaken: result.TotalDamageTaken,
+            xpGained: xpGained,
+            goldGained: goldGained,
+            dungeonFloor: m?.Level ?? 0,
+            monsterCount: mCount,
+            hasTeammates: hasTeam
+        );
+    }
+
     public CombatEngine(TerminalEmulator? term = null)
     {
         terminal = term;
@@ -150,7 +192,11 @@ public partial class CombatEngine
 
         // Reset per-combat faction flags
         attacker.DivineFavorTriggeredThisCombat = false;
-        if (attacker.PoisonCoatingCombats > 0) attacker.PoisonCoatingCombats--;
+        if (attacker.PoisonCoatingCombats > 0)
+        {
+            attacker.PoisonCoatingCombats--;
+            if (attacker.PoisonCoatingCombats <= 0) attacker.ActivePoisonType = PoisonType.None;
+        }
         if (attacker.WellRestedCombats > 0) attacker.WellRestedCombats--;
         if (attacker.LoversBlissCombats > 0) attacker.LoversBlissCombats--;
         if (attacker.DivineBlessingCombats > 0) attacker.DivineBlessingCombats--;
@@ -250,7 +296,11 @@ public partial class CombatEngine
         // Reset per-combat faction flags
         player.DivineFavorTriggeredThisCombat = false;
         // Decrement poison coating and well-rested (per combat, not per round)
-        if (player.PoisonCoatingCombats > 0) player.PoisonCoatingCombats--;
+        if (player.PoisonCoatingCombats > 0)
+        {
+            player.PoisonCoatingCombats--;
+            if (player.PoisonCoatingCombats <= 0) player.ActivePoisonType = PoisonType.None;
+        }
         if (player.WellRestedCombats > 0) player.WellRestedCombats--;
         if (player.LoversBlissCombats > 0) player.LoversBlissCombats--;
         if (player.DivineBlessingCombats > 0) player.DivineBlessingCombats--;
@@ -439,6 +489,7 @@ public partial class CombatEngine
         while ((player.IsAlive || anyGroupedAlive()) && monsters.Any(m => m.IsAlive) && !globalEscape)
         {
             roundNumber++;
+            result.CurrentRound = roundNumber;
 
             // BBS 80x25 — clear screen at start of each round so combat fits one page
             if (DoorMode.IsInDoorMode)
@@ -835,6 +886,9 @@ public partial class CombatEngine
                 player.Class.ToString()
             );
 
+            // Log to balance dashboard
+            LogCombatEventToDb(result, "fled");
+
             // Calculate partial exp/gold from defeated monsters
             if (result.DefeatedMonsters.Count > 0)
             {
@@ -1153,6 +1207,10 @@ public partial class CombatEngine
         terminal.WriteLine("  T - Taunt, lower enemy defense");
         terminal.WriteLine("  L - Hide, attempt to slip away");
 
+        // Coat Blade (poison vials)
+        if (player.PoisonVials > 0)
+            terminal.WriteLine($"  B - Coat Blade with Poison, Vials: {player.PoisonVials}");
+
         // Retreat/Flee
         if (monster != null)
         {
@@ -1256,6 +1314,15 @@ public partial class CombatEngine
         terminal.SetColor("darkgray");
         terminal.Write("aunt ");
 
+        // Coat Blade (poison vials)
+        if (player.PoisonVials > 0)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[B]");
+            terminal.SetColor("dark_green");
+            terminal.Write($"Poison({player.PoisonVials}) ");
+        }
+
         string speedLabel = player.CombatSpeed switch
         {
             CombatSpeed.Instant => "Inst",
@@ -1352,6 +1419,15 @@ public partial class CombatEngine
         terminal.Write("[L]");
         terminal.SetColor("darkgray");
         terminal.Write("Hide ");
+
+        // Coat Blade (poison vials)
+        if (player.PoisonVials > 0)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[B]");
+            terminal.SetColor("dark_green");
+            terminal.Write($"Poison({player.PoisonVials}) ");
+        }
 
         if (!isFollower)
         {
@@ -1567,6 +1643,19 @@ public partial class CombatEngine
         terminal.SetColor("green");
         terminal.WriteLine("║");
 
+        // === COAT BLADE (poison vials) ===
+        if (player.PoisonVials > 0)
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[B] ");
+            terminal.SetColor("dark_green");
+            string coatDesc = $"Coat Blade (Vials: {player.PoisonVials})";
+            terminal.Write($"{coatDesc,-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+
         // === RETREAT/FLEE OPTIONS ===
         if (monster != null)
         {
@@ -1682,6 +1771,10 @@ public partial class CombatEngine
                     terminal.WriteLine($"  {key} - {name} (unavailable)");
             }
         }
+
+        // Coat Blade (poison vials)
+        if (player.PoisonVials > 0)
+            terminal.WriteLine($"  B - Coat Blade with Poison, Vials: {player.PoisonVials}");
 
         // Boss Save option (only when fighting saveable Old God with artifact)
         if (BossContext?.CanSave == true)
@@ -1803,6 +1896,19 @@ public partial class CombatEngine
             }
         }
 
+        // Coat Blade (poison vials)
+        if (player.PoisonVials > 0)
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[B] ");
+            terminal.SetColor("dark_green");
+            string coatDesc = $"Coat Blade (Vials: {player.PoisonVials})";
+            terminal.Write($"{coatDesc,-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+
         // Boss Save option (only when fighting saveable Old God with artifact)
         if (BossContext?.CanSave == true)
         {
@@ -1874,10 +1980,11 @@ public partial class CombatEngine
             "I" => new CombatAction { Type = CombatActionType.Disarm },
             "T" => new CombatAction { Type = CombatActionType.Taunt },
             "L" => new CombatAction { Type = CombatActionType.Hide },
+            "B" when player.PoisonVials > 0 => new CombatAction { Type = CombatActionType.CoatBlade },
             _ => new CombatAction { Type = CombatActionType.Attack } // Default to attack
         };
     }
-    
+
     /// <summary>
     /// Process player action - Pascal combat mechanics
     /// </summary>
@@ -1972,9 +2079,13 @@ public partial class CombatEngine
             case CombatActionType.RangedAttack:
                 await ExecuteRangedAttack(player, monster, result);
                 break;
+
+            case CombatActionType.CoatBlade:
+                await ExecuteCoatBlade(player, result);
+                break;
         }
     }
-    
+
     /// <summary>
     /// Execute attack - Pascal normal_attack calculation
     /// Based on normal_attack function from VARIOUS.PAS
@@ -2178,8 +2289,15 @@ public partial class CombatEngine
             }
         }
 
-        // Poison Coating bonus damage (Black Market consumable)
-        if (attacker.PoisonCoatingCombats > 0)
+        // Poison Coating bonus damage (only for damage-boosting poison types)
+        if (attacker.PoisonCoatingCombats > 0 && PoisonData.HasDamageBonus(attacker.ActivePoisonType))
+        {
+            float bonus = PoisonData.GetDamageBonus(attacker.ActivePoisonType);
+            long poisonBonus = (long)(attackPower * bonus);
+            attackPower += poisonBonus;
+        }
+        // Legacy: if ActivePoisonType is None but coating is active (old Dark Alley saves), use default bonus
+        else if (attacker.PoisonCoatingCombats > 0 && attacker.ActivePoisonType == PoisonType.None)
         {
             long poisonBonus = (long)(attackPower * GameConfig.PoisonCoatingDamageBonus);
             attackPower += poisonBonus;
@@ -2337,6 +2455,10 @@ public partial class CombatEngine
             }
         }
 
+        // Apply poison coating effects on hit
+        if (actualDamage > 0 && target.IsAlive)
+            ApplyPoisonEffectsOnHit(attacker, target);
+
         // Chance to improve basic attack skill from successful use
         if (TrainingSystem.TryImproveFromUse(attacker, "basic_attack", random))
         {
@@ -2346,7 +2468,7 @@ public partial class CombatEngine
 
         await Task.Delay(GetCombatDelay(1500));
     }
-    
+
     /// <summary>
     /// Execute heal action
     /// </summary>
@@ -2427,7 +2549,154 @@ public partial class CombatEngine
 
         await Task.Delay(GetCombatDelay(1000));
     }
-    
+
+    /// <summary>
+    /// Execute Coat Blade action — player selects a poison type and applies it to their weapon.
+    /// Consumes 1 poison vial. Costs the player's turn for the round.
+    /// </summary>
+    private async Task ExecuteCoatBlade(Character player, CombatResult result)
+    {
+        if (player.PoisonVials <= 0)
+        {
+            terminal.WriteLine("You have no poison vials!", "red");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+
+        // If blade is already coated, ask to replace
+        if (player.PoisonCoatingCombats > 0 && player.ActivePoisonType != PoisonType.None)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Your blade is already coated with {PoisonData.GetName(player.ActivePoisonType)} ({player.PoisonCoatingCombats} combats remaining).");
+            terminal.Write("Replace it? (Y/N): ");
+            var confirm = await terminal.GetInput("");
+            if (!confirm.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase))
+            {
+                terminal.WriteLine("You keep your current coating.", "gray");
+                await Task.Delay(GetCombatDelay(500));
+                return;
+            }
+        }
+
+        // Get available poisons for player's level
+        var available = PoisonData.GetAvailablePoisons(player.Level);
+        if (available.Count == 0)
+        {
+            terminal.WriteLine("You don't know how to use any poisons yet!", "yellow");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+
+        // Show poison selection menu
+        terminal.WriteLine("");
+        terminal.SetColor("dark_green");
+        terminal.WriteLine("═══ Select Poison ═══");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"Vials remaining: {player.PoisonVials}");
+        terminal.WriteLine("");
+
+        for (int i = 0; i < available.Count; i++)
+        {
+            var poison = available[i];
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  [{i + 1}] ");
+            terminal.SetColor(PoisonData.GetColor(poison));
+            terminal.Write(PoisonData.GetName(poison));
+            terminal.SetColor("gray");
+            terminal.WriteLine($" - {PoisonData.GetDescription(poison)} ({PoisonData.GetCoatingCombats(poison)} combats)");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write("Choose (0 to cancel): ");
+        var input = await terminal.GetInput("");
+
+        if (!int.TryParse(input.Trim(), out int choice) || choice < 1 || choice > available.Count)
+        {
+            terminal.WriteLine("Cancelled.", "gray");
+            await Task.Delay(GetCombatDelay(500));
+            return;
+        }
+
+        var selectedPoison = available[choice - 1];
+
+        // Consume vial and apply coating
+        player.PoisonVials--;
+        player.ActivePoisonType = selectedPoison;
+        player.PoisonCoatingCombats = PoisonData.GetCoatingCombats(selectedPoison);
+
+        terminal.WriteLine("");
+        terminal.SetColor(PoisonData.GetColor(selectedPoison));
+        terminal.WriteLine($"You carefully coat your blade with {PoisonData.GetName(selectedPoison)}...");
+        terminal.SetColor("dark_green");
+        terminal.WriteLine($"Your weapon glistens with a deadly sheen. ({player.PoisonCoatingCombats} combats)");
+
+        result.CombatLog.Add($"Player coats blade with {PoisonData.GetName(selectedPoison)} ({player.PoisonCoatingCombats} combats)");
+        await Task.Delay(GetCombatDelay(1500));
+    }
+
+    /// <summary>
+    /// Apply poison effects from an active blade coating after a successful attack on a monster.
+    /// Called after damage is dealt to the target.
+    /// </summary>
+    private void ApplyPoisonEffectsOnHit(Character attacker, Monster target)
+    {
+        if (attacker.PoisonCoatingCombats <= 0 || attacker.ActivePoisonType == PoisonType.None)
+            return;
+
+        switch (attacker.ActivePoisonType)
+        {
+            case PoisonType.SerpentVenom:
+                // Damage bonus only — already handled in attack power calculation
+                break;
+
+            case PoisonType.NightshadeExtract:
+                if (!target.IsStunned)
+                {
+                    target.IsStunned = true;
+                    terminal.SetColor("dark_magenta");
+                    terminal.WriteLine($"  Nightshade takes hold — {target.Name} falls asleep!");
+                }
+                break;
+
+            case PoisonType.HemlockDraught:
+                if (!target.Distracted)
+                {
+                    target.Distracted = true;
+                    target.Strength = Math.Max(1, target.Strength - target.Strength / 4); // -25% strength
+                    terminal.SetColor("dark_green");
+                    terminal.WriteLine($"  Hemlock courses through {target.Name}'s veins — weakened!");
+                }
+                break;
+
+            case PoisonType.SiphoningVenom:
+                if (!attacker.HasStatus(StatusEffect.Lifesteal))
+                {
+                    attacker.ApplyStatus(StatusEffect.Lifesteal, 3);
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine("  Siphoning venom activates — your attacks drain life!");
+                }
+                break;
+
+            case PoisonType.WidowsKiss:
+                if (!target.IsStunned)
+                {
+                    target.IsStunned = true;
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine($"  Widow's Kiss paralyzes {target.Name}!");
+                }
+                break;
+
+            case PoisonType.Deathbane:
+                // Damage bonus already handled in attack power calculation
+                target.Poisoned = true;
+                target.Strength = Math.Max(1, target.Strength - target.Strength / 4); // -25% strength
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"  Deathbane ravages {target.Name} — poisoned and weakened!");
+                break;
+        }
+    }
+
     /// <summary>
     /// Execute backstab (Assassin special ability)
     /// Based on Pascal backstab mechanics
@@ -3024,10 +3293,11 @@ public partial class CombatEngine
 
         long actualDamage = Math.Max(1, monsterAttack - playerDefense);
 
-        // Cap non-boss monster damage at 75% of player max HP to prevent one-shots
-        if (!monster.IsBoss)
+        // Cap monster damage per hit to prevent one-shots
+        // Non-bosses: 75% of max HP; Bosses: 85% of max HP
         {
-            long maxDamage = Math.Max(1, (long)(player.MaxHP * 0.75));
+            double capPercent = monster.IsBoss ? 0.85 : 0.75;
+            long maxDamage = Math.Max(1, (long)(player.MaxHP * capPercent));
             if (actualDamage > maxDamage)
                 actualDamage = maxDamage;
         }
@@ -3196,6 +3466,11 @@ public partial class CombatEngine
                 if (drugEffects.MagicResistBonus > 0)
                     actualDamage = Math.Max(1, (long)(actualDamage * (1.0 - drugEffects.MagicResistBonus / 100.0)));
 
+                // Cap ability damage per hit (same caps as normal attacks)
+                double capPercent = monster.IsBoss ? 0.85 : 0.75;
+                long maxDmg = Math.Max(1, (long)(player.MaxHP * capPercent));
+                if (actualDamage > maxDmg) actualDamage = maxDmg;
+
                 player.HP -= actualDamage;
                 terminal.WriteLine($"You take {actualDamage} damage!", "red");
                 result.CombatLog.Add($"{monster.Name} uses {abilityName} for {actualDamage} damage");
@@ -3238,6 +3513,12 @@ public partial class CombatEngine
                 // Do a regular attack with life steal
                 long damage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
                 damage = Math.Max(1, damage - player.Defence);
+
+                // Cap ability damage per hit
+                double capPercent = monster.IsBoss ? 0.85 : 0.75;
+                long maxDmg = Math.Max(1, (long)(player.MaxHP * capPercent));
+                if (damage > maxDmg) damage = maxDmg;
+
                 player.HP -= damage;
                 long healAmount = damage * abilityResult.LifeStealPercent / 100;
                 monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmount);
@@ -3258,6 +3539,12 @@ public partial class CombatEngine
             {
                 long damage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
                 damage = Math.Max(1, damage - player.Defence);
+
+                // Cap ability damage per hit
+                double capPercent = monster.IsBoss ? 0.85 : 0.75;
+                long maxDmg = Math.Max(1, (long)(player.MaxHP * capPercent));
+                if (damage > maxDmg) damage = maxDmg;
+
                 player.HP -= damage;
                 terminal.WriteLine($"You take {damage} damage!", "red");
                 result.CombatLog.Add($"{monster.Name} uses {abilityName} for {damage} damage");
@@ -3489,6 +3776,9 @@ public partial class CombatEngine
         // Track statistics
         result.Player.Statistics.RecordMonsterKill(expReward, goldReward, isBoss, result.Monster.IsUnique);
         result.Player.Statistics.RecordGoldChange(result.Player.Gold);
+
+        // Log to balance dashboard
+        LogCombatEventToDb(result, "victory", expReward, goldReward);
 
         // Track telemetry for combat victory
         TelemetrySystem.Instance.TrackCombat(
@@ -6504,6 +6794,16 @@ public partial class CombatEngine
                     // Player cancelled - loop back
                     continue;
 
+                case "B":
+                    if (player.PoisonVials > 0)
+                    {
+                        action.Type = CombatActionType.CoatBlade;
+                        return (action, false);
+                    }
+                    terminal.WriteLine("You have no poison vials!", "yellow");
+                    await Task.Delay(GetCombatDelay(1000));
+                    continue;
+
                 case "V":
                     if (BossContext?.CanSave == true)
                     {
@@ -6704,7 +7004,9 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * player.LoversBlissBonus);
                         if (player.DivineBlessingCombats > 0 && player.DivineBlessingBonus > 0f)
                             attackPower += (long)(attackPower * player.DivineBlessingBonus);
-                        if (player.PoisonCoatingCombats > 0)
+                        if (player.PoisonCoatingCombats > 0 && PoisonData.HasDamageBonus(player.ActivePoisonType))
+                            attackPower += (long)(attackPower * PoisonData.GetDamageBonus(player.ActivePoisonType));
+                        else if (player.PoisonCoatingCombats > 0 && player.ActivePoisonType == PoisonType.None)
                             attackPower += (long)(attackPower * GameConfig.PoisonCoatingDamageBonus);
                         if (player.PermanentDamageBonus > 0)
                             attackPower += (long)(attackPower * (player.PermanentDamageBonus / 100.0));
@@ -6728,6 +7030,10 @@ public partial class CombatEngine
 
                         long damage = Math.Max(1, attackPower);
                         await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player);
+
+                        // Apply poison coating effects on hit
+                        if (damage > 0 && target.IsAlive)
+                            ApplyPoisonEffectsOnHit(player, target);
                     }
                 }
                 break;
@@ -6758,6 +7064,10 @@ public partial class CombatEngine
 
             case CombatActionType.UseItem:
                 await ExecuteUseItem(player, result);
+                break;
+
+            case CombatActionType.CoatBlade:
+                await ExecuteCoatBlade(player, result);
                 break;
 
             case CombatActionType.Retreat:
@@ -9279,6 +9589,9 @@ public partial class CombatEngine
 
         if (chosenAbility == null) return false;
 
+        // Deduct stamina before executing
+        teammate.SpendStamina(chosenAbility.StaminaCost);
+
         // Use the ability through the proper system (calculates damage, scaling, effects)
         var abilityResult = ClassAbilitySystem.UseAbility(teammate, chosenAbility.Id, random);
         if (!abilityResult.Success) return false;
@@ -9596,7 +9909,11 @@ public partial class CombatEngine
                     }
                     if (abilityResult.DirectDamage > 0)
                     {
-                        long actualDmg = Math.Max(1, abilityResult.DirectDamage - (companion.Defence / 3));
+                        // Use sqrt-scaled defense to prevent high-armor companions from absorbing all damage
+                        long abilityDefense = (long)(Math.Sqrt(companion.Defence) * 3);
+                        long actualDmg = Math.Max(1, abilityResult.DirectDamage - abilityDefense);
+                        if (monster.IsBoss)
+                            actualDmg = Math.Max(actualDmg, monster.Level * 2);
                         companion.HP -= actualDmg;
                         terminal.WriteLine($"{companion.DisplayName} takes {actualDmg} damage from {abilityName}!", "red");
                         result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {actualDmg}");
@@ -9617,6 +9934,20 @@ public partial class CombatEngine
                     // Fall through to death check below if companion died from ability
                     if (companion.IsAlive) return;
                 }
+                else if (monster.IsBoss)
+                {
+                    // Old God abilities use custom names that don't match MonsterAbilities enum.
+                    // Generate direct damage so these thematic attacks still hurt companions.
+                    long bossDmg = monster.Level * 3 + random.Next(0, monster.Level);
+                    companion.HP = Math.Max(0, companion.HP - bossDmg);
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"{monster.Name} unleashes {abilityName}!");
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"{companion.DisplayName} takes {bossDmg} damage! ({companion.HP}/{companion.MaxHP} HP)");
+                    result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {bossDmg}");
+                    await Task.Delay(GetCombatDelay(800));
+                    if (companion.IsAlive) return;
+                }
             }
         }
 
@@ -9630,10 +9961,23 @@ public partial class CombatEngine
         // Apply difficulty modifier
         monsterAttack = DifficultySystem.ApplyMonsterDamageMultiplier(monsterAttack);
 
-        // Calculate companion defense
-        long companionDefense = companion.Defence + companion.ArmPow / 2;
+        // Calculate companion defense — use same diminishing returns as player defense (v0.41.4)
+        // Without sqrt scaling, high-level bodyguards become untouchable (damage always = 1)
+        long companionDefense = companion.Defence + random.Next(0, (int)Math.Max(1, companion.Defence / 8));
+        if (companion.ArmPow > 0)
+        {
+            int armAbsorbMax = (int)(Math.Sqrt(companion.ArmPow) * 5);
+            companionDefense += random.Next(0, armAbsorbMax + 1);
+        }
 
         long actualDamage = Math.Max(1, monsterAttack - companionDefense);
+
+        // Boss monsters deal at least level-scaled damage — divine power overwhelms mortal defenses
+        if (monster.IsBoss)
+        {
+            long minBossDamage = monster.Level * 3;
+            actualDamage = Math.Max(actualDamage, minBossDamage);
+        }
 
         // Apply damage to companion
         companion.HP = Math.Max(0, companion.HP - actualDamage);
@@ -10039,6 +10383,9 @@ public partial class CombatEngine
             : $"{result.DefeatedMonsters.Count} monsters";
         GrantGodKillXP(result.Player, adjustedExp, mmMonsterDesc);
 
+        // Log to balance dashboard
+        LogCombatEventToDb(result, "victory", adjustedExp, adjustedGold);
+
         // Track telemetry for multi-monster combat victory
         bool hasBoss = result.DefeatedMonsters.Any(m => m.IsBoss);
         TelemetrySystem.Instance.TrackCombat(
@@ -10342,6 +10689,9 @@ public partial class CombatEngine
 
         // Track statistics - death (not from player)
         result.Player.Statistics.RecordDeath(false);
+
+        // Log to balance dashboard
+        LogCombatEventToDb(result, "death");
 
         // Queue Stranger encounter after first death
         if (result.Player.Statistics.TotalMonsterDeaths == 1)
@@ -13644,6 +13994,15 @@ public partial class CombatEngine
         var ability = ClassAbilitySystem.GetAbility(abilityId);
         if (ability == null) return;
 
+        // Check and deduct stamina
+        if (!player.HasEnoughStamina(ability.StaminaCost))
+        {
+            terminal.WriteLine($"Not enough stamina! Need {ability.StaminaCost}, have {player.CurrentCombatStamina}.", "red");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+        player.SpendStamina(ability.StaminaCost);
+
         // Use the ability
         var abilityResult = ClassAbilitySystem.UseAbility(player, abilityId, random);
 
@@ -14074,6 +14433,8 @@ public partial class CombatEngine
         if (teammate.Healing > 0 && teammate.HP < teammate.MaxHP)
             actions.Add("[I]tem");
         actions.Add("[D]efend");
+        if (teammate.PoisonVials > 0)
+            actions.Add($"[B]Poison({teammate.PoisonVials})");
         followerTerm.WriteLine($"  {string.Join("  ", actions)}");
 
         followerTerm.SetColor("gray");
@@ -14270,6 +14631,13 @@ public partial class CombatEngine
         if (trimmed == "L")
         {
             action.Type = CombatActionType.Hide;
+            return action;
+        }
+
+        // Coat Blade (poison vial)
+        if (trimmed == "B" && teammate.PoisonVials > 0)
+        {
+            action.Type = CombatActionType.CoatBlade;
             return action;
         }
 
@@ -14679,7 +15047,8 @@ public enum CombatActionType
     Hide,
     RangedAttack,
     HealAlly,       // Heal a teammate with potion or spell
-    BossSave        // Attempt to save an Old God boss mid-combat
+    BossSave,       // Attempt to save an Old God boss mid-combat
+    CoatBlade       // Coat weapon with poison from vial inventory
 }
 
 /// <summary>
@@ -14735,6 +15104,9 @@ public class CombatResult
     // Damage tracking for berserker mode
     public long TotalDamageDealt { get; set; }
     public long TotalDamageTaken { get; set; }
+
+    // Round tracking for balance dashboard
+    public int CurrentRound { get; set; }
 
     // Simple outcome flags
     public bool Victory { get; set; }

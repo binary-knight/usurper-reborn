@@ -263,6 +263,38 @@ namespace UsurperRemake.Systems
                         attack_log TEXT DEFAULT '[]'
                     );
 
+                    CREATE TABLE IF NOT EXISTS combat_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_name TEXT NOT NULL,
+                        player_level INTEGER NOT NULL,
+                        player_class TEXT NOT NULL,
+                        player_max_hp INTEGER NOT NULL,
+                        player_str INTEGER NOT NULL,
+                        player_dex INTEGER NOT NULL,
+                        player_weap_pow INTEGER NOT NULL,
+                        player_arm_pow INTEGER NOT NULL,
+                        monster_name TEXT,
+                        monster_level INTEGER,
+                        monster_max_hp INTEGER,
+                        monster_str INTEGER,
+                        monster_def INTEGER,
+                        is_boss INTEGER DEFAULT 0,
+                        outcome TEXT NOT NULL,
+                        rounds INTEGER DEFAULT 0,
+                        damage_dealt INTEGER DEFAULT 0,
+                        damage_taken INTEGER DEFAULT 0,
+                        xp_gained INTEGER DEFAULT 0,
+                        gold_gained INTEGER DEFAULT 0,
+                        dungeon_floor INTEGER DEFAULT 0,
+                        monster_count INTEGER DEFAULT 1,
+                        has_teammates INTEGER DEFAULT 0,
+                        created_at TEXT DEFAULT (datetime('now'))
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_ce_player ON combat_events(player_name, created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_ce_outcome ON combat_events(outcome, created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_ce_class ON combat_events(player_class, outcome);
+
                     CREATE INDEX IF NOT EXISTS idx_news_created ON news(created_at DESC);
                     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_player, is_read);
                     CREATE INDEX IF NOT EXISTS idx_messages_to_type ON messages(to_player, message_type, is_read, created_at DESC);
@@ -987,6 +1019,66 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to add news: {ex.Message}");
+            }
+        }
+
+        // --- Combat Events (Balance Dashboard) ---
+
+        public async Task LogCombatEvent(
+            string playerName, int playerLevel, string playerClass,
+            long playerMaxHP, long playerSTR, long playerDEX, long playerWeapPow, long playerArmPow,
+            string? monsterName, int monsterLevel, long monsterMaxHP, long monsterSTR, long monsterDEF,
+            bool isBoss, string outcome, int rounds,
+            long damageDealt, long damageTaken, long xpGained, long goldGained,
+            int dungeonFloor, int monsterCount, bool hasTeammates)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO combat_events (
+                        player_name, player_level, player_class,
+                        player_max_hp, player_str, player_dex, player_weap_pow, player_arm_pow,
+                        monster_name, monster_level, monster_max_hp, monster_str, monster_def,
+                        is_boss, outcome, rounds, damage_dealt, damage_taken,
+                        xp_gained, gold_gained, dungeon_floor, monster_count, has_teammates
+                    ) VALUES (
+                        @pName, @pLevel, @pClass,
+                        @pMaxHP, @pSTR, @pDEX, @pWeapPow, @pArmPow,
+                        @mName, @mLevel, @mMaxHP, @mSTR, @mDEF,
+                        @isBoss, @outcome, @rounds, @dmgDealt, @dmgTaken,
+                        @xpGained, @goldGained, @floor, @mCount, @hasTeam
+                    );
+                ";
+                cmd.Parameters.AddWithValue("@pName", playerName);
+                cmd.Parameters.AddWithValue("@pLevel", playerLevel);
+                cmd.Parameters.AddWithValue("@pClass", playerClass);
+                cmd.Parameters.AddWithValue("@pMaxHP", playerMaxHP);
+                cmd.Parameters.AddWithValue("@pSTR", playerSTR);
+                cmd.Parameters.AddWithValue("@pDEX", playerDEX);
+                cmd.Parameters.AddWithValue("@pWeapPow", playerWeapPow);
+                cmd.Parameters.AddWithValue("@pArmPow", playerArmPow);
+                cmd.Parameters.AddWithValue("@mName", (object?)monsterName ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@mLevel", monsterLevel);
+                cmd.Parameters.AddWithValue("@mMaxHP", monsterMaxHP);
+                cmd.Parameters.AddWithValue("@mSTR", monsterSTR);
+                cmd.Parameters.AddWithValue("@mDEF", monsterDEF);
+                cmd.Parameters.AddWithValue("@isBoss", isBoss ? 1 : 0);
+                cmd.Parameters.AddWithValue("@outcome", outcome);
+                cmd.Parameters.AddWithValue("@rounds", rounds);
+                cmd.Parameters.AddWithValue("@dmgDealt", damageDealt);
+                cmd.Parameters.AddWithValue("@dmgTaken", damageTaken);
+                cmd.Parameters.AddWithValue("@xpGained", xpGained);
+                cmd.Parameters.AddWithValue("@goldGained", goldGained);
+                cmd.Parameters.AddWithValue("@floor", dungeonFloor);
+                cmd.Parameters.AddWithValue("@mCount", monsterCount);
+                cmd.Parameters.AddWithValue("@hasTeam", hasTeammates ? 1 : 0);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to log combat event: {ex.Message}");
             }
         }
 

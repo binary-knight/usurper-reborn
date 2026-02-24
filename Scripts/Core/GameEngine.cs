@@ -684,11 +684,15 @@ public partial class GameEngine : Node
                 break;
         }
 
-        // Handle immortal ascension — player became a god, just re-enter Pantheon
+        // Handle immortal ascension — player became a god, enter the Pantheon
         if (PendingImmortalAscension)
         {
             PendingImmortalAscension = false;
-            // Save is already updated with IsImmortal=true; next login will route to Pantheon
+            // Route to Pantheon for this session; future logins route via IsImmortal check in LoadSaveByFileName
+            if (currentPlayer != null)
+            {
+                await locationManager.EnterLocation(GameLocation.Pantheon, currentPlayer);
+            }
         }
 
         // Handle NG+ restart in BBS/online mode — after any LoadSaveByFileName path
@@ -3371,6 +3375,8 @@ public partial class GameEngine : Node
 
         // Faction consumable properties (v0.40.2)
         player.PoisonCoatingCombats = playerData.PoisonCoatingCombats;
+        player.ActivePoisonType = (PoisonType)playerData.ActivePoisonType;
+        player.PoisonVials = playerData.PoisonVials;
         player.SmokeBombs = playerData.SmokeBombs;
         player.InnerSanctumLastDay = playerData.InnerSanctumLastDay;
 
@@ -4809,12 +4815,20 @@ public partial class GameEngine : Node
 
         // Switch online presence tracking to the new identity
         var osm = OnlineStateManager.Instance;
+        var onlineName = !string.IsNullOrEmpty(displayName) ? displayName : altKey;
         if (osm != null)
         {
             var connType = ctx?.ConnectionType ?? "Unknown";
             // Use the character's display name (not the raw __alt key) for online presence
-            var onlineName = !string.IsNullOrEmpty(displayName) ? displayName : altKey;
             await osm.SwitchIdentity(altKey, onlineName, connType);
+        }
+
+        // Update the PlayerSession's active character name so RoomRegistry
+        // shows the alt's name (not the account name) in "Also here" and broadcasts
+        var server = UsurperRemake.Server.MudServer.Instance;
+        if (server != null && server.ActiveSessions.TryGetValue(ctx?.Username?.ToLowerInvariant() ?? "", out var session))
+        {
+            session.ActiveCharacterName = onlineName;
         }
     }
 

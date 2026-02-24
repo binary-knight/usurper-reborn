@@ -2831,9 +2831,10 @@ public partial class TempleLocation : BaseLocation
                 var immortals = await backend.GetImmortalPlayers();
                 foreach (var god in immortals)
                 {
-                    // Don't show the current mortal player as a god they can worship
-                    var ctx = UsurperRemake.Server.SessionContext.Current;
-                    if (ctx != null && god.Username.Equals(ctx.Username, StringComparison.OrdinalIgnoreCase))
+                    // Don't show the player's own god entry if they ARE the immortal.
+                    // Alt characters on the same account (mortal) should still see and worship their god.
+                    if (currentPlayer.IsImmortal && !string.IsNullOrEmpty(currentPlayer.DivineName)
+                        && currentPlayer.DivineName.Equals(god.DivineName, StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     gods.Add(new ImmortalGodInfo

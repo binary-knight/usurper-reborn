@@ -629,8 +629,9 @@ public class StreetEncounterSystem
                 muggers.Add(mugger);
             }
 
+            var muggerTeammates = GetStreetCombatTeammates(player);
             var combatEngine = new CombatEngine(terminal);
-            var combatResult = await combatEngine.PlayerVsMonsters(player, muggers);
+            var combatResult = await combatEngine.PlayerVsMonsters(player, muggers, muggerTeammates);
 
             if (combatResult.Outcome == CombatOutcome.Victory)
             {
@@ -1330,6 +1331,76 @@ public class StreetEncounterSystem
     // ======================== HELPER METHODS ========================
 
     /// <summary>
+    /// Build a list of the player's available combat allies (companions + royal mercenaries)
+    /// for street encounters. Mirrors the dungeon's teammate assembly but without display text.
+    /// </summary>
+    private List<Character> GetStreetCombatTeammates(Character player)
+    {
+        var teammates = new List<Character>();
+        const int maxPartySize = 4;
+
+        // Add active companions
+        var companionSystem = CompanionSystem.Instance;
+        if (companionSystem != null)
+        {
+            var companionChars = companionSystem.GetCompanionsAsCharacters();
+            foreach (var c in companionChars)
+            {
+                if (teammates.Count >= maxPartySize) break;
+                if (c.IsAlive) teammates.Add(c);
+            }
+        }
+
+        // Add royal mercenaries (bodyguards for king players)
+        if (player.King && player.RoyalMercenaries != null)
+        {
+            foreach (var merc in player.RoyalMercenaries)
+            {
+                if (teammates.Count >= maxPartySize) break;
+                if (merc.HP <= 0) continue;
+
+                var character = new Character
+                {
+                    Name2 = merc.Name,
+                    Class = merc.Class,
+                    Sex = merc.Sex,
+                    Level = merc.Level,
+                    HP = merc.HP,
+                    MaxHP = merc.MaxHP,
+                    Mana = merc.Mana,
+                    MaxMana = merc.MaxMana,
+                    Strength = merc.Strength,
+                    Defence = merc.Defence,
+                    WeapPow = merc.WeapPow,
+                    ArmPow = merc.ArmPow,
+                    Agility = merc.Agility,
+                    Dexterity = merc.Dexterity,
+                    Wisdom = merc.Wisdom,
+                    Intelligence = merc.Intelligence,
+                    Constitution = merc.Constitution,
+                    Healing = merc.Healing,
+                    AI = CharacterAI.Computer,
+                    IsMercenary = true,
+                    MercenaryName = merc.Name,
+                    BaseMaxHP = merc.MaxHP,
+                    BaseMaxMana = merc.MaxMana,
+                    BaseStrength = merc.Strength,
+                    BaseDefence = merc.Defence,
+                    BaseAgility = merc.Agility,
+                    BaseDexterity = merc.Dexterity,
+                    BaseWisdom = merc.Wisdom,
+                    BaseIntelligence = merc.Intelligence,
+                    BaseConstitution = merc.Constitution,
+                    Stamina = 5 + merc.Level * 2
+                };
+                teammates.Add(character);
+            }
+        }
+
+        return teammates;
+    }
+
+    /// <summary>
     /// Fight an NPC using the combat engine
     /// </summary>
     private async Task FightNPC(Character player, NPC npc, EncounterResult result, TerminalEmulator terminal,
@@ -1355,8 +1426,10 @@ public class StreetEncounterSystem
             weappow: (int)npc.WeapPow
         );
 
+        // Include player's companions and bodyguards in street combat
+        var teammates = GetStreetCombatTeammates(player);
         var combatEngine = new CombatEngine(terminal);
-        var combatResult = await combatEngine.PlayerVsMonster(player, monster);
+        var combatResult = await combatEngine.PlayerVsMonster(player, monster, teammates);
 
         result.Victory = combatResult.Outcome == CombatOutcome.Victory;
 
@@ -2812,9 +2885,10 @@ public class StreetEncounterSystem
         }
         terminal.WriteLine("");
 
-        // Combat
+        // Combat (include companions and bodyguards)
+        var murderTeammates = GetStreetCombatTeammates(player);
         var combatEngine = new CombatEngine(terminal);
-        var combatResult = await combatEngine.PlayerVsMonster(player, monster);
+        var combatResult = await combatEngine.PlayerVsMonster(player, monster, murderTeammates);
 
         result.Victory = combatResult.Outcome == CombatOutcome.Victory;
 

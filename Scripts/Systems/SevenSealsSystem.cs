@@ -389,22 +389,25 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(800);
 
-            // Show collection progress
+            // Show collection progress — each slot maps to a specific seal, not ordinal count
             var story = StoryProgressionSystem.Instance;
             int collected = story.CollectedSeals.Count + 1; // +1 for current seal
+            var sealOrder = new[] { SealType.Creation, SealType.FirstWar, SealType.Corruption,
+                SealType.Imprisonment, SealType.Prophecy, SealType.Regret, SealType.Truth };
             terminal.SetColor("gray");
             terminal.Write("  Seal Progress: ");
-            for (int i = 1; i <= 7; i++)
+            for (int i = 0; i < 7; i++)
             {
-                if (i < collected)
+                if (sealOrder[i] == seal.Type)
+                {
+                    // This is the seal being collected right now
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write("[*]");
+                }
+                else if (story.CollectedSeals.Contains(sealOrder[i]))
                 {
                     terminal.SetColor("bright_green");
                     terminal.Write("[X]");
-                }
-                else if (i == collected)
-                {
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write("[*]");
                 }
                 else
                 {
@@ -430,13 +433,21 @@ namespace UsurperRemake.Systems
 
             foreach (var line in seal.LoreText)
             {
-                if (string.IsNullOrEmpty(line))
+                string displayLine = line;
+
+                // Seal 7 lore starts with "You have found all seven seals" — fix when not all collected
+                if (seal.Type == SealType.Truth && line == "You have found all seven seals." && collected < 7)
+                {
+                    displayLine = $"You have found the final seal — but {7 - collected} still elude you.";
+                }
+
+                if (string.IsNullOrEmpty(displayLine))
                 {
                     terminal.WriteLine("");
                 }
                 else
                 {
-                    terminal.WriteLine($"  {line}", "white");
+                    terminal.WriteLine($"  {displayLine}", "white");
                 }
                 await Task.Delay(150);
             }

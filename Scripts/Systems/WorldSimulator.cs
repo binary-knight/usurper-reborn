@@ -5084,11 +5084,16 @@ public class WorldSimulator
                 // Pick a random aggressive NPC — only Dark or Evil alignment NPCs will attack sleepers
                 // (Good/Holy/Neutral NPCs don't murder people in their sleep)
                 // Also skip NPCs on the same team, or who are spouse/lover of the sleeping player
+                // Level filter: NPC must be within ±5 levels of sleeper to prevent overleveled NPCs
+                // from trivially killing lower-level players through all their guards
                 var alignmentSystem = new UsurperRemake.Systems.AlignmentSystem();
                 string sleeperTeam = SqlBackend.GetPlayerTeamName(sleeper.Username);
                 string sleeperName = sleeper.Username;
+                int sleeperLevel = GetSleeperLevel(sleeper.Username);
+                int minAttackerLevel = Math.Max(GameConfig.MinNPCLevelForSleeperAttack, sleeperLevel - 5);
+                int maxAttackerLevel = sleeperLevel + 5;
                 var eligibleNPCs = npcs
-                    .Where(n => n.IsAlive && !n.IsDead && n.Level >= GameConfig.MinNPCLevelForSleeperAttack && !n.IsStoryNPC
+                    .Where(n => n.IsAlive && !n.IsDead && n.Level >= minAttackerLevel && n.Level <= maxAttackerLevel && !n.IsStoryNPC
                         && (alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Dark
                          || alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil)
                         && (string.IsNullOrEmpty(sleeperTeam) || !sleeperTeam.Equals(n.Team, StringComparison.OrdinalIgnoreCase))
@@ -5130,7 +5135,7 @@ public class WorldSimulator
                     {
                         var guard = guards[i];
                         var guardChar = HeadlessCombatResolver.CreateGuardCharacter(
-                            guard.Type, guard.Hp, GetSleeperLevel(sleeper.Username), random);
+                            guard.Type, guard.Hp, sleeperLevel, random);
 
                         var guardResult = HeadlessCombatResolver.Resolve(attacker, guardChar, random);
 

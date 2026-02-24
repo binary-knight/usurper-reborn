@@ -4660,8 +4660,10 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("");
 
         // Skip NPCs on the player's team or spouse/lover
+        // Level filter: can only attack sleepers within ±5 levels
         string playerTeam = currentPlayer?.Team ?? "";
         string playerName = currentPlayer?.Name2 ?? currentPlayer?.Name1 ?? "";
+        int attackerLevel = currentPlayer?.Level ?? 1;
         var targets = new List<(string name, bool isNPC)>();
         foreach (var npcName in sleepingNPCNames)
         {
@@ -4672,16 +4674,24 @@ public class InnLocation : BaseLocation
             if (npc != null && (npc.SpouseName.Equals(playerName, StringComparison.OrdinalIgnoreCase)
                 || RelationshipSystem.IsMarriedOrLover(npcName, playerName)))
                 continue;
+            if (npc != null && Math.Abs(npc.Level - attackerLevel) > 5)
+                continue;
             string lvlStr = npc != null ? $" (Lvl {npc.Level})" : "";
             terminal.WriteLine($"  {targets.Count + 1}. {npcName}{lvlStr} [SLEEPING NPC]", "yellow");
             targets.Add((npcName, true));
         }
         foreach (var s in innPlayerSleepers)
         {
+            // Level filter: can only attack players within ±5 levels
+            var targetSave = await backend.ReadGameData(s.Username);
+            int targetLevel = targetSave?.Player?.Level ?? 1;
+            if (Math.Abs(targetLevel - attackerLevel) > 5)
+                continue;
+
             int guardCount = 0;
             try { guardCount = JsonSerializer.Deserialize<List<object>>(s.GuardsJson)?.Count ?? 0; } catch { }
             string guardLabel = guardCount > 0 ? $" [{guardCount} guard{(guardCount != 1 ? "s" : "")}]" : "";
-            terminal.WriteLine($"  {targets.Count + 1}. {s.Username}{guardLabel} [SLEEPING PLAYER]", "red");
+            terminal.WriteLine($"  {targets.Count + 1}. {s.Username} (Lvl {targetLevel}){guardLabel} [SLEEPING PLAYER]", "red");
             targets.Add((s.Username, false));
         }
 

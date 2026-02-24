@@ -464,6 +464,8 @@ namespace UsurperRemake.Systems
 
         // Faction consumable properties (v0.40.2)
         public int PoisonCoatingCombats { get; set; }
+        public int ActivePoisonType { get; set; }   // PoisonType enum cast to int
+        public int PoisonVials { get; set; }
         public int SmokeBombs { get; set; }
         public int InnerSanctumLastDay { get; set; }
 

@@ -718,6 +718,8 @@ namespace UsurperRemake.Systems
 
                 // Faction consumable properties (v0.40.2)
                 PoisonCoatingCombats = player.PoisonCoatingCombats,
+                ActivePoisonType = (int)player.ActivePoisonType,
+                PoisonVials = player.PoisonVials,
                 SmokeBombs = player.SmokeBombs,
                 InnerSanctumLastDay = player.InnerSanctumLastDay,
 

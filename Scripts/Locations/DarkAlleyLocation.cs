@@ -1255,8 +1255,8 @@ namespace UsurperRemake.Locations
             terminal.Write("2");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
-            terminal.SetColor(currentPlayer.PoisonCoatingCombats > 0 ? "gray" : "white");
-            terminal.WriteLine($"Poison Vial       {poisonVialPrice,8:N0}g  — +20% damage for 5 combats");
+            terminal.SetColor(currentPlayer.PoisonVials >= GameConfig.MaxPoisonVials ? "gray" : "white");
+            terminal.WriteLine($"Poison Vials (x3) {poisonVialPrice,8:N0}g  — Coat blade in combat [B]");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("bright_yellow");
@@ -1306,11 +1306,11 @@ namespace UsurperRemake.Locations
                     }
                     break;
 
-                case "2": // Poison Vial
-                    if (currentPlayer.PoisonCoatingCombats > 0)
+                case "2": // Poison Vials
+                    if (currentPlayer.PoisonVials >= GameConfig.MaxPoisonVials)
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine("  Your blade is already coated. Wait til it wears off.");
+                        terminal.WriteLine($"  You can't carry any more vials. ({currentPlayer.PoisonVials}/{GameConfig.MaxPoisonVials})");
                     }
                     else if (currentPlayer.Gold < poisonVialPrice)
                     {
@@ -1320,9 +1320,12 @@ namespace UsurperRemake.Locations
                     else
                     {
                         currentPlayer.Gold -= poisonVialPrice;
-                        currentPlayer.PoisonCoatingCombats = 5;
+                        int vialsToAdd = 3;
+                        currentPlayer.PoisonVials = Math.Min(GameConfig.MaxPoisonVials, currentPlayer.PoisonVials + vialsToAdd);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine("  You coat your weapon in a sickly green paste. +20% damage for 5 combats.");
+                        terminal.WriteLine($"  You acquire {vialsToAdd} poison vials. (Total: {currentPlayer.PoisonVials})");
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine("  Use [B] Coat Blade during combat to apply a poison.");
                         currentPlayer.Statistics?.RecordGoldSpent(poisonVialPrice);
                     }
                     break;

@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.46.2";
+    public const string Version = "0.46.3";
     public const string VersionName = "Ascension";
 
     // From Pascal global_maxXX constants
@@ -512,7 +512,9 @@ public static partial class GameConfig
     public const float DivineFavorMaxChance = 0.25f;         // 25% divine favor at rank 8
     public const float GuardInterventionBaseChance = 0.20f;  // 20% base guard intervention for Crown
     public const float GuardInterventionPerRank = 0.05f;     // +5% guard intervention per Crown rank
-    public const float PoisonCoatingDamageBonus = 0.20f;     // +20% damage from poison coating
+    public const float PoisonCoatingDamageBonus = 0.20f;     // +20% damage from Serpent Venom / legacy coating
+    public const float DeathbaneDamageBonus = 0.30f;         // +30% damage from Deathbane poison
+    public const int MaxPoisonVials = 10;                    // Max poison vials in inventory
     public const int InnerSanctumCost = 500;                 // Gold cost for Inner Sanctum meditation
     public const int InformantCost = 100;                    // Gold cost for Shadows informant
     public const float CrownTaxExemptionRate = 0.20f;        // 20% gold loss reduction on death for Crown

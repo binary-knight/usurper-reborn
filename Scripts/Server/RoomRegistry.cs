@@ -53,7 +53,7 @@ public class RoomRegistry
         // Broadcast arrival to others already in the room (suppress for invisible wizards)
         if (!session.IsWizInvisible)
         {
-            BroadcastToRoom(location, $"\u001b[36m{session.Username} arrives.\u001b[0m", excludeUsername: session.Username);
+            BroadcastToRoom(location, $"\u001b[36m{session.ActiveCharacterName} arrives.\u001b[0m", excludeUsername: session.Username);
         }
     }
 
@@ -77,7 +77,7 @@ public class RoomRegistry
         if (!session.IsWizInvisible)
         {
             var destName = destination.HasValue ? BaseLocation.GetLocationName(destination.Value) : "elsewhere";
-            BroadcastToRoom(location, $"\u001b[90m{session.Username} leaves toward {destName}.\u001b[0m", excludeUsername: session.Username);
+            BroadcastToRoom(location, $"\u001b[90m{session.ActiveCharacterName} leaves toward {destName}.\u001b[0m", excludeUsername: session.Username);
         }
     }
 
@@ -97,7 +97,7 @@ public class RoomRegistry
                     _rooms.TryRemove(location, out _);
             }
 
-            BroadcastToRoom(location, $"\u001b[90m{session.Username} has disconnected.\u001b[0m", excludeUsername: session.Username);
+            BroadcastToRoom(location, $"\u001b[90m{session.ActiveCharacterName} has disconnected.\u001b[0m", excludeUsername: session.Username);
         }
     }
 
@@ -127,14 +127,14 @@ public class RoomRegistry
             : WizardLevel.Mortal;
 
         return room.Values
-            .Where(s => excludeKey == null || s.Username.ToLowerInvariant() != excludeKey)
+            .Where(s => excludeKey == null || s.ActiveCharacterName.ToLowerInvariant() != excludeKey)
             .Where(s => !s.IsWizInvisible || viewerWizLevel >= s.WizardLevel) // Hide invisible wizards from lower-level
             .Select(s =>
             {
                 // Add wizard title to display name
                 if (s.WizardLevel > WizardLevel.Mortal)
-                    return $"{s.Username} [{WizardConstants.GetTitle(s.WizardLevel)}]";
-                return s.Username;
+                    return $"{s.ActiveCharacterName} [{WizardConstants.GetTitle(s.WizardLevel)}]";
+                return s.ActiveCharacterName;
             })
             .ToList()
             .AsReadOnly();
@@ -151,7 +151,7 @@ public class RoomRegistry
         var excludeKey = excludeUsername?.ToLowerInvariant();
         foreach (var kvp in room)
         {
-            if (excludeKey != null && kvp.Key == excludeKey)
+            if (excludeKey != null && (kvp.Key == excludeKey || kvp.Value.ActiveCharacterName.ToLowerInvariant() == excludeKey))
                 continue;
 
             kvp.Value.EnqueueMessage(message);

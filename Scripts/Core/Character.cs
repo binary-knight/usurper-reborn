@@ -402,7 +402,9 @@ public class Character
     public float CycleExpMultiplier { get; set; } = 1.0f; // NG+ XP multiplier (scales with cycle)
 
     // Faction consumable properties (v0.40.2)
-    public int PoisonCoatingCombats { get; set; } = 0;  // Combats remaining with poison coating (+20% dmg)
+    public int PoisonCoatingCombats { get; set; } = 0;  // Combats remaining with poison coating
+    public PoisonType ActivePoisonType { get; set; } = PoisonType.None; // Which poison is coating the blade
+    public int PoisonVials { get; set; } = 0;            // Poison vials in inventory (max 10)
     public int SmokeBombs { get; set; } = 0;             // Guaranteed escape items (max 3)
     public int InnerSanctumLastDay { get; set; } = 0;    // Last day Inner Sanctum was used (legacy, single-player)
 
@@ -1904,4 +1906,107 @@ public class RoyalMercenary
     public long Intelligence { get; set; }
     public long Constitution { get; set; }
     public long Healing { get; set; } // Potion count
+}
+
+/// <summary>
+/// Poison types that Assassins unlock at various levels.
+/// Each poison has a unique combat effect when coated on a blade.
+/// </summary>
+public enum PoisonType
+{
+    None = 0,
+    SerpentVenom = 1,       // Level 5  — +20% attack damage
+    NightshadeExtract = 2,  // Level 15 — Applies Sleeping (free opening hit)
+    HemlockDraught = 3,     // Level 30 — Weakened + Vulnerable
+    SiphoningVenom = 4,     // Level 45 — Lifesteal on player
+    WidowsKiss = 5,         // Level 60 — Paralyzed
+    Deathbane = 6           // Level 80 — Poisoned + Weakened + 30% damage
+}
+
+/// <summary>
+/// Static data and helpers for the poison vial system.
+/// </summary>
+public static class PoisonData
+{
+    public static int GetUnlockLevel(PoisonType type) => type switch
+    {
+        PoisonType.SerpentVenom => 5,
+        PoisonType.NightshadeExtract => 15,
+        PoisonType.HemlockDraught => 30,
+        PoisonType.SiphoningVenom => 45,
+        PoisonType.WidowsKiss => 60,
+        PoisonType.Deathbane => 80,
+        _ => 999
+    };
+
+    public static string GetName(PoisonType type) => type switch
+    {
+        PoisonType.SerpentVenom => "Serpent Venom",
+        PoisonType.NightshadeExtract => "Nightshade Extract",
+        PoisonType.HemlockDraught => "Hemlock Draught",
+        PoisonType.SiphoningVenom => "Siphoning Venom",
+        PoisonType.WidowsKiss => "Widow's Kiss",
+        PoisonType.Deathbane => "Deathbane",
+        _ => "None"
+    };
+
+    public static string GetDescription(PoisonType type) => type switch
+    {
+        PoisonType.SerpentVenom => "+20% attack damage for 3 combats",
+        PoisonType.NightshadeExtract => "Puts enemy to sleep on first hit (2 rounds)",
+        PoisonType.HemlockDraught => "Weakens enemy: -4 STR, +25% damage taken (3 rounds)",
+        PoisonType.SiphoningVenom => "Drain life: heal 25% of damage dealt (3 rounds)",
+        PoisonType.WidowsKiss => "Paralyzes enemy: skip turns, easier to hit (2 rounds)",
+        PoisonType.Deathbane => "Deadly: poison DoT + weaken + 30% damage (2 combats)",
+        _ => ""
+    };
+
+    public static string GetColor(PoisonType type) => type switch
+    {
+        PoisonType.SerpentVenom => "green",
+        PoisonType.NightshadeExtract => "dark_magenta",
+        PoisonType.HemlockDraught => "yellow",
+        PoisonType.SiphoningVenom => "bright_red",
+        PoisonType.WidowsKiss => "cyan",
+        PoisonType.Deathbane => "bright_magenta",
+        _ => "white"
+    };
+
+    public static int GetCoatingCombats(PoisonType type) => type switch
+    {
+        PoisonType.SerpentVenom => 3,
+        PoisonType.NightshadeExtract => 3,
+        PoisonType.HemlockDraught => 3,
+        PoisonType.SiphoningVenom => 3,
+        PoisonType.WidowsKiss => 2,
+        PoisonType.Deathbane => 2,
+        _ => 0
+    };
+
+    public static List<PoisonType> GetAvailablePoisons(int playerLevel)
+    {
+        var available = new List<PoisonType>();
+        foreach (PoisonType pt in Enum.GetValues(typeof(PoisonType)))
+        {
+            if (pt != PoisonType.None && playerLevel >= GetUnlockLevel(pt))
+                available.Add(pt);
+        }
+        return available;
+    }
+
+    /// <summary>
+    /// Whether this poison type grants a damage bonus (vs. applying a status effect).
+    /// </summary>
+    public static bool HasDamageBonus(PoisonType type) =>
+        type == PoisonType.SerpentVenom || type == PoisonType.Deathbane;
+
+    /// <summary>
+    /// Get the damage bonus multiplier for this poison type.
+    /// </summary>
+    public static float GetDamageBonus(PoisonType type) => type switch
+    {
+        PoisonType.SerpentVenom => GameConfig.PoisonCoatingDamageBonus,
+        PoisonType.Deathbane => GameConfig.DeathbaneDamageBonus,
+        _ => 0f
+    };
 }

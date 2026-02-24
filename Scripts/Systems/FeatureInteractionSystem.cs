@@ -567,9 +567,9 @@ public class FeatureInteractionSystem
 
         if (failureType < 40)
         {
-            // Minor consequence - small damage
+            // Minor consequence - small damage (never lethal)
             long damage = level + random.Next(1, 10);
-            player.HP -= damage;
+            player.HP = Math.Max(1, player.HP - damage);
             terminal.SetColor("red");
             terminal.WriteLine($"Your failure costs you. -{damage} HP");
             outcome.DamageTaken = damage;
@@ -686,7 +686,7 @@ public class FeatureInteractionSystem
         if (option.HealthChange != 0)
         {
             player.HP += option.HealthChange;
-            player.HP = Math.Clamp(player.HP, 0, player.MaxHP);
+            player.HP = Math.Clamp(player.HP, 1, player.MaxHP);
             terminal.SetColor(option.HealthChange > 0 ? "green" : "red");
             terminal.WriteLine(option.HealthChange > 0 ? $"+{option.HealthChange} HP" : $"{option.HealthChange} HP");
         }
@@ -871,10 +871,12 @@ public class FeatureInteractionSystem
                 terminal.SetColor("dark_gray");
                 terminal.WriteLine("You notice hidden passages others would miss.");
                 terminal.WriteLine("Someone left supplies for those who know where to look.");
-                int potions = 1 + (level / 25);
-                player.Healing = Math.Min(player.MaxPotions, player.Healing + potions);
-                terminal.SetColor("green");
-                terminal.WriteLine($"+{potions} hidden poison/potion{(potions > 1 ? "s" : "")}!");
+                int vials = 1 + (level / 25);
+                player.PoisonVials = Math.Min(GameConfig.MaxPoisonVials, player.PoisonVials + vials);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"+{vials} poison vial{(vials > 1 ? "s" : "")}! (Total: {player.PoisonVials})");
+                terminal.SetColor("gray");
+                terminal.WriteLine("Use [B] Coat Blade during combat to apply a poison.");
                 break;
 
             case CharacterClass.Ranger:
@@ -970,7 +972,7 @@ public class FeatureInteractionSystem
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("FAILURE!");
                 terminal.WriteLine("A trap springs!");
-                player.HP -= potentialDamage;
+                player.HP = Math.Max(1, player.HP - potentialDamage);
                 terminal.SetColor("red");
                 terminal.WriteLine($"-{potentialDamage} HP!");
                 outcome.DamageTaken = potentialDamage;
@@ -1279,7 +1281,7 @@ public class FeatureInteractionSystem
         else
         {
             long damage = level + random.Next(5, 15);
-            player.HP -= damage;
+            player.HP = Math.Max(1, player.HP - damage);
             terminal.SetColor("red");
             terminal.WriteLine($"A trap! You take {damage} damage!");
             outcome.DamageTaken = damage;
