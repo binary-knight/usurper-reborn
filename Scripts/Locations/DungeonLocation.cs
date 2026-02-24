@@ -1535,7 +1535,7 @@ public class DungeonLocation : BaseLocation
 
         ShowBBSMenuRow(
             ("M", "bright_yellow", "Map"),
-            ("N", "bright_yellow", "Nav"),
+            ("G", "bright_yellow", "Guide"),
             ("I", "bright_yellow", "Inv"),
             ("P", "bright_yellow", "Potions"),
             ("=", "bright_yellow", "Status"),
@@ -1974,11 +1974,11 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
-        terminal.Write("N");
+        terminal.Write("G");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.Write("Nav  ");
+        terminal.Write("Guide  ");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
@@ -3034,7 +3034,7 @@ public class DungeonLocation : BaseLocation
                 await ShowDungeonMap();
                 return false;
 
-            case "N":
+            case "G":
                 await ShowDungeonNavigator();
                 return false;
 
@@ -11186,7 +11186,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("S - View your character status");
         terminal.WriteLine("P - Buy potions from the wandering monk");
         terminal.WriteLine("M - View the dungeon map");
-        terminal.WriteLine("N - Navigator (directions to stairs, unexplored, uncleared, boss)");
+        terminal.WriteLine("G - Guide (directions to stairs, unexplored, uncleared, boss)");
         terminal.WriteLine("Q - Quit and return to town");
         terminal.WriteLine("");
         await terminal.PressAnyKey();

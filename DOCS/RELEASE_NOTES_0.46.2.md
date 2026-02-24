@@ -40,9 +40,9 @@ to just:
 UsurperReborn --door32 %f
 ```
 
-### Dungeon Navigator (`[N]`)
+### Dungeon Guide (`[G]`)
 
-New `[N] Nav` option in the dungeon gives step-by-step compass directions to key points of interest. Available to all players alongside the existing `[M] Map`.
+New `[G] Guide` option in the dungeon gives step-by-step compass directions to key points of interest. Available to all players alongside the existing `[M] Map`.
 
 Select a destination to get the shortest path:
 
