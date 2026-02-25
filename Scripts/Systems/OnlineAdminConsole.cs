@@ -19,9 +19,11 @@ namespace UsurperRemake.Systems
         private readonly TerminalEmulator terminal;
         private readonly SqlSaveBackend backend;
 
+        // Class names indexed by CharacterClass enum value (alphabetical base + prestige)
         private static readonly string[] ClassNames = {
             "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",
-            "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior"
+            "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior",
+            "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver"
         };
 
         public OnlineAdminConsole(TerminalEmulator term, SqlSaveBackend sqlBackend)
@@ -65,23 +67,17 @@ namespace UsurperRemake.Systems
             catch (InvalidOperationException)
             {
                 // Console.KeyAvailable not supported when stdin is fully redirected
-                // (online mode with PTY should support it, but catch just in case)
             }
         }
 
         /// <summary>
         /// Read sanitized input from the terminal.
-        /// Drains any buffered escape sequences from stdin before reading,
-        /// preventing terminal response garbage from ANSI codes and special keys.
+        /// Drains any buffered escape sequences from stdin before reading.
         /// </summary>
         private async Task<string> ReadInput(string prompt)
         {
-            // Let any pending terminal response bytes arrive in stdin buffer
             await Task.Delay(50);
-
-            // Drain buffered bytes (ANSI responses from ClearScreen/SetColor, stale escape sequences)
             DrainPendingInput();
-
             return Sanitize(await terminal.GetInputAsync(prompt));
         }
 
@@ -97,7 +93,7 @@ namespace UsurperRemake.Systems
                 switch (choice.ToUpper())
                 {
                     case "1":
-                        await ListAllPlayers();
+                        await ListAndEditPlayers();
                         break;
                     case "2":
                         await BanPlayer();
@@ -109,21 +105,18 @@ namespace UsurperRemake.Systems
                         await DeletePlayer();
                         break;
                     case "5":
-                        await EditPlayer();
-                        break;
-                    case "6":
                         await EditDifficultySettings();
                         break;
-                    case "7":
+                    case "6":
                         await SetMOTD();
                         break;
-                    case "8":
+                    case "7":
                         await ViewOnlinePlayers();
                         break;
-                    case "9":
+                    case "8":
                         await ClearNews();
                         break;
-                    case "A":
+                    case "9":
                         await BroadcastMessage();
                         break;
                     case "P":
@@ -158,27 +151,23 @@ namespace UsurperRemake.Systems
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("═══ PLAYER MANAGEMENT ═══");
             terminal.SetColor("white");
-            terminal.WriteLine("  [1] List All Players");
-            terminal.WriteLine("  [2] Ban Player");
-            terminal.WriteLine("  [3] Unban Player");
-            terminal.WriteLine("  [4] Delete Player");
-            terminal.WriteLine("  [5] Edit Player");
-            terminal.WriteLine("  [P] Reset Player Password");
+            terminal.WriteLine("  [1] List/Edit Players");
+            terminal.WriteLine("  [2] Ban Player        [3] Unban Player");
+            terminal.WriteLine("  [4] Delete Player     [P] Reset Password");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("═══ GAME SETTINGS ═══");
             terminal.SetColor("white");
-            terminal.WriteLine("  [6] Difficulty Settings (XP/Gold/Monster multipliers)");
-            terminal.WriteLine("  [7] Set Message of the Day (MOTD)");
+            terminal.WriteLine("  [5] Difficulty Settings");
+            terminal.WriteLine("  [6] Set Message of the Day (MOTD)");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("═══ WORLD MANAGEMENT ═══");
             terminal.SetColor("white");
-            terminal.WriteLine("  [8] View Online Players");
-            terminal.WriteLine("  [9] Clear News Feed");
-            terminal.WriteLine("  [A] Broadcast System Message");
+            terminal.WriteLine("  [7] View Online Players");
+            terminal.WriteLine("  [8] Clear News Feed   [9] Broadcast Message");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
@@ -209,7 +198,7 @@ namespace UsurperRemake.Systems
         {
             if (p.IsBanned) return "BANNED";
             if (p.IsOnline) return "ONLINE";
-            return "Offline";
+            return "Off";
         }
 
         private string GetStatusColor(AdminPlayerInfo p)
@@ -220,10 +209,68 @@ namespace UsurperRemake.Systems
         }
 
         // =====================================================================
+        // Reusable numbered player list for single-select operations
+        // =====================================================================
+
+        /// <summary>
+        /// Show a numbered list of players and let the admin select one.
+        /// Returns the selected player or null on cancel.
+        /// </summary>
+        private async Task<AdminPlayerInfo?> ShowPlayerList(string title,
+            List<AdminPlayerInfo> players)
+        {
+            if (players.Count == 0)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("yellow");
+                terminal.WriteLine("No players found.");
+                await ReadInput("Press Enter to continue...");
+                return null;
+            }
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"═══ {title} ═══");
+            terminal.WriteLine("");
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {"#",-4} {"Name",-16} {"Lvl",4} {"Class",-14} {"Gold",10} {"Status",-8}");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  " + new string('─', 60));
+
+            for (int i = 0; i < players.Count; i++)
+            {
+                var p = players[i];
+                terminal.SetColor(GetStatusColor(p));
+                terminal.WriteLine($"  {i + 1,-4} {p.DisplayName,-16} {p.Level,4} {GetClassName(p.ClassId),-14} {p.Gold,10:N0} {GetPlayerStatus(p),-8}");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine("  Enter # to select, [Q]uit");
+            terminal.WriteLine("");
+
+            var input = await ReadInput("Choice: ");
+            if (string.IsNullOrWhiteSpace(input) || input.ToUpper() == "Q")
+                return null;
+
+            if (int.TryParse(input, out int sel) && sel >= 1 && sel <= players.Count)
+                return players[sel - 1];
+
+            terminal.SetColor("red");
+            terminal.WriteLine("Invalid selection.");
+            await Task.Delay(1000);
+            return null;
+        }
+
+        // =====================================================================
         // Player Management
         // =====================================================================
 
-        internal async Task ListAllPlayers()
+        /// <summary>
+        /// Paginated player list with number selection to edit.
+        /// </summary>
+        internal async Task ListAndEditPlayers()
         {
             var players = await backend.GetAllPlayersDetailed();
 
@@ -249,25 +296,24 @@ namespace UsurperRemake.Systems
 
                 // Header
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  {"#",-4} {"Name",-16} {"Lvl",4} {"Class",-12} {"Gold",10} {"Status",-8} {"Last Login",-12}");
+                terminal.WriteLine($"  {"#",-4} {"Name",-16} {"Lvl",4} {"Class",-14} {"Gold",10} {"Status",-8} {"Last Login",-12}");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  " + new string('─', 70));
+                terminal.WriteLine("  " + new string('─', 72));
 
                 var pageItems = players.Skip(page * pageSize).Take(pageSize).ToList();
                 for (int i = 0; i < pageItems.Count; i++)
                 {
                     var p = pageItems[i];
                     int num = page * pageSize + i + 1;
-                    string status = GetPlayerStatus(p);
                     string lastLogin = p.LastLogin != null ? p.LastLogin.Substring(0, Math.Min(10, p.LastLogin.Length)) : "Never";
 
                     terminal.SetColor(GetStatusColor(p));
-                    terminal.WriteLine($"  {num,-4} {p.DisplayName,-16} {p.Level,4} {GetClassName(p.ClassId),-12} {p.Gold,10:N0} {status,-8} {lastLogin,-12}");
+                    terminal.WriteLine($"  {num,-4} {p.DisplayName,-16} {p.Level,4} {GetClassName(p.ClassId),-14} {p.Gold,10:N0} {GetPlayerStatus(p),-8} {lastLogin,-12}");
                 }
 
                 terminal.WriteLine("");
                 terminal.SetColor("white");
-                string nav = "";
+                string nav = "#=Edit  ";
                 if (totalPages > 1)
                 {
                     if (page > 0) nav += "[P]rev  ";
@@ -289,47 +335,37 @@ namespace UsurperRemake.Systems
                     case "Q":
                     case "":
                         return;
+                    default:
+                        // Try to parse as a player number
+                        if (int.TryParse(choice, out int playerNum) && playerNum >= 1 && playerNum <= players.Count)
+                        {
+                            var selected = players[playerNum - 1];
+                            await EditPlayer(selected.Username);
+                            // Refresh list after edit
+                            players = await backend.GetAllPlayersDetailed();
+                            totalPages = (players.Count + pageSize - 1) / pageSize;
+                            if (page >= totalPages) page = Math.Max(0, totalPages - 1);
+                        }
+                        break;
                 }
             }
         }
 
         internal async Task BanPlayer()
         {
-            terminal.ClearScreen();
-            terminal.SetColor("bright_red");
-            terminal.WriteLine("═══ BAN PLAYER ═══");
-            terminal.WriteLine("");
+            var players = (await backend.GetAllPlayersDetailed())
+                .Where(p => !p.IsBanned)
+                .OrderBy(p => p.DisplayName)
+                .ToList();
 
-            terminal.SetColor("white");
-            var username = await ReadInput("Enter username to ban (or blank to cancel): ");
-            if (string.IsNullOrWhiteSpace(username))
-                return;
+            var target = await ShowPlayerList("BAN PLAYER", players);
+            if (target == null) return;
 
             // Self-ban protection
-            if (string.Equals(username, DoorMode.OnlineUsername, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(target.Username, DoorMode.OnlineUsername, StringComparison.OrdinalIgnoreCase))
             {
                 terminal.SetColor("red");
                 terminal.WriteLine("You cannot ban yourself!");
-                await ReadInput("Press Enter to continue...");
-                return;
-            }
-
-            // Check if player exists
-            var players = await backend.GetAllPlayersDetailed();
-            var target = players.FirstOrDefault(p => string.Equals(p.Username, username, StringComparison.OrdinalIgnoreCase));
-            if (target == null)
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine($"Player '{username}' not found.");
-                await ReadInput("Press Enter to continue...");
-                return;
-            }
-
-            if (target.IsBanned)
-            {
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"Player '{target.DisplayName}' is already banned.");
-                terminal.WriteLine($"Reason: {target.BanReason ?? "No reason given"}");
                 await ReadInput("Press Enter to continue...");
                 return;
             }
@@ -430,34 +466,18 @@ namespace UsurperRemake.Systems
 
         internal async Task DeletePlayer()
         {
-            terminal.ClearScreen();
-            terminal.SetColor("bright_red");
-            terminal.WriteLine("═══ DELETE PLAYER ═══");
-            terminal.SetColor("red");
-            terminal.WriteLine("WARNING: This permanently deletes a player's account and all their data!");
-            terminal.WriteLine("");
+            var players = (await backend.GetAllPlayersDetailed())
+                .OrderBy(p => p.DisplayName)
+                .ToList();
 
-            terminal.SetColor("white");
-            var username = await ReadInput("Enter username to delete (or blank to cancel): ");
-            if (string.IsNullOrWhiteSpace(username))
-                return;
+            var target = await ShowPlayerList("DELETE PLAYER", players);
+            if (target == null) return;
 
             // Self-delete protection
-            if (string.Equals(username, DoorMode.OnlineUsername, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(target.Username, DoorMode.OnlineUsername, StringComparison.OrdinalIgnoreCase))
             {
                 terminal.SetColor("red");
                 terminal.WriteLine("You cannot delete your own account!");
-                await ReadInput("Press Enter to continue...");
-                return;
-            }
-
-            // Check if player exists
-            var players = await backend.GetAllPlayersDetailed();
-            var target = players.FirstOrDefault(p => string.Equals(p.Username, username, StringComparison.OrdinalIgnoreCase));
-            if (target == null)
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine($"Player '{username}' not found.");
                 await ReadInput("Press Enter to continue...");
                 return;
             }
@@ -499,18 +519,15 @@ namespace UsurperRemake.Systems
 
         internal async Task ResetPlayerPassword()
         {
-            terminal.ClearScreen();
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("═══ RESET PLAYER PASSWORD ═══");
-            terminal.WriteLine("");
+            var players = (await backend.GetAllPlayersDetailed())
+                .OrderBy(p => p.DisplayName)
+                .ToList();
 
-            terminal.SetColor("white");
-            var username = await ReadInput("Enter username (or blank to cancel): ");
-            if (string.IsNullOrWhiteSpace(username))
-                return;
+            var target = await ShowPlayerList("RESET PLAYER PASSWORD", players);
+            if (target == null) return;
 
             terminal.SetColor("yellow");
-            terminal.WriteLine($"Setting new password for '{username}'.");
+            terminal.WriteLine($"Setting new password for '{target.DisplayName}'.");
             terminal.WriteLine("The player will use this password to log in.");
             terminal.WriteLine("");
 
@@ -524,29 +541,14 @@ namespace UsurperRemake.Systems
                 return;
             }
 
-            var (success, message) = backend.AdminResetPassword(username, newPassword);
+            var (success, message) = backend.AdminResetPassword(target.Username, newPassword);
             terminal.SetColor(success ? "green" : "red");
             terminal.WriteLine(message);
 
             if (success)
-                DebugLogger.Instance.LogWarning("ADMIN", $"Password reset for '{username}' by {DoorMode.OnlineUsername}");
+                DebugLogger.Instance.LogWarning("ADMIN", $"Password reset for '{target.DisplayName}' by {DoorMode.OnlineUsername}");
 
             await ReadInput("Press Enter to continue...");
-        }
-
-        internal async Task EditPlayer()
-        {
-            terminal.ClearScreen();
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("═══ EDIT PLAYER ═══");
-            terminal.WriteLine("");
-
-            terminal.SetColor("white");
-            var username = await ReadInput("Enter username to edit (or blank to cancel): ");
-            if (string.IsNullOrWhiteSpace(username))
-                return;
-
-            await EditPlayer(username);
         }
 
         internal async Task EditPlayer(string username)
@@ -605,6 +607,9 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("  [A] Agility        [B] Charisma       [C] Dexterity");
                 terminal.WriteLine("  [D] Wisdom         [E] Intelligence   [F] Constitution");
                 terminal.WriteLine("");
+                terminal.SetColor("cyan");
+                terminal.WriteLine("  [G] Manage Companions              [H] Manage Old Gods");
+                terminal.WriteLine("");
                 terminal.SetColor("green");
                 terminal.WriteLine("  [S] Save Changes");
                 terminal.SetColor("red");
@@ -633,49 +638,68 @@ namespace UsurperRemake.Systems
                         break;
                     case "5":
                         player.MaxHP = await PromptNumericEdit("Max HP", player.MaxHP, 1, long.MaxValue);
+                        player.BaseMaxHP = player.MaxHP;
                         player.HP = player.MaxHP;
                         modified = true;
                         break;
                     case "6":
                         player.MaxMana = await PromptNumericEdit("Max Mana", player.MaxMana, 0, long.MaxValue);
+                        player.BaseMaxMana = player.MaxMana;
                         player.Mana = player.MaxMana;
                         modified = true;
                         break;
                     case "7":
                         player.Strength = await PromptNumericEdit("Strength", player.Strength, 1, 9999);
+                        player.BaseStrength = player.Strength;
                         modified = true;
                         break;
                     case "8":
                         player.Defence = await PromptNumericEdit("Defence", player.Defence, 1, 9999);
+                        player.BaseDefence = player.Defence;
                         modified = true;
                         break;
                     case "9":
                         player.Stamina = await PromptNumericEdit("Stamina", player.Stamina, 1, 9999);
+                        player.BaseStamina = player.Stamina;
                         modified = true;
                         break;
                     case "A":
                         player.Agility = await PromptNumericEdit("Agility", player.Agility, 1, 9999);
+                        player.BaseAgility = player.Agility;
                         modified = true;
                         break;
                     case "B":
                         player.Charisma = await PromptNumericEdit("Charisma", player.Charisma, 1, 9999);
+                        player.BaseCharisma = player.Charisma;
                         modified = true;
                         break;
                     case "C":
                         player.Dexterity = await PromptNumericEdit("Dexterity", player.Dexterity, 1, 9999);
+                        player.BaseDexterity = player.Dexterity;
                         modified = true;
                         break;
                     case "D":
                         player.Wisdom = await PromptNumericEdit("Wisdom", player.Wisdom, 1, 9999);
+                        player.BaseWisdom = player.Wisdom;
                         modified = true;
                         break;
                     case "E":
                         player.Intelligence = await PromptNumericEdit("Intelligence", player.Intelligence, 1, 9999);
+                        player.BaseIntelligence = player.Intelligence;
                         modified = true;
                         break;
                     case "F":
                         player.Constitution = await PromptNumericEdit("Constitution", player.Constitution, 1, 9999);
+                        player.BaseConstitution = player.Constitution;
                         modified = true;
+                        break;
+                    case "G":
+                        if (await EditCompanions(saveData))
+                            modified = true;
+                        break;
+                    case "H":
+                        if (await EditOldGods(saveData))
+                            modified = true;
                         break;
                     case "S":
                         if (!modified)
@@ -694,8 +718,8 @@ namespace UsurperRemake.Systems
                             DebugLogger.Instance.LogInfo("ADMIN", $"Player '{player.Name2}' edited by {DoorMode.OnlineUsername}");
 
                             // Apply changes to live in-memory session if player is online
-                            // Without this, their next autosave would overwrite our DB changes
                             ApplyEditsToLiveSession(username, player);
+                            ApplyStoryEditsToLiveSession(username, saveData);
                         }
                         else
                         {
@@ -755,51 +779,539 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("  (Live session updated)");
         }
 
+        // ──────────────────────────────────────────────────────────────
+        //  Companion & Old God Admin Editors
+        // ──────────────────────────────────────────────────────────────
+
+        private static readonly string[] CompanionNames = { "Lyris", "Aldric", "Mira", "Vex" };
+
+        private static readonly string[] GodNames =
+        {
+            "Maelketh (War, Floor 25)",
+            "Veloura (Love, Floor 40)",
+            "Thorgrim (Law, Floor 55)",
+            "Noctura (Shadow, Floor 70)",
+            "Aurelion (Light, Floor 85)",
+            "Terravok (Earth, Floor 95)",
+            "Manwe (Creation, Floor 100)"
+        };
+
+        private static readonly string[] GodStatusNames =
+        {
+            "Unknown", "Imprisoned", "Dormant", "Dying", "Corrupted",
+            "Neutral", "Awakened", "Hostile", "Allied", "Saved", "Defeated", "Consumed"
+        };
+
+        /// <summary>
+        /// Submenu for managing a player's companion states (resurrect, kill, un-recruit).
+        /// </summary>
+        private async Task<bool> EditCompanions(SaveGameData saveData)
+        {
+            var ss = saveData.StorySystems;
+            bool changed = false;
+
+            while (true)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"═══ COMPANIONS: {saveData.Player.Name2} ═══");
+                terminal.WriteLine("");
+
+                // Display each companion's status
+                for (int i = 0; i < CompanionNames.Length; i++)
+                {
+                    var comp = ss.Companions?.FirstOrDefault(c => c.Id == i);
+                    string status;
+                    string color;
+
+                    if (comp == null)
+                    {
+                        status = "No data";
+                        color = "dark_gray";
+                    }
+                    else if (comp.IsDead)
+                    {
+                        var deathInfo = ss.FallenCompanions?.FirstOrDefault(f => f.CompanionId == i);
+                        string deathDetail = deathInfo != null ? $": \"{deathInfo.Circumstance}\"" : "";
+                        status = $"DEAD{deathDetail}";
+                        color = "dark_red";
+                    }
+                    else if (comp.IsRecruited && comp.IsActive)
+                    {
+                        status = $"Active, Level {comp.Level}";
+                        color = "bright_green";
+                    }
+                    else if (comp.IsRecruited)
+                    {
+                        status = $"Recruited (at Inn), Level {comp.Level}";
+                        color = "yellow";
+                    }
+                    else
+                    {
+                        status = "Not Recruited";
+                        color = "gray";
+                    }
+
+                    terminal.SetColor("white");
+                    terminal.Write($"  [{i}] {CompanionNames[i],-10}— ");
+                    terminal.SetColor(color);
+                    terminal.WriteLine(status);
+                }
+
+                // Show grief info if any
+                if (ss.ActiveGriefs != null && ss.ActiveGriefs.Count > 0)
+                {
+                    terminal.WriteLine("");
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine("  Active Griefs:");
+                    foreach (var g in ss.ActiveGriefs)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"    {g.CompanionName} — Stage {g.CurrentStage}");
+                    }
+                }
+
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine("  [R] Resurrect a companion");
+                terminal.WriteLine("  [K] Kill a companion");
+                terminal.WriteLine("  [U] Un-recruit (reset to factory)");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  [Q] Back");
+                terminal.WriteLine("");
+
+                var choice = await ReadInput("Choice: ");
+
+                switch (choice.ToUpper())
+                {
+                    case "R":
+                    {
+                        var idx = await PromptCompanionIndex("Resurrect which companion?");
+                        if (idx < 0) break;
+
+                        var comp = ss.Companions?.FirstOrDefault(c => c.Id == idx);
+                        if (comp == null)
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine("  No companion data found.");
+                            await Task.Delay(1000);
+                            break;
+                        }
+                        if (!comp.IsDead)
+                        {
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"  {CompanionNames[idx]} is not dead.");
+                            await Task.Delay(1000);
+                            break;
+                        }
+
+                        // Resurrect
+                        comp.IsDead = false;
+                        comp.IsRecruited = true; // keep recruited
+
+                        // Remove from fallen companions
+                        ss.FallenCompanions?.RemoveAll(f => f.CompanionId == idx);
+
+                        // Clear grief entries
+                        ss.ActiveGriefs?.RemoveAll(g => g.CompanionId == idx);
+                        ss.GriefMemories?.RemoveAll(m => m.CompanionId == idx);
+
+                        // Clear legacy grief fields if they reference this companion
+                        if (ss.GriefCompanionName == CompanionNames[idx])
+                        {
+                            ss.GriefStage = 0;
+                            ss.GriefDaysRemaining = 0;
+                            ss.GriefCompanionName = "";
+                        }
+
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  {CompanionNames[idx]} has been resurrected!");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  (Cleared: IsDead, FallenCompanions, ActiveGriefs, GriefMemories)");
+                        changed = true;
+                        await Task.Delay(1500);
+                        break;
+                    }
+                    case "K":
+                    {
+                        var idx = await PromptCompanionIndex("Kill which companion?");
+                        if (idx < 0) break;
+
+                        var comp = ss.Companions?.FirstOrDefault(c => c.Id == idx);
+                        if (comp == null)
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine("  No companion data found.");
+                            await Task.Delay(1000);
+                            break;
+                        }
+                        if (comp.IsDead)
+                        {
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"  {CompanionNames[idx]} is already dead.");
+                            await Task.Delay(1000);
+                            break;
+                        }
+
+                        comp.IsDead = true;
+                        comp.IsActive = false;
+                        ss.ActiveCompanionIds?.Remove(idx);
+
+                        // Add to fallen if not already there
+                        if (ss.FallenCompanions == null)
+                            ss.FallenCompanions = new List<CompanionDeathInfo>();
+                        if (!ss.FallenCompanions.Any(f => f.CompanionId == idx))
+                        {
+                            ss.FallenCompanions.Add(new CompanionDeathInfo
+                            {
+                                CompanionId = idx,
+                                DeathType = 0, // Combat
+                                Circumstance = "Admin kill",
+                                LastWords = "",
+                                DeathDay = saveData.CurrentDay
+                            });
+                        }
+
+                        terminal.SetColor("dark_red");
+                        terminal.WriteLine($"  {CompanionNames[idx]} has been killed.");
+                        changed = true;
+                        await Task.Delay(1500);
+                        break;
+                    }
+                    case "U":
+                    {
+                        var idx = await PromptCompanionIndex("Un-recruit which companion?");
+                        if (idx < 0) break;
+
+                        var comp = ss.Companions?.FirstOrDefault(c => c.Id == idx);
+                        if (comp == null)
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine("  No companion data found.");
+                            await Task.Delay(1000);
+                            break;
+                        }
+                        if (!comp.IsRecruited && !comp.IsDead)
+                        {
+                            terminal.SetColor("yellow");
+                            terminal.WriteLine($"  {CompanionNames[idx]} is already in factory state.");
+                            await Task.Delay(1000);
+                            break;
+                        }
+
+                        // Reset to factory
+                        comp.IsRecruited = false;
+                        comp.IsActive = false;
+                        comp.IsDead = false;
+                        comp.PersonalQuestStarted = false;
+                        comp.PersonalQuestCompleted = false;
+                        ss.ActiveCompanionIds?.Remove(idx);
+                        ss.FallenCompanions?.RemoveAll(f => f.CompanionId == idx);
+                        ss.ActiveGriefs?.RemoveAll(g => g.CompanionId == idx);
+                        ss.GriefMemories?.RemoveAll(m => m.CompanionId == idx);
+
+                        if (ss.GriefCompanionName == CompanionNames[idx])
+                        {
+                            ss.GriefStage = 0;
+                            ss.GriefDaysRemaining = 0;
+                            ss.GriefCompanionName = "";
+                        }
+
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"  {CompanionNames[idx]} has been reset to factory state.");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  They can now be re-encountered and recruited.");
+                        changed = true;
+                        await Task.Delay(1500);
+                        break;
+                    }
+                    case "Q":
+                    case "":
+                        return changed;
+                }
+            }
+        }
+
+        private async Task<int> PromptCompanionIndex(string prompt)
+        {
+            terminal.SetColor("white");
+            var input = await ReadInput($"  {prompt} (0-3, or Q): ");
+            if (string.IsNullOrWhiteSpace(input) || input.ToUpper() == "Q")
+                return -1;
+            if (int.TryParse(input, out int idx) && idx >= 0 && idx < CompanionNames.Length)
+                return idx;
+            terminal.SetColor("red");
+            terminal.WriteLine("  Invalid selection.");
+            await Task.Delay(800);
+            return -1;
+        }
+
+        /// <summary>
+        /// Submenu for managing a player's Old God encounter states.
+        /// </summary>
+        private async Task<bool> EditOldGods(SaveGameData saveData)
+        {
+            var ss = saveData.StorySystems;
+            if (ss.OldGodStates == null)
+                ss.OldGodStates = new Dictionary<int, int>();
+            bool changed = false;
+
+            while (true)
+            {
+                terminal.ClearScreen();
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"═══ OLD GODS: {saveData.Player.Name2} ═══");
+                terminal.WriteLine("");
+
+                for (int i = 0; i < GodNames.Length; i++)
+                {
+                    ss.OldGodStates.TryGetValue(i, out int statusInt);
+                    string statusName = statusInt >= 0 && statusInt < GodStatusNames.Length
+                        ? GodStatusNames[statusInt] : $"({statusInt})";
+
+                    string color = statusInt switch
+                    {
+                        8 => "bright_green",  // Allied
+                        9 => "cyan",          // Saved
+                        10 => "dark_red",     // Defeated
+                        11 => "dark_gray",    // Consumed
+                        7 => "red",           // Hostile
+                        0 => "gray",          // Unknown
+                        _ => "yellow"
+                    };
+
+                    terminal.SetColor("white");
+                    terminal.Write($"  [{i}] {GodNames[i],-32}— ");
+                    terminal.SetColor(color);
+                    terminal.WriteLine(statusName);
+                }
+
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine("  Select god to edit (0-6), or Q to go back");
+                terminal.WriteLine("");
+
+                var choice = await ReadInput("Choice: ");
+                if (string.IsNullOrWhiteSpace(choice) || choice.ToUpper() == "Q")
+                    return changed;
+
+                if (!int.TryParse(choice, out int godIdx) || godIdx < 0 || godIdx >= GodNames.Length)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("  Invalid selection.");
+                    await Task.Delay(800);
+                    continue;
+                }
+
+                // Show status options
+                ss.OldGodStates.TryGetValue(godIdx, out int currentStatus);
+                string currentName = currentStatus >= 0 && currentStatus < GodStatusNames.Length
+                    ? GodStatusNames[currentStatus] : $"({currentStatus})";
+
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine($"  Current: {currentName}");
+                terminal.WriteLine("");
+                terminal.WriteLine("  [0]  Unknown      [1]  Imprisoned   [2]  Dormant");
+                terminal.WriteLine("  [3]  Dying        [4]  Corrupted    [5]  Neutral");
+                terminal.WriteLine("  [6]  Awakened     [7]  Hostile      [8]  Allied");
+                terminal.WriteLine("  [9]  Saved        [10] Defeated     [11] Consumed");
+                terminal.WriteLine("");
+
+                var statusInput = await ReadInput("  New status: ");
+                if (string.IsNullOrWhiteSpace(statusInput))
+                    continue;
+
+                if (int.TryParse(statusInput, out int newStatus) && newStatus >= 0 && newStatus < GodStatusNames.Length)
+                {
+                    ss.OldGodStates[godIdx] = newStatus;
+                    terminal.SetColor("green");
+                    terminal.WriteLine($"  {GodNames[godIdx].Split('(')[0].Trim()}: {currentName} → {GodStatusNames[newStatus]}");
+                    changed = true;
+                    await Task.Delay(1500);
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("  Invalid status.");
+                    await Task.Delay(800);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Apply admin edits to a live session's story systems (companions, Old Gods, grief).
+        /// Mirrors the conversion logic in SaveSystem.RestoreFromSaveData.
+        /// </summary>
+        private void ApplyStoryEditsToLiveSession(string username, SaveGameData saveData)
+        {
+            var server = MudServer.Instance;
+            if (server == null) return;
+
+            var key = username.ToLowerInvariant();
+            if (!server.ActiveSessions.TryGetValue(key, out var session)) return;
+
+            var ctx = session.Context;
+            if (ctx == null) return;
+
+            var ss = saveData.StorySystems;
+
+            // --- Sync companions ---
+            try
+            {
+                var companionSystemData = new CompanionSystemData
+                {
+                    CompanionStates = ss.Companions?.Select(c => new CompanionSaveData
+                    {
+                        Id = (CompanionId)c.Id,
+                        IsRecruited = c.IsRecruited,
+                        IsActive = c.IsActive,
+                        IsDead = c.IsDead,
+                        LoyaltyLevel = c.LoyaltyLevel,
+                        TrustLevel = c.TrustLevel,
+                        RomanceLevel = c.RomanceLevel,
+                        PersonalQuestStarted = c.PersonalQuestStarted,
+                        PersonalQuestCompleted = c.PersonalQuestCompleted,
+                        RecruitedDay = c.RecruitedDay,
+                        Level = c.Level,
+                        Experience = c.Experience,
+                        BaseStatsHP = c.BaseStatsHP,
+                        BaseStatsAttack = c.BaseStatsAttack,
+                        BaseStatsDefense = c.BaseStatsDefense,
+                        BaseStatsMagicPower = c.BaseStatsMagicPower,
+                        BaseStatsSpeed = c.BaseStatsSpeed,
+                        BaseStatsHealingPower = c.BaseStatsHealingPower,
+                        EquippedItemsSave = c.EquippedItemsSave ?? new Dictionary<int, int>(),
+                        DisabledAbilities = c.DisabledAbilities ?? new List<string>()
+                    }).ToList() ?? new List<CompanionSaveData>(),
+
+                    ActiveCompanions = ss.ActiveCompanionIds?.Select(id => (CompanionId)id).ToList()
+                        ?? new List<CompanionId>(),
+
+                    FallenCompanions = ss.FallenCompanions?.Select(d => new CompanionDeath
+                    {
+                        CompanionId = (CompanionId)d.CompanionId,
+                        Type = (DeathType)d.DeathType,
+                        Circumstance = d.Circumstance,
+                        LastWords = d.LastWords,
+                        DeathDay = d.DeathDay
+                    }).ToList() ?? new List<CompanionDeath>()
+                };
+
+                ctx.Companions.Deserialize(companionSystemData);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ADMIN", $"Failed to sync companions: {ex.Message}");
+            }
+
+            // --- Sync grief ---
+            try
+            {
+                var griefData = new GriefSystemData
+                {
+                    ActiveGrief = ss.ActiveGriefs?.Select(g => new GriefState
+                    {
+                        CompanionId = (CompanionId)g.CompanionId,
+                        NpcId = g.NpcId,
+                        CompanionName = g.CompanionName,
+                        DeathType = (DeathType)g.DeathType,
+                        CurrentStage = (GriefStage)g.CurrentStage,
+                        StageStartDay = g.StageStartDay,
+                        GriefStartDay = g.GriefStartDay,
+                        ResurrectionAttempts = g.ResurrectionAttempts,
+                        IsComplete = g.IsComplete
+                    }).ToList() ?? new List<GriefState>(),
+
+                    ActiveNpcGrief = ss.ActiveNpcGriefs?.Select(g => new GriefState
+                    {
+                        CompanionId = (CompanionId)g.CompanionId,
+                        NpcId = g.NpcId,
+                        CompanionName = g.CompanionName,
+                        DeathType = (DeathType)g.DeathType,
+                        CurrentStage = (GriefStage)g.CurrentStage,
+                        StageStartDay = g.StageStartDay,
+                        GriefStartDay = g.GriefStartDay,
+                        ResurrectionAttempts = g.ResurrectionAttempts,
+                        IsComplete = g.IsComplete
+                    }).ToList() ?? new List<GriefState>(),
+
+                    Memories = ss.GriefMemories?.Select(m => new CompanionMemory
+                    {
+                        CompanionId = (CompanionId)m.CompanionId,
+                        NpcId = m.NpcId,
+                        CompanionName = m.CompanionName,
+                        MemoryText = m.MemoryText,
+                        CreatedDay = m.CreatedDay
+                    }).ToList() ?? new List<CompanionMemory>()
+                };
+
+                ctx.Grief.Deserialize(griefData);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ADMIN", $"Failed to sync grief: {ex.Message}");
+            }
+
+            // --- Sync Old God states ---
+            try
+            {
+                if (ss.OldGodStates != null)
+                {
+                    foreach (var kvp in ss.OldGodStates)
+                    {
+                        var godType = (OldGodType)kvp.Key;
+                        var newStatus = (GodStatus)kvp.Value;
+                        if (ctx.Story.OldGodStates.TryGetValue(godType, out var state))
+                        {
+                            state.Status = newStatus;
+                            if (newStatus != GodStatus.Unknown)
+                                state.HasBeenEncountered = true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ADMIN", $"Failed to sync Old God states: {ex.Message}");
+            }
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  (Live story systems updated)");
+        }
+
         internal async Task ImmortalizePlayer()
         {
-            terminal.ClearScreen();
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("═══ IMMORTALIZE PLAYER ═══");
-            terminal.WriteLine("");
+            var allPlayers = await backend.GetAllPlayersDetailed();
 
-            terminal.SetColor("white");
-            terminal.WriteLine("  Grant godhood to a player. Their mortal character will become");
-            terminal.WriteLine("  an immortal god in the Pantheon, and they will earn an alt slot.");
-            terminal.WriteLine("");
+            // Filter: show only non-alt players who aren't already immortal
+            var eligible = new List<AdminPlayerInfo>();
+            foreach (var p in allPlayers.OrderBy(p => p.DisplayName))
+            {
+                if (SqlSaveBackend.IsAltCharacter(p.Username))
+                    continue;
 
-            var username = await ReadInput("Enter username to immortalize (or blank to cancel): ");
-            if (string.IsNullOrWhiteSpace(username))
-                return;
+                // Check if already immortal by loading save
+                var saveData = await backend.ReadGameData(p.Username);
+                if (saveData?.Player?.IsImmortal == true)
+                    continue;
 
-            username = username.ToLowerInvariant();
+                eligible.Add(p);
+            }
 
-            // Block immortalizing alt characters
-            if (SqlSaveBackend.IsAltCharacter(username))
+            var target = await ShowPlayerList("IMMORTALIZE PLAYER", eligible);
+            if (target == null) return;
+
+            var targetSave = await backend.ReadGameData(target.Username);
+            if (targetSave?.Player == null)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine("  Cannot immortalize an alt character. Use the main account.");
+                terminal.WriteLine($"  No save data found for '{target.Username}'.");
                 await ReadInput("Press Enter to continue...");
                 return;
             }
 
-            var saveData = await backend.ReadGameData(username);
-            if (saveData?.Player == null)
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine($"  No save data found for '{username}'.");
-                await ReadInput("Press Enter to continue...");
-                return;
-            }
-
-            var player = saveData.Player;
-
-            if (player.IsImmortal)
-            {
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"  {player.Name2} is already immortal ({player.DivineName}).");
-                await ReadInput("Press Enter to continue...");
-                return;
-            }
+            var player = targetSave.Player;
 
             terminal.SetColor("white");
             terminal.WriteLine($"  Player: {player.Name2} — Level {player.Level} {GetClassName((int)player.Class)}");
@@ -852,8 +1364,8 @@ namespace UsurperRemake.Systems
             player.AscensionDate = DateTime.UtcNow;
             player.HasEarnedAltSlot = true;
 
-            saveData.Player = player;
-            var success = await backend.WriteGameData(username, saveData);
+            targetSave.Player = player;
+            var success = await backend.WriteGameData(target.Username, targetSave);
             if (success)
             {
                 terminal.SetColor("bright_green");
@@ -863,7 +1375,7 @@ namespace UsurperRemake.Systems
 
                 // Apply to live session if online
                 var server = MudServer.Instance;
-                if (server != null && server.ActiveSessions.TryGetValue(username, out var session))
+                if (server != null && server.ActiveSessions.TryGetValue(target.Username, out var session))
                 {
                     var livePlayer = session.Context?.Engine?.CurrentPlayer;
                     if (livePlayer != null)

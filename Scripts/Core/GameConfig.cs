@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.46.3";
-    public const string VersionName = "Ascension";
+    public const string Version = "0.47.0";
+    public const string VersionName = "Prestige";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -24,7 +24,7 @@ public static partial class GameConfig
     public const int MaxHittas = 450;            // global_maxhittas (dungeon objects)
     public const int MaxSpells = 25;             // global_maxspells - Expanded from 12 to 25 spells per class
     public const int MaxCombat = 14;             // global_maxcombat
-    public const int MaxClasses = 11;            // global_maxclasses
+    public const int MaxClasses = 16;            // global_maxclasses (11 base + 5 NG+ prestige)
     public const int MaxRaces = 10;              // global_maxraces
     public const int MaxBarrelMasters = 15;      // global_maxbarrelmasters
     public const int MaxInput = 2000000000;      // global_maxinput
@@ -1032,7 +1032,14 @@ public static partial class GameConfig
         [CharacterClass.Paladin] = new() { HP = 4, Strength = 4, Defence = 3, Stamina = 4, Agility = 2, Charisma = 2, Dexterity = 3, Wisdom = 3, Intelligence = 2, Constitution = 4, Mana = 0, MaxMana = 0 },
         [CharacterClass.Ranger] = new() { HP = 3, Strength = 3, Defence = 3, Stamina = 4, Agility = 3, Charisma = 2, Dexterity = 4, Wisdom = 3, Intelligence = 2, Constitution = 3, Mana = 0, MaxMana = 0 },
         [CharacterClass.Sage] = new() { HP = 2, Strength = 2, Defence = 2, Stamina = 2, Agility = 2, Charisma = 3, Dexterity = 3, Wisdom = 5, Intelligence = 5, Constitution = 2, Mana = 50, MaxMana = 50 },
-        [CharacterClass.Warrior] = new() { HP = 4, Strength = 4, Defence = 4, Stamina = 4, Agility = 3, Charisma = 2, Dexterity = 2, Wisdom = 2, Intelligence = 2, Constitution = 4, Mana = 0, MaxMana = 0 }
+        [CharacterClass.Warrior] = new() { HP = 4, Strength = 4, Defence = 4, Stamina = 4, Agility = 3, Charisma = 2, Dexterity = 2, Wisdom = 2, Intelligence = 2, Constitution = 4, Mana = 0, MaxMana = 0 },
+
+        // NG+ Prestige Classes — strictly stronger, both spells AND abilities
+        [CharacterClass.Tidesworn] = new() { HP = 6, Strength = 5, Defence = 5, Stamina = 5, Agility = 3, Charisma = 4, Dexterity = 3, Wisdom = 5, Intelligence = 3, Constitution = 5, Mana = 30, MaxMana = 30 },
+        [CharacterClass.Wavecaller] = new() { HP = 4, Strength = 3, Defence = 3, Stamina = 3, Agility = 3, Charisma = 6, Dexterity = 3, Wisdom = 5, Intelligence = 5, Constitution = 3, Mana = 45, MaxMana = 45 },
+        [CharacterClass.Cyclebreaker] = new() { HP = 4, Strength = 4, Defence = 4, Stamina = 4, Agility = 4, Charisma = 4, Dexterity = 4, Wisdom = 4, Intelligence = 4, Constitution = 4, Mana = 35, MaxMana = 35 },
+        [CharacterClass.Abysswarden] = new() { HP = 4, Strength = 5, Defence = 3, Stamina = 4, Agility = 5, Charisma = 3, Dexterity = 6, Wisdom = 3, Intelligence = 5, Constitution = 4, Mana = 35, MaxMana = 35 },
+        [CharacterClass.Voidreaver] = new() { HP = 3, Strength = 6, Defence = 2, Stamina = 4, Agility = 4, Charisma = 2, Dexterity = 5, Wisdom = 2, Intelligence = 6, Constitution = 3, Mana = 40, MaxMana = 40 }
     };
 
     // Character Race Bonuses (Pascal USERHUNC.PAS race case statements)
@@ -1081,7 +1088,8 @@ public static partial class GameConfig
     };
 
     public static readonly string[] ClassNames = {
-        "Warrior", "Paladin", "Ranger", "Assassin", "Bard", "Jester", "Alchemist", "Magician", "Cleric", "Sage", "Barbarian"
+        "Warrior", "Paladin", "Ranger", "Assassin", "Bard", "Jester", "Alchemist", "Magician", "Cleric", "Sage", "Barbarian",
+        "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver"
     };
 
     // Race Descriptions for Character Creation
@@ -1152,6 +1160,13 @@ Magician  - Powerful spellcasters with low health. Requires high intellect.
 Sage      - Scholars and wise magic users. Requires wisdom and study.
 Cleric    - Healers and holy magic users. Requires devotion and wisdom.
 Alchemist - Potion makers and researchers. Requires intellect and patience.
+
+=== PRESTIGE CLASSES (NG+) ===
+Tidesworn    - Ocean's divine shield. Tank/healer hybrid. Requires Holy alignment ending.
+Wavecaller   - Ocean's harmonics. Support/buffer specialist. Requires Savior ending.
+Cyclebreaker - Reality manipulator. Balanced versatility. Requires Defiant ending.
+Abysswarden  - Old God prison warden. Drain/debuff striker. Requires Usurper ending.
+Voidreaver   - Void consumer. Extreme glass cannon. Requires Usurper ending.
 ";
 
     // Invalid Race/Class Combinations (Pascal validation + expanded restrictions)
@@ -1210,6 +1225,31 @@ Alchemist - Potion makers and researchers. Requires intellect and patience.
         [CharacterRace.Gnome] = "Gnomes are too small to wield heavy weapons effectively.",
         [CharacterRace.Gnoll] = "Gnolls lack the intellect for complex magic or holy devotion."
     };
+
+    // NG+ Prestige Classes — set for quick lookup
+    public static readonly HashSet<CharacterClass> PrestigeClasses = new()
+    {
+        CharacterClass.Tidesworn,
+        CharacterClass.Wavecaller,
+        CharacterClass.Cyclebreaker,
+        CharacterClass.Abysswarden,
+        CharacterClass.Voidreaver
+    };
+
+    // Prestige class descriptions for character creation
+    public static readonly Dictionary<CharacterClass, string> PrestigeClassDescriptions = new()
+    {
+        [CharacterClass.Tidesworn] = "The Ocean's divine shield. Channel primordial waters as a holy tank and healer.",
+        [CharacterClass.Wavecaller] = "Conductor of the Ocean's harmonics. Amplify allies with powerful buffs and healing.",
+        [CharacterClass.Cyclebreaker] = "Reality manipulator who exploits the cycle's seams. Bend probability and time.",
+        [CharacterClass.Abysswarden] = "Warden of the Old Gods' prisons. Siphon divine corruption as weapon and sustain.",
+        [CharacterClass.Voidreaver] = "Consumer of the void between cycles. Sacrifice your own life force for devastating power."
+    };
+
+    /// <summary>
+    /// Returns true if a CharacterClass is an NG+ prestige class.
+    /// </summary>
+    public static bool IsPrestigeClass(CharacterClass c) => PrestigeClasses.Contains(c);
 
     #endregion
 

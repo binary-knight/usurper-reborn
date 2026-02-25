@@ -29,8 +29,12 @@ public class CharacterCreationSystem
     /// </summary>
     public async Task<Character> CreateNewCharacter(string playerName)
     {
-        // Reset all story progress for a fresh start (seals, artifacts, etc.)
-        StoryProgressionSystem.Instance.FullReset();
+        // Reset story progress for a fresh start — but preserve NG+ cycle data
+        // (CreateNewGame already handles the NG+ vs fresh distinction)
+        if (StoryProgressionSystem.Instance.CurrentCycle <= 1)
+        {
+            StoryProgressionSystem.Instance.FullReset();
+        }
 
         terminal.WriteLine("");
         terminal.WriteLine("--- CHARACTER CREATION ---", "bright_green");
@@ -76,12 +80,29 @@ public class CharacterCreationSystem
             }
             else if (!string.IsNullOrWhiteSpace(playerName))
             {
-                // Name already provided (from save slot dialog), use it directly
-                characterName = playerName;
-                terminal.WriteLine($"Creating character: {characterName}", "cyan");
-                terminal.WriteLine("");
-                character.Name1 = characterName;
-                character.Name2 = characterName;
+                // Name1 = save key (account name in online mode, chosen name otherwise)
+                character.Name1 = playerName;
+
+                if (DoorMode.IsOnlineMode)
+                {
+                    // Online mode: account name is the save key, let player choose a display name
+                    terminal.WriteLine($"Account: {playerName}", "gray");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("Choose a character name (or press Enter to use your account name):", "bright_cyan");
+                    terminal.WriteLine("");
+                    characterName = await SelectCharacterName(allowEmpty: true);
+                    if (string.IsNullOrWhiteSpace(characterName))
+                        characterName = playerName; // Default to account name
+                    character.Name2 = characterName;
+                }
+                else
+                {
+                    // Local/save slot: name already provided, use it directly
+                    characterName = playerName;
+                    terminal.WriteLine($"Creating character: {characterName}", "cyan");
+                    terminal.WriteLine("");
+                    character.Name2 = characterName;
+                }
             }
             else
             {
@@ -292,7 +313,7 @@ public class CharacterCreationSystem
     /// <summary>
     /// Select character name with Pascal validation (USERHUNC.PAS)
     /// </summary>
-    private async Task<string> SelectCharacterName()
+    private async Task<string> SelectCharacterName(bool allowEmpty = false)
     {
         string name;
         bool validName = false;
@@ -308,6 +329,8 @@ public class CharacterCreationSystem
 
             if (string.IsNullOrWhiteSpace(name))
             {
+                if (allowEmpty)
+                    return ""; // Caller handles the default
                 terminal.WriteLine("You must enter a name!", "red");
                 continue;
             }
@@ -323,10 +346,13 @@ public class CharacterCreationSystem
             }
 
             // Check for duplicate display names in online mode
+            // Allow reuse of the player's own account name (e.g., NG+ reroll keeping same name)
             if (DoorMode.IsOnlineMode)
             {
+                var ownAccount = DoorMode.GetPlayerName()?.ToLowerInvariant();
                 var existingNames = SaveSystem.Instance.GetAllPlayerNames();
-                if (existingNames.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)))
+                if (existingNames.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(n, ownAccount, StringComparison.OrdinalIgnoreCase)))
                 {
                     terminal.WriteLine("That name is already taken! Choose another.", "red");
                     continue;
@@ -1308,8 +1334,24 @@ public class CharacterCreationSystem
         AddSeparator();
 
         // ── Mana ──
-        string manaText = attrs.Mana > 0 ? $"Mana: {attrs.Mana}" : "Mana: None";
-        AddText(manaText, attrs.Mana > 0 ? "bright_green" : "gray");
+        string manaText;
+        string manaColor;
+        if (attrs.Mana > 0)
+        {
+            manaText = $"Mana: {attrs.Mana}";
+            manaColor = "bright_green";
+        }
+        else if (GetClassManaPerLevel(characterClass) > 0)
+        {
+            manaText = $"Mana: +{GetClassManaPerLevel(characterClass)}/level";
+            manaColor = "cyan";
+        }
+        else
+        {
+            manaText = "Mana: None";
+            manaColor = "gray";
+        }
+        AddText(manaText, manaColor);
 
         // ── Strengths ──
         string strengths = GetClassStrengths(characterClass);
@@ -1401,8 +1443,14 @@ public class CharacterCreationSystem
         CardBlank(pad, W);
 
         // ── Mana + Strengths (compact) ──
-        string manaText = attrs.Mana > 0 ? $"[bright_green]{attrs.Mana}" : "[gray]None";
-        CardLine(pad, W, $"  [cyan]Mana: {manaText}");
+        string manaCardText;
+        if (attrs.Mana > 0)
+            manaCardText = $"[bright_green]{attrs.Mana}";
+        else if (GetClassManaPerLevel(characterClass) > 0)
+            manaCardText = $"[cyan]+{GetClassManaPerLevel(characterClass)}/level";
+        else
+            manaCardText = "[gray]None";
+        CardLine(pad, W, $"  [cyan]Mana: {manaCardText}");
         string strengths = GetClassStrengths(characterClass);
         CardLine(pad, W, $"  [cyan]Strengths:  [white]{strengths}");
 
@@ -1506,7 +1554,13 @@ public class CharacterCreationSystem
         terminal.WriteLine($"Stats: HP +{attrs.HP}, STR +{attrs.Strength}, DEF +{attrs.Defence}, STA +{attrs.Stamina}, AGI +{attrs.Agility}, CHA +{attrs.Charisma}, DEX +{attrs.Dexterity}, WIS +{attrs.Wisdom}, INT +{attrs.Intelligence}, CON +{attrs.Constitution}");
         terminal.WriteLine("");
 
-        string manaText = attrs.Mana > 0 ? attrs.Mana.ToString() : "None (physical class)";
+        string manaText;
+        if (attrs.Mana > 0)
+            manaText = attrs.Mana.ToString();
+        else if (GetClassManaPerLevel(characterClass) > 0)
+            manaText = $"+{GetClassManaPerLevel(characterClass)}/level (grows with level)";
+        else
+            manaText = "None (physical class)";
         terminal.WriteLine($"Mana: {manaText}");
         string strengths = GetClassStrengths(characterClass);
         terminal.WriteLine($"Strengths: {strengths}");
@@ -1551,6 +1605,21 @@ public class CharacterCreationSystem
         _ => "Unknown strengths."
     };
 
+    /// <summary>
+    /// Returns the mana gained per level for a class, matching LevelMasterLocation.ApplyClassBasedStatIncreases().
+    /// Returns 0 for purely physical classes that never gain mana.
+    /// </summary>
+    private static int GetClassManaPerLevel(CharacterClass cls) => cls switch
+    {
+        CharacterClass.Magician => 15,
+        CharacterClass.Cleric => 12,
+        CharacterClass.Sage => 18,
+        CharacterClass.Alchemist => 10,
+        CharacterClass.Paladin => 5,
+        CharacterClass.Bard => 5,
+        _ => 0
+    };
+
     #endregion
 
     /// <summary>
@@ -1575,6 +1644,19 @@ public class CharacterCreationSystem
             { 9, CharacterClass.Sage },
             { 10, CharacterClass.Barbarian }
         };
+
+        // Check for unlocked NG+ prestige classes
+        var unlockedPrestige = GetUnlockedPrestigeClasses();
+        int prestigeStartIndex = 11;
+        // Always map unlocked prestige classes to menu indices
+        {
+            int idx = prestigeStartIndex;
+            foreach (var pc in unlockedPrestige)
+            {
+                menuToClass[idx] = pc;
+                idx++;
+            }
+        }
 
         // Get restricted classes for this race (if any)
         CharacterClass[] restrictedClasses = GameConfig.InvalidCombinations.ContainsKey(race)
@@ -1602,6 +1684,38 @@ public class CharacterCreationSystem
                 DisplayClassOption(8, "Cleric", CharacterClass.Cleric, restrictedClasses);
                 DisplayClassOption(9, "Sage", CharacterClass.Sage, restrictedClasses);
                 DisplayClassOption(10, "Barbarian", CharacterClass.Barbarian, restrictedClasses);
+
+                // Always show prestige classes — unlocked ones selectable, locked ones grayed out
+                terminal.WriteLine("");
+                terminal.WriteLine("  ═══ PRESTIGE CLASSES (NG+) ═══", "bright_magenta");
+                var allPrestige = new[]
+                {
+                    (CharacterClass.Tidesworn, "Savior ending"),
+                    (CharacterClass.Wavecaller, "Savior ending"),
+                    (CharacterClass.Cyclebreaker, "Defiant ending"),
+                    (CharacterClass.Abysswarden, "Usurper ending"),
+                    (CharacterClass.Voidreaver, "Usurper ending")
+                };
+                int prestigeIdx = prestigeStartIndex;
+                foreach (var (pc, unlockReq) in allPrestige)
+                {
+                    bool isUnlocked = unlockedPrestige.Contains(pc);
+                    if (isUnlocked)
+                    {
+                        terminal.Write($"({prestigeIdx}) ", "bright_magenta");
+                        terminal.Write($"{pc,-14}", "bright_white");
+                        var desc = GameConfig.PrestigeClassDescriptions.TryGetValue(pc, out var d) ? d : "";
+                        terminal.WriteLine($" {desc}", "magenta");
+                        prestigeIdx++;
+                    }
+                    else
+                    {
+                        terminal.Write($"     ", "dark_gray");
+                        terminal.Write($"{pc,-14}", "dark_gray");
+                        terminal.WriteLine($" [Locked — requires {unlockReq}]", "dark_gray");
+                    }
+                }
+
                 terminal.WriteLine("(H) Help", "green");
                 terminal.WriteLine("(A) Abort", "red");
                 terminal.WriteLine("");
@@ -1665,9 +1779,61 @@ public class CharacterCreationSystem
             }
             else
             {
-                terminal.WriteLine("Invalid choice. Please select 0-10, H for help, or A to abort.", "red");
+                int maxChoice = unlockedPrestige.Count > 0 ? prestigeStartIndex + unlockedPrestige.Count - 1 : 10;
+                terminal.WriteLine($"Invalid choice. Please select 0-{maxChoice}, H for help, or A to abort.", "red");
             }
         }
+    }
+
+    /// <summary>
+    /// Returns the set of NG+ prestige classes unlocked by the player's completed endings.
+    /// Requires CurrentCycle >= 2 (at least one completed playthrough).
+    /// </summary>
+    private static List<CharacterClass> GetUnlockedPrestigeClasses()
+    {
+        var story = StoryProgressionSystem.Instance;
+        var unlocked = new List<CharacterClass>();
+
+        var endingsList = story?.CompletedEndings != null ? string.Join(",", story.CompletedEndings) : "null";
+        Console.Error.WriteLine($"[Prestige] cycle={story?.CurrentCycle}, endings=[{endingsList}], count={story?.CompletedEndings?.Count}");
+        if (story == null || story.CurrentCycle < 2 || story.CompletedEndings.Count == 0)
+        {
+            Console.Error.WriteLine($"[Prestige] BLOCKED: story null={story == null}, cycle<2={story?.CurrentCycle < 2}, endings empty={story?.CompletedEndings?.Count == 0}");
+            return unlocked;
+        }
+
+        var endings = story.CompletedEndings;
+
+        // True ending or Secret ending unlocks all prestige classes
+        if (endings.Contains(EndingType.TrueEnding) || endings.Contains(EndingType.Secret))
+        {
+            unlocked.Add(CharacterClass.Tidesworn);
+            unlocked.Add(CharacterClass.Wavecaller);
+            unlocked.Add(CharacterClass.Cyclebreaker);
+            unlocked.Add(CharacterClass.Abysswarden);
+            unlocked.Add(CharacterClass.Voidreaver);
+            return unlocked;
+        }
+
+        // Savior ending unlocks Holy and Good classes
+        if (endings.Contains(EndingType.Savior))
+        {
+            unlocked.Add(CharacterClass.Tidesworn);
+            unlocked.Add(CharacterClass.Wavecaller);
+        }
+
+        // Defiant ending unlocks Neutral class
+        if (endings.Contains(EndingType.Defiant))
+            unlocked.Add(CharacterClass.Cyclebreaker);
+
+        // Usurper ending unlocks Dark and Evil classes
+        if (endings.Contains(EndingType.Usurper))
+        {
+            unlocked.Add(CharacterClass.Abysswarden);
+            unlocked.Add(CharacterClass.Voidreaver);
+        }
+
+        return unlocked;
     }
 
     /// <summary>
@@ -1757,11 +1923,24 @@ public class CharacterCreationSystem
             terminal.Write($"{character.Charisma,3}", GetStatColor(character.Charisma, 5, 10));
             terminal.WriteLine("  - Shop prices, NPC reactions", "gray");
 
-            if (character.MaxMana > 0)
+            // Show effective mana including INT/WIS bonuses (matches what RecalculateStats will give)
+            long effectiveMana = character.MaxMana;
+            if (effectiveMana > 0)
+            {
+                effectiveMana += StatEffectsSystem.GetIntelligenceManaBonus(character.Intelligence, character.Level);
+                effectiveMana += StatEffectsSystem.GetWisdomManaBonus(character.Wisdom);
+            }
+            if (effectiveMana > 0)
             {
                 terminal.Write($"  Mana:          ");
-                terminal.Write($"{character.Mana,3}/{character.MaxMana}", "cyan");
+                terminal.Write($"{effectiveMana,3}/{effectiveMana}", "cyan");
                 terminal.WriteLine("  - Spellcasting resource", "gray");
+            }
+            else if (GetClassManaPerLevel(character.Class) > 0)
+            {
+                terminal.Write($"  Mana:          ");
+                terminal.Write($"+{GetClassManaPerLevel(character.Class)}/level", "cyan");
+                terminal.WriteLine("  - Grows with level-ups", "gray");
             }
             terminal.WriteLine("");
             terminal.WriteLine($"  Total Stats: {totalStats}", totalStats >= 70 ? "bright_green" : totalStats >= 55 ? "yellow" : "red");

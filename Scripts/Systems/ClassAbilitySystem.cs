@@ -948,7 +948,9 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist
+                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
         },
         ["focus"] = new ClassAbility
@@ -965,7 +967,9 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist
+                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
         },
         ["rally"] = new ClassAbility
@@ -981,7 +985,9 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist
+                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
         },
         ["desperate_strike"] = new ClassAbility
@@ -998,7 +1004,9 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist
+                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
         },
         ["iron_will"] = new ClassAbility
@@ -1016,8 +1024,580 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist
+                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // TIDESWORN ABILITIES (NG+ Holy) - Ocean's divine shield
+        // ═══════════════════════════════════════════════════════════════════════════════
+        ["undertow_stance"] = new ClassAbility
+        {
+            Id = "undertow_stance",
+            Name = "Undertow Stance",
+            Description = "Enemies attacking you are pulled off-balance: -20% damage for 3 rounds. Self defense +35.",
+            LevelRequired = 1, StaminaCost = 30, Cooldown = 4,
+            Type = AbilityType.Defense, DefenseBonus = 35, Duration = 3,
+            SpecialEffect = "undertow",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["riptide_strike"] = new ClassAbility
+        {
+            Id = "riptide_strike",
+            Name = "Riptide Strike",
+            Description = "A sweeping blow infused with tidal force. Target's next attack reduced by 25%.",
+            LevelRequired = 5, StaminaCost = 40, Cooldown = 2,
+            Type = AbilityType.Attack, BaseDamage = 70,
+            SpecialEffect = "riptide",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["breakwater"] = new ClassAbility
+        {
+            Id = "breakwater",
+            Name = "Breakwater",
+            Description = "Become an immovable bastion. Defense +100 for 2 rounds.",
+            LevelRequired = 15, StaminaCost = 60, Cooldown = 5,
+            Type = AbilityType.Defense, DefenseBonus = 100, Duration = 2,
+            SpecialEffect = "breakwater",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["living_waters"] = new ClassAbility
+        {
+            Id = "living_waters",
+            Name = "Living Waters",
+            Description = "Channel the Ocean's restorative power. Heals 100 HP + 20 HP/round for 3 rounds.",
+            LevelRequired = 25, StaminaCost = 50, Cooldown = 5,
+            Type = AbilityType.Heal, BaseHealing = 100, Duration = 3,
+            SpecialEffect = "regen_20",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["maelstrom_faithful"] = new ClassAbility
+        {
+            Id = "maelstrom_faithful",
+            Name = "Maelstrom of the Faithful",
+            Description = "Holy maelstrom: 160 damage to all enemies. Self: +50 attack, +50 defense for 3 rounds.",
+            LevelRequired = 40, StaminaCost = 90, Cooldown = 7,
+            Type = AbilityType.Attack, BaseDamage = 160, AttackBonus = 50, DefenseBonus = 50, Duration = 3,
+            SpecialEffect = "aoe",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["abyssal_anchor"] = new ClassAbility
+        {
+            Id = "abyssal_anchor",
+            Name = "Abyssal Anchor",
+            Description = "Root yourself like a reef. +80 defense for 3 rounds. Enemies deal 20% less damage.",
+            LevelRequired = 50, StaminaCost = 65, Cooldown = 5,
+            Type = AbilityType.Defense, DefenseBonus = 80, Duration = 3,
+            SpecialEffect = "abyssal_anchor",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["sanctified_torrent"] = new ClassAbility
+        {
+            Id = "sanctified_torrent",
+            Name = "Sanctified Torrent",
+            Description = "Holy water AoE. 120 damage to all enemies. 2x vs undead/demons. Heals self 20% dealt.",
+            LevelRequired = 60, StaminaCost = 75, Cooldown = 4,
+            Type = AbilityType.Attack, BaseDamage = 120,
+            SpecialEffect = "sanctified_torrent",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["oceans_embrace"] = new ClassAbility
+        {
+            Id = "oceans_embrace",
+            Name = "Ocean's Embrace",
+            Description = "The Ocean cradles all allies. Heals 150 HP to party. Cleanses all debuffs.",
+            LevelRequired = 70, StaminaCost = 80, Cooldown = 6,
+            Type = AbilityType.Heal, BaseHealing = 150,
+            SpecialEffect = "oceans_embrace",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["tidal_colossus"] = new ClassAbility
+        {
+            Id = "tidal_colossus",
+            Name = "Tidal Colossus",
+            Description = "Become a living wave. +60 ATK, +60 DEF, immune to stun for 4 rounds.",
+            LevelRequired = 80, StaminaCost = 90, Cooldown = 7,
+            Type = AbilityType.Buff, AttackBonus = 60, DefenseBonus = 60, Duration = 4,
+            SpecialEffect = "tidal_colossus",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["eternal_vigil"] = new ClassAbility
+        {
+            Id = "eternal_vigil",
+            Name = "Eternal Vigil",
+            Description = "Become invulnerable for 2 rounds. Draw all attacks to yourself.",
+            LevelRequired = 90, StaminaCost = 100, Cooldown = 8,
+            Type = AbilityType.Defense, Duration = 2,
+            SpecialEffect = "eternal_vigil",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+        ["wrath_of_the_deep"] = new ClassAbility
+        {
+            Id = "wrath_of_the_deep",
+            Name = "Wrath of the Deep",
+            Description = "The Ocean's fury incarnate. 350 damage. Instant kill if target below 30% HP (non-boss). Heals 50% dealt.",
+            LevelRequired = 95, StaminaCost = 120, Cooldown = 8,
+            Type = AbilityType.Attack, BaseDamage = 350,
+            SpecialEffect = "wrath_deep",
+            AvailableToClasses = new[] { CharacterClass.Tidesworn }
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // WAVECALLER ABILITIES (NG+ Good) - Ocean harmonics, party support
+        // ═══════════════════════════════════════════════════════════════════════════════
+        ["inspiring_cadence"] = new ClassAbility
+        {
+            Id = "inspiring_cadence",
+            Name = "Inspiring Cadence",
+            Description = "Rally allies with the Ocean's rhythm. All allies +25 attack for 3 rounds.",
+            LevelRequired = 1, StaminaCost = 20, Cooldown = 3,
+            Type = AbilityType.Buff, AttackBonus = 25, Duration = 3,
+            SpecialEffect = "party_buff",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["wave_echo"] = new ClassAbility
+        {
+            Id = "wave_echo",
+            Name = "Wave Echo",
+            Description = "Project a focused wave of sound. Damage doubles if target is debuffed.",
+            LevelRequired = 5, StaminaCost = 25, Cooldown = 2,
+            Type = AbilityType.Attack, BaseDamage = 50,
+            SpecialEffect = "double_vs_debuffed",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["calm_waters"] = new ClassAbility
+        {
+            Id = "calm_waters",
+            Name = "Calm Waters",
+            Description = "Soothe the battlefield. Remove all negative effects from allies.",
+            LevelRequired = 15, StaminaCost = 40, Cooldown = 4,
+            Type = AbilityType.Utility,
+            SpecialEffect = "cleanse",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["empathic_link"] = new ClassAbility
+        {
+            Id = "empathic_link",
+            Name = "Empathic Link",
+            Description = "Link life force to an ally. Damage split 50/50 for 4 rounds. Ally +30 defense.",
+            LevelRequired = 25, StaminaCost = 50, Cooldown = 5,
+            Type = AbilityType.Buff, DefenseBonus = 30, Duration = 4,
+            SpecialEffect = "empathic_link",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["crescendo"] = new ClassAbility
+        {
+            Id = "crescendo",
+            Name = "Crescendo",
+            Description = "Devastating harmonic peak. 120 AoE damage + 30 bonus per ally in party.",
+            LevelRequired = 40, StaminaCost = 80, Cooldown = 6,
+            Type = AbilityType.Attack, BaseDamage = 120,
+            SpecialEffect = "crescendo_aoe",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["harmonic_shield"] = new ClassAbility
+        {
+            Id = "harmonic_shield",
+            Name = "Harmonic Shield",
+            Description = "All allies gain +40 defense and 15% damage reflection for 3 rounds.",
+            LevelRequired = 50, StaminaCost = 60, Cooldown = 5,
+            Type = AbilityType.Buff, DefenseBonus = 40, Duration = 3,
+            SpecialEffect = "harmonic_shield",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["dissonant_wave"] = new ClassAbility
+        {
+            Id = "dissonant_wave",
+            Name = "Dissonant Wave",
+            Description = "Discordant blast. All enemies: -30 ATK, -30 DEF, 25% chance to skip turn for 3 rounds.",
+            LevelRequired = 60, StaminaCost = 70, Cooldown = 5,
+            Type = AbilityType.Debuff, Duration = 3,
+            SpecialEffect = "dissonant_wave",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["resonance_cascade"] = new ClassAbility
+        {
+            Id = "resonance_cascade",
+            Name = "Resonance Cascade",
+            Description = "Cascading harmonics. 100 AoE damage. +25% damage per additional enemy hit.",
+            LevelRequired = 70, StaminaCost = 80, Cooldown = 5,
+            Type = AbilityType.Attack, BaseDamage = 100,
+            SpecialEffect = "resonance_cascade",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["tidal_harmony"] = new ClassAbility
+        {
+            Id = "tidal_harmony",
+            Name = "Tidal Harmony",
+            Description = "Restorative harmony. All allies heal 200 HP. Self gains +40 ATK for 4 rounds.",
+            LevelRequired = 80, StaminaCost = 85, Cooldown = 6,
+            Type = AbilityType.Heal, BaseHealing = 200, AttackBonus = 40, Duration = 4,
+            SpecialEffect = "tidal_harmony",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["oceans_voice"] = new ClassAbility
+        {
+            Id = "oceans_voice",
+            Name = "Ocean's Voice",
+            Description = "The Ocean speaks through you. All allies: +50 ATK, +30 DEF, +20% crit for 4 rounds.",
+            LevelRequired = 90, StaminaCost = 100, Cooldown = 7,
+            Type = AbilityType.Buff, AttackBonus = 50, DefenseBonus = 30, Duration = 4,
+            SpecialEffect = "oceans_voice",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+        ["grand_finale"] = new ClassAbility
+        {
+            Id = "grand_finale",
+            Name = "Grand Finale",
+            Description = "Devastating harmonic crescendo. 300 AoE damage + 50 per active buff on party. Consumes all buffs.",
+            LevelRequired = 95, StaminaCost = 120, Cooldown = 8,
+            Type = AbilityType.Attack, BaseDamage = 300,
+            SpecialEffect = "grand_finale",
+            AvailableToClasses = new[] { CharacterClass.Wavecaller }
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // CYCLEBREAKER ABILITIES (NG+ Neutral) - Reality manipulation, temporal
+        // ═══════════════════════════════════════════════════════════════════════════════
+        ["temporal_feint"] = new ClassAbility
+        {
+            Id = "temporal_feint",
+            Name = "Temporal Feint",
+            Description = "Step between moments. Next attack auto-hits and crits. Enemy misses this round.",
+            LevelRequired = 1, StaminaCost = 25, Cooldown = 2,
+            Type = AbilityType.Buff,
+            SpecialEffect = "temporal_feint",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["borrowed_power"] = new ClassAbility
+        {
+            Id = "borrowed_power",
+            Name = "Borrowed Power",
+            Description = "Channel a past self's strength. +1 per cycle to all stats (max +10) for 4 rounds.",
+            LevelRequired = 5, StaminaCost = 35, Cooldown = 3,
+            Type = AbilityType.Buff, Duration = 4,
+            SpecialEffect = "borrowed_power",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["fracture_reality"] = new ClassAbility
+        {
+            Id = "fracture_reality",
+            Name = "Fracture Reality",
+            Description = "Shatter the target's connection to this timeline. 25% chance to echo the damage.",
+            LevelRequired = 15, StaminaCost = 50, Cooldown = 4,
+            Type = AbilityType.Attack, BaseDamage = 90,
+            SpecialEffect = "echo_25",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["quantum_state"] = new ClassAbility
+        {
+            Id = "quantum_state",
+            Name = "Quantum State",
+            Description = "Exist in two states simultaneously. 50% chance to avoid any attack for 3 rounds.",
+            LevelRequired = 25, StaminaCost = 60, Cooldown = 5,
+            Type = AbilityType.Defense, Duration = 3,
+            SpecialEffect = "quantum_state",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["entropy_cascade"] = new ClassAbility
+        {
+            Id = "entropy_cascade",
+            Name = "Entropy Cascade",
+            Description = "Accelerate entropy. 140 AoE damage. Enemies take +15% damage for 4 rounds.",
+            LevelRequired = 40, StaminaCost = 100, Cooldown = 7,
+            Type = AbilityType.Attack, BaseDamage = 140, Duration = 4,
+            SpecialEffect = "entropy_aoe",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["timeline_split"] = new ClassAbility
+        {
+            Id = "timeline_split",
+            Name = "Timeline Split",
+            Description = "Create a temporal clone that attacks for 50% of your damage for 3 rounds.",
+            LevelRequired = 50, StaminaCost = 65, Cooldown = 6,
+            Type = AbilityType.Buff, Duration = 3,
+            SpecialEffect = "timeline_split",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["causality_loop"] = new ClassAbility
+        {
+            Id = "causality_loop",
+            Name = "Causality Loop",
+            Description = "Trap the enemy in a loop. They take damage equal to what they dealt last round for 3 rounds.",
+            LevelRequired = 60, StaminaCost = 70, Cooldown = 5,
+            Type = AbilityType.Debuff, Duration = 3,
+            SpecialEffect = "causality_loop",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["chrono_surge"] = new ClassAbility
+        {
+            Id = "chrono_surge",
+            Name = "Chrono Surge",
+            Description = "Accelerate time around yourself. Take two actions this round.",
+            LevelRequired = 70, StaminaCost = 80, Cooldown = 7,
+            Type = AbilityType.Buff,
+            SpecialEffect = "chrono_surge",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["singularity"] = new ClassAbility
+        {
+            Id = "singularity",
+            Name = "Singularity",
+            Description = "Collapse space. 200 AoE damage. Stunned enemies take double damage.",
+            LevelRequired = 80, StaminaCost = 90, Cooldown = 6,
+            Type = AbilityType.Attack, BaseDamage = 200,
+            SpecialEffect = "singularity",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["temporal_prison"] = new ClassAbility
+        {
+            Id = "temporal_prison",
+            Name = "Temporal Prison",
+            Description = "Freeze the target in time. Cannot act for 2 rounds (boss: 1 round). Takes no damage during.",
+            LevelRequired = 90, StaminaCost = 95, Cooldown = 8,
+            Type = AbilityType.Debuff, Duration = 2,
+            SpecialEffect = "temporal_prison",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+        ["cycles_end"] = new ClassAbility
+        {
+            Id = "cycles_end",
+            Name = "Cycle's End",
+            Description = "Strike with the weight of every cycle. 400 damage + 50 per NG+ cycle (max +250). Ignores 50% defense.",
+            LevelRequired = 95, StaminaCost = 120, Cooldown = 8,
+            Type = AbilityType.Attack, BaseDamage = 400,
+            SpecialEffect = "cycles_end",
+            AvailableToClasses = new[] { CharacterClass.Cyclebreaker }
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // ABYSSWARDEN ABILITIES (NG+ Dark) - Life drain, shadow strikes, corruption
+        // ═══════════════════════════════════════════════════════════════════════════════
+        ["shadow_harvest"] = new ClassAbility
+        {
+            Id = "shadow_harvest",
+            Name = "Shadow Harvest",
+            Description = "Strike from the abyss. +50% damage if target below 50% HP. Heals 25% dealt.",
+            LevelRequired = 1, StaminaCost = 25, Cooldown = 2,
+            Type = AbilityType.Attack, BaseDamage = 55,
+            SpecialEffect = "shadow_harvest",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["corrupting_touch"] = new ClassAbility
+        {
+            Id = "corrupting_touch",
+            Name = "Corrupting Touch",
+            Description = "Infect with Old God corruption. 15 damage/round for 5 rounds. Each tick heals you.",
+            LevelRequired = 5, StaminaCost = 35, Cooldown = 3,
+            Type = AbilityType.Debuff, BaseDamage = 15, Duration = 5,
+            SpecialEffect = "corrupting_dot",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["umbral_step"] = new ClassAbility
+        {
+            Id = "umbral_step",
+            Name = "Umbral Step",
+            Description = "Vanish into shadow. Next attack guaranteed critical. Evade all attacks this round.",
+            LevelRequired = 15, StaminaCost = 40, Cooldown = 3,
+            Type = AbilityType.Utility,
+            SpecialEffect = "umbral_step",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["wardens_authority"] = new ClassAbility
+        {
+            Id = "wardens_authority",
+            Name = "Warden's Authority",
+            Description = "Assert dominion over abyssal energies. +40 ATK, +20 DEF, 10% lifesteal for 4 rounds.",
+            LevelRequired = 25, StaminaCost = 60, Cooldown = 5,
+            Type = AbilityType.Buff, AttackBonus = 40, DefenseBonus = 20, Duration = 4,
+            SpecialEffect = "lifesteal_10",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["seal_fracture"] = new ClassAbility
+        {
+            Id = "seal_fracture",
+            Name = "Seal Fracture",
+            Description = "Crack reality's seal. 200 single-target damage. Overflow spreads to all enemies on kill.",
+            LevelRequired = 40, StaminaCost = 100, Cooldown = 7,
+            Type = AbilityType.Attack, BaseDamage = 200,
+            SpecialEffect = "overflow_aoe",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["soul_leech"] = new ClassAbility
+        {
+            Id = "soul_leech",
+            Name = "Soul Leech",
+            Description = "Drain the target's life force. 130 damage. Heals 40% dealt. If target poisoned: heals 60% instead.",
+            LevelRequired = 50, StaminaCost = 65, Cooldown = 4,
+            Type = AbilityType.Attack, BaseDamage = 130,
+            SpecialEffect = "soul_leech",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["abyssal_eruption"] = new ClassAbility
+        {
+            Id = "abyssal_eruption",
+            Name = "Abyssal Eruption",
+            Description = "Unleash corruption. 150 AoE damage. Leaves 20 damage/round DoT for 3 rounds on all enemies.",
+            LevelRequired = 60, StaminaCost = 75, Cooldown = 5,
+            Type = AbilityType.Attack, BaseDamage = 150,
+            SpecialEffect = "abyssal_eruption",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["dark_pact"] = new ClassAbility
+        {
+            Id = "dark_pact",
+            Name = "Dark Pact",
+            Description = "Sacrifice 20% max HP. Gain +80 ATK and 25% lifesteal for 4 rounds.",
+            LevelRequired = 70, StaminaCost = 70, Cooldown = 6,
+            Type = AbilityType.Buff, AttackBonus = 80, Duration = 4,
+            SpecialEffect = "dark_pact",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["prison_wardens_command"] = new ClassAbility
+        {
+            Id = "prison_wardens_command",
+            Name = "Prison Warden's Command",
+            Description = "Dominate the target. -50% ATK, -50% DEF for 3 rounds. Bosses: half effect.",
+            LevelRequired = 80, StaminaCost = 85, Cooldown = 6,
+            Type = AbilityType.Debuff, Duration = 3,
+            SpecialEffect = "prison_wardens_command",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["consume_soul"] = new ClassAbility
+        {
+            Id = "consume_soul",
+            Name = "Consume Soul",
+            Description = "Devour the target's essence. 250 damage. If kills: permanently gain +5 ATK this combat (stacks).",
+            LevelRequired = 90, StaminaCost = 100, Cooldown = 6,
+            Type = AbilityType.Attack, BaseDamage = 250,
+            SpecialEffect = "consume_soul",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+        ["abyss_unchained"] = new ClassAbility
+        {
+            Id = "abyss_unchained",
+            Name = "Abyss Unchained",
+            Description = "Release the full power of the abyss. 380 AoE damage. Self heals to full HP. Removes all debuffs.",
+            LevelRequired = 95, StaminaCost = 130, Cooldown = 9,
+            Type = AbilityType.Attack, BaseDamage = 380,
+            SpecialEffect = "abyss_unchained",
+            AvailableToClasses = new[] { CharacterClass.Abysswarden }
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // VOIDREAVER ABILITIES (NG+ Evil) - Self-sacrifice, extreme damage, void
+        // ═══════════════════════════════════════════════════════════════════════════════
+        ["hungering_strike"] = new ClassAbility
+        {
+            Id = "hungering_strike",
+            Name = "Hungering Strike",
+            Description = "A ravenous blow. 60 base damage. Heals 30% of damage dealt.",
+            LevelRequired = 1, StaminaCost = 20, Cooldown = 1,
+            Type = AbilityType.Attack, BaseDamage = 60,
+            SpecialEffect = "lifesteal_30",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["offer_flesh"] = new ClassAbility
+        {
+            Id = "offer_flesh",
+            Name = "Offer Flesh",
+            Description = "Sacrifice 15% HP for +60 ATK for 3 rounds. Below 25% HP: doubles to +120.",
+            LevelRequired = 5, StaminaCost = 35, Cooldown = 3,
+            Type = AbilityType.Buff, AttackBonus = 60, Duration = 3,
+            SpecialEffect = "offer_flesh",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["reap"] = new ClassAbility
+        {
+            Id = "reap",
+            Name = "Reap",
+            Description = "Execute a weakened foe. Triples damage if target below 30% HP. Kill resets cooldown.",
+            LevelRequired = 15, StaminaCost = 50, Cooldown = 3,
+            Type = AbilityType.Attack, BaseDamage = 100,
+            SpecialEffect = "execute_reap",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["void_shroud"] = new ClassAbility
+        {
+            Id = "void_shroud",
+            Name = "Void Shroud",
+            Description = "25% of damage taken reflected to attacker. +30 defense for 3 rounds.",
+            LevelRequired = 25, StaminaCost = 60, Cooldown = 5,
+            Type = AbilityType.Defense, DefenseBonus = 30, Duration = 3,
+            SpecialEffect = "damage_reflect_25",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["apotheosis_of_ruin"] = new ClassAbility
+        {
+            Id = "apotheosis_of_ruin",
+            Name = "Apotheosis of Ruin",
+            Description = "Burn 40% HP. 4 rounds: +100 ATK, hit all enemies, 20% lifesteal.",
+            LevelRequired = 40, StaminaCost = 120, Cooldown = 8,
+            Type = AbilityType.Buff, AttackBonus = 100, Duration = 4,
+            SpecialEffect = "apotheosis",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["devour"] = new ClassAbility
+        {
+            Id = "devour",
+            Name = "Devour",
+            Description = "Consume the target. 160 damage. Heals 50% dealt. Below 30% HP: damage doubles.",
+            LevelRequired = 50, StaminaCost = 60, Cooldown = 4,
+            Type = AbilityType.Attack, BaseDamage = 160,
+            SpecialEffect = "devour",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["entropic_blade"] = new ClassAbility
+        {
+            Id = "entropic_blade",
+            Name = "Entropic Blade",
+            Description = "A cut through reality itself. 180 damage. Ignores all defense. Costs 10% current HP.",
+            LevelRequired = 60, StaminaCost = 65, Cooldown = 4,
+            Type = AbilityType.Attack, BaseDamage = 180,
+            SpecialEffect = "entropic_blade",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["blood_frenzy"] = new ClassAbility
+        {
+            Id = "blood_frenzy",
+            Name = "Blood Frenzy",
+            Description = "Sacrifice 25% HP. Attack twice per round and gain +50 ATK for 3 rounds.",
+            LevelRequired = 70, StaminaCost = 70, Cooldown = 7,
+            Type = AbilityType.Buff, AttackBonus = 50, Duration = 3,
+            SpecialEffect = "blood_frenzy",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["void_rupture"] = new ClassAbility
+        {
+            Id = "void_rupture",
+            Name = "Void Rupture",
+            Description = "Tear the void open. 220 AoE damage. Enemies killed explode for 100 bonus damage to others.",
+            LevelRequired = 80, StaminaCost = 90, Cooldown = 6,
+            Type = AbilityType.Attack, BaseDamage = 220,
+            SpecialEffect = "void_rupture",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["deaths_embrace"] = new ClassAbility
+        {
+            Id = "deaths_embrace",
+            Name = "Death's Embrace",
+            Description = "Cheat death. If HP reaches 0, revive with 1 HP and become invulnerable for 1 round. Lasts 3 rounds.",
+            LevelRequired = 90, StaminaCost = 100, Cooldown = 9,
+            Type = AbilityType.Buff, Duration = 3,
+            SpecialEffect = "deaths_embrace",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
+        },
+        ["annihilation"] = new ClassAbility
+        {
+            Id = "annihilation",
+            Name = "Annihilation",
+            Description = "Erase from existence. Costs 50% current HP. 500 damage. Below 50% HP: instant kill (non-boss).",
+            LevelRequired = 95, StaminaCost = 130, Cooldown = 9,
+            Type = AbilityType.Attack, BaseDamage = 500,
+            SpecialEffect = "annihilation",
+            AvailableToClasses = new[] { CharacterClass.Voidreaver }
         }
     };
 

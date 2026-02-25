@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.45.0** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.47.0** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,14 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.47.0 - Prestige
+
+**NG+ Prestige Classes:** Five powerful new classes unlocked by completing the game — Tidesworn (holy tank/healer), Wavecaller (support/buffer), Cyclebreaker (reality manipulator), Abysswarden (drain/debuff), and Voidreaver (glass cannon). Each has both spells and combat abilities, 11 abilities spanning levels 1-95 with all special effects fully implemented, plus access to universal abilities. Unlock specific classes by completing different endings.
+
+**Old God Boss Abilities:** All seven Old God boss encounters now have fully working combat abilities with 40+ effect mappings. Manwe has 12 unique abilities across 3 combat phases including Split Form (clone summon), The Offer (mid-combat choice), and Creation's End (artifact-blockable instant kill).
+
+**Missing God Dialogue:** Complete dialogue trees for Aurelion, Terravok, and Manwe with branching choices and story consequences.
 
 ### Completed in v0.45.0 - Band of Brothers
 

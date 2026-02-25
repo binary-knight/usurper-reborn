@@ -936,7 +936,8 @@ public class StreetEncounterSystem
             result.Message = "Declined romantic encounter.";
         }
 
-        await Task.Delay(2000);
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
     }
 
     /// <summary>

@@ -400,7 +400,7 @@ public class EnhancedNPCBehaviorSystem : Node
     /// </summary>
     private async Task ConductRoundBattles(List<Character> team1, List<Character> team2, GangWarResult result)
     {
-        var busy = new bool[11]; // Pascal busy array
+        var busy = new bool[GameConfig.MaxClasses]; // Pascal busy array
         
         for (int i = 0; i < team1.Count; i++)
         {

@@ -1604,7 +1604,14 @@ public enum CharacterClass
     Paladin,
     Ranger,     // no special ability
     Sage,
-    Warrior     // no special ability
+    Warrior,    // no special ability
+
+    // NG+ Prestige Classes (alignment-gated, cycle >= 2)
+    Tidesworn,    // Holy alignment — divine tank/healer
+    Wavecaller,   // Good alignment — support/buffer
+    Cyclebreaker, // Neutral alignment — reality manipulator
+    Abysswarden,  // Dark alignment — drain/debuff striker
+    Voidreaver    // Evil alignment — glass cannon / self-sacrifice
 }
 
 /// <summary>

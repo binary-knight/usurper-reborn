@@ -40,6 +40,12 @@ public partial class CombatEngine
     /// <summary>True when the current combat is against Manwe (for Void Key artifact doubling)</summary>
     public static bool IsManweBattle { get; set; }
 
+    public void ResetManweBossFlags()
+    {
+        _manweSplitFormUsed = false;
+        _manweOfferUsed = false;
+    }
+
     // Combat tip system - shows helpful hints occasionally
     private int combatTipCounter = 0;
     private static readonly string[] CombatTips = new string[]
@@ -3106,7 +3112,7 @@ public partial class CombatEngine
 
         // === MONSTER SPECIAL ABILITIES ===
         // Chance for monster to use a special ability instead of normal attack
-        bool usedSpecialAbility = await TryMonsterSpecialAbility(monster, player, result);
+        bool usedSpecialAbility = await TryMonsterSpecialAbility(monster, player, result, null);
         if (usedSpecialAbility)
         {
             await Task.Delay(GetCombatDelay(800));
@@ -3421,7 +3427,7 @@ public partial class CombatEngine
     /// Try to use a monster special ability instead of normal attack
     /// Returns true if ability was used (skip normal attack), false otherwise
     /// </summary>
-    private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result)
+    private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result, List<Monster>? monsterList = null)
     {
         // No abilities? Normal attack
         if (monster.SpecialAbilities == null || monster.SpecialAbilities.Count == 0)
@@ -3429,11 +3435,21 @@ public partial class CombatEngine
 
         // Base 30% chance to use special ability (scales with monster level)
         int abilityChance = 30 + (monster.Level / 5);
+        // Boss encounters always use abilities (they're the main mechanic)
+        if (BossContext != null && monster.IsBoss)
+            abilityChance = 70;
         if (random.Next(100) >= abilityChance)
             return false;
 
         // Pick a random ability
         string abilityName = monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+
+        // Old God boss abilities — handle by name before generic enum parse
+        if (BossContext != null && monster.IsBoss)
+        {
+            bool handled = await TryBossAbility(monster, player, abilityName, result, monsterList);
+            if (handled) return true;
+        }
 
         // Try to parse as AbilityType
         if (!Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType))
@@ -3553,6 +3569,658 @@ public partial class CombatEngine
 
         return abilityResult.SkipNormalAttack || abilityResult.DirectDamage > 0 || abilityResult.ManaDrain > 0
                || abilityResult.LifeStealPercent > 0 || (abilityResult.DamageMultiplier > 0 && abilityResult.LifeStealPercent == 0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // OLD GOD BOSS ABILITY SYSTEM
+    // Maps boss ability name strings to actual combat mechanics.
+    // Each god's abilities are defined in OldGodsData.cs as string arrays.
+    // ═══════════════════════════════════════════════════════════════════
+
+    private bool _manweSplitFormUsed = false;
+    private bool _manweOfferUsed = false;
+
+    /// <summary>
+    /// Handle Old God boss abilities by name. Returns true if ability was handled.
+    /// </summary>
+    private async Task<bool> TryBossAbility(Monster monster, Character player, string abilityName, CombatResult result, List<Monster>? monsterList)
+    {
+        // Manwe gets fully custom ability implementations
+        if (IsManweBattle)
+            return await TryManweBossAbility(monster, player, abilityName, result, monsterList);
+
+        // All other gods use generic ability mappings
+        return await TryGenericBossAbility(monster, player, abilityName, result, monsterList);
+    }
+
+    /// <summary>
+    /// Generic boss ability handler — maps ability names to effects for all non-Manwe gods.
+    /// Grouped by effect type to keep code concise.
+    /// </summary>
+    private async Task<bool> TryGenericBossAbility(Monster monster, Character player, string abilityName, CombatResult result, List<Monster>? monsterList)
+    {
+        long baseDamage = monster.GetAttackPower();
+        long maxDmg = Math.Max(1, (long)(player.MaxHP * 0.85));
+
+        switch (abilityName)
+        {
+            // ─── HIGH DAMAGE (2x–3x) ───
+            case "Cleave":
+            case "Whirlwind":
+            case "Final Stand":
+            case "Endless War":
+            case "Solar Flare":
+            case "Last Light":
+            case "Final Truth":
+            case "World Breaker":
+            case "Final Verdict":
+            case "Tyranny Unleashed":
+            case "Final Secret":
+            {
+                double mult = abilityName is "Final Stand" or "Endless War" or "Last Light" or "World Breaker"
+                    or "Final Verdict" or "Tyranny Unleashed" or "Final Secret" ? 3.0 : 2.0;
+                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * mult) - player.Defence));
+                if (player.HasStatus(StatusEffect.Invulnerable))
+                {
+                    terminal.WriteLine($"  Your divine shield absorbs {monster.Name}'s {abilityName}!", "bright_white");
+                }
+                else
+                {
+                    player.HP -= damage;
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "bright_red");
+                    terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                }
+                result.CombatLog.Add($"{monster.Name} uses {abilityName} for {damage} damage");
+                return true;
+            }
+
+            // ─── MEDIUM DAMAGE (1.5x) ───
+            case "Shield Bash":
+            case "Gavel Strike":
+            case "Thorn Embrace":
+            case "Blinding Flash":
+            case "Earthquake":
+            case "Mountain's Weight":
+            case "Magma Surge":
+            case "Geological Shift":
+            case "Purifying Light":
+            case "Truth Revealed":
+            {
+                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
+                if (player.HasStatus(StatusEffect.Invulnerable))
+                {
+                    terminal.WriteLine($"  Your divine shield absorbs {monster.Name}'s {abilityName}!", "bright_white");
+                }
+                else
+                {
+                    player.HP -= damage;
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "yellow");
+                    terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                }
+                result.CombatLog.Add($"{monster.Name} uses {abilityName} for {damage} damage");
+                return true;
+            }
+
+            // ─── SELF-HEAL (5–10% MaxHP) ───
+            case "Blood Sacrifice":
+            case "Light's Embrace":
+            case "Love's Sacrifice":
+            case "Sacrifice":
+            case "Core Awakening":
+            case "The Long Sleep":
+            {
+                double healPct = abilityName is "Blood Sacrifice" or "Love's Sacrifice" or "Sacrifice" ? 0.10 : 0.05;
+                long healAmt = (long)(monster.MaxHP * healPct);
+                monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
+                terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "bright_magenta");
+                terminal.WriteLine($"  {monster.Name} heals {healAmt:N0} HP!", "green");
+                result.CombatLog.Add($"{monster.Name} heals {healAmt} HP via {abilityName}");
+                return true;
+            }
+
+            // ─── BUFF (increase boss damage for a few rounds) ───
+            case "War Cry":
+            case "Berserker Rage":
+            case "Martial Law":
+            case "Absolute Order":
+            case "Entomb":
+            {
+                int buff = (int)(baseDamage * 0.3);
+                monster.Strength += buff;
+                terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "bright_red");
+                terminal.WriteLine($"  {monster.Name}'s power surges! (+{buff} attack)", "red");
+                result.CombatLog.Add($"{monster.Name} uses {abilityName} (attack buff +{buff})");
+                return true;
+            }
+
+            // ─── DEBUFF (reduce player stats) ───
+            case "Heartbreak":
+            case "Jealous Rage":
+            case "Memory Theft":
+            case "Veil of Darkness":
+            case "Whispered Lies":
+            case "Stone Skin":
+            case "Divine Judgment":
+            {
+                if (!player.HasStatus(StatusEffect.Cursed))
+                {
+                    player.ApplyStatus(StatusEffect.Cursed, 3);
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "dark_magenta");
+                    terminal.WriteLine($"  Your strength falters! (-2 all stats for 3 rounds)", "yellow");
+                }
+                else
+                {
+                    // Fallback to damage if already cursed
+                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
+                    if (!player.HasStatus(StatusEffect.Invulnerable))
+                    {
+                        player.HP -= damage;
+                        terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "dark_magenta");
+                        terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                    }
+                }
+                result.CombatLog.Add($"{monster.Name} uses {abilityName}");
+                return true;
+            }
+
+            // ─── STUN (skip player turn) ───
+            case "Binding Chains":
+            case "Charm":
+            case "Desperate Plea":
+            case "Eye for Eye":
+            case "Judgment":
+            {
+                if (!player.HasStatusImmunity && !player.HasStatus(StatusEffect.Stunned))
+                {
+                    player.ApplyStatus(StatusEffect.Stunned, 1);
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "bright_yellow");
+                    terminal.WriteLine($"  You are stunned!", "yellow");
+                }
+                else
+                {
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}, but you resist!", "gray");
+                }
+                result.CombatLog.Add($"{monster.Name} uses {abilityName} (stun)");
+                return true;
+            }
+
+            // ─── LIFE DRAIN ───
+            case "Passion's Fire":
+            case "Shadow Merge":
+            case "Forgotten Lovers":
+            case "Shadow Step":
+            case "Truth Unveiled":
+            {
+                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.8) - player.Defence));
+                long healAmt = damage * 30 / 100;
+                if (player.HasStatus(StatusEffect.Invulnerable))
+                {
+                    terminal.WriteLine($"  Your divine shield deflects {monster.Name}'s {abilityName}!", "bright_white");
+                }
+                else
+                {
+                    player.HP -= damage;
+                    monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "magenta");
+                    terminal.WriteLine($"  You take {damage:N0} damage! {monster.Name} heals {healAmt:N0}!", "red");
+                }
+                result.CombatLog.Add($"{monster.Name} life drains {damage} via {abilityName}");
+                return true;
+            }
+
+            // ─── SUMMON MINIONS ───
+            case "Summon Soldiers":
+            case "Summon Executioners":
+            case "Shade Clones":
+            case "Manifest Shadows":
+            {
+                if (monsterList != null)
+                {
+                    int count = 1 + random.Next(2);
+                    string minionName = abilityName switch
+                    {
+                        "Summon Soldiers" => "Spectral Soldier",
+                        "Summon Executioners" => "Divine Executioner",
+                        "Shade Clones" => "Shadow Clone",
+                        "Manifest Shadows" => "Living Shadow",
+                        _ => "Summoned Creature"
+                    };
+                    var minions = new List<Monster>();
+                    for (int i = 0; i < count; i++)
+                    {
+                        long hp = 50 + monster.Level * 4;
+                        minions.Add(new Monster
+                        {
+                            Name = minionName,
+                            Level = Math.Max(1, monster.Level - 10),
+                            HP = hp, MaxHP = hp,
+                            Strength = 10 + monster.Level * 2,
+                            Defence = (int)(5 + monster.Level),
+                            WeapPow = 5 + monster.Level,
+                            ArmPow = 3 + monster.Level / 2,
+                            MonsterColor = "dark_red",
+                            FamilyName = "Summoned",
+                            IsBoss = false, IsActive = true, CanSpeak = false
+                        });
+                    }
+                    monsterList.AddRange(minions);
+                    result.Monsters.AddRange(minions);
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "bright_red");
+                    terminal.WriteLine($"  {count} {minionName}s materialize!", "red");
+                    result.CombatLog.Add($"{monster.Name} summons {count} {minionName}s");
+                }
+                return true;
+            }
+
+            // ─── FEAR ───
+            case "Primal Roar":
+            case "Shadow Sovereignty":
+            case "Final Kiss":
+            case "HorrifyingScream":
+            {
+                if (!player.HasStatusImmunity && !player.HasStatus(StatusEffect.Feared))
+                {
+                    player.ApplyStatus(StatusEffect.Feared, 2);
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "dark_red");
+                    terminal.WriteLine($"  Terror grips your heart!", "yellow");
+                }
+                else
+                {
+                    terminal.WriteLine($"  {monster.Name} uses {abilityName}, but you stand firm!", "gray");
+                }
+                result.CombatLog.Add($"{monster.Name} uses {abilityName} (fear)");
+                return true;
+            }
+
+            // ─── NARRATIVE MOMENTS (Phase 3 special) ───
+            case "The Offer":
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"  {monster.Name} pauses mid-combat.", "bright_yellow");
+                terminal.WriteLine($"  \"Enough. I offer you peace. Will you accept?\"", "yellow");
+                terminal.WriteLine("");
+                // Narrative moment, but doesn't stop combat for non-Manwe gods
+                // Just a brief moment of hesitation — the god skips their attack
+                result.CombatLog.Add($"{monster.Name} offers peace (skips attack)");
+                return true;
+            }
+
+            default:
+                return false; // Unknown ability, fall through to normal attack
+        }
+    }
+
+    /// <summary>
+    /// Manwe-specific boss ability handler with fully custom mechanics.
+    /// </summary>
+    private async Task<bool> TryManweBossAbility(Monster monster, Character player, string abilityName, CombatResult result, List<Monster>? monsterList)
+    {
+        long baseDamage = monster.GetAttackPower();
+        long maxDmg = Math.Max(1, (long)(player.MaxHP * 0.85));
+
+        switch (abilityName)
+        {
+            // ═══ PHASE 1 (100%–50% HP) ═══
+
+            case "Word of Creation":
+            {
+                long healAmt = (long)(monster.MaxHP * 0.08);
+                monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
+                terminal.WriteLine("  Manwe speaks a word that predates language.", "bright_yellow");
+                terminal.WriteLine($"  Reality mends around him. Manwe heals {healAmt:N0} HP!", "green");
+                result.CombatLog.Add($"Manwe heals {healAmt} via Word of Creation");
+                return true;
+            }
+
+            case "Unmake":
+            {
+                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.5) - player.Defence));
+                if (player.HasStatus(StatusEffect.Invulnerable))
+                {
+                    terminal.WriteLine("  Manwe tries to unmake you, but your shield holds!", "bright_white");
+                }
+                else
+                {
+                    player.HP -= damage;
+                    terminal.WriteLine("  Manwe gestures and part of you simply... stops existing.", "bright_red");
+                    terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                }
+                result.CombatLog.Add($"Manwe uses Unmake for {damage} damage");
+                return true;
+            }
+
+            case "Divine Judgment":
+            {
+                double mult = 1.5;
+                string flavor;
+                var story = StoryProgressionSystem.Instance;
+                // Check alignment — Darkness > Chivalry means negative alignment
+                if (player is Player pp && pp.Darkness > pp.Chivalry)
+                {
+                    mult = 2.25; // 50% bonus
+                    flavor = "  Your dark deeds burn under his gaze! (bonus damage)";
+                }
+                else
+                {
+                    flavor = "  The Creator's judgment falls upon you!";
+                }
+                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * mult) - player.Defence));
+                if (player.HasStatus(StatusEffect.Invulnerable))
+                {
+                    terminal.WriteLine("  Your divine shield deflects Manwe's judgment!", "bright_white");
+                }
+                else
+                {
+                    player.HP -= damage;
+                    terminal.WriteLine("  Manwe raises his hand. Light and shadow converge.", "bright_yellow");
+                    terminal.WriteLine(flavor, "red");
+                    terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                }
+                result.CombatLog.Add($"Manwe uses Divine Judgment for {damage} damage");
+                return true;
+            }
+
+            case "Time Stop":
+            {
+                if (!player.HasStatusImmunity && !player.HasStatus(StatusEffect.Stunned))
+                {
+                    player.ApplyStatus(StatusEffect.Stunned, 1);
+                    terminal.WriteLine("  Manwe snaps his fingers. Time freezes.", "bright_cyan");
+                    terminal.WriteLine("  You are trapped between moments! (Stunned 1 round)", "yellow");
+                }
+                else
+                {
+                    terminal.WriteLine("  Manwe tries to freeze time, but your will shatters the moment!", "bright_white");
+                }
+                result.CombatLog.Add("Manwe uses Time Stop");
+                return true;
+            }
+
+            case "Reality Warp":
+            {
+                int effect = random.Next(3);
+                if (effect == 0)
+                {
+                    // Heal Manwe 5%
+                    long healAmt = (long)(monster.MaxHP * 0.05);
+                    monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
+                    terminal.WriteLine("  Reality shifts. Manwe's wounds knit themselves together.", "bright_magenta");
+                    terminal.WriteLine($"  Manwe heals {healAmt:N0} HP!", "green");
+                    result.CombatLog.Add($"Reality Warp heals Manwe {healAmt}");
+                }
+                else if (effect == 1)
+                {
+                    // 1.5x damage
+                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
+                    if (!player.HasStatus(StatusEffect.Invulnerable))
+                    {
+                        player.HP -= damage;
+                        terminal.WriteLine("  The world inverts. Pain becomes your reality.", "bright_magenta");
+                        terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                    }
+                    result.CombatLog.Add($"Reality Warp deals {damage} damage");
+                }
+                else
+                {
+                    // Debuff defense
+                    if (!player.HasStatus(StatusEffect.Cursed))
+                    {
+                        player.ApplyStatus(StatusEffect.Cursed, 2);
+                        terminal.WriteLine("  Reality warps around you. Your armor feels like paper.", "bright_magenta");
+                        terminal.WriteLine("  Your defenses are weakened! (Cursed 2 rounds)", "yellow");
+                    }
+                    else
+                    {
+                        long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
+                        if (!player.HasStatus(StatusEffect.Invulnerable))
+                        {
+                            player.HP -= damage;
+                            terminal.WriteLine("  Reality convulses!", "bright_magenta");
+                            terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                        }
+                    }
+                    result.CombatLog.Add("Reality Warp (debuff/damage)");
+                }
+                return true;
+            }
+
+            // ═══ PHASE 2 (50%–10% HP) ═══
+
+            case "Split Form":
+            {
+                if (!_manweSplitFormUsed && monsterList != null)
+                {
+                    _manweSplitFormUsed = true;
+                    long shadowHP = 25000;
+                    var shadow = new Monster
+                    {
+                        Name = "Shadow of Manwe",
+                        Level = 80,
+                        HP = shadowHP, MaxHP = shadowHP,
+                        Strength = 110,
+                        Defence = 100,
+                        WeapPow = 80,
+                        ArmPow = 60,
+                        MonsterColor = "dark_magenta",
+                        FamilyName = "Divine",
+                        IsBoss = false, IsActive = true, CanSpeak = true
+                    };
+                    monsterList.Add(shadow);
+                    result.Monsters.Add(shadow);
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  Manwe splits into two beings!", "bright_magenta");
+                    terminal.WriteLine("  Light and shadow separate — a dark reflection steps forward.", "dark_magenta");
+                    terminal.WriteLine("  \"We are the question you must answer.\"", "bright_yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  Shadow of Manwe appears! (25,000 HP)", "red");
+                    result.CombatLog.Add("Manwe uses Split Form — Shadow of Manwe appears");
+                }
+                else
+                {
+                    // Already split — do a heavy damage attack instead
+                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence));
+                    if (!player.HasStatus(StatusEffect.Invulnerable))
+                    {
+                        player.HP -= damage;
+                        terminal.WriteLine("  Light and shadow strike in unison!", "bright_magenta");
+                        terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                    }
+                    result.CombatLog.Add($"Manwe dual-strikes for {damage} damage");
+                }
+                return true;
+            }
+
+            case "Light Incarnate":
+            {
+                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                if (player.HasStatus(StatusEffect.Invulnerable))
+                {
+                    terminal.WriteLine("  Your divine shield absorbs the radiance!", "bright_white");
+                }
+                else
+                {
+                    player.HP -= damage;
+                    terminal.WriteLine("  Manwe becomes pure light. It burns.", "bright_white");
+                    terminal.WriteLine("  Every shadow in the room screams.", "bright_yellow");
+                    terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                }
+                result.CombatLog.Add($"Manwe uses Light Incarnate for {damage} damage");
+                return true;
+            }
+
+            case "Shadow Incarnate":
+            {
+                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence));
+                long healAmt = damage * 30 / 100;
+                if (player.HasStatus(StatusEffect.Invulnerable))
+                {
+                    terminal.WriteLine("  Your divine shield deflects the darkness!", "bright_white");
+                }
+                else
+                {
+                    player.HP -= damage;
+                    monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
+                    terminal.WriteLine("  Manwe becomes living darkness. It hungers.", "dark_magenta");
+                    terminal.WriteLine($"  You take {damage:N0} damage! Manwe absorbs {healAmt:N0} HP!", "red");
+                }
+                result.CombatLog.Add($"Manwe uses Shadow Incarnate: {damage} damage, heals {healAmt}");
+                return true;
+            }
+
+            case "The Question":
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_yellow");
+                if (random.Next(2) == 0)
+                {
+                    // Philosophical pause — Manwe skips his attack
+                    string[] questions = {
+                        "\"Was creation worth the suffering it caused?\"",
+                        "\"If you could unmake everything, would you?\"",
+                        "\"What makes a mortal life worth living?\"",
+                        "\"Is it better to be the wave, or the ocean?\"",
+                        "\"Can a creator be forgiven for what he creates?\""
+                    };
+                    terminal.WriteLine($"  Manwe pauses. {questions[random.Next(questions.Length)]}", "bright_yellow");
+                    terminal.WriteLine("  He waits for an answer that never comes.", "gray");
+                    terminal.WriteLine("  (Manwe skips his attack, lost in thought)", "dark_gray");
+                    result.CombatLog.Add("Manwe asks The Question (skips attack)");
+                }
+                else
+                {
+                    // The question IS the attack
+                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                    if (!player.HasStatus(StatusEffect.Invulnerable))
+                    {
+                        player.HP -= damage;
+                        terminal.WriteLine("  \"WHAT WILL YOU DO WITH THE POWER OF CREATION?\"", "bright_yellow");
+                        terminal.WriteLine("  The question itself tears at your soul!", "bright_red");
+                        terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                    }
+                    result.CombatLog.Add($"Manwe uses The Question as attack for {damage} damage");
+                }
+                return true;
+            }
+
+            // ═══ PHASE 3 (10%–0% HP) ═══
+
+            case "Final Word":
+            {
+                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence));
+                if (player.HasStatus(StatusEffect.Invulnerable))
+                {
+                    terminal.WriteLine("  Your divine shield barely holds against the Final Word!", "bright_white");
+                }
+                else
+                {
+                    player.HP -= damage;
+                    terminal.WriteLine("  Manwe speaks the Word that began everything.", "bright_white");
+                    terminal.WriteLine("  And the Word echoes: ENOUGH.", "bright_yellow");
+                    terminal.WriteLine($"  You take {damage:N0} damage!", "bright_red");
+                }
+                result.CombatLog.Add($"Manwe uses Final Word for {damage} damage");
+                return true;
+            }
+
+            case "Creation's End":
+            {
+                double hpPct = (double)player.HP / Math.Max(1, player.MaxHP);
+                if (hpPct < 0.20)
+                {
+                    // Check for Worldstone protection
+                    if (ArtifactSystem.Instance.HasArtifact(ArtifactType.Worldstone))
+                    {
+                        long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                        if (!player.HasStatus(StatusEffect.Invulnerable))
+                        {
+                            player.HP -= damage;
+                            terminal.WriteLine("  Manwe tries to unmake you entirely!", "bright_red");
+                            terminal.WriteLine("  The Worldstone pulses — reality holds!", "bright_cyan");
+                            terminal.WriteLine($"  You take {damage:N0} damage instead of instant death!", "yellow");
+                        }
+                        result.CombatLog.Add($"Creation's End blocked by Worldstone ({damage} damage)");
+                    }
+                    else
+                    {
+                        // Instant kill
+                        player.HP = 0;
+                        terminal.WriteLine("  Manwe reaches out and touches your forehead.", "bright_white");
+                        terminal.WriteLine("  \"I take back what I gave.\"", "bright_yellow");
+                        terminal.WriteLine("  You cease to exist.", "dark_red");
+                        result.CombatLog.Add("Creation's End — instant kill (no Worldstone)");
+                    }
+                }
+                else
+                {
+                    // Player HP too high for instant kill — heavy damage instead
+                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.5) - player.Defence));
+                    if (!player.HasStatus(StatusEffect.Invulnerable))
+                    {
+                        player.HP -= damage;
+                        terminal.WriteLine("  Manwe begins to speak the word of ending...", "bright_red");
+                        terminal.WriteLine("  Your life force resists annihilation — barely!", "yellow");
+                        terminal.WriteLine($"  You take {damage:N0} damage!", "red");
+                    }
+                    result.CombatLog.Add($"Creation's End deals {damage} damage (HP too high for instant kill)");
+                }
+                return true;
+            }
+
+            case "The Offer":
+            {
+                if (!_manweOfferUsed)
+                {
+                    _manweOfferUsed = true;
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  Manwe drops his hands. The stars stop shaking.", "bright_yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  \"Enough.\"", "bright_white");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  His voice is barely a whisper now.", "gray");
+                    terminal.WriteLine("  \"You have proven yourself. More than anyone before you.\"", "bright_yellow");
+                    terminal.WriteLine("  \"I offer you this: walk away. Take my power peacefully.\"", "bright_yellow");
+                    terminal.WriteLine("  \"No more death. No more pain. Just... an ending.\"", "bright_yellow");
+                    terminal.WriteLine("");
+                    terminal.Write("  Accept Manwe's offer? [Y/N]: ", "bright_white");
+                    string response = (await terminal.GetKeyInput()).ToUpperInvariant();
+                    terminal.WriteLine("");
+
+                    if (response == "Y")
+                    {
+                        // Peaceful resolution — mark as spared
+                        terminal.WriteLine("  You lower your weapon.", "bright_cyan");
+                        terminal.WriteLine("  Manwe smiles. For the first time in eternity.", "bright_yellow");
+                        terminal.WriteLine("  \"Thank you.\"", "bright_white");
+                        if (BossContext != null) BossContext.BossSaved = true;
+                        monster.HP = 0; // End combat peacefully
+                        result.CombatLog.Add("Player accepts The Offer — Manwe spared");
+                    }
+                    else
+                    {
+                        terminal.WriteLine("  \"No. You don't get to quit.\"", "bright_red");
+                        terminal.WriteLine("  Manwe's eyes harden.", "yellow");
+                        terminal.WriteLine("  \"Then finish it.\"", "bright_yellow");
+                        result.CombatLog.Add("Player refuses The Offer — combat continues");
+                    }
+                }
+                else
+                {
+                    // Already offered — use Final Word instead
+                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence));
+                    if (!player.HasStatus(StatusEffect.Invulnerable))
+                    {
+                        player.HP -= damage;
+                        terminal.WriteLine("  \"There are no second offers.\"", "bright_yellow");
+                        terminal.WriteLine($"  You take {damage:N0} damage!", "bright_red");
+                    }
+                    result.CombatLog.Add($"Manwe attacks (Offer already made) for {damage} damage");
+                }
+                return true;
+            }
+
+            default:
+                return false;
+        }
     }
 
     /// <summary>
@@ -4819,22 +5487,39 @@ public partial class CombatEngine
         }
 
         // Solo loot (no grouped players) — original behavior
-        // Ask player what to do
-        terminal.SetColor("white");
-        terminal.WriteLine($"You found this on the {monster.Name}'s corpse.");
-        terminal.WriteLine("");
-        if (lootItem.IsIdentified)
+        // Flush any buffered input (e.g. from auto-combat key presses) so it
+        // doesn't accidentally get consumed as the E/T/L choice.
+        terminal.FlushPendingInput();
+
+        // Ask player what to do — loop until we get valid E/T/L input
+        string choice;
+        while (true)
         {
-            terminal.WriteLine("(E)quip immediately");
+            terminal.SetColor("white");
+            terminal.WriteLine($"You found this on the {monster.Name}'s corpse.");
+            terminal.WriteLine("");
+            if (lootItem.IsIdentified)
+            {
+                terminal.WriteLine("(E)quip immediately");
+            }
+            terminal.WriteLine("(T)ake to inventory");
+            terminal.WriteLine("(L)eave it");
+            terminal.WriteLine("");
+
+            terminal.Write("Your choice: ");
+            choice = (await terminal.GetKeyInput()).ToUpper();
+
+            if (choice == "T" || choice == "L" || (choice == "E" && lootItem.IsIdentified))
+                break;
+            if (choice == "E" && !lootItem.IsIdentified)
+                break; // Handled below with redirect to inventory
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"Invalid choice '{choice}'. Please enter E, T, or L.");
+            terminal.WriteLine("");
         }
-        terminal.WriteLine("(T)ake to inventory");
-        terminal.WriteLine("(L)eave it");
-        terminal.WriteLine("");
 
-        terminal.Write("Your choice: ");
-        var choice = await terminal.GetKeyInput();
-
-        switch (choice.ToUpper())
+        switch (choice)
         {
             case "E":
                 // Block equipping unidentified items
@@ -5098,6 +5783,9 @@ public partial class CombatEngine
     /// </summary>
     private async Task PromptLootWinner(Item lootItem, Monster monster, Character winner, TerminalEmulator winnerTerm)
     {
+        // Flush any buffered input before the loot prompt
+        winnerTerm.FlushPendingInput();
+
         winnerTerm.SetColor("white");
         winnerTerm.WriteLine($"You won the roll for loot from {monster.Name}!");
         winnerTerm.WriteLine("");
@@ -5109,15 +5797,24 @@ public partial class CombatEngine
         winnerTerm.WriteLine("(L)eave it");
         winnerTerm.WriteLine("");
 
-        // Read input with a 30-second timeout
-        string choice = "L";
+        // Read input with a 30-second timeout, validate E/T/L
+        string choice = "T";
         try
         {
             winnerTerm.Write("Your choice: ");
             var inputTask = winnerTerm.GetKeyInput();
             var completed = await Task.WhenAny(inputTask, Task.Delay(30000));
             if (completed == inputTask)
-                choice = inputTask.Result;
+            {
+                choice = inputTask.Result.ToUpper();
+                // Only accept valid choices; default to Take for invalid input
+                if (choice != "E" && choice != "T" && choice != "L")
+                {
+                    winnerTerm.SetColor("yellow");
+                    winnerTerm.WriteLine($"Invalid choice '{choice}' — taking item to inventory.");
+                    choice = "T";
+                }
+            }
             else
             {
                 winnerTerm.SetColor("yellow");
@@ -5127,7 +5824,7 @@ public partial class CombatEngine
         }
         catch { choice = "T"; }
 
-        switch (choice.ToUpper())
+        switch (choice)
         {
             case "E":
                 if (!lootItem.IsIdentified)
@@ -8227,6 +8924,855 @@ public partial class CombatEngine
                 terminal.SetColor("cyan");
                 terminal.WriteLine("Your aim is true!");
                 break;
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // TIDESWORN PRESTIGE ABILITIES
+            // ═══════════════════════════════════════════════════════════════════════
+            case "undertow":
+                // -20% enemy damage for duration (apply Weakened + reduce strength)
+                if (target != null && target.IsAlive)
+                {
+                    target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration);
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"The undertow pulls at {target.Name}, weakening their strikes!");
+                }
+                break;
+
+            case "riptide":
+                // Target's next attack reduced by 25% (apply Weakened)
+                if (target != null && target.IsAlive)
+                {
+                    target.WeakenRounds = Math.Max(target.WeakenRounds, 2);
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"A riptide surges through {target.Name}, sapping their strength!");
+                }
+                break;
+
+            case "breakwater":
+                // +100 DEF already handled by DefenseBonus on ability
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("You become an unbreakable wall of ocean stone!");
+                break;
+
+            case "regen_20":
+                // 20 HP/round regen for duration
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Regenerating))
+                    player.ActiveStatuses[StatusEffect.Regenerating] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("Living waters flow through your veins, mending wounds each round!");
+                break;
+
+            case "abyssal_anchor":
+                // +80 DEF (handled by ability) + enemies deal 20% less (Weakened)
+                if (target != null && target.IsAlive)
+                {
+                    target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration);
+                }
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("You anchor yourself to the ocean floor! Enemies struggle against the current!");
+                break;
+
+            case "sanctified_torrent":
+            {
+                // AoE holy water. 2x vs undead/demons. Heals 20% dealt.
+                int totalHeal = 0;
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = abilityResult.Damage;
+                        bool isHoly = m.FamilyName?.IndexOf("undead", StringComparison.OrdinalIgnoreCase) >= 0 || m.FamilyName?.IndexOf("demon", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (isHoly) dmg *= 2;
+                        m.HP -= dmg;
+                        totalHeal += (int)(dmg * 0.20);
+                        terminal.SetColor(isHoly ? "bright_yellow" : "bright_cyan");
+                        terminal.WriteLine($"Sanctified water crashes into {m.Name} for {dmg} damage!{(isHoly ? " (HOLY!)" : "")}");
+                    }
+                }
+                if (totalHeal > 0)
+                {
+                    player.HP = Math.Min(player.MaxHP, player.HP + totalHeal);
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"The holy waters heal you for {totalHeal} HP!");
+                }
+                break;
+            }
+
+            case "oceans_embrace":
+                // Party heal 150 + cleanse debuffs
+                player.HP = Math.Min(player.MaxHP, player.HP + abilityResult.Healing);
+                player.Poison = 0;
+                player.RemoveStatus(StatusEffect.Poisoned);
+                player.RemoveStatus(StatusEffect.Bleeding);
+                player.RemoveStatus(StatusEffect.Burning);
+                player.RemoveStatus(StatusEffect.Cursed);
+                player.RemoveStatus(StatusEffect.Weakened);
+                player.RemoveStatus(StatusEffect.Slow);
+                player.RemoveStatus(StatusEffect.Vulnerable);
+                player.RemoveStatus(StatusEffect.Exhausted);
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"The Ocean embraces you, healing {abilityResult.Healing} HP and cleansing all afflictions!");
+                // Also heal companions
+                if (result?.Teammates != null)
+                {
+                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        tm.HP = Math.Min(tm.MaxHP, tm.HP + abilityResult.Healing);
+                        terminal.WriteLine($"  {tm.Name} is healed for {abilityResult.Healing} HP!", "cyan");
+                    }
+                }
+                break;
+
+            case "tidal_colossus":
+                // +60 ATK/DEF (handled) + stun immunity
+                player.HasStatusImmunity = true;
+                player.StatusImmunityDuration = abilityResult.Duration;
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("YOU RISE AS A TIDAL COLOSSUS! Nothing can stagger you!");
+                break;
+
+            case "eternal_vigil":
+                // Invulnerable for 2 rounds
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Invulnerable))
+                    player.ActiveStatuses[StatusEffect.Invulnerable] = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("The Ocean's eternal vigil protects you! You cannot be harmed!");
+                break;
+
+            case "wrath_deep":
+            {
+                // 350 damage. Instant kill <30% HP non-boss. 50% lifesteal.
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    bool instantKill = !target.IsBoss && target.HP < (int)(target.MaxHP * 0.30);
+                    if (instantKill)
+                    {
+                        target.HP = 0;
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine($"THE OCEAN CLAIMS {target.Name.ToUpper()}! Dragged to the depths!");
+                    }
+                    else
+                    {
+                        target.HP -= dmg;
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine($"The Deep's wrath crashes into {target.Name} for {dmg} damage!");
+                    }
+                    int heal = (int)(dmg * 0.50);
+                    player.HP = Math.Min(player.MaxHP, player.HP + heal);
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"The ocean restores {heal} HP!");
+                }
+                break;
+            }
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // WAVECALLER PRESTIGE ABILITIES
+            // ═══════════════════════════════════════════════════════════════════════
+            case "party_buff":
+                // +25 ATK to all allies (handled by AttackBonus for self)
+                if (result?.Teammates != null)
+                {
+                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        tm.TempAttackBonus += 25;
+                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, abilityResult.Duration);
+                    }
+                }
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("An inspiring cadence fills the air! All allies surge with power!");
+                break;
+
+            case "double_vs_debuffed":
+                // Double damage if target is debuffed
+                if (target != null && target.IsAlive)
+                {
+                    bool isDebuffed = target.Poisoned || target.Stunned || target.Charmed || target.Distracted ||
+                        target.WeakenRounds > 0 || target.IsSlowed || target.IsMarked;
+                    int dmg = abilityResult.Damage;
+                    if (isDebuffed) dmg *= 2;
+                    target.HP -= dmg;
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine(isDebuffed
+                        ? $"The wave echo RESONATES with {target.Name}'s weakness for {dmg} DOUBLE damage!"
+                        : $"A wave echo strikes {target.Name} for {dmg} damage!");
+                }
+                break;
+
+            case "empathic_link":
+                // +30 DEF to self (handled), damage sharing proxy
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
+                    player.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("An empathic bond forms! Damage is shared, burdens lightened!");
+                break;
+
+            case "crescendo_aoe":
+            {
+                // 120 AoE + 30 per ally in party
+                int allyCount = result?.Teammates?.Count(t => t.IsAlive) ?? 0;
+                int bonusDmg = allyCount * 30;
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = abilityResult.Damage + bonusDmg;
+                        m.HP -= dmg;
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine($"Crescendo strikes {m.Name} for {dmg} damage!");
+                    }
+                }
+                if (allyCount > 0)
+                {
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"  ({allyCount} allies amplified the harmony by +{bonusDmg} damage!)");
+                }
+                break;
+            }
+
+            case "harmonic_shield":
+                // +40 DEF (handled) + 15% reflection to party
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
+                    player.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
+                if (result?.Teammates != null)
+                {
+                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        tm.TempDefenseBonus += 40;
+                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                    }
+                }
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("A harmonic shield envelops your party! Attacks are reflected!");
+                break;
+
+            case "dissonant_wave":
+                // All enemies: weakened + vulnerable + 25% stun
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        m.WeakenRounds = Math.Max(m.WeakenRounds, abilityResult.Duration);
+                        m.IsMarked = true;
+                        m.MarkedDuration = Math.Max(m.MarkedDuration, abilityResult.Duration);
+                        if (random.Next(100) < 25) m.Stunned = true;
+                        terminal.SetColor("magenta");
+                        terminal.WriteLine($"Dissonance rattles {m.Name}! (Weakened, Vulnerable{(m.Stunned ? ", STUNNED!" : "")})");
+                    }
+                }
+                break;
+
+            case "resonance_cascade":
+            {
+                // 100 AoE, +25% per additional enemy
+                if (monsters != null)
+                {
+                    int enemyCount = monsters.Count(m => m.IsAlive);
+                    float multiplier = 1.0f + (enemyCount - 1) * 0.25f;
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = (int)(abilityResult.Damage * multiplier);
+                        m.HP -= dmg;
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine($"Resonance cascades through {m.Name} for {dmg} damage!");
+                    }
+                    if (enemyCount > 1)
+                    {
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine($"  (Cascade amplified by {enemyCount} targets: {(int)(multiplier * 100)}% damage!)");
+                    }
+                }
+                break;
+            }
+
+            case "tidal_harmony":
+                // Heal 200 all allies (handled for self by BaseHealing) + self ATK buff (handled)
+                if (result?.Teammates != null)
+                {
+                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        tm.HP = Math.Min(tm.MaxHP, tm.HP + 200);
+                        terminal.WriteLine($"  {tm.Name} is healed for 200 HP!", "cyan");
+                    }
+                }
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("Tidal harmony restores your party and empowers your strikes!");
+                break;
+
+            case "oceans_voice":
+                // All allies: +50 ATK, +30 DEF (handled for self)
+                if (result?.Teammates != null)
+                {
+                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        tm.TempAttackBonus += 50;
+                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, abilityResult.Duration);
+                        tm.TempDefenseBonus += 30;
+                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                    }
+                }
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("THE OCEAN SPEAKS THROUGH YOU! All allies surge with divine power!");
+                break;
+
+            case "grand_finale":
+            {
+                // 300 AoE + 50 per active buff, consumes buffs
+                int buffCount = player.ActiveStatuses.Count(kvp =>
+                    kvp.Key == StatusEffect.Blessed || kvp.Key == StatusEffect.Raging ||
+                    kvp.Key == StatusEffect.Haste || kvp.Key == StatusEffect.Regenerating ||
+                    kvp.Key == StatusEffect.Shielded || kvp.Key == StatusEffect.Empowered ||
+                    kvp.Key == StatusEffect.Protected || kvp.Key == StatusEffect.Stoneskin ||
+                    kvp.Key == StatusEffect.Reflecting);
+                int bonusDmg = buffCount * 50;
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = abilityResult.Damage + bonusDmg;
+                        m.HP -= dmg;
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine($"GRAND FINALE strikes {m.Name} for {dmg} damage!");
+                    }
+                }
+                // Consume buffs
+                var toRemove = player.ActiveStatuses.Keys.Where(k =>
+                    k == StatusEffect.Blessed || k == StatusEffect.Raging ||
+                    k == StatusEffect.Haste || k == StatusEffect.Regenerating ||
+                    k == StatusEffect.Shielded || k == StatusEffect.Empowered ||
+                    k == StatusEffect.Protected || k == StatusEffect.Stoneskin ||
+                    k == StatusEffect.Reflecting).ToList();
+                foreach (var key in toRemove) player.ActiveStatuses.Remove(key);
+                if (buffCount > 0)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"  ({buffCount} buffs consumed for +{bonusDmg} bonus damage!)");
+                }
+                break;
+            }
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // CYCLEBREAKER PRESTIGE ABILITIES
+            // ═══════════════════════════════════════════════════════════════════════
+            case "temporal_feint":
+                // Auto-hit/crit next attack, dodge this round
+                player.DodgeNextAttack = true;
+                player.TempAttackBonus += 999; // Guarantee hit
+                player.TempAttackBonusDuration = 1;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
+                    player.ActiveStatuses[StatusEffect.Hidden] = 1; // Crit bonus from stealth
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("You step between moments! Your next strike is inevitable!");
+                break;
+
+            case "borrowed_power":
+            {
+                // +N per cycle to all stats (N = CurrentCycle, max 10)
+                int cycleBonus = Math.Min(10, StoryProgressionSystem.Instance?.CurrentCycle ?? 1);
+                player.TempAttackBonus += cycleBonus;
+                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, abilityResult.Duration);
+                player.TempDefenseBonus += cycleBonus;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration);
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"Power from {cycleBonus} past lives floods through you! (+{cycleBonus} to all combat stats)");
+                break;
+            }
+
+            case "echo_25":
+                // 25% chance to echo (deal damage again)
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    target.HP -= dmg;
+                    terminal.SetColor("magenta");
+                    terminal.WriteLine($"Reality fractures around {target.Name} for {dmg} damage!");
+                    if (random.Next(100) < 25)
+                    {
+                        target.HP -= dmg;
+                        terminal.SetColor("bright_magenta");
+                        terminal.WriteLine($"  The fracture ECHOES! {dmg} additional damage!");
+                    }
+                }
+                break;
+
+            case "quantum_state":
+                // 50% dodge chance for duration (use Blur status)
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Blur))
+                    player.ActiveStatuses[StatusEffect.Blur] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                player.DodgeNextAttack = true;
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("You exist in a quantum superposition! Attacks phase through you!");
+                break;
+
+            case "entropy_aoe":
+            {
+                // 140 AoE + enemies take +15% damage for 4 rounds (Vulnerable)
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = abilityResult.Damage;
+                        m.HP -= dmg;
+                        m.IsMarked = true;
+                        m.MarkedDuration = Math.Max(m.MarkedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
+                        terminal.SetColor("magenta");
+                        terminal.WriteLine($"Entropy consumes {m.Name} for {dmg} damage! (Vulnerable!)");
+                    }
+                }
+                break;
+            }
+
+            case "timeline_split":
+                // Clone attacks for 50% damage for 3 rounds (use Haste as double attack proxy)
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Haste))
+                    player.ActiveStatuses[StatusEffect.Haste] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("A temporal clone materializes beside you, mirroring your every strike!");
+                break;
+
+            case "causality_loop":
+                // Enemy trapped in loop - confused + weakened
+                if (target != null && target.IsAlive)
+                {
+                    target.IsConfused = true;
+                    target.ConfusedDuration = Math.Max(target.ConfusedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
+                    target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine($"{target.Name} is trapped in a causality loop! Their own violence turns against them!");
+                }
+                break;
+
+            case "chrono_surge":
+                // Double actions this round
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Haste))
+                    player.ActiveStatuses[StatusEffect.Haste] = 1;
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("Time accelerates around you! You move with impossible speed!");
+                break;
+
+            case "singularity":
+            {
+                // 200 AoE, stunned enemies take 2x
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = abilityResult.Damage;
+                        if (m.Stunned || m.IsStunned) dmg *= 2;
+                        m.HP -= dmg;
+                        terminal.SetColor("bright_magenta");
+                        terminal.WriteLine($"The singularity crushes {m.Name} for {dmg} damage!{(m.Stunned ? " (STUNNED: 2x!)" : "")}");
+                    }
+                }
+                break;
+            }
+
+            case "temporal_prison":
+                // Target cannot act for 2 rounds (boss: 1)
+                if (target != null && target.IsAlive)
+                {
+                    int dur = target.IsBoss ? 1 : (abilityResult.Duration > 0 ? abilityResult.Duration : 2);
+                    target.Stunned = true;
+                    target.IsStunned = true;
+                    target.StunDuration = Math.Max(target.StunDuration, dur);
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine($"{target.Name} is frozen in time for {dur} round{(dur > 1 ? "s" : "")}!");
+                }
+                break;
+
+            case "cycles_end":
+            {
+                // 400 + 50 per cycle (max +250), ignore 50% defense
+                int cycleBonus = Math.Min(250, (StoryProgressionSystem.Instance?.CurrentCycle ?? 1) * 50);
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage + cycleBonus;
+                    // Ignore 50% defense by adding back half the defense reduction
+                    dmg += (int)(target.Defence * 0.25);
+                    target.HP -= dmg;
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine($"THE CYCLE ENDS HERE! {target.Name} takes {dmg} damage!");
+                    if (cycleBonus > 0)
+                    {
+                        terminal.SetColor("magenta");
+                        terminal.WriteLine($"  (Empowered by {cycleBonus / 50} cycles: +{cycleBonus} bonus damage!)");
+                    }
+                }
+                break;
+            }
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // ABYSSWARDEN PRESTIGE ABILITIES
+            // ═══════════════════════════════════════════════════════════════════════
+            case "shadow_harvest":
+            {
+                // +50% damage if target <50% HP, 25% lifesteal
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    if (target.HP < target.MaxHP / 2) dmg = (int)(dmg * 1.5);
+                    target.HP -= dmg;
+                    int heal = (int)(dmg * 0.25);
+                    player.HP = Math.Min(player.MaxHP, player.HP + heal);
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($"Shadows harvest {target.Name} for {dmg} damage! You absorb {heal} HP!");
+                }
+                break;
+            }
+
+            case "corrupting_dot":
+                // Poison DoT + lifesteal
+                if (target != null && target.IsAlive)
+                {
+                    target.Poisoned = true;
+                    target.PoisonRounds = Math.Max(target.PoisonRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 5);
+                    if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
+                        player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($"Corruption seeps into {target.Name}! Their life force feeds yours!");
+                }
+                break;
+
+            case "umbral_step":
+                // Guaranteed crit + evade all attacks
+                player.DodgeNextAttack = true;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
+                    player.ActiveStatuses[StatusEffect.Hidden] = 1;
+                terminal.SetColor("dark_red");
+                terminal.WriteLine("You melt into shadow! Your next strike will be lethal!");
+                break;
+
+            case "lifesteal_10":
+                // 10% lifesteal for duration
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
+                    player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                terminal.SetColor("dark_red");
+                terminal.WriteLine("Dark authority flows through you! Your strikes drain life force!");
+                break;
+
+            case "overflow_aoe":
+            {
+                // 200 single target. On kill, overflow spreads to all.
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    target.HP -= dmg;
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($"The seal fractures through {target.Name} for {dmg} damage!");
+                    if (target.HP <= 0 && monsters != null)
+                    {
+                        int overflow = (int)Math.Abs(target.HP);
+                        int spreadDmg = Math.Max(overflow, dmg / 2);
+                        foreach (var m in monsters.Where(m => m.IsAlive && m != target))
+                        {
+                            m.HP -= spreadDmg;
+                            terminal.SetColor("bright_red");
+                            terminal.WriteLine($"  Overflow erupts into {m.Name} for {spreadDmg} damage!");
+                        }
+                    }
+                }
+                break;
+            }
+
+            case "soul_leech":
+            {
+                // 130 damage, 40% lifesteal (60% if target poisoned)
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    target.HP -= dmg;
+                    bool isPoisoned = target.Poisoned;
+                    float leechRate = isPoisoned ? 0.60f : 0.40f;
+                    int heal = (int)(dmg * leechRate);
+                    player.HP = Math.Min(player.MaxHP, player.HP + heal);
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($"Soul leech drains {target.Name} for {dmg} damage! You absorb {heal} HP!{(isPoisoned ? " (Corrupted bonus!)" : "")}");
+                }
+                break;
+            }
+
+            case "abyssal_eruption":
+            {
+                // 150 AoE + corruption DoT on all
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = abilityResult.Damage;
+                        m.HP -= dmg;
+                        m.Poisoned = true;
+                        m.PoisonRounds = Math.Max(m.PoisonRounds, 3);
+                        terminal.SetColor("dark_red");
+                        terminal.WriteLine($"Abyssal eruption engulfs {m.Name} for {dmg} damage! (Corrupted!)");
+                    }
+                }
+                break;
+            }
+
+            case "dark_pact":
+            {
+                // Sacrifice 20% max HP, +80 ATK (handled) + 25% lifesteal
+                int sacrifice = (int)(player.MaxHP * 0.20);
+                player.HP = Math.Max(1, player.HP - sacrifice);
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
+                    player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                terminal.SetColor("dark_red");
+                terminal.WriteLine($"You offer {sacrifice} HP to the abyss! Dark power surges through you!");
+                break;
+            }
+
+            case "prison_wardens_command":
+                // -50% ATK/DEF to target (boss: half) - Weakened + Vulnerable + direct stat reduction
+                if (target != null && target.IsAlive)
+                {
+                    float mult = target.IsBoss ? 0.25f : 0.50f;
+                    int atkReduction = (int)(target.Strength * mult);
+                    int defReduction = (int)(target.Defence * mult);
+                    target.Strength = Math.Max(1, target.Strength - atkReduction);
+                    target.Defence = Math.Max(0, target.Defence - defReduction);
+                    target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration);
+                    target.IsMarked = true;
+                    target.MarkedDuration = Math.Max(target.MarkedDuration, abilityResult.Duration);
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($"You assert dominion over {target.Name}! (-{atkReduction} ATK, -{defReduction} DEF)");
+                }
+                break;
+
+            case "consume_soul":
+            {
+                // 250 damage, on kill: +5 permanent ATK this combat
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    target.HP -= dmg;
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($"You consume {target.Name}'s soul for {dmg} damage!");
+                    if (target.HP <= 0)
+                    {
+                        player.TempAttackBonus += 5;
+                        player.TempAttackBonusDuration = 999;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine("  Their essence empowers you permanently! (+5 ATK this combat)");
+                    }
+                }
+                break;
+            }
+
+            case "abyss_unchained":
+            {
+                // 380 AoE, heal to full, remove all debuffs
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = abilityResult.Damage;
+                        m.HP -= dmg;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"THE ABYSS UNCHAINED crushes {m.Name} for {dmg} damage!");
+                    }
+                }
+                player.HP = player.MaxHP;
+                player.Poison = 0;
+                player.Blind = false;
+                player.RemoveStatus(StatusEffect.Poisoned);
+                player.RemoveStatus(StatusEffect.Bleeding);
+                player.RemoveStatus(StatusEffect.Cursed);
+                player.RemoveStatus(StatusEffect.Weakened);
+                player.RemoveStatus(StatusEffect.Slow);
+                player.RemoveStatus(StatusEffect.Vulnerable);
+                player.RemoveStatus(StatusEffect.Stunned);
+                player.RemoveStatus(StatusEffect.Confused);
+                player.RemoveStatus(StatusEffect.Charmed);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("The abyss restores you to full health and purges all afflictions!");
+                break;
+            }
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // VOIDREAVER PRESTIGE ABILITIES
+            // ═══════════════════════════════════════════════════════════════════════
+            case "lifesteal_30":
+            {
+                // 60 damage + 30% lifesteal
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    target.HP -= dmg;
+                    int heal = (int)(dmg * 0.30);
+                    player.HP = Math.Min(player.MaxHP, player.HP + heal);
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"Your hungering strike tears into {target.Name} for {dmg} damage! You feast on {heal} HP!");
+                }
+                break;
+            }
+
+            case "offer_flesh":
+            {
+                // Sacrifice 15% HP for +60 ATK (handled). Below 25% HP: doubles to +120.
+                int sacrifice = (int)(player.MaxHP * 0.15);
+                player.HP = Math.Max(1, player.HP - sacrifice);
+                bool desperate = player.HP < (int)(player.MaxHP * 0.25);
+                if (desperate)
+                {
+                    player.TempAttackBonus += 60;
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"You offer {sacrifice} HP! DESPERATE POWER surges — DOUBLE bonus! (+120 ATK total)");
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"You sacrifice {sacrifice} HP to the void! Dark power flows through you!");
+                }
+                break;
+            }
+
+            case "execute_reap":
+            {
+                // 100 damage, 3x vs <30% HP
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    bool canReap = target.HP < (int)(target.MaxHP * 0.30);
+                    if (canReap) dmg *= 3;
+                    target.HP -= dmg;
+                    terminal.SetColor("red");
+                    terminal.WriteLine(canReap
+                        ? $"REAP! The weakened {target.Name} is harvested for {dmg} TRIPLE damage!"
+                        : $"You reap at {target.Name} for {dmg} damage!");
+                }
+                break;
+            }
+
+            case "damage_reflect_25":
+                // 25% damage reflection + 30 DEF (handled)
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
+                    player.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                terminal.SetColor("dark_red");
+                terminal.WriteLine("The void wraps around you like a shroud! Attacks are reflected!");
+                break;
+
+            case "apotheosis":
+            {
+                // Burn 40% HP. 4 rounds: +100 ATK (handled), hit all, 20% lifesteal
+                int sacrifice = (int)(player.MaxHP * 0.40);
+                player.HP = Math.Max(1, player.HP - sacrifice);
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
+                    player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                player.IsRaging = true;
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
+                    player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"YOU SACRIFICE {sacrifice} HP AND BECOME RUIN INCARNATE!");
+                terminal.WriteLine("  +100 ATK, all enemies targeted, 20% lifesteal!", "red");
+                break;
+            }
+
+            case "devour":
+            {
+                // 160 damage, 50% lifesteal, double if player <30% HP
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage;
+                    if (player.HP < (int)(player.MaxHP * 0.30)) dmg *= 2;
+                    target.HP -= dmg;
+                    int heal = (int)(dmg * 0.50);
+                    player.HP = Math.Min(player.MaxHP, player.HP + heal);
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"You DEVOUR {target.Name} for {dmg} damage and feast on {heal} HP!");
+                }
+                break;
+            }
+
+            case "entropic_blade":
+            {
+                // 180 damage, ignores defense, costs 10% HP
+                int hpCost = (int)(player.HP * 0.10);
+                player.HP = Math.Max(1, player.HP - hpCost);
+                if (target != null && target.IsAlive)
+                {
+                    int dmg = abilityResult.Damage + (int)(target.Defence * 0.5);
+                    target.HP -= dmg;
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"Your entropic blade cuts through ALL defense! {target.Name} takes {dmg} damage! (-{hpCost} HP)");
+                }
+                break;
+            }
+
+            case "blood_frenzy":
+            {
+                // Sacrifice 25% HP, double attack + 50 ATK (handled)
+                int sacrifice = (int)(player.MaxHP * 0.25);
+                player.HP = Math.Max(1, player.HP - sacrifice);
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Haste))
+                    player.ActiveStatuses[StatusEffect.Haste] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"You sacrifice {sacrifice} HP in a blood frenzy! Attack twice per round!");
+                break;
+            }
+
+            case "void_rupture":
+            {
+                // 220 AoE, killed enemies explode for 100
+                int killExplosionDmg = 100;
+                int kills = 0;
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        int dmg = abilityResult.Damage;
+                        m.HP -= dmg;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"Void rupture tears through {m.Name} for {dmg} damage!");
+                        if (m.HP <= 0) kills++;
+                    }
+                    if (kills > 0)
+                    {
+                        foreach (var m in monsters.Where(m => m.IsAlive))
+                        {
+                            int explosionDmg = killExplosionDmg * kills;
+                            m.HP -= explosionDmg;
+                            terminal.SetColor("bright_red");
+                            terminal.WriteLine($"  Void explosion from {kills} kill{(kills > 1 ? "s" : "")} hits {m.Name} for {explosionDmg}!");
+                        }
+                    }
+                }
+                break;
+            }
+
+            case "deaths_embrace":
+                // Safety net: regen + dodge
+                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Regenerating))
+                    player.ActiveStatuses[StatusEffect.Regenerating] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                player.DodgeNextAttack = true;
+                terminal.SetColor("dark_red");
+                terminal.WriteLine("Death wraps you in its embrace — you will not fall easily!");
+                terminal.WriteLine("  (Regenerating for 3 rounds, next attack dodged)", "red");
+                break;
+
+            case "annihilation":
+            {
+                // Costs 50% HP, 500 damage, instant kill <50% (non-boss)
+                int hpCost = (int)(player.HP * 0.50);
+                player.HP = Math.Max(1, player.HP - hpCost);
+                if (target != null && target.IsAlive)
+                {
+                    bool instantKill = !target.IsBoss && target.HP < (int)(target.MaxHP * 0.50);
+                    if (instantKill)
+                    {
+                        target.HP = 0;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"ANNIHILATION! {target.Name.ToUpper()} IS ERASED FROM EXISTENCE! (-{hpCost} HP)");
+                    }
+                    else
+                    {
+                        int dmg = abilityResult.Damage;
+                        target.HP -= dmg;
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"ANNIHILATION strikes {target.Name} for {dmg} damage! (-{hpCost} HP)");
+                    }
+                }
+                break;
+            }
         }
 
         await Task.CompletedTask;
@@ -9846,6 +11392,23 @@ public partial class CombatEngine
                 break;
             case CharacterClass.Alchemist:
                 baseWeight = 75; // Support class, stays back
+                break;
+
+            // NG+ Prestige Classes
+            case CharacterClass.Tidesworn:
+                baseWeight = 190; // Ocean's shield — highest aggro in game
+                break;
+            case CharacterClass.Voidreaver:
+                baseWeight = 140; // Aggressive glass cannon draws attention
+                break;
+            case CharacterClass.Cyclebreaker:
+                baseWeight = 110; // Middle of the pack — hard to pin down
+                break;
+            case CharacterClass.Wavecaller:
+                baseWeight = 85; // Support/buffer stays back
+                break;
+            case CharacterClass.Abysswarden:
+                baseWeight = 75; // Shadow striker lurks in darkness
                 break;
 
             default:

@@ -684,6 +684,58 @@ public class LevelMasterLocation : BaseLocation
                 currentPlayer.BaseMaxMana += 5;
                 break;
 
+            // NG+ Prestige Classes — strictly stronger, both spells AND abilities
+            case CharacterClass.Tidesworn:
+                currentPlayer.BaseStrength += 4;
+                currentPlayer.BaseConstitution += 4;
+                currentPlayer.BaseWisdom += 3;
+                currentPlayer.BaseCharisma += 2;
+                currentPlayer.BaseDefence += 2;
+                currentPlayer.BaseMaxHP += 13;
+                currentPlayer.BaseMaxMana += 8;
+                break;
+
+            case CharacterClass.Wavecaller:
+                currentPlayer.BaseCharisma += 5;
+                currentPlayer.BaseWisdom += 4;
+                currentPlayer.BaseIntelligence += 3;
+                currentPlayer.BaseConstitution += 2;
+                currentPlayer.BaseAgility += 2;
+                currentPlayer.BaseMaxHP += 7;
+                currentPlayer.BaseMaxMana += 14;
+                break;
+
+            case CharacterClass.Cyclebreaker:
+                currentPlayer.BaseStrength += 3;
+                currentPlayer.BaseIntelligence += 3;
+                currentPlayer.BaseWisdom += 3;
+                currentPlayer.BaseDexterity += 3;
+                currentPlayer.BaseConstitution += 3;
+                currentPlayer.BaseAgility += 2;
+                currentPlayer.BaseMaxHP += 9;
+                currentPlayer.BaseMaxMana += 10;
+                break;
+
+            case CharacterClass.Abysswarden:
+                currentPlayer.BaseDexterity += 5;
+                currentPlayer.BaseStrength += 4;
+                currentPlayer.BaseAgility += 4;
+                currentPlayer.BaseIntelligence += 3;
+                currentPlayer.BaseConstitution += 2;
+                currentPlayer.BaseMaxHP += 8;
+                currentPlayer.BaseMaxMana += 10;
+                break;
+
+            case CharacterClass.Voidreaver:
+                currentPlayer.BaseStrength += 5;
+                currentPlayer.BaseIntelligence += 5;
+                currentPlayer.BaseDexterity += 4;
+                currentPlayer.BaseAgility += 3;
+                currentPlayer.BaseStamina += 2;
+                currentPlayer.BaseMaxHP += 6;
+                currentPlayer.BaseMaxMana += 12;
+                break;
+
             default:
                 // Fallback for any undefined class
                 currentPlayer.BaseStrength += 2;

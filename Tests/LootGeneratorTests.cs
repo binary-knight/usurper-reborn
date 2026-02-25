@@ -181,7 +181,10 @@ public class LootGeneratorTests
         long totalBossValue = 0;
         long totalMiniBossValue = 0;
 
-        for (int i = 0; i < 50; i++)
+        // Use 500 iterations for statistical reliability — with fewer samples,
+        // random variance (especially cursed Epic+ items losing 50% value) can
+        // occasionally cause mini-boss totals to exceed boss totals.
+        for (int i = 0; i < 500; i++)
         {
             var bossLoot = LootGenerator.GenerateBossLoot(50, CharacterClass.Barbarian);
             var miniBossLoot = LootGenerator.GenerateMiniBossLoot(50, CharacterClass.Barbarian);

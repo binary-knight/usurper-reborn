@@ -108,7 +108,9 @@ const DASH_SNAPSHOT_INTERVAL = 30000; // 30 seconds for NPC snapshots
 const CLASS_NAMES = {
   0: 'Alchemist', 1: 'Assassin', 2: 'Barbarian', 3: 'Bard',
   4: 'Cleric', 5: 'Jester', 6: 'Magician', 7: 'Paladin',
-  8: 'Ranger', 9: 'Sage', 10: 'Warrior'
+  8: 'Ranger', 9: 'Sage', 10: 'Warrior',
+  11: 'Tidesworn', 12: 'Wavecaller', 13: 'Cyclebreaker',
+  14: 'Abysswarden', 15: 'Voidreaver'
 };
 
 const RACE_NAMES = {

@@ -361,7 +361,8 @@ namespace UsurperRemake.Systems
 
         private static readonly string[] ClassNames = {
             "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",
-            "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior"
+            "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior",
+            "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver"
         };
 
         private async Task ListAndEditPlayers(OnlineAdminConsole admin)
@@ -1579,7 +1580,7 @@ namespace UsurperRemake.Systems
         private async Task ViewOnlineStatistics(SqlSaveBackend sqlBackend)
         {
             var s = await sqlBackend.GetGameStatistics();
-            string className(int id) => id >= 0 && id <= 10 ? ((CharacterClass)id).ToString() : "?";
+            string className(int id) => id >= 0 && id < GameConfig.MaxClasses ? ((CharacterClass)id).ToString() : "?";
 
             // Players section
             terminal.SetColor("cyan");

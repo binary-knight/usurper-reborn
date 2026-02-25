@@ -2104,6 +2104,51 @@ public partial class GameEngine : Node
                 }
             }
 
+            // Failsafe: if player beat Manwe and triggered an ending but disconnected before
+            // completing the NG+/ascension prompt, re-trigger the ending sequence on login.
+            if (currentPlayer != null && !currentPlayer.IsImmortal)
+            {
+                var storySystem = StoryProgressionSystem.Instance;
+                bool manweResolved = storySystem.OldGodStates.TryGetValue(OldGodType.Manwe, out var manweState) &&
+                    (manweState.Status == GodStatus.Defeated || manweState.Status == GodStatus.Allied ||
+                     manweState.Status == GodStatus.Saved || manweState.Status == GodStatus.Consumed);
+                bool hasEndingFlag = storySystem.HasStoryFlag("ending_usurper_achieved") ||
+                    storySystem.HasStoryFlag("ending_savior_achieved") ||
+                    storySystem.HasStoryFlag("ending_defiant_achieved") ||
+                    storySystem.HasStoryFlag("ending_trueending_achieved");
+                bool sequenceCompleted = storySystem.HasStoryFlag("ending_sequence_completed");
+
+                if (manweResolved && hasEndingFlag && !sequenceCompleted)
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("Your previous session ended before the cycle could complete.");
+                    terminal.WriteLine("Resuming where you left off...");
+                    terminal.WriteLine("");
+                    await Task.Delay(2000);
+
+                    var endingType = EndingsSystem.Instance.DetermineEnding(currentPlayer);
+                    await EndingsSystem.Instance.TriggerEnding(currentPlayer, endingType, terminal);
+
+                    if (PendingNewGamePlus)
+                    {
+                        PendingNewGamePlus = false;
+                        var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? fileName;
+                        var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
+                        foreach (var save in ngpSaves)
+                            SaveSystem.Instance.DeleteSave(System.IO.Path.GetFileNameWithoutExtension(save.FileName));
+                        await CreateNewGame(activeKey);
+                        return;
+                    }
+                    if (PendingImmortalAscension)
+                    {
+                        PendingImmortalAscension = false;
+                        await locationManager.EnterLocation(GameLocation.Pantheon, currentPlayer);
+                        return;
+                    }
+                }
+            }
+
             // Route immortals directly to the Pantheon; mortals go to Main Street
             var startLocation = currentPlayer!.IsImmortal ? GameLocation.Pantheon : GameLocation.MainStreet;
             await locationManager.EnterLocation(startLocation, currentPlayer!);
@@ -2623,16 +2668,20 @@ public partial class GameEngine : Node
     private async Task CreateNewGame(string playerName)
     {
         // Reset per-player session systems for new game
-        bool isNgPlus = StoryProgressionSystem.Instance.CurrentCycle > 1;
+        var storyDbg = StoryProgressionSystem.Instance;
+        bool isNgPlus = storyDbg.CurrentCycle > 1;
+        Console.Error.WriteLine($"[NG+] CreateNewGame: cycle={storyDbg.CurrentCycle}, isNgPlus={isNgPlus}, endings=[{string.Join(",", storyDbg.CompletedEndings)}]");
         UsurperRemake.Systems.RomanceTracker.Instance.Reset();
         UsurperRemake.Systems.CompanionSystem.Instance?.ResetAllCompanions();
         if (isNgPlus)
         {
             // NG+ — StartNewCycle already reset story state while preserving cycle/endings/seals.
             // Don't call FullReset which would wipe cycle counter and completed endings.
+            Console.Error.WriteLine($"[NG+] Preserving cycle data (skipping FullReset)");
         }
         else
         {
+            Console.Error.WriteLine($"[NG+] NOT NG+ — calling FullReset");
             UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
         }
         UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();

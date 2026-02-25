@@ -530,26 +530,6 @@ public class DungeonLocation : BaseLocation
                 {
                     await MoralParadoxSystem.Instance.PresentParadox("free_terravok", player, term);
                 }
-                // TERRAVOK ENCOUNTER - God of Earth
-                else if (OldGodBossSystem.Instance.CanEncounterBoss(player, OldGodType.Terravok))
-                {
-                    term.WriteLine("");
-                    term.WriteLine("The mountain itself seems to breathe. Stone shifts like flesh.", "yellow");
-                    await Task.Delay(2000);
-
-                    term.WriteLine("Terravok, the Worldbreaker, senses your presence.", "bright_yellow");
-                    term.WriteLine("Do you wish to wake the Sleeping Mountain? (Y/N)", "yellow");
-                    var response = await term.GetInput("> ");
-                    if (response.Trim().ToUpper().StartsWith("Y"))
-                    {
-                        var result = await OldGodBossSystem.Instance.StartBossEncounter(player, OldGodType.Terravok, term, teammates);
-                        await HandleGodEncounterResult(result, player, term);
-                    }
-                    else
-                    {
-                        term.WriteLine("The mountain settles. Terravok slumbers on.", "gray");
-                    }
-                }
                 break;
 
             case 95:
@@ -606,65 +586,6 @@ public class DungeonLocation : BaseLocation
                         "Choose wisely. This is the only choice that matters."
                     }, "bright_yellow");
                 StoryProgressionSystem.Instance.AdvanceChapter(StoryChapter.FinalConfrontation);
-
-                // MANWE ENCOUNTER - The Creator, Final Boss
-                if (OldGodBossSystem.Instance.CanEncounterBoss(player, OldGodType.Manwe))
-                {
-                    term.WriteLine("");
-                    term.WriteLine("The dream trembles. The Dreamer stirs.", "white");
-                    await Task.Delay(2000);
-
-                    term.WriteLine("Manwe, the Creator of All, awaits your judgment.", "bright_white");
-                    term.WriteLine("");
-                    term.WriteLine("This is the final confrontation. Are you ready? (Y/N)", "bright_yellow");
-                    var response = await term.GetInput("> ");
-                    if (response.Trim().ToUpper().StartsWith("Y"))
-                    {
-                        var result = await OldGodBossSystem.Instance.StartBossEncounter(player, OldGodType.Manwe, term, teammates);
-                        await HandleGodEncounterResult(result, player, term);
-
-                        // After Manwe, trigger the full ending sequence (cinematic ending, credits, NG+ offer)
-                        if (result.Outcome != BossOutcome.Fled)
-                        {
-                            var endingType = EndingsSystem.Instance.DetermineEnding(player);
-                            await EndingsSystem.Instance.TriggerEnding(player, endingType, term);
-                            if (GameEngine.Instance.PendingNewGamePlus || GameEngine.Instance.PendingImmortalAscension)
-                                throw new LocationExitException(GameLocation.NoWhere);
-                            else
-                                await NavigateToLocation(GameLocation.MainStreet);
-                        }
-                    }
-                    else
-                    {
-                        term.WriteLine("You hesitate at the threshold. The Creator can wait.", "gray");
-                        term.WriteLine("But not forever...", "dark_gray");
-                    }
-                }
-                // Fallback: Moral Paradox if boss not available
-                else if (MoralParadoxSystem.Instance.IsParadoxAvailable("final_choice", player))
-                {
-                    var choice = await MoralParadoxSystem.Instance.PresentParadox("final_choice", player, term);
-
-                    // Trigger the actual ending based on the choice made
-                    if (choice != null)
-                    {
-                        EndingType endingType;
-                        if (choice.OptionId == "claim_power")
-                            endingType = EndingType.Usurper;
-                        else if (choice.OptionId == "refuse_power")
-                            endingType = EndingType.Defiant;
-                        else if (choice.OptionId == "remember_truth")
-                            endingType = EndingType.TrueEnding;
-                        else
-                            endingType = EndingsSystem.Instance.DetermineEnding(player);
-
-                        await EndingsSystem.Instance.TriggerEnding(player, endingType, term);
-                        if (GameEngine.Instance.PendingNewGamePlus || GameEngine.Instance.PendingImmortalAscension)
-                            throw new LocationExitException(GameLocation.NoWhere);
-                        else
-                            await NavigateToLocation(GameLocation.MainStreet);
-                    }
-                }
                 break;
         }
     }
@@ -3406,10 +3327,31 @@ public class DungeonLocation : BaseLocation
                 break;
 
             case 4:
-                var expLost = currentDungeonLevel * 50;
-                player.Experience = Math.Max(0, player.Experience - expLost);
-                terminal.WriteLine($"A curse drains you! You lose {expLost} experience!");
-                BroadcastDungeonEvent($"\u001b[35m  A dark curse washes over the room! {player!.Name2} loses {expLost} experience!\u001b[0m");
+                // Wisdom check: high wisdom can fully resist the curse
+                int resistChance = (int)Math.Min(60, player.Wisdom / 2);
+                if (player.Class == CharacterClass.Cleric || player.Class == CharacterClass.Sage)
+                    resistChance += 15;
+                if (dungeonRandom.Next(100) < resistChance)
+                {
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine($"A dark curse washes over you, but your wisdom shields your mind! (Wisdom: {player.Wisdom})");
+                    BroadcastDungeonEvent($"\u001b[36m  A dark curse washes over {player!.Name2}, but their wisdom shields them!\u001b[0m");
+                }
+                else
+                {
+                    // XP drain: capped to 5% of current XP or level*25, whichever is lower
+                    long baseExpLost = currentDungeonLevel * 50;
+                    long maxDrain = Math.Max(50, (long)(player.Experience * 0.05));
+                    long levelCap = (long)player.Level * 25;
+                    var expLost = (long)Math.Min(baseExpLost, Math.Min(maxDrain, levelCap));
+                    // Constitution reduces the drain by up to 40%
+                    float conReduction = Math.Min(0.4f, player.Constitution / 100f);
+                    expLost = (long)(expLost * (1f - conReduction));
+                    expLost = Math.Max(10, expLost);
+                    player.Experience = Math.Max(0, player.Experience - expLost);
+                    terminal.WriteLine($"A curse drains you! You lose {expLost} experience! (Resist with Wisdom/Constitution)");
+                    BroadcastDungeonEvent($"\u001b[35m  A dark curse washes over the room! {player!.Name2} loses {expLost} experience!\u001b[0m");
+                }
                 break;
 
             case 5:

@@ -733,24 +733,37 @@ namespace UsurperRemake.Systems
             var credits = new[]
             {
                 ("ORIGINAL CONCEPT", "bright_yellow"),
-                ("Usurper BBS Door Game", "white"),
+                ("Jakob Dangarden", "white"),
+                ("Usurper: Halls of Avarice (1993)", "gray"),
                 ("", "white"),
                 ("REBORN BY", "bright_yellow"),
-                ($"With love for the classics", "white"),
+                ("Jason Knight", "white"),
                 ("", "white"),
                 ("STORY & NARRATIVE", "bright_yellow"),
-                ("The Seven Old Gods Saga", "white"),
+                ("Jason Knight", "white"),
+                ("Inspired by Buddhist philosophy:", "gray"),
+                ("Samsara, the Wheel of Becoming,", "gray"),
+                ("and the Ocean of consciousness", "gray"),
                 ("", "white"),
                 ("SYSTEMS DESIGN", "bright_yellow"),
-                ("Story Progression System", "white"),
-                ("Branching Dialogue Engine", "white"),
-                ("Artifact & Seal Collection", "white"),
-                ("Multiple Endings Framework", "white"),
-                ("Eternal Cycle System", "white"),
+                ("Jason Knight", "white"),
+                ("", "white"),
+                ("ARTWORK", "bright_yellow"),
+                ("xbit (x-bit.org)", "white"),
+                ("Race & Class ANSI Portraits", "gray"),
+                ("", "white"),
+                ("CONTRIBUTORS", "bright_yellow"),
+                ("fastfinge - Code Contributions", "white"),
+                ("xbit - ANSI Art", "white"),
+                ("", "white"),
+                ("ALPHA TESTERS & DISCORD COMMUNITY", "bright_yellow"),
+                ("fastfinge, Inkblot, Byte Knight,", "white"),
+                ("Druidah, Quent, xbit, Stettin", "white"),
+                ("...and many more", "gray"),
                 ("", "white"),
                 ("SPECIAL THANKS", "bright_yellow"),
                 ("To all BBS door game enthusiasts", "white"),
-                ("Who keep the spirit alive", "white"),
+                ("who keep the spirit alive", "white"),
                 ("", "white"),
                 ("AND TO YOU", "bright_yellow"),
                 ($"Player: {player.Name2}", "bright_cyan"),
@@ -1372,7 +1385,14 @@ namespace UsurperRemake.Systems
             // Achievement
             AchievementSystem.TryUnlock(player, "ascended");
 
-            // Save immediately
+            // Record this ending and advance the cycle — the player completed the game,
+            // they just chose godhood instead of immediate reroll. This ensures:
+            // 1. CompletedEndings tracks their achievement (gates prestige classes)
+            // 2. CurrentCycle increments (gates NG+ bonuses when they renounce)
+            StoryProgressionSystem.Instance.CompletedEndings.Add(ending);
+            StoryProgressionSystem.Instance.CurrentCycle++;
+
+            // Save immediately (includes the ending/cycle data)
             try
             {
                 await SaveSystem.Instance.AutoSave(player);
@@ -1384,6 +1404,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             await terminal.GetInputAsync("  Press Enter to enter the Divine Realm...");
+
+            // Mark ending sequence as completed before routing to Pantheon
+            StoryProgressionSystem.Instance.SetStoryFlag("ending_sequence_completed", true);
 
             // Route to Pantheon
             GameEngine.Instance.PendingImmortalAscension = true;
@@ -1432,6 +1455,37 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("  - Increased experience gain", "white");
             terminal.WriteLine("  - Knowledge of artifact locations", "white");
             terminal.WriteLine("  - New dialogue options with gods", "white");
+
+            // Show which prestige classes this ending unlocks
+            var newClasses = new List<string>();
+            switch (ending)
+            {
+                case EndingType.Savior:
+                    newClasses.Add("Tidesworn (Holy)");
+                    newClasses.Add("Wavecaller (Good)");
+                    break;
+                case EndingType.Defiant:
+                    newClasses.Add("Cyclebreaker (Neutral)");
+                    break;
+                case EndingType.Usurper:
+                    newClasses.Add("Abysswarden (Dark)");
+                    newClasses.Add("Voidreaver (Evil)");
+                    break;
+                case EndingType.TrueEnding:
+                case EndingType.Secret:
+                    newClasses.Add("Tidesworn (Holy)");
+                    newClasses.Add("Wavecaller (Good)");
+                    newClasses.Add("Cyclebreaker (Neutral)");
+                    newClasses.Add("Abysswarden (Dark)");
+                    newClasses.Add("Voidreaver (Evil)");
+                    break;
+            }
+            if (newClasses.Count > 0)
+            {
+                terminal.WriteLine($"  - New prestige classes unlocked:", "white");
+                foreach (var cls in newClasses)
+                    terminal.WriteLine($"      {cls}", "bright_cyan");
+            }
             terminal.WriteLine("");
 
             var response = await terminal.GetInputAsync("  Begin the Eternal Cycle? (Y/N): ");
@@ -1451,6 +1505,11 @@ namespace UsurperRemake.Systems
 
                 await terminal.GetInputAsync("  Press Enter to return to the main menu...");
             }
+
+            // Mark the ending sequence as fully completed (player answered the NG+ prompt).
+            // This prevents re-triggering on reconnect if they disconnected mid-sequence.
+            StoryProgressionSystem.Instance.SetStoryFlag("ending_sequence_completed", true);
+            try { await SaveSystem.Instance.AutoSave(player); } catch { /* best effort */ }
         }
 
         #endregion

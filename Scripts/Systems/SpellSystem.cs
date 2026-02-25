@@ -184,6 +184,71 @@ public static class SpellSystem
             [23] = new SpellInfo(23, "Temporal Paradox", "Trap the enemy in a time loop. Damage: 180-220. Duration: 1 turn.", 200, 23, "Temporalarie", false, "Attack"),
             [24] = new SpellInfo(24, "Veloura's Embrace", "Channel the lost Goddess of Love. Heals 250 + Protection +80. Duration: whole fight.", 230, 24, "Velouralovearie", false, "Heal"),
             [25] = new SpellInfo(25, "Death Kiss", "The ultimate draining of life force. Damage: 280-380. Duration: 1 turn.", 300, 25, "Exmasdamliemasumarie", false, "Attack")
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // TIDESWORN SPELLS (NG+ Holy) - Ocean's divine power, holy water magic
+        // The Ocean's immune response against corruption
+        // ═══════════════════════════════════════════════════════════════════════════════
+        [CharacterClass.Tidesworn] = new Dictionary<int, SpellInfo>
+        {
+            [1] = new SpellInfo(1, "Tidal Ward", "Conjure a barrier of living water. Protection: +20, reflects 10% melee damage. Duration: whole fight.", 20, 1, "Tidacovenarie", false, "Buff"),
+            [2] = new SpellInfo(2, "Purifying Surge", "A wave of sacred water cleanses and mends. Effect: 40-60 hp + removes poison/disease. Duration: 1 turn.", 35, 5, "Surgiapurarie", false, "Heal"),
+            [3] = new SpellInfo(3, "Ocean's Rebuke", "Call forth a crashing wave of consecrated water. Damage: 70-95. Extra vs undead/evil. Duration: 1 turn.", 60, 10, "Oceanrebuquarie", false, "Attack"),
+            [4] = new SpellInfo(4, "Covenant of the Deep", "The Ocean itself shields the faithful. All allies: +40 protection, +20 attack. Duration: whole fight.", 100, 17, "Covendeepmarie", true, "Buff"),
+            [5] = new SpellInfo(5, "Deluge of Sanctity", "Unleash the Ocean's full wrath as a holy flood. Damage: 200-280 to all enemies. Heals self 100 hp. Duration: 1 turn.", 180, 23, "Diluviasanctarie", true, "Attack")
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // WAVECALLER SPELLS (NG+ Good) - Ocean harmonics, party support, crowd control
+        // Conductors of the Ocean's voice
+        // ═══════════════════════════════════════════════════════════════════════════════
+        [CharacterClass.Wavecaller] = new Dictionary<int, SpellInfo>
+        {
+            [1] = new SpellInfo(1, "Harmonic Resonance", "Attune to an ally's rhythm. Target ally: +15 attack, +10 defense. Duration: whole fight.", 15, 1, "Harmonresarie", false, "Buff"),
+            [2] = new SpellInfo(2, "Tidecall Barrier", "Surround all allies with shimmering wave-light. All allies: +25 protection. Duration: whole fight.", 40, 6, "Tidabarriarie", true, "Buff"),
+            [3] = new SpellInfo(3, "Siren's Lament", "Sing the Ocean's grief, sapping enemy will. All enemies: -30% attack, -20% defense. Duration: 4 rounds.", 55, 11, "Sirenlamentarie", true, "Debuff"),
+            [4] = new SpellInfo(4, "Restorative Tide", "A warm wave of healing energy. Effect: 80-120 hp to all allies. Duration: 1 turn.", 90, 16, "Restoratidarie", true, "Heal"),
+            [5] = new SpellInfo(5, "Symphony of the Depths", "Channel the Ocean's full harmonic spectrum. All allies: +60 attack, +40 defense, +30% crit. Self: -50% max HP. Duration: whole fight.", 160, 22, "Symphodeptarie", true, "Buff")
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // CYCLEBREAKER SPELLS (NG+ Neutral) - Reality manipulation, time/probability
+        // Those who perceive the cycle's machinery
+        // ═══════════════════════════════════════════════════════════════════════════════
+        [CharacterClass.Cyclebreaker] = new Dictionary<int, SpellInfo>
+        {
+            [1] = new SpellInfo(1, "Deja Vu", "Glimpse a fragment of a past cycle. Dodge the next incoming attack completely. Duration: 1 attack.", 15, 1, "Dejavuarie", false, "Buff"),
+            [2] = new SpellInfo(2, "Probability Shift", "Twist fate against your enemy. Target: crit chance = 0%, miss chance +30%. Duration: 3 rounds.", 40, 7, "Probashiftarie", false, "Debuff"),
+            [3] = new SpellInfo(3, "Echo of Tomorrow", "Strike with damage from a future timeline. Damage: 80-110. Ignores 50% of defense. Duration: 1 turn.", 65, 12, "Echomorrarie", false, "Attack"),
+            [4] = new SpellInfo(4, "Cycle Rewind", "Revert your body to an earlier state. Restores HP to 3 rounds ago or full if combat just started. Duration: 1 turn.", 100, 18, "Cyclewindarie", false, "Heal"),
+            [5] = new SpellInfo(5, "Paradox Collapse", "Collapse multiple timelines onto the target. Damage: 250-350 + 10% of all damage dealt this fight. Duration: 1 turn.", 200, 24, "Paradoxcollarie", false, "Attack")
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // ABYSSWARDEN SPELLS (NG+ Dark) - Old God prison energy, corruption, life drain
+        // Wardens who siphon divine prison power
+        // ═══════════════════════════════════════════════════════════════════════════════
+        [CharacterClass.Abysswarden] = new Dictionary<int, SpellInfo>
+        {
+            [1] = new SpellInfo(1, "Prison Siphon", "Draw power from the nearest sealed God-prison. Damage: 12-18. Heals self 50% of damage. Duration: 1 turn.", 15, 1, "Prisonsipharie", false, "Attack"),
+            [2] = new SpellInfo(2, "Noctura's Whisper", "Invoke the Shadow Goddess's paranoia. Target: -25% attack, -25% defense, 20% skip turn. Duration: 3 rounds.", 35, 6, "Nocturwhisparie", false, "Debuff"),
+            [3] = new SpellInfo(3, "Abyssal Chains", "Bind the target with chains from the Old Gods' prison. Damage: 65-85. Target immobilized 2 rounds. Duration: 1 turn.", 60, 11, "Abysschainarie", false, "Attack"),
+            [4] = new SpellInfo(4, "Devour Essence", "Consume the target's life force. Damage: 100-140. Heals 75%. Restores 20 mana. Duration: 1 turn.", 90, 17, "Devouressarie", false, "Attack"),
+            [5] = new SpellInfo(5, "Maelketh's Prison Break", "Crack the War God's seal, releasing imprisoned fury. Damage: 220-300. Self takes 10% as backlash. Duration: 1 turn.", 180, 23, "Maelbreakarie", false, "Attack")
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // VOIDREAVER SPELLS (NG+ Evil) - Void energy, self-sacrifice, annihilation
+        // What happens when a mortal decides to eat a god
+        // ═══════════════════════════════════════════════════════════════════════════════
+        [CharacterClass.Voidreaver] = new Dictionary<int, SpellInfo>
+        {
+            [1] = new SpellInfo(1, "Soul Shred", "Tear at the target's soul. Damage: 15-22 + 5% of your current HP as bonus. Duration: 1 turn.", 10, 1, "Soulshredarie", false, "Attack"),
+            [2] = new SpellInfo(2, "Blood Pact", "Sacrifice 20% of max HP. Gain +50 attack, +30% crit for the fight. Cannot be dispelled. Duration: whole fight.", 30, 5, "Bloodpactarie", false, "Buff"),
+            [3] = new SpellInfo(3, "Void Bolt", "Fire a bolt of annihilating nothingness. Damage: 90-120. Ignores all defense. Duration: 1 turn.", 55, 10, "Voidboltarie", false, "Attack"),
+            [4] = new SpellInfo(4, "Consume the Fallen", "Devour a dead enemy's residual energy. Heals 50% of last killed enemy's max HP (min 100). Only after a kill. Duration: 1 turn.", 80, 16, "Consumfallarie", false, "Heal"),
+            [5] = new SpellInfo(5, "Unmaking", "Erase the target from reality. Damage: 350-450. Costs 25% current HP. If kills: restore all HP and mana. Duration: 1 turn.", 250, 24, "Unmakingarie", false, "Attack")
         }
     };
     

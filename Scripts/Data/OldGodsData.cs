@@ -750,7 +750,8 @@ namespace UsurperRemake.Data
                     "His eyes close. The Weary Creator rests at last."
                 },
 
-                ArtifactDropped = ArtifactType.VoidKey,
+                // Manwe drops no artifact — the Void Key is auto-awarded when 6 artifacts are collected
+                // (see ArtifactSystem.TriggerVoidKeyAppearance)
 
                 CanBeSaved = false, // Final choice, not saveable in traditional sense
                 SaveRequirement = null,

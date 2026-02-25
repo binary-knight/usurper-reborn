@@ -494,7 +494,10 @@ namespace UsurperRemake.Systems
             {
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM players WHERE LOWER(username) = LOWER(@username);";
+                // Clear player_data instead of deleting the row — preserves password_hash,
+                // ban status, and other account-level fields. A row with '{}' player_data
+                // is treated as "no save" by ReadGameData.
+                cmd.CommandText = "UPDATE players SET player_data = '{}' WHERE LOWER(username) = LOWER(@username);";
                 cmd.Parameters.AddWithValue("@username", playerName);
                 var affected = cmd.ExecuteNonQuery();
                 return affected > 0;

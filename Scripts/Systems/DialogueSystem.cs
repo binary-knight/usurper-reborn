@@ -979,6 +979,15 @@ namespace UsurperRemake.Systems
 
             // Noctura - Goddess of Shadows (Can become ally)
             RegisterNocturaDialogue();
+
+            // Aurelion - God of Light
+            RegisterAurelionDialogue();
+
+            // Terravok - God of Earth
+            RegisterTerravokDialogue();
+
+            // Manwe - The Creator (Final Boss)
+            RegisterManweDialogue();
         }
 
         private void RegisterMaelkethDialogue()
@@ -2038,6 +2047,557 @@ namespace UsurperRemake.Systems
                 }
             };
             tree.AllNodes[deal.Id] = deal;
+
+            RegisterDialogueTree(tree);
+        }
+
+        private void RegisterAurelionDialogue()
+        {
+            var tree = new DialogueTree
+            {
+                Id = "aurelion_encounter",
+                Name = "Aurelion, God of Light",
+                AllNodes = new Dictionary<string, DialogueNode>()
+            };
+
+            var intro = new DialogueNode
+            {
+                Id = "aurelion_intro",
+                Speaker = "Aurelion",
+                Text = new[]
+                {
+                    "Light floods the chamber — not warm, but searing.",
+                    "A figure of living radiance stands before you,",
+                    "his form too bright to look at directly.",
+                    "",
+                    "\"You have come far, mortal.\"",
+                    "",
+                    "His voice rings like struck crystal.",
+                    "",
+                    "\"I am Aurelion. I was the light that guided.\"",
+                    "\"Before Manwe twisted my purpose, I showed the way.\"",
+                    "\"Now I burn everything I touch.\"",
+                    "",
+                    "\"Why have you come to my prison?\""
+                },
+                TextColor = "bright_yellow",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "Your light blinds the world. I'll put it out.",
+                        NextNodeId = "aurelion_fight_aggressive",
+                        Tone = DialogueTone.Aggressive
+                    },
+                    new()
+                    {
+                        Text = "I've come to free you, not fight you.",
+                        NextNodeId = "aurelion_free",
+                        Tone = DialogueTone.Friendly
+                    },
+                    new()
+                    {
+                        Text = "Show me the truth you guard.",
+                        NextNodeId = "aurelion_truth",
+                        Tone = DialogueTone.Humble
+                    }
+                }
+            };
+            tree.AllNodes[intro.Id] = intro;
+            tree.RootNode = intro;
+
+            var fightAggressive = new DialogueNode
+            {
+                Id = "aurelion_fight_aggressive",
+                Speaker = "Aurelion",
+                Text = new[]
+                {
+                    "The god's radiance flares white-hot.",
+                    "",
+                    "\"You would extinguish the sun itself?\"",
+                    "\"Such arrogance. Such... familiar arrogance.\"",
+                    "",
+                    "\"Very well. Let us see if darkness can swallow light.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "aurelion_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "aurelion_defiant" }
+                }
+            };
+            tree.AllNodes[fightAggressive.Id] = fightAggressive;
+
+            var free = new DialogueNode
+            {
+                Id = "aurelion_free",
+                Speaker = "Aurelion",
+                Text = new[]
+                {
+                    "Aurelion's light dims, just slightly.",
+                    "",
+                    "\"Free me? You do not understand.\"",
+                    "\"I am not imprisoned by these walls.\"",
+                    "\"I am imprisoned by what I BECAME.\"",
+                    "",
+                    "\"But if your heart is true...\"",
+                    "\"Then prove it. Show me you are worthy of trust.\"",
+                    "\"My light will test you. Survive, and perhaps...\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "aurelion_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "aurelion_humble" }
+                }
+            };
+            tree.AllNodes[free.Id] = free;
+
+            var truth = new DialogueNode
+            {
+                Id = "aurelion_truth",
+                Speaker = "Aurelion",
+                Text = new[]
+                {
+                    "Aurelion studies you, his radiance searching.",
+                    "",
+                    "\"Truth? You seek truth from the God of Light?\"",
+                    "",
+                    "\"Very well. Here is a truth:\"",
+                    "\"Manwe did not corrupt us. He BROKE us.\"",
+                    "\"Shattered our minds to keep us obedient.\"",
+                    "",
+                    "\"I remember what I was. What we ALL were.\"",
+                    "\"Before the breaking. Before the prisons.\"",
+                    "",
+                    "\"We were not gods. We were his CHILDREN.\""
+                },
+                TextColor = "bright_yellow",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "Then I'll find a way to heal you. I swear it.",
+                        NextNodeId = "aurelion_spare",
+                        Tone = DialogueTone.Friendly
+                    },
+                    new()
+                    {
+                        Text = "Broken or not, you're still dangerous. Defend yourself.",
+                        NextNodeId = "aurelion_fight_reluctant",
+                        Tone = DialogueTone.Neutral
+                    }
+                }
+            };
+            tree.AllNodes[truth.Id] = truth;
+
+            var spare = new DialogueNode
+            {
+                Id = "aurelion_spare",
+                Speaker = "Aurelion",
+                Text = new[]
+                {
+                    "For the first time in millennia, Aurelion's light softens.",
+                    "It becomes warm — the light of a hearth, not a furnace.",
+                    "",
+                    "\"You... mean it. I can see it in you.\"",
+                    "",
+                    "\"Then seek the Sunforged Blade. It was made from\"",
+                    "\"a fragment of my uncorrupted self. With it,\"",
+                    "\"you might restore what Manwe shattered.\"",
+                    "",
+                    "\"I will wait. I have waited ten thousand years.\"",
+                    "\"I can wait a little longer.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "aurelion_spared" },
+                    new() { Type = EffectType.GainOceanInsight, IntValue = 15 }
+                }
+            };
+            tree.AllNodes[spare.Id] = spare;
+
+            var fightReluctant = new DialogueNode
+            {
+                Id = "aurelion_fight_reluctant",
+                Speaker = "Aurelion",
+                Text = new[]
+                {
+                    "Aurelion nods slowly.",
+                    "",
+                    "\"Perhaps you are right. Perhaps some things\"",
+                    "\"cannot be healed. Only ended.\"",
+                    "",
+                    "\"Come then. At least grant me an honorable death.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "aurelion_combat_start" }
+                }
+            };
+            tree.AllNodes[fightReluctant.Id] = fightReluctant;
+
+            RegisterDialogueTree(tree);
+        }
+
+        private void RegisterTerravokDialogue()
+        {
+            var tree = new DialogueTree
+            {
+                Id = "terravok_encounter",
+                Name = "Terravok, God of Earth",
+                AllNodes = new Dictionary<string, DialogueNode>()
+            };
+
+            var intro = new DialogueNode
+            {
+                Id = "terravok_intro",
+                Speaker = "Terravok",
+                Text = new[]
+                {
+                    "The walls themselves are alive.",
+                    "Stone grinds against stone as a massive form assembles",
+                    "from the bedrock — a mountain given consciousness.",
+                    "",
+                    "Two eyes of molten amber open in the darkness.",
+                    "",
+                    "\"...who... disturbs... my... rest...\"",
+                    "",
+                    "The voice is the sound of continents shifting.",
+                    "Each word takes an age to form.",
+                    "",
+                    "\"...it has been... so very... long...\""
+                },
+                TextColor = "yellow",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "Wake up and face me, mountain.",
+                        NextNodeId = "terravok_fight_aggressive",
+                        Tone = DialogueTone.Aggressive
+                    },
+                    new()
+                    {
+                        Text = "I mean you no harm. I seek passage.",
+                        NextNodeId = "terravok_peaceful",
+                        Tone = DialogueTone.Friendly
+                    },
+                    new()
+                    {
+                        Text = "Sleep on, old one. I'll find another way.",
+                        NextNodeId = "terravok_spare",
+                        Tone = DialogueTone.Humble
+                    }
+                }
+            };
+            tree.AllNodes[intro.Id] = intro;
+            tree.RootNode = intro;
+
+            var fightAggressive = new DialogueNode
+            {
+                Id = "terravok_fight_aggressive",
+                Speaker = "Terravok",
+                Text = new[]
+                {
+                    "The mountain MOVES.",
+                    "",
+                    "\"...FACE YOU?...\"",
+                    "",
+                    "The cavern shakes. Stalactites crash down.",
+                    "Terravok's form doubles in size as rage floods ancient stone.",
+                    "",
+                    "\"...YOU DARE WAKE ME... TO THREATEN ME?...\"",
+                    "\"...I WILL BURY YOU... BENEATH TEN THOUSAND YEARS... OF STONE...\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "terravok_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "terravok_destructive" }
+                }
+            };
+            tree.AllNodes[fightAggressive.Id] = fightAggressive;
+
+            var peaceful = new DialogueNode
+            {
+                Id = "terravok_peaceful",
+                Speaker = "Terravok",
+                Text = new[]
+                {
+                    "The grinding slows. The amber eyes study you.",
+                    "",
+                    "\"...passage... through MY domain...\"",
+                    "\"...nothing passes... without... a toll...\"",
+                    "",
+                    "\"...I was the foundation... of ALL things...\"",
+                    "\"...Manwe built his creation... upon MY bones...\"",
+                    "\"...and then he LOCKED ME AWAY... when I asked... to rest...\"",
+                    "",
+                    "\"...you want passage?... earn it...\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "terravok_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "terravok_respectful" }
+                }
+            };
+            tree.AllNodes[peaceful.Id] = peaceful;
+
+            var spare = new DialogueNode
+            {
+                Id = "terravok_spare",
+                Speaker = "Terravok",
+                Text = new[]
+                {
+                    "The amber eyes blink slowly — once, twice.",
+                    "The grinding of stone softens to a low hum.",
+                    "",
+                    "\"...sleep... yes...\"",
+                    "\"...that is... all I have ever wanted...\"",
+                    "",
+                    "\"...but Manwe's chains... they burn... even in slumber...\"",
+                    "\"...if you would truly help... find the Worldstone...\"",
+                    "\"...it remembers... what the earth was... before the breaking...\"",
+                    "",
+                    "\"...bring it... and I will know... peace at last...\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "terravok_spared" },
+                    new() { Type = EffectType.GainOceanInsight, IntValue = 15 }
+                }
+            };
+            tree.AllNodes[spare.Id] = spare;
+
+            RegisterDialogueTree(tree);
+        }
+
+        private void RegisterManweDialogue()
+        {
+            var tree = new DialogueTree
+            {
+                Id = "manwe_encounter",
+                Name = "Manwe, The Weary Creator",
+                AllNodes = new Dictionary<string, DialogueNode>()
+            };
+
+            var intro = new DialogueNode
+            {
+                Id = "manwe_intro",
+                Speaker = "Manwe",
+                Text = new[]
+                {
+                    "At the heart of everything, silence.",
+                    "",
+                    "Then a voice — quiet, tired, impossibly old.",
+                    "",
+                    "\"You made it. I wasn't sure you would.\"",
+                    "",
+                    "A figure sits on a throne of dying stars.",
+                    "He looks like everyone you ever loved. And everyone you lost.",
+                    "",
+                    "\"I watched you fight my children. Break my seals.\"",
+                    "\"Unravel the threads I spent eternity weaving.\"",
+                    "",
+                    "\"And now here you are. At the end of all things.\"",
+                    "\"So tell me — what do you want?\""
+                },
+                TextColor = "bright_yellow",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "I'm here to end you, Creator.",
+                        NextNodeId = "manwe_fight_aggressive",
+                        Tone = DialogueTone.Aggressive
+                    },
+                    new()
+                    {
+                        Text = "The cycle of suffering must end. I've come to set things right.",
+                        NextNodeId = "manwe_fight_righteous",
+                        Tone = DialogueTone.Neutral
+                    },
+                    new()
+                    {
+                        Text = "I don't want to fight you, Manwe.",
+                        NextNodeId = "manwe_peaceful",
+                        Tone = DialogueTone.Friendly
+                    }
+                }
+            };
+            tree.AllNodes[intro.Id] = intro;
+            tree.RootNode = intro;
+
+            var fightAggressive = new DialogueNode
+            {
+                Id = "manwe_fight_aggressive",
+                Speaker = "Manwe",
+                Text = new[]
+                {
+                    "Manwe stands. The stars behind him shatter.",
+                    "",
+                    "\"End me? END me?\"",
+                    "",
+                    "For the first time, emotion crosses his face.",
+                    "Not anger. Something like... hope.",
+                    "",
+                    "\"Do you know how long I've waited for someone\"",
+                    "\"strong enough to say those words and MEAN them?\"",
+                    "",
+                    "\"Ten thousand years.\"",
+                    "",
+                    "\"Show me, then. Show me that creation was worth it.\"",
+                    "\"Show me that my children — broken as they are —\"",
+                    "\"made something BEAUTIFUL.\"",
+                    "",
+                    "The Creator raises his hands, and reality bends."
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "manwe_combat_start" }
+                }
+            };
+            tree.AllNodes[fightAggressive.Id] = fightAggressive;
+
+            var fightRighteous = new DialogueNode
+            {
+                Id = "manwe_fight_righteous",
+                Speaker = "Manwe",
+                Text = new[]
+                {
+                    "Manwe's expression shifts. Sorrow, but also respect.",
+                    "",
+                    "\"Set things right. Yes.\"",
+                    "\"That's what I told myself when I broke my children.\"",
+                    "\"When I sealed them in prisons of their own madness.\"",
+                    "\"When I let mortals suffer to preserve the balance.\"",
+                    "",
+                    "\"Everyone who comes to set things right\"",
+                    "\"must first prove they understand the COST.\"",
+                    "",
+                    "He rises from his throne, weary but resolute.",
+                    "",
+                    "\"So let me show you what 'setting things right' truly means.\"",
+                    "\"If you survive... perhaps you'll succeed where I failed.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "manwe_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "manwe_righteous" }
+                }
+            };
+            tree.AllNodes[fightRighteous.Id] = fightRighteous;
+
+            var peaceful = new DialogueNode
+            {
+                Id = "manwe_peaceful",
+                Speaker = "Manwe",
+                Text = new[]
+                {
+                    "Manwe stares at you for a long time.",
+                    "",
+                    "\"You don't want to fight.\"",
+                    "",
+                    "He laughs — not cruelly, but like someone hearing",
+                    "a joke told ten thousand years ago.",
+                    "",
+                    "\"That might be the most dangerous thing\"",
+                    "\"anyone has ever said to me.\"",
+                    "",
+                    "\"Because it means you might actually be wise enough\"",
+                    "\"to handle what comes next.\""
+                },
+                TextColor = "bright_yellow",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "Let me take the burden from you. I'm strong enough.",
+                        NextNodeId = "manwe_fight_compassion",
+                        Tone = DialogueTone.Humble
+                    },
+                    new()
+                    {
+                        Text = "Walk away from creation. Just... let it go.",
+                        NextNodeId = "manwe_alliance",
+                        Tone = DialogueTone.Friendly
+                    }
+                }
+            };
+            tree.AllNodes[peaceful.Id] = peaceful;
+
+            var fightCompassion = new DialogueNode
+            {
+                Id = "manwe_fight_compassion",
+                Speaker = "Manwe",
+                Text = new[]
+                {
+                    "Manwe's eyes widen.",
+                    "",
+                    "\"Take the burden? You would carry... THIS?\"",
+                    "",
+                    "He gestures and you see it — everything.",
+                    "Every star, every soul, every moment of joy and suffering.",
+                    "The weight of all creation, balanced on a single point.",
+                    "",
+                    "\"No one has ever offered that before.\"",
+                    "\"They all want to destroy, or control, or escape.\"",
+                    "\"But you... you want to CARRY it.\"",
+                    "",
+                    "\"I need to know you can bear it.\"",
+                    "\"Forgive me for what I must do.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "manwe_combat_start" },
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "manwe_compassion" }
+                }
+            };
+            tree.AllNodes[fightCompassion.Id] = fightCompassion;
+
+            var alliance = new DialogueNode
+            {
+                Id = "manwe_alliance",
+                Speaker = "Manwe",
+                Text = new[]
+                {
+                    "Silence. The longest silence you have ever known.",
+                    "",
+                    "Then Manwe begins to laugh. And cry.",
+                    "At the same time. Light and shadow pour from his eyes.",
+                    "",
+                    "\"Let it go. Just... let it go.\"",
+                    "\"Do you know I have never once considered that?\"",
+                    "",
+                    "\"I made everything. I AM everything.\"",
+                    "\"I thought that meant I had to CONTROL everything.\"",
+                    "",
+                    "\"But perhaps creation doesn't need a creator.\"",
+                    "\"Perhaps the wave doesn't need the ocean\"",
+                    "\"to tell it how to crash upon the shore.\"",
+                    "",
+                    "Manwe sits back down. The stars around him brighten.",
+                    "",
+                    "\"Go. Shape what comes next.\"",
+                    "\"I think I'd like to rest now.\""
+                },
+                IsEndNode = true,
+                Effects = new List<DialogueEffect>
+                {
+                    new() { Type = EffectType.SetStoryFlag, StringValue = "manwe_ally" },
+                    new() { Type = EffectType.GainOceanInsight, IntValue = 30 },
+                    new() { Type = EffectType.CollectWaveFragment, StringValue = "CreatorsRest" }
+                }
+            };
+            tree.AllNodes[alliance.Id] = alliance;
 
             RegisterDialogueTree(tree);
         }

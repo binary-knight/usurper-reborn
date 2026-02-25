@@ -1213,6 +1213,9 @@ public class PantheonLocation : BaseLocation
         NewsSystem.Instance?.Newsy(true,
             $"[DIVINE] {currentPlayer.DivineName} has fallen from the heavens! Their believers are left godless.");
 
+        // Capture alignment before clearing (needed for legacy migration below)
+        string godAlignment = currentPlayer.GodAlignment ?? "";
+
         // Clear immortal state
         currentPlayer.IsImmortal = false;
         currentPlayer.DivineName = "";
@@ -1220,6 +1223,24 @@ public class PantheonLocation : BaseLocation
         currentPlayer.GodExperience = 0;
         currentPlayer.DeedsLeft = 0;
         currentPlayer.GodAlignment = "";
+
+        // Migration: players who ascended before v0.47.0 have CurrentCycle=1 and
+        // empty CompletedEndings because the ending wasn't recorded at ascension time.
+        // Infer the ending from their god alignment and record it now.
+        var story = StoryProgressionSystem.Instance;
+        if (story.CurrentCycle <= 1 || story.CompletedEndings.Count == 0)
+        {
+            EndingType inferredEnding = godAlignment switch
+            {
+                "Light" => EndingType.Savior,
+                "Dark" => EndingType.Usurper,
+                _ => EndingType.Defiant
+            };
+            if (!story.CompletedEndings.Contains(inferredEnding))
+                story.CompletedEndings.Add(inferredEnding);
+            if (story.CurrentCycle <= 1)
+                story.CurrentCycle = 2;
+        }
 
         terminal.WriteLine("");
         terminal.SetColor("bright_red");

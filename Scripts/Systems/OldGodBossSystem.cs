@@ -236,6 +236,14 @@ namespace UsurperRemake.Systems
         {
             var story = StoryProgressionSystem.Instance;
 
+            // Count gods that have been resolved in any way (defeated, saved, allied, awakened, consumed)
+            int resolvedGods = story.OldGodStates.Values.Count(s =>
+                s.Status == GodStatus.Defeated ||
+                s.Status == GodStatus.Saved ||
+                s.Status == GodStatus.Allied ||
+                s.Status == GodStatus.Awakened ||
+                s.Status == GodStatus.Consumed);
+
             switch (type)
             {
                 case OldGodType.Maelketh:
@@ -243,37 +251,28 @@ namespace UsurperRemake.Systems
                     return true;
 
                 case OldGodType.Veloura:
-                    // Must have resolved Maelketh (defeated, saved, or allied)
-                    if (story.OldGodStates.TryGetValue(OldGodType.Maelketh, out var maelkethState))
-                    {
-                        return maelkethState.Status == GodStatus.Defeated ||
-                               maelkethState.Status == GodStatus.Saved ||
-                               maelkethState.Status == GodStatus.Allied ||
-                               maelkethState.Status == GodStatus.Awakened ||
-                               maelkethState.Status == GodStatus.Consumed;
-                    }
-                    return false;
+                    // Must have resolved Maelketh
+                    return resolvedGods >= 1;
 
                 case OldGodType.Thorgrim:
-                    // Must have defeated at least one god
-                    return story.OldGodStates.Values.Any(s => s.Status == GodStatus.Defeated);
+                    // Must have resolved at least one god
+                    return resolvedGods >= 1;
 
                 case OldGodType.Noctura:
-                    // Must have defeated at least two gods
-                    return story.OldGodStates.Values.Count(s => s.Status == GodStatus.Defeated) >= 2;
+                    // Must have resolved at least two gods
+                    return resolvedGods >= 2;
 
                 case OldGodType.Aurelion:
-                    // Must have defeated at least three gods
-                    return story.OldGodStates.Values.Count(s => s.Status == GodStatus.Defeated) >= 3;
+                    // Must have resolved at least three gods
+                    return resolvedGods >= 3;
 
                 case OldGodType.Terravok:
-                    // Must have defeated at least four gods
-                    return story.OldGodStates.Values.Count(s => s.Status == GodStatus.Defeated) >= 4;
+                    // Must have resolved at least four gods
+                    return resolvedGods >= 4;
 
                 case OldGodType.Manwe:
-                    // Must have all artifacts and faced all other gods
-                    return story.CollectedArtifacts.Count >= 6 &&
-                           story.HasStoryFlag("void_key_obtained");
+                    // Must have resolved all six other gods
+                    return resolvedGods >= 6;
 
                 default:
                     return false;
@@ -667,32 +666,53 @@ namespace UsurperRemake.Systems
 
         private void ApplyManweModifiers(StoryProgressionSystem story, TerminalEmulator terminal)
         {
-            // Final boss - modifiers based on choices with previous gods
+            // Dialogue-based modifiers from the Manwe encounter
+            if (story.HasStoryFlag("manwe_compassion"))
+            {
+                activeCombatModifiers.ApproachType = "compassionate";
+                activeCombatModifiers.BossDamageMultiplier *= 0.80;
+                activeCombatModifiers.BossDefenseMultiplier = 0.85;
+                terminal.WriteLine("  Manwe holds back, testing your resolve. (Boss -20% damage, -15% defense)", "bright_cyan");
+            }
+            else if (story.HasStoryFlag("manwe_righteous"))
+            {
+                activeCombatModifiers.ApproachType = "righteous";
+                activeCombatModifiers.DefenseMultiplier *= 1.15;
+                activeCombatModifiers.BossDamageMultiplier *= 0.90;
+                terminal.WriteLine("  Your conviction shields you. (+15% defense, boss -10% damage)", "bright_green");
+            }
+            else
+            {
+                // Aggressive path — no special dialogue flag, just manwe_combat_start
+                activeCombatModifiers.ApproachType = "aggressive";
+                activeCombatModifiers.DamageMultiplier *= 1.25;
+                activeCombatModifiers.CriticalChance = Math.Max(activeCombatModifiers.CriticalChance, 0.15);
+                activeCombatModifiers.DefenseMultiplier *= 0.85;
+                terminal.WriteLine("  Your fury burns bright! (+25% damage, +15% crit, -15% defense)", "bright_red");
+            }
+
+            // Additive bonuses based on choices with previous gods
             int godsSaved = story.OldGodStates.Values.Count(s => s.Status == GodStatus.Saved);
             int godsAllied = story.OldGodStates.Values.Count(s => s.Status == GodStatus.Allied);
             int godsDestroyed = story.OldGodStates.Values.Count(s => s.Status == GodStatus.Defeated);
 
             if (godsAllied >= 2)
             {
-                activeCombatModifiers.ApproachType = "allied";
-                activeCombatModifiers.DamageMultiplier = 1.20;
-                activeCombatModifiers.DefenseMultiplier = 1.20;
+                activeCombatModifiers.DamageMultiplier += 0.20;
+                activeCombatModifiers.DefenseMultiplier += 0.20;
                 terminal.WriteLine("  Your allied gods lend you their power! (+20% damage and defense)", "bright_magenta");
             }
             else if (godsSaved >= 3)
             {
-                activeCombatModifiers.ApproachType = "savior";
                 activeCombatModifiers.BossWeakened = true;
-                activeCombatModifiers.BossDamageMultiplier = 0.85;
+                activeCombatModifiers.BossDamageMultiplier *= 0.85;
                 terminal.WriteLine("  The saved gods weaken the Creator's hold. (-15% boss damage)", "bright_cyan");
             }
             else if (godsDestroyed >= 5)
             {
-                activeCombatModifiers.ApproachType = "destroyer";
-                activeCombatModifiers.DamageMultiplier = 1.35;
-                activeCombatModifiers.DefenseMultiplier = 0.85;
-                activeCombatModifiers.CriticalChance = 0.20;
-                terminal.WriteLine("  Consumed divine power surges through you! (+35% damage, +20% crit, -15% defense)", "dark_red");
+                activeCombatModifiers.DamageMultiplier += 0.35;
+                activeCombatModifiers.CriticalChance = Math.Max(activeCombatModifiers.CriticalChance, 0.20);
+                terminal.WriteLine("  Consumed divine power surges through you! (+35% damage, +20% crit)", "dark_red");
             }
 
             // Defiant to stranger bonus
@@ -751,8 +771,9 @@ namespace UsurperRemake.Systems
                 BossWeakened = activeCombatModifiers.BossWeakened,
             };
 
-            // Set static flag for Void Key artifact doubling
+            // Set static flags for Manwe battle
             CombatEngine.IsManweBattle = boss.Type == OldGodType.Manwe;
+            combatEngine.ResetManweBossFlags();
 
             // Run combat through the standard engine
             var combatResult = await combatEngine.PlayerVsMonsters(
@@ -1028,8 +1049,11 @@ namespace UsurperRemake.Systems
             story.UpdateGodState(boss.Type, GodStatus.Defeated);
             story.SetStoryFlag($"{boss.Type.ToString().ToLower()}_destroyed", true);
 
-            // Award artifact
-            await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
+            // Award artifact (Manwe drops none — Void Key auto-triggers when 6 artifacts collected)
+            if (boss.Type != OldGodType.Manwe)
+            {
+                await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
+            }
 
             // Award thematic crafting materials
             var thematicMaterial = GameConfig.CraftingMaterials.FirstOrDefault(
