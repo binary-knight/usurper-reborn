@@ -1,5 +1,4 @@
 using UsurperRemake.Utils;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +9,7 @@ using System.Threading.Tasks;
 /// Provides sophisticated combat mechanics including retreat, special abilities, monster AI, and PvP features
 /// Direct Pascal compatibility with exact function preservation
 /// </summary>
-public class AdvancedCombatEngine : Node
+public class AdvancedCombatEngine
 {
     private NewsSystem newsSystem;
 
@@ -36,10 +35,9 @@ public class AdvancedCombatEngine : Node
     private const int MaxMonstersInFight = 5; // Pascal global_maxmon
     private const int CowardlyRunAwayDamage = 10; // Base damage for failed retreat
     
-    public override void _Ready()
+    public AdvancedCombatEngine()
     {
         newsSystem = NewsSystem.Instance;
-        // mailSystem and spellSystem are static - no instance needed
         relationshipSystem = new RelationshipSystem();
     }
     
@@ -69,7 +67,7 @@ public class AdvancedCombatEngine : Node
         globalBegged = false;
         globalEscape = false;
         
-        var terminal = GetNode<TerminalEmulator>("/root/TerminalEmulator");
+        var terminal = TerminalEmulator.Instance ?? new TerminalEmulator();
         
         // Initialize combat
         await InitializeMonsterCombat(result, terminal);
@@ -381,7 +379,7 @@ public class AdvancedCombatEngine : Node
         
         globalBegged = false;
 
-        var terminal = GetNode<TerminalEmulator>("/root/TerminalEmulator");
+        var terminal = TerminalEmulator.Instance ?? new TerminalEmulator();
         
         // Initialize PvP combat
         await InitializePlayerVsPlayerCombat(attacker, defender, result, terminal);

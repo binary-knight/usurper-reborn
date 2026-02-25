@@ -2,7 +2,6 @@ using UsurperRemake.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 /// <summary>
 /// Quest Record - Pascal-compatible quest structure based on QuestRec
@@ -61,7 +60,7 @@ public partial class Quest
     
     public Quest()
     {
-        Id = $"Q{DateTime.Now:yyyyMMddHHmmss}{GD.Randi() % 1000:D3}";
+        Id = $"Q{DateTime.Now:yyyyMMddHHmmss}{Random.Shared.Next() % 1000:D3}";
         Date = DateTime.Now;
         DaysToComplete = 7; // Default 7 days
         Monsters = new List<QuestMonster>();

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 namespace UsurperRemake.Systems
 {
@@ -703,7 +702,6 @@ namespace UsurperRemake.Systems
             if (CompletedScriptedEncounters.Contains(type)) return;
             if (PendingScriptedEncounters.Contains(type)) return;
             PendingScriptedEncounters.Add(type);
-            GD.Print($"[Stranger] Queued scripted encounter: {type}");
         }
 
         /// <summary>
@@ -882,7 +880,6 @@ namespace UsurperRemake.Systems
             if (EncountersHad >= 4 && !PlayerSuspectsStranger)
                 PlayerSuspectsStranger = true;
 
-            GD.Print($"[Stranger] Encounter #{EncountersHad} recorded. Response: {responseType}, Receptivity: {Receptivity}");
         }
 
         /// <summary>
@@ -918,7 +915,6 @@ namespace UsurperRemake.Systems
                 PlayerSuspectsStranger = true;
             }
 
-            GD.Print($"[Stranger] Scripted encounter completed: {type}");
         }
 
         /// <summary>
@@ -928,7 +924,6 @@ namespace UsurperRemake.Systems
         {
             PlayerKnowsTruth = true;
             StoryProgressionSystem.Instance?.SetFlag(StoryFlag.KnowsNocturaTruth);
-            GD.Print("[Stranger] Player now knows Noctura's true identity");
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -1041,7 +1036,6 @@ namespace UsurperRemake.Systems
                 if (PlayerKnowsTruth)
                     Receptivity = Math.Max(Receptivity, 40);
 
-                GD.Print($"[Stranger] Migration: Estimated receptivity at {Receptivity} for {EncountersHad} encounters");
             }
         }
 
@@ -1059,7 +1053,6 @@ namespace UsurperRemake.Systems
             PendingScriptedEncounters = new HashSet<ScriptedEncounterType>();
             UsedDialogueIds = new HashSet<string>();
             RecentGameEvents = new List<StrangerContextEvent>();
-            GD.Print("[Stranger] System reset for new game");
         }
     }
 

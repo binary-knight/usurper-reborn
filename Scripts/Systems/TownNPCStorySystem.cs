@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 namespace UsurperRemake.Systems
 {
@@ -820,7 +819,6 @@ namespace UsurperRemake.Systems
                 return allConditionsMet;
 
             // Default: unknown trigger type, don't proceed
-            GD.Print($"[TownNPC] Unknown trigger type: {trigger}");
             return false;
         }
 
@@ -856,17 +854,14 @@ namespace UsurperRemake.Systems
                 if (npcId == "Pip_OrphanThief" && choiceMade == "guards")
                 {
                     state.CurrentStage = 99; // Mark as completed/gone
-                    GD.Print($"[TownNPC] {npc.Name} was turned in to the guards - story ended");
                 }
                 // Pip: Forgiving her also ends the story (no further stages for that path)
                 else if (npcId == "Pip_OrphanThief" && choiceMade == "forgive")
                 {
                     state.CurrentStage = 99; // Mark as completed
-                    GD.Print($"[TownNPC] {npc.Name} was forgiven and left - story ended");
                 }
             }
 
-            GD.Print($"[TownNPC] Completed stage {stageId} for {npc.Name}");
         }
 
         /// <summary>
@@ -919,7 +914,6 @@ namespace UsurperRemake.Systems
         public void Reset()
         {
             InitializeNPCStates();
-            GD.Print("[TownNPC] System reset for new game");
         }
     }
 

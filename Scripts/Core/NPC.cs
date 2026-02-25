@@ -1,7 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.Data;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -328,45 +327,45 @@ public partial class NPC : Character
         {
             case "thug":
                 CurrentLocation = "Inn";
-                Race = (CharacterRace)GD.RandRange(0, 9); // Random race
-                Sex = (CharacterSex)GD.RandRange(1, 2);
-                IsHostile = GD.Randf() < 0.3f; // 30% chance of being hostile
+                Race = (CharacterRace)Random.Shared.Next(0, 10); // Random race
+                Sex = (CharacterSex)Random.Shared.Next(1, 3);
+                IsHostile = (float)Random.Shared.NextDouble() < 0.3f; // 30% chance of being hostile
                 break;
 
             case "guard":
-                CurrentLocation = GD.RandRange(0, 2) == 0 ? "Castle" : "Main Street";
+                CurrentLocation = Random.Shared.Next(0, 3) == 0 ? "Castle" : "Main Street";
                 Race = CharacterRace.Human; // Guards are usually human
-                Sex = (CharacterSex)GD.RandRange(1, 2);
+                Sex = (CharacterSex)Random.Shared.Next(1, 3);
                 break;
 
             case "merchant":
                 CurrentLocation = "Auction House";
                 Race = CharacterRace.Human;
-                Sex = (CharacterSex)GD.RandRange(1, 2);
+                Sex = (CharacterSex)Random.Shared.Next(1, 3);
                 break;
 
             case "priest":
                 CurrentLocation = "Temple";
                 Race = CharacterRace.Human;
-                Sex = (CharacterSex)GD.RandRange(1, 2);
+                Sex = (CharacterSex)Random.Shared.Next(1, 3);
                 Chivalry = Level * 10; // Priests start with chivalry
                 break;
 
             case "mystic":
                 CurrentLocation = "Magic Shop";
                 Race = CharacterRace.Elf;
-                Sex = (CharacterSex)GD.RandRange(1, 2);
+                Sex = (CharacterSex)Random.Shared.Next(1, 3);
                 break;
 
             default:
                 CurrentLocation = "Main Street";
-                Race = (CharacterRace)GD.RandRange(0, 9);
-                Sex = (CharacterSex)GD.RandRange(1, 2);
+                Race = (CharacterRace)Random.Shared.Next(0, 10);
+                Sex = (CharacterSex)Random.Shared.Next(1, 3);
                 break;
         }
         
         // Set age based on level and archetype (minimum 18)
-        Age = 18 + Level + GD.RandRange(-5, 10);
+        Age = 18 + Level + Random.Shared.Next(-5, 11);
         if (Age < 18) Age = 18;
         if (Age > 80) Age = 80;
     }
@@ -654,13 +653,13 @@ public partial class NPC : Character
         switch (Archetype.ToLower())
         {
             case "merchant":
-                Gold += GD.RandRange(5, 20);
+                Gold += Random.Shared.Next(5, 21);
                 break;
                 
             case "guard":
                 // Guards patrol
                 var locations = new[] { "Main Street", "Castle", "Auction House" };
-                CurrentLocation = locations[GD.RandRange(0, locations.Length - 1)];
+                CurrentLocation = locations[Random.Shared.Next(0, locations.Length)];
                 break;
                 
             case "priest":
@@ -782,7 +781,7 @@ public partial class NPC : Character
             "Another pretty boy... pfft!"
         };
         
-        return greetings[GD.RandRange(0, greetings.Length - 1)];
+        return greetings[Random.Shared.Next(0, greetings.Length)];
     }
     
     /// <summary>
@@ -819,7 +818,6 @@ public partial class NPC : Character
         catch (Exception ex)
         {
             // GameEngine not ready - return empty list
-            GD.PrintErr($"[NPC] GetPlayersInLocation error: {ex.Message}");
         }
 
         return players;
@@ -847,7 +845,6 @@ public partial class NPC : Character
         catch (Exception ex)
         {
             // NPCSpawnSystem not ready - return empty list
-            GD.PrintErr($"[NPC] GetNPCsInLocation error: {ex.Message}");
         }
 
         return npcNames;
@@ -905,7 +902,6 @@ public partial class NPC : Character
         {
             // Log error but continue - LocationManager may not be ready during initialization
             // Will be corrected on next movement attempt
-            GD.PrintErr($"[NPC] UpdateLocation error for {Name2}: {ex.Message}");
             CurrentLocation = newLocation;
         }
     }

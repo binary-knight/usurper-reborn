@@ -2,7 +2,6 @@ using UsurperRemake.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 public partial class MemorySystem
 {
@@ -46,7 +45,6 @@ public partial class MemorySystem
         // Reduce console spam: only log memories of notable importance (>=0.5)
         if (memoryEvent.Importance >= 0.5f)
         {
-            GD.Print($"[Memory] Recorded: {memoryEvent.Description}");
         }
     }
     

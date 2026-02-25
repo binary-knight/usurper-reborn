@@ -1,4 +1,3 @@
-using Godot;
 using UsurperRemake.BBS;
 using UsurperRemake.Systems;
 using GlobalItem = global::Item;

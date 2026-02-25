@@ -1,7 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.Data;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -15,7 +14,7 @@ using System.IO;
 /// Handles the core game loop, initialization, and game state management
 /// Now includes comprehensive save/load system and flexible daily cycles
 /// </summary>
-public partial class GameEngine : Node
+public partial class GameEngine
 {
     private static readonly Lazy<GameEngine> lazyInstance = new Lazy<GameEngine>(() => new GameEngine());
     private static GameEngine? _fallbackInstance;
@@ -708,9 +707,8 @@ public partial class GameEngine : Node
         }
     }
 
-    public override void _Ready()
+    public void _Ready()
     {
-        GD.Print("Usurper Reborn - Initializing Game Engine...");
 
         // Initialize core systems
         InitializeGame();
@@ -726,8 +724,6 @@ public partial class GameEngine : Node
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[GameEngine] Fatal error in main loop: {ex.Message}");
-                GD.PrintErr(ex.StackTrace ?? "");
                 UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Fatal error in main loop:\n{ex}");
                 UsurperRemake.Systems.DebugLogger.Instance.Flush();
                 throw; // Re-throw to crash properly rather than hang silently
@@ -748,27 +744,23 @@ public partial class GameEngine : Node
             terminal = TerminalEmulator.Instance ?? new TerminalEmulator();
         }
 
-        GD.Print("Reading configuration...");
         ReadStartCfgValues();
 
         // Load SysOp configuration (for BBS door mode settings persistence)
         UsurperRemake.Systems.SysOpConfigSystem.Instance.LoadConfig();
 
-        GD.Print("Initializing core managers...");
         // Create the LocationManager early so that it becomes the singleton before NPCs are loaded
         if (locationManager == null)
         {
             locationManager = new LocationManager(terminal);
         }
 
-        GD.Print("Initializing game data...");
         InitializeItems();      // From INIT.PAS Init_Items
         InitializeMonsters();   // From INIT.PAS Init_Monsters
         InitializeNPCs();       // From INIT.PAS Init_NPCs (needs LocationManager ready)
         InitializeLevels();     // From INIT.PAS Init_Levels
         InitializeGuards();     // From INIT.PAS Init_Guards
         
-        GD.Print("Setting up game state...");
         gameState = new GameState
         {
             GameDate = 1,
@@ -800,14 +792,12 @@ public partial class GameEngine : Node
         onlinePlayers = new List<OnlinePlayer>();
 
         // Initialize achievement and statistics systems
-        GD.Print("Initializing achievement and statistics systems...");
         AchievementSystem.Initialize();
         QuestSystem.EnsureQuestsExist();
 
         // Initialize periodic check timer
         lastPeriodicCheck = DateTime.Now;
 
-        GD.Print("Game engine initialized successfully!");
     }
     
     /// <summary>
@@ -1842,7 +1832,6 @@ public partial class GameEngine : Node
                             }
                             catch (Exception ex)
                             {
-                                GD.PrintErr($"Failed to delete {save.FileName}: {ex.Message}");
                             }
                         }
                         terminal.WriteLine("All saves deleted.", "green");
@@ -2156,7 +2145,6 @@ public partial class GameEngine : Node
         catch (Exception ex)
         {
             terminal.WriteLine($"Error loading save: {ex.Message}", "red");
-            GD.PrintErr($"Failed to load save {fileName}: {ex}");
             UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Failed to load save {fileName}:\n{ex}");
             UsurperRemake.Systems.DebugLogger.Instance.Flush();
             await Task.Delay(3000);
@@ -3696,7 +3684,6 @@ public partial class GameEngine : Node
     {
         if (npcData == null || npcData.Count == 0)
         {
-            GD.Print("No NPC data to restore - will use fresh NPCs");
             return;
         }
 
@@ -3992,7 +3979,6 @@ public partial class GameEngine : Node
                 npc.NPCFaction = DetermineFactionForNPC(npc);
                 if (npc.NPCFaction.HasValue)
                 {
-                    GD.Print($"[GameEngine] Migrated {npc.Name} to faction {npc.NPCFaction.Value}");
                 }
             }
 
@@ -4109,7 +4095,6 @@ public partial class GameEngine : Node
         if (kingNpc != null)
         {
             global::CastleLocation.SetCurrentKing(kingNpc);
-            GD.Print($"Restored king: {kingNpc.Name}");
         }
 
         // Mark NPCs as initialized so they don't get re-created
@@ -4129,7 +4114,6 @@ public partial class GameEngine : Node
             UsurperRemake.Systems.DebugLogger.Instance.LogWarning("NPC", "worldSimulator is null - cannot process dead NPCs!");
         }
 
-        GD.Print($"Restored {npcData.Count} NPCs from save data");
         await Task.CompletedTask;
     }
 
@@ -4368,7 +4352,6 @@ public partial class GameEngine : Node
         catch (Exception ex)
         {
             terminal.WriteLine($"An error occurred during character creation: {ex.Message}", "red");
-            GD.PrintErr($"Character creation error: {ex}");
             UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Character creation error:\n{ex}");
 
             terminal.WriteLine("Please try again.", "yellow");
@@ -4602,7 +4585,7 @@ public partial class GameEngine : Node
         
         // Escape chance based on stats
         var escapeChance = (currentPlayer.Dexterity + currentPlayer.Agility) / 4;
-        var roll = GD.RandRange(1, 100);
+        var roll = Random.Shared.Next(1, 101);
         
         if (roll <= escapeChance)
         {
@@ -4692,7 +4675,7 @@ public partial class GameEngine : Node
     private string GetWeather()
     {
         var weather = new[] { "clear", "cloudy", "misty", "cool", "warm", "breezy" };
-        return weather[GD.RandRange(0, weather.Length - 1)];
+        return weather[Random.Shared.Next(0, weather.Length)];
     }
     
     /// <summary>
@@ -5170,16 +5153,13 @@ public partial class GameEngine : Node
                     }
                     catch (Exception exNpc)
                     {
-                        GD.PrintErr($"[Init] Failed to load NPC: {exNpc.Message}");
                     }
                 }
             }
 
-            GD.Print($"[Init] Loaded {worldNPCs.Count} NPC definitions from data file.");
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"[Init] Error loading NPCs: {ex.Message}");
         }
     }
     
@@ -5222,13 +5202,10 @@ public partial class GameEngine : Node
     {
         try
         {
-            GD.Print("═══ Running Magic Shop System Tests ═══");
             // MagicShopSystemValidation(); // TODO: Implement this validation method
-            GD.Print("═══ Magic Shop Tests Complete ═══");
         }
         catch (System.Exception ex)
         {
-            GD.PrintErr($"Magic Shop Test Error: {ex.Message}");
         }
     }
 

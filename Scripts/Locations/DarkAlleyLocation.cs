@@ -1,4 +1,3 @@
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -55,7 +54,7 @@ namespace UsurperRemake.Locations
                 await HandleEnforcerEncounter(player, term);
             }
             // Random shady encounter (15% chance)
-            else if (GD.RandRange(1, 100) <= 15)
+            else if (Random.Shared.Next(1, 101) <= 15)
             {
                 await HandleShadyEncounter(player, term);
             }
@@ -794,7 +793,7 @@ namespace UsurperRemake.Locations
                         "\"Your destiny is intertwined with the Seven Seals.\"",
                         "\"The old gods stir in their prisons...\""
                     };
-                    terminal.WriteLine($"  {fortunes[GD.RandRange(0, fortunes.Length - 1)]}", "white");
+                    terminal.WriteLine($"  {fortunes[Random.Shared.Next(0, fortunes.Length)]}", "white");
                     break;
 
                 case "3":
@@ -847,7 +846,7 @@ namespace UsurperRemake.Locations
             currentPlayer.Gold -= price;
 
             // Small random buff (not a penalty!)
-            int effect = GD.RandRange(1, 4);
+            int effect = Random.Shared.Next(1, 5);
             switch (effect)
             {
                 case 1:
@@ -885,7 +884,7 @@ namespace UsurperRemake.Locations
             }
 
             currentPlayer.Gold -= price;
-            int effect = GD.RandRange(1, 3);
+            int effect = Random.Shared.Next(1, 4);
             switch (effect)
             {
                 case 1:
@@ -1660,8 +1659,8 @@ namespace UsurperRemake.Locations
             bool guessOver = guess != "2"; // Default to over
 
             await Task.Delay(1000);
-            int die1 = GD.RandRange(1, 6);
-            int die2 = GD.RandRange(1, 6);
+            int die1 = Random.Shared.Next(1, 7);
+            int die2 = Random.Shared.Next(1, 7);
             int total = die1 + die2;
 
             terminal.SetColor("bright_cyan");
@@ -1679,7 +1678,7 @@ namespace UsurperRemake.Locations
                 // Player wins - adjust displayed result to match their guess
                 if ((guessOver && total <= 7) || (!guessOver && total >= 7))
                 {
-                    total = guessOver ? GD.RandRange(8, 12) : GD.RandRange(2, 6);
+                    total = guessOver ? Random.Shared.Next(8, 13) : Random.Shared.Next(2, 7);
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine($"Wait... actually it's {total}!");
                 }
@@ -1692,7 +1691,7 @@ namespace UsurperRemake.Locations
             {
                 if ((guessOver && total > 7) || (!guessOver && total < 7))
                 {
-                    total = guessOver ? GD.RandRange(2, 7) : GD.RandRange(7, 12);
+                    total = guessOver ? Random.Shared.Next(2, 8) : Random.Shared.Next(7, 13);
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine($"Wait... actually it's {total}!");
                 }
@@ -1751,7 +1750,7 @@ namespace UsurperRemake.Locations
             float chance = 0.33f + dexBonus;
             float roll = (float)new Random().NextDouble();
 
-            int queenPosition = GD.RandRange(1, 3);
+            int queenPosition = Random.Shared.Next(1, 4);
             if (roll < chance)
             {
                 queenPosition = int.TryParse(pick, out int p) && p >= 1 && p <= 3 ? p : 1;
@@ -1880,8 +1879,8 @@ namespace UsurperRemake.Locations
             // Show 3-5 random NPCs as targets
             var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs?
                 .Where(n => !n.IsDead && n.Gold > 0)
-                .OrderBy(_ => GD.RandRange(0, 1000))
-                .Take(GD.RandRange(3, 5))
+                .OrderBy(_ => Random.Shared.Next(0, 1001))
+                .Take(Random.Shared.Next(3, 6))
                 .ToList();
 
             if (allNPCs == null || allNPCs.Count == 0)
@@ -1963,7 +1962,7 @@ namespace UsurperRemake.Locations
             else if (roll >= (1.0f - chance))
             {
                 // Success — steal gold
-                float stealPercent = GD.RandRange(5, 15) / 100f;
+                float stealPercent = Random.Shared.Next(5, 16) / 100f;
                 long stolen = Math.Max(1, (long)(target.Gold * stealPercent));
                 target.Gold -= stolen;
                 currentPlayer.Gold += stolen;
@@ -2167,8 +2166,8 @@ namespace UsurperRemake.Locations
             int maxLevel = currentPlayer.Level + 5;
             var candidates = NPCSpawnSystem.Instance?.ActiveNPCs?
                 .Where(n => !n.IsDead && n.Level >= minLevel && n.Level <= maxLevel)
-                .OrderBy(_ => GD.RandRange(0, 1000))
-                .Take(GD.RandRange(3, 5))
+                .OrderBy(_ => Random.Shared.Next(0, 1001))
+                .Take(Random.Shared.Next(3, 6))
                 .ToList();
 
             if (candidates == null || candidates.Count == 0)
@@ -2738,9 +2737,9 @@ namespace UsurperRemake.Locations
 
             // 10% robbery chance (Shadows members exempt)
             bool isShadows = FactionSystem.Instance?.PlayerFaction == Faction.TheShadows;
-            if (!isShadows && GD.RandRange(1, 100) <= 10)
+            if (!isShadows && Random.Shared.Next(1, 101) <= 10)
             {
-                float lossPercent = GD.RandRange(5, 10) / 100f;
+                float lossPercent = Random.Shared.Next(5, 11) / 100f;
                 long goldLost = Math.Max(1, (long)(currentPlayer.Gold * lossPercent));
                 currentPlayer.Gold -= goldLost;
 
@@ -2880,7 +2879,7 @@ namespace UsurperRemake.Locations
         /// </summary>
         private async Task HandleShadyEncounter(Character player, TerminalEmulator term)
         {
-            int encounterType = GD.RandRange(1, 100);
+            int encounterType = Random.Shared.Next(1, 101);
 
             if (encounterType <= 30)
             {
@@ -2948,7 +2947,7 @@ namespace UsurperRemake.Locations
                     "\"The fence pays more for cursed items than regular ones, if you know how to ask.\"",
                     "\"The pit fights are rigged, but if yer strong enough it don't matter.\"",
                 };
-                term.WriteLine(tips[GD.RandRange(0, tips.Length - 1)]);
+                term.WriteLine(tips[Random.Shared.Next(0, tips.Length)]);
                 term.SetColor("gray");
                 term.WriteLine("The beggar shuffles away.");
             }
@@ -2996,7 +2995,7 @@ namespace UsurperRemake.Locations
                 term.WriteLine("A cloaked figure sidles up to you.");
                 term.SetColor("yellow");
 
-                int offer = GD.RandRange(1, 2);
+                int offer = Random.Shared.Next(1, 3);
                 if (offer == 1)
                 {
                     // Healing potion at half price
@@ -3057,7 +3056,7 @@ namespace UsurperRemake.Locations
                     if (ans.ToUpper() == "Y" && player.Gold >= price)
                     {
                         player.Gold -= price;
-                        int stat = GD.RandRange(1, 3);
+                        int stat = Random.Shared.Next(1, 4);
                         switch (stat)
                         {
                             case 1:

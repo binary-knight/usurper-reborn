@@ -3,7 +3,6 @@ using UsurperRemake.Systems;
 using UsurperRemake.Data;
 using UsurperRemake.UI;
 using UsurperRemake.BBS;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -137,7 +136,6 @@ public abstract class BaseLocation
         // Ensure NPCs are initialized (safety check)
         if (NPCSpawnSystem.Instance.ActiveNPCs.Count == 0)
         {
-            GD.Print("[BaseLocation] NPCs not initialized, initializing now...");
             await NPCSpawnSystem.Instance.InitializeClassicNPCs();
         }
 
@@ -231,7 +229,6 @@ public abstract class BaseLocation
                     player.RoyalMercenaries?.Clear(); // Dismiss bodyguards on dethronement
                     player.RecalculateStats(); // Remove Royal Authority HP bonus
                     string newRuler = currentKing?.Name ?? "nobody";
-                    GD.Print($"[BaseLocation] Synced player King=false (throne belongs to {newRuler})");
 
                     // Notify the player they lost the throne
                     var term = GameEngine.Instance?.Terminal;
@@ -261,7 +258,6 @@ public abstract class BaseLocation
                 if (player.CTurf != teamHasTurf)
                 {
                     player.CTurf = teamHasTurf;
-                    GD.Print($"[BaseLocation] Synced player CTurf={teamHasTurf} (team '{player.Team}')");
                 }
             }
             else if (player.CTurf)
@@ -4791,17 +4787,8 @@ public abstract class BaseLocation
         }
     }
 
-    // Placeholder Ready method for Godot-style initialization
-    public virtual void _Ready()
-    {
-        // No-op for standalone build
-    }
-
     // Expose CurrentPlayer as Player for legacy code while still maintaining Character
     public Player? CurrentPlayer { get; protected set; }
-
-    // Convenience GetNode wrapper (delegates to global helper)
-    protected T GetNode<T>(string path) where T : class, new() => UsurperRemake.Utils.GodotHelpers.GetNode<T>(path);
 
     // Legacy exit helper used by some derived locations
     protected virtual async Task Exit(Player player)

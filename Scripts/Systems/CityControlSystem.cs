@@ -1,5 +1,4 @@
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -265,7 +264,6 @@ public class CityControlSystem
         if (player != null && player.CTurf && player.Team != newControllingTeam)
         {
             player.CTurf = false;
-            GD.Print($"[CityControl] Player {player.DisplayName}'s team lost city control to '{newControllingTeam}'");
         }
 
         // Give control to new team

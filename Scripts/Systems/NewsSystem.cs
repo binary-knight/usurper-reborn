@@ -1,9 +1,8 @@
 using UsurperRemake.Utils;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using FileAccess = Godot.FileAccess;
+// FileAccess alias removed (was Godot.FileAccess — no longer needed)
 using System.Text;
 using System.Globalization;
 using System.Linq;
@@ -71,7 +70,6 @@ public partial class NewsSystem
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"NewsSystem error: {ex.Message}");
             }
         }
     }
@@ -229,7 +227,6 @@ public partial class NewsSystem
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Error reading news: {ex.Message}");
         }
 
         return news;
@@ -326,7 +323,6 @@ public partial class NewsSystem
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"News maintenance error: {ex.Message}");
             }
         }
     }
@@ -381,7 +377,6 @@ public partial class NewsSystem
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Error initializing news file: {ex.Message}");
         }
     }
 
@@ -403,7 +398,6 @@ public partial class NewsSystem
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Error writing news: {ex.Message}");
         }
     }
 

@@ -1,5 +1,4 @@
 using UsurperRemake.Utils;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -10,7 +9,7 @@ using System.IO;
 /// Provides real-time player vs player dueling with communication and Pascal compatibility
 /// Direct Pascal compatibility with exact function preservation
 /// </summary>
-public class OnlineDuelSystem : Node
+public class OnlineDuelSystem
 {
     // MailSystem and NewsSystem are accessed via static/singleton - no need to instantiate
     private Random random = new Random();
@@ -44,10 +43,7 @@ public class OnlineDuelSystem : Node
     private ComRec commy = new ComRec();
     private Character enemy = new Character();
     
-    public override void _Ready()
-    {
-        // Combat handled internally - MailSystem and NewsSystem accessed via singletons
-    }
+    // MailSystem and NewsSystem accessed via static singletons — no initialization needed
     
     /// <summary>
     /// Online duel main procedure - Pascal ONDUEL.PAS Online_Duel
@@ -63,7 +59,7 @@ public class OnlineDuelSystem : Node
         
         challenger = isChallenger;
         
-        var terminal = GetNode<TerminalEmulator>("/root/TerminalEmulator");
+        var terminal = TerminalEmulator.Instance ?? new TerminalEmulator();
         
         // Initialize duel state
         await InitializeDuel(player, opponent, result, terminal);
@@ -443,7 +439,6 @@ public class OnlineDuelSystem : Node
             catch (Exception ex)
             {
                 // Handle file access errors gracefully
-                GD.PrintErr($"Error reading say file: {ex.Message}");
             }
         }
     }
@@ -587,7 +582,6 @@ public class OnlineDuelSystem : Node
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Error sending chat message: {ex.Message}");
         }
     }
     
@@ -605,7 +599,6 @@ public class OnlineDuelSystem : Node
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Error cleaning up communication files: {ex.Message}");
         }
     }
     

@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.BBS;
 
 namespace UsurperRemake.Systems
@@ -119,13 +118,11 @@ namespace UsurperRemake.Systems
 
                 if (saveData == null)
                 {
-                    GD.PrintErr("Failed to deserialize save data");
                     return null;
                 }
 
                 if (saveData.Version < GameConfig.MinSaveVersion)
                 {
-                    GD.PrintErr($"Save file version {saveData.Version} is too old (minimum: {GameConfig.MinSaveVersion})");
                     return null;
                 }
 
@@ -133,7 +130,6 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"Failed to load game: {ex.Message}");
                 return null;
             }
         }
@@ -162,7 +158,6 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"Failed to delete save: {ex.Message}");
                 return false;
             }
         }
@@ -197,13 +192,11 @@ namespace UsurperRemake.Systems
                     }
                     catch (Exception ex)
                     {
-                        GD.PrintErr($"Failed to read save file {file}: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"Failed to enumerate save files: {ex.Message}");
             }
 
             return saves;
@@ -247,7 +240,6 @@ namespace UsurperRemake.Systems
                     }
                     catch (Exception ex)
                     {
-                        GD.PrintErr($"Failed to read save file {file}: {ex.Message}");
                     }
                 }
 
@@ -255,7 +247,6 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"Failed to get player saves: {ex.Message}");
             }
 
             return saves;
@@ -299,7 +290,6 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"Failed to enumerate player names: {ex.Message}");
             }
 
             return playerNames.OrderBy(n => n).ToList();
@@ -335,7 +325,6 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"Failed to create backup: {ex.Message}");
             }
         }
 
@@ -366,7 +355,6 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"Failed to rotate autosaves: {ex.Message}");
             }
         }
 

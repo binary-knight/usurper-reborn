@@ -2,7 +2,6 @@ using UsurperRemake.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 public class NPCBrain
 {
@@ -701,9 +700,9 @@ public class NPCBrain
         if (personality.Impulsiveness > 0.7f && actions.Count > 1)
         {
             // Sometimes pick a random action instead of the best one
-            if (GD.Randf() < personality.Impulsiveness * 0.3f)
+            if ((float)Random.Shared.NextDouble() < personality.Impulsiveness * 0.3f)
             {
-                return actions[GD.RandRange(0, actions.Count - 1)];
+                return actions[Random.Shared.Next(0, actions.Count)];
             }
         }
         

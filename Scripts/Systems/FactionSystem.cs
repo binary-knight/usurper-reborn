@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 namespace UsurperRemake.Systems
 {
@@ -326,7 +325,6 @@ namespace UsurperRemake.Systems
                     break;
             }
 
-            GD.Print($"[Faction] Player joined {faction}");
         }
 
         /// <summary>
@@ -347,7 +345,6 @@ namespace UsurperRemake.Systems
             FactionRank = 0;
             FactionReputation = 0;
 
-            GD.Print($"[Faction] Player betrayed {oldFaction}");
         }
 
         /// <summary>
@@ -536,7 +533,6 @@ namespace UsurperRemake.Systems
             if (targetRank > FactionRank && FactionRank < maxRank)
             {
                 FactionRank = Math.Min(targetRank, maxRank);
-                GD.Print($"[Faction] Player promoted to rank {FactionRank}: {GetCurrentRankTitle()}");
             }
         }
 
@@ -789,7 +785,6 @@ namespace UsurperRemake.Systems
             CompletedFactionQuests = new HashSet<string>();
             HasBetrayedFaction = false;
             BetrayedFaction = null;
-            GD.Print("[Faction] System reset for new game");
         }
     }
 

@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Godot;
 
 /// <summary>
 /// God System - Complete Pascal-compatible god management system
@@ -172,7 +171,6 @@ public class GodSystem
             }
         }
 
-        GD.Print($"[GodSystem] Initialized {defaultGods.Count} pantheon gods");
     }
 
     /// <summary>
@@ -209,10 +207,8 @@ public class GodSystem
         if (listThem)
         {
             // In Pascal this would display the list - here we just return count
-            GD.Print($"Followers of {godName}:");
             for (int i = 0; i < god.Disciples.Count; i++)
             {
-                GD.Print($"{i + 1}. {god.Disciples[i]}");
             }
         }
         
@@ -379,7 +375,6 @@ public class GodSystem
         godsByName[newGod.Name] = newGod;
         
         // In Pascal, this would send news and notifications
-        GD.Print($"DIVINITY! {newGod.Name} became immortal and entered the Divine Realm!");
         
         return newGod;
     }
@@ -423,7 +418,6 @@ public class GodSystem
             for (int i = 0; i < activeGods.Count; i++)
             {
                 var god = activeGods[i];
-                GD.Print($"{i + 1}. {god.Name} - {god.GetTitle()} - {god.Believers} believers");
             }
         }
         
@@ -442,10 +436,8 @@ public class GodSystem
         {
             // In Pascal, this would send mail to each disciple
             // For now, just log the message
-            GD.Print($"Message to {disciple} from {god.Name}: {header}");
             foreach (var message in messages.Where(m => !string.IsNullOrEmpty(m)))
             {
-                GD.Print($"  {message}");
             }
         }
     }
@@ -466,7 +458,6 @@ public class GodSystem
         god.IncreaseExperience(powerGained);
         
         // Inform god if online (in Pascal this would be a broadcast)
-        GD.Print($"{playerName} sacrificed {goldAmount} gold to {godName}! Power increased by {powerGained}");
         
         return powerGained;
     }
@@ -484,7 +475,6 @@ public class GodSystem
             return;
             
         // In Pascal, this would reduce god power and inform disciples
-        GD.Print($"{playerName} desecrated the altar of {godName}!");
         
         // Inform disciples
         InformDisciples(god, "ALTAR DESECRATED!", 
@@ -501,7 +491,6 @@ public class GodSystem
             return false;
             
         // In Pascal, this would actually free the prisoner
-        GD.Print($"{god.Name} helped {prisonerName} escape from prison!");
         
         return true;
     }
@@ -515,7 +504,6 @@ public class GodSystem
             return false;
             
         // In Pascal, this would provide actual blessing effects
-        GD.Print($"{god.Name} blessed {mortalName}!");
         
         return true;
     }
@@ -529,7 +517,6 @@ public class GodSystem
             return false;
             
         // In Pascal, this would provide actual curse effects
-        GD.Print($"{god.Name} cursed {mortalName}!");
         
         return true;
     }

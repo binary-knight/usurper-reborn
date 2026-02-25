@@ -1,6 +1,5 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +10,7 @@ using System.Threading.Tasks;
 /// Handles team creation, management, combat, territory control, and all team-related functionality
 /// Direct Pascal compatibility with exact function preservation
 /// </summary>
-public partial class TeamSystem : Node
+public partial class TeamSystem
 {
     private NewsSystem newsSystem;
     // MailSystem is static - no need to instantiate
@@ -34,10 +33,9 @@ public partial class TeamSystem : Node
         "Rival Gangs Clash!"
     };
     
-    public override void _Ready()
+    public TeamSystem()
     {
         newsSystem = NewsSystem.Instance;
-        // mailSystem is static - use MailSystem.MethodName directly
         combatEngine = new CombatEngine();
         relationshipSystem = RelationshipSystem.Instance;
     }

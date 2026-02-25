@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.Systems;
 using UsurperRemake.Utils;
 
@@ -391,7 +390,6 @@ namespace UsurperRemake.Data
                 CannotTrulyLose = true // This fight is about understanding, not winning
             };
 
-            GD.Print($"[SecretBosses] Initialized {bosses.Count} secret bosses");
         }
 
         /// <summary>

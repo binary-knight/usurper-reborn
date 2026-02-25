@@ -1,6 +1,5 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -740,7 +739,6 @@ public partial class RelationshipSystem
     {
         // In a full implementation, this would send mail notifications
         // For now, we just log the change
-        GD.Print($"Relationship changed: {character1.Name} -> {character2.Name}: {GetRelationshipDescription(newRelation)}");
         DebugLogger.Instance.LogRelationshipChange(character1.Name, character2.Name, 0, newRelation, "interaction");
     }
     
@@ -760,7 +758,6 @@ public partial class RelationshipSystem
             NewsSystem.Instance?.Newsy(true, $"{parent1.Name} was awarded custody of {totalChildren} child{(totalChildren > 1 ? "ren" : "")} in the divorce from {parent2.Name}.");
         }
 
-        GD.Print($"Child custody handled: {parent1.Name} has custody of {totalChildren} children after divorce from {parent2.Name}");
     }
     
     private static void ProcessAutomaticDivorce(RelationshipRecord relation)
@@ -770,7 +767,6 @@ public partial class RelationshipSystem
         relation.Relation2 = GameConfig.RelationHate;
         relation.MarriedDays = 0;
 
-        GD.Print($"Automatic divorce: {relation.Name1} and {relation.Name2} divorced after {relation.MarriedDays} days");
     }
 
     /// <summary>
@@ -924,7 +920,6 @@ public partial class RelationshipSystem
             };
         }
 
-        GD.Print($"[RelationshipSystem] Imported {savedRelationships.Count} relationships");
     }
 
     #endregion

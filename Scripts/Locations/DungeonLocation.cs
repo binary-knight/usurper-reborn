@@ -4429,7 +4429,6 @@ public class DungeonLocation : BaseLocation
                 if (!player.ClearedSpecialFloors.Contains(sealData.DungeonFloor))
                 {
                     player.ClearedSpecialFloors.Add(sealData.DungeonFloor);
-                    Godot.GD.Print($"[DungeonLocation] Synced seal floor {sealData.DungeonFloor} to ClearedSpecialFloors");
                 }
             }
         }

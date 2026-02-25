@@ -1,7 +1,6 @@
 using UsurperRemake.BBS;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;

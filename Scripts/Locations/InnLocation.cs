@@ -1,7 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.BBS;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -722,7 +721,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("The bitter brew slides down your throat...");
         
         // Random drink effects
-        var effect = GD.RandRange(1, 4);
+        var effect = Random.Shared.Next(1, 5);
         switch (effect)
         {
             case 1:
@@ -800,7 +799,7 @@ public class InnLocation : BaseLocation
         };
 
         terminal.SetColor("yellow");
-        terminal.WriteLine($"Seth Able: \"{responses[GD.RandRange(0, responses.Length - 1)]}\"");
+        terminal.WriteLine($"Seth Able: \"{responses[Random.Shared.Next(0, responses.Length)]}\"");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -1353,7 +1352,7 @@ public class InnLocation : BaseLocation
         var maxOpponents = 5;
         var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs?
             .Where(n => !n.IsDead && n.HP > 0 && n.Name2 != currentPlayer.Name2)
-            .OrderBy(_ => GD.Randf())
+            .OrderBy(_ => (float)Random.Shared.NextDouble())
             .Take(maxOpponents)
             .ToList() ?? new List<NPC>();
 
@@ -1410,7 +1409,7 @@ public class InnLocation : BaseLocation
 
         foreach (var npc in allNPCs)
         {
-            var line = howdyLines[GD.RandRange(0, howdyLines.Length - 1)];
+            var line = howdyLines[Random.Shared.Next(0, howdyLines.Length)];
             line = string.Format(line, currentPlayer.Name2);
             terminal.SetColor("bright_green");
             terminal.Write($"  {npc.Name2}");
@@ -1546,7 +1545,7 @@ public class InnLocation : BaseLocation
                     // CON check to bow out without embarrassment
                     int bowOutChance = 30 + (int)(currentPlayer.Constitution / 2);
                     if (bowOutChance > 80) bowOutChance = 80;
-                    if (GD.RandRange(1, 100) <= bowOutChance)
+                    if (Random.Shared.Next(1, 101) <= bowOutChance)
                     {
                         terminal.SetColor("green");
                         terminal.WriteLine("  You stand up steadily and bow to the crowd.");
@@ -1584,7 +1583,7 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine("Glugg...!");
 
                 // Reduce soberness: random(23 + drinkStrength)
-                long reduction = GD.RandRange(1, 22 + drinkStrength);
+                long reduction = Random.Shared.Next(1, (22 + drinkStrength) + 1);
                 playerSoberness -= reduction;
 
                 if (playerSoberness <= 0)
@@ -1614,7 +1613,7 @@ public class InnLocation : BaseLocation
                 var opp = opponents[i];
                 if (opp.Soberness <= 0) continue;
 
-                long oppReduction = GD.RandRange(1, 22 + drinkStrength);
+                long oppReduction = Random.Shared.Next(1, (22 + drinkStrength) + 1);
                 var newSob = opp.Soberness - oppReduction;
 
                 if (playerAlive || round == playerRounds) // Only show if player is conscious
@@ -1852,7 +1851,7 @@ public class InnLocation : BaseLocation
 
                 if (string.IsNullOrWhiteSpace(text)) continue;
 
-                var prefix = gossipPrefixes[GD.RandRange(0, gossipPrefixes.Length - 1)];
+                var prefix = gossipPrefixes[Random.Shared.Next(0, gossipPrefixes.Length)];
                 terminal.Write($"  {prefix} ");
                 terminal.SetColor("bright_white");
                 // Lowercase first char for natural dialogue flow
@@ -1877,7 +1876,7 @@ public class InnLocation : BaseLocation
             terminal.SetColor("white");
             for (int i = 0; i < 3; i++)
             {
-                terminal.WriteLine($"  {staticRumors[GD.RandRange(0, staticRumors.Length - 1)]}");
+                terminal.WriteLine($"  {staticRumors[Random.Shared.Next(0, staticRumors.Length)]}");
                 terminal.WriteLine("");
             }
         }

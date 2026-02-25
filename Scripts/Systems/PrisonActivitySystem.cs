@@ -1,4 +1,3 @@
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -262,7 +261,6 @@ public class PrisonActivitySystem
                 break;
         }
 
-        GD.Print($"[Prison] {prisoner.Name} performed {activity} while imprisoned");
     }
 
     /// <summary>

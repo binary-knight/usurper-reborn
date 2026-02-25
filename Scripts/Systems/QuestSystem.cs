@@ -4,14 +4,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Godot;
 
 /// <summary>
 /// Quest System - Complete Pascal-compatible quest management engine
 /// Based on Pascal PLYQUEST.PAS and RQUESTS.PAS with all quest functionality
 /// Handles quest creation, claiming, completion, rewards, and database management
 /// </summary>
-public partial class QuestSystem : Node
+public partial class QuestSystem
 {
     private static List<Quest> questDatabase = new List<Quest>();
     private static Random random = new Random();
@@ -828,7 +827,6 @@ public partial class QuestSystem : Node
 
         if (totalRemoved > 0)
         {
-            GD.Print($"[QuestSystem] Cleaned up {totalRemoved} stale quests, {questDatabase.Count} remaining");
         }
     }
     

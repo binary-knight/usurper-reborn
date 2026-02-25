@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UsurperRemake.Data;
-using Godot;
 
 namespace UsurperRemake.Systems
 {
@@ -1151,7 +1150,6 @@ namespace UsurperRemake.Systems
             ).ToList();
 
             var result = SerializeQuestList(playerQuests);
-            GD.Print($"[SaveSystem] Serialized {result.Count} quests for player {playerName} (from {allQuests.Count} total)");
             return result;
         }
 
@@ -1168,7 +1166,6 @@ namespace UsurperRemake.Systems
             var worldQuests = allQuests.Where(q => string.IsNullOrEmpty(q.Occupier)).ToList();
 
             var result = SerializeQuestList(worldQuests);
-            GD.Print($"[SaveSystem] Serialized {result.Count} world quests (from {allQuests.Count} total)");
             return result;
         }
 
@@ -1467,7 +1464,6 @@ namespace UsurperRemake.Systems
 
                 if (data.ActiveGriefs.Count > 0 || data.GriefMemories.Count > 0)
                 {
-                    GD.Print($"[SaveSystem] Saving grief data: {data.ActiveGriefs.Count} active griefs, {data.GriefMemories.Count} memories");
                 }
             }
             catch { /* System not initialized */ }
@@ -1489,7 +1485,6 @@ namespace UsurperRemake.Systems
                 );
                 if (data.OldGodStates.Count > 0)
                 {
-                    GD.Print($"[SaveSystem] Saving {data.OldGodStates.Count} Old God states");
                 }
             }
             catch { /* System not initialized */ }
@@ -1539,7 +1534,6 @@ namespace UsurperRemake.Systems
                 }).ToList();
 
                 data.ActiveCompanionIds = companionData.ActiveCompanions.Select(c => (int)c).ToList();
-                GD.Print($"[SaveSystem] Saving {data.ActiveCompanionIds.Count} active companions: [{string.Join(", ", data.ActiveCompanionIds)}]");
 
                 data.FallenCompanions = companionData.FallenCompanions.Select(d => new CompanionDeathInfo
                 {
@@ -1559,7 +1553,6 @@ namespace UsurperRemake.Systems
                 data.DungeonPartyPlayerNames = GameEngine.Instance?.DungeonPartyPlayerNames?.ToList() ?? new List<string>();
                 if (data.DungeonPartyNPCIds.Count > 0)
                 {
-                    GD.Print($"[SaveSystem] Saving {data.DungeonPartyNPCIds.Count} dungeon party NPCs: [{string.Join(", ", data.DungeonPartyNPCIds)}]");
                 }
             }
             catch { /* GameEngine not initialized */ }
@@ -1570,23 +1563,19 @@ namespace UsurperRemake.Systems
                 data.Children = FamilySystem.Instance.SerializeChildren();
                 if (data.Children.Count > 0)
                 {
-                    GD.Print($"[SaveSystem] Saved {data.Children.Count} children");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save children: {ex.Message}");
             }
 
             // Archetype Tracker - save Jungian archetype scores
             try
             {
                 data.ArchetypeTracker = ArchetypeTracker.Instance.Serialize();
-                GD.Print($"[SaveSystem] Saved archetype tracker data");
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save archetype tracker: {ex.Message}");
             }
 
             // Royal Court Political Systems - save court members, heirs, spouse, plots
@@ -1721,12 +1710,10 @@ namespace UsurperRemake.Systems
                         LastProclamationDate = king.LastProclamationDate != DateTime.MinValue
                             ? king.LastProclamationDate.ToString("o") : ""
                     };
-                    GD.Print($"[SaveSystem] Saved royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.Guards.Count} guards, {king.MonsterGuards.Count} monsters");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save royal court: {ex.Message}");
             }
 
             // Relationship System - save all character relationships
@@ -1735,12 +1722,10 @@ namespace UsurperRemake.Systems
                 data.Relationships = RelationshipSystem.ExportAllRelationships();
                 if (data.Relationships.Count > 0)
                 {
-                    GD.Print($"[SaveSystem] Saved {data.Relationships.Count} relationships");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save relationships: {ex.Message}");
             }
 
             // ===== NEW NARRATIVE SYSTEMS =====
@@ -1751,12 +1736,10 @@ namespace UsurperRemake.Systems
                 data.StrangerEncounters = StrangerEncounterSystem.Instance.Serialize();
                 if (data.StrangerEncounters.EncountersHad > 0)
                 {
-                    GD.Print($"[SaveSystem] Saved {data.StrangerEncounters.EncountersHad} stranger encounters");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save stranger encounters: {ex.Message}");
             }
 
             // Faction System
@@ -1765,12 +1748,10 @@ namespace UsurperRemake.Systems
                 data.Factions = FactionSystem.Instance.Serialize();
                 if (data.Factions.PlayerFaction >= 0)
                 {
-                    GD.Print($"[SaveSystem] Saved faction data: faction {data.Factions.PlayerFaction}, rank {data.Factions.FactionRank}");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save faction system: {ex.Message}");
             }
 
             // Town NPC Story System
@@ -1780,12 +1761,10 @@ namespace UsurperRemake.Systems
                 var activeStories = data.TownNPCStories.NPCStates.Count(s => s.CurrentStage > 0);
                 if (activeStories > 0)
                 {
-                    GD.Print($"[SaveSystem] Saved {activeStories} active town NPC stories");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save town NPC stories: {ex.Message}");
             }
 
             // Dream System
@@ -1794,12 +1773,10 @@ namespace UsurperRemake.Systems
                 data.Dreams = DreamSystem.Instance.Serialize();
                 if (data.Dreams.ExperiencedDreams.Count > 0)
                 {
-                    GD.Print($"[SaveSystem] Saved {data.Dreams.ExperiencedDreams.Count} experienced dreams");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save dream system: {ex.Message}");
             }
 
             // NPC Marriage Registry — only save to individual player saves in single-player mode.
@@ -1830,12 +1807,10 @@ namespace UsurperRemake.Systems
 
                     if (data.NPCMarriages.Count > 0 || data.Affairs.Count > 0)
                     {
-                        GD.Print($"[SaveSystem] Saved {data.NPCMarriages.Count} NPC marriages, {data.Affairs.Count} affairs");
                     }
                 }
                 catch (Exception ex)
                 {
-                    GD.PrintErr($"[SaveSystem] Failed to save NPC marriages/affairs: {ex.Message}");
                 }
             }
 
@@ -1845,12 +1820,10 @@ namespace UsurperRemake.Systems
                 data.CulturalMemes = CulturalMemeSystem.Instance?.ExportSaveData();
                 if (data.CulturalMemes != null)
                 {
-                    GD.Print($"[SaveSystem] Saved cultural meme system data");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to save cultural meme system: {ex.Message}");
             }
 
             return data;
@@ -1941,10 +1914,8 @@ namespace UsurperRemake.Systems
                         if (story.OldGodStates.TryGetValue(godType, out var existingState))
                         {
                             existingState.Status = godStatus;
-                            GD.Print($"[SaveSystem] Restored {godType} state: {godStatus}");
                         }
                     }
-                    GD.Print($"[SaveSystem] Restored {data.OldGodStates.Count} Old God states");
                 }
 
                 // MIGRATION: Sync OldGodStates from story flags for saves created before OldGodStates was saved
@@ -2015,7 +1986,6 @@ namespace UsurperRemake.Systems
                     };
 
                     CompanionSystem.Instance.Deserialize(companionSystemData);
-                    GD.Print($"[SaveSystem] Restored {companionSystemData.ActiveCompanions.Count} active companions");
                 }
             }
             catch { /* Companion system not available */ }
@@ -2026,12 +1996,10 @@ namespace UsurperRemake.Systems
                 if (data.DungeonPartyNPCIds != null && data.DungeonPartyNPCIds.Count > 0)
                 {
                     GameEngine.Instance?.SetDungeonPartyNPCs(data.DungeonPartyNPCIds);
-                    GD.Print($"[SaveSystem] Restored {data.DungeonPartyNPCIds.Count} dungeon party NPCs");
                 }
                 if (data.DungeonPartyPlayerNames != null && data.DungeonPartyPlayerNames.Count > 0)
                 {
                     GameEngine.Instance?.SetDungeonPartyPlayers(data.DungeonPartyPlayerNames);
-                    GD.Print($"[SaveSystem] Restored {data.DungeonPartyPlayerNames.Count} dungeon party player echoes");
                 }
             }
             catch { /* GameEngine not available */ }
@@ -2042,12 +2010,10 @@ namespace UsurperRemake.Systems
                 if (data.Children != null && data.Children.Count > 0)
                 {
                     FamilySystem.Instance.DeserializeChildren(data.Children);
-                    GD.Print($"[SaveSystem] Restored {data.Children.Count} children from save");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore children: {ex.Message}");
             }
 
             // Archetype Tracker - restore Jungian archetype scores
@@ -2056,12 +2022,10 @@ namespace UsurperRemake.Systems
                 if (data.ArchetypeTracker != null)
                 {
                     ArchetypeTracker.Instance.Deserialize(data.ArchetypeTracker);
-                    GD.Print($"[SaveSystem] Restored archetype tracker data");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore archetype tracker: {ex.Message}");
             }
 
             // Royal Court Political Systems - restore court members, heirs, spouse, plots
@@ -2244,13 +2208,11 @@ namespace UsurperRemake.Systems
                             king.LastProclamationDate = procDate;
                         }
 
-                        GD.Print($"[SaveSystem] Restored royal court: {king.CourtMembers.Count} members, {king.Heirs.Count} heirs, {king.Guards.Count} guards, {king.MonsterGuards.Count} monsters, {king.Prisoners.Count} prisoners, {king.Orphans.Count} orphans");
                     }
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore royal court: {ex.Message}");
             }
 
             // Grief System - restore full grief states and memories
@@ -2288,12 +2250,10 @@ namespace UsurperRemake.Systems
                     };
 
                     GriefSystem.Instance.Deserialize(griefSystemData);
-                    GD.Print($"[SaveSystem] Restored grief data: {griefSystemData.ActiveGrief.Count} active griefs, {griefSystemData.Memories.Count} memories");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore grief system: {ex.Message}");
             }
 
             // Relationship System - restore all character relationships
@@ -2302,12 +2262,10 @@ namespace UsurperRemake.Systems
                 if (data.Relationships != null && data.Relationships.Count > 0)
                 {
                     RelationshipSystem.ImportAllRelationships(data.Relationships);
-                    GD.Print($"[SaveSystem] Restored {data.Relationships.Count} relationships");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore relationships: {ex.Message}");
             }
 
             // ===== NEW NARRATIVE SYSTEMS =====
@@ -2318,12 +2276,10 @@ namespace UsurperRemake.Systems
                 if (data.StrangerEncounters != null)
                 {
                     StrangerEncounterSystem.Instance.Deserialize(data.StrangerEncounters);
-                    GD.Print($"[SaveSystem] Restored {data.StrangerEncounters.EncountersHad} stranger encounters");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore stranger encounters: {ex.Message}");
             }
 
             // Faction System
@@ -2334,13 +2290,11 @@ namespace UsurperRemake.Systems
                     FactionSystem.Instance.Deserialize(data.Factions);
                     if (data.Factions.PlayerFaction >= 0)
                     {
-                        GD.Print($"[SaveSystem] Restored faction: {data.Factions.PlayerFaction}, rank {data.Factions.FactionRank}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore faction system: {ex.Message}");
             }
 
             // Town NPC Story System
@@ -2350,12 +2304,10 @@ namespace UsurperRemake.Systems
                 {
                     TownNPCStorySystem.Instance.Deserialize(data.TownNPCStories);
                     var activeStories = data.TownNPCStories.NPCStates.Count(s => s.CurrentStage > 0);
-                    GD.Print($"[SaveSystem] Restored {activeStories} active town NPC stories");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore town NPC stories: {ex.Message}");
             }
 
             // Dream System
@@ -2364,12 +2316,10 @@ namespace UsurperRemake.Systems
                 if (data.Dreams != null)
                 {
                     DreamSystem.Instance.Deserialize(data.Dreams);
-                    GD.Print($"[SaveSystem] Restored {data.Dreams.ExperiencedDreams.Count} experienced dreams");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore dream system: {ex.Message}");
             }
 
             // NPC Marriage Registry — only restore from individual saves in single-player mode.
@@ -2387,7 +2337,6 @@ namespace UsurperRemake.Systems
                             Npc2Id = m.Npc2Id
                         }).ToList();
                         NPCMarriageRegistry.Instance.RestoreMarriages(marriageData);
-                        GD.Print($"[SaveSystem] Restored {data.NPCMarriages.Count} NPC marriages");
                     }
 
                     // Restore affairs
@@ -2404,12 +2353,10 @@ namespace UsurperRemake.Systems
                             LastInteraction = a.LastInteraction
                         }).ToList();
                         NPCMarriageRegistry.Instance.RestoreAffairs(affairData);
-                        GD.Print($"[SaveSystem] Restored {data.Affairs.Count} affairs");
                     }
                 }
                 catch (Exception ex)
                 {
-                    GD.PrintErr($"[SaveSystem] Failed to restore NPC marriages/affairs: {ex.Message}");
                 }
             }
 
@@ -2419,12 +2366,10 @@ namespace UsurperRemake.Systems
                 CulturalMemeSystem.Instance?.RestoreFromSaveData(data?.CulturalMemes);
                 if (data?.CulturalMemes != null)
                 {
-                    GD.Print($"[SaveSystem] Restored cultural meme system data");
                 }
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"[SaveSystem] Failed to restore cultural meme system: {ex.Message}");
             }
         }
 
@@ -2477,25 +2422,21 @@ namespace UsurperRemake.Systems
                         if (wasDestroyed || wasDefeated)
                         {
                             godState.Status = GodStatus.Defeated;
-                            GD.Print($"[SaveSystem] MIGRATION: Set {godType} to Defeated (from story flags)");
                             migrationCount++;
                         }
                         else if (wasSaved)
                         {
                             godState.Status = GodStatus.Saved;
-                            GD.Print($"[SaveSystem] MIGRATION: Set {godType} to Saved (from story flags)");
                             migrationCount++;
                         }
                         else if (wasAllied)
                         {
                             godState.Status = GodStatus.Allied;
-                            GD.Print($"[SaveSystem] MIGRATION: Set {godType} to Allied (from story flags)");
                             migrationCount++;
                         }
                         else if (wasAwakened)
                         {
                             godState.Status = GodStatus.Awakened;
-                            GD.Print($"[SaveSystem] MIGRATION: Set {godType} to Awakened (from story flags)");
                             migrationCount++;
                         }
                     }
@@ -2504,7 +2445,6 @@ namespace UsurperRemake.Systems
 
             if (migrationCount > 0)
             {
-                GD.Print($"[SaveSystem] Migration complete: Updated {migrationCount} Old God states from story flags");
             }
         }
     }

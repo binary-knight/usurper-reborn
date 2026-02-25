@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 namespace UsurperRemake.Systems
 {
@@ -448,7 +447,6 @@ namespace UsurperRemake.Systems
             CollectedFragments = new HashSet<WaveFragment>();
             ExperiencedMoments = new HashSet<AwakeningMoment>();
             Insights = new List<OceanInsight>();
-            GD.Print("[Ocean] System reset for new game");
         }
     }
 

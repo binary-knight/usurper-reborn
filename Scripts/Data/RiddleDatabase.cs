@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.Systems;
 using UsurperRemake.Utils;
 
@@ -899,7 +898,6 @@ namespace UsurperRemake.Data
             // More quick riddles to reach 50+
             AddQuickRiddles();
 
-            GD.Print($"[RiddleDatabase] Initialized with {riddles.Count} riddles");
         }
 
         private void AddQuickRiddles()

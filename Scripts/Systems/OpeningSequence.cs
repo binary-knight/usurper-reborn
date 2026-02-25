@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.Utils;
 
 namespace UsurperRemake.Systems
@@ -144,7 +143,6 @@ namespace UsurperRemake.Systems
             StoryProgressionSystem.Instance.AdvanceChapter(StoryChapter.TheFirstSeal);
 
             // Log event
-            GD.Print($"[OpeningSequence] Player {player.Name2} completed stranger encounter");
         }
 
         /// <summary>
@@ -352,7 +350,6 @@ namespace UsurperRemake.Systems
             // Apply bonuses to player
             ApplyCycleBonuses(player, bonuses);
 
-            GD.Print($"[Cycle] Started cycle {currentCycle + 1} with ending {endingAchieved}");
         }
 
         /// <summary>

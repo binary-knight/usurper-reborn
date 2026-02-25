@@ -1,7 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Locations;
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -233,7 +232,6 @@ public class LocationManager
 
         if (!locations.ContainsKey(locationId))
         {
-            GD.PrintErr($"[LocationManager] Location {locationId} not found!");
             return;
         }
         

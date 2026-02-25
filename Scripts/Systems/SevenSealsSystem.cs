@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.Utils;
 
 namespace UsurperRemake.Systems
@@ -299,7 +298,6 @@ namespace UsurperRemake.Systems
                 GrantsWaveFragment = true
             };
 
-            GD.Print($"[SevenSeals] Initialized {seals.Count} lore seals");
         }
 
         /// <summary>
@@ -370,7 +368,6 @@ namespace UsurperRemake.Systems
 
             // Auto-save after collecting a seal - this is a major milestone
             await SaveSystem.Instance.AutoSave(player);
-            GD.Print($"[Seals] Auto-saved after collecting {seal.Name}");
 
             return true;
         }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 namespace UsurperRemake.Systems
 {
@@ -512,7 +511,6 @@ namespace UsurperRemake.Systems
             InitializeOldGods();
             InitializeKeyNPCs();
 
-            GD.Print("[Story] Full reset - new character started");
         }
 
         /// <summary>
@@ -543,7 +541,6 @@ namespace UsurperRemake.Systems
                 Timestamp = DateTime.Now
             });
 
-            GD.Print($"[Story] Started new cycle: {CurrentCycle}");
         }
 
         /// <summary>

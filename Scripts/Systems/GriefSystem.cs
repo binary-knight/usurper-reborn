@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.Utils;
 
 namespace UsurperRemake.Systems
@@ -114,7 +113,6 @@ namespace UsurperRemake.Systems
         {
             if (string.IsNullOrEmpty(npcId))
             {
-                GD.PrintErr("[Grief] Cannot begin NPC grief with empty npcId");
                 return;
             }
 
@@ -743,7 +741,6 @@ namespace UsurperRemake.Systems
             activeGrief.Clear();
             activeNpcGrief.Clear();
             memories.Clear();
-            GD.Print("[Grief] System reset for new game");
         }
 
         #endregion

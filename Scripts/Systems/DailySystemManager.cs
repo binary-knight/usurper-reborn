@@ -3,7 +3,6 @@ using UsurperRemake.Systems;
 using UsurperRemake.BBS;
 using System;
 using System.Threading.Tasks;
-using Godot;
 
 /// <summary>
 /// Modern Daily System Manager - Flexible daily reset system for Steam single-player experience
@@ -201,7 +200,6 @@ public class DailySystemManager
             await SaveSystem.Instance.AutoSave(player);
         }
         
-        GD.Print($"[DailySystem] Day {currentDay} reset completed at {DateTime.Now} (Mode: {currentMode})");
     }
     
     /// <summary>
@@ -491,7 +489,6 @@ public class DailySystemManager
         }
         catch { /* StoryProgressionSystem not initialized */ }
 
-        GD.Print($"Daily system loaded: Day {currentDay}, Mode {currentMode}");
     }
     
     /// <summary>
@@ -879,7 +876,7 @@ public class DailySystemManager
     {
         // Force a festival or market event on weekly intervals
         var worldEvents = WorldEventSystem.Instance;
-        var roll = GD.RandRange(0, 2);
+        var roll = Random.Shared.Next(0, 3);
         switch (roll)
         {
             case 0:
@@ -899,7 +896,7 @@ public class DailySystemManager
     {
         // Force a major event on monthly intervals (usually king's decree or war-related)
         var worldEvents = WorldEventSystem.Instance;
-        var roll = GD.RandRange(0, 3);
+        var roll = Random.Shared.Next(0, 4);
         switch (roll)
         {
             case 0:

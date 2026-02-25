@@ -1,5 +1,4 @@
 using UsurperRemake.Utils;
-using Godot;
 using System;
 using System.Collections.Generic;
 
@@ -188,35 +187,35 @@ public class Monster
         // values for the first few dungeon tiers.
         IQ = monsterType switch
         {
-            <= 3 => GD.RandRange(4, 8),        // Very low-level monsters (goblins, rats…)
-            <= 5 => GD.RandRange(8, 14),       // Low-level monsters
-            <= 10 => GD.RandRange(20, 40),     // Mid-level monsters
-            <= 15 => GD.RandRange(40, 60),     // High-level monsters
-            _ => GD.RandRange(60, 80)          // Boss monsters
+            <= 3 => Random.Shared.Next(4, 9),        // Very low-level monsters (goblins, rats…)
+            <= 5 => Random.Shared.Next(8, 15),       // Low-level monsters
+            <= 10 => Random.Shared.Next(20, 41),     // Mid-level monsters
+            <= 15 => Random.Shared.Next(40, 61),     // High-level monsters
+            _ => Random.Shared.Next(60, 81)          // Boss monsters
         };
         
         // Set evil rating
         Evil = monsterType switch
         {
-            <= 3 => GD.RandRange(20, 50),      // Neutral creatures
-            <= 8 => GD.RandRange(50, 80),      // Somewhat evil
-            _ => GD.RandRange(80, 100)          // Very evil
+            <= 3 => Random.Shared.Next(20, 51),      // Neutral creatures
+            <= 8 => Random.Shared.Next(50, 81),      // Somewhat evil
+            _ => Random.Shared.Next(80, 101)          // Very evil
         };
         
         // Set magic resistance
-        MagicRes = monsterType / 2 + GD.RandRange(0, 20);
+        MagicRes = monsterType / 2 + Random.Shared.Next(0, 21);
         
         // Set magic level and mana for spell-casting monsters
         if (monsterType >= 8)
         {
-            MagicLevel = (byte)GD.RandRange(1, 6);
-            MaxMana = monsterType * 5 + GD.RandRange(10, 30);
+            MagicLevel = (byte)Random.Shared.Next(1, 7);
+            MaxMana = monsterType * 5 + Random.Shared.Next(10, 31);
             Mana = MaxMana;
             
             // Give some spells to magical monsters
             for (int i = 0; i < Math.Min((int)MagicLevel, GameConfig.MaxMSpells); i++)
             {
-                if (GD.Randf() < 0.6f) // 60% chance per spell
+                if ((float)Random.Shared.NextDouble() < 0.6f) // 60% chance per spell
                 {
                     Spell[i] = true;
                 }
@@ -224,7 +223,7 @@ public class Monster
         }
         
         // Set dungeon level appearance
-        DungeonLevel = Math.Max(1, (monsterType / 3) + GD.RandRange(-1, 2));
+        DungeonLevel = Math.Max(1, (monsterType / 3) + Random.Shared.Next(-1, 3));
         
         // Check for elite status based on name (for legacy monsters)
         // Note: MonsterGenerator sets IsBoss directly and applies boss multipliers in CalculateMonsterStats
@@ -276,7 +275,7 @@ public class Monster
                 "*hiccup* Want to fight?",
                 "I can take anyone in this place!"
             };
-            return phrases[GD.RandRange(0, phrases.Length - 1)];
+            return phrases[Random.Shared.Next(0, phrases.Length)];
         }
         
         return Phrase;
@@ -374,7 +373,7 @@ public class Monster
         }
         
         // Cast random spell
-        var spellIndex = availableSpells[GD.RandRange(0, availableSpells.Count - 1)];
+        var spellIndex = availableSpells[Random.Shared.Next(0, availableSpells.Count)];
         var spellCost = 5 + (spellIndex * 2);
         
         if (Mana < spellCost)
@@ -396,13 +395,13 @@ public class Monster
         switch (spellIndex)
         {
             case 0: // Heal
-                var healAmount = MagicLevel * 10 + GD.RandRange(5, 15);
+                var healAmount = MagicLevel * 10 + Random.Shared.Next(5, 16);
                 HP = Math.Min((int)HP + (int)healAmount, (int)GetMaxHP());
                 result.Message = $"{Name} heals for {healAmount} points!";
                 break;
                 
             case 1: // Magic missile
-                var damage = MagicLevel * 8 + GD.RandRange(3, 12);
+                var damage = MagicLevel * 8 + Random.Shared.Next(3, 13);
                 result.Damage = damage;
                 result.Message = $"{Name} casts magic missile for {damage} damage!";
                 break;
@@ -423,7 +422,7 @@ public class Monster
                 break;
                 
             case 5: // Death spell
-                if (MagicLevel >= 5 && GD.Randf() < 0.1f) // 10% chance, high level only
+                if (MagicLevel >= 5 && (float)Random.Shared.NextDouble() < 0.1f) // 10% chance, high level only
                 {
                     result.Damage = target.HP; // Instant death
                     result.Message = $"{Name} casts DEATH! You feel your life force drain away!";
@@ -464,13 +463,13 @@ public class Monster
         }
         
         // If low on HP and can heal, try to heal
-        if (HP < GetMaxHP() / 3 && Mana >= 5 && Spell[0] && GD.Randf() < 0.7f)
+        if (HP < GetMaxHP() / 3 && Mana >= 5 && Spell[0] && (float)Random.Shared.NextDouble() < 0.7f)
         {
             return new MonsterAction { Type = MonsterActionType.CastSpell, SpellIndex = 0 };
         }
         
         // If has offensive spells and mana, sometimes cast spells
-        if (Mana >= 10 && MagicLevel > 0 && GD.Randf() < 0.3f)
+        if (Mana >= 10 && MagicLevel > 0 && (float)Random.Shared.NextDouble() < 0.3f)
         {
             for (int i = 1; i < Spell.Count; i++)
             {
@@ -532,7 +531,7 @@ public class Monster
         // Gold scales with level using level^1.5 curve (steeper than before for late game)
         // At level 1: ~22-62g, level 50: ~4,300-4,340g, level 100: ~12,000-12,050g
         int level = Math.Max(1, Level > 0 ? Level : MonsterType);
-        long baseGold = (long)(Math.Pow(level, 1.5) * 12) + GD.RandRange(10, 50);
+        long baseGold = (long)(Math.Pow(level, 1.5) * 12) + Random.Shared.Next(10, 51);
 
         if (IsBoss)
         {

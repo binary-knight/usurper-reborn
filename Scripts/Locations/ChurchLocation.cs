@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.BBS;
@@ -692,8 +691,8 @@ namespace UsurperRemake.Locations
             }
             
             // Grant small chivalry bonus for seeking healing
-            currentPlayer.Chivalry += GD.RandRange(1, 3);
-            terminal.WriteLine($"Your faith in divine healing grants you wisdom! (+{GD.RandRange(1, 3)} chivalry)", "cyan");
+            currentPlayer.Chivalry += Random.Shared.Next(1, 4);
+            terminal.WriteLine($"Your faith in divine healing grants you wisdom! (+{Random.Shared.Next(1, 4)} chivalry)", "cyan");
             
             await Task.Delay(3000);
         }
@@ -828,7 +827,7 @@ namespace UsurperRemake.Locations
             await Task.Delay(2000);
 
             terminal.WriteLine("");
-            var ceremonyMsg = GameConfig.WeddingCeremonyMessages[GD.RandRange(0, GameConfig.WeddingCeremonyMessages.Length - 1)];
+            var ceremonyMsg = GameConfig.WeddingCeremonyMessages[Random.Shared.Next(0, GameConfig.WeddingCeremonyMessages.Length)];
             terminal.WriteLine($"\"{ceremonyMsg}\"", "bright_magenta");
             await Task.Delay(2000);
 
@@ -923,11 +922,11 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("You begin to confess your sins...", "white");
             await Task.Delay(2000);
             
-            long darknessReduction = Math.Min(currentPlayer.Darkness, GD.RandRange(5, 10));
+            long darknessReduction = Math.Min(currentPlayer.Darkness, Random.Shared.Next(5, 11));
             currentPlayer.Darkness = Math.Max(0, currentPlayer.Darkness - darknessReduction);
             
             // Small chivalry gain
-            int chivalryGain = GD.RandRange(2, 5);
+            int chivalryGain = Random.Shared.Next(2, 6);
             currentPlayer.Chivalry += chivalryGain;
             
             terminal.WriteLine("");
@@ -1027,10 +1026,10 @@ namespace UsurperRemake.Locations
             
             // Church statistics (placeholder for now)
             terminal.WriteLine("Church Statistics:", "cyan");
-            terminal.WriteLine($"- Total church donations this month: {GD.RandRange(50000, 200000):N0} {GameConfig.MoneyType}");
-            terminal.WriteLine($"- Marriages performed this month: {GD.RandRange(5, 25)}");
-            terminal.WriteLine($"- Blessings given this month: {GD.RandRange(100, 500)}");
-            terminal.WriteLine($"- Souls saved from darkness: {GD.RandRange(50, 200)}");
+            terminal.WriteLine($"- Total church donations this month: {Random.Shared.Next(50000, 200001):N0} {GameConfig.MoneyType}");
+            terminal.WriteLine($"- Marriages performed this month: {Random.Shared.Next(5, 26)}");
+            terminal.WriteLine($"- Blessings given this month: {Random.Shared.Next(100, 501)}");
+            terminal.WriteLine($"- Souls saved from darkness: {Random.Shared.Next(50, 201)}");
             terminal.WriteLine("");
             
             await terminal.PressAnyKey();
@@ -1056,7 +1055,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("\"Continue on your path of virtue, my child.\"", "bright_green");
                 
                 // Reward for high chivalry
-                if (GD.RandRange(1, 100) <= 25) // 25% chance
+                if (Random.Shared.Next(1, 101) <= 25) // 25% chance
                 {
                     terminal.WriteLine("");
                     terminal.WriteLine("\"As a reward for your righteousness, accept this blessing!\"", "bright_yellow");
@@ -1073,7 +1072,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("\"Consider making a donation or purchasing a blessing.\"", "yellow");
                 
                 // Chance for forced confession
-                if (GD.RandRange(1, 100) <= 30) // 30% chance
+                if (Random.Shared.Next(1, 101) <= 30) // 30% chance
                 {
                     terminal.WriteLine("");
                     terminal.WriteLine("\"In fact, I insist you confess your sins immediately!\"", "bright_red");
@@ -1095,7 +1094,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.WriteLine("Bishop's Wisdom:", "bright_yellow");
             
-            var wisdom = GD.RandRange(1, 5);
+            var wisdom = Random.Shared.Next(1, 6);
             switch (wisdom)
             {
                 case 1:
@@ -1177,7 +1176,6 @@ namespace UsurperRemake.Locations
             }
             catch (Exception ex)
             {
-                GD.PrintErr($"Failed to create news entry: {ex.Message}");
             }
         }
     }

@@ -1,6 +1,5 @@
 using UsurperRemake.Utils;
 using UsurperRemake.BBS;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,17 +7,15 @@ using System.Threading.Tasks;
 using System.Text;
 using System.Linq;
 
-public partial class TerminalEmulator : Control
+public partial class TerminalEmulator
 {
     private const int COLUMNS = 80;
     private const int ROWS = 25;
 
-    private RichTextLabel display;
-    private LineEdit inputLine;
-    private Font dosFont;
+    private readonly object? display = null;   // Godot RichTextLabel - always null in console mode
+    private readonly object? inputLine = null; // Godot LineEdit - always null in console mode
 
     private Queue<string> outputBuffer = new Queue<string>();
-    private TaskCompletionSource<string> inputAwaiter;
     private int cursorX = 0, cursorY = 0;
     private string currentColor = "white";
 
@@ -132,40 +129,40 @@ public partial class TerminalEmulator : Control
         }
     }
     
-    // ANSI color mappings - supports both underscore and no-underscore variants
-    private readonly Dictionary<string, Color> ansiColors = new Dictionary<string, Color>
+    // ANSI color mappings - hex strings (was Godot Color, now plain strings)
+    private readonly Dictionary<string, string> ansiColors = new Dictionary<string, string>
     {
-        { "black", Color.Black },
-        { "darkred", Color.FromHtml("#800000") },
-        { "dark_red", Color.FromHtml("#800000") },
-        { "darkgreen", Color.FromHtml("#008000") },
-        { "dark_green", Color.FromHtml("#008000") },
-        { "darkyellow", Color.FromHtml("#808000") },
-        { "dark_yellow", Color.FromHtml("#808000") },
-        { "brown", Color.FromHtml("#808000") },  // Alias for dark yellow (used in ANSIArt)
-        { "darkblue", Color.FromHtml("#000080") },
-        { "dark_blue", Color.FromHtml("#000080") },
-        { "darkmagenta", Color.FromHtml("#800080") },
-        { "dark_magenta", Color.FromHtml("#800080") },
-        { "darkcyan", Color.FromHtml("#008080") },
-        { "dark_cyan", Color.FromHtml("#008080") },
-        { "gray", Color.FromHtml("#C0C0C0") },
-        { "darkgray", Color.FromHtml("#808080") },
-        { "dark_gray", Color.FromHtml("#808080") },
-        { "red", Color.Red },
-        { "green", Color.Green },
-        { "yellow", Color.Yellow },
-        { "blue", Color.Blue },
-        { "magenta", Color.Magenta },
-        { "cyan", Color.Cyan },
-        { "white", Color.White },
-        { "bright_white", Color.White },
-        { "bright_red", Color.FromHtml("#FF6060") },
-        { "bright_green", Color.FromHtml("#60FF60") },
-        { "bright_yellow", Color.FromHtml("#FFFF60") },
-        { "bright_blue", Color.FromHtml("#6060FF") },
-        { "bright_magenta", Color.FromHtml("#FF60FF") },
-        { "bright_cyan", Color.FromHtml("#60FFFF") }
+        { "black", "000000" },
+        { "darkred", "800000" },
+        { "dark_red", "800000" },
+        { "darkgreen", "008000" },
+        { "dark_green", "008000" },
+        { "darkyellow", "808000" },
+        { "dark_yellow", "808000" },
+        { "brown", "808000" },
+        { "darkblue", "000080" },
+        { "dark_blue", "000080" },
+        { "darkmagenta", "800080" },
+        { "dark_magenta", "800080" },
+        { "darkcyan", "008080" },
+        { "dark_cyan", "008080" },
+        { "gray", "C0C0C0" },
+        { "darkgray", "808080" },
+        { "dark_gray", "808080" },
+        { "red", "FF0000" },
+        { "green", "00FF00" },
+        { "yellow", "FFFF00" },
+        { "blue", "0000FF" },
+        { "magenta", "FF00FF" },
+        { "cyan", "00FFFF" },
+        { "white", "FFFFFF" },
+        { "bright_white", "FFFFFF" },
+        { "bright_red", "FF6060" },
+        { "bright_green", "60FF60" },
+        { "bright_yellow", "FFFF60" },
+        { "bright_blue", "6060FF" },
+        { "bright_magenta", "FF60FF" },
+        { "bright_cyan", "60FFFF" }
     };
     
     /// <summary>
@@ -180,54 +177,20 @@ public partial class TerminalEmulator : Control
             && DoorMode.SessionInfo?.CommType != ConnectionType.Local;
     }
 
-    public override void _Ready()
+    public void _Ready()
     {
         Instance = this; // Set static instance for compatibility
-        SetupDisplay();
-        SetupInput();
+        // display and inputLine remain null — all I/O goes through console/BBS adapter
     }
-    
+
     private void SetupDisplay()
     {
-        display = new RichTextLabel();
-        display.SetAnchorsAndOffsetsPreset(Control.Preset.FullRect);
-        display.BbcodeEnabled = true;
-        display.ScrollFollowing = true;
-        display.FitContent = true;
-        
-        // Try to load DOS font, fall back to monospace
-        if (Godot.FileAccess.FileExists("res://Assets/Fonts/perfect_dos_vga_437.ttf"))
-        {
-            dosFont = GD.Load<Font>("res://Assets/Fonts/perfect_dos_vga_437.ttf");
-        }
-        else
-        {
-            // Use system monospace font as fallback
-            dosFont = ThemeDB.FallbackFont;
-        }
-        
-        display.AddThemeFontOverride("normal_font", dosFont);
-        display.AddThemeFontSizeOverride("normal_font_size", 16);
-        
-        // Set background to black
-        var styleBox = new StyleBoxFlat();
-        styleBox.BgColor = Color.Black;
-        display.AddThemeStyleboxOverride("normal", styleBox);
-        
-        // Set default text color
-        display.AddThemeColorOverride("default_color", ansiColors["bright_white"]);
-        
-        AddChild(display);
+        // No-op in console mode — Godot UI not used
     }
-    
+
     private void SetupInput()
     {
-        inputLine = new LineEdit();
-        inputLine.Visible = false;
-        inputLine.TextSubmitted += OnInputSubmitted;
-        inputLine.AddThemeFontOverride("font", dosFont);
-        inputLine.AddThemeFontSizeOverride("font_size", 16);
-        AddChild(inputLine);
+        // No-op in console mode — Godot UI not used
     }
     
     public void WriteLine(string text, string color = "white")
@@ -258,13 +221,7 @@ public partial class TerminalEmulator : Control
             // MUD stream mode — write ANSI-colored output to TCP stream
             WriteLineToStream(text, color);
         }
-        else if (display != null)
-        {
-            // Convert simplified [colorname]text[/] format to BBCode [color=colorname]text[/color]
-            string processedText = ConvertSimplifiedColorToBBCode(text);
-            string formattedText = $"[color={color}]{processedText}[/color]";
-            display.Text += formattedText + "\n";
-        }
+        // display is always null in console mode — Godot branch removed
         else if (ShouldUseBBSAdapter())
         {
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
@@ -421,12 +378,12 @@ public partial class TerminalEmulator : Control
             match =>
             {
                 string colorName = match.Groups[1].Value;
-                if (ansiColors.TryGetValue(colorName, out Color color))
+                if (ansiColors.TryGetValue(colorName, out string? hex))
                 {
-                    return $"[color=#{color.ToHtml()}]";
+                    return $"[color=#{hex}]";
                 }
                 // Fallback to white if color not found
-                return $"[color=#{ansiColors["white"].ToHtml()}]";
+                return $"[color=#{ansiColors["white"]}]";
             }
         );
 
@@ -472,13 +429,7 @@ public partial class TerminalEmulator : Control
             // MUD stream mode — write ANSI-colored output to TCP stream
             WriteToStream(text, effectiveColor);
         }
-        else if (display != null)
-        {
-            var colorCode = ansiColors.ContainsKey(effectiveColor) ?
-                ansiColors[effectiveColor].ToHtml() : ansiColors["white"].ToHtml();
-
-            display.AppendText($"[color=#{colorCode}]{text}[/color]");
-        }
+        // display is always null in console mode — Godot branch removed
         else if (ShouldUseBBSAdapter())
         {
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
@@ -520,8 +471,7 @@ public partial class TerminalEmulator : Control
         }
         else if (display != null)
         {
-            // Godot mode can't render raw ANSI — output as plain text
-            display.AppendText(text);
+            // Godot mode removed — display is always null in console mode
         }
         else if (ShouldUseBBSAdapter())
         {
@@ -716,10 +666,7 @@ public partial class TerminalEmulator : Control
             }
             ForwardToSpectators(clearAnsi);
         }
-        else if (display != null)
-        {
-            display.Clear();
-        }
+        // display is always null in console mode — Godot branch removed
         else if (ShouldUseBBSAdapter())
         {
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
@@ -888,21 +835,7 @@ public partial class TerminalEmulator : Control
 
         Write(prompt, "bright_white");
 
-        // If running inside Godot (display created) use the LineEdit, otherwise Console.ReadLine
-        if (inputLine != null && display != null)
-        {
-        inputLine.Clear();
-        inputLine.Visible = true;
-        inputLine.GrabFocus();
-
-        inputAwaiter = new TaskCompletionSource<string>();
-        var result = await inputAwaiter.Task;
-
-        inputLine.Visible = false;
-        WriteLine(result, "cyan");
-            return result;
-        }
-        else
+        // In online/door mode, Console.ReadLine() doesn't handle backspace properly.
         {
             // In online/door mode, Console.ReadLine() doesn't handle backspace properly.
             // On redirected stdin: raw 0x7F/0x08 bytes leak through.
@@ -1141,11 +1074,6 @@ public partial class TerminalEmulator : Control
         return buffer.ToString();
     }
     
-    private void OnInputSubmitted(string text)
-    {
-        inputAwaiter?.SetResult(text);
-    }
-    
     public async Task<int> GetMenuChoice(List<MenuOption> options)
     {
         WriteLine("");
@@ -1172,13 +1100,10 @@ public partial class TerminalEmulator : Control
     
     public void ShowASCIIArt(string artName)
     {
-        var artPath = $"res://Assets/ASCII/{artName}.ans";
-        if (Godot.FileAccess.FileExists(artPath))
+        var artPath = $"Assets/ASCII/{artName}.ans";
+        if (File.Exists(artPath))
         {
-            var file = Godot.FileAccess.Open(artPath, Godot.FileAccess.ModeFlags.Read);
-            var content = file.GetAsText();
-            file.Close();
-            
+            var content = File.ReadAllText(artPath);
             // Parse ANSI art and display
             DisplayANSI(content);
         }
@@ -1230,25 +1155,22 @@ public partial class TerminalEmulator : Control
         // Box drawing characters
         const string TL = "╔"; const string TR = "╗";
         const string BL = "╚"; const string BR = "╝";
-        const string V = "║"; // H removed - using inline '═' in string
-        
-        var colorCode = ansiColors.ContainsKey(color) ? 
-            ansiColors[color].ToHtml() : ansiColors["white"].ToHtml();
-        
+        const string V = "║";
+
         // Draw top
         var topLine = TL + new string('═', width - 2) + TR;
-        display.AppendText($"[color=#{colorCode}]{topLine}[/color]\n");
-        
+        WriteLine(topLine, color);
+
         // Draw sides
         for (int i = 1; i < height - 1; i++)
         {
             var middleLine = V + new string(' ', width - 2) + V;
-            display.AppendText($"[color=#{colorCode}]{middleLine}[/color]\n");
+            WriteLine(middleLine, color);
         }
-        
+
         // Draw bottom
         var bottomLine = BL + new string('═', width - 2) + BR;
-        display.AppendText($"[color=#{colorCode}]{bottomLine}[/color]\n");
+        WriteLine(bottomLine, color);
     }
     
     public void ShowStatusBar(string playerName, int level, int hp, int maxHp, int gold, int turns)

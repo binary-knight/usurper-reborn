@@ -1,5 +1,4 @@
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -528,7 +527,6 @@ public class ChallengeSystem
             player.King = false;
             player.RoyalMercenaries?.Clear(); // Dismiss bodyguards on dethronement
             player.RecalculateStats(); // Remove Royal Authority HP bonus
-            GD.Print($"[ChallengeSystem] Player {player.DisplayName} deposed from throne by {newKing.Name}");
         }
 
         NewsSystem.Instance?.Newsy(true,

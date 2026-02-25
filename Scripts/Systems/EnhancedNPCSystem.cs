@@ -1,5 +1,4 @@
 using UsurperRemake.Utils;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,15 +7,14 @@ using System.Linq;
 /// Enhanced NPC System - Phase 21 Implementation
 /// Builds upon existing NPC AI with Pascal-compatible behaviors
 /// </summary>
-public class EnhancedNPCSystem : Node
+public class EnhancedNPCSystem
 {
     private NewsSystem newsSystem;
     private Random random = new Random();
     
-    public override void _Ready()
+    public EnhancedNPCSystem()
     {
         newsSystem = NewsSystem.Instance;
-        // MailSystem is static - no instance needed
     }
     
     /// <summary>
@@ -33,7 +31,6 @@ public class EnhancedNPCSystem : Node
             // NPC examines new item
             if (shout)
             {
-                GD.Print($"{npc.Name2} looks at the item.");
             }
             
             // Check if NPC should equip this item
@@ -184,7 +181,6 @@ public class EnhancedNPCSystem : Node
     private void RecordNPCPurchase(NPC npc, string itemType)
     {
         npc.Memory?.AddMemory($"I bought a {itemType}", "purchase", DateTime.Now);
-        GD.Print($"[Shop] {npc.Name2} purchased {itemType}");
     }
     
     private Dictionary<string, GangInfo> AnalyzeGangs(List<NPC> npcs)

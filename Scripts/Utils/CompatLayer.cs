@@ -31,6 +31,17 @@ namespace UsurperRemake.Utils
     {
         public static implicit operator TerminalUI(TerminalEmulator emulator) => new TerminalUI();
         public static implicit operator TerminalEmulator(TerminalUI ui) => TerminalEmulator.Instance ?? new TerminalEmulator();
+
+        private TerminalEmulator Term => TerminalEmulator.Instance ?? new TerminalEmulator();
+
+        public void WriteLine(string text) => Term.WriteLine(text);
+        public void WriteLine(string text, string color) => Term.WriteLine(text, color);
+        public void Write(string text) => Term.Write(text);
+        public void Write(string text, string color) => Term.Write(text, color);
+        public void ClearScreen() => Term.ClearScreen();
+        public string ReadLine() => System.Console.ReadLine() ?? "";
+        public System.Threading.Tasks.Task PressAnyKey(string message = "Press Enter to continue...") => Term.PressAnyKey(message);
+        public System.Threading.Tasks.Task<string> GetInputAsync(string prompt = "") => Term.GetInput(prompt);
     }
 }
 

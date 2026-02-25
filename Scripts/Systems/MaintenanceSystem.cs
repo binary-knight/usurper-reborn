@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using Godot;
 
 /// <summary>
 /// Daily Maintenance System - Complete Pascal-compatible maintenance engine
@@ -109,7 +108,6 @@ public class MaintenanceSystem
             else
             {
                 // Log silently to Godot console
-                GD.Print($"[Maintenance] Daily maintenance completed at {DateTime.Now:MM-dd-yyyy HH:mm:ss}");
             }
         }
         finally
@@ -673,7 +671,6 @@ public class MaintenanceSystem
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Failed to create maintenance flag: {ex.Message}");
         }
     }
     
@@ -694,7 +691,6 @@ public class MaintenanceSystem
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Failed to remove maintenance flag: {ex.Message}");
         }
     }
     
@@ -720,7 +716,6 @@ public class MaintenanceSystem
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Failed to load maintenance date: {ex.Message}");
         }
 
         // Default to yesterday to trigger maintenance
@@ -752,7 +747,6 @@ public class MaintenanceSystem
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Failed to save maintenance date: {ex.Message}");
         }
     }
 }

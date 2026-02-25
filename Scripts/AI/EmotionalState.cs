@@ -2,7 +2,6 @@ using UsurperRemake.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 public partial class EmotionalState
 {
@@ -40,7 +39,6 @@ public partial class EmotionalState
             activeEmotions.Remove(weakest.Type);
         }
         
-        GD.Print($"[Emotions] Added {type} emotion (Intensity: {intensity:F2}, Duration: {durationMinutes}m)");
     }
     
     public void Update(List<MemoryEvent> recentEvents)

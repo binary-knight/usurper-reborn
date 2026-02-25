@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Godot;
 
 /// <summary>
 /// Temple of the Gods - Complete Pascal-compatible temple system

@@ -1,5 +1,4 @@
 using UsurperRemake.Utils;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +9,7 @@ using System.Threading.Tasks;
 /// Handles organized competitions, tug-of-war, automated tournaments, and all competition-related functionality
 /// Direct Pascal compatibility with exact function preservation
 /// </summary>
-public class TournamentSystem : Node
+public class TournamentSystem
 {
     private NewsSystem newsSystem;
     // MailSystem is static - no need to instantiate
@@ -48,10 +47,9 @@ public class TournamentSystem : Node
         Cancelled           // Tournament cancelled
     }
     
-    public override void _Ready()
+    public TournamentSystem()
     {
         newsSystem = NewsSystem.Instance;
-        // mailSystem is static - use MailSystem.MethodName directly
         combatEngine = new CombatEngine();
         teamSystem = new TeamSystem();
         relationshipSystem = RelationshipSystem.Instance;

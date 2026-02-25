@@ -5,7 +5,6 @@ using UsurperRemake.BBS;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 /// <summary>
 /// Magic Shop - Complete Pascal-compatible magical services

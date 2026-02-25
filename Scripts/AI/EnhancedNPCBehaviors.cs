@@ -1,6 +1,5 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,7 +26,6 @@ public static class EnhancedNPCBehaviors
             // NPC examines new item (Pascal shout logic)
             if (shout)
             {
-                GD.Print($"{npc.Name2} looks at the new item.");
             }
             
             // Determine if NPC should use this item
@@ -665,7 +663,6 @@ public static class EnhancedNPCBehaviors
             );
         }
 
-        GD.Print($"[NPC Marriage] {npc1.Name2} married {npc2.Name2} (poly={isPoly})");
     }
 
     /// <summary>
@@ -873,7 +870,6 @@ public static class EnhancedNPCBehaviors
         // Check if NPC is dead
         if (npc.IsDead || !npc.IsAlive)
         {
-            GD.Print($"[Affair] Cannot process divorce for dead NPC {npc.Name2}");
             return;
         }
 
@@ -931,7 +927,6 @@ public static class EnhancedNPCBehaviors
                 $"Scandal and Romance! {npc.Name2} left {oldSpouseName} and immediately married {player.Name}!"
             );
 
-            GD.Print($"[Affair] {npc.Name2} left {oldSpouseName} and married {player.Name}!");
         }
         else
         {
@@ -944,7 +939,6 @@ public static class EnhancedNPCBehaviors
                 $"Scandal! {npc.Name2} has left {oldSpouseName} for the adventurer {player.Name}!"
             );
 
-            GD.Print($"[Affair] {npc.Name2} left {oldSpouseName} for {player.Name} (lovers)!");
         }
     }
 
@@ -1119,7 +1113,6 @@ public class NPCMarriageRegistry
         marriages[npc1Id] = npc2Id;
         marriages[npc2Id] = npc1Id;
 
-        GD.Print($"[MarriageRegistry] Registered marriage: {npc1Name} <-> {npc2Name}");
     }
 
     public void EndMarriage(string npcId)
@@ -1127,7 +1120,6 @@ public class NPCMarriageRegistry
         if (marriages.TryRemove(npcId, out var spouseId))
         {
             marriages.TryRemove(spouseId, out _);
-            GD.Print($"[MarriageRegistry] Ended marriage for {npcId}");
         }
     }
 
@@ -1235,7 +1227,6 @@ public class NPCMarriageRegistry
     {
         marriages.Clear();
         affairs.Clear();
-        GD.Print("[MarriageRegistry] Reset for new game");
     }
 }
 

@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.BBS;
 
 namespace UsurperRemake.Systems
@@ -711,7 +710,6 @@ namespace UsurperRemake.Systems
                         DateTime.TryParse(royalCourt.LastProclamationDate, out var procDate))
                         king.LastProclamationDate = procDate;
 
-                    GD.Print($"[Online] Loaded royal court from world_state: King {king.Name}, Treasury {king.Treasury:N0}, Guards {king.Guards.Count}, Monsters {king.MonsterGuards.Count}");
                 }
             }
             catch (Exception ex)

@@ -1,6 +1,5 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -72,7 +71,6 @@ public class WorldInitializerSystem
         var npcs = NPCSpawnSystem.Instance.ActiveNPCs;
         if (npcs == null || npcs.Count == 0)
         {
-            GD.PrintErr("[WorldInit] No NPCs available for world simulation!");
             return;
         }
 
@@ -684,6 +682,5 @@ public class WorldInitializerSystem
         ActiveTeams.Clear();
         DeadNPCNames.Clear();
         SimulatedDays = 0;
-        GD.Print("[WorldInit] World reset");
     }
 }

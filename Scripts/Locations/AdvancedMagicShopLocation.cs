@@ -1,6 +1,5 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -12,8 +11,8 @@ using System.Threading.Tasks;
 /// </summary>
 public class AdvancedMagicShopLocation : BaseLocation
 {
-    private LocationManager locationManager = null!;
-    private NewsSystem newsSystem = null!;
+    private LocationManager locationManager => LocationManager.Instance;
+    private NewsSystem newsSystem => NewsSystem.Instance;
     private Random random = new Random();
     
     // Pascal constants from MAGIC.PAS
@@ -33,15 +32,7 @@ public class AdvancedMagicShopLocation : BaseLocation
     {
     }
     
-    public new void _Ready()
-    {
-        base._Ready();
-        locationManager = GetNode<LocationManager>("/root/LocationManager");
-        newsSystem = NewsSystem.Instance;
-        
-        // Load configuration values (Pascal cfg_string calls)
-        LoadMagicShopConfig();
-    }
+    // Constructor initializes via field declarations and LoadMagicShopConfig is called lazily
     
     /// <summary>
     /// Load magic shop configuration - Pascal MAGIC.PAS cfg_string logic
@@ -71,7 +62,7 @@ public class AdvancedMagicShopLocation : BaseLocation
     /// </summary>
     public async Task ShowLocationMenu(Character player)
     {
-        var terminal = GetNode<TerminalEmulator>("/root/TerminalEmulator");
+        var terminal = TerminalEmulator.Instance ?? new TerminalEmulator();
         
         await DisplayMenu(player, true, false, terminal);
         

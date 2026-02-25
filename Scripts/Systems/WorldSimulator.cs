@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
-using Godot;
 
 public class WorldSimulator
 {
@@ -2499,7 +2498,6 @@ public class WorldSimulator
                 {
                     MarkNPCDead(deadMember, GameConfig.PermadeathChanceDungeonTeam, killerName, "the Dungeon");
                 }
-                GD.Print($"[WorldSim] Team '{npc.Team}' was defeated! {dead.Count} members died");
             }
 
             // Survivors flee
@@ -2648,7 +2646,6 @@ public class WorldSimulator
         {
             // NPC died in solo dungeon crawl — permadeath roll
             MarkNPCDead(npc, GameConfig.PermadeathChanceDungeonSolo, monster.Name, "the Dungeon");
-            GD.Print($"[WorldSim] {npc.Name} was slain by {monster.Name} in the dungeon!");
         }
         else
         {
@@ -3627,7 +3624,7 @@ public class WorldSimulator
         if (target == null || target.CurrentLocation != npc.CurrentLocation) return;
         
         // Simple trade simulation
-        var tradeAmount = GD.RandRange(10, 100);
+        var tradeAmount = Random.Shared.Next(10, 101);
         if (npc.CanAfford(tradeAmount) && target.CanAfford(tradeAmount))
         {
             // Exchange some gold (simplified)
@@ -3659,7 +3656,7 @@ public class WorldSimulator
             target.Brain?.RecordInteraction(npc, InteractionType.Complimented);
             
             // Chance to become friends or allies
-            if (GD.Randf() < compatibility * 0.5f)
+            if ((float)Random.Shared.NextDouble() < compatibility * 0.5f)
             {
                 npc.AddRelationship(target.Id, 0);
                 target.AddRelationship(npc.Id, 0);
@@ -3743,7 +3740,6 @@ public class WorldSimulator
                 target.Gold -= stolenGold;
             }
 
-            GD.Print($"[WorldSim] {npc.Name} killed {target.Name} in combat ({rounds} rounds)!");
         }
         else if (!npc.IsAlive)
         {
@@ -3759,7 +3755,6 @@ public class WorldSimulator
                 Location = target.CurrentLocation
             });
 
-            GD.Print($"[WorldSim] {npc.Name} was killed by {target.Name} in combat ({rounds} rounds)!");
         }
     }
     
@@ -3775,9 +3770,9 @@ public class WorldSimulator
     private void ExecuteTrain(NPC npc)
     {
         // Small chance to gain experience from training
-        if (GD.Randf() < 0.3f)
+        if ((float)Random.Shared.NextDouble() < 0.3f)
         {
-            var expGain = (long)(GD.RandRange(10, 30) * NpcXpMultiplier);
+            var expGain = (long)(Random.Shared.Next(10, 31) * NpcXpMultiplier);
             npc.GainExperience(expGain);
             // GD.Print($"[WorldSim] {npc.Name} trained and gained {expGain} experience");
         }
@@ -3945,7 +3940,7 @@ public class WorldSimulator
     private void ProcessWorldEvents()
     {
         // Random world events that can affect NPCs
-        if (GD.Randf() < 0.05f) // 5% chance per simulation step
+        if ((float)Random.Shared.NextDouble() < 0.05f) // 5% chance per simulation step
         {
             GenerateRandomEvent();
         }
@@ -3965,7 +3960,7 @@ public class WorldSimulator
             "A new shop opens in the market"
         };
         
-        var randomEvent = events[GD.RandRange(0, events.Length - 1)];
+        var randomEvent = events[Random.Shared.Next(0, events.Length)];
         // GD.Print($"[WorldSim] World Event: {randomEvent}");
         
         // Record event in all NPC memories with low importance
@@ -4016,13 +4011,13 @@ public class WorldSimulator
             if (king == null || !king.IsActive) return;
 
             // NPC guard recruitment (10% chance per tick if there are openings)
-            if (king.Guards.Count < King.MaxNPCGuards && GD.Randf() < 0.10f)
+            if (king.Guards.Count < King.MaxNPCGuards && (float)Random.Shared.NextDouble() < 0.10f)
             {
                 ProcessNPCGuardRecruitment(king);
             }
 
             // Court intrigue processing (5% chance per tick)
-            if (GD.Randf() < 0.05f)
+            if ((float)Random.Shared.NextDouble() < 0.05f)
             {
                 ProcessCourtIntrigue(king);
             }
@@ -4035,7 +4030,6 @@ public class WorldSimulator
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"[WorldSim] Error processing court politics: {ex.Message}");
         }
     }
 
@@ -4068,7 +4062,7 @@ public class WorldSimulator
         if (candidates == null || candidates.Count == 0) return;
 
         // Pick a random candidate
-        var applicant = candidates[GD.RandRange(0, candidates.Count - 1)];
+        var applicant = candidates[Random.Shared.Next(0, candidates.Count)];
 
         // Check if treasury can afford the recruitment cost
         if (king.Treasury < GameConfig.GuardRecruitmentCost)
@@ -4085,7 +4079,7 @@ public class WorldSimulator
             Sex = applicant.Sex,
             DailySalary = GameConfig.BaseGuardSalary + (applicant.Level * GameConfig.GuardSalaryPerGuardLevel),
             RecruitmentDate = DateTime.Now,
-            Loyalty = 70 + GD.RandRange(0, 30)  // New recruits have 70-100 loyalty
+            Loyalty = 70 + Random.Shared.Next(0, 31)  // New recruits have 70-100 loyalty
         };
 
         king.Guards.Add(guard);
@@ -4114,9 +4108,9 @@ public class WorldSimulator
         if (unhappyMembers.Count >= 2 && king.ActivePlots.Count < 3)
         {
             // Start a new plot
-            var conspirators = unhappyMembers.Take(GD.RandRange(2, Math.Min(4, unhappyMembers.Count))).ToList();
+            var conspirators = unhappyMembers.Take(Random.Shared.Next(2, (Math.Min(4, unhappyMembers.Count)) + 1)).ToList();
 
-            string plotType = GD.RandRange(0, 3) switch
+            string plotType = Random.Shared.Next(0, 4) switch
             {
                 0 => "Assassination",
                 1 => "Coup",
@@ -4129,7 +4123,7 @@ public class WorldSimulator
                 PlotType = plotType,
                 Conspirators = conspirators.Select(c => c.Name).ToList(),
                 Target = king.Name,
-                Progress = 10 + GD.RandRange(0, 20),
+                Progress = 10 + Random.Shared.Next(0, 21),
                 StartDate = DateTime.Now
             };
 
@@ -4158,9 +4152,9 @@ public class WorldSimulator
             {
                 Name = GenerateCourtMemberName(),
                 Role = role,
-                Faction = factions[GD.RandRange(0, factions.Length - 1)],
-                Influence = 40 + GD.RandRange(0, 40),
-                LoyaltyToKing = 50 + GD.RandRange(0, 40),
+                Faction = factions[Random.Shared.Next(0, factions.Length)],
+                Influence = 40 + Random.Shared.Next(0, 41),
+                LoyaltyToKing = 50 + Random.Shared.Next(0, 41),
                 JoinedCourt = DateTime.Now
             };
             king.CourtMembers.Add(member);
@@ -4176,7 +4170,7 @@ public class WorldSimulator
         var lastNames = new[] { "Blackwood", "Ashford", "Ironside", "Goldstein", "Silverhart",
                                 "Ravencroft", "Thornwood", "Nightingale", "Stormwind", "Darkhaven" };
 
-        return $"{firstNames[GD.RandRange(0, firstNames.Length - 1)]} {lastNames[GD.RandRange(0, lastNames.Length - 1)]}";
+        return $"{firstNames[Random.Shared.Next(0, firstNames.Length)]} {lastNames[Random.Shared.Next(0, lastNames.Length)]}";
     }
 
     /// <summary>
@@ -4187,11 +4181,11 @@ public class WorldSimulator
         if (plot.IsDiscovered) return;
 
         // Plots advance 5-15% per tick
-        plot.Progress += GD.RandRange(5, 15);
+        plot.Progress += Random.Shared.Next(5, 16);
 
         // Chance of discovery (higher for larger conspiracies)
         float discoveryChance = 0.02f + (plot.Conspirators.Count * 0.01f);
-        if (GD.Randf() < discoveryChance)
+        if ((float)Random.Shared.NextDouble() < discoveryChance)
         {
             plot.IsDiscovered = true;
             plot.DiscoveredBy = "Royal Spymaster";
@@ -4287,7 +4281,6 @@ public class WorldSimulator
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"[WorldSim] Error processing challenges: {ex.Message}");
         }
     }
 
@@ -4302,7 +4295,6 @@ public class WorldSimulator
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"[WorldSim] Error processing prisoner activities: {ex.Message}");
         }
     }
 
@@ -4566,7 +4558,7 @@ public class WorldSimulator
         
         foreach (var member in gangMembers)
         {
-            if (member.Brain?.Personality?.IsLikelyToBetray() == true && GD.Randf() < 0.02f) // 2% chance
+            if (member.Brain?.Personality?.IsLikelyToBetray() == true && (float)Random.Shared.NextDouble() < 0.02f) // 2% chance
             {
                 var gangLeader = npcs.FirstOrDefault(npc => npc.Id == member.GangId);
                 if (gangLeader != null)
@@ -4598,7 +4590,7 @@ public class WorldSimulator
         
         foreach (var leader in potentialLeaders)
         {
-            if (GD.Randf() < 0.01f) // 1% chance to form new gang
+            if ((float)Random.Shared.NextDouble() < 0.01f) // 1% chance to form new gang
             {
                 // Look for potential gang members in the same location
                 var sameLocation = npcs.Where(npc => 
@@ -4609,7 +4601,7 @@ public class WorldSimulator
                 
                 if (sameLocation.Count >= 2)
                 {
-                    var newMember = sameLocation[GD.RandRange(0, sameLocation.Count - 1)];
+                    var newMember = sameLocation[Random.Shared.Next(0, sameLocation.Count)];
                     newMember.GangId = leader.Id;
                     leader.GangMembers.Add(newMember.Id);
                     
@@ -4636,7 +4628,7 @@ public class WorldSimulator
         {
             var personality = npc.Brain?.Personality;
             if (personality == null || personality.Aggression < 0.5f) continue;
-            if (GD.Randf() > newRivalryChance) continue;
+            if ((float)Random.Shared.NextDouble() > newRivalryChance) continue;
 
             // Online mode: cap enemy list size to prevent runaway escalation
             if (isOnline && npc.Enemies.Count >= 5) continue;
@@ -4671,7 +4663,7 @@ public class WorldSimulator
 
             // Fallback: pick a random rival (less likely)
             float fallbackChance = isOnline ? 0.01f : 0.03f;
-            if (rival == null && GD.Randf() < fallbackChance)
+            if (rival == null && (float)Random.Shared.NextDouble() < fallbackChance)
                 rival = potentialRivals[random.Next(potentialRivals.Count)];
 
             if (rival != null)
@@ -4738,7 +4730,7 @@ public class WorldSimulator
                 var enemy = npcs.FirstOrDefault(n => n.Id == enemyId);
                 if (enemy == null || enemy.Id == npc.Id) continue; // skip self (corrupt enemy list)
                 if (!enemy.IsAlive || enemy.IsDead) continue;
-                if (GD.Randf() >= escalationChance) continue;
+                if ((float)Random.Shared.NextDouble() >= escalationChance) continue;
 
                 // Must be at same location to escalate
                 if (npc.CurrentLocation != enemy.CurrentLocation) continue;
@@ -4816,7 +4808,7 @@ public class WorldSimulator
 
             foreach (var enemyId in npc.Enemies.ToList())
             {
-                if (GD.Randf() < baseChance)
+                if ((float)Random.Shared.NextDouble() < baseChance)
                 {
                     npc.Enemies.Remove(enemyId);
                     var enemy = npcs.FirstOrDefault(n => n.Id == enemyId);

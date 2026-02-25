@@ -1,5 +1,4 @@
 using UsurperRemake.Utils;
-using Godot;
 using System.Collections.Generic;
 
 /// <summary>
@@ -106,19 +105,19 @@ public class PersonalityProfile
         {
             case "thug":
             case "brawler":
-                profile.Aggression = GD.Randf() * 0.3f + 0.7f;  // 0.7-1.0
-                profile.Courage = GD.Randf() * 0.4f + 0.6f;     // 0.6-1.0
-                profile.Greed = GD.Randf() * 0.5f + 0.3f;       // 0.3-0.8
-                profile.Loyalty = GD.Randf() * 0.3f + 0.2f;     // 0.2-0.5
-                profile.Vengefulness = GD.Randf() * 0.3f + 0.6f; // 0.6-0.9
-                profile.Impulsiveness = GD.Randf() * 0.4f + 0.5f; // 0.5-0.9
-                profile.Sociability = GD.Randf() * 0.4f + 0.3f; // 0.3-0.7
-                profile.Ambition = GD.Randf() * 0.5f + 0.2f;    // 0.2-0.7
-                profile.Intelligence = GD.Randf() * 0.4f + 0.1f; // 0.1-0.5 (street smart, not book smart)
-                profile.Patience = GD.Randf() * 0.3f + 0.1f;    // 0.1-0.4 (short tempered)
-                profile.Mysticism = GD.Randf() * 0.2f;          // 0.0-0.2 (no interest in magic)
-                profile.Trustworthiness = GD.Randf() * 0.3f + 0.1f; // 0.1-0.4 (unreliable)
-                profile.Caution = GD.Randf() * 0.3f + 0.1f;     // 0.1-0.4 (reckless)
+                profile.Aggression = (float)Random.Shared.NextDouble() * 0.3f + 0.7f;  // 0.7-1.0
+                profile.Courage = (float)Random.Shared.NextDouble() * 0.4f + 0.6f;     // 0.6-1.0
+                profile.Greed = (float)Random.Shared.NextDouble() * 0.5f + 0.3f;       // 0.3-0.8
+                profile.Loyalty = (float)Random.Shared.NextDouble() * 0.3f + 0.2f;     // 0.2-0.5
+                profile.Vengefulness = (float)Random.Shared.NextDouble() * 0.3f + 0.6f; // 0.6-0.9
+                profile.Impulsiveness = (float)Random.Shared.NextDouble() * 0.4f + 0.5f; // 0.5-0.9
+                profile.Sociability = (float)Random.Shared.NextDouble() * 0.4f + 0.3f; // 0.3-0.7
+                profile.Ambition = (float)Random.Shared.NextDouble() * 0.5f + 0.2f;    // 0.2-0.7
+                profile.Intelligence = (float)Random.Shared.NextDouble() * 0.4f + 0.1f; // 0.1-0.5 (street smart, not book smart)
+                profile.Patience = (float)Random.Shared.NextDouble() * 0.3f + 0.1f;    // 0.1-0.4 (short tempered)
+                profile.Mysticism = (float)Random.Shared.NextDouble() * 0.2f;          // 0.0-0.2 (no interest in magic)
+                profile.Trustworthiness = (float)Random.Shared.NextDouble() * 0.3f + 0.1f; // 0.1-0.4 (unreliable)
+                profile.Caution = (float)Random.Shared.NextDouble() * 0.3f + 0.1f;     // 0.1-0.4 (reckless)
                 profile.PreferredCombatStyle = CombatStyle.Aggressive;
                 profile.Fears.Add("stronger_opponents");
                 profile.Fears.Add("law_enforcement");
@@ -128,19 +127,19 @@ public class PersonalityProfile
                 
             case "merchant":
             case "trader":
-                profile.Aggression = GD.Randf() * 0.3f;         // 0.0-0.3
-                profile.Greed = GD.Randf() * 0.3f + 0.7f;      // 0.7-1.0
-                profile.Courage = GD.Randf() * 0.4f + 0.2f;     // 0.2-0.6
-                profile.Loyalty = GD.Randf() * 0.4f + 0.4f;     // 0.4-0.8
-                profile.Vengefulness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
-                profile.Impulsiveness = GD.Randf() * 0.3f + 0.1f; // 0.1-0.4
-                profile.Sociability = GD.Randf() * 0.3f + 0.6f; // 0.6-0.9
-                profile.Ambition = GD.Randf() * 0.3f + 0.5f;    // 0.5-0.8
-                profile.Intelligence = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (shrewd business sense)
-                profile.Patience = GD.Randf() * 0.3f + 0.5f;    // 0.5-0.8 (patient negotiators)
-                profile.Mysticism = GD.Randf() * 0.3f;          // 0.0-0.3 (practical minded)
-                profile.Trustworthiness = GD.Randf() * 0.4f + 0.4f; // 0.4-0.8 (reputation matters)
-                profile.Caution = GD.Randf() * 0.3f + 0.5f;     // 0.5-0.8 (careful with money)
+                profile.Aggression = (float)Random.Shared.NextDouble() * 0.3f;         // 0.0-0.3
+                profile.Greed = (float)Random.Shared.NextDouble() * 0.3f + 0.7f;      // 0.7-1.0
+                profile.Courage = (float)Random.Shared.NextDouble() * 0.4f + 0.2f;     // 0.2-0.6
+                profile.Loyalty = (float)Random.Shared.NextDouble() * 0.4f + 0.4f;     // 0.4-0.8
+                profile.Vengefulness = (float)Random.Shared.NextDouble() * 0.3f + 0.2f; // 0.2-0.5
+                profile.Impulsiveness = (float)Random.Shared.NextDouble() * 0.3f + 0.1f; // 0.1-0.4
+                profile.Sociability = (float)Random.Shared.NextDouble() * 0.3f + 0.6f; // 0.6-0.9
+                profile.Ambition = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;    // 0.5-0.8
+                profile.Intelligence = (float)Random.Shared.NextDouble() * 0.3f + 0.5f; // 0.5-0.8 (shrewd business sense)
+                profile.Patience = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;    // 0.5-0.8 (patient negotiators)
+                profile.Mysticism = (float)Random.Shared.NextDouble() * 0.3f;          // 0.0-0.3 (practical minded)
+                profile.Trustworthiness = (float)Random.Shared.NextDouble() * 0.4f + 0.4f; // 0.4-0.8 (reputation matters)
+                profile.Caution = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;     // 0.5-0.8 (careful with money)
                 profile.PreferredCombatStyle = CombatStyle.Defensive;
                 profile.Fears.Add("poverty");
                 profile.Fears.Add("violence");
@@ -152,19 +151,19 @@ public class PersonalityProfile
                 
             case "noble":
             case "aristocrat":
-                profile.Ambition = GD.Randf() * 0.2f + 0.8f;    // 0.8-1.0
-                profile.Vengefulness = GD.Randf() * 0.4f + 0.5f;// 0.5-0.9
-                profile.Loyalty = GD.Randf() * 0.3f + 0.4f;     // 0.4-0.7
-                profile.Courage = GD.Randf() * 0.3f + 0.5f;     // 0.5-0.8
-                profile.Sociability = GD.Randf() * 0.3f + 0.4f; // 0.4-0.7
-                profile.Greed = GD.Randf() * 0.4f + 0.4f;       // 0.4-0.8
-                profile.Aggression = GD.Randf() * 0.4f + 0.3f;  // 0.3-0.7
-                profile.Impulsiveness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
-                profile.Intelligence = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (educated, politically savvy)
-                profile.Patience = GD.Randf() * 0.3f + 0.4f;    // 0.4-0.7 (plays the long game)
-                profile.Mysticism = GD.Randf() * 0.3f + 0.1f;   // 0.1-0.4 (some superstition)
-                profile.Trustworthiness = GD.Randf() * 0.4f + 0.3f; // 0.3-0.7 (varies by individual)
-                profile.Caution = GD.Randf() * 0.3f + 0.4f;     // 0.4-0.7 (calculated)
+                profile.Ambition = (float)Random.Shared.NextDouble() * 0.2f + 0.8f;    // 0.8-1.0
+                profile.Vengefulness = (float)Random.Shared.NextDouble() * 0.4f + 0.5f;// 0.5-0.9
+                profile.Loyalty = (float)Random.Shared.NextDouble() * 0.3f + 0.4f;     // 0.4-0.7
+                profile.Courage = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;     // 0.5-0.8
+                profile.Sociability = (float)Random.Shared.NextDouble() * 0.3f + 0.4f; // 0.4-0.7
+                profile.Greed = (float)Random.Shared.NextDouble() * 0.4f + 0.4f;       // 0.4-0.8
+                profile.Aggression = (float)Random.Shared.NextDouble() * 0.4f + 0.3f;  // 0.3-0.7
+                profile.Impulsiveness = (float)Random.Shared.NextDouble() * 0.3f + 0.2f; // 0.2-0.5
+                profile.Intelligence = (float)Random.Shared.NextDouble() * 0.3f + 0.5f; // 0.5-0.8 (educated, politically savvy)
+                profile.Patience = (float)Random.Shared.NextDouble() * 0.3f + 0.4f;    // 0.4-0.7 (plays the long game)
+                profile.Mysticism = (float)Random.Shared.NextDouble() * 0.3f + 0.1f;   // 0.1-0.4 (some superstition)
+                profile.Trustworthiness = (float)Random.Shared.NextDouble() * 0.4f + 0.3f; // 0.3-0.7 (varies by individual)
+                profile.Caution = (float)Random.Shared.NextDouble() * 0.3f + 0.4f;     // 0.4-0.7 (calculated)
                 profile.PreferredCombatStyle = CombatStyle.Tactical;
                 profile.Fears.Add("disgrace");
                 profile.Fears.Add("poverty");
@@ -175,19 +174,19 @@ public class PersonalityProfile
                 
             case "guard":
             case "soldier":
-                profile.Loyalty = GD.Randf() * 0.2f + 0.7f;     // 0.7-0.9
-                profile.Courage = GD.Randf() * 0.3f + 0.6f;     // 0.6-0.9
-                profile.Aggression = GD.Randf() * 0.3f + 0.4f;  // 0.4-0.7
-                profile.Ambition = GD.Randf() * 0.4f + 0.3f;    // 0.3-0.7
-                profile.Vengefulness = GD.Randf() * 0.3f + 0.4f; // 0.4-0.7
-                profile.Impulsiveness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
-                profile.Sociability = GD.Randf() * 0.4f + 0.3f; // 0.3-0.7
-                profile.Greed = GD.Randf() * 0.4f + 0.2f;       // 0.2-0.6
-                profile.Intelligence = GD.Randf() * 0.4f + 0.3f; // 0.3-0.7 (tactical awareness)
-                profile.Patience = GD.Randf() * 0.3f + 0.5f;    // 0.5-0.8 (disciplined, waits for orders)
-                profile.Mysticism = GD.Randf() * 0.2f + 0.1f;   // 0.1-0.3 (superstitious but practical)
-                profile.Trustworthiness = GD.Randf() * 0.2f + 0.6f; // 0.6-0.8 (duty-bound, reliable)
-                profile.Caution = GD.Randf() * 0.3f + 0.4f;     // 0.4-0.7 (trained to assess threats)
+                profile.Loyalty = (float)Random.Shared.NextDouble() * 0.2f + 0.7f;     // 0.7-0.9
+                profile.Courage = (float)Random.Shared.NextDouble() * 0.3f + 0.6f;     // 0.6-0.9
+                profile.Aggression = (float)Random.Shared.NextDouble() * 0.3f + 0.4f;  // 0.4-0.7
+                profile.Ambition = (float)Random.Shared.NextDouble() * 0.4f + 0.3f;    // 0.3-0.7
+                profile.Vengefulness = (float)Random.Shared.NextDouble() * 0.3f + 0.4f; // 0.4-0.7
+                profile.Impulsiveness = (float)Random.Shared.NextDouble() * 0.3f + 0.2f; // 0.2-0.5
+                profile.Sociability = (float)Random.Shared.NextDouble() * 0.4f + 0.3f; // 0.3-0.7
+                profile.Greed = (float)Random.Shared.NextDouble() * 0.4f + 0.2f;       // 0.2-0.6
+                profile.Intelligence = (float)Random.Shared.NextDouble() * 0.4f + 0.3f; // 0.3-0.7 (tactical awareness)
+                profile.Patience = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;    // 0.5-0.8 (disciplined, waits for orders)
+                profile.Mysticism = (float)Random.Shared.NextDouble() * 0.2f + 0.1f;   // 0.1-0.3 (superstitious but practical)
+                profile.Trustworthiness = (float)Random.Shared.NextDouble() * 0.2f + 0.6f; // 0.6-0.8 (duty-bound, reliable)
+                profile.Caution = (float)Random.Shared.NextDouble() * 0.3f + 0.4f;     // 0.4-0.7 (trained to assess threats)
                 profile.PreferredCombatStyle = CombatStyle.Balanced;
                 profile.Fears.Add("dereliction");
                 profile.Fears.Add("dishonor");
@@ -198,19 +197,19 @@ public class PersonalityProfile
                 
             case "priest":
             case "cleric":
-                profile.Loyalty = GD.Randf() * 0.3f + 0.6f;     // 0.6-0.9
-                profile.Courage = GD.Randf() * 0.4f + 0.4f;     // 0.4-0.8
-                profile.Aggression = GD.Randf() * 0.2f;         // 0.0-0.2
-                profile.Ambition = GD.Randf() * 0.3f + 0.3f;    // 0.3-0.6
-                profile.Vengefulness = GD.Randf() * 0.2f;       // 0.0-0.2
-                profile.Impulsiveness = GD.Randf() * 0.3f + 0.1f; // 0.1-0.4
-                profile.Sociability = GD.Randf() * 0.3f + 0.6f; // 0.6-0.9
-                profile.Greed = GD.Randf() * 0.3f;              // 0.0-0.3
-                profile.Intelligence = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (theological study)
-                profile.Patience = GD.Randf() * 0.2f + 0.7f;    // 0.7-0.9 (serene, meditative)
-                profile.Mysticism = GD.Randf() * 0.3f + 0.5f;   // 0.5-0.8 (deeply spiritual)
-                profile.Trustworthiness = GD.Randf() * 0.2f + 0.7f; // 0.7-0.9 (pillars of community)
-                profile.Caution = GD.Randf() * 0.3f + 0.5f;     // 0.5-0.8 (thoughtful, deliberate)
+                profile.Loyalty = (float)Random.Shared.NextDouble() * 0.3f + 0.6f;     // 0.6-0.9
+                profile.Courage = (float)Random.Shared.NextDouble() * 0.4f + 0.4f;     // 0.4-0.8
+                profile.Aggression = (float)Random.Shared.NextDouble() * 0.2f;         // 0.0-0.2
+                profile.Ambition = (float)Random.Shared.NextDouble() * 0.3f + 0.3f;    // 0.3-0.6
+                profile.Vengefulness = (float)Random.Shared.NextDouble() * 0.2f;       // 0.0-0.2
+                profile.Impulsiveness = (float)Random.Shared.NextDouble() * 0.3f + 0.1f; // 0.1-0.4
+                profile.Sociability = (float)Random.Shared.NextDouble() * 0.3f + 0.6f; // 0.6-0.9
+                profile.Greed = (float)Random.Shared.NextDouble() * 0.3f;              // 0.0-0.3
+                profile.Intelligence = (float)Random.Shared.NextDouble() * 0.3f + 0.5f; // 0.5-0.8 (theological study)
+                profile.Patience = (float)Random.Shared.NextDouble() * 0.2f + 0.7f;    // 0.7-0.9 (serene, meditative)
+                profile.Mysticism = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;   // 0.5-0.8 (deeply spiritual)
+                profile.Trustworthiness = (float)Random.Shared.NextDouble() * 0.2f + 0.7f; // 0.7-0.9 (pillars of community)
+                profile.Caution = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;     // 0.5-0.8 (thoughtful, deliberate)
                 profile.PreferredCombatStyle = CombatStyle.Defensive;
                 profile.Fears.Add("sin");
                 profile.Fears.Add("corruption");
@@ -221,19 +220,19 @@ public class PersonalityProfile
                 
             case "mystic":
             case "mage":
-                profile.Ambition = GD.Randf() * 0.3f + 0.6f;    // 0.6-0.9
-                profile.Courage = GD.Randf() * 0.5f + 0.3f;     // 0.3-0.8
-                profile.Aggression = GD.Randf() * 0.4f + 0.2f;  // 0.2-0.6
-                profile.Loyalty = GD.Randf() * 0.4f + 0.3f;     // 0.3-0.7
-                profile.Vengefulness = GD.Randf() * 0.4f + 0.4f; // 0.4-0.8
-                profile.Impulsiveness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
-                profile.Sociability = GD.Randf() * 0.5f + 0.2f; // 0.2-0.7
-                profile.Greed = GD.Randf() * 0.4f + 0.3f;       // 0.3-0.7
-                profile.Intelligence = GD.Randf() * 0.2f + 0.8f; // 0.8-1.0 (brilliant scholars)
-                profile.Patience = GD.Randf() * 0.3f + 0.5f;    // 0.5-0.8 (years of study require patience)
-                profile.Mysticism = GD.Randf() * 0.2f + 0.8f;   // 0.8-1.0 (deeply attuned to the arcane)
-                profile.Trustworthiness = GD.Randf() * 0.5f + 0.2f; // 0.2-0.7 (varies — some are secretive)
-                profile.Caution = GD.Randf() * 0.4f + 0.4f;     // 0.4-0.8 (respects dangerous magic)
+                profile.Ambition = (float)Random.Shared.NextDouble() * 0.3f + 0.6f;    // 0.6-0.9
+                profile.Courage = (float)Random.Shared.NextDouble() * 0.5f + 0.3f;     // 0.3-0.8
+                profile.Aggression = (float)Random.Shared.NextDouble() * 0.4f + 0.2f;  // 0.2-0.6
+                profile.Loyalty = (float)Random.Shared.NextDouble() * 0.4f + 0.3f;     // 0.3-0.7
+                profile.Vengefulness = (float)Random.Shared.NextDouble() * 0.4f + 0.4f; // 0.4-0.8
+                profile.Impulsiveness = (float)Random.Shared.NextDouble() * 0.3f + 0.2f; // 0.2-0.5
+                profile.Sociability = (float)Random.Shared.NextDouble() * 0.5f + 0.2f; // 0.2-0.7
+                profile.Greed = (float)Random.Shared.NextDouble() * 0.4f + 0.3f;       // 0.3-0.7
+                profile.Intelligence = (float)Random.Shared.NextDouble() * 0.2f + 0.8f; // 0.8-1.0 (brilliant scholars)
+                profile.Patience = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;    // 0.5-0.8 (years of study require patience)
+                profile.Mysticism = (float)Random.Shared.NextDouble() * 0.2f + 0.8f;   // 0.8-1.0 (deeply attuned to the arcane)
+                profile.Trustworthiness = (float)Random.Shared.NextDouble() * 0.5f + 0.2f; // 0.2-0.7 (varies — some are secretive)
+                profile.Caution = (float)Random.Shared.NextDouble() * 0.4f + 0.4f;     // 0.4-0.8 (respects dangerous magic)
                 profile.PreferredCombatStyle = CombatStyle.Tactical;
                 profile.Fears.Add("ignorance");
                 profile.Fears.Add("powerlessness");
@@ -244,19 +243,19 @@ public class PersonalityProfile
                 
             case "craftsman":
             case "artisan":
-                profile.Loyalty = GD.Randf() * 0.3f + 0.5f;     // 0.5-0.8
-                profile.Courage = GD.Randf() * 0.4f + 0.4f;     // 0.4-0.8
-                profile.Aggression = GD.Randf() * 0.3f + 0.2f;  // 0.2-0.5
-                profile.Ambition = GD.Randf() * 0.4f + 0.3f;    // 0.3-0.7
-                profile.Vengefulness = GD.Randf() * 0.3f + 0.3f; // 0.3-0.6
-                profile.Impulsiveness = GD.Randf() * 0.3f + 0.2f; // 0.2-0.5
-                profile.Sociability = GD.Randf() * 0.4f + 0.4f; // 0.4-0.8
-                profile.Greed = GD.Randf() * 0.4f + 0.4f;       // 0.4-0.8
-                profile.Intelligence = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (skilled problem solvers)
-                profile.Patience = GD.Randf() * 0.2f + 0.6f;    // 0.6-0.8 (meticulous work requires patience)
-                profile.Mysticism = GD.Randf() * 0.3f + 0.1f;   // 0.1-0.4 (some enchanting interest)
-                profile.Trustworthiness = GD.Randf() * 0.3f + 0.5f; // 0.5-0.8 (honest tradespeople)
-                profile.Caution = GD.Randf() * 0.3f + 0.4f;     // 0.4-0.7 (careful with their work)
+                profile.Loyalty = (float)Random.Shared.NextDouble() * 0.3f + 0.5f;     // 0.5-0.8
+                profile.Courage = (float)Random.Shared.NextDouble() * 0.4f + 0.4f;     // 0.4-0.8
+                profile.Aggression = (float)Random.Shared.NextDouble() * 0.3f + 0.2f;  // 0.2-0.5
+                profile.Ambition = (float)Random.Shared.NextDouble() * 0.4f + 0.3f;    // 0.3-0.7
+                profile.Vengefulness = (float)Random.Shared.NextDouble() * 0.3f + 0.3f; // 0.3-0.6
+                profile.Impulsiveness = (float)Random.Shared.NextDouble() * 0.3f + 0.2f; // 0.2-0.5
+                profile.Sociability = (float)Random.Shared.NextDouble() * 0.4f + 0.4f; // 0.4-0.8
+                profile.Greed = (float)Random.Shared.NextDouble() * 0.4f + 0.4f;       // 0.4-0.8
+                profile.Intelligence = (float)Random.Shared.NextDouble() * 0.3f + 0.5f; // 0.5-0.8 (skilled problem solvers)
+                profile.Patience = (float)Random.Shared.NextDouble() * 0.2f + 0.6f;    // 0.6-0.8 (meticulous work requires patience)
+                profile.Mysticism = (float)Random.Shared.NextDouble() * 0.3f + 0.1f;   // 0.1-0.4 (some enchanting interest)
+                profile.Trustworthiness = (float)Random.Shared.NextDouble() * 0.3f + 0.5f; // 0.5-0.8 (honest tradespeople)
+                profile.Caution = (float)Random.Shared.NextDouble() * 0.3f + 0.4f;     // 0.4-0.7 (careful with their work)
                 profile.PreferredCombatStyle = CombatStyle.Balanced;
                 profile.Fears.Add("mediocrity");
                 profile.Fears.Add("poverty");
@@ -267,20 +266,20 @@ public class PersonalityProfile
                 
             default: // commoner
                 // Balanced random stats with slight variation
-                profile.Aggression = GD.Randf() * 0.6f + 0.2f;  // 0.2-0.8
-                profile.Greed = GD.Randf() * 0.6f + 0.2f;       // 0.2-0.8
-                profile.Courage = GD.Randf() * 0.6f + 0.2f;     // 0.2-0.8
-                profile.Loyalty = GD.Randf() * 0.6f + 0.2f;     // 0.2-0.8
-                profile.Vengefulness = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8
-                profile.Impulsiveness = GD.Randf() * 0.8f + 0.1f; // 0.1-0.9
-                profile.Sociability = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8
-                profile.Ambition = GD.Randf() * 0.6f + 0.2f;    // 0.2-0.8
-                profile.Intelligence = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8 (wide range)
-                profile.Patience = GD.Randf() * 0.6f + 0.2f;    // 0.2-0.8 (wide range)
-                profile.Mysticism = GD.Randf() * 0.4f + 0.1f;   // 0.1-0.5 (some folk superstition)
-                profile.Trustworthiness = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8 (wide range)
-                profile.Caution = GD.Randf() * 0.6f + 0.2f;     // 0.2-0.8 (wide range)
-                profile.PreferredCombatStyle = (CombatStyle)GD.RandRange(0, 3);
+                profile.Aggression = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;  // 0.2-0.8
+                profile.Greed = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;       // 0.2-0.8
+                profile.Courage = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;     // 0.2-0.8
+                profile.Loyalty = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;     // 0.2-0.8
+                profile.Vengefulness = (float)Random.Shared.NextDouble() * 0.6f + 0.2f; // 0.2-0.8
+                profile.Impulsiveness = (float)Random.Shared.NextDouble() * 0.8f + 0.1f; // 0.1-0.9
+                profile.Sociability = (float)Random.Shared.NextDouble() * 0.6f + 0.2f; // 0.2-0.8
+                profile.Ambition = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;    // 0.2-0.8
+                profile.Intelligence = (float)Random.Shared.NextDouble() * 0.6f + 0.2f; // 0.2-0.8 (wide range)
+                profile.Patience = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;    // 0.2-0.8 (wide range)
+                profile.Mysticism = (float)Random.Shared.NextDouble() * 0.4f + 0.1f;   // 0.1-0.5 (some folk superstition)
+                profile.Trustworthiness = (float)Random.Shared.NextDouble() * 0.6f + 0.2f; // 0.2-0.8 (wide range)
+                profile.Caution = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;     // 0.2-0.8 (wide range)
+                profile.PreferredCombatStyle = (CombatStyle)Random.Shared.Next(0, 4);
                 profile.Fears.Add("death");
                 profile.Fears.Add("poverty");
                 profile.Desires.Add("survival");
@@ -300,16 +299,16 @@ public class PersonalityProfile
     private static void GenerateRomanceTraits(PersonalityProfile profile, string archetype)
     {
         // Base romance traits - everyone gets some variance
-        profile.Romanticism = GD.Randf() * 0.6f + 0.2f;     // 0.2-0.8
-        profile.Sensuality = GD.Randf() * 0.6f + 0.2f;      // 0.2-0.8
-        profile.Jealousy = GD.Randf() * 0.6f + 0.2f;        // 0.2-0.8
-        profile.Commitment = GD.Randf() * 0.6f + 0.2f;      // 0.2-0.8
-        profile.Adventurousness = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8
-        profile.Exhibitionism = GD.Randf() * 0.4f;          // 0.0-0.4 (rarer)
-        profile.Voyeurism = GD.Randf() * 0.4f;              // 0.0-0.4 (rarer)
-        profile.Flirtatiousness = GD.Randf() * 0.6f + 0.2f; // 0.2-0.8
-        profile.Passion = GD.Randf() * 0.6f + 0.2f;         // 0.2-0.8
-        profile.Tenderness = GD.Randf() * 0.6f + 0.2f;      // 0.2-0.8
+        profile.Romanticism = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;     // 0.2-0.8
+        profile.Sensuality = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;      // 0.2-0.8
+        profile.Jealousy = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;        // 0.2-0.8
+        profile.Commitment = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;      // 0.2-0.8
+        profile.Adventurousness = (float)Random.Shared.NextDouble() * 0.6f + 0.2f; // 0.2-0.8
+        profile.Exhibitionism = (float)Random.Shared.NextDouble() * 0.4f;          // 0.0-0.4 (rarer)
+        profile.Voyeurism = (float)Random.Shared.NextDouble() * 0.4f;              // 0.0-0.4 (rarer)
+        profile.Flirtatiousness = (float)Random.Shared.NextDouble() * 0.6f + 0.2f; // 0.2-0.8
+        profile.Passion = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;         // 0.2-0.8
+        profile.Tenderness = (float)Random.Shared.NextDouble() * 0.6f + 0.2f;      // 0.2-0.8
 
         // Archetype-specific romance trait adjustments
         switch (archetype.ToLower())
@@ -319,7 +318,7 @@ public class PersonalityProfile
                 profile.Romanticism *= 0.5f;        // Less romantic
                 profile.Passion += 0.2f;            // More passionate/intense
                 profile.Tenderness *= 0.4f;         // Less tender
-                profile.IntimateStyle = GD.Randf() > 0.7f ? RomanceStyle.Dominant : RomanceStyle.Adventurous;
+                profile.IntimateStyle = (float)Random.Shared.NextDouble() > 0.7f ? RomanceStyle.Dominant : RomanceStyle.Adventurous;
                 profile.Jealousy += 0.2f;           // More possessive
                 break;
 
@@ -328,8 +327,8 @@ public class PersonalityProfile
                 profile.Romanticism += 0.2f;        // More romantic (courtly love)
                 profile.Exhibitionism += 0.1f;      // Enjoys showing off
                 profile.Commitment += 0.2f;         // Values marriage/alliances
-                profile.IntimateStyle = GD.Randf() > 0.5f ? RomanceStyle.Dominant : RomanceStyle.Vanilla;
-                profile.RelationshipPref = GD.Randf() > 0.7f ? RelationshipPreference.OpenRelationship : RelationshipPreference.Monogamous;
+                profile.IntimateStyle = (float)Random.Shared.NextDouble() > 0.5f ? RomanceStyle.Dominant : RomanceStyle.Vanilla;
+                profile.RelationshipPref = (float)Random.Shared.NextDouble() > 0.7f ? RelationshipPreference.OpenRelationship : RelationshipPreference.Monogamous;
                 break;
 
             case "merchant":
@@ -345,7 +344,7 @@ public class PersonalityProfile
                 profile.Commitment += 0.2f;         // Loyal in relationships too
                 profile.Jealousy += 0.1f;           // Protective
                 profile.Passion += 0.1f;
-                profile.IntimateStyle = GD.Randf() > 0.5f ? RomanceStyle.Dominant : RomanceStyle.Switch;
+                profile.IntimateStyle = (float)Random.Shared.NextDouble() > 0.5f ? RomanceStyle.Dominant : RomanceStyle.Switch;
                 break;
 
             case "priest":
@@ -363,8 +362,8 @@ public class PersonalityProfile
             case "mage":
                 profile.Adventurousness += 0.3f;    // Open to experimentation
                 profile.Sensuality += 0.1f;
-                profile.IntimateStyle = GD.Randf() > 0.5f ? RomanceStyle.Switch : RomanceStyle.Adventurous;
-                profile.RelationshipPref = GD.Randf() > 0.6f ? RelationshipPreference.Polyamorous : RelationshipPreference.Undecided;
+                profile.IntimateStyle = (float)Random.Shared.NextDouble() > 0.5f ? RomanceStyle.Switch : RomanceStyle.Adventurous;
+                profile.RelationshipPref = (float)Random.Shared.NextDouble() > 0.6f ? RelationshipPreference.Polyamorous : RelationshipPreference.Undecided;
                 break;
 
             case "craftsman":
@@ -378,7 +377,7 @@ public class PersonalityProfile
 
         // Randomly assign orientation — heterosexual is the vast majority,
         // non-hetero relationships are rare flavor (~1-2% of the population)
-        float orientationRoll = GD.Randf();
+        float orientationRoll = (float)Random.Shared.NextDouble();
         if (orientationRoll < 0.96f)
             profile.Orientation = SexualOrientation.Straight;
         else if (orientationRoll < 0.975f)
@@ -391,7 +390,7 @@ public class PersonalityProfile
         // Randomly assign relationship preference if not already set by archetype
         if (profile.RelationshipPref == RelationshipPreference.Undecided)
         {
-            float relPrefRoll = GD.Randf();
+            float relPrefRoll = (float)Random.Shared.NextDouble();
             if (relPrefRoll < 0.60f)
                 profile.RelationshipPref = RelationshipPreference.Monogamous;
             else if (relPrefRoll < 0.75f)

@@ -1,5 +1,4 @@
 using UsurperRemake.Utils;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +9,7 @@ using System.Threading.Tasks;
 /// Provides sophisticated NPC inventory management, gang warfare, and relationship systems
 /// Direct Pascal compatibility with exact function preservation
 /// </summary>
-public class EnhancedNPCBehaviorSystem : Node
+public class EnhancedNPCBehaviorSystem
 {
     // MailSystem and RelationshipSystem are static - no need to instantiate
     private Random random = new Random();
@@ -25,17 +24,7 @@ public class EnhancedNPCBehaviorSystem : Node
     private Dictionary<string, NPCGangData> gangData = new();
     private List<string> activeGangs = new();
     
-    public override void _Ready()
-    {
-        // Remove GetNode calls for static systems - these are static classes, not Nodes
-        // MailSystem, NewsSystem, and RelationshipSystem are static and don't need to be retrieved as Nodes
-        
-        // Initialize any non-static systems here if needed
-        random = new Random();
-        npcMaintenanceData = new Dictionary<string, NPCMaintenanceData>();
-        gangData = new Dictionary<string, NPCGangData>();
-        activeGangs = new List<string>();
-    }
+    // All systems are static singletons — no initialization needed beyond field initializers
     
     #region Pascal NPC_CHEC.PAS - Inventory Management
     

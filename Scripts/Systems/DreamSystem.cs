@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 namespace UsurperRemake.Systems
 {
@@ -511,7 +510,6 @@ namespace UsurperRemake.Systems
                 }
             }
 
-            GD.Print($"[Dream] Player experienced dream: {dreamId}");
         }
 
         /// <summary>
@@ -531,9 +529,9 @@ namespace UsurperRemake.Systems
             if (!eligible.Any()) return null;
 
             // 30% chance to trigger a vision when entering a new room
-            if (GD.RandRange(0, 100) > 30) return null;
+            if (Random.Shared.Next(0, 101) > 30) return null;
 
-            var vision = eligible[GD.RandRange(0, eligible.Count - 1)];
+            var vision = eligible[Random.Shared.Next(0, eligible.Count)];
 
             // Mark as seen so it won't repeat
             SeenDungeonVisions.Add(vision.Id);
@@ -753,7 +751,6 @@ namespace UsurperRemake.Systems
             SeenDungeonVisions = new HashSet<string>();
             _lastDreamId = "";
             _restsSinceLastDream = 0;
-            GD.Print("[Dream] System reset for new game");
         }
     }
 

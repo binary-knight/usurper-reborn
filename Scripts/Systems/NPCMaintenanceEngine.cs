@@ -1,6 +1,5 @@
 using UsurperRemake;
 using UsurperRemake.Utils;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +9,7 @@ using System.Threading.Tasks;
 /// NPC Maintenance Engine for automated NPC behaviors
 /// Pascal NPCMAINT.PAS integration with existing AI systems
 /// </summary>
-public class NPCMaintenanceEngine : Node
+public class NPCMaintenanceEngine
 {
     private EnhancedNPCBehaviorSystem behaviorSystem;
     private WorldSimulator worldSimulator;
@@ -28,12 +27,12 @@ public class NPCMaintenanceEngine : Node
     private Dictionary<string, NPCShoppingProfile> shoppingProfiles = new();
     private Dictionary<CharacterClass, ShopPreferences> classShopPreferences = new();
     
-    public override void _Ready()
+    public void Initialize()
     {
-        behaviorSystem = GetNode<EnhancedNPCBehaviorSystem>("/root/EnhancedNPCBehaviorSystem");
-        worldSimulator = GetNode<WorldSimulator>("/root/WorldSimulator");
-        locationManager = GetNode<LocationManager>("/root/LocationManager");
-        
+        behaviorSystem = new EnhancedNPCBehaviorSystem();
+        worldSimulator = WorldSimulator.Instance ?? new WorldSimulator();
+        locationManager = LocationManager.Instance;
+
         InitializeShopPreferences();
     }
     

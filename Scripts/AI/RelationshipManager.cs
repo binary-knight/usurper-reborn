@@ -2,7 +2,6 @@ using UsurperRemake.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Godot;
 
 public partial class RelationshipManager
 {
@@ -21,7 +20,6 @@ public partial class RelationshipManager
         
         if (oldType != type)
         {
-            GD.Print($"[Relationships] Relationship with {characterId} changed from {oldType} to {type}");
         }
     }
     

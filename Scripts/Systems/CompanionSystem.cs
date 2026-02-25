@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Godot;
 using UsurperRemake.Utils;
 
 namespace UsurperRemake.Systems
@@ -289,7 +288,6 @@ namespace UsurperRemake.Systems
                 TeachesAcceptance = true
             };
 
-            GD.Print($"[CompanionSystem] Initialized {companions.Count} companions");
         }
 
         #region Companion Management

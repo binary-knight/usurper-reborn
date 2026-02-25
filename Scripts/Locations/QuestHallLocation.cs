@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Godot;
 
 /// <summary>
 /// Quest Hall Location - Where players can view and claim quests/bounties

@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using Godot;
 
 /// <summary>
 /// Mail System - Complete Pascal-compatible mail and messaging system

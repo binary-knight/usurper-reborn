@@ -1,7 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.BBS;
-using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1974,7 +1973,7 @@ public class MainStreetLocation : BaseLocation
     private string GetWeather()
     {
         var weather = new[] { "clear", "cloudy", "misty", "cool", "warm", "breezy" };
-        return weather[GD.RandRange(0, weather.Length - 1)];
+        return weather[Random.Shared.Next(0, weather.Length)];
     }
     
     private int GetPlayerRank()
