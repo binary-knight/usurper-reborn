@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.47.1";
+    public const string Version = "0.47.2";
     public const string VersionName = "Prestige";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -77,6 +77,12 @@ public static partial class GameConfig
     /// Message of the Day - displayed to players on login
     /// </summary>
     public static string MessageOfTheDay { get; set; } = "Thanks for playing Usurper Reborn! Report bugs with the in-game ! command.";
+
+    /// <summary>
+    /// When true, the [O]nline Multiplayer option is hidden from BBS door players.
+    /// SysOps can set this to keep their players on the local BBS game only.
+    /// </summary>
+    public static bool DisableOnlinePlay { get; set; } = false;
 
     /// <summary>
     /// Default daily turns for new characters (default: 325 to match TurnsPerDay)

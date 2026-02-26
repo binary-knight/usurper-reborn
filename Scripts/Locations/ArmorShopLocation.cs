@@ -60,7 +60,7 @@ public class ArmorShopLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
-        if (DoorMode.IsInDoorMode && currentPlayer != null && currentPlayer.ArmHag >= 1)
+        if (IsBBSSession && currentPlayer != null && currentPlayer.ArmHag >= 1)
         {
             if (currentSlotCategory == null) { DisplayLocationBBS(); return; }
         }

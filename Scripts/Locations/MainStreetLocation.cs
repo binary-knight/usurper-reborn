@@ -72,7 +72,7 @@ public class MainStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
 
-        if (DoorMode.IsInDoorMode)
+        if (IsBBSSession)
         {
             DisplayLocationBBS();
             return;
@@ -2815,8 +2815,10 @@ public class MainStreetLocation : BaseLocation
         // In online/BBS mode, restrict dev menu to authorized users only
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
-            // Online mode: only "Rage" (the game admin) can access
-            if (!string.Equals(currentPlayer?.Name1, "Rage", StringComparison.OrdinalIgnoreCase))
+            // Online mode: only authorized admins can access
+            var playerName = currentPlayer?.Name1;
+            if (!string.Equals(playerName, "Rage", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(playerName, "fastfinge", StringComparison.OrdinalIgnoreCase))
             {
                 terminal.SetColor("red");
                 terminal.WriteLine("  Access denied.");

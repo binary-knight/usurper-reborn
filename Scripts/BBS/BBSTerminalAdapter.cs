@@ -33,26 +33,28 @@ namespace UsurperRemake.BBS
             Instance = this;
         }
 
-        // ANSI color codes for stdio mode
+        // BBS-compatible ANSI color codes using bold attribute for bright colors.
+        // Traditional BBS terminals expect ESC[1;33m (bold+yellow) not ESC[93m (extended bright yellow).
+        // Uses "0;" prefix on standard colors to reset bold when transitioning from bright colors.
         private static readonly Dictionary<string, string> AnsiColorCodes = new()
         {
-            { "black", "30" },
-            { "red", "31" }, { "bright_red", "91" },
-            { "green", "32" }, { "bright_green", "92" },
-            { "yellow", "33" }, { "bright_yellow", "93" },
-            { "blue", "34" }, { "bright_blue", "94" },
-            { "magenta", "35" }, { "bright_magenta", "95" },
-            { "cyan", "36" }, { "bright_cyan", "96" },
-            { "white", "37" }, { "bright_white", "97" },
-            { "gray", "90" }, { "grey", "90" },
-            { "darkgray", "90" }, { "dark_gray", "90" },
-            { "darkred", "31" }, { "dark_red", "31" },
-            { "darkgreen", "32" }, { "dark_green", "32" },
-            { "dim_green", "2;32" },
-            { "darkyellow", "33" }, { "dark_yellow", "33" }, { "brown", "33" },
-            { "darkblue", "34" }, { "dark_blue", "34" },
-            { "darkmagenta", "35" }, { "dark_magenta", "35" },
-            { "darkcyan", "36" }, { "dark_cyan", "36" }
+            { "black", "0;30" },
+            { "red", "0;31" }, { "bright_red", "1;31" },
+            { "green", "0;32" }, { "bright_green", "1;32" },
+            { "yellow", "0;33" }, { "bright_yellow", "1;33" },
+            { "blue", "0;34" }, { "bright_blue", "1;34" },
+            { "magenta", "0;35" }, { "bright_magenta", "1;35" },
+            { "cyan", "0;36" }, { "bright_cyan", "1;36" },
+            { "white", "0;37" }, { "bright_white", "1;37" },
+            { "gray", "0;37" }, { "grey", "0;37" },
+            { "darkgray", "1;30" }, { "dark_gray", "1;30" },
+            { "darkred", "0;31" }, { "dark_red", "0;31" },
+            { "darkgreen", "0;32" }, { "dark_green", "0;32" },
+            { "dim_green", "0;32" },
+            { "darkyellow", "0;33" }, { "dark_yellow", "0;33" }, { "brown", "0;33" },
+            { "darkblue", "0;34" }, { "dark_blue", "0;34" },
+            { "darkmagenta", "0;35" }, { "dark_magenta", "0;35" },
+            { "darkcyan", "0;36" }, { "dark_cyan", "0;36" }
         };
 
         // WWIV heart codes: Ctrl-C (ASCII 3) + digit 0-7
@@ -90,6 +92,12 @@ namespace UsurperRemake.BBS
 
         public BBSSessionInfo SessionInfo => _sessionInfo;
         public bool IsConnected => _socketTerminal?.IsConnected ?? false;
+
+        /// <summary>
+        /// Get the raw BBS socket output stream for direct byte relay.
+        /// Returns null if in stdio mode (no socket — use Console.Out instead).
+        /// </summary>
+        public System.IO.Stream? GetRawOutputStream() => _socketTerminal?.GetRawOutputStream();
 
         #region Output Methods
 
@@ -217,6 +225,22 @@ namespace UsurperRemake.BBS
         public void Write(string text)
         {
             Write(text, _currentColor);
+        }
+
+        /// <summary>
+        /// Write raw text without prepending any color codes.
+        /// Used by PipeIO relay to pass server ANSI output through untouched.
+        /// </summary>
+        public void WriteRaw(string text)
+        {
+            if (_sessionInfo.CommType == ConnectionType.Local)
+            {
+                Console.Write(text);
+            }
+            else if (_socketTerminal != null)
+            {
+                _socketTerminal.WriteAsync(text).GetAwaiter().GetResult();
+            }
         }
 
         public void SetColor(string color)

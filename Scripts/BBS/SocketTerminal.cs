@@ -56,47 +56,50 @@ namespace UsurperRemake.BBS
         private const string CSI = "\x1b[";
 
         // ANSI color codes
+        // BBS-compatible ANSI color codes using bold attribute (SGR 1) for bright colors.
+        // Traditional BBS terminals expect ESC[1;33m (bold+yellow) not ESC[93m (extended bright yellow).
+        // Uses "0;" prefix on standard colors to reset bold when transitioning from bright colors.
         private static readonly Dictionary<string, string> AnsiColors = new()
         {
-            // Standard colors (30-37)
-            { "black", "30" },
-            { "red", "31" },
-            { "green", "32" },
-            { "yellow", "33" },
-            { "blue", "34" },
-            { "magenta", "35" },
-            { "cyan", "36" },
-            { "white", "37" },
-            { "gray", "90" },
-            { "grey", "90" },
+            // Standard colors with explicit reset (0;3X clears bold)
+            { "black", "0;30" },
+            { "red", "0;31" },
+            { "green", "0;32" },
+            { "yellow", "0;33" },
+            { "blue", "0;34" },
+            { "magenta", "0;35" },
+            { "cyan", "0;36" },
+            { "white", "0;37" },
+            { "gray", "0;37" },
+            { "grey", "0;37" },
 
-            // Dark variants (use dim attribute)
-            { "darkred", "31" },
-            { "dark_red", "31" },
-            { "darkgreen", "32" },
-            { "dark_green", "32" },
-            { "darkyellow", "33" },
-            { "dark_yellow", "33" },
-            { "brown", "33" },
-            { "darkblue", "34" },
-            { "dark_blue", "34" },
-            { "darkmagenta", "35" },
-            { "dark_magenta", "35" },
-            { "darkcyan", "36" },
-            { "dark_cyan", "36" },
-            { "darkgray", "90" },
-            { "dark_gray", "90" },
-            { "darkgrey", "90" },
+            // Dark variants with explicit reset
+            { "darkred", "0;31" },
+            { "dark_red", "0;31" },
+            { "darkgreen", "0;32" },
+            { "dark_green", "0;32" },
+            { "darkyellow", "0;33" },
+            { "dark_yellow", "0;33" },
+            { "brown", "0;33" },
+            { "darkblue", "0;34" },
+            { "dark_blue", "0;34" },
+            { "darkmagenta", "0;35" },
+            { "dark_magenta", "0;35" },
+            { "darkcyan", "0;36" },
+            { "dark_cyan", "0;36" },
+            { "darkgray", "1;30" },
+            { "dark_gray", "1;30" },
+            { "darkgrey", "1;30" },
 
-            // Bright variants (90-97)
-            { "bright_black", "90" },
-            { "bright_red", "91" },
-            { "bright_green", "92" },
-            { "bright_yellow", "93" },
-            { "bright_blue", "94" },
-            { "bright_magenta", "95" },
-            { "bright_cyan", "96" },
-            { "bright_white", "97" }
+            // Bright variants using bold (1;3X)
+            { "bright_black", "1;30" },
+            { "bright_red", "1;31" },
+            { "bright_green", "1;32" },
+            { "bright_yellow", "1;33" },
+            { "bright_blue", "1;34" },
+            { "bright_magenta", "1;35" },
+            { "bright_cyan", "1;36" },
+            { "bright_white", "1;37" }
         };
 
         // Unicode to CP437 character mapping for BBS compatibility
@@ -246,6 +249,20 @@ namespace UsurperRemake.BBS
 
         public bool IsConnected => _socket?.Connected ?? false;
         public BBSSessionInfo SessionInfo => _sessionInfo;
+
+        /// <summary>
+        /// Get the raw output stream for direct byte-level relay (bypasses all encoding/color).
+        /// Returns the raw handle stream or network stream, whichever is active.
+        /// Returns null if in stdio/local mode (no socket).
+        /// </summary>
+        public Stream? GetRawOutputStream()
+        {
+            if (_usingRawHandle && _rawHandleStream != null)
+                return _rawHandleStream;
+            if (_stream != null)
+                return _stream;
+            return null;
+        }
 
         public SocketTerminal(BBSSessionInfo sessionInfo)
         {

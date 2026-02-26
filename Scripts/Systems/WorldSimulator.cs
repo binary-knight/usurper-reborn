@@ -479,6 +479,15 @@ public class WorldSimulator
             return false;
         }
 
+        // NPCs on a player's team are protected from world sim kills
+        if (IsPlayerTeam(npc.Team))
+        {
+            // Heal them back up instead of killing — they're an active team member
+            npc.HP = Math.Max(1, npc.MaxHP / 4);
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Skipping death for {npc.Name} — on player team '{npc.Team}'");
+            return false;
+        }
+
         npc.IsDead = true;
         npc.HP = 0;
         CheckKingDeath(npc);
@@ -1523,6 +1532,10 @@ public class WorldSimulator
     /// </summary>
     private void ProcessNPCActivities(NPC npc, WorldState world)
     {
+        // Player team NPCs don't do autonomous activities (dungeon runs, shopping, etc.)
+        // They could die in simulated dungeon combat, causing the "disappeared from team" bug
+        if (IsPlayerTeam(npc.Team)) return;
+
         // Chance per tick to do something interesting
         // Online: 5% (was 15%) — more realistic pacing for persistent server
         // Single-player: 15% (unchanged)
@@ -3684,6 +3697,9 @@ public class WorldSimulator
         // Don't attack NPCs engaged with a player (in conversation, dungeon party, etc.)
         if (target.IsInConversation || npc.IsInConversation) return;
 
+        // Don't attack NPCs on a player's team, and don't let player team NPCs start brawls
+        if (IsPlayerTeam(target.Team) || IsPlayerTeam(npc.Team)) return;
+
         // Multi-round combat simulation (like a real fight, not a single punch)
         int rounds = 0;
         const int maxRounds = 30;
@@ -4718,6 +4734,9 @@ public class WorldSimulator
 
         foreach (var npc in enemies)
         {
+            // Player team NPCs don't participate in world sim brawls
+            if (IsPlayerTeam(npc.Team)) continue;
+
             // Clean corrupt self-references from enemy list
             npc.Enemies.RemoveAll(eid => eid == npc.Id);
             if (npc.Enemies.Count == 0) continue;
@@ -4730,6 +4749,7 @@ public class WorldSimulator
                 var enemy = npcs.FirstOrDefault(n => n.Id == enemyId);
                 if (enemy == null || enemy.Id == npc.Id) continue; // skip self (corrupt enemy list)
                 if (!enemy.IsAlive || enemy.IsDead) continue;
+                if (IsPlayerTeam(enemy.Team)) continue; // Don't target player team members
                 if ((float)Random.Shared.NextDouble() >= escalationChance) continue;
 
                 // Must be at same location to escalate

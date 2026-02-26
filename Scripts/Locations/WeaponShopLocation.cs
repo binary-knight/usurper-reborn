@@ -51,7 +51,7 @@ public class WeaponShopLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
-        if (DoorMode.IsInDoorMode && currentPlayer != null && currentPlayer.WeapHag >= 1)
+        if (IsBBSSession && currentPlayer != null && currentPlayer.WeapHag >= 1)
         {
             if (currentCategory == null) { DisplayLocationBBS(); return; }
         }

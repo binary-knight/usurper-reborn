@@ -54,6 +54,20 @@ public abstract class BaseLocation
     private List<UsurperRemake.Systems.OnlinePlayerInfo> _coPresenceCache = new();
     private DateTime _coPresenceCacheTime = DateTime.MinValue;
 
+    /// <summary>
+    /// True when this session should use compact BBS menus (80x24 terminal).
+    /// Covers both single-player BBS door mode and MUD server BBS connections.
+    /// </summary>
+    protected static bool IsBBSSession
+    {
+        get
+        {
+            if (DoorMode.IsInDoorMode) return true;
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            return ctx?.ConnectionType == "BBS";
+        }
+    }
+
     public BaseLocation(GameLocation locationId, string name, string description)
     {
         LocationId = locationId;

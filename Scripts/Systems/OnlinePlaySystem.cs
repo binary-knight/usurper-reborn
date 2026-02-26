@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -9,17 +10,13 @@ using Renci.SshNet;
 namespace UsurperRemake.Systems
 {
     /// <summary>
-    /// Client-side system for connecting to an online Usurper Reborn MUD server via SSH.
-    /// Connects to the game server's SSH gateway (usurper@server:4000), which runs a relay
-    /// that bridges to the MUD game server. Authentication (Login/Register) and credential
-    /// storage are handled locally, with AUTH headers sent through the encrypted SSH channel.
+    /// Client-side system for connecting to an online Usurper Reborn MUD server.
     ///
-    /// Flow:
-    ///   1. SSH connect to server:4000 as gateway user "usurper" / password "play"
-    ///   2. sshd ForceCommand launches relay client
-    ///   3. Client sends AUTH:username:password:connectionType through SSH shell
-    ///   4. Relay authenticates with MUD server and bridges I/O
-    ///   5. All game traffic flows through the encrypted SSH tunnel
+    /// Two connection modes:
+    ///   - BBS door mode: Direct TCP to server:4000 (sslh routes raw TCP to MUD server).
+    ///     Sends AUTH header directly on the TCP stream. No SSH overhead or echo issues.
+    ///   - Local/Steam mode: SSH to server:4000 as gateway user "usurper"/"play".
+    ///     sshd ForceCommand launches relay client which bridges to MUD server.
     /// </summary>
     public class OnlinePlaySystem
     {
@@ -30,10 +27,16 @@ namespace UsurperRemake.Systems
         private const string CREDENTIALS_FILE = "online_credentials.json";
 
         private readonly TerminalEmulator terminal;
+        // SSH mode (Local/Steam)
         private SshClient? sshClient;
         private ShellStream? shellStream;
+        // TCP mode (BBS)
+        private TcpClient? tcpClient;
+        private NetworkStream? tcpStream;
+        // Shared
         private CancellationTokenSource? cancellationSource;
         private bool vtProcessingEnabled = false;
+        private bool useTcpMode = false;
 
         public OnlinePlaySystem(TerminalEmulator terminal)
         {
@@ -158,20 +161,180 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Connect to the MUD server via SSH, authenticate, and pipe I/O.
-        /// Shows a Login/Register menu, sends AUTH header through SSH tunnel, then bridges I/O.
+        /// Establish a direct TCP connection to the game server (for BBS door mode).
+        /// sslh on port 4000 routes non-SSH traffic to the MUD server on port 4001.
+        /// </summary>
+        private async Task<bool> EstablishTcpConnection(string server, int port)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  Connecting to {server}:{port} (telnet)...");
+
+            try
+            {
+                tcpClient = new TcpClient();
+                tcpClient.NoDelay = true;
+                // sslh needs a moment to detect protocol — connect with timeout
+                var connectTask = tcpClient.ConnectAsync(server, port);
+                if (await Task.WhenAny(connectTask, Task.Delay(10000)) != connectTask)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("  Connection timed out.");
+                    return false;
+                }
+                await connectTask; // propagate any exception
+
+                tcpStream = tcpClient.GetStream();
+                tcpStream.ReadTimeout = 30000;
+                tcpStream.WriteTimeout = 10000;
+
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("  Connected!");
+                terminal.WriteLine("");
+                return true;
+            }
+            catch (SocketException ex)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"  Connection failed: {ex.Message}");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  The server may be down or unreachable.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"  Error: {ex.Message}");
+                DebugLogger.Instance.LogError("ONLINE_PLAY", $"TCP connection error: {ex}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Write a string to the active connection (SSH shell stream or TCP stream).
+        /// </summary>
+        private void WriteToServer(string text)
+        {
+            if (useTcpMode && tcpStream != null)
+            {
+                var bytes = Encoding.UTF8.GetBytes(text);
+                tcpStream.Write(bytes, 0, bytes.Length);
+                tcpStream.Flush();
+            }
+            else if (shellStream != null)
+            {
+                shellStream.Write(text);
+                shellStream.Flush();
+            }
+        }
+
+        /// <summary>
+        /// Read a line response from the active connection (AUTH response).
+        /// Waits up to timeout for OK or ERR: response.
+        /// </summary>
+        private async Task<string?> ReadAuthResponse()
+        {
+            if (useTcpMode)
+                return await ReadLineFromTcp();
+            else
+                return await ReadLineFromShell();
+        }
+
+        /// <summary>
+        /// Read an AUTH response from the TCP stream.
+        /// Uses blocking ReadAsync with cancellation instead of polling DataAvailable,
+        /// because the server may send ERR: and close the connection simultaneously.
+        /// </summary>
+        private async Task<string?> ReadLineFromTcp()
+        {
+            try
+            {
+                var result = new StringBuilder();
+                var buffer = new byte[4096];
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+                while (!cts.Token.IsCancellationRequested)
+                {
+                    int read = await tcpStream!.ReadAsync(buffer, 0, buffer.Length, cts.Token);
+                    if (read == 0)
+                    {
+                        // Connection closed — return whatever we have
+                        break;
+                    }
+
+                    result.Append(Encoding.UTF8.GetString(buffer, 0, read));
+
+                    // Check for auth response markers
+                    var text = result.ToString();
+                    var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        var trimmed = line.Trim();
+                        if (trimmed == "OK" || trimmed.StartsWith("ERR:"))
+                            return text;
+                    }
+                }
+
+                return result.Length > 0 ? result.ToString() : null;
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Check if the connection is still alive.
+        /// </summary>
+        private bool IsConnected()
+        {
+            if (useTcpMode)
+                return tcpClient?.Connected == true;
+            else
+                return sshClient?.IsConnected == true;
+        }
+
+        /// <summary>
+        /// Connect to the MUD server, authenticate, and pipe I/O.
+        /// BBS mode uses direct TCP; Local/Steam uses SSH tunnel.
         /// </summary>
         private async Task ConnectAndPlay(string server, int port)
         {
-            if (!EstablishSSHConnection(server, port))
+            // Detect telnet BBS: socket mode (raw handle) means the BBS user connected via telnet.
+            // In that case, use direct TCP to MUD server on port 4001 — SSH relay output goes
+            // through SocketTerminal which strips ANSI colors, but raw TCP bytes are clean.
+            // SSH BBS (stdio mode) and Local/Steam use SSH tunnel on port 4000.
+            bool isTelnetBBS = UsurperRemake.BBS.DoorMode.IsInDoorMode
+                && UsurperRemake.BBS.BBSTerminalAdapter.Instance?.GetRawOutputStream() != null;
+            useTcpMode = isTelnetBBS;
+
+            bool connected;
+            if (useTcpMode)
+            {
+                // Direct TCP to MUD server on port 4001 (bypasses sslh on 4000)
+                connected = await EstablishTcpConnection(server, 4001);
+            }
+            else
+            {
+                connected = EstablishSSHConnection(server, port);
+            }
+
+            if (!connected)
             {
                 await terminal.PressAnyKey();
                 return;
             }
 
-            // Drain any initial relay output (menu banner) before sending AUTH
-            await Task.Delay(500);
-            DrainShellStream();
+            if (!useTcpMode)
+            {
+                // SSH mode: drain relay banner before sending AUTH
+                await Task.Delay(500);
+                DrainShellStream();
+            }
 
             // Auth loop — prompt for Login/Register until success or user quits
             bool authenticated = false;
@@ -192,10 +355,9 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine($"  Logging in as {savedCreds.Username}...");
 
                     string authLine = $"AUTH:{savedCreds.Username}:{savedCreds.GetDecodedPassword()}:{GetConnectionType()}\n";
-                    shellStream!.Write(authLine);
-                    shellStream.Flush();
+                    WriteToServer(authLine);
 
-                    var response = await ReadLineFromShell();
+                    var response = await ReadAuthResponse();
                     if (response != null && response.Contains("OK"))
                     {
                         terminal.SetColor("bright_green");
@@ -216,15 +378,21 @@ namespace UsurperRemake.Systems
                         DeleteSavedCredentials();
                         savedCreds = null;
 
-                        // Reconnect SSH for next attempt
+                        // Reconnect for next attempt
                         Disconnect();
-                        if (!EstablishSSHConnection(server, port))
+                        bool reconnected = useTcpMode
+                            ? await EstablishTcpConnection(server, 4001)
+                            : EstablishSSHConnection(server, port);
+                        if (!reconnected)
                         {
                             await terminal.PressAnyKey();
                             return;
                         }
-                        await Task.Delay(500);
-                        DrainShellStream();
+                        if (!useTcpMode)
+                        {
+                            await Task.Delay(500);
+                            DrainShellStream();
+                        }
                     }
                 }
 
@@ -287,7 +455,7 @@ namespace UsurperRemake.Systems
                     if (string.IsNullOrEmpty(username)) continue;
 
                     terminal.Write("  Password: ", "bright_white");
-                    password = (await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true))).Trim();
+                    password = (await terminal.GetMaskedInput()).Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                 }
                 else if (choice == "R")
@@ -307,7 +475,7 @@ namespace UsurperRemake.Systems
                     }
 
                     terminal.Write("  Choose a password: ", "bright_green");
-                    password = (await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true))).Trim();
+                    password = (await terminal.GetMaskedInput()).Trim();
                     if (string.IsNullOrEmpty(password)) continue;
 
                     if (password.Length < 4)
@@ -319,7 +487,7 @@ namespace UsurperRemake.Systems
                     }
 
                     terminal.Write("  Confirm password: ", "bright_green");
-                    var confirm = (await Task.Run(() => TerminalEmulator.ReadLineWithBackspace(maskPassword: true))).Trim();
+                    var confirm = (await terminal.GetMaskedInput()).Trim();
                     if (password != confirm)
                     {
                         terminal.SetColor("bright_red");
@@ -335,7 +503,7 @@ namespace UsurperRemake.Systems
                     continue; // Invalid choice
                 }
 
-                // Send AUTH header through SSH tunnel to the relay
+                // Send AUTH header to the server
                 string connType = GetConnectionType();
                 string authHeader;
                 if (isRegistration)
@@ -345,8 +513,7 @@ namespace UsurperRemake.Systems
 
                 try
                 {
-                    shellStream!.Write(authHeader);
-                    shellStream.Flush();
+                    WriteToServer(authHeader);
                 }
                 catch
                 {
@@ -357,8 +524,8 @@ namespace UsurperRemake.Systems
                     return;
                 }
 
-                // Read response from relay (may include relay menu output mixed in)
-                var authResponse = await ReadLineFromShell();
+                // Read AUTH response
+                var authResponse = await ReadAuthResponse();
                 if (authResponse == null)
                 {
                     terminal.SetColor("bright_red");
@@ -381,15 +548,21 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine($"  {errText}");
                     terminal.WriteLine("");
 
-                    // Reconnect SSH for next attempt
+                    // Reconnect for next attempt
                     Disconnect();
-                    if (!EstablishSSHConnection(server, port))
+                    bool reconnected = useTcpMode
+                        ? await EstablishTcpConnection(server, 4001)
+                        : EstablishSSHConnection(server, port);
+                    if (!reconnected)
                     {
                         await terminal.PressAnyKey();
                         return;
                     }
-                    await Task.Delay(500);
-                    DrainShellStream();
+                    if (!useTcpMode)
+                    {
+                        await Task.Delay(500);
+                        DrainShellStream();
+                    }
                     continue;
                 }
 
@@ -517,6 +690,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         private static string GetConnectionType()
         {
+            if (UsurperRemake.BBS.DoorMode.IsInDoorMode) return "BBS";
 #if STEAM_BUILD
             return "Steam";
 #else
@@ -525,25 +699,29 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Pipe input/output between the local console and the remote SSH shell stream.
-        /// The remote game sends ANSI escape codes for colors. We use a fallback ANSI
-        /// parser that translates escape codes to Console.ForegroundColor calls.
-        /// Runs until the connection is closed or the player disconnects (Ctrl+]).
+        /// Pipe input/output between the local terminal and the remote game server.
+        /// TCP mode: reads/writes directly on NetworkStream.
+        /// SSH mode: reads/writes on ShellStream (SSH tunnel).
         /// </summary>
         private async Task PipeIO(CancellationToken ct)
         {
-            // Always use our fallback ANSI parser which translates escape codes to
-            // Console.ForegroundColor calls. Windows VT processing claims to work
-            // (escape chars get consumed) but often fails to actually render colors.
             vtProcessingEnabled = false;
 
-            Console.OutputEncoding = Encoding.UTF8;
+            if (!UsurperRemake.BBS.DoorMode.IsInDoorMode)
+                Console.OutputEncoding = Encoding.UTF8;
 
-            terminal.SetColor("gray");
-            terminal.WriteLine("  Press Ctrl+] to disconnect.");
-            terminal.WriteLine("");
+            // For telnet BBS: get the raw BBS socket stream for direct byte relay.
+            // This bypasses all terminal/encoding processing, preserving ANSI colors.
+            Stream? bbsRawStream = UsurperRemake.BBS.BBSTerminalAdapter.Instance?.GetRawOutputStream();
 
-            // Read thread: read from SSH shell and write to Console.Out
+            if (!useTcpMode)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Press Ctrl+] to disconnect.");
+                terminal.WriteLine("");
+            }
+
+            // Read task: server → local terminal
             var readTask = Task.Run(async () =>
             {
                 var buffer = new byte[4096];
@@ -551,26 +729,53 @@ namespace UsurperRemake.Systems
                 {
                     while (!ct.IsCancellationRequested)
                     {
-                        if (shellStream!.DataAvailable)
+                        int bytesRead = 0;
+                        bool dataAvailable = false;
+
+                        if (useTcpMode)
                         {
-                            int bytesRead = shellStream.Read(buffer, 0, buffer.Length);
+                            dataAvailable = tcpStream?.DataAvailable == true;
+                            if (dataAvailable)
+                                bytesRead = await tcpStream!.ReadAsync(buffer, 0, buffer.Length, ct);
+                        }
+                        else
+                        {
+                            dataAvailable = shellStream?.DataAvailable == true;
+                            if (dataAvailable)
+                                bytesRead = shellStream!.Read(buffer, 0, buffer.Length);
+                        }
+
+                        if (dataAvailable)
+                        {
                             if (bytesRead == 0) break; // Server closed connection
 
-                            var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                            if (vtProcessingEnabled)
+                            if (bbsRawStream != null)
                             {
-                                Console.Write(text);
+                                // Telnet BBS: write raw bytes directly to BBS socket.
+                                // Bypasses all terminal/encoding processing — ANSI colors preserved.
+                                bbsRawStream.Write(buffer, 0, bytesRead);
+                                bbsRawStream.Flush();
                             }
                             else
                             {
-                                WriteAnsiToConsole(text);
+                                var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                                if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
+                                {
+                                    terminal.WriteRawAnsi(text);
+                                }
+                                else if (vtProcessingEnabled)
+                                {
+                                    Console.Write(text);
+                                }
+                                else
+                                {
+                                    WriteAnsiToConsole(text);
+                                }
                             }
                         }
                         else
                         {
-                            // Check if SSH is still connected
-                            if (sshClient == null || !sshClient.IsConnected)
-                                break;
+                            if (!IsConnected()) break;
                             await Task.Delay(10, ct);
                         }
                     }
@@ -582,58 +787,75 @@ namespace UsurperRemake.Systems
                 {
                     DebugLogger.Instance.LogError("ONLINE_PLAY", $"Read error: {ex.Message}");
                 }
+                finally
+                {
+                    if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
+                        terminal.WriteLine("\r\n  Server closed the connection. Press Enter to return.");
+                }
             }, ct);
 
-            // Write loop: buffer input locally and send complete lines on Enter.
-            // All line editing (backspace, character echo) is handled locally.
-            // PTY echo is disabled, so we don't get corrupted echo responses.
-            var inputBuffer = new StringBuilder();
             try
             {
-                while (!ct.IsCancellationRequested)
+                if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
                 {
-                    // Check if the read task ended (server disconnected)
-                    if (readTask.IsCompleted)
-                        break;
-
-                    if (Console.KeyAvailable)
+                    // BBS mode: terminal.GetInput() routes through BBS adapter (socket or stdio).
+                    // Input is line-buffered — the player types a command and presses Enter.
+                    // IMPORTANT: Must send "\n" even for empty input — the game has many
+                    // "Press Enter to continue" prompts that require receiving a newline.
+                    while (!ct.IsCancellationRequested)
                     {
-                        var keyInfo = Console.ReadKey(intercept: true);
-
-                        // Ctrl+] = disconnect (classic telnet escape)
-                        if (keyInfo.Key == ConsoleKey.Oem6 && keyInfo.Modifiers.HasFlag(ConsoleModifiers.Control))
-                        {
-                            break;
-                        }
-
-                        if (keyInfo.Key == ConsoleKey.Enter)
-                        {
-                            // Send the complete line to the server
-                            shellStream!.Write(inputBuffer.ToString() + "\n");
-                            shellStream.Flush();
-                            Console.Write("\r\n"); // Local newline echo
-                            inputBuffer.Clear();
-                        }
-                        else if (keyInfo.Key == ConsoleKey.Backspace)
-                        {
-                            // Handle backspace locally — erase last character
-                            if (inputBuffer.Length > 0)
-                            {
-                                inputBuffer.Remove(inputBuffer.Length - 1, 1);
-                                Console.Write("\b \b"); // Visual backspace
-                            }
-                        }
-                        else if (keyInfo.KeyChar >= ' ' && keyInfo.KeyChar != '\x7f')
-                        {
-                            // Printable character — buffer and echo locally
-                            inputBuffer.Append(keyInfo.KeyChar);
-                            Console.Write(keyInfo.KeyChar);
-                        }
-                        // Non-printable keys (arrows, escape, tab) are ignored
+                        if (readTask.IsCompleted) break;
+                        var line = await terminal.GetInput("");
+                        if (readTask.IsCompleted) break;
+                        if (line == null) continue; // null = error/EOF, skip
+                        WriteToServer(line + "\n");
                     }
-                    else
+                }
+                else
+                {
+                    // Local/Steam mode: poll Console.KeyAvailable for non-blocking char-by-char input.
+                    // Ctrl+] disconnects (classic telnet escape).
+                    var inputBuffer = new StringBuilder();
+                    while (!ct.IsCancellationRequested)
                     {
-                        await Task.Delay(10, ct);
+                        if (readTask.IsCompleted)
+                            break;
+
+                        if (Console.KeyAvailable)
+                        {
+                            var keyInfo = Console.ReadKey(intercept: true);
+
+                            // Ctrl+] = disconnect (classic telnet escape)
+                            if (keyInfo.Key == ConsoleKey.Oem6 && keyInfo.Modifiers.HasFlag(ConsoleModifiers.Control))
+                            {
+                                break;
+                            }
+
+                            if (keyInfo.Key == ConsoleKey.Enter)
+                            {
+                                WriteToServer(inputBuffer.ToString() + "\n");
+                                Console.Write("\r\n"); // Local newline echo
+                                inputBuffer.Clear();
+                            }
+                            else if (keyInfo.Key == ConsoleKey.Backspace)
+                            {
+                                if (inputBuffer.Length > 0)
+                                {
+                                    inputBuffer.Remove(inputBuffer.Length - 1, 1);
+                                    Console.Write("\b \b");
+                                }
+                            }
+                            else if (keyInfo.KeyChar >= ' ' && keyInfo.KeyChar != '\x7f')
+                            {
+                                inputBuffer.Append(keyInfo.KeyChar);
+                                Console.Write(keyInfo.KeyChar);
+                            }
+                            // Non-printable keys (arrows, escape, tab) are ignored
+                        }
+                        else
+                        {
+                            await Task.Delay(10, ct);
+                        }
                     }
                 }
             }
@@ -915,6 +1137,16 @@ namespace UsurperRemake.Systems
         {
             cancellationSource?.Cancel();
 
+            // TCP mode cleanup
+            try { tcpStream?.Close(); } catch { }
+            try { tcpStream?.Dispose(); } catch { }
+            tcpStream = null;
+
+            try { tcpClient?.Close(); } catch { }
+            try { tcpClient?.Dispose(); } catch { }
+            tcpClient = null;
+
+            // SSH mode cleanup
             try { shellStream?.Close(); } catch { }
             try { shellStream?.Dispose(); } catch { }
             shellStream = null;

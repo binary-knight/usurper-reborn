@@ -118,6 +118,9 @@ namespace UsurperRemake.Systems
                 case "T":
                     await SetDefaultColorTheme();
                     break;
+                case "O":
+                    await ToggleOnlinePlay();
+                    break;
                 case "Q":
                     return true;
             }
@@ -197,6 +200,9 @@ namespace UsurperRemake.Systems
                 case "T":
                     await SetDefaultColorTheme();
                     break;
+                case "O":
+                    await ToggleOnlinePlay();
+                    break;
                 case "Q":
                     return true;
             }
@@ -254,6 +260,12 @@ namespace UsurperRemake.Systems
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(" Settings:");
             SysOpMenuRow(("4", "Difficulty"), ("5", "MOTD"), ("I", $"Idle:{DoorMode.IdleTimeoutMinutes}m"), ("T", "Theme"));
+            terminal.Write(" ");
+            terminal.SetColor("darkgray"); terminal.Write("[");
+            terminal.SetColor("bright_yellow"); terminal.Write("O");
+            terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor(GameConfig.DisableOnlinePlay ? "red" : "bright_green");
+            terminal.WriteLine(GameConfig.DisableOnlinePlay ? "Online:OFF" : "Online:ON");
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(" Monitoring:");
             SysOpMenuRow(("6", "Stats"), ("7", "DebugLog"), ("8", "NPCs"));
@@ -298,6 +310,12 @@ namespace UsurperRemake.Systems
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(" Settings:");
             SysOpMenuRow(("5", "Difficulty"), ("6", "MOTD"), ("I", $"Idle:{DoorMode.IdleTimeoutMinutes}m"), ("T", "Theme"));
+            terminal.Write(" ");
+            terminal.SetColor("darkgray"); terminal.Write("[");
+            terminal.SetColor("bright_yellow"); terminal.Write("O");
+            terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor(GameConfig.DisableOnlinePlay ? "red" : "bright_green");
+            terminal.WriteLine(GameConfig.DisableOnlinePlay ? "Online:OFF" : "Online:ON");
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(" Monitoring:");
             SysOpMenuRow(("7", "Online"), ("8", "Stats"), ("K", "Kick"), ("D", "DebugLog"), ("N", "NPCs"));
@@ -1322,6 +1340,25 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("Invalid choice.");
             }
             await terminal.GetInputAsync("Press Enter to continue...");
+        }
+
+        private async Task ToggleOnlinePlay()
+        {
+            GameConfig.DisableOnlinePlay = !GameConfig.DisableOnlinePlay;
+            SysOpConfigSystem.Instance.SaveConfig();
+            terminal.WriteLine("");
+            if (GameConfig.DisableOnlinePlay)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(" Online Multiplayer DISABLED — players cannot connect to the online server.");
+            }
+            else
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(" Online Multiplayer ENABLED — players can connect to the online server.");
+            }
+            DebugLogger.Instance.LogInfo("SYSOP", $"Online multiplayer {(GameConfig.DisableOnlinePlay ? "disabled" : "enabled")}");
+            await terminal.GetInputAsync(" Press Enter to continue...");
         }
 
         private async Task SetMOTD()

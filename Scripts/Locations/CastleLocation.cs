@@ -44,7 +44,7 @@ public class CastleLocation : BaseLocation
 
         terminal.ClearScreen();
 
-        if (DoorMode.IsInDoorMode)
+        if (IsBBSSession)
         {
             if (playerIsKing)
                 DisplayRoyalCastleInteriorBBS();

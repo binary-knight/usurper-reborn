@@ -149,7 +149,7 @@ namespace UsurperRemake.Locations
         {
             terminal.ClearScreen();
 
-            if (DoorMode.IsInDoorMode)
+            if (IsBBSSession)
             {
                 DisplayLocationBBS();
                 return;

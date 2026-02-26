@@ -636,8 +636,9 @@ public partial class TerminalEmulator
         }
         else if (ShouldUseBBSAdapter())
         {
-            // BBS adapter: use Write with neutral color; the ANSI codes in text override it
-            BBSTerminalAdapter.Instance!.Write(text, "white");
+            // BBS adapter: pass raw ANSI through without prepending any color codes.
+            // The server output already contains its own ANSI escape sequences.
+            BBSTerminalAdapter.Instance!.WriteRaw(text);
         }
         else
         {
@@ -716,10 +717,48 @@ public partial class TerminalEmulator
         { "darkcyan", "36" }, { "dark_cyan", "36" }
     };
 
+    /// <summary>
+    /// BBS-compatible ANSI codes using bold attribute (SGR 1) for bright colors.
+    /// Many BBS terminals (SyncTERM, NetRunner, mTelnet) only support the traditional
+    /// "bold + standard color" format (e.g., ESC[1;33m) instead of the extended
+    /// bright color codes (ESC[93m). Uses "0;" prefix on standard colors to reset
+    /// bold when switching from a bright color.
+    /// </summary>
+    private static readonly Dictionary<string, string> BbsAnsiColorCodes = new()
+    {
+        { "black", "0;30" },
+        { "red", "0;31" }, { "bright_red", "1;31" },
+        { "green", "0;32" }, { "bright_green", "1;32" },
+        { "yellow", "0;33" }, { "bright_yellow", "1;33" },
+        { "blue", "0;34" }, { "bright_blue", "1;34" },
+        { "magenta", "0;35" }, { "bright_magenta", "1;35" },
+        { "cyan", "0;36" }, { "bright_cyan", "1;36" },
+        { "white", "0;37" }, { "bright_white", "1;37" },
+        { "gray", "0;37" }, { "grey", "0;37" },
+        { "darkgray", "1;30" }, { "dark_gray", "1;30" },
+        { "darkred", "0;31" }, { "dark_red", "0;31" },
+        { "darkgreen", "0;32" }, { "dark_green", "0;32" },
+        { "dim_green", "0;32" },
+        { "darkyellow", "0;33" }, { "dark_yellow", "0;33" }, { "brown", "0;33" },
+        { "darkblue", "0;34" }, { "dark_blue", "0;34" },
+        { "darkmagenta", "0;35" }, { "dark_magenta", "0;35" },
+        { "darkcyan", "0;36" }, { "dark_cyan", "0;36" }
+    };
+
     private string GetAnsiColorCode(string color)
     {
         var resolved = ColorTheme.Resolve(color);
-        if (AnsiColorCodes.TryGetValue(resolved?.ToLower() ?? "white", out var code))
+        var key = resolved?.ToLower() ?? "white";
+
+        // Use BBS-compatible codes (bold for bright) when running as a BBS door
+        if (DoorMode.IsInDoorMode)
+        {
+            if (BbsAnsiColorCodes.TryGetValue(key, out var bbsCode))
+                return bbsCode;
+            return "0;37"; // Default white
+        }
+
+        if (AnsiColorCodes.TryGetValue(key, out var code))
             return code;
         return "37"; // Default white
     }
@@ -1173,7 +1212,20 @@ public partial class TerminalEmulator
                 else if (ch >= 32) // Printable characters only
                 {
                     buffer.Append((char)ch);
-                    if (!bbsEchoes)
+                    if (bbsEchoes)
+                    {
+                        if (maskPassword)
+                        {
+                            // BBS already echoed the real char — overwrite with asterisks
+                            // by restoring cursor to start of input and rewriting masked buffer
+                            Console.Out.Write("\x1b[u");  // Restore cursor to start of input
+                            Console.Out.Write(new string('*', buffer.Length));
+                            Console.Out.Write("\x1b[K");  // Clear any trailing chars
+                            Console.Out.Flush();
+                        }
+                        // else: BBS echo is fine for normal (non-password) input
+                    }
+                    else
                     {
                         Console.Out.Write(maskPassword ? '*' : (char)ch);
                         Console.Out.Flush();

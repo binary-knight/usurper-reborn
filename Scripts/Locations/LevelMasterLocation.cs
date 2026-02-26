@@ -110,7 +110,7 @@ public class LevelMasterLocation : BaseLocation
     {
         terminal.ClearScreen();
 
-        if (DoorMode.IsInDoorMode)
+        if (IsBBSSession)
         {
             DisplayLocationBBS();
             return;

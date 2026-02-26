@@ -376,7 +376,8 @@ public partial class GameEngine
         bool isOnlineAdmin = UsurperRemake.Server.SessionContext.IsActive
             ? (UsurperRemake.Server.SessionContext.Current?.WizardLevel ?? UsurperRemake.Server.WizardLevel.Mortal) >= UsurperRemake.Server.WizardLevel.God
             : UsurperRemake.BBS.DoorMode.IsOnlineMode &&
-                string.Equals(UsurperRemake.BBS.DoorMode.OnlineUsername, "rage", StringComparison.OrdinalIgnoreCase);
+                (string.Equals(UsurperRemake.BBS.DoorMode.OnlineUsername, "rage", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(UsurperRemake.BBS.DoorMode.OnlineUsername, "fastfinge", StringComparison.OrdinalIgnoreCase));
 
         // Peek at main save to check immortal/alt slot status
         bool mainIsImmortal = false;
@@ -414,74 +415,117 @@ public partial class GameEngine
         // Show alt creation option if eligible (has alt slot but no alt character yet)
         bool canCreateAlt = (mainIsImmortal || hasAltSlot) && altSave == null && UsurperRemake.BBS.DoorMode.IsOnlineMode;
 
-        // ── PLAY ──────────────────────────────────────────────────────────────────
-        terminal.SetColor("darkgray");
-        terminal.WriteLine("  ── PLAY ─────────────────────────────────────────────────────────────────");
-        if (mainSave != null)
-            WriteMenuKey("1", $"Play {mainSave.PlayerName}");
-        if (altSave != null)
-            WriteMenuKey("2", $"Play {altSave.PlayerName}");
-        if (canCreateAlt)
-            WriteMenuKey("M", "Create Mortal Alt Character");
-        if (altSave != null)
-            WriteMenuKey("D", "Delete Alt Character");
-        if (mainSave == null)
-            WriteMenuKey("N", "Create new character");
-        else
-            WriteMenuKey("N", "New character (WARNING: Overwrites main!)");
+        // Compact BBS menu (fits 24-line terminals) vs full menu for MUD/local
+        bool compactMenu = UsurperRemake.BBS.DoorMode.IsInDoorMode;
+        bool showOnline = !UsurperRemake.BBS.DoorMode.IsMudServerMode && !UsurperRemake.BBS.DoorMode.IsMudRelayMode
+            && !GameConfig.DisableOnlinePlay;
 
-        terminal.WriteLine("");
-
-        // ── INFO ──────────────────────────────────────────────────────────────────
-        terminal.SetColor("darkgray");
-        terminal.WriteLine("  ── INFO ─────────────────────────────────────────────────────────────────");
-        WriteMenuKey("I", "The Story So Far...");
-        WriteMenuKey("H", "Usurper History");
-        WriteMenuKey("B", "BBS & Online Server List");
-        WriteMenuKey("C", "Credits");
+        if (compactMenu)
+        {
+            // ── Compact BBS menu: all options in a dense layout ──
+            if (mainSave != null)
+                WriteMenuKey("1", $"Play {mainSave.PlayerName}");
+            if (altSave != null)
+                WriteMenuKey("2", $"Play {altSave.PlayerName}");
+            if (mainSave == null)
+                WriteMenuKey("N", "New Character");
+            else
+                WriteMenuKey("N", "New (Overwrites!)");
+            if (canCreateAlt)
+                WriteMenuKey("M", "Create Alt");
+            if (altSave != null)
+                WriteMenuKey("D", "Delete Alt");
+            if (showOnline)
+                WriteMenuKey("O", "Online Multiplayer");
+            terminal.WriteLine("");
+            WriteMenuKey("I", "Story");
+            WriteMenuKey("H", "History");
+            WriteMenuKey("B", "BBS List");
+            WriteMenuKey("C", "Credits");
+            WriteMenuKey("A", GameConfig.ScreenReaderMode ? "Screen Reader: ON" : "Screen Reader: OFF");
+            if (UsurperRemake.Server.SessionContext.IsActive)
+                WriteMenuKey("S", "Spectate");
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
+                WriteMenuKey("P", "Password");
+            if (isSysOp || isOnlineAdmin)
+                WriteMenuKey("%", isSysOp ? "SysOp" : "Admin");
 #if !STEAM_BUILD
-        WriteMenuKey("@", "Support the Developer");
+            WriteMenuKey("@", "Support");
+#endif
+            WriteMenuKey("Q", "Quit");
+            terminal.WriteLine("");
+        }
+        else
+        {
+            // ── Full menu for MUD/local/Steam ──
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("  ── PLAY ─────────────────────────────────────────────────────────────────");
+            if (mainSave != null)
+                WriteMenuKey("1", $"Play {mainSave.PlayerName}");
+            if (altSave != null)
+                WriteMenuKey("2", $"Play {altSave.PlayerName}");
+            if (canCreateAlt)
+                WriteMenuKey("M", "Create Mortal Alt Character");
+            if (altSave != null)
+                WriteMenuKey("D", "Delete Alt Character");
+            if (mainSave == null)
+                WriteMenuKey("N", "Create new character");
+            else
+                WriteMenuKey("N", "New character (WARNING: Overwrites main!)");
+            if (showOnline)
+                WriteMenuKey("O", "Online Multiplayer - Shared World");
+
+            terminal.WriteLine("");
+
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("  ── INFO ─────────────────────────────────────────────────────────────────");
+            WriteMenuKey("I", "The Story So Far...");
+            WriteMenuKey("H", "Usurper History");
+            WriteMenuKey("B", "BBS & Online Server List");
+            WriteMenuKey("C", "Credits");
+#if !STEAM_BUILD
+            WriteMenuKey("@", "Support the Developer");
 #endif
 
-        terminal.WriteLine("");
+            terminal.WriteLine("");
 
-        // ── ACCESSIBILITY ─────────────────────────────────────────────────────────
-        terminal.SetColor("darkgray");
-        terminal.WriteLine("  ── ACCESSIBILITY ────────────────────────────────────────────────────────");
-        terminal.SetColor("darkgray");
-        terminal.Write("  [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("A");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.SetColor("bright_green");
-            terminal.WriteLine("Screen Reader Mode: ON");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine("  ── ACCESSIBILITY ────────────────────────────────────────────────────────");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("A");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            if (GameConfig.ScreenReaderMode)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("Screen Reader Mode: ON");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("Screen Reader Mode: OFF");
+            }
+            if (UsurperRemake.Server.SessionContext.IsActive)
+                WriteMenuKey("S", "Spectate a Player");
+
+            terminal.WriteLine("");
+
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
+                WriteMenuKey("P", "Change Password");
+            if (isSysOp || isOnlineAdmin)
+                WriteMenuKey("%", isSysOp ? "SysOp Console" : "Admin Console");
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("red");
+            terminal.Write("Q");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("gray");
+            terminal.WriteLine("Quit");
+            terminal.WriteLine("");
         }
-        else
-        {
-            terminal.SetColor("white");
-            terminal.WriteLine("Screen Reader Mode: OFF");
-        }
-        if (UsurperRemake.Server.SessionContext.IsActive)
-            WriteMenuKey("S", "Spectate a Player");
-
-        terminal.WriteLine("");
-
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
-            WriteMenuKey("P", "Change Password");
-        if (isSysOp || isOnlineAdmin)
-            WriteMenuKey("%", isSysOp ? "SysOp Console" : "Admin Console");
-        terminal.SetColor("darkgray");
-        terminal.Write("  [");
-        terminal.SetColor("red");
-        terminal.Write("Q");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        terminal.SetColor("gray");
-        terminal.WriteLine("Quit");
-        terminal.WriteLine("");
 
         var choice = await terminal.GetInput("Your choice: ");
 
@@ -643,6 +687,17 @@ public partial class GameEngine
                 await Task.Delay(1500);
                 await RunBBSDoorMode();
                 return;
+
+            case "O":
+                if (!UsurperRemake.BBS.DoorMode.IsMudServerMode && !UsurperRemake.BBS.DoorMode.IsMudRelayMode
+                    && !GameConfig.DisableOnlinePlay)
+                {
+                    var onlinePlay = new UsurperRemake.Systems.OnlinePlaySystem(terminal);
+                    await onlinePlay.StartOnlinePlay();
+                    await RunBBSDoorMode();
+                    return;
+                }
+                break;
 
             case "S":
                 if (UsurperRemake.Server.SessionContext.IsActive)
@@ -1058,6 +1113,16 @@ public partial class GameEngine
     
     private void ShowAlphaBanner()
     {
+        bool compact = UsurperRemake.BBS.DoorMode.IsInDoorMode ||
+            UsurperRemake.Server.SessionContext.Current?.ConnectionType == "BBS";
+
+        if (compact)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  [!] ALPHA - Bugs expected. Data may be wiped. /bug to report.");
+            return;
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("bright_red");
         terminal.WriteLine("  ══════════════════════════════════════════════════════════════════════════");
@@ -1126,8 +1191,9 @@ public partial class GameEngine
             terminal.SetColor("bright_green");
             terminal.WriteLine("Single-Player");
 
-            // Online Multiplayer - not shown in BBS door mode or online server mode (they're already online)
-            if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            // Online Multiplayer - hidden when already on the server, or when SysOp disabled it
+            if (!UsurperRemake.BBS.DoorMode.IsMudServerMode && !UsurperRemake.BBS.DoorMode.IsMudRelayMode
+                && !GameConfig.DisableOnlinePlay)
             {
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
@@ -1280,7 +1346,8 @@ public partial class GameEngine
                     done = true;
                     break;
                 case "O":
-                    if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    if (!UsurperRemake.BBS.DoorMode.IsMudServerMode && !UsurperRemake.BBS.DoorMode.IsMudRelayMode
+                        && !GameConfig.DisableOnlinePlay)
                     {
                         var onlinePlay = new UsurperRemake.Systems.OnlinePlaySystem(terminal);
                         await onlinePlay.StartOnlinePlay();

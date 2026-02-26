@@ -1686,22 +1686,23 @@ public partial class QuestSystem
     {
         var bountyTypes = new[]
         {
-            ("Bandit Leader", "A dangerous bandit leader terrorizes the roads", QuestTarget.Monster, new[] { ("Bandit Leader", 1), ("Bandit", 4) }),
-            ("Escaped Prisoner", "A dangerous criminal has escaped the dungeon", QuestTarget.Monster, new[] { ("Escaped Convict", 1) }),
-            ("Cult Leader", "A dark cult threatens the realm", QuestTarget.Monster, new[] { ("Cult Leader", 1), ("Cultist", 3) }),
-            ("Rogue Mage", "A mage gone mad wreaks havoc", QuestTarget.Monster, new[] { ("Rogue Mage", 1), ("Dark Apprentice", 2) }),
-            ("Orc Warlord", "An orc warlord raids border villages", QuestTarget.Monster, new[] { ("Orc Warlord", 1), ("Orc Warrior", 5) })
+            ("Bandit Leader", "Hunt down a bandit leader and their gang in the dungeon", 5),
+            ("Escaped Prisoner", "A dangerous criminal has escaped into the dungeon", 3),
+            ("Cult Leader", "Root out a dark cult hiding in the dungeon depths", 6),
+            ("Rogue Mage", "A mage gone mad lurks in the dungeon", 4),
+            ("Orc Warlord", "An orc warlord and raiders have retreated into the dungeon", 7)
         };
 
-        var (title, desc, target, monsters) = bountyTypes[random.Next(bountyTypes.Length)];
-        var difficulty = (byte)(random.Next(1, 5)); // 1-4 difficulty (was incorrectly 1-3)
+        var (title, desc, killCount) = bountyTypes[random.Next(bountyTypes.Length)];
+        var difficulty = (byte)(random.Next(1, 5)); // 1-4 difficulty
+        killCount += difficulty * 2; // Scale kills with difficulty
 
         var bounty = new Quest
         {
             Title = $"WANTED: {title}",
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
-            QuestTarget = target,
+            QuestTarget = QuestTarget.Monster,
             Difficulty = difficulty,
             Comment = desc,
             Date = DateTime.Now,
@@ -1710,10 +1711,11 @@ public partial class QuestSystem
             DaysToComplete = 14
         };
 
-        foreach (var (name, count) in monsters)
-        {
-            bounty.Monsters.Add(new QuestMonster(0, count, name));
-        }
+        bounty.Objectives.Add(new QuestObjective(
+            QuestObjectiveType.KillMonsters,
+            $"Slay {killCount} monsters in the dungeon",
+            killCount
+        ));
 
         SetDefaultRewards(bounty);
         bounty.Reward = (byte)Math.Min(255, bounty.Reward * 2); // King bounties pay double

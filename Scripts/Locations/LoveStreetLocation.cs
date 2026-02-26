@@ -107,7 +107,7 @@ public class LoveStreetLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
-        if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
+        if (IsBBSSession) { DisplayLocationBBS(); return; }
 
         terminal.ClearScreen();
 

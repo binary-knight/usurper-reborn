@@ -104,6 +104,9 @@ namespace UsurperRemake.Systems
             // Idle timeout: 1-60 minutes (default 15)
             DoorMode.IdleTimeoutMinutes = Math.Clamp(_config.IdleTimeoutMinutes, GameConfig.MinBBSIdleTimeoutMinutes, GameConfig.MaxBBSIdleTimeoutMinutes);
 
+            // Feature toggles
+            GameConfig.DisableOnlinePlay = _config.DisableOnlinePlay;
+
             // Default color theme
             if (Enum.TryParse<ColorThemeType>(_config.DefaultColorTheme, true, out var theme))
                 GameConfig.DefaultColorTheme = theme;
@@ -141,6 +144,7 @@ namespace UsurperRemake.Systems
             _config.SysOpSecurityLevel = DoorMode.SysOpSecurityLevel;
             _config.IdleTimeoutMinutes = DoorMode.IdleTimeoutMinutes;
             _config.DefaultColorTheme = GameConfig.DefaultColorTheme.ToString();
+            _config.DisableOnlinePlay = GameConfig.DisableOnlinePlay;
         }
 
         /// <summary>
@@ -180,6 +184,9 @@ namespace UsurperRemake.Systems
         public int SysOpSecurityLevel { get; set; } = 100;
         public int IdleTimeoutMinutes { get; set; } = GameConfig.DefaultBBSIdleTimeoutMinutes;
         public string DefaultColorTheme { get; set; } = "Default";
+
+        // Feature toggles
+        public bool DisableOnlinePlay { get; set; } = false;
 
         // Metadata
         public DateTime LastModified { get; set; } = DateTime.UtcNow;

@@ -74,7 +74,7 @@ public class BankLocation : BaseLocation
             return;
         }
 
-        if (DoorMode.IsInDoorMode)
+        if (IsBBSSession)
         {
             DisplayLocationBBS();
             return;

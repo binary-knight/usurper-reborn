@@ -1319,7 +1319,7 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private void DisplayRoomView(DungeonRoom room)
     {
-        if (DoorMode.IsInDoorMode) { DisplayRoomViewBBS(room); return; }
+        if (IsBBSSession) { DisplayRoomViewBBS(room); return; }
 
         var player = GetCurrentPlayer();
 
@@ -2058,7 +2058,7 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private void DisplayFloorOverview()
     {
-        if (DoorMode.IsInDoorMode) { DisplayFloorOverviewBBS(); return; }
+        if (IsBBSSession) { DisplayFloorOverviewBBS(); return; }
 
         ShowBreadcrumb();
 

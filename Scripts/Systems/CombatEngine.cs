@@ -8986,6 +8986,12 @@ public partial class CombatEngine
                         totalHeal += (int)(dmg * 0.20);
                         terminal.SetColor(isHoly ? "bright_yellow" : "bright_cyan");
                         terminal.WriteLine($"Sanctified water crashes into {m.Name} for {dmg} damage!{(isHoly ? " (HOLY!)" : "")}");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
                 }
                 if (totalHeal > 0)
@@ -9061,6 +9067,12 @@ public partial class CombatEngine
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"The ocean restores {heal} HP!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
             }
@@ -9095,6 +9107,12 @@ public partial class CombatEngine
                     terminal.WriteLine(isDebuffed
                         ? $"The wave echo RESONATES with {target.Name}'s weakness for {dmg} DOUBLE damage!"
                         : $"A wave echo strikes {target.Name} for {dmg} damage!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
 
@@ -9119,6 +9137,12 @@ public partial class CombatEngine
                         m.HP -= dmg;
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine($"Crescendo strikes {m.Name} for {dmg} damage!");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
                 }
                 if (allyCount > 0)
@@ -9174,6 +9198,12 @@ public partial class CombatEngine
                         m.HP -= dmg;
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine($"Resonance cascades through {m.Name} for {dmg} damage!");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
                     if (enemyCount > 1)
                     {
@@ -9232,6 +9262,12 @@ public partial class CombatEngine
                         m.HP -= dmg;
                         terminal.SetColor("bright_yellow");
                         terminal.WriteLine($"GRAND FINALE strikes {m.Name} for {dmg} damage!");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
                 }
                 // Consume buffs
@@ -9323,8 +9359,10 @@ public partial class CombatEngine
 
             case "timeline_split":
                 // Clone attacks for 50% damage for 3 rounds (use Haste as double attack proxy)
+                // +1 to duration: ProcessStatusEffects decrements before the player acts each round,
+                // so Duration=3 would only yield 2 effective rounds of doubled attacks.
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Haste))
-                    player.ActiveStatuses[StatusEffect.Haste] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                    player.ActiveStatuses[StatusEffect.Haste] = (abilityResult.Duration > 0 ? abilityResult.Duration : 3) + 1;
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine("A temporal clone materializes beside you, mirroring your every strike!");
                 break;
@@ -9342,9 +9380,10 @@ public partial class CombatEngine
                 break;
 
             case "chrono_surge":
-                // Double actions this round
+                // Double actions this round — set Haste=2 so after the start-of-round decrement
+                // the player still has Haste=1 and benefits for exactly 1 round.
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Haste))
-                    player.ActiveStatuses[StatusEffect.Haste] = 1;
+                    player.ActiveStatuses[StatusEffect.Haste] = 2;
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine("Time accelerates around you! You move with impossible speed!");
                 break;
@@ -9361,6 +9400,12 @@ public partial class CombatEngine
                         m.HP -= dmg;
                         terminal.SetColor("bright_magenta");
                         terminal.WriteLine($"The singularity crushes {m.Name} for {dmg} damage!{(m.Stunned ? " (STUNNED: 2x!)" : "")}");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
                 }
                 break;
@@ -9396,6 +9441,12 @@ public partial class CombatEngine
                         terminal.SetColor("magenta");
                         terminal.WriteLine($"  (Empowered by {cycleBonus / 50} cycles: +{cycleBonus} bonus damage!)");
                     }
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
             }
@@ -9415,6 +9466,12 @@ public partial class CombatEngine
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("dark_red");
                     terminal.WriteLine($"Shadows harvest {target.Name} for {dmg} damage! You absorb {heal} HP!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
             }
@@ -9460,14 +9517,29 @@ public partial class CombatEngine
                     terminal.WriteLine($"The seal fractures through {target.Name} for {dmg} damage!");
                     if (target.HP <= 0 && monsters != null)
                     {
-                        int overflow = (int)Math.Abs(target.HP);
+                        int overflow = (int)Math.Abs(target.HP); // overkill, computed before clamp
                         int spreadDmg = Math.Max(overflow, dmg / 2);
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
                         foreach (var m in monsters.Where(m => m.IsAlive && m != target))
                         {
                             m.HP -= spreadDmg;
                             terminal.SetColor("bright_red");
                             terminal.WriteLine($"  Overflow erupts into {m.Name} for {spreadDmg} damage!");
+                            if (m.HP <= 0)
+                            {
+                                m.HP = 0;
+                                if (!result.DefeatedMonsters.Contains(m))
+                                    result.DefeatedMonsters.Add(m);
+                            }
                         }
+                    }
+                    else if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
                     }
                 }
                 break;
@@ -9486,6 +9558,12 @@ public partial class CombatEngine
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("dark_red");
                     terminal.WriteLine($"Soul leech drains {target.Name} for {dmg} damage! You absorb {heal} HP!{(isPoisoned ? " (Corrupted bonus!)" : "")}");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
             }
@@ -9503,6 +9581,12 @@ public partial class CombatEngine
                         m.PoisonRounds = Math.Max(m.PoisonRounds, 3);
                         terminal.SetColor("dark_red");
                         terminal.WriteLine($"Abyssal eruption engulfs {m.Name} for {dmg} damage! (Corrupted!)");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
                 }
                 break;
@@ -9548,6 +9632,9 @@ public partial class CombatEngine
                     terminal.WriteLine($"You consume {target.Name}'s soul for {dmg} damage!");
                     if (target.HP <= 0)
                     {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
                         player.TempAttackBonus += 5;
                         player.TempAttackBonusDuration = 999;
                         terminal.SetColor("bright_red");
@@ -9568,6 +9655,12 @@ public partial class CombatEngine
                         m.HP -= dmg;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine($"THE ABYSS UNCHAINED crushes {m.Name} for {dmg} damage!");
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
                 }
                 player.HP = player.MaxHP;
@@ -9601,6 +9694,12 @@ public partial class CombatEngine
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("red");
                     terminal.WriteLine($"Your hungering strike tears into {target.Name} for {dmg} damage! You feast on {heal} HP!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
             }
@@ -9638,6 +9737,12 @@ public partial class CombatEngine
                     terminal.WriteLine(canReap
                         ? $"REAP! The weakened {target.Name} is harvested for {dmg} TRIPLE damage!"
                         : $"You reap at {target.Name} for {dmg} damage!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
             }
@@ -9678,6 +9783,12 @@ public partial class CombatEngine
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("red");
                     terminal.WriteLine($"You DEVOUR {target.Name} for {dmg} damage and feast on {heal} HP!");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
             }
@@ -9693,6 +9804,12 @@ public partial class CombatEngine
                     target.HP -= dmg;
                     terminal.SetColor("bright_red");
                     terminal.WriteLine($"Your entropic blade cuts through ALL defense! {target.Name} takes {dmg} damage! (-{hpCost} HP)");
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
             }
@@ -9700,10 +9817,12 @@ public partial class CombatEngine
             case "blood_frenzy":
             {
                 // Sacrifice 25% HP, double attack + 50 ATK (handled)
+                // +1 to duration: same off-by-one as timeline_split — ProcessStatusEffects
+                // decrements before the player acts each round.
                 int sacrifice = (int)(player.MaxHP * 0.25);
                 player.HP = Math.Max(1, player.HP - sacrifice);
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Haste))
-                    player.ActiveStatuses[StatusEffect.Haste] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                    player.ActiveStatuses[StatusEffect.Haste] = (abilityResult.Duration > 0 ? abilityResult.Duration : 3) + 1;
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"You sacrifice {sacrifice} HP in a blood frenzy! Attack twice per round!");
                 break;
@@ -9722,7 +9841,13 @@ public partial class CombatEngine
                         m.HP -= dmg;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine($"Void rupture tears through {m.Name} for {dmg} damage!");
-                        if (m.HP <= 0) kills++;
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            kills++;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
                     if (kills > 0)
                     {
@@ -9732,6 +9857,12 @@ public partial class CombatEngine
                             m.HP -= explosionDmg;
                             terminal.SetColor("bright_red");
                             terminal.WriteLine($"  Void explosion from {kills} kill{(kills > 1 ? "s" : "")} hits {m.Name} for {explosionDmg}!");
+                            if (m.HP <= 0)
+                            {
+                                m.HP = 0;
+                                if (!result.DefeatedMonsters.Contains(m))
+                                    result.DefeatedMonsters.Add(m);
+                            }
                         }
                     }
                 }
@@ -9761,6 +9892,8 @@ public partial class CombatEngine
                         target.HP = 0;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine($"ANNIHILATION! {target.Name.ToUpper()} IS ERASED FROM EXISTENCE! (-{hpCost} HP)");
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
                     }
                     else
                     {
@@ -9768,10 +9901,36 @@ public partial class CombatEngine
                         target.HP -= dmg;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine($"ANNIHILATION strikes {target.Name} for {dmg} damage! (-{hpCost} HP)");
+                        if (target.HP <= 0)
+                        {
+                            target.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(target))
+                                result.DefeatedMonsters.Add(target);
+                        }
                     }
                 }
                 break;
             }
+        }
+
+        // Sweep all monsters for deaths caused by special-effect cases that bypass the generic
+        // damage handler (e.g. abilities that apply their own bonus damage after the base hit).
+        // This is a defense-in-depth guard — individual cases above may have their own checks too.
+        if (monsters != null)
+        {
+            foreach (var m in monsters)
+            {
+                if (m.HP <= 0 && !result.DefeatedMonsters.Contains(m))
+                {
+                    m.HP = 0;
+                    result.DefeatedMonsters.Add(m);
+                }
+            }
+        }
+        if (target != null && target.HP <= 0 && !result.DefeatedMonsters.Contains(target))
+        {
+            target.HP = 0;
+            result.DefeatedMonsters.Add(target);
         }
 
         await Task.CompletedTask;
@@ -11953,7 +12112,7 @@ public partial class CombatEngine
         TelemetrySystem.Instance.TrackCombat(
             "victory",
             result.Player.Level,
-            result.DefeatedMonsters.Max(m => m.Level),
+            result.DefeatedMonsters.Any() ? result.DefeatedMonsters.Max(m => m.Level) : 0,
             result.DefeatedMonsters.Count,
             result.TotalDamageDealt,
             result.TotalDamageTaken,

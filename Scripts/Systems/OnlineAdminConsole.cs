@@ -11,7 +11,7 @@ namespace UsurperRemake.Systems
 {
     /// <summary>
     /// Online Admin Console for managing the online multiplayer server.
-    /// Only accessible to admin users (hardcoded to "Rage") from the character selection screen.
+    /// Only accessible to admin users (Rage, fastfinge) from the character selection screen.
     /// Operates on SqlSaveBackend for all data operations.
     /// </summary>
     public class OnlineAdminConsole

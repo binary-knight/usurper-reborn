@@ -572,6 +572,21 @@ public class SysOpLocation : BaseLocation
             terminal.WriteLine("  (Values < 1.0 make the game harder/less rewarding)");
             terminal.WriteLine("");
 
+            terminal.SetColor("white");
+            terminal.WriteLine("Feature Toggles:");
+            terminal.Write("  Online Multiplayer: ");
+            if (GameConfig.DisableOnlinePlay)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("DISABLED");
+            }
+            else
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("ENABLED");
+            }
+            terminal.WriteLine("");
+
             terminal.SetColor("cyan");
             terminal.WriteLine("Edit Options:");
             terminal.SetColor("white");
@@ -579,6 +594,7 @@ public class SysOpLocation : BaseLocation
             terminal.WriteLine("  [2] Set Gold Multiplier");
             terminal.WriteLine("  [3] Set Monster HP Multiplier");
             terminal.WriteLine("  [4] Set Monster Damage Multiplier");
+            terminal.WriteLine("  [5] Toggle Online Multiplayer");
             terminal.WriteLine("  [Q] Return to SysOp Menu");
             terminal.WriteLine("");
 
@@ -661,6 +677,18 @@ public class SysOpLocation : BaseLocation
                         terminal.SetColor("red");
                         terminal.WriteLine($"Invalid input '{dmgInput}'. Please enter a number between 0.1 and 10.0.");
                     }
+                    await terminal.GetInputAsync("Press Enter to continue...");
+                    break;
+
+                case "5":
+                    GameConfig.DisableOnlinePlay = !GameConfig.DisableOnlinePlay;
+                    SysOpConfigSystem.Instance.SaveConfig();
+                    terminal.SetColor("green");
+                    if (GameConfig.DisableOnlinePlay)
+                        terminal.WriteLine("Online Multiplayer DISABLED — players cannot connect to the online server.");
+                    else
+                        terminal.WriteLine("Online Multiplayer ENABLED — players can connect to the online server.");
+                    DebugLogger.Instance.LogInfo("SYSOP", $"Online multiplayer {(GameConfig.DisableOnlinePlay ? "disabled" : "enabled")}");
                     await terminal.GetInputAsync("Press Enter to continue...");
                     break;
 
