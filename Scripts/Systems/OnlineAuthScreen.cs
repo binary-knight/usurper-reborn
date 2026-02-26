@@ -100,11 +100,16 @@ namespace UsurperRemake.Systems
         private void ShowBanner()
         {
             terminal.ClearScreen();
+
+            const string titleText = "USURPER REBORN - ONLINE";
+            const int innerWidth = 78;
+            int leftPad  = (innerWidth - titleText.Length) / 2;
+            int rightPad = innerWidth - titleText.Length - leftPad;
+            string titleLine = $"║{new string(' ', leftPad)}{titleText}{new string(' ', rightPad)}║";
+
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.SetColor("bright_white");
-            terminal.WriteLine("║                        USURPER REBORN - ONLINE                              ║");
-            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(titleLine);
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
             terminal.SetColor("gray");

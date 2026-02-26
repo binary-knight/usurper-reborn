@@ -50,9 +50,11 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+            terminal.Write("║");
             terminal.SetColor("bright_white");
-            terminal.WriteLine("║                           ONLINE PLAY                                       ║");
+            { const string t = "ONLINE PLAY"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_cyan");
+            terminal.WriteLine("║");
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 

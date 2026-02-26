@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.47.0** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.47.1** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,20 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.47.1 - MUD Client Polish
+
+**MUD Streaming Mode:** The online server now behaves like a real MUD — output flows continuously in your scroll buffer instead of wiping the screen on every action. Chat messages appear inline, location banners print once on entry, and prompts show your current location (`Inn >`, `Dungeon Fl.5 >`). Type `look` to reprint the banner at any time.
+
+**MUD Client Support:** Connect with Mudlet, TinTin++, MUSHclient, or any telnet/raw TCP client on port 4000. `sslh` multiplexes SSH and raw TCP on the same port.
+
+**Echo Fixes:** Three echo bugs resolved — doubled characters in the browser terminal, doubled prompts in Mudlet (caused by `\r\n` Enter), and doubled keystrokes for SSH connections. Server now sends `IAC WILL ECHO` to suppress client local echo on raw TCP connections, and suppresses its own echo for SSH/web relay connections where the PTY handles it.
+
+**VIP Mud / Screen Reader Support:** Auto-detected via TTYPE negotiation. Plain text mode strips all ANSI art, color codes, and box-drawing characters — replaces them with plain ASCII equivalents. Auth screen rendered as plain text. Activates automatically for VIP Mud, DUMB, or UNKNOWN terminal types.
+
+**UI Polish:** 65+ title box alignment fixes across 21 files. Box borders now use calculated centering and consistent colors throughout.
+
+**Code Cleanup:** All legacy Godot engine scaffolding removed (GodotStubs.cs, GodotHelpers.cs, `using Godot;` from 110 files).
 
 ### Completed in v0.47.0 - Prestige
 

@@ -47,6 +47,8 @@ public class TeamCornerLocation : BaseLocation
         };
     }
 
+    protected override string GetMudPromptName() => "Team Corner";
+
     protected override void DisplayLocation()
     {
         if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
@@ -54,10 +56,15 @@ public class TeamCornerLocation : BaseLocation
         terminal.ClearScreen();
 
         // Header
+        const string tcTitle    = "ADVENTURERS TEAM CORNER";
+        const string tcSubtitle = "'Where gangs forge their destiny'";
+        int tcTitleL = (78 - tcTitle.Length) / 2,    tcTitleR = 78 - tcTitle.Length - tcTitleL;
+        int tcSubL   = (78 - tcSubtitle.Length) / 2, tcSubR   = 78 - tcSubtitle.Length - tcSubL;
+
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                         ADVENTURERS TEAM CORNER                             ║");
-        terminal.WriteLine("║                    'Where gangs forge their destiny'                        ║");
+        terminal.WriteLine($"║{new string(' ', tcTitleL)}{tcTitle}{new string(' ', tcTitleR)}║");
+        terminal.WriteLine($"║{new string(' ', tcSubL)}{tcSubtitle}{new string(' ', tcSubR)}║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -314,7 +321,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                             TEAM RANKINGS                                   ║");
+        { const string t = "TEAM RANKINGS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -962,7 +969,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                             NPC RECRUITMENT                                 ║");
+        { const string t = "NPC RECRUITMENT"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1456,7 +1463,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          RECRUIT PLAYER ALLY                                ║");
+        { const string t = "RECRUIT PLAYER ALLY"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1558,7 +1565,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           EQUIP TEAM MEMBER                                 ║");
+        { const string t = "EQUIP TEAM MEMBER"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -2146,7 +2153,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                            TEAM WARS                                       ║");
+            { const string t = "TEAM WARS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.SetColor("white");
             terminal.WriteLine($"  Your Team: {currentPlayer.Team}");

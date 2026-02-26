@@ -516,6 +516,9 @@ namespace UsurperRemake.Systems
         public int DivineBlessingCombats { get; set; }
         public float DivineBlessingBonus { get; set; }
         public string DivineBoonConfig { get; set; } = "";  // Gods: comma-separated "boonId:tier" boon configuration
+
+        // MUD title — free-form string shown in /who (set via /title command, ANSI codes allowed)
+        public string MudTitle { get; set; } = "";
     }
 
     /// <summary>

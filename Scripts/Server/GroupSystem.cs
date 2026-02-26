@@ -78,7 +78,12 @@ public class GroupSystem
         }
 
         // Notify remaining group members
-        NotifyGroup(group, $"\u001b[1;33m  * {username} has left the group ({reason}).\u001b[0m", excludeUsername: username);
+        var leavingSession = GetSession(username);
+        var leavingPlayer = leavingSession?.Context?.Engine?.CurrentPlayer;
+        var leavingName = !string.IsNullOrEmpty(leavingPlayer?.Name2) ? leavingPlayer.Name2
+            : !string.IsNullOrEmpty(leavingPlayer?.Name1) ? leavingPlayer.Name1
+            : username;
+        NotifyGroup(group, $"\u001b[1;33m  * {leavingName} has left the group ({reason}).\u001b[0m", excludeUsername: username);
 
         // If only leader remains, disband
         lock (group.MemberUsernames)

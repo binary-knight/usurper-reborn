@@ -55,6 +55,19 @@ public class MainStreetLocation : BaseLocation
         };
     }
 
+    protected override string GetMudPromptName() => "Main Street";
+
+    protected override string[]? GetAmbientMessages() => new[]
+    {
+        "A merchant bellows the price of his wares.",
+        "The crowd shifts and murmurs around you.",
+        "A distant bell tolls the hour.",
+        "Cart wheels clatter over the cobblestones.",
+        "The wind carries the smell of fresh bread from a nearby stall.",
+        "A dog barks somewhere down an alley.",
+        "Two guards exchange words as they pass.",
+    };
+
     protected override void DisplayLocation()
     {
         terminal.ClearScreen();
@@ -1430,7 +1443,7 @@ public class MainStreetLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                         PLAYER STATISTICS                                   ║");
+        { const string t = "PLAYER STATISTICS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1513,7 +1526,7 @@ public class MainStreetLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           * ACHIEVEMENTS *                                  ║");
+        { const string t = "* ACHIEVEMENTS *"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
 
         var achievements = currentPlayer.Achievements;
@@ -1530,8 +1543,8 @@ public class MainStreetLocation : BaseLocation
 
         // Category selection
         terminal.SetColor("white");
-        terminal.WriteLine("║  [1] Combat     [2] Progression  [3] Economy    [4] Exploration             ║");
-        terminal.WriteLine("║  [5] Social     [6] Challenge    [7] Secret     [A] All                     ║");
+        terminal.WriteLine("║  [1] Combat     [2] Progression  [3] Economy    [4] Exploration              ║");
+        terminal.WriteLine("║  [5] Social     [6] Challenge    [7] Secret     [A] All                      ║");
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
@@ -2135,7 +2148,7 @@ public class MainStreetLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                            SETTINGS & SAVE OPTIONS                          ║");
+            { const string t = "SETTINGS & SAVE OPTIONS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
             
@@ -2846,7 +2859,7 @@ public class MainStreetLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          ✦ YOUR JOURNEY ✦                                   ║");
+        terminal.WriteLine("║                               ✦ YOUR JOURNEY ✦                               ║");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
 
         // === SEALS SECTION ===
@@ -3133,7 +3146,7 @@ public class MainStreetLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_magenta");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                            WORLD BOSS                                      ║");
+            { const string t = "WORLD BOSS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 

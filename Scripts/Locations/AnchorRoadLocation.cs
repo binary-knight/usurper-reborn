@@ -37,6 +37,8 @@ public class AnchorRoadLocation : BaseLocation
         };
     }
 
+    protected override string GetMudPromptName() => "Anchor Road";
+
     protected override void DisplayLocation()
     {
         if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
@@ -46,7 +48,7 @@ public class AnchorRoadLocation : BaseLocation
         // Header
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                    ANCHOR ROAD - Conjunction of Destinies                  ║");
+        { const string t = "ANCHOR ROAD - Conjunction of Destinies"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -325,7 +327,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                              BOUNTY HUNTING                                 ║");
+        { const string t = "BOUNTY HUNTING"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -463,7 +465,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                                GANG WAR                                     ║");
+        { const string t = "GANG WAR"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -690,7 +692,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                             THE GAUNTLET                                    ║");
+        { const string t = "THE GAUNTLET"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -940,7 +942,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                              CLAIM TOWN                                     ║");
+        { const string t = "CLAIM TOWN"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1077,7 +1079,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("darkgray");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                             PRISON GROUNDS                                  ║");
+        { const string t = "PRISON GROUNDS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

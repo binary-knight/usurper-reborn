@@ -102,7 +102,8 @@ public class PlayerSession : IDisposable
         NetworkStream stream,
         SqlSaveBackend sqlBackend,
         MudServer server,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isPlainText = false)
     {
         Username = username;
         ActiveCharacterName = username;
@@ -112,7 +113,10 @@ public class PlayerSession : IDisposable
         _sqlBackend = sqlBackend;
         _server = server;
         _serverCancellationToken = cancellationToken;
+        _isPlainText = isPlainText;
     }
+
+    private readonly bool _isPlainText;
 
     /// <summary>
     /// Run the game loop for this player session. Blocks until the player
@@ -141,6 +145,16 @@ public class PlayerSession : IDisposable
         {
             // Create per-session terminal backed by the TCP stream
             ctx.Terminal = new TerminalEmulator(_stream, _stream);
+
+            // Screen-reader / plain text mode (e.g. VIP Mud) — strips ANSI art
+            if (_isPlainText)
+                ctx.Terminal.IsPlainText = true;
+
+            // ServerEchoes: true only for direct raw-TCP MUD connections (Mudlet, etc.)
+            // where we sent IAC WILL ECHO and the client disabled its local echo.
+            // SSH relay connections (web terminal, direct SSH) use PTY echo — server
+            // must not double-echo or every character appears twice in the terminal.
+            ctx.Terminal.ServerEchoes = (ConnectionType == "MUD");
 
             // Enable real-time message delivery: terminal polls this during GetInput()
             ctx.Terminal.MessageSource = () =>

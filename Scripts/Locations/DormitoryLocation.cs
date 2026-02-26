@@ -509,9 +509,13 @@ public class DormitoryLocation : BaseLocation
         }
         foreach (var s in dormPlayerSleepers)
         {
-            // Level filter: can only attack players within ±5 levels
+            // Skip accounts that have no character data (registered but never finished creation)
             var targetSave = await backend.ReadGameData(s.Username);
-            int targetLevel = targetSave?.Player?.Level ?? 1;
+            if (targetSave?.Player == null)
+                continue;
+
+            // Level filter: can only attack players within ±5 levels
+            int targetLevel = targetSave.Player.Level;
             if (Math.Abs(targetLevel - attackerLevel) > 5)
                 continue;
 

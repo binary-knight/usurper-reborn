@@ -1964,7 +1964,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("bright_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                           MARRIAGE PROPOSAL                                 ║");
+            { const string t = "MARRIAGE PROPOSAL"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -2091,7 +2091,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                      <3<3<3 WEDDING CEREMONY <3<3<3                         ║");
+            { const string t = "<3<3<3 WEDDING CEREMONY <3<3<3"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 

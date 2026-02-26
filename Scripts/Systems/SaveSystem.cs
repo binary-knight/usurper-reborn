@@ -584,6 +584,7 @@ namespace UsurperRemake.Systems
                 DivineBlessingCombats = player.DivineBlessingCombats,
                 DivineBlessingBonus = player.DivineBlessingBonus,
                 DivineBoonConfig = player.DivineBoonConfig ?? "",
+                MudTitle = player.MudTitle ?? "",
 
                 // Combat statistics (kill/death counts)
                 MKills = (int)player.MKills,

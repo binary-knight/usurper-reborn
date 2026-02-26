@@ -103,6 +103,8 @@ public class LoveStreetLocation : BaseLocation
         };
     }
 
+    protected override string GetMudPromptName() => "Love Street";
+
     protected override void DisplayLocation()
     {
         if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }

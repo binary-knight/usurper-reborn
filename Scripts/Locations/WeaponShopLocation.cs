@@ -38,6 +38,17 @@ public class WeaponShopLocation : BaseLocation
         shopkeeperName = "Tully";
     }
 
+    protected override string GetMudPromptName() => "Weapon Shop";
+
+    protected override string[]? GetAmbientMessages() => new[]
+    {
+        "Steel rings against steel somewhere in the back.",
+        "The slow grind of a whetstone fills the room.",
+        "A hammer pounds away at an anvil in the smithy next door.",
+        "The sharp smell of oil and metal hangs in the air.",
+        "A blade is drawn from its scabbard and inspected with a soft whistle.",
+    };
+
     protected override void DisplayLocation()
     {
         if (DoorMode.IsInDoorMode && currentPlayer != null && currentPlayer.WeapHag >= 1)
@@ -560,16 +571,19 @@ public class WeaponShopLocation : BaseLocation
             case "1":
                 currentCategory = WeaponCategory.OneHanded;
                 currentPage = 0;
+                RequestRedisplay();
                 return false;
 
             case "2":
                 currentCategory = WeaponCategory.TwoHanded;
                 currentPage = 0;
+                RequestRedisplay();
                 return false;
 
             case "3":
                 currentCategory = WeaponCategory.Shields;
                 currentPage = 0;
+                RequestRedisplay();
                 return false;
 
             case "D":
@@ -598,13 +612,20 @@ public class WeaponShopLocation : BaseLocation
     {
         switch (choice)
         {
+            case "R":
+                await NavigateToLocation(GameLocation.MainStreet);
+                return true;
+
+            case "X":
             case "B":
                 currentCategory = null;
                 currentPage = 0;
+                RequestRedisplay();
                 return false;
 
             case "P":
                 if (currentPage > 0) currentPage--;
+                RequestRedisplay();
                 return false;
 
             case "N":
@@ -617,6 +638,7 @@ public class WeaponShopLocation : BaseLocation
                 };
                 int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
                 if (currentPage < totalPages - 1) currentPage++;
+                RequestRedisplay();
                 return false;
 
             default:

@@ -51,6 +51,18 @@ public partial class MagicShopLocation : BaseLocation
         base.SetupLocation();
     }
 
+    protected override string GetMudPromptName() => "Magic Shop";
+
+    protected override string[]? GetAmbientMessages() => new[]
+    {
+        "A faint arcane hum pulses from somewhere behind the shelves.",
+        "Pages rustle by themselves in an open tome.",
+        "A candle flame bends sideways though there is no wind.",
+        "Glass vials chime softly against one another.",
+        "The air tastes faintly of ozone and old ink.",
+        "A distant incantation trails off and falls silent.",
+    };
+
     protected override void DisplayLocation()
     {
         if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
@@ -1275,7 +1287,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          ENCHANTMENT FORGE                                  ║");
+        { const string t = "ENCHANTMENT FORGE"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -2553,7 +2565,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           ARCANE ROMANCE                                    ║");
+        { const string t = "ARCANE ROMANCE"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -2852,7 +2864,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                              DARK ARTS                                      ║");
+        { const string t = "DARK ARTS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         terminal.SetColor("gray");

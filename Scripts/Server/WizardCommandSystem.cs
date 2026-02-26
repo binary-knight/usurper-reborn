@@ -168,9 +168,11 @@ public static class WizardCommandSystem
     {
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.Write("║");
         terminal.SetColor("bright_white");
-        terminal.WriteLine("║                         Wizard Commands                                    ║");
+        { const string t = "Wizard Commands"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
         terminal.SetColor("bright_cyan");
+        terminal.WriteLine("║");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
 
         terminal.SetColor("cyan");
@@ -259,9 +261,11 @@ public static class WizardCommandSystem
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.Write("║");
         terminal.SetColor("bright_white");
-        terminal.WriteLine("║                         Wizards Online                                     ║");
+        { const string t = "Wizards Online"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
         terminal.SetColor("bright_cyan");
+        terminal.WriteLine("║");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
 
         var wizards = server.ActiveSessions.Values
@@ -359,9 +363,11 @@ public static class WizardCommandSystem
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.Write("║");
         terminal.SetColor("bright_white");
-        terminal.WriteLine($"║  Player Stats: {name,-62}║");
+        terminal.Write($"  Player Stats: {name,-62}");
         terminal.SetColor("bright_cyan");
+        terminal.WriteLine("║");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
         terminal.SetColor("white");
         terminal.WriteLine($"║  Status: {(isOnline ? "\u001b[1;32mONLINE\u001b[0;37m" : "\u001b[90mOffline\u001b[0;37m"),-69}║");
@@ -402,9 +408,11 @@ public static class WizardCommandSystem
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        terminal.Write("║");
         terminal.SetColor("bright_white");
-        terminal.WriteLine("║                       Player Locations                                     ║");
+        { const string t = "Player Locations"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
         terminal.SetColor("bright_cyan");
+        terminal.WriteLine("║");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
 
         var sessions = server.ActiveSessions.Values.OrderBy(s => s.Username).ToList();
@@ -964,15 +972,19 @@ public static class WizardCommandSystem
         }
         player.HP = 0;
 
+        var slainName = !string.IsNullOrEmpty(player.Name2) ? player.Name2
+            : !string.IsNullOrEmpty(player.Name1) ? player.Name1
+            : session.Username;
+
         session.EnqueueMessage($"\u001b[1;31m  The hand of a god reaches down and smites you!\u001b[0m");
         terminal.SetColor("bright_red");
-        terminal.WriteLine($"  You raise your hand and smite {session.Username}. They fall lifeless.");
+        terminal.WriteLine($"  You raise your hand and smite {slainName}. They fall lifeless.");
 
         var loc = RoomRegistry.Instance?.GetPlayerLocation(session.Username);
         if (loc.HasValue)
         {
             RoomRegistry.Instance!.BroadcastToRoom(loc.Value,
-                $"\u001b[1;31m  A bolt of divine lightning strikes {session.Username}! They fall lifeless.\u001b[0m",
+                $"\u001b[1;31m  A bolt of divine lightning strikes {slainName}! They fall lifeless.\u001b[0m",
                 excludeUsername: session.Username);
         }
 

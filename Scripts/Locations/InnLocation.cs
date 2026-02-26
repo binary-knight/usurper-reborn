@@ -26,6 +26,17 @@ public class InnLocation : BaseLocation
         "You enter the smoky tavern. The air is thick with the smell of ale and the sound of rowdy conversation."
     ) { }
     
+    protected override string[]? GetAmbientMessages() => new[]
+    {
+        "The hearth crackles and spits a shower of sparks.",
+        "Distant laughter erupts from a corner table.",
+        "The smell of stale ale and pipe smoke hangs in the air.",
+        "A bard strums somewhere, barely audible over the din.",
+        "The floorboards creak as someone shuffles past.",
+        "A mug is slammed on the bar with a satisfied thud.",
+        "The door swings open and closed, letting in a gust of cold air.",
+    };
+
     protected override void SetupLocation()
     {
         // Pascal-compatible exits from ONLINE.PAS onloc_theinn case
@@ -132,7 +143,7 @@ public class InnLocation : BaseLocation
         // Dramatic encounter
         terminal.SetColor("red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          TROUBLE AT THE INN!                                  ║");
+        { const string t = "TROUBLE AT THE INN!"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -3643,7 +3654,7 @@ public class InnLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                         THE MASTER TRAINER                                  ║");
+        { const string t = "THE MASTER TRAINER"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -3910,7 +3921,7 @@ public class InnLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                            GAMBLING DEN                                     ║");
+        { const string t = "GAMBLING DEN"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

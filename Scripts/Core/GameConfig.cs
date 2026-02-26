@@ -9,8 +9,9 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.47.0";
+    public const string Version = "0.47.1";
     public const string VersionName = "Prestige";
+    public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers

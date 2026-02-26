@@ -45,9 +45,9 @@ namespace UsurperRemake.Locations
             {
                 term.ClearScreen();
                 term.SetColor("bright_red");
-                term.WriteLine("╔═══════════════════════════════════════════════════════════════════════════╗");
-                term.WriteLine("║                        ENTRY DENIED!                                     ║");
-                term.WriteLine("╚═══════════════════════════════════════════════════════════════════════════╝");
+                term.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+                { const string t = "ENTRY DENIED!"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; term.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
+                term.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
                 term.WriteLine("");
                 term.SetColor("red");
                 term.WriteLine(reason);

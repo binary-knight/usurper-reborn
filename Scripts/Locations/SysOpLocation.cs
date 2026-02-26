@@ -135,7 +135,7 @@ public class SysOpLocation : BaseLocation
             // Pad to fit the box
             int contentLen = 18 + _latestVersion.Length + 11 + GameConfig.Version.Length + 1;
             terminal.WriteLine(new string(' ', Math.Max(0, 74 - contentLen)) + "║");
-            terminal.WriteLine("║  Press [9] to download and install the update                               ║");
+            terminal.WriteLine("║  Press [9] to download and install the update                                ║");
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
         }
@@ -953,7 +953,18 @@ public class SysOpLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine("Failed to check for updates.");
-                terminal.WriteLine("Check your internet connection and try again.");
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                if (!string.IsNullOrEmpty(checker.CheckFailedReason))
+                    terminal.WriteLine($"  Error: {checker.CheckFailedReason}");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  This may be a TLS/SSL issue on older 32-bit Windows systems,");
+                terminal.WriteLine("  a firewall block, or a temporary GitHub outage.");
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine("  Download the latest version manually from:");
+                terminal.SetColor("cyan");
+                terminal.WriteLine("  https://github.com/binary-knight/usurper-reborn/releases/latest");
                 terminal.WriteLine("");
                 await terminal.GetInputAsync("Press Enter to continue...");
                 return;
@@ -1102,7 +1113,7 @@ public class SysOpLocation : BaseLocation
         {
             terminal.SetColor("bright_green");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                     UPDATE DOWNLOADED SUCCESSFULLY                          ║");
+            { const string t = "UPDATE DOWNLOADED SUCCESSFULLY"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
             terminal.SetColor("white");

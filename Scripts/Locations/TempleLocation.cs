@@ -2317,7 +2317,7 @@ public partial class TempleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_green");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                    MEDITATION CHAPEL                              ║");
+        { const string t = "MEDITATION CHAPEL"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         await Task.Delay(1000);
@@ -2744,7 +2744,7 @@ public partial class TempleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                      THE INNER SANCTUM                            ║");
+        { const string t = "THE INNER SANCTUM"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

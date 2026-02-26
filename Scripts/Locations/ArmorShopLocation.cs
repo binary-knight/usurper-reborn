@@ -47,6 +47,17 @@ public class ArmorShopLocation : BaseLocation
         shopkeeperName = "Reese";
     }
 
+    protected override string GetMudPromptName() => "Armor Shop";
+
+    protected override string[]? GetAmbientMessages() => new[]
+    {
+        "Chainmail clinks softly as a suit sways on its stand.",
+        "The creak of worked leather fills a brief silence.",
+        "A faint smell of polish and tallow drifts through the shop.",
+        "Distant hammer blows travel through the wall from the smithy.",
+        "An armor stand shifts with a dull metallic scrape.",
+    };
+
     protected override void DisplayLocation()
     {
         if (DoorMode.IsInDoorMode && currentPlayer != null && currentPlayer.ArmHag >= 1)
@@ -481,6 +492,7 @@ public class ArmorShopLocation : BaseLocation
                 {
                     currentSlotCategory = ArmorSlots[slotNum - 1];
                     currentPage = 0;
+                    RequestRedisplay();
                     return false;
                 }
 
@@ -494,13 +506,20 @@ public class ArmorShopLocation : BaseLocation
     {
         switch (choice)
         {
+            case "R":
+                await NavigateToLocation(GameLocation.MainStreet);
+                return true;
+
+            case "X":
             case "B":
                 currentSlotCategory = null;
                 currentPage = 0;
+                RequestRedisplay();
                 return false;
 
             case "P":
                 if (currentPage > 0) currentPage--;
+                RequestRedisplay();
                 return false;
 
             case "N":
@@ -510,6 +529,7 @@ public class ArmorShopLocation : BaseLocation
                     int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
                     if (currentPage < totalPages - 1) currentPage++;
                 }
+                RequestRedisplay();
                 return false;
 
             default:
@@ -517,6 +537,7 @@ public class ArmorShopLocation : BaseLocation
                 if (currentSlotCategory.HasValue && int.TryParse(choice, out int itemNum) && itemNum >= 1)
                 {
                     await BuyItem(currentSlotCategory.Value, itemNum);
+                    RequestRedisplay();
                 }
                 return false;
         }

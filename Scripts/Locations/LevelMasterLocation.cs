@@ -104,6 +104,8 @@ public class LevelMasterLocation : BaseLocation
         };
     }
 
+    protected override string GetMudPromptName() => "Level Master";
+
     protected override void DisplayLocation()
     {
         terminal.ClearScreen();
@@ -828,7 +830,7 @@ public class LevelMasterLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor(currentMaster.Color);
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                          THE CRYSTAL BALL                                   ║");
+            { const string t = "THE CRYSTAL BALL"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -910,7 +912,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                        VISIONS IN THE CRYSTAL                               ║");
+        { const string t = "VISIONS IN THE CRYSTAL"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -963,7 +965,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor(currentMaster.Color);
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                        HELP ALLY                                            ║");
+        { const string t = "HELP ALLY"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

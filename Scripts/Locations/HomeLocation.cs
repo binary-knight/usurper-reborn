@@ -3107,7 +3107,7 @@ public class HomeLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║              MASTER CRAFTSMAN'S RENOVATIONS                   ║");
+        { const string t = "MASTER CRAFTSMAN'S RENOVATIONS"; int l = (62 - t.Length) / 2, r = 62 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════╝");
         terminal.WriteLine();
 
@@ -3582,7 +3582,7 @@ toResurrect.IsDead = false;
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          EQUIP YOUR PARTNER                                 ║");
+        { const string t = "EQUIP YOUR PARTNER"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

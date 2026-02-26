@@ -33,6 +33,7 @@ namespace UsurperRemake.Systems
         public string ReleaseNotes { get; private set; } = "";
         public bool CheckCompleted { get; private set; }
         public bool CheckFailed { get; private set; }
+        public string CheckFailedReason { get; private set; } = "";
 
         // Auto-update properties
         public bool IsDownloading { get; private set; }
@@ -110,9 +111,18 @@ namespace UsurperRemake.Systems
 
                 DebugLogger.Instance.LogInfo("UPDATE", $"Fetching from GitHub API: {GitHubApiUrl}");
 
-                using var client = new HttpClient();
+                // Force TLS 1.2+ — required by GitHub API, not always default on 32-bit Windows
+                var handler = new System.Net.Http.HttpClientHandler();
+                try
+                {
+                    handler.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 |
+                                           System.Security.Authentication.SslProtocols.Tls13;
+                }
+                catch { /* SslProtocols may be restricted on some platforms — proceed with defaults */ }
+
+                using var client = new HttpClient(handler);
                 client.DefaultRequestHeaders.Add("User-Agent", $"UsurperReborn/{GameConfig.Version}");
-                client.Timeout = TimeSpan.FromSeconds(10);
+                client.Timeout = TimeSpan.FromSeconds(15);
 
                 var response = await client.GetStringAsync(GitHubApiUrl);
                 var release = JsonSerializer.Deserialize<GitHubRelease>(response);
@@ -154,18 +164,21 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogDebug("UPDATE", $"Could not check for updates (offline?): {ex.Message}");
                 CheckFailed = true;
+                CheckFailedReason = ex.Message;
                 CheckCompleted = true;
             }
             catch (TaskCanceledException)
             {
                 DebugLogger.Instance.LogDebug("UPDATE", "Version check timed out");
                 CheckFailed = true;
+                CheckFailedReason = "Request timed out (15s)";
                 CheckCompleted = true;
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogWarning("UPDATE", $"Version check failed: {ex.Message}");
                 CheckFailed = true;
+                CheckFailedReason = ex.Message;
                 CheckCompleted = true;
             }
         }

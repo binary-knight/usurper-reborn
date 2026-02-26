@@ -33,7 +33,27 @@ public abstract class BaseLocation
 
     /// <summary>When true, the next loop iteration skips DisplayLocation() redraw. Used for chat commands.</summary>
     protected bool _skipNextRedraw;
-    
+
+    /// <summary>MUD streaming mode: true after the location banner has been shown once on entry.
+    /// Prevents full-screen redraws on every loop iteration so output flows like a real MUD.</summary>
+    private bool _locationEntryDisplayed = false;
+
+    /// <summary>
+    /// Signal that DisplayLocation() should run on the next loop iteration.
+    /// Use in MUD streaming mode when content changes substantially (e.g. dungeon room navigation,
+    /// floor changes, or returning from a sub-menu that changed the view).
+    /// </summary>
+    protected void RequestRedisplay() => _locationEntryDisplayed = false;
+
+    // Ambient message state (MUD mode only)
+    private DateTime _lastAmbientTime = DateTime.MinValue;
+    private int _ambientIndex = 0;
+    private static readonly Random _ambientRng = new();
+
+    // Co-presence cache: other online players at this location (MUD mode only, 15s TTL)
+    private List<UsurperRemake.Systems.OnlinePlayerInfo> _coPresenceCache = new();
+    private DateTime _coPresenceCacheTime = DateTime.MinValue;
+
     public BaseLocation(GameLocation locationId, string name, string description)
     {
         LocationId = locationId;
@@ -351,7 +371,7 @@ public abstract class BaseLocation
             terminal.SetColor("bright_red");
             terminal.WriteLine("");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                    *** URGENT: CASTLE UNDER ATTACK! ***                     ║");
+            { const string t = "*** URGENT: CASTLE UNDER ATTACK! ***"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -456,14 +476,31 @@ public abstract class BaseLocation
         if (currentPlayer.IsAlive && NPCPetitionSystem.Instance != null)
             await NPCPetitionSystem.Instance.CheckForPetition(currentPlayer, LocationId, terminal);
 
+        // Reset on every location entry so the banner always shows once on arrival
+        _locationEntryDisplayed = false;
+
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {
-            if (_skipNextRedraw)
+            // In MUD streaming mode: show the full location display only on the first iteration
+            // (or after `look`/`l` resets the flag). Subsequent iterations just flow output
+            // continuously without wiping the scroll buffer — real MUD behaviour.
+            bool showDisplay = !_skipNextRedraw &&
+                (!UsurperRemake.BBS.DoorMode.IsMudServerMode || !_locationEntryDisplayed);
+            _skipNextRedraw = false;
+
+            // Refresh co-presence player cache every 15s (MUD mode only)
+            if (UsurperRemake.BBS.DoorMode.IsMudServerMode &&
+                UsurperRemake.Systems.OnlineStateManager.IsActive &&
+                (DateTime.Now - _coPresenceCacheTime).TotalSeconds >= 15)
             {
-                _skipNextRedraw = false;
-                // Just re-prompt without redrawing the full location
+                var allPlayers = await UsurperRemake.Systems.OnlineStateManager.Instance!.GetOnlinePlayers();
+                _coPresenceCache = allPlayers
+                    .Where(p => p.Location == Name && p.DisplayName != (currentPlayer?.Name2 ?? ""))
+                    .ToList();
+                _coPresenceCacheTime = DateTime.Now;
             }
-            else
+
+            if (showDisplay)
             {
                 // Autosave BEFORE displaying location (save stable state)
                 // This ensures we don't save during quit/exit actions
@@ -474,34 +511,61 @@ public abstract class BaseLocation
 
                 // Display location
                 DisplayLocation();
+                _locationEntryDisplayed = true;
 
-                // Show any pending online chat messages
-                if (OnlineChatSystem.IsActive)
+                // Co-presence: show other online players at this location (MUD mode only)
+                if (UsurperRemake.BBS.DoorMode.IsMudServerMode && _coPresenceCache.Count > 0)
                 {
-                    OnlineChatSystem.Instance!.DisplayPendingMessages(terminal);
+                    terminal.SetColor("cyan");
+                    terminal.Write("Also here: ");
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine(string.Join(", ", _coPresenceCache.Select(p => p.DisplayName)));
+                    terminal.WriteLine("");
                 }
+            }
 
-                // MUD mode: drain incoming room/system messages (arrival/departure, chat, etc.)
-                if (UsurperRemake.Server.SessionContext.IsActive)
+            // Always drain pending messages — in streaming mode these must flow every
+            // iteration, not only when the screen redraws
+            if (OnlineChatSystem.IsActive)
+            {
+                OnlineChatSystem.Instance!.DisplayPendingMessages(terminal);
+            }
+
+            // MUD mode: drain incoming room/system messages (arrival/departure, chat, etc.)
+            if (UsurperRemake.Server.SessionContext.IsActive)
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                var session = ctx != null ? UsurperRemake.Server.MudServer.Instance?.ActiveSessions
+                    .GetValueOrDefault(ctx.Username.ToLowerInvariant()) : null;
+                if (session != null)
                 {
-                    var ctx = UsurperRemake.Server.SessionContext.Current;
-                    var session = ctx != null ? UsurperRemake.Server.MudServer.Instance?.ActiveSessions
-                        .GetValueOrDefault(ctx.Username.ToLowerInvariant()) : null;
-                    if (session != null)
+                    while (session.IncomingMessages.TryDequeue(out var msg))
                     {
-                        while (session.IncomingMessages.TryDequeue(out var msg))
-                        {
-                            terminal.WriteLine(msg);
-                        }
+                        terminal.WriteLine(msg);
                     }
                 }
+            }
 
-                // Show persistent broadcast banner if active (MUD mode)
-                var broadcast = UsurperRemake.Server.MudServer.ActiveBroadcast;
-                if (!string.IsNullOrEmpty(broadcast))
+            // Show persistent broadcast banner if active (MUD mode)
+            var broadcast = UsurperRemake.Server.MudServer.ActiveBroadcast;
+            if (!string.IsNullOrEmpty(broadcast))
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"*** SYSTEM MESSAGE: {broadcast} ***", "bright_red");
+            }
+
+            // Ambient messages (MUD mode only) — fire every 30-60s, flowing inline
+            if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+            {
+                var ambientPool = GetAmbientMessages();
+                if (ambientPool != null && ambientPool.Length > 0)
                 {
-                    terminal.WriteLine("");
-                    terminal.WriteLine($"*** SYSTEM MESSAGE: {broadcast} ***", "bright_red");
+                    if ((DateTime.Now - _lastAmbientTime).TotalSeconds >= 30 + _ambientRng.Next(31))
+                    {
+                        terminal.WriteLine(ambientPool[_ambientIndex % ambientPool.Length], "gray");
+                        _ambientIndex++;
+                        _lastAmbientTime = DateTime.Now;
+                    }
                 }
             }
 
@@ -619,10 +683,14 @@ public abstract class BaseLocation
     private async Task DisplayStrangerEncounter(StrangerEncounter encounter)
     {
         terminal.ClearScreen();
+        const string stTitle = "A MYSTERIOUS ENCOUNTER";
+        int stLeft  = (78 - stTitle.Length) / 2;
+        int stRight = 78 - stTitle.Length - stLeft;
+
         terminal.SetColor("dark_magenta");
         terminal.WriteLine("");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          A MYSTERIOUS ENCOUNTER                            ║");
+        terminal.WriteLine($"║{new string(' ', stLeft)}{stTitle}{new string(' ', stRight)}║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1664,6 +1732,18 @@ public abstract class BaseLocation
         terminal.SetColor("white");
         terminal.Write("Bug");
 
+        // New player hint: show 'look' tip until level 5
+        if (currentPlayer.Level < 5)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.Write("  Tip: type ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("look");
+            terminal.SetColor("darkgray");
+            terminal.Write(" to redraw the screen");
+        }
+
         terminal.WriteLine("");
         terminal.WriteLine("");
     }
@@ -1805,10 +1885,41 @@ public abstract class BaseLocation
     /// </summary>
     protected virtual async Task<string> GetUserChoice()
     {
+        if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+        {
+            var player = GetCurrentPlayer();
+            if (player != null)
+            {
+                double hpPct = player.MaxHP > 0 ? (double)player.HP / player.MaxHP : 1.0;
+                string hpColor = hpPct < 0.25 ? "red" : hpPct < 0.50 ? "yellow" : "bright_green";
+                terminal.Write("[", "white");
+                terminal.Write($"{player.HP}hp", hpColor);
+                if (player.MaxMana > 0)
+                    terminal.Write($" {player.Mana}mp", "cyan");
+                terminal.Write("] ", "white");
+            }
+            terminal.SetColor("bright_white");
+            return await terminal.GetInput($"{GetMudPromptName()} > ");
+        }
         terminal.SetColor("bright_white");
         return await terminal.GetInput("Your choice: ");
     }
-    
+
+    /// <summary>
+    /// Short location name shown in the MUD streaming prompt, e.g. "Inn > ".
+    /// Override in subclasses for a better name than the default class-name stripping.
+    /// </summary>
+    protected virtual string GetMudPromptName()
+    {
+        return GetType().Name.Replace("Location", "");
+    }
+
+    /// <summary>
+    /// Flavor lines printed occasionally in MUD streaming mode to make the world feel alive.
+    /// Return null (default) to suppress ambient messages for a location.
+    /// </summary>
+    protected virtual string[]? GetAmbientMessages() => null;
+
     /// <summary>
     /// Try to process global quick commands (* for inventory, ? for help, etc.)
     /// Returns (handled, shouldExit) - if handled is true, the command was processed
@@ -1819,6 +1930,16 @@ public abstract class BaseLocation
             return (false, false);
 
         var upperChoice = choice.ToUpper().Trim();
+
+        // MUD streaming mode: `look` reprints the location banner (MUD convention).
+        // Single-letter `l` is intentionally excluded to avoid conflicting with location
+        // menu keys (e.g. [L]evel Raise at Level Master, [L]eave, etc.).
+        if (UsurperRemake.BBS.DoorMode.IsMudServerMode && upperChoice == "LOOK")
+        {
+            _locationEntryDisplayed = false;
+            _skipNextRedraw = false;
+            return (true, false);
+        }
 
         // Handle slash commands (works from any location)
         if (choice.StartsWith("/"))
@@ -3725,7 +3846,7 @@ public abstract class BaseLocation
         // Header
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           CHARACTER STATUS                                  ║");
+        { const string t = "CHARACTER STATUS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -5010,7 +5131,7 @@ public abstract class BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                              YOUR MAILBOX                                   ║");
+            { const string t = "YOUR MAILBOX"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -5204,7 +5325,7 @@ public abstract class BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                            TRADE PACKAGES                                   ║");
+            { const string t = "TRADE PACKAGES"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -5633,7 +5754,7 @@ public abstract class BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                           BOUNTY BOARD                                     ║");
+            { const string t = "BOUNTY BOARD"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 

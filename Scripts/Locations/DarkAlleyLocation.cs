@@ -200,6 +200,18 @@ namespace UsurperRemake.Locations
             }
         }
 
+        protected override string GetMudPromptName() => "Dark Alley";
+
+        protected override string[]? GetAmbientMessages() => new[]
+        {
+            "A distant footstep echoes and then stops.",
+            "Something small skitters across the cobblestones.",
+            "Water drips steadily from a broken gutter overhead.",
+            "Hushed voices drift from a darkened doorway.",
+            "A shadow shifts at the far end of the alley.",
+            "Distant laughter, low and brief, comes from somewhere unseen.",
+        };
+
         protected override void DisplayLocation()
         {
             if (DoorMode.IsInDoorMode) { DisplayLocationBBS(); return; }
@@ -1224,7 +1236,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("bright_magenta");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                      THE BLACK MARKET                             ║");
+            { const string t = "THE BLACK MARKET"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -1371,7 +1383,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("bright_magenta");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                        THE INFORMANT                              ║");
+            { const string t = "THE INFORMANT"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -1484,7 +1496,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("dark_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                       THE GAMBLING DEN                            ║");
+            { const string t = "THE GAMBLING DEN"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -1855,7 +1867,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("dark_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                        PICKPOCKETING                              ║");
+            { const string t = "PICKPOCKETING"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -2021,7 +2033,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("dark_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                          THE PIT                                  ║");
+            { const string t = "THE PIT"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -2362,7 +2374,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("dark_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                        THE LOAN SHARK                             ║");
+            { const string t = "THE LOAN SHARK"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -2568,7 +2580,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("dark_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                      FENCE STOLEN GOODS                           ║");
+            { const string t = "FENCE STOLEN GOODS"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -2680,7 +2692,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("dark_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                         THE SAFE HOUSE                            ║");
+            { const string t = "THE SAFE HOUSE"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -2780,7 +2792,7 @@ namespace UsurperRemake.Locations
             terminal.ClearScreen();
             terminal.SetColor("dark_magenta");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                       PAY TRIBUTE                                 ║");
+            { const string t = "PAY TRIBUTE"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -3097,7 +3109,7 @@ namespace UsurperRemake.Locations
             term.SetColor("bright_red");
             term.WriteLine("");
             term.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-            term.WriteLine("║              THE ENFORCER HAS FOUND YOU                           ║");
+            { const string t = "THE ENFORCER HAS FOUND YOU"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; term.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             term.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
             term.WriteLine("");
             term.SetColor("red");

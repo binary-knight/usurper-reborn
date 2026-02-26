@@ -412,6 +412,7 @@ namespace UsurperRemake.Systems
             {
                 "Web" => "Web",
                 "SSH" => "SSH",
+                "MUD" => "MUD",
                 "BBS" => "BBS",
                 "Steam" => "Steam",
                 "Local" => "Local",

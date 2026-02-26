@@ -74,11 +74,161 @@ public partial class TerminalEmulator
     internal readonly object _streamWriterLock = new object(); // Protects all _streamWriter.Write calls
     private readonly SemaphoreSlim _streamReadLock = new(1, 1); // Serializes all _streamReader reads
 
+    // Tracks whether the previous input character was \r so we can discard the
+    // following \n in a \r\n pair (standard NVT telnet: \r\n = single newline).
+    // Without this, Mudlet (and most MUD clients) trigger two empty line returns
+    // per Enter press because they send \r\n as the line terminator.
+    private bool _prevInputWasCR = false;
+
+    /// <summary>
+    /// When true, ReadLineInteractiveAsync echoes characters, backspace, and Enter
+    /// back to the TCP stream. Set true ONLY for direct raw-TCP MUD connections
+    /// (Mudlet, TinTin++, VIP Mud) where the server sent IAC WILL ECHO and the
+    /// client disabled its local echo.
+    ///
+    /// For SSH relay connections (web terminal, direct SSH) the SSH PTY already
+    /// echoes every keystroke. If the server echoes too, every character appears
+    /// twice. Leave false for all AUTH-header relay sessions.
+    /// </summary>
+    public bool ServerEchoes { get; set; } = false;
+
     /// <summary>Returns true when this terminal is backed by a TCP stream (MUD mode).</summary>
     public bool IsStreamBacked => _streamWriter != null;
 
     /// <summary>Internal accessor for the stream writer, used by spectator mode to register streams.</summary>
     internal StreamWriter? StreamWriterInternal => _streamWriter;
+
+    /// <summary>
+    /// When true, output to the TCP stream is encoded as CP437 (classic DOS/telnet encoding)
+    /// instead of UTF-8. Used for raw-TCP MUD client connections that expect CP437.
+    /// </summary>
+    public bool UseCp437 { get; set; } = false;
+
+    /// <summary>
+    /// When true, strip all ANSI escape codes and box-drawing characters before writing
+    /// to the TCP stream. Used for screen-reader MUD clients (e.g. VIP Mud) that cannot
+    /// parse ANSI art and read the escape sequences aloud as garbled text.
+    /// </summary>
+    public bool IsPlainText { get; set; } = false;
+
+    /// <summary>
+    /// Convert a string to plain ASCII for screen-reader clients:
+    ///   1. Strip [colorname]...[/] markup tags (keep inner text)
+    ///   2. Strip ANSI escape sequences (\x1b[...m)
+    ///   3. Replace box-drawing characters with ASCII equivalents
+    /// </summary>
+    private static string ToPlainText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+
+        var sb = new System.Text.StringBuilder(text.Length);
+        int i = 0;
+        while (i < text.Length)
+        {
+            // Strip ANSI escape sequences (\x1b[...m)
+            if (text[i] == '\x1b' && i + 1 < text.Length && text[i + 1] == '[')
+            {
+                i += 2;
+                while (i < text.Length && (char.IsDigit(text[i]) || text[i] == ';')) i++;
+                if (i < text.Length) i++; // consume the final letter (m, A, B, etc.)
+                continue;
+            }
+
+            // Strip [colorname]...[/] or [/] markup tags
+            if (text[i] == '[')
+            {
+                int j = text.IndexOf(']', i + 1);
+                if (j > i)
+                {
+                    string tag = text.Substring(i + 1, j - i - 1);
+                    if (tag == "/" || System.Text.RegularExpressions.Regex.IsMatch(
+                            tag, @"^[a-z_]+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    {
+                        i = j + 1;
+                        continue;
+                    }
+                }
+            }
+
+            // Replace box-drawing characters with ASCII
+            char c = text[i] switch
+            {
+                '╔' or '╗' or '╚' or '╝' or '╠' or '╣' or '╦' or '╩' or '╬' or
+                '┌' or '┐' or '└' or '┘' or '├' or '┤' or '┬' or '┴' or '┼' => '+',
+                '═' or '─' or '━' or '─' => '-',
+                '║' or '│' or '┃' => '|',
+                '★' => '*',
+                _ => text[i]
+            };
+            sb.Append(c);
+            i++;
+        }
+        return sb.ToString();
+    }
+
+    private static System.Text.Encoding? _cp437Encoding;
+    private static System.Text.Encoding Cp437Encoding
+    {
+        get
+        {
+            if (_cp437Encoding == null)
+            {
+                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                _cp437Encoding = System.Text.Encoding.GetEncoding(437,
+                    new System.Text.EncoderReplacementFallback("?"),
+                    new System.Text.DecoderReplacementFallback("?"));
+            }
+            return _cp437Encoding;
+        }
+    }
+
+    /// <summary>
+    /// Replace Unicode characters that have no CP437 equivalent with visually similar
+    /// ASCII/CP437 alternatives before encoding. Characters that ARE in CP437 (like ═ ║ ╔ etc.)
+    /// pass through unchanged and are correctly encoded by Encoding.GetEncoding(437).
+    /// </summary>
+    private static string PreTranslateCp437(string text)
+    {
+        if (!text.Any(c => c > 127)) return text; // fast path: all ASCII, nothing to translate
+        var sb = new System.Text.StringBuilder(text.Length);
+        foreach (char c in text)
+        {
+            sb.Append(c switch
+            {
+                '━' => '═',  // heavy horizontal → double horizontal
+                '┃' => '║',  // heavy vertical → double vertical
+                '┄' or '┅' or '┈' or '┉' or '╌' or '╍' => '-',
+                '┆' or '┇' or '┊' or '┋' or '╎' or '╏' => '|',
+                '★' or '☆' => '*',
+                '●' or '○' or '◉' => '*',
+                '→' => '>',
+                '←' => '<',
+                '↑' => '^',
+                '↓' => 'v',
+                '…' => '.',
+                '\u2019' or '\u2018' => '\'',  // curly single quotes
+                '\u201C' or '\u201D' => '"',   // curly double quotes
+                '\u2014' => '-',               // em dash
+                '\u2013' => '-',               // en dash
+                _ => c
+            });
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Write an ANSI string to the TCP stream encoded as CP437 bytes.
+    /// Bypasses the StreamWriter's UTF-8 encoding by writing directly to BaseStream.
+    /// Spectators always receive the original UTF-8 string.
+    /// </summary>
+    private void WriteCp437ToStream(string ansi, string? spectatorAnsi = null)
+    {
+        var translated = PreTranslateCp437(ansi);
+        var bytes = Cp437Encoding.GetBytes(translated);
+        _streamWriter!.BaseStream.Write(bytes, 0, bytes.Length);
+        _streamWriter.BaseStream.Flush();
+        ForwardToSpectators(spectatorAnsi ?? ansi);
+    }
 
     // Spectator mode: output is duplicated to all spectator terminals in real-time
     private readonly List<TerminalEmulator> _spectatorTerminals = new();
@@ -464,10 +614,21 @@ public partial class TerminalEmulator
         {
             lock (_streamWriterLock)
             {
-                _streamWriter.Write(text);
-                _streamWriter.Flush();
+                if (IsPlainText)
+                {
+                    var plain = ToPlainText(text);
+                    _streamWriter.Write(plain);
+                    _streamWriter.Flush();
+                }
+                else if (UseCp437)
+                    WriteCp437ToStream(text);
+                else
+                {
+                    _streamWriter.Write(text);
+                    _streamWriter.Flush();
+                    ForwardToSpectators(text);
+                }
             }
-            ForwardToSpectators(text);
         }
         else if (display != null)
         {
@@ -655,8 +816,27 @@ public partial class TerminalEmulator
             return;
         }
 
+        // MUD streaming mode: never wipe the scroll buffer — output flows continuously
+        // downward like a real MUD. Location banners print once on entry, then actions
+        // and chat accumulate naturally in the terminal history.
+        if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+        {
+            _bbsLineCount = 0;
+            return;
+        }
+
         if (_streamWriter != null)
         {
+            if (IsPlainText)
+            {
+                // Plain text / screen-reader mode — never clear; output a separator instead
+                lock (_streamWriterLock)
+                {
+                    _streamWriter.Write("\r\n---\r\n");
+                    _streamWriter.Flush();
+                }
+                return;
+            }
             // MUD stream mode — ANSI clear screen
             var clearAnsi = "\x1b[2J\x1b[H";
             lock (_streamWriterLock)
@@ -724,47 +904,17 @@ public partial class TerminalEmulator
 
             Write(prompt, "bright_white");
 
-            // Serialize reads — prevents concurrent ReadLineAsync from
-            // GroupFollowerLoop and CombatEngine.ProcessGroupedPlayerTurn
+            // Serialize reads — prevents concurrent reads from GroupFollowerLoop
+            // and CombatEngine.ProcessGroupedPlayerTurn
             await _streamReadLock.WaitAsync();
-            string? line;
             try
             {
-                if (MessageSource != null)
-                {
-                    // Run message pump concurrently with input reading for real-time chat
-                    using var pumpCts = new CancellationTokenSource();
-                    var pumpTask = RunMessagePumpAsync(prompt, pumpCts.Token);
-                    try
-                    {
-                        line = await _streamReader.ReadLineAsync();
-                    }
-                    finally
-                    {
-                        pumpCts.Cancel();
-                        try { await pumpTask; } catch (OperationCanceledException) { }
-                    }
-                }
-                else
-                {
-                    line = await _streamReader.ReadLineAsync();
-                }
+                return await ReadLineInteractiveAsync(prompt);
             }
             finally
             {
                 _streamReadLock.Release();
             }
-
-            // Update idle timeout tracker
-            var ctx = UsurperRemake.Server.SessionContext.Current;
-            if (ctx != null)
-            {
-                var server = UsurperRemake.Server.MudServer.Instance;
-                if (server != null && server.ActiveSessions.TryGetValue(ctx.Username.ToLowerInvariant(), out var session))
-                    session.LastActivityTime = DateTime.UtcNow;
-            }
-
-            return line ?? string.Empty;
         }
 
         // BBS/Online disconnect and timeout checks
@@ -1198,7 +1348,7 @@ public partial class TerminalEmulator
     public void SetColor(string color)
     {
         currentColor = color;
-        if (_streamWriter != null)
+        if (_streamWriter != null && !IsPlainText)
         {
             lock (_streamWriterLock)
             {
@@ -1708,9 +1858,191 @@ public partial class TerminalEmulator
 
     /// <summary>
     /// Background task that polls MessageSource every 100ms and writes incoming
-    /// messages directly to the TCP stream while ReadLineAsync is pending.
-    /// Moves to a new line (preserving the player's partially-typed input),
-    /// writes message(s), then redraws the prompt below.
+    /// <summary>
+    /// Reads one line interactively: char-by-char with explicit echo, so that
+    /// when chat or room messages arrive mid-input the game can erase the current
+    /// line, display the message, and then redraw the prompt + whatever the player
+    /// had already typed — rather than letting the message visually split the text.
+    ///
+    /// Handles: printable ASCII, backspace (0x7F / 0x08), ANSI escape sequences
+    /// (arrow keys, F-keys — consumed and discarded), \r / \n as line terminator.
+    /// </summary>
+    private async Task<string> ReadLineInteractiveAsync(string prompt)
+    {
+        if (_streamReader == null || _streamWriter == null) return string.Empty;
+
+        var buffer = new System.Text.StringBuilder();
+        var charBuf = new char[1];
+        int escState = 0; // 0 = normal, 1 = after ESC, 2 = inside CSI (ESC [)
+
+        // Kick off the first async read.  We reuse this task across the poll loop
+        // so we never have two concurrent ReadAsync calls on the same stream.
+        var readTask = _streamReader.ReadAsync(charBuf, 0, 1);
+
+        while (true)
+        {
+            // Wait up to 50 ms for a character; on timeout, deliver any pending
+            // messages and loop back with the same readTask still outstanding.
+            var completed = await Task.WhenAny(readTask, Task.Delay(50));
+
+            if (completed != readTask)
+            {
+                // No character yet — check/deliver queued messages.
+                DeliverPendingMessagesWithRedraw(prompt, buffer);
+                continue; // readTask is still the same pending call
+            }
+
+            // A character arrived.
+            int read = await readTask;
+            if (read == 0) // EOF / disconnected
+            {
+                // Update idle tracker before returning
+                UpdateMudIdleTimeout();
+                return buffer.ToString();
+            }
+
+            char c = charBuf[0];
+
+            // ── Escape-sequence state machine (consume, don't echo) ──────────
+            if (escState == 1) // after ESC
+            {
+                escState = c == '[' ? 2 : 0; // CSI or unknown — either way, skip
+                readTask = _streamReader.ReadAsync(charBuf, 0, 1);
+                continue;
+            }
+            if (escState == 2) // inside CSI (ESC [)
+            {
+                // Final byte: letter or '~' ends the sequence
+                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '~')
+                    escState = 0;
+                readTask = _streamReader.ReadAsync(charBuf, 0, 1);
+                continue;
+            }
+            if (c == '\x1b')
+            {
+                escState = 1;
+                readTask = _streamReader.ReadAsync(charBuf, 0, 1);
+                continue;
+            }
+            // ────────────────────────────────────────────────────────────────
+
+            // Skip Unicode replacement characters — produced when a MUD client sends
+            // telnet IAC bytes (0xFF) that the UTF-8 StreamReader can't decode.
+            if (c == '\uFFFD')
+            {
+                readTask = _streamReader.ReadAsync(charBuf, 0, 1);
+                continue;
+            }
+
+            if (c == '\r')
+            {
+                _prevInputWasCR = true;
+                if (ServerEchoes)
+                {
+                    lock (_streamWriterLock) { _streamWriter.Write("\r\n"); _streamWriter.Flush(); }
+                }
+                UpdateMudIdleTimeout();
+                return buffer.ToString();
+            }
+            else if (c == '\n')
+            {
+                // If \n immediately follows \r, it's the second byte of a \r\n pair
+                // (standard telnet NVT). Discard it to avoid a spurious empty input.
+                if (_prevInputWasCR)
+                {
+                    _prevInputWasCR = false;
+                    readTask = _streamReader.ReadAsync(charBuf, 0, 1);
+                    continue;
+                }
+                // Bare \n (no preceding \r) — treat as line terminator
+                _prevInputWasCR = false;
+                if (ServerEchoes)
+                {
+                    lock (_streamWriterLock) { _streamWriter.Write("\r\n"); _streamWriter.Flush(); }
+                }
+                UpdateMudIdleTimeout();
+                return buffer.ToString();
+            }
+            else if (c == (char)0x7F || c == (char)0x08) // DEL or BS
+            {
+                _prevInputWasCR = false;
+                if (buffer.Length > 0)
+                {
+                    buffer.Remove(buffer.Length - 1, 1);
+                    if (ServerEchoes)
+                    {
+                        lock (_streamWriterLock) { _streamWriter.Write("\b \b"); _streamWriter.Flush(); }
+                    }
+                }
+            }
+            else if (c >= ' ') // printable ASCII
+            {
+                _prevInputWasCR = false;
+                buffer.Append(c);
+                if (ServerEchoes)
+                {
+                    lock (_streamWriterLock) { _streamWriter.Write(c); _streamWriter.Flush(); }
+                }
+            }
+            // Control chars other than the above are silently dropped.
+
+            readTask = _streamReader.ReadAsync(charBuf, 0, 1);
+        }
+    }
+
+    /// <summary>
+    /// Drain the MessageSource queue and, if any messages were present, erase the
+    /// current input line, print all messages, then redraw prompt + typed buffer.
+    /// Called from ReadLineInteractiveAsync on every 50 ms poll tick.
+    /// </summary>
+    private void DeliverPendingMessagesWithRedraw(string prompt, System.Text.StringBuilder currentBuffer)
+    {
+        if (MessageSource == null || _streamWriter == null) return;
+
+        bool anyMessages = false;
+        string? msg;
+        while ((msg = MessageSource()) != null)
+        {
+            if (!anyMessages)
+            {
+                // Erase the entire current line (prompt + whatever the player typed)
+                lock (_streamWriterLock)
+                    _streamWriter.Write("\r\x1b[2K");
+                anyMessages = true;
+            }
+            lock (_streamWriterLock)
+            {
+                _streamWriter.Write(msg);
+                _streamWriter.Write("\r\n\x1b[0m");
+            }
+        }
+
+        if (anyMessages)
+        {
+            // Redraw prompt and restore the player's typed text
+            lock (_streamWriterLock)
+            {
+                _streamWriter.Write($"\x1b[{GetAnsiColorCode("bright_white")}m{prompt}\x1b[0m");
+                if (currentBuffer.Length > 0)
+                    _streamWriter.Write(currentBuffer.ToString());
+                _streamWriter.Flush();
+            }
+        }
+    }
+
+    /// <summary>Updates the MUD session's last-activity timestamp (idle timeout).</summary>
+    private void UpdateMudIdleTimeout()
+    {
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        if (ctx == null) return;
+        var server = UsurperRemake.Server.MudServer.Instance;
+        if (server != null && server.ActiveSessions.TryGetValue(ctx.Username.ToLowerInvariant(), out var session))
+            session.LastActivityTime = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Legacy message pump — kept for any callers that still reference it.
+    /// The primary GetInput path now uses ReadLineInteractiveAsync instead.
     /// </summary>
     private async Task RunMessagePumpAsync(string prompt, CancellationToken ct)
     {
@@ -1892,9 +2224,26 @@ public partial class TerminalEmulator
         {
             lock (_streamWriterLock)
             {
-                _streamWriter.WriteLine();
+                if (UseCp437)
+                    WriteCp437ToStream("\r\n");
+                else
+                {
+                    _streamWriter.WriteLine();
+                    ForwardToSpectators("\r\n");
+                }
             }
-            ForwardToSpectators("\r\n");
+            return;
+        }
+
+        // Plain text mode — strip ANSI/markup/box-drawing for screen-reader clients
+        if (IsPlainText)
+        {
+            var plain = ToPlainText(text) + "\r\n";
+            lock (_streamWriterLock)
+            {
+                _streamWriter.Write(plain);
+                _streamWriter.Flush();
+            }
             return;
         }
 
@@ -1904,9 +2253,14 @@ public partial class TerminalEmulator
             var ansi = $"\x1b[{GetAnsiColorCode(baseColor)}m{text}\r\n\x1b[0m";
             lock (_streamWriterLock)
             {
-                _streamWriter.Write(ansi);
+                if (UseCp437)
+                    WriteCp437ToStream(ansi);
+                else
+                {
+                    _streamWriter.Write(ansi);
+                    ForwardToSpectators(ansi);
+                }
             }
-            ForwardToSpectators(ansi);
         }
         else
         {
@@ -1919,11 +2273,14 @@ public partial class TerminalEmulator
 
             lock (_streamWriterLock)
             {
-                _streamWriter.Write(fullAnsi);
+                if (UseCp437)
+                    WriteCp437ToStream(fullAnsi);
+                else
+                {
+                    _streamWriter.Write(fullAnsi);
+                    ForwardToSpectators(fullAnsi);
+                }
             }
-
-            // Forward to spectators
-            ForwardToSpectators(fullAnsi);
         }
     }
 
@@ -1931,12 +2288,29 @@ public partial class TerminalEmulator
     private void WriteToStream(string text, string color)
     {
         if (_streamWriter == null) return;
+
+        if (IsPlainText)
+        {
+            var plain = ToPlainText(text);
+            lock (_streamWriterLock)
+            {
+                _streamWriter.Write(plain);
+                _streamWriter.Flush();
+            }
+            return;
+        }
+
         var ansi = $"\x1b[{GetAnsiColorCode(color)}m{text}";
         lock (_streamWriterLock)
         {
-            _streamWriter.Write(ansi);
+            if (UseCp437)
+                WriteCp437ToStream(ansi);
+            else
+            {
+                _streamWriter.Write(ansi);
+                ForwardToSpectators(ansi);
+            }
         }
-        ForwardToSpectators(ansi);
     }
 
     /// <summary>Parse [colorname]text[/] markup and write to the MUD TCP stream using ANSI codes.</summary>

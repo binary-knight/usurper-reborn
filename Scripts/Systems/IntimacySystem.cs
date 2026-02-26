@@ -307,7 +307,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                          BLESSED NEWS!                                      ║");
+            { const string t = "BLESSED NEWS!"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 

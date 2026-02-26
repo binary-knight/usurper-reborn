@@ -832,7 +832,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           THE ROYAL GUARD                                   ║");
+        { const string t = "THE ROYAL GUARD"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -894,7 +894,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           THE ROYAL PRISON                                  ║");
+        { const string t = "THE ROYAL PRISON"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -937,7 +937,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_red");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                        PRISON CELL MANAGEMENT                               ║");
+            { const string t = "PRISON CELL MANAGEMENT"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -1320,7 +1320,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                             ROYAL MAIL                                      ║");
+        { const string t = "ROYAL MAIL"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1422,7 +1422,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_blue");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          THE ROYAL CHAMBERS                                 ║");
+        { const string t = "THE ROYAL CHAMBERS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1530,7 +1530,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          SECURITY REPORT                                    ║");
+        { const string t = "SECURITY REPORT"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1695,7 +1695,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                      MONSTER GUARD MARKET                                   ║");
+        { const string t = "MONSTER GUARD MARKET"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1916,7 +1916,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                         HISTORY OF MONARCHS                                 ║");
+        { const string t = "HISTORY OF MONARCHS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1969,7 +1969,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          THE COURT MAGICIAN                                 ║");
+        { const string t = "THE COURT MAGICIAN"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -2170,7 +2170,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                           FISCAL MATTERS                                    ║");
+            { const string t = "FISCAL MATTERS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -2426,7 +2426,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                             ROYAL ORDERS                                    ║");
+            { const string t = "ROYAL ORDERS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -2615,7 +2615,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                          THE ROYAL ORPHANAGE                                ║");
+            { const string t = "THE ROYAL ORPHANAGE"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -4069,7 +4069,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                          ROYAL BODYGUARDS                                   ║");
+            { const string t = "ROYAL BODYGUARDS"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -4290,7 +4290,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                         ROYAL BOUNTY BOARD                                  ║");
+        { const string t = "ROYAL BOUNTY BOARD"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -4407,7 +4407,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                          THRONE CHALLENGE                                   ║");
+        { const string t = "THRONE CHALLENGE"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -4798,7 +4798,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                         CLAIMING THE THRONE                                 ║");
+        { const string t = "CLAIMING THE THRONE"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -4893,7 +4893,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                            ABDICATION                                       ║");
+        { const string t = "ABDICATION"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -4977,7 +4977,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                           SEEK AN AUDIENCE                                  ║");
+            { const string t = "SEEK AN AUDIENCE"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
             terminal.SetColor("gray");
@@ -4998,7 +4998,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                           SEEK AN AUDIENCE                                  ║");
+            { const string t = "SEEK AN AUDIENCE"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
             terminal.SetColor("red");
@@ -5023,7 +5023,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║                        AUDIENCE WITH THE CROWN                              ║");
+            { const string t = "AUDIENCE WITH THE CROWN"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -6546,9 +6546,9 @@ public class CastleLocation : BaseLocation
 
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                       THE ROYAL ARMORY                            ║");
-        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
+        terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        { const string t = "THE ROYAL ARMORY"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
+        terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
@@ -6950,7 +6950,7 @@ public class CastleLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           CASTLE SIEGE                                      ║");
+        { const string t = "CASTLE SIEGE"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

@@ -33,7 +33,7 @@ public class DevMenuLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                       * DEVELOPER MENU *                                    ║");
+        { const string t = "* DEVELOPER MENU *"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("║                    For Testing Purposes Only                                 ║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
@@ -232,9 +232,9 @@ public class DevMenuLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-                terminal.WriteLine("║                         !! STEAM WARNING !!                                 ║");
+                { const string t = "!! STEAM WARNING !!"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
                 terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
-                terminal.WriteLine("║  Using the Developer Menu will PERMANENTLY disable Steam achievements       ║");
+                terminal.WriteLine("║  Using the Developer Menu will PERMANENTLY disable Steam achievements        ║");
                 terminal.WriteLine("║  for this save file. This cannot be undone - the only way to re-enable      ║");
                 terminal.WriteLine("║  achievements is to delete this save and start a new character.             ║");
                 terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");

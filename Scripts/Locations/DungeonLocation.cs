@@ -1284,6 +1284,18 @@ public class DungeonLocation : BaseLocation
         };
     }
 
+    protected override string GetMudPromptName() => $"Dungeon Fl.{currentDungeonLevel}";
+
+    protected override string[]? GetAmbientMessages() => new[]
+    {
+        "Water drips somewhere in the darkness ahead.",
+        "Your torch gutters in an unseen draft.",
+        "Something skitters faintly behind the walls.",
+        "A cold draft seeps through the stones.",
+        "The floor settles with a low groan.",
+        "A distant clang of metal echoes from deeper in.",
+        "The shadows at the edge of your light seem to shift.",
+    };
 
     protected override void DisplayLocation()
     {
@@ -2436,6 +2448,7 @@ public class DungeonLocation : BaseLocation
                         currentDungeonLevel
                     );
                 }
+                RequestRedisplay();
                 return false;
 
             case "J":
@@ -2930,6 +2943,7 @@ public class DungeonLocation : BaseLocation
                 if (room.HasEvent && !room.EventCompleted)
                 {
                     await HandleRoomEvent(room);
+                    RequestRedisplay();
                 }
                 return false;
 
@@ -2937,6 +2951,7 @@ public class DungeonLocation : BaseLocation
                 if (room.Features.Any(f => !f.IsInteracted))
                 {
                     await ExamineFeatures(room);
+                    RequestRedisplay();
                 }
                 return false;
 
@@ -2951,6 +2966,7 @@ public class DungeonLocation : BaseLocation
                 if ((room.IsCleared || !room.HasMonsters) && !hasRestThisFloor)
                 {
                     await RestInRoom();
+                    RequestRedisplay();
                 }
                 return false;
 
@@ -2968,6 +2984,7 @@ public class DungeonLocation : BaseLocation
 
             case "P":
                 await UsePotions();
+                RequestRedisplay();
                 return false;
 
             case "=":
@@ -2977,6 +2994,7 @@ public class DungeonLocation : BaseLocation
             case "Q":
                 // Leave dungeon
                 inRoomMode = false;
+                RequestRedisplay();
                 return false;
 
             default:
@@ -3147,6 +3165,10 @@ public class DungeonLocation : BaseLocation
         {
             consecutiveMonsterRooms = 0;
         }
+
+        // MUD streaming mode: entering a new room is a content change — show the room view
+        // on the next loop iteration instead of just re-showing the prompt
+        RequestRedisplay();
     }
 
     /// <summary>
@@ -3609,6 +3631,7 @@ public class DungeonLocation : BaseLocation
             await Task.Delay(2000);
         }
 
+        RequestRedisplay();
         await terminal.PressAnyKey();
     }
 
@@ -3803,6 +3826,7 @@ public class DungeonLocation : BaseLocation
                     await NavigateToLocation(GameLocation.MainStreet);
             }
 
+            RequestRedisplay();
             await terminal.PressAnyKey();
             return true;
         }
@@ -4729,6 +4753,7 @@ public class DungeonLocation : BaseLocation
         await CheckFloorStoryEvents(player, terminal);
 
         await Task.Delay(2500);
+        RequestRedisplay();
     }
 
     /// <summary>
@@ -4989,8 +5014,9 @@ public class DungeonLocation : BaseLocation
         }
 
         await Task.Delay(1500);
+        RequestRedisplay();
     }
-    
+
     /// <summary>
     /// Main exploration mechanic - Pascal encounter system
     /// </summary>
@@ -6634,7 +6660,7 @@ public class DungeonLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("bright_magenta");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║              THE FORGOTTEN SHRINE                                 ║");
+        { const string t = "THE FORGOTTEN SHRINE"; int l = (66 - t.Length) / 2, r = 66 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         await Task.Delay(1000);
@@ -7953,6 +7979,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("You have reached the deepest level of the dungeon.", "red");
         }
         await Task.Delay(1500);
+        RequestRedisplay();
     }
 
     private async Task AscendToSurface()
@@ -7975,8 +8002,9 @@ public class DungeonLocation : BaseLocation
             await NavigateToLocation(GameLocation.MainStreet);
         }
         await Task.Delay(1500);
+        RequestRedisplay();
     }
-    
+
     private async Task ManageTeam()
     {
         var player = GetCurrentPlayer();
@@ -9632,15 +9660,27 @@ public class DungeonLocation : BaseLocation
         var selected = options.FirstOrDefault(o => o.key == choice);
         if (selected.targetId != null)
         {
-            var path = BuildDirectionPath(selected.targetId, startId, parentMap);
-            if (path != null && path.Count > 0)
+            var roomIdPath = BuildRoomIdPath(selected.targetId, startId, parentMap);
+            if (roomIdPath != null && roomIdPath.Count > 0)
             {
-                terminal.WriteLine("");
-                var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == selected.targetId);
-                terminal.Write($"Path to {room?.Name ?? selected.label}: ", "white");
-                terminal.WriteLine(string.Join(", ", path.Select(d => d.ToString())), "bright_green");
-                terminal.WriteLine("");
-                await terminal.PressAnyKey();
+                terminal.SetColor("gray");
+                terminal.WriteLine("Auto-navigating... (press Enter at any prompt to stop)");
+                await Task.Delay(800);
+
+                foreach (var roomId in roomIdPath)
+                {
+                    await MoveToRoom(roomId);
+                    var rm = currentFloor.GetCurrentRoom();
+                    if (rm != null && rm.HasMonsters && !rm.IsCleared)
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine("Enemies ahead — auto-navigation stopped!");
+                        await Task.Delay(1200);
+                        break;
+                    }
+                    await Task.Delay(300);
+                }
+                RequestRedisplay();
             }
         }
     }
@@ -9657,6 +9697,23 @@ public class DungeonLocation : BaseLocation
             path.Add(parent.direction);
             current = parent.parentId;
         }
+        path.Reverse();
+        return path;
+    }
+
+    private List<string>? BuildRoomIdPath(string targetId, string startId,
+        Dictionary<string, (string parentId, Direction direction)> parentMap)
+    {
+        if (!parentMap.ContainsKey(targetId)) return null;
+
+        var path = new List<string>();
+        string current = targetId;
+        while (current != startId && parentMap.TryGetValue(current, out var parent))
+        {
+            path.Add(current);
+            current = parent.parentId;
+        }
+        if (current != startId) return null;
         path.Reverse();
         return path;
     }
