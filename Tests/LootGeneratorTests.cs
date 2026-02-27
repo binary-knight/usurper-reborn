@@ -144,7 +144,9 @@ public class LootGeneratorTests
         var hasRing = false;
         var hasNecklace = false;
 
-        for (int i = 0; i < 100; i++)
+        // Ring/necklace each have ~2.6% chance per mini-boss drop (65% armor * 4% slot)
+        // 500 iterations gives <0.01% chance of missing any type
+        for (int i = 0; i < 500; i++)
         {
             var loot = LootGenerator.GenerateMiniBossLoot(50, CharacterClass.Barbarian);
 
