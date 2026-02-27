@@ -59,6 +59,10 @@ public class Monster
     public bool IsMiniBoss { get; set; } = false;       // Champion/elite monsters (10% random encounters)
     public bool IsUnique { get; set; } = false;
     public bool CanSpeak { get; set; } = false;         // From Pascal mon_talk setting
+
+    // Taunt mechanic — forced targeting
+    public string? TauntedBy { get; set; }              // DisplayName of character who taunted this monster
+    public int TauntRoundsLeft { get; set; }            // Rounds remaining (decremented each monster round)
     
     // Additional properties for API compatibility
     public int Armour { get; set; }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
+using UsurperRemake.Server;
 
 namespace UsurperRemake.Systems
 {
@@ -1380,6 +1381,18 @@ namespace UsurperRemake.Systems
             // Write news
             NewsSystem.Instance?.Newsy(true,
                 $"[DIVINE] {player.Name2} has ascended to godhood as {divineName}!");
+
+            // Broadcast to all online players
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                try
+                {
+                    MudServer.Instance?.BroadcastToAll(
+                        $"\r\n\x1b[1;33m  {divineName}, Lesser Spirit of {alignment}\r\n  has ascended to the Divine Realm!\x1b[0m\r\n",
+                        excludeUsername: player.DisplayName);
+                }
+                catch { /* broadcast is optional */ }
+            }
 
             // Achievement
             AchievementSystem.TryUnlock(player, "ascended");

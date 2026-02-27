@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.Locations;
 using UsurperRemake.Data;
 using UsurperRemake.UI;
 using UsurperRemake.BBS;
@@ -495,6 +496,24 @@ public abstract class BaseLocation
 
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {
+            // Auto-level-up check — catches ALL XP sources (combat, quests, seals, events, etc.)
+            if (currentPlayer != null && currentPlayer.AI == CharacterAI.Human)
+            {
+                int levelsGained = LevelMasterLocation.CheckAutoLevelUp(currentPlayer);
+                if (levelsGained > 0)
+                {
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  *** LEVEL UP! You are now Level {currentPlayer.Level}! ***");
+                    terminal.SetColor("yellow");
+                    if (currentPlayer.TrainingPoints > 0)
+                        terminal.WriteLine($"  You earned training points! Visit the Level Master to spend them.");
+                    terminal.SetColor("white");
+                    terminal.WriteLine("");
+                    await terminal.PressAnyKey();
+                }
+            }
+
             // In MUD streaming mode: show the full location display only on the first iteration
             // (or after `look`/`l` resets the flag). Subsequent iterations just flow output
             // continuously without wiping the scroll buffer — real MUD behaviour.
@@ -3075,6 +3094,8 @@ public abstract class BaseLocation
                     var nextTheme = ColorTheme.NextTheme(currentPlayer.ColorTheme);
                     currentPlayer.ColorTheme = nextTheme;
                     ColorTheme.Current = nextTheme;
+                    // Force screen clear even in MUD mode so new theme colors are visible immediately
+                    terminal.WriteRawAnsi("\x1b[2J\x1b[H");
                     terminal.WriteLine($"Color theme set to: {ColorTheme.GetThemeName(nextTheme)}", "green");
                     terminal.WriteLine($"  {ColorTheme.GetThemeDescription(nextTheme)}", "white");
                     await GameEngine.Instance.SaveCurrentGame();

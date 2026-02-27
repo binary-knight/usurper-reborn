@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.47.2";
+    public const string Version = "0.47.3";
     public const string VersionName = "Prestige";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -474,7 +474,19 @@ public static partial class GameConfig
     public const float PermadeathChancePlayerKill = 0.08f;      // 8% for player killing NPC (was 12%)
     public const float PermadeathChanceTeamWar = 0.02f;         // 2% for team war death (was 4%)
     public const int PermadeathPopulationFloor = 45;            // Skip permadeath if alive NPCs < this (was 40)
+    public const int PermadeathRaceFloor = 3;                  // Skip permadeath if alive NPCs of same race <= this
     public const float PermadeathLevelReduction = 0.015f;       // Per NPC level: chance *= (1 - level * this) (was 0.01)
+
+    // New Player Onboarding (v0.47.3)
+    public const int MenuTier2Level = 3;                       // Level at which town services unlock in menu
+    public const int MenuTier3Level = 5;                       // Level at which full menu unlocks
+    public const long FirstKillGoldBonus = 500;                // Gold bonus for first ever monster kill
+    public const int DeathPenaltyTier1MaxLevel = 3;            // Levels 1-3: gentle death penalties
+    public const int DeathPenaltyTier2MaxLevel = 5;            // Levels 4-5: moderate death penalties
+    public const float DeathXPLossTier1 = 0.05f;               // 5% XP loss at levels 1-3
+    public const float DeathGoldLossTier1 = 0.15f;             // 15% gold loss at levels 1-3
+    public const float DeathXPLossTier2 = 0.10f;               // 10% XP loss at levels 4-5
+    public const float DeathGoldLossTier2 = 0.30f;             // 30% gold loss at levels 4-5
 
     // Blood Price / Murder Weight System (v0.42.0)
     public const float MurderWeightPerDeliberateMurder = 3.0f;  // Weight from deliberate murder

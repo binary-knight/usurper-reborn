@@ -98,6 +98,19 @@ public static class ClassAbilitySystem
             Duration = 4,
             AvailableToClasses = new[] { CharacterClass.Warrior, CharacterClass.Barbarian }
         },
+        ["thundering_roar"] = new ClassAbility
+        {
+            Id = "thundering_roar",
+            Name = "Thundering Roar",
+            Description = "A devastating war cry that forces all enemies to attack you for 3 rounds.",
+            LevelRequired = 20,
+            StaminaCost = 40,
+            Cooldown = 5,
+            Type = AbilityType.Debuff,
+            Duration = 3,
+            SpecialEffect = "aoe_taunt",
+            AvailableToClasses = new[] { CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Barbarian, CharacterClass.Tidesworn }
+        },
         ["execute"] = new ClassAbility
         {
             Id = "execute",

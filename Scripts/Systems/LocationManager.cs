@@ -288,8 +288,11 @@ public class LocationManager
                     Console.Error.WriteLine($"[LocationManager] Save on quit failed: {saveEx.Message}");
                 }
                 GameEngine.MarkIntentionalExit();
-                terminal.WriteLine("Returning to main menu...", "yellow");
-                await Task.Delay(1000);
+                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    terminal.WriteLine("Returning to main menu...", "yellow");
+                    await Task.Delay(1000);
+                }
             }
         }
         catch (LocationChangeException ex)

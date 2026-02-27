@@ -67,7 +67,7 @@ public class LevelMasterLocation : BaseLocation
     /// <summary>
     /// Determines player alignment based on Chivalry/Darkness ratio
     /// </summary>
-    private static PlayerAlignment DetermineAlignment(Character player)
+    public static PlayerAlignment DetermineAlignment(Character player)
     {
         long chivalry = player.Chivalry;
         long darkness = player.Darkness;
@@ -576,220 +576,241 @@ public class LevelMasterLocation : BaseLocation
     }
 
     /// <summary>
-    /// Apply class-based stat increases based on character class type
+    /// Apply class-based stat increases based on character class type.
+    /// Instance wrapper for the static method.
     /// </summary>
     private void ApplyClassBasedStatIncreases()
     {
+        ApplyClassStatIncreases(currentPlayer);
+    }
+
+    /// <summary>
+    /// Apply class-based stat increases for a level-up. Public static so it can be
+    /// called from auto-level-up (BaseLocation) and grouped combat (CombatEngine).
+    /// </summary>
+    public static void ApplyClassStatIncreases(Character player)
+    {
         // Base stats that everyone gets
-        currentPlayer.BaseMaxHP += 5;
-        currentPlayer.BaseDefence += 1;
-        currentPlayer.BaseStamina += 1;
+        player.BaseMaxHP += 5;
+        player.BaseDefence += 1;
+        player.BaseStamina += 1;
 
         // Class-specific bonuses
-        switch (currentPlayer.Class)
+        switch (player.Class)
         {
             // Magic classes - focus on Intelligence, Wisdom, Mana
             case CharacterClass.Magician:
-                currentPlayer.BaseIntelligence += 4;
-                currentPlayer.BaseWisdom += 3;
-                currentPlayer.BaseMaxMana += 15;
-                currentPlayer.BaseMaxHP += 3;
-                currentPlayer.BaseStrength += 1;
-                currentPlayer.BaseConstitution += 1;
+                player.BaseIntelligence += 4;
+                player.BaseWisdom += 3;
+                player.BaseMaxMana += 15;
+                player.BaseMaxHP += 3;
+                player.BaseStrength += 1;
+                player.BaseConstitution += 1;
                 break;
 
             case CharacterClass.Cleric:
-                currentPlayer.BaseWisdom += 4;
-                currentPlayer.BaseIntelligence += 2;
-                currentPlayer.BaseMaxMana += 12;
-                currentPlayer.BaseMaxHP += 6;
-                currentPlayer.BaseStrength += 2;
-                currentPlayer.BaseConstitution += 2;
+                player.BaseWisdom += 4;
+                player.BaseIntelligence += 2;
+                player.BaseMaxMana += 12;
+                player.BaseMaxHP += 6;
+                player.BaseStrength += 2;
+                player.BaseConstitution += 2;
                 break;
 
             case CharacterClass.Sage:
-                currentPlayer.BaseIntelligence += 5;
-                currentPlayer.BaseWisdom += 4;
-                currentPlayer.BaseMaxMana += 18;
-                currentPlayer.BaseMaxHP += 2;
-                currentPlayer.BaseStrength += 1;
+                player.BaseIntelligence += 5;
+                player.BaseWisdom += 4;
+                player.BaseMaxMana += 18;
+                player.BaseMaxHP += 2;
+                player.BaseStrength += 1;
                 break;
 
             case CharacterClass.Alchemist:
-                currentPlayer.BaseIntelligence += 3;
-                currentPlayer.BaseWisdom += 2;
-                currentPlayer.BaseDexterity += 2;
-                currentPlayer.BaseMaxMana += 10;
-                currentPlayer.BaseMaxHP += 5;
-                currentPlayer.BaseConstitution += 2;
+                player.BaseIntelligence += 3;
+                player.BaseWisdom += 2;
+                player.BaseDexterity += 2;
+                player.BaseMaxMana += 10;
+                player.BaseMaxHP += 5;
+                player.BaseConstitution += 2;
                 break;
 
             // Warrior classes - focus on Strength, Constitution, HP
             case CharacterClass.Warrior:
-                currentPlayer.BaseStrength += 4;
-                currentPlayer.BaseConstitution += 3;
-                currentPlayer.BaseMaxHP += 12;
-                currentPlayer.BaseDexterity += 2;
-                currentPlayer.BaseDefence += 2;
+                player.BaseStrength += 4;
+                player.BaseConstitution += 3;
+                player.BaseMaxHP += 12;
+                player.BaseDexterity += 2;
+                player.BaseDefence += 2;
                 break;
 
             case CharacterClass.Barbarian:
-                currentPlayer.BaseStrength += 5;
-                currentPlayer.BaseConstitution += 4;
-                currentPlayer.BaseMaxHP += 15;
-                currentPlayer.BaseStamina += 2;
+                player.BaseStrength += 5;
+                player.BaseConstitution += 4;
+                player.BaseMaxHP += 15;
+                player.BaseStamina += 2;
                 break;
 
             case CharacterClass.Paladin:
-                currentPlayer.BaseStrength += 3;
-                currentPlayer.BaseConstitution += 3;
-                currentPlayer.BaseWisdom += 2;
-                currentPlayer.BaseCharisma += 2;
-                currentPlayer.BaseMaxHP += 10;
-                currentPlayer.BaseMaxMana += 5;
-                currentPlayer.BaseDefence += 1;
+                player.BaseStrength += 3;
+                player.BaseConstitution += 3;
+                player.BaseWisdom += 2;
+                player.BaseCharisma += 2;
+                player.BaseMaxHP += 10;
+                player.BaseMaxMana += 5;
+                player.BaseDefence += 1;
                 break;
 
             // Agile classes - focus on Dexterity, Agility, Stamina
             case CharacterClass.Assassin:
-                currentPlayer.BaseDexterity += 4;
-                currentPlayer.BaseAgility += 3;
-                currentPlayer.BaseStrength += 2;
-                currentPlayer.BaseMaxHP += 6;
-                currentPlayer.BaseStamina += 2;
+                player.BaseDexterity += 4;
+                player.BaseAgility += 3;
+                player.BaseStrength += 2;
+                player.BaseMaxHP += 6;
+                player.BaseStamina += 2;
                 break;
 
             case CharacterClass.Ranger:
-                currentPlayer.BaseDexterity += 3;
-                currentPlayer.BaseAgility += 3;
-                currentPlayer.BaseStrength += 2;
-                currentPlayer.BaseWisdom += 1;
-                currentPlayer.BaseMaxHP += 8;
-                currentPlayer.BaseStamina += 2;
+                player.BaseDexterity += 3;
+                player.BaseAgility += 3;
+                player.BaseStrength += 2;
+                player.BaseWisdom += 1;
+                player.BaseMaxHP += 8;
+                player.BaseStamina += 2;
                 break;
 
             case CharacterClass.Jester:
-                currentPlayer.BaseDexterity += 3;
-                currentPlayer.BaseAgility += 3;
-                currentPlayer.BaseCharisma += 3;
-                currentPlayer.BaseMaxHP += 5;
-                currentPlayer.BaseStamina += 2;
+                player.BaseDexterity += 3;
+                player.BaseAgility += 3;
+                player.BaseCharisma += 3;
+                player.BaseMaxHP += 5;
+                player.BaseStamina += 2;
                 break;
 
             case CharacterClass.Bard:
-                currentPlayer.BaseCharisma += 4;
-                currentPlayer.BaseDexterity += 2;
-                currentPlayer.BaseAgility += 2;
-                currentPlayer.BaseIntelligence += 2;
-                currentPlayer.BaseMaxHP += 5;
-                currentPlayer.BaseMaxMana += 5;
+                player.BaseCharisma += 4;
+                player.BaseDexterity += 2;
+                player.BaseAgility += 2;
+                player.BaseIntelligence += 2;
+                player.BaseMaxHP += 5;
+                player.BaseMaxMana += 5;
                 break;
 
             // NG+ Prestige Classes — strictly stronger, both spells AND abilities
             case CharacterClass.Tidesworn:
-                currentPlayer.BaseStrength += 4;
-                currentPlayer.BaseConstitution += 4;
-                currentPlayer.BaseWisdom += 3;
-                currentPlayer.BaseCharisma += 2;
-                currentPlayer.BaseDefence += 2;
-                currentPlayer.BaseMaxHP += 13;
-                currentPlayer.BaseMaxMana += 8;
+                player.BaseStrength += 4;
+                player.BaseConstitution += 4;
+                player.BaseWisdom += 3;
+                player.BaseCharisma += 2;
+                player.BaseDefence += 2;
+                player.BaseMaxHP += 13;
+                player.BaseMaxMana += 8;
                 break;
 
             case CharacterClass.Wavecaller:
-                currentPlayer.BaseCharisma += 5;
-                currentPlayer.BaseWisdom += 4;
-                currentPlayer.BaseIntelligence += 3;
-                currentPlayer.BaseConstitution += 2;
-                currentPlayer.BaseAgility += 2;
-                currentPlayer.BaseMaxHP += 7;
-                currentPlayer.BaseMaxMana += 14;
+                player.BaseCharisma += 5;
+                player.BaseWisdom += 4;
+                player.BaseIntelligence += 3;
+                player.BaseConstitution += 2;
+                player.BaseAgility += 2;
+                player.BaseMaxHP += 7;
+                player.BaseMaxMana += 14;
                 break;
 
             case CharacterClass.Cyclebreaker:
-                currentPlayer.BaseStrength += 3;
-                currentPlayer.BaseIntelligence += 3;
-                currentPlayer.BaseWisdom += 3;
-                currentPlayer.BaseDexterity += 3;
-                currentPlayer.BaseConstitution += 3;
-                currentPlayer.BaseAgility += 2;
-                currentPlayer.BaseMaxHP += 9;
-                currentPlayer.BaseMaxMana += 10;
+                player.BaseStrength += 3;
+                player.BaseIntelligence += 3;
+                player.BaseWisdom += 3;
+                player.BaseDexterity += 3;
+                player.BaseConstitution += 3;
+                player.BaseAgility += 2;
+                player.BaseMaxHP += 9;
+                player.BaseMaxMana += 10;
                 break;
 
             case CharacterClass.Abysswarden:
-                currentPlayer.BaseDexterity += 5;
-                currentPlayer.BaseStrength += 4;
-                currentPlayer.BaseAgility += 4;
-                currentPlayer.BaseIntelligence += 3;
-                currentPlayer.BaseConstitution += 2;
-                currentPlayer.BaseMaxHP += 8;
-                currentPlayer.BaseMaxMana += 10;
+                player.BaseDexterity += 5;
+                player.BaseStrength += 4;
+                player.BaseAgility += 4;
+                player.BaseIntelligence += 3;
+                player.BaseConstitution += 2;
+                player.BaseMaxHP += 8;
+                player.BaseMaxMana += 10;
                 break;
 
             case CharacterClass.Voidreaver:
-                currentPlayer.BaseStrength += 5;
-                currentPlayer.BaseIntelligence += 5;
-                currentPlayer.BaseDexterity += 4;
-                currentPlayer.BaseAgility += 3;
-                currentPlayer.BaseStamina += 2;
-                currentPlayer.BaseMaxHP += 6;
-                currentPlayer.BaseMaxMana += 12;
+                player.BaseStrength += 5;
+                player.BaseIntelligence += 5;
+                player.BaseDexterity += 4;
+                player.BaseAgility += 3;
+                player.BaseStamina += 2;
+                player.BaseMaxHP += 6;
+                player.BaseMaxMana += 12;
                 break;
 
             default:
                 // Fallback for any undefined class
-                currentPlayer.BaseStrength += 2;
-                currentPlayer.BaseConstitution += 2;
-                currentPlayer.BaseMaxHP += 8;
+                player.BaseStrength += 2;
+                player.BaseConstitution += 2;
+                player.BaseMaxHP += 8;
                 break;
         }
 
         // Recalculate all stats from base values
-        currentPlayer.RecalculateStats();
+        player.RecalculateStats();
     }
 
     /// <summary>
-    /// Apply hidden master-specific bonuses based on alignment
-    /// These are not shown to the player but provide small advantages
+    /// Apply hidden master-specific bonuses based on alignment.
+    /// Instance wrapper for the static method.
     /// </summary>
     private void ApplyMasterBonuses()
     {
-        switch (playerAlignment)
+        ApplyAlignmentBonuses(currentPlayer);
+    }
+
+    /// <summary>
+    /// Apply alignment-based bonus stats on level-up. Public static so it can be
+    /// called from auto-level-up and grouped combat.
+    /// </summary>
+    public static void ApplyAlignmentBonuses(Character player)
+    {
+        var alignment = DetermineAlignment(player);
+
+        switch (alignment)
         {
             case PlayerAlignment.Good:
                 // Good master grants bonus Wisdom and Charisma
-                currentPlayer.BaseWisdom += 1;
-                currentPlayer.BaseCharisma += 1;
+                player.BaseWisdom += 1;
+                player.BaseCharisma += 1;
                 // Small healing boost
-                currentPlayer.BaseMaxHP += 2;
+                player.BaseMaxHP += 2;
                 break;
 
             case PlayerAlignment.Evil:
                 // Evil master grants bonus Strength and Constitution
-                currentPlayer.BaseStrength += 1;
-                currentPlayer.BaseConstitution += 1;
+                player.BaseStrength += 1;
+                player.BaseConstitution += 1;
                 // Small damage boost
-                currentPlayer.BaseMaxHP += 1;
+                player.BaseMaxHP += 1;
                 break;
 
             case PlayerAlignment.Neutral:
                 // Neutral master grants bonus Intelligence and Dexterity
-                currentPlayer.BaseIntelligence += 1;
-                currentPlayer.BaseDexterity += 1;
+                player.BaseIntelligence += 1;
+                player.BaseDexterity += 1;
                 // Small mana boost
-                currentPlayer.BaseMaxMana += 3;
+                player.BaseMaxMana += 3;
                 break;
         }
 
-        // Recalculate after master bonuses
-        currentPlayer.RecalculateStats();
+        // Recalculate after alignment bonuses
+        player.RecalculateStats();
     }
 
     /// <summary>
     /// Experience required to have <paramref name="level"/> (cumulative), compatible with NPC formula.
     /// </summary>
-    private static long GetExperienceForLevel(int level)
+    public static long GetExperienceForLevel(int level)
     {
         if (level <= 1) return 0;
         long exp = 0;
@@ -799,6 +820,87 @@ public class LevelMasterLocation : BaseLocation
             exp += (long)(Math.Pow(i, 2.0) * 50);
         }
         return exp;
+    }
+
+    /// <summary>
+    /// Checks if a character has enough XP to level up, and if so, applies all
+    /// level-up effects (class stats, alignment bonuses, training points, quickbar).
+    /// Called from BaseLocation.LocationLoop() to catch ALL XP sources, and from
+    /// CombatEngine for grouped combat. Returns number of levels gained (0 = none).
+    /// </summary>
+    public static int CheckAutoLevelUp(Character player)
+    {
+        int levelsGained = 0;
+        int startLevel = player.Level;
+
+        while (player.Level < GameConfig.MaxLevel &&
+               player.Experience >= GetExperienceForLevel(player.Level + 1))
+        {
+            int newLevel = player.Level + 1;
+
+            // Apply proper class-based stat increases
+            ApplyClassStatIncreases(player);
+
+            // Apply alignment-based bonus stats
+            ApplyAlignmentBonuses(player);
+
+            // Award training points for the new level
+            int trainingPoints = TrainingSystem.CalculateTrainingPointsPerLevel(player);
+            player.TrainingPoints += trainingPoints;
+
+            player.RaiseLevel(newLevel);
+            levelsGained++;
+        }
+
+        if (levelsGained > 0)
+        {
+            // Full HP and Mana restore on level up
+            player.HP = player.MaxHP;
+            player.Mana = player.MaxMana;
+
+            // Track statistics for each level gained
+            for (int i = 0; i < levelsGained; i++)
+            {
+                player.Statistics.RecordLevelUp(startLevel + i + 1);
+            }
+
+            // Telemetry
+            UsurperRemake.Systems.TelemetrySystem.Instance.TrackLevelUp(
+                player.Level,
+                player.Class.ToString(),
+                (int)player.Strength,
+                (int)player.Dexterity,
+                (int)player.Constitution,
+                (int)player.Intelligence,
+                (int)player.Wisdom,
+                (int)player.Charisma
+            );
+
+            UsurperRemake.Systems.TelemetrySystem.Instance.SetUserProperties(
+                new System.Collections.Generic.Dictionary<string, object>
+                {
+                    ["level"] = player.Level,
+                    ["max_level_reached"] = player.Level
+                }
+            );
+
+            // Log level up
+            UsurperRemake.Systems.DebugLogger.Instance.LogLevelUp(player.Name, startLevel, player.Level);
+
+            // Online news: announce level ups at milestones
+            if (UsurperRemake.Systems.OnlineStateManager.IsActive)
+            {
+                var displayName = player.Name2 ?? player.Name1;
+                if (player.Level % 5 == 0 || player.Level <= 3)
+                    _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
+                        $"{displayName} has reached level {player.Level}!", "combat");
+            }
+
+            // Auto-add newly unlocked spells/abilities to empty quickbar slots
+            GameEngine.QuickbarAddNewSkills(player);
+        }
+
+        return levelsGained;
     }
 
     #endregion

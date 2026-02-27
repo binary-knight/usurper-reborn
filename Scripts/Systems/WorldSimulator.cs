@@ -296,6 +296,9 @@ public class WorldSimulator
         // Process orphan aging in the Royal Orphanage
         ProcessOrphanAging();
 
+        // Process NPC immigration (replenish extinct/critical races)
+        ProcessNPCImmigration();
+
         // Process NPC pregnancies and births (including affairs)
         ProcessNPCPregnancies();
 
@@ -451,6 +454,10 @@ public class WorldSimulator
         // Population floor — don't let the world get too empty
         int aliveCount = npcs.Count(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead);
         if (aliveCount < GameConfig.PermadeathPopulationFloor) return false;
+
+        // Race floor — prevent any race from going extinct
+        int raceAlive = npcs.Count(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead && n.Race == npc.Race);
+        if (raceAlive <= GameConfig.PermadeathRaceFloor) return false;
 
         // Higher-level NPCs are harder to permanently kill
         float levelReduction = npc.Level * GameConfig.PermadeathLevelReduction;
@@ -850,6 +857,54 @@ public class WorldSimulator
                     // Check if this NPC's children are now orphaned (both parents dead)
                     CheckForOrphanedChildren(npc);
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Process NPC immigration — for each playable race with fewer than 2 alive NPCs,
+    /// generate immigrant NPCs (1 male, 1 female) to prevent race extinction.
+    /// Called once per world sim tick.
+    /// </summary>
+    private void ProcessNPCImmigration()
+    {
+        var aliveNPCs = npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead).ToList();
+
+        // Calculate average level of alive NPCs for immigrant scaling
+        int avgLevel = aliveNPCs.Count > 0 ? Math.Max(1, (int)aliveNPCs.Average(n => n.Level)) : 5;
+
+        // Check each playable race (0-9, the 10 base races)
+        foreach (CharacterRace race in Enum.GetValues(typeof(CharacterRace)))
+        {
+            // Skip prestige-only races if any exist beyond base 10
+            if ((int)race > 9) continue;
+
+            int raceAlive = aliveNPCs.Count(n => n.Race == race);
+            if (raceAlive >= 2) continue;
+
+            // This race needs immigrants
+            int needed = 2 - raceAlive;
+            var sexes = new[] { CharacterSex.Male, CharacterSex.Female };
+
+            for (int i = 0; i < needed && i < sexes.Length; i++)
+            {
+                var immigrant = NPCSpawnSystem.Instance?.GenerateImmigrantNPC(race, sexes[i], avgLevel);
+                if (immigrant != null)
+                {
+                    NPCSpawnSystem.Instance?.AddRestoredNPC(immigrant);
+
+                    NewsSystem.Instance?.Newsy(
+                        $"A {race} traveler named {immigrant.Name2} has arrived in town.");
+
+                    UsurperRemake.Systems.DebugLogger.Instance.LogInfo("IMMIGRATION",
+                        $"Generated immigrant: {immigrant.Name2} ({race} {immigrant.Class} L{immigrant.Level} {sexes[i]})");
+                }
+            }
+
+            if (needed > 0)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("IMMIGRATION",
+                    $"Race {race}: {raceAlive} alive, generated {needed} immigrant(s)");
             }
         }
     }

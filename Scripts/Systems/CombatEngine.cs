@@ -1,6 +1,7 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Data;
 using UsurperRemake.Systems;
+using UsurperRemake.Locations;
 using UsurperRemake.UI;
 using UsurperRemake.BBS;
 using UsurperRemake.Server;
@@ -18,6 +19,7 @@ public partial class CombatEngine
 {
     private TerminalEmulator terminal;
     private Random random = new Random();
+    private bool _lastMonsterTargetedGroupPlayer; // Set by ProcessMonsterAction when monster attacks a grouped player
 
     // Combat state
     private bool globalBegged = false;
@@ -26,6 +28,7 @@ public partial class CombatEngine
 
     // Ability cooldowns - reset each combat
     private Dictionary<string, int> abilityCooldowns = new();
+    private Dictionary<string, int> pvpDefenderCooldowns = new();
 
     // Current player reference for combat speed setting
     private Character currentPlayer;
@@ -191,9 +194,11 @@ public partial class CombatEngine
         attacker.HasStatusImmunity = false;
         attacker.StatusImmunityDuration = 0;
         abilityCooldowns.Clear();
+        pvpDefenderCooldowns.Clear();
 
         // Initialize combat stamina for abilities
         attacker.InitializeCombatStamina();
+        defender.InitializeCombatStamina();
 
         // Reset per-combat faction flags
         attacker.DivineFavorTriggeredThisCombat = false;
@@ -210,6 +215,10 @@ public partial class CombatEngine
         if (!ClassAbilitySystem.IsSpellcaster(attacker.Class))
         {
             ClassAbilitySystem.GetAvailableAbilities(attacker);
+        }
+        if (!ClassAbilitySystem.IsSpellcaster(defender.Class))
+        {
+            ClassAbilitySystem.GetAvailableAbilities(defender);
         }
 
         // Initialize combat state
@@ -243,6 +252,12 @@ public partial class CombatEngine
                 await ProcessComputerPlayerAction(defender, attacker, result);
             }
             
+            // Tick down cooldowns for both sides
+            foreach (var key in abilityCooldowns.Keys.ToList())
+                if (abilityCooldowns[key] > 0) abilityCooldowns[key]--;
+            foreach (var key in pvpDefenderCooldowns.Keys.ToList())
+                if (pvpDefenderCooldowns[key] > 0) pvpDefenderCooldowns[key]--;
+
             // Check for combat end conditions
             if (!attacker.IsAlive || !defender.IsAlive || globalEscape)
                 break;
@@ -457,28 +472,29 @@ public partial class CombatEngine
             BroadcastGroupCombatEvent(result,
                 "\u001b[1;31m  *** AMBUSH! Monsters strike before the party can react! ***\u001b[0m");
 
-            // Capture ambush attacks for group broadcast
-            if (hasGroupAmbush) terminal.StartCapture();
-
+            // Process ambush attacks — capture per-monster for group broadcast
             foreach (var ambushMonster in monsters.Where(m => m.IsAlive))
             {
                 if (!player.IsAlive) break;
+
+                _lastMonsterTargetedGroupPlayer = false;
+                if (hasGroupAmbush) terminal.StartCapture();
+
                 await ProcessMonsterAction(ambushMonster, player, result);
+
+                if (hasGroupAmbush)
+                {
+                    string? ambushOutput = terminal.StopCapture();
+                    if (!_lastMonsterTargetedGroupPlayer && !string.IsNullOrWhiteSpace(ambushOutput))
+                        BroadcastGroupCombatEvent(result,
+                            ConvertToThirdPerson(ambushOutput, player.DisplayName));
+                }
             }
 
             if (!player.IsAlive)
             {
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("You were slain in the ambush!");
-            }
-
-            // Broadcast ambush attacks to followers
-            if (hasGroupAmbush)
-            {
-                string? ambushOutput = terminal.StopCapture();
-                if (!string.IsNullOrWhiteSpace(ambushOutput))
-                    BroadcastGroupCombatEvent(result,
-                        ConvertToThirdPerson(ambushOutput, player.DisplayName));
             }
 
             await Task.Delay(GetCombatDelay(1500));
@@ -768,7 +784,6 @@ public partial class CombatEngine
                 break;
 
             // === ALL MONSTERS' TURNS ===
-            if (hasGroup) terminal.StartCapture();
             var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
             foreach (var monster in livingMonsters)
             {
@@ -790,9 +805,17 @@ public partial class CombatEngine
                         terminal.WriteLine("");
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"{monster.Name} hesitates, confused by internal contradictions!");
+                        if (hasGroup)
+                            BroadcastGroupCombatEvent(result,
+                                $"\u001b[36m  {monster.Name} hesitates, confused by internal contradictions!\u001b[0m");
                         await Task.Delay(GetCombatDelay(500));
                         continue;
                     }
+
+                    // Capture per-attack so we can skip broadcast when monster targets a grouped player
+                    // (MonsterAttacksCompanion already sends direct messages to grouped players)
+                    _lastMonsterTargetedGroupPlayer = false;
+                    if (hasGroup) terminal.StartCapture();
 
                     terminal.WriteLine("");
                     terminal.SetColor("red");
@@ -809,16 +832,19 @@ public partial class CombatEngine
                     }
 
                     await ProcessMonsterAction(monster, player, result);
+
+                    // Broadcast this attack to followers — but skip if monster targeted a grouped
+                    // player, because MonsterAttacksCompanion already sent them direct messages.
+                    if (hasGroup)
+                    {
+                        string? monsterOutput = terminal.StopCapture();
+                        if (!_lastMonsterTargetedGroupPlayer && !string.IsNullOrWhiteSpace(monsterOutput))
+                            BroadcastGroupCombatEvent(result,
+                                ConvertToThirdPerson(monsterOutput, player.DisplayName));
+                    }
+
                     await Task.Delay(GetCombatDelay(800));
                 }
-            }
-            // Broadcast all monster actions to followers (convert "You" to leader's name)
-            if (hasGroup)
-            {
-                string? monsterOutput = terminal.StopCapture();
-                if (!string.IsNullOrWhiteSpace(monsterOutput))
-                    BroadcastGroupCombatEvent(result,
-                        ConvertToThirdPerson(monsterOutput, player.DisplayName));
             }
 
             // Check for player death — only end combat if no grouped players survive
@@ -2934,6 +2960,11 @@ public partial class CombatEngine
             monster.PoisonRounds--;
             terminal.WriteLine($"Poison burns {monster.Name} for {dmg} damage!", "dark_green");
             if (monster.PoisonRounds == 0) monster.Poisoned = false;
+            if (!monster.IsAlive)
+            {
+                terminal.WriteLine($"{monster.Name} succumbs to poison!", "dark_green");
+                return;
+            }
         }
 
         if (monster.StunRounds > 0)
@@ -3077,6 +3108,14 @@ public partial class CombatEngine
             }
         }
 
+        // Tick down taunt duration
+        if (monster.TauntRoundsLeft > 0)
+        {
+            monster.TauntRoundsLeft--;
+            if (monster.TauntRoundsLeft <= 0)
+                monster.TauntedBy = null;
+        }
+
         // Check if player will dodge the next attack
         if (player.DodgeNextAttack)
         {
@@ -3094,6 +3133,7 @@ public partial class CombatEngine
             var targetChoice = SelectMonsterTarget(player, aliveTeammates, monster, random);
             if (targetChoice != null && targetChoice != player)
             {
+                if (targetChoice.IsGroupedPlayer) _lastMonsterTargetedGroupPlayer = true;
                 await MonsterAttacksCompanion(monster, targetChoice, result);
                 return;
             }
@@ -3101,6 +3141,7 @@ public partial class CombatEngine
             if (!player.IsAlive && aliveTeammates.Count > 0)
             {
                 var fallbackTarget = aliveTeammates[random.Next(aliveTeammates.Count)];
+                if (fallbackTarget.IsGroupedPlayer) _lastMonsterTargetedGroupPlayer = true;
                 await MonsterAttacksCompanion(monster, fallbackTarget, result);
                 return;
             }
@@ -4429,6 +4470,7 @@ public partial class CombatEngine
 
         result.Player.Experience += expReward;
         result.Player.Gold += goldReward;
+        bool isFirstKill = result.Player.MKills == 0;
         result.Player.MKills++;
 
         // Award experience to active companions (50% of player's XP)
@@ -4531,6 +4573,12 @@ public partial class CombatEngine
         {
             terminal.SetColor("cyan");
             terminal.WriteLine($"  (Team bonus: +{teamXPBonus} XP, +{teamGoldBonus} gold)");
+        }
+
+        // First kill bonus for brand new players
+        if (isFirstKill)
+        {
+            await ShowFirstKillBonus(result.Player, terminal);
         }
 
         // Offer weapon pickup
@@ -8118,11 +8166,13 @@ public partial class CombatEngine
         terminal.WriteLine($"You taunt {target.Name} mercilessly!");
         await Task.Delay(GetCombatDelay(500));
 
-        // Taunt: Lower enemy defense
+        // Taunt: Lower enemy defense + force targeting for 2 rounds
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"{target.Name} becomes enraged and lowers their guard!");
+        terminal.WriteLine($"{target.Name} becomes enraged and focuses on you!");
         target.Defence = Math.Max(0, target.Defence - 3);
         target.ArmPow = Math.Max(0, target.ArmPow - 2);
+        target.TauntedBy = player.DisplayName;
+        target.TauntRoundsLeft = 2;
 
         await Task.Delay(GetCombatDelay(1000));
     }
@@ -8267,6 +8317,19 @@ public partial class CombatEngine
                 await ApplyAoEDamage(monsters, actualDamage, result, ability.Name);
                 // Skip single target damage since we did AoE
                 actualDamage = 0;
+            }
+            else if (abilityResult.SpecialEffect == "aoe_taunt")
+            {
+                // AoE taunt — force all living monsters to attack the taunter
+                int tauntDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                foreach (var m in monsters.Where(m => m.IsAlive))
+                {
+                    m.TauntedBy = player.DisplayName;
+                    m.TauntRoundsLeft = tauntDuration;
+                }
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("Your thundering roar echoes through the chamber! All enemies turn to face you!");
+                actualDamage = 0; // Taunt is not a damage ability
             }
 
             // Apply single target damage (unless AoE)
@@ -9037,11 +9100,19 @@ public partial class CombatEngine
                 break;
 
             case "eternal_vigil":
-                // Invulnerable for 2 rounds
+                // Invulnerable for 2 rounds + force all monsters to attack you
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Invulnerable))
                     player.ActiveStatuses[StatusEffect.Invulnerable] = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
+                {
+                    int vigilDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        m.TauntedBy = player.DisplayName;
+                        m.TauntRoundsLeft = vigilDuration;
+                    }
+                }
                 terminal.SetColor("bright_white");
-                terminal.WriteLine("The Ocean's eternal vigil protects you! You cannot be harmed!");
+                terminal.WriteLine("The Ocean's eternal vigil protects you! All enemies are drawn to your invulnerable form!");
                 break;
 
             case "wrath_deep":
@@ -11466,6 +11537,20 @@ public partial class CombatEngine
     /// </summary>
     private Character? SelectMonsterTarget(Character player, List<Character> aliveTeammates, Monster monster, Random random)
     {
+        // Taunt override — if this monster is taunted, force it to attack the taunter
+        if (!string.IsNullOrEmpty(monster.TauntedBy) && monster.TauntRoundsLeft > 0)
+        {
+            // Check if taunter is still alive
+            if (player.IsAlive && player.DisplayName == monster.TauntedBy)
+                return null; // null = attack the player
+            var tauntTarget = aliveTeammates.FirstOrDefault(t => t.IsAlive && t.DisplayName == monster.TauntedBy);
+            if (tauntTarget != null)
+                return tauntTarget;
+            // Taunter is dead/gone — clear taunt
+            monster.TauntedBy = null;
+            monster.TauntRoundsLeft = 0;
+        }
+
         // Build a list of all potential targets with weights
         var targetWeights = new List<(Character target, int weight)>();
 
@@ -11997,6 +12082,7 @@ public partial class CombatEngine
         // Calculate total rewards from all defeated monsters
         long totalExp = 0;
         long totalGold = 0;
+        bool isFirstKillMulti = result.Player.MKills == 0;
 
         foreach (var monster in result.DefeatedMonsters)
         {
@@ -12164,6 +12250,13 @@ public partial class CombatEngine
             if (adjustedGold > totalGold)
                 terminal.WriteLine($"  (World event bonus: +{adjustedGold - totalGold} gold)");
         }
+
+        // First kill bonus for brand new players
+        if (isFirstKillMulti)
+        {
+            await ShowFirstKillBonus(result.Player, terminal);
+        }
+
         terminal.WriteLine("");
 
         // Show NPC teammate reactions after combat victory — broadcast to group
@@ -12248,6 +12341,38 @@ public partial class CombatEngine
 
         // Auto-save after combat victory
         await SaveSystem.Instance.AutoSave(result.Player);
+    }
+
+    /// <summary>
+    /// Show celebratory first kill bonus when a player kills their very first monster.
+    /// </summary>
+    private async Task ShowFirstKillBonus(Character player, TerminalEmulator terminal)
+    {
+        long bonus = GameConfig.FirstKillGoldBonus;
+        player.Gold += bonus;
+
+        string bonusLine = $"  Bonus reward: {bonus} gold!";
+        int boxWidth = 50; // inner width between ║ chars
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("  ╔══════════════════════════════════════════════════╗");
+        terminal.WriteLine("  ║                                                  ║");
+        terminal.WriteLine("  ║            ★  FIRST BLOOD!  ★                    ║");
+        terminal.WriteLine("  ║                                                  ║");
+        terminal.WriteLine("  ║  You slew your first monster!                    ║");
+        terminal.WriteLine($"  ║{bonusLine.PadRight(boxWidth)}║");
+        terminal.WriteLine("  ║                                                  ║");
+        terminal.WriteLine("  ║  The dungeons hold many more challenges...       ║");
+        terminal.WriteLine("  ║                                                  ║");
+        terminal.WriteLine("  ╚══════════════════════════════════════════════════╝");
+        terminal.SetColor("white");
+        terminal.WriteLine("");
+
+        player.Statistics.RecordGoldChange(player.Gold);
+
+        DebugLogger.Instance.LogInfo("COMBAT", $"First kill bonus: {bonus} gold awarded to {player.DisplayName}");
+
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -12643,13 +12768,38 @@ public partial class CombatEngine
         terminal.WriteLine("");
         await Task.Delay(GetCombatDelay(1000));
 
-        // Experience loss (10-20%)
-        long expLoss = (long)(player.Experience * (0.1 + random.NextDouble() * 0.1));
+        // Death penalties scale by level for new player protection
+        float xpLossRate;
+        double goldLossRate;
+        bool canLoseItems;
+
+        if (player.Level <= GameConfig.DeathPenaltyTier1MaxLevel)
+        {
+            // Gentle: 5% XP, 15% gold, no item loss
+            xpLossRate = GameConfig.DeathXPLossTier1;
+            goldLossRate = GameConfig.DeathGoldLossTier1;
+            canLoseItems = false;
+        }
+        else if (player.Level <= GameConfig.DeathPenaltyTier2MaxLevel)
+        {
+            // Moderate: 10% XP, 30% gold, no item loss
+            xpLossRate = GameConfig.DeathXPLossTier2;
+            goldLossRate = GameConfig.DeathGoldLossTier2;
+            canLoseItems = false;
+        }
+        else
+        {
+            // Full: 10-20% XP, 50-75% gold, 20% item loss
+            xpLossRate = (float)(0.1 + random.NextDouble() * 0.1);
+            goldLossRate = 0.5 + random.NextDouble() * 0.25;
+            canLoseItems = true;
+        }
+
+        long expLoss = (long)(player.Experience * xpLossRate);
         player.Experience = Math.Max(0, player.Experience - expLoss);
         terminal.WriteLine($"You lose {expLoss:N0} experience points!");
 
-        // Gold loss (drop 50-75%) — Crown Tax Exemption reduces by 20%
-        double goldLossRate = 0.5 + random.NextDouble() * 0.25;
+        // Crown Tax Exemption reduces gold loss
         float taxExemption = FactionSystem.Instance?.GetTaxExemptionRate() ?? 0f;
         if (taxExemption > 0) goldLossRate *= (1.0 - taxExemption);
         long goldLoss = (long)(player.Gold * goldLossRate);
@@ -12659,8 +12809,8 @@ public partial class CombatEngine
             terminal.WriteLine($"You drop {goldLoss:N0} gold!");
         }
 
-        // Small chance to lose an item
-        if (player.Item != null && player.Item.Count > 0 && random.Next(100) < 20)
+        // Item loss only for experienced players (level 6+)
+        if (canLoseItems && player.Item != null && player.Item.Count > 0 && random.Next(100) < 20)
         {
             int itemIndex = random.Next(player.Item.Count);
             player.Item.RemoveAt(itemIndex);
@@ -13655,6 +13805,17 @@ public partial class CombatEngine
                 terminal.SetColor("cyan");
                 terminal.WriteLine("Your aim is true!");
                 break;
+
+            case "aoe_taunt":
+                if (monster != null && monster.IsAlive)
+                {
+                    int tauntDur = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                    monster.TauntedBy = player.DisplayName;
+                    monster.TauntRoundsLeft = tauntDur;
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"Your thundering roar forces {monster.Name} to focus on you!");
+                }
+                break;
         }
 
         await Task.CompletedTask;
@@ -13854,10 +14015,26 @@ public partial class CombatEngine
                 await ExecutePvPDisarm(attacker, defender, result);
                 break;
 
-            // Actions that don't work in PvP
+            // Map combat actions to class abilities for PvP
             case CombatActionType.PowerAttack:
             case CombatActionType.PreciseStrike:
             case CombatActionType.Backstab:
+            {
+                string? mappedAbilityId = MapCombatActionToAbility(attacker, action.Type);
+                if (mappedAbilityId != null)
+                {
+                    var mappedAction = new CombatAction { Type = CombatActionType.UseAbility, AbilityId = mappedAbilityId };
+                    await ExecutePvPAbility(attacker, defender, mappedAction, result);
+                }
+                else
+                {
+                    terminal.WriteLine("No matching ability available — using basic attack.", "yellow");
+                    await ExecutePvPAttack(attacker, defender, result);
+                }
+                break;
+            }
+
+            // Actions that truly don't work in PvP
             case CombatActionType.Smite:
             case CombatActionType.FightToDeath:
             case CombatActionType.BegForMercy:
@@ -13872,6 +14049,37 @@ public partial class CombatEngine
                 await ExecutePvPAttack(attacker, defender, result);
                 break;
         }
+    }
+
+    /// <summary>
+    /// Map a combat action type (Backstab, PowerAttack, PreciseStrike) to the best matching class ability.
+    /// </summary>
+    private string? MapCombatActionToAbility(Character attacker, CombatActionType actionType)
+    {
+        var abilities = ClassAbilitySystem.GetAvailableAbilities(attacker);
+        string? targetEffect = actionType switch
+        {
+            CombatActionType.Backstab => "backstab",
+            CombatActionType.PowerAttack => "power_strike",   // Warrior's signature
+            CombatActionType.PreciseStrike => "precise_shot",  // Ranger's signature
+            _ => null
+        };
+
+        if (targetEffect == null) return null;
+
+        // First try exact special effect match
+        var match = abilities.FirstOrDefault(a =>
+            a.SpecialEffect == targetEffect
+            && ClassAbilitySystem.CanUseAbility(attacker, a.Id, abilityCooldowns)
+            && attacker.HasEnoughStamina(a.StaminaCost));
+        if (match != null) return match.Id;
+
+        // Fall back to exact ID match
+        match = abilities.FirstOrDefault(a =>
+            a.Id == targetEffect
+            && ClassAbilitySystem.CanUseAbility(attacker, a.Id, abilityCooldowns)
+            && attacker.HasEnoughStamina(a.StaminaCost));
+        return match?.Id;
     }
 
     /// <summary>
@@ -14252,6 +14460,61 @@ public partial class CombatEngine
                 // For now only self-affecting or damage spells ignored in PvP; skip Monster
                 ApplySpellEffects(computer, null, spellResult);
                 result.CombatLog.Add($"{computer.DisplayName} casts {chosen.Name}");
+                await Task.Delay(GetCombatDelay(1000));
+                return;
+            }
+        }
+
+        // 2b. Use class ability if non-spellcaster and has stamina (50% chance)
+        if (!ClassAbilitySystem.IsSpellcaster(computer.Class) && random.Next(100) < 50)
+        {
+            var abilities = ClassAbilitySystem.GetAvailableAbilities(computer)
+                .Where(a => a.Type == ClassAbilitySystem.AbilityType.Attack
+                         && ClassAbilitySystem.CanUseAbility(computer, a.Id, pvpDefenderCooldowns)
+                         && computer.HasEnoughStamina(a.StaminaCost))
+                .ToList();
+            if (abilities.Count > 0)
+            {
+                // Pick highest-damage ability
+                var chosen = abilities.OrderByDescending(a => a.BaseDamage).First();
+                computer.SpendStamina(chosen.StaminaCost);
+                var abilityResult = ClassAbilitySystem.UseAbility(computer, chosen.Id, random);
+
+                if (abilityResult.Damage > 0)
+                {
+                    long actualDamage = (long)(abilityResult.Damage + computer.Strength / 2);
+                    if (abilityResult.SpecialEffect == "backstab")
+                        actualDamage = (long)(actualDamage * 1.5);
+                    else if (abilityResult.SpecialEffect == "last_stand" && computer.HP < computer.MaxHP * 0.25)
+                        actualDamage = (long)(actualDamage * 1.5);
+
+                    if (abilityResult.SpecialEffect != "armor_pierce")
+                    {
+                        long abilDef = opponent.Defence / 2;
+                        actualDamage = Math.Max(1, actualDamage - abilDef);
+                    }
+                    opponent.HP = Math.Max(0, opponent.HP - actualDamage);
+                    terminal.WriteLine($"{computer.DisplayName} uses {chosen.Name} for {actualDamage} damage!", "bright_red");
+                }
+                if (abilityResult.Healing > 0)
+                {
+                    computer.HP = Math.Min(computer.MaxHP, computer.HP + abilityResult.Healing);
+                    terminal.WriteLine($"{computer.DisplayName} recovers {abilityResult.Healing} HP!", "green");
+                }
+                if (abilityResult.AttackBonus > 0)
+                {
+                    computer.TempAttackBonus += abilityResult.AttackBonus;
+                    computer.TempAttackBonusDuration = Math.Max(computer.TempAttackBonusDuration, abilityResult.Duration);
+                }
+                if (abilityResult.DefenseBonus > 0)
+                {
+                    computer.TempDefenseBonus += abilityResult.DefenseBonus;
+                    computer.TempDefenseBonusDuration = Math.Max(computer.TempDefenseBonusDuration, abilityResult.Duration);
+                }
+                if (abilityResult.CooldownApplied > 0)
+                    pvpDefenderCooldowns[chosen.Id] = abilityResult.CooldownApplied;
+
+                result.CombatLog.Add($"{computer.DisplayName} uses {chosen.Name}");
                 await Task.Delay(GetCombatDelay(1000));
                 return;
             }
@@ -15003,8 +15266,10 @@ public partial class CombatEngine
             return;
         }
         terminal.WriteLine($"You taunt {monster.Name}, drawing its ire!", "yellow");
-        // Simple effect: lower monster defence for next round
+        // Lower defence + force targeting for 2 rounds
         monster.Defence = Math.Max(0, monster.Defence - 2);
+        monster.TauntedBy = player.DisplayName;
+        monster.TauntRoundsLeft = 2;
         result.CombatLog.Add($"{player.DisplayName} taunted {monster.Name}");
         await Task.Delay(GetCombatDelay(700));
     }
@@ -16579,21 +16844,8 @@ public partial class CombatEngine
             groupedPlayer.Experience += playerExp;
             groupedPlayer.Gold += playerGold;
 
-            // Check for level up (same formula as NPC teammates)
-            long xpForNextLevel = GetExperienceForLevel(groupedPlayer.Level + 1);
-            while (groupedPlayer.Experience >= xpForNextLevel && groupedPlayer.Level < 100)
-            {
-                groupedPlayer.Level++;
-                var random = new Random();
-                groupedPlayer.BaseMaxHP += 10 + random.Next(5, 15);
-                groupedPlayer.BaseStrength += random.Next(1, 3);
-                groupedPlayer.BaseDefence += random.Next(1, 2);
-                groupedPlayer.RecalculateStats();
-                groupedPlayer.HP = groupedPlayer.MaxHP;
-                groupedPlayer.Statistics.RecordLevelUp(groupedPlayer.Level);
-                NewsSystem.Instance?.Newsy(true, $"{groupedPlayer.DisplayName} has achieved Level {groupedPlayer.Level}!");
-                xpForNextLevel = GetExperienceForLevel(groupedPlayer.Level + 1);
-            }
+            // Check for level up — uses proper class-based stat increases (same as Level Master)
+            LevelMasterLocation.CheckAutoLevelUp(groupedPlayer);
 
             // Track monster kills on the grouped player
             foreach (var monster in result.DefeatedMonsters)

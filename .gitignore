@@ -63,3 +63,6 @@ tools/ans_to_csharp.py
 tools/wizard_portrait_output.txt
 tools/orc_portrait_output.txt
 tools/bbs_json_to_csharp.py
+tools/balance_audit.py
+tools/npc_audit.py
+tools/retention_audit.py

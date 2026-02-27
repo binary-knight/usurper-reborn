@@ -152,7 +152,7 @@ public class King
         }
         else
         {
-            npcCount = activeNPCs?.Count ?? 10;
+            npcCount = Math.Max(GameConfig.PermadeathPopulationFloor, activeNPCs?.Count ?? GameConfig.PermadeathPopulationFloor);
         }
         long baseIncome = TaxRate * Math.Max(1, npcCount);
 

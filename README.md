@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.47.1** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.47.3** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,20 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.47.3 - Onboarding, All-Slot Loot & Balance
+
+**New Player Onboarding:** Progressive menu disclosure (Lv1-2 shows 8 core options, expanding at Lv3 and Lv5), dungeon guidance banner, reduced death penalties for levels 1-5, and +500 gold first kill bonus. Automatic level-ups from any XP source. PvP AI defenders now use class abilities.
+
+**All-Slot Dungeon Loot:** Dungeon monsters now drop armor for every equipment slot — head, arms, hands, legs, feet, waist, face, and cloak — not just weapons and body armor. 93 new per-slot armor templates covering levels 1-100. Regular monsters: 45% weapon / 55% armor (weighted across all slots). Ring/necklace drops folded into the armor pool.
+
+**Balance & Fixes:** Treasury income fallback (45 NPCs minimum). NPC race extinction prevention (permadeath floor + immigration). Instant disconnect detection. Playtime tracking fallback.
+
+### Completed in v0.47.2 - BBS → Online Server Bridge
+
+**BBS Online Play:** BBS door players can now access `[O]nline Multiplayer` from the main menu and connect to the shared online server. BBS-safe I/O for the relay loop, BBS-compatible ANSI color codes, and connection type shows as "BBS" on the server.
+
+**Bug Fixes:** Generic bounty quests now completable (proper kill objectives instead of phantom monster names). Prestige ability kill-tracking crash fixed across 17 cases. Prestige buff duration off-by-one fixed (Timeline Split, Chrono Surge, Blood Frenzy). NPC team members protected from world simulator combat.
 
 ### Completed in v0.47.1 - MUD Client Polish
 

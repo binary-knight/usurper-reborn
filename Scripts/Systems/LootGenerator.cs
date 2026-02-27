@@ -392,6 +392,132 @@ public static class LootGenerator
             ("Titan's Harness", new[] { "Barbarian" }, 80, 100, 105),
         };
 
+        // Per-slot armor templates for dungeon loot drops
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> HeadArmorTemplates = new()
+        {
+            ("Leather Cap", new[] { "All" }, 1, 25, 4),
+            ("Iron Helm", new[] { "Warrior", "Paladin", "Barbarian" }, 10, 45, 12),
+            ("Chain Coif", new[] { "Warrior", "Paladin", "Cleric", "Ranger" }, 15, 55, 16),
+            ("Steel Helm", new[] { "Warrior", "Paladin", "Barbarian" }, 25, 65, 25),
+            ("Wizard's Hat", new[] { "Magician", "Sage" }, 15, 60, 10),
+            ("Monk's Headband", new[] { "Monk" }, 10, 55, 8),
+            ("Shadow Hood", new[] { "Assassin", "Ranger" }, 20, 70, 18),
+            ("Battle Crown", new[] { "Warrior", "Paladin" }, 40, 80, 38),
+            ("Mithril Helm", new[] { "All" }, 55, 90, 52),
+            ("Crown of the Archmage", new[] { "Magician", "Sage" }, 70, 100, 65),
+            ("Titan's Greathelm", new[] { "Warrior", "Barbarian" }, 75, 100, 78),
+            ("Holy Diadem", new[] { "Paladin", "Cleric" }, 65, 100, 60),
+        };
+
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> ArmsArmorTemplates = new()
+        {
+            ("Leather Bracers", new[] { "All" }, 1, 25, 3),
+            ("Iron Vambraces", new[] { "Warrior", "Paladin", "Barbarian" }, 10, 45, 10),
+            ("Chain Sleeves", new[] { "Warrior", "Paladin", "Cleric" }, 15, 55, 14),
+            ("Studded Armguards", new[] { "Ranger", "Assassin" }, 15, 50, 12),
+            ("Steel Vambraces", new[] { "Warrior", "Paladin" }, 25, 65, 22),
+            ("Silk Arm Wraps", new[] { "Magician", "Sage", "Monk" }, 10, 50, 7),
+            ("Barbarian Arm Guards", new[] { "Barbarian" }, 20, 65, 18),
+            ("Mithril Armguards", new[] { "All" }, 45, 85, 40),
+            ("Shadow Bracers", new[] { "Assassin" }, 40, 80, 35),
+            ("Plate Vambraces", new[] { "Warrior", "Paladin" }, 55, 95, 55),
+            ("Holy Armguards", new[] { "Paladin", "Cleric" }, 60, 100, 58),
+            ("Dragonscale Bracers", new[] { "All" }, 80, 100, 75),
+        };
+
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> HandsArmorTemplates = new()
+        {
+            ("Cloth Gloves", new[] { "All" }, 1, 20, 2),
+            ("Leather Gloves", new[] { "All" }, 5, 30, 5),
+            ("Chain Gauntlets", new[] { "Warrior", "Paladin", "Cleric" }, 15, 55, 14),
+            ("Thief's Gloves", new[] { "Assassin", "Ranger" }, 10, 50, 10),
+            ("Iron Gauntlets", new[] { "Warrior", "Paladin", "Barbarian" }, 20, 60, 18),
+            ("Silk Handwraps", new[] { "Magician", "Sage", "Monk" }, 10, 50, 7),
+            ("Steel Gauntlets", new[] { "Warrior", "Paladin" }, 35, 75, 30),
+            ("Spiked Fists", new[] { "Barbarian", "Monk" }, 30, 70, 25),
+            ("Mithril Gloves", new[] { "All" }, 50, 85, 42),
+            ("Shadow Handwraps", new[] { "Assassin" }, 45, 85, 38),
+            ("Plate Gauntlets", new[] { "Warrior", "Paladin" }, 60, 95, 55),
+            ("Dragon Grip", new[] { "All" }, 80, 100, 72),
+        };
+
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> LegsArmorTemplates = new()
+        {
+            ("Cloth Leggings", new[] { "All" }, 1, 20, 3),
+            ("Leather Leggings", new[] { "All" }, 5, 30, 6),
+            ("Chain Leggings", new[] { "Warrior", "Paladin", "Cleric", "Ranger" }, 15, 55, 15),
+            ("Studded Legguards", new[] { "Ranger", "Assassin" }, 15, 50, 12),
+            ("Iron Greaves", new[] { "Warrior", "Paladin", "Barbarian" }, 20, 60, 20),
+            ("Silk Trousers", new[] { "Magician", "Sage" }, 10, 50, 7),
+            ("Steel Greaves", new[] { "Warrior", "Paladin" }, 35, 75, 32),
+            ("Barbarian Legguards", new[] { "Barbarian" }, 25, 70, 22),
+            ("Mithril Legguards", new[] { "All" }, 50, 85, 45),
+            ("Shadow Leggings", new[] { "Assassin" }, 40, 80, 35),
+            ("Plate Greaves", new[] { "Warrior", "Paladin" }, 60, 95, 58),
+            ("Titan's Legplates", new[] { "Warrior", "Barbarian" }, 80, 100, 75),
+        };
+
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> FeetArmorTemplates = new()
+        {
+            ("Cloth Sandals", new[] { "All" }, 1, 20, 2),
+            ("Leather Boots", new[] { "All" }, 5, 30, 5),
+            ("Iron Boots", new[] { "Warrior", "Paladin", "Barbarian" }, 15, 50, 12),
+            ("Scout's Boots", new[] { "Ranger", "Assassin" }, 10, 50, 9),
+            ("Chain Boots", new[] { "Warrior", "Paladin", "Cleric" }, 20, 60, 16),
+            ("Silk Slippers", new[] { "Magician", "Sage" }, 10, 50, 6),
+            ("Steel Sabatons", new[] { "Warrior", "Paladin" }, 35, 75, 28),
+            ("Shadow Treads", new[] { "Assassin" }, 30, 70, 22),
+            ("Mithril Boots", new[] { "All" }, 50, 85, 42),
+            ("Monk's Sandals", new[] { "Monk" }, 20, 70, 15),
+            ("Plate Sabatons", new[] { "Warrior", "Paladin" }, 60, 95, 52),
+            ("Dragonhide Boots", new[] { "All" }, 80, 100, 70),
+        };
+
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> WaistArmorTemplates = new()
+        {
+            ("Rope Belt", new[] { "All" }, 1, 20, 2),
+            ("Leather Belt", new[] { "All" }, 5, 30, 4),
+            ("Chain Belt", new[] { "Warrior", "Paladin", "Cleric" }, 15, 50, 10),
+            ("Sash of Focus", new[] { "Magician", "Sage", "Monk" }, 10, 50, 7),
+            ("War Belt", new[] { "Warrior", "Barbarian" }, 20, 60, 15),
+            ("Thief's Girdle", new[] { "Assassin", "Ranger" }, 15, 55, 11),
+            ("Steel Girdle", new[] { "Warrior", "Paladin" }, 35, 75, 25),
+            ("Mithril Belt", new[] { "All" }, 50, 85, 38),
+            ("Holy Sash", new[] { "Paladin", "Cleric" }, 40, 80, 30),
+            ("Titan's Belt", new[] { "Warrior", "Barbarian" }, 65, 100, 55),
+            ("Dragonscale Belt", new[] { "All" }, 80, 100, 65),
+        };
+
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> FaceArmorTemplates = new()
+        {
+            ("Cloth Mask", new[] { "All" }, 1, 25, 2),
+            ("Leather Face Guard", new[] { "All" }, 10, 40, 6),
+            ("Iron Visor", new[] { "Warrior", "Paladin", "Barbarian" }, 15, 55, 12),
+            ("Shadow Mask", new[] { "Assassin" }, 15, 60, 10),
+            ("War Mask", new[] { "Warrior", "Barbarian" }, 25, 65, 18),
+            ("Mystic Veil", new[] { "Magician", "Sage", "Cleric" }, 20, 65, 12),
+            ("Steel Faceplate", new[] { "Warrior", "Paladin" }, 40, 80, 30),
+            ("Mithril Visor", new[] { "All" }, 55, 90, 42),
+            ("Death Mask", new[] { "Assassin" }, 50, 90, 38),
+            ("Dragon Visage", new[] { "All" }, 80, 100, 60),
+        };
+
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> CloakArmorTemplates = new()
+        {
+            ("Tattered Cloak", new[] { "All" }, 1, 20, 2),
+            ("Traveler's Cloak", new[] { "All" }, 5, 30, 5),
+            ("Ranger's Cloak", new[] { "Ranger" }, 10, 50, 10),
+            ("Shadow Cloak", new[] { "Assassin", "Ranger" }, 15, 55, 14),
+            ("Wizard's Mantle", new[] { "Magician", "Sage" }, 15, 55, 10),
+            ("War Cloak", new[] { "Warrior", "Paladin", "Barbarian" }, 20, 60, 16),
+            ("Elven Cloak", new[] { "All" }, 30, 70, 25),
+            ("Cloak of Shadows", new[] { "Assassin" }, 40, 80, 32),
+            ("Holy Shroud", new[] { "Paladin", "Cleric" }, 35, 75, 28),
+            ("Mithril Weave Cloak", new[] { "All" }, 55, 90, 45),
+            ("Cloak of the Archmage", new[] { "Magician", "Sage" }, 65, 100, 55),
+            ("Dragonwing Cape", new[] { "All" }, 80, 100, 68),
+        };
+
         #endregion
 
         #region Accessory Templates
@@ -482,41 +608,71 @@ public static class LootGenerator
         }
 
         /// <summary>
-        /// Generate an armor drop for dungeon loot
+        /// Generate an armor drop for dungeon loot — randomly selects from ALL armor slots
         /// </summary>
         public static Item GenerateArmor(int dungeonLevel, CharacterClass playerClass)
         {
             var rarity = RollRarity(dungeonLevel);
 
-            var candidates = ArmorTemplates
+            // Roll a random armor slot with weighted distribution
+            var (slotTemplates, objType) = RollArmorSlot();
+
+            // Ring and necklace delegate to their specialized generators
+            if (objType == ObjType.Fingers)
+                return GenerateRing(dungeonLevel, rarity);
+            if (objType == ObjType.Neck)
+                return GenerateNecklace(dungeonLevel, rarity);
+
+            var candidates = slotTemplates
                 .Where(a => dungeonLevel >= a.MinLevel && dungeonLevel <= a.MaxLevel)
                 .Where(a => a.Classes.Contains("All") || a.Classes.Contains(playerClass.ToString()))
                 .ToList();
 
             if (candidates.Count == 0)
             {
-                candidates = ArmorTemplates
+                candidates = slotTemplates
                     .Where(a => dungeonLevel >= a.MinLevel && dungeonLevel <= a.MaxLevel)
                     .ToList();
             }
 
             if (candidates.Count == 0)
             {
-                return CreateBasicArmor(dungeonLevel, rarity);
+                return CreateBasicArmor(dungeonLevel, rarity, objType);
             }
 
             var template = candidates[random.Next(candidates.Count)];
 
-            return CreateArmorFromTemplate(template, dungeonLevel, rarity);
+            return CreateArmorFromTemplate(template, dungeonLevel, rarity, objType);
         }
 
         /// <summary>
-        /// Generate random loot (weapon or armor) for dungeon
+        /// Roll a random armor slot with weighted distribution.
+        /// Returns the template list and ObjType for the selected slot.
+        /// </summary>
+        private static (List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> templates, ObjType objType) RollArmorSlot()
+        {
+            // Weighted distribution: body favored, accessories rare
+            double roll = random.NextDouble();
+            if (roll < 0.25) return (ArmorTemplates, ObjType.Body);        // 25%
+            if (roll < 0.37) return (HeadArmorTemplates, ObjType.Head);    // 12%
+            if (roll < 0.46) return (ArmsArmorTemplates, ObjType.Arms);    // 9%
+            if (roll < 0.55) return (HandsArmorTemplates, ObjType.Hands);  // 9%
+            if (roll < 0.64) return (LegsArmorTemplates, ObjType.Legs);    // 9%
+            if (roll < 0.73) return (FeetArmorTemplates, ObjType.Feet);    // 9%
+            if (roll < 0.80) return (WaistArmorTemplates, ObjType.Waist);  // 7%
+            if (roll < 0.85) return (FaceArmorTemplates, ObjType.Face);    // 5%
+            if (roll < 0.92) return (CloakArmorTemplates, ObjType.Abody);  // 7%
+            if (roll < 0.96) return (new List<(string, string[], int, int, float)>(), ObjType.Fingers); // 4% — delegates to GenerateRing
+            return (new List<(string, string[], int, int, float)>(), ObjType.Neck); // 4% — delegates to GenerateNecklace
+        }
+
+        /// <summary>
+        /// Generate random loot (weapon or armor for any slot) for dungeon
         /// </summary>
         public static Item GenerateDungeonLoot(int dungeonLevel, CharacterClass playerClass)
         {
-            // 55% weapon, 45% armor
-            if (random.NextDouble() < 0.55)
+            // 45% weapon, 55% armor (distributed across all armor slots including accessories)
+            if (random.NextDouble() < 0.45)
                 return GenerateWeapon(dungeonLevel, playerClass);
             else
                 return GenerateArmor(dungeonLevel, playerClass);
@@ -566,7 +722,7 @@ public static class LootGenerator
 
         /// <summary>
         /// Generate loot specifically for mini-boss/champion monsters
-        /// Mini-bosses ALWAYS drop equipment (weapon, armor, ring, or necklace)
+        /// Mini-bosses ALWAYS drop equipment (weapon or armor for any slot)
         /// </summary>
         public static Item GenerateMiniBossLoot(int dungeonLevel, CharacterClass playerClass)
         {
@@ -575,16 +731,11 @@ public static class LootGenerator
             if (rarity == ItemRarity.Common)
                 rarity = ItemRarity.Uncommon;
 
-            // 35% weapon, 30% armor, 20% ring, 15% necklace
-            double roll = random.NextDouble();
-            if (roll < 0.35)
+            // 35% weapon, 65% armor (distributed across all slots including rings/necklaces)
+            if (random.NextDouble() < 0.35)
                 return GenerateWeaponWithRarity(dungeonLevel, playerClass, rarity);
-            else if (roll < 0.65)
-                return GenerateArmorWithRarity(dungeonLevel, playerClass, rarity);
-            else if (roll < 0.85)
-                return GenerateRing(dungeonLevel, rarity);
             else
-                return GenerateNecklace(dungeonLevel, rarity);
+                return GenerateArmorWithRarity(dungeonLevel, playerClass, rarity);
         }
 
         /// <summary>
@@ -598,16 +749,11 @@ public static class LootGenerator
             if (rarity < ItemRarity.Epic)
                 rarity = ItemRarity.Epic;
 
-            // 40% weapon, 35% armor, 15% ring, 10% necklace
-            double roll = random.NextDouble();
-            if (roll < 0.40)
+            // 40% weapon, 60% armor (distributed across all slots including rings/necklaces)
+            if (random.NextDouble() < 0.40)
                 return GenerateWeaponWithRarity(dungeonLevel, playerClass, rarity);
-            else if (roll < 0.75)
-                return GenerateArmorWithRarity(dungeonLevel, playerClass, rarity);
-            else if (roll < 0.90)
-                return GenerateRing(dungeonLevel, rarity);
             else
-                return GenerateNecklace(dungeonLevel, rarity);
+                return GenerateArmorWithRarity(dungeonLevel, playerClass, rarity);
         }
 
         /// <summary>
@@ -637,29 +783,38 @@ public static class LootGenerator
         }
 
         /// <summary>
-        /// Generate armor with a specific rarity
+        /// Generate armor with a specific rarity — randomly selects from ALL armor slots
         /// </summary>
         private static Item GenerateArmorWithRarity(int dungeonLevel, CharacterClass playerClass, ItemRarity rarity)
         {
-            var candidates = ArmorTemplates
+            // Roll a random armor slot with weighted distribution
+            var (slotTemplates, objType) = RollArmorSlot();
+
+            // Ring and necklace delegate to their specialized generators
+            if (objType == ObjType.Fingers)
+                return GenerateRing(dungeonLevel, rarity);
+            if (objType == ObjType.Neck)
+                return GenerateNecklace(dungeonLevel, rarity);
+
+            var candidates = slotTemplates
                 .Where(a => dungeonLevel >= a.MinLevel && dungeonLevel <= a.MaxLevel)
                 .Where(a => a.Classes.Contains("All") || a.Classes.Contains(playerClass.ToString()))
                 .ToList();
 
             if (candidates.Count == 0)
             {
-                candidates = ArmorTemplates
+                candidates = slotTemplates
                     .Where(a => dungeonLevel >= a.MinLevel && dungeonLevel <= a.MaxLevel)
                     .ToList();
             }
 
             if (candidates.Count == 0)
             {
-                return CreateBasicArmor(dungeonLevel, rarity);
+                return CreateBasicArmor(dungeonLevel, rarity, objType);
             }
 
             var template = candidates[random.Next(candidates.Count)];
-            return CreateArmorFromTemplate(template, dungeonLevel, rarity);
+            return CreateArmorFromTemplate(template, dungeonLevel, rarity, objType);
         }
 
         #endregion
@@ -729,7 +884,8 @@ public static class LootGenerator
         private static Item CreateArmorFromTemplate(
             (string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower) template,
             int level,
-            ItemRarity rarity)
+            ItemRarity rarity,
+            ObjType armorType = ObjType.Body)
         {
             var stats = RarityStats[rarity];
 
@@ -750,7 +906,7 @@ public static class LootGenerator
             var item = new Item
             {
                 Name = name,
-                Type = ObjType.Body,
+                Type = armorType,
                 Value = value,
                 Armor = finalPower,
                 MinLevel = Math.Max(1, level - 10),
@@ -860,16 +1016,29 @@ public static class LootGenerator
             };
         }
 
-        private static Item CreateBasicArmor(int level, ItemRarity rarity)
+        private static Item CreateBasicArmor(int level, ItemRarity rarity, ObjType armorType = ObjType.Body)
         {
             var stats = RarityStats[rarity];
             float levelScale = 1.0f + (level / 40.0f);
             int power = (int)(8 * levelScale * stats.PowerMult);
 
+            string slotName = armorType switch
+            {
+                ObjType.Head => "Helm",
+                ObjType.Arms => "Armguards",
+                ObjType.Hands => "Gauntlets",
+                ObjType.Legs => "Greaves",
+                ObjType.Feet => "Boots",
+                ObjType.Waist => "Belt",
+                ObjType.Face => "Mask",
+                ObjType.Abody => "Cloak",
+                _ => "Armor"
+            };
+
             return new Item
             {
-                Name = $"{GetRarityPrefix(rarity)}Armor",
-                Type = ObjType.Body,
+                Name = $"{GetRarityPrefix(rarity)}{slotName}",
+                Type = armorType,
                 Value = power * 20,
                 Armor = power,
                 MinLevel = Math.Max(1, level - 10),

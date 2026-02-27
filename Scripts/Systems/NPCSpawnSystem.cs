@@ -875,5 +875,169 @@ namespace UsurperRemake.Systems
             }
             return exp;
         }
+
+        // Fantasy name pools for immigrant NPCs (shared with FamilySystem)
+        private static readonly string[] ImmigrantMaleNames = new[]
+        {
+            "Aldric", "Bram", "Caelum", "Dorin", "Eldric", "Fenris", "Gareth", "Hadwin",
+            "Ivar", "Jorund", "Kael", "Leoric", "Magnus", "Noric", "Osric", "Perrin",
+            "Quillan", "Rowan", "Soren", "Theron", "Ulric", "Varen", "Wulfric", "Xander",
+            "Yorick", "Zephyr", "Alaric", "Brandt", "Cedric", "Darian", "Erland", "Finnian",
+            "Gideon", "Halvar", "Iskander", "Jarek", "Korbin", "Lysander", "Malakai", "Nolan"
+        };
+
+        private static readonly string[] ImmigrantFemaleNames = new[]
+        {
+            "Aelara", "Brielle", "Calista", "Darina", "Elara", "Freya", "Gwyneth", "Helena",
+            "Isolde", "Jocelyn", "Kira", "Lyria", "Mirena", "Nessa", "Orina", "Petra",
+            "Rhiannon", "Seraphina", "Thalia", "Ursula", "Vesper", "Wren", "Ysolde", "Zara",
+            "Astrid", "Brianna", "Celeste", "Dahlia", "Elowen", "Fiora", "Guinevere", "Hilda",
+            "Ingrid", "Juliana", "Katarina", "Lucinda", "Morgana", "Nerissa", "Ondine", "Rosalind"
+        };
+
+        private static readonly string[] ImmigrantSurnames = new[]
+        {
+            "Ashford", "Blackthorn", "Copperfield", "Dunmore", "Everhart",
+            "Fairwind", "Greymane", "Holloway", "Ironwood", "Kettleburn",
+            "Larkwood", "Mossgrove", "Northgate", "Oakshield", "Pennywhistle",
+            "Quickwater", "Ravenswood", "Silverbrook", "Thornbury", "Underhill",
+            "Whitmore", "Yarrow", "Ashwick", "Bramblewood", "Coldstream",
+            "Dewberry", "Emberglow", "Foxglove", "Greystone", "Hawkridge"
+        };
+
+        /// <summary>
+        /// Generate an immigrant NPC for a specific race and sex.
+        /// Used by the immigration system to replenish extinct/critical races.
+        /// </summary>
+        public NPC? GenerateImmigrantNPC(CharacterRace race, CharacterSex sex, int targetLevel)
+        {
+            try
+            {
+                // Pick a random name
+                string firstName = sex == CharacterSex.Male
+                    ? ImmigrantMaleNames[random.Next(ImmigrantMaleNames.Length)]
+                    : ImmigrantFemaleNames[random.Next(ImmigrantFemaleNames.Length)];
+                string surname = ImmigrantSurnames[random.Next(ImmigrantSurnames.Length)];
+                string fullName = $"{firstName} {surname}";
+
+                // Check for duplicate name — append Roman numeral if needed
+                if (spawnedNPCs.Any(n => n.Name2.Equals(fullName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    for (int suffix = 2; suffix <= 10; suffix++)
+                    {
+                        string suffixed = $"{fullName} {ToRomanNumeral(suffix)}";
+                        if (!spawnedNPCs.Any(n => n.Name2.Equals(suffixed, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            fullName = suffixed;
+                            break;
+                        }
+                    }
+                }
+
+                // Random class from the 11 base classes
+                int classCount = 11; // Alchemist through Warrior
+                var npcClass = (CharacterClass)random.Next(classCount);
+
+                // Age 20-35
+                int age = 20 + random.Next(16);
+
+                // Level scaled to average of alive NPCs (±3 variance, min 1)
+                int level = Math.Max(1, targetLevel + random.Next(7) - 3);
+
+                // Compute BirthDate from age using the lifecycle rate
+                var birthDate = DateTime.Now.AddHours(-age * GameConfig.NpcLifecycleHoursPerYear);
+
+                // Base stats scaled by level (same formula as ConvertChildToNPC but level-scaled)
+                int baseStat = 10 + level * 2;
+
+                var npc = new NPC
+                {
+                    ID = $"npc_imm_{firstName.ToLower()}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
+                    Name1 = fullName,
+                    Name2 = fullName,
+                    Sex = sex,
+                    Age = age,
+                    Race = race,
+                    Class = npcClass,
+                    Level = level,
+                    Experience = GetExperienceForLevel(level),
+                    Strength = baseStat + random.Next(5),
+                    Defence = baseStat + random.Next(5),
+                    Stamina = baseStat + random.Next(5),
+                    Agility = baseStat + random.Next(5),
+                    Intelligence = baseStat + random.Next(5),
+                    Charisma = baseStat + random.Next(5),
+                    Gold = 100 + level * 50,
+                    CurrentLocation = GetRandomStartLocation(),
+                    AI = CharacterAI.Computer,
+                    BirthDate = birthDate
+                };
+
+                // Set HP based on class (same formula as NPC level-up)
+                long baseHP = npcClass switch
+                {
+                    CharacterClass.Warrior or CharacterClass.Barbarian => 80 + (level * 38),
+                    CharacterClass.Paladin or CharacterClass.Ranger => 70 + (level * 32),
+                    CharacterClass.Assassin or CharacterClass.Alchemist => 60 + (level * 28),
+                    CharacterClass.Cleric or CharacterClass.Bard => 55 + (level * 25),
+                    CharacterClass.Magician or CharacterClass.Sage => 45 + (level * 20),
+                    CharacterClass.Jester => 50 + (level * 22),
+                    _ => 60 + (level * 25)
+                };
+                npc.MaxHP = baseHP;
+                npc.HP = baseHP;
+                npc.BaseMaxHP = baseHP;
+                npc.BaseStrength = npc.Strength;
+                npc.BaseDefence = npc.Defence;
+                npc.BaseAgility = npc.Agility;
+
+                // Set mana for caster classes
+                long baseMana = npcClass switch
+                {
+                    CharacterClass.Magician or CharacterClass.Sage => 50 + (level * 25),
+                    CharacterClass.Cleric or CharacterClass.Paladin => 40 + (level * 20),
+                    _ => 0
+                };
+                npc.MaxMana = baseMana;
+                npc.Mana = baseMana;
+                npc.BaseMaxMana = baseMana;
+
+                // Random alignment
+                if (random.Next(2) == 0)
+                {
+                    npc.Chivalry = 25 + random.Next(75);
+                    npc.Darkness = 0;
+                }
+                else
+                {
+                    npc.Chivalry = 0;
+                    npc.Darkness = 25 + random.Next(75);
+                }
+
+                // Create personality profile
+                var personality = PersonalityProfile.GenerateForArchetype("commoner");
+                personality.Gender = sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+                npc.Personality = personality;
+                npc.Brain = new NPCBrain(npc, personality);
+
+                return npc;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("IMMIGRATION",
+                    $"Failed to generate immigrant NPC ({race} {sex}): {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string ToRomanNumeral(int number)
+        {
+            return number switch
+            {
+                2 => "II", 3 => "III", 4 => "IV", 5 => "V",
+                6 => "VI", 7 => "VII", 8 => "VIII", 9 => "IX", 10 => "X",
+                _ => number.ToString()
+            };
+        }
     }
 }

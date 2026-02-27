@@ -1504,16 +1504,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine($"{player.Level}");
 
-        // Level eligibility (1 line if applicable)
-        if (player.Level < GameConfig.MaxLevel)
-        {
-            long experienceNeeded = GetExperienceForLevel(player.Level + 1);
-            if (player.Experience >= experienceNeeded)
-            {
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(" * Level raise available! Visit your Master! *");
-            }
-        }
+        // Training points reminder only shown on Main Street (where Level Master is accessible)
     }
 
     /// <summary>
@@ -9557,7 +9548,7 @@ public class DungeonLocation : BaseLocation
         int total = currentFloor.Rooms.Count;
 
         var current = currentFloor.GetCurrentRoom();
-        terminal.WriteLine($"Dungeon Navigator - Level {currentDungeonLevel}, {currentFloor.Theme}", "bright_yellow");
+        terminal.WriteLine($"Dungeon Guide - Level {currentDungeonLevel}, {currentFloor.Theme}", "bright_yellow");
         if (current != null)
         {
             terminal.Write($"You are in: {current.Name}", "white");
@@ -9590,11 +9581,9 @@ public class DungeonLocation : BaseLocation
                 if (bfsVisited.Contains(kvp.Value.TargetRoomId)) continue;
                 var target = currentFloor.Rooms.FirstOrDefault(r => r.Id == kvp.Value.TargetRoomId);
                 if (target == null) continue;
-                // Allow pathing through explored rooms, and to the first unexplored room
-                if (!target.IsExplored && parentMap.Values.Any(p => !currentFloor.Rooms.First(r => r.Id == kvp.Value.TargetRoomId).IsExplored))
-                    continue; // already found one unexplored via another path — but let BFS find all
                 bfsVisited.Add(kvp.Value.TargetRoomId);
                 parentMap[kvp.Value.TargetRoomId] = (roomId, kvp.Key);
+                // Only continue BFS through explored rooms — unexplored rooms are reachable but not waypoints
                 if (target.IsExplored)
                     bfsQueue.Enqueue(kvp.Value.TargetRoomId);
             }
@@ -9663,22 +9652,15 @@ public class DungeonLocation : BaseLocation
             var roomIdPath = BuildRoomIdPath(selected.targetId, startId, parentMap);
             if (roomIdPath != null && roomIdPath.Count > 0)
             {
-                terminal.SetColor("gray");
-                terminal.WriteLine("Auto-navigating... (press Enter at any prompt to stop)");
-                await Task.Delay(800);
-
+                long startHP = currentPlayer.HP;
                 foreach (var roomId in roomIdPath)
                 {
                     await MoveToRoom(roomId);
+                    // MoveToRoom handles traps, events, combat — stop if anything happened
+                    if (currentPlayer.HP <= 0) break;
+                    if (currentPlayer.HP < startHP) break;
                     var rm = currentFloor.GetCurrentRoom();
-                    if (rm != null && rm.HasMonsters && !rm.IsCleared)
-                    {
-                        terminal.SetColor("bright_red");
-                        terminal.WriteLine("Enemies ahead — auto-navigation stopped!");
-                        await Task.Delay(1200);
-                        break;
-                    }
-                    await Task.Delay(300);
+                    if (rm != null && rm.HasMonsters && !rm.IsCleared) break;
                 }
                 RequestRedisplay();
             }

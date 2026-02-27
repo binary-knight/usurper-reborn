@@ -594,6 +594,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  HP: {player.HP}/{player.MaxHP,-12} Mana: {player.Mana}/{player.MaxMana}");
                 terminal.WriteLine($"  Gold: {player.Gold:N0,-15} Bank: {player.BankGold:N0}");
                 terminal.WriteLine($"  Class: {GetClassName((int)player.Class),-14} Race: {player.Race}");
+                terminal.WriteLine($"  Training Points: {player.TrainingPoints}");
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  STR: {player.Strength,-5} DEF: {player.Defence,-5} STA: {player.Stamina,-5} AGI: {player.Agility,-5} CHA: {player.Charisma}");
@@ -609,6 +610,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.SetColor("cyan");
                 terminal.WriteLine("  [G] Manage Companions              [H] Manage Old Gods");
+                terminal.WriteLine("  [I] Training Points");
                 terminal.WriteLine("");
                 terminal.SetColor("green");
                 terminal.WriteLine("  [S] Save Changes");
@@ -701,6 +703,10 @@ namespace UsurperRemake.Systems
                         if (await EditOldGods(saveData))
                             modified = true;
                         break;
+                    case "I":
+                        player.TrainingPoints = (int)await PromptNumericEdit("Training Points", player.TrainingPoints, 0, 99999);
+                        modified = true;
+                        break;
                     case "S":
                         if (!modified)
                         {
@@ -773,6 +779,7 @@ namespace UsurperRemake.Systems
             livePlayer.Wisdom = edited.Wisdom;
             livePlayer.Intelligence = edited.Intelligence;
             livePlayer.Constitution = edited.Constitution;
+            livePlayer.TrainingPoints = edited.TrainingPoints;
             livePlayer.RecalculateStats();
 
             terminal.SetColor("cyan");

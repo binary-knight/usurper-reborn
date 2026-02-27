@@ -370,7 +370,21 @@ public class PlayerSession : IDisposable
                 sessionChat?.Shutdown();
 
                 if (sessionOsm != null)
+                {
                     await sessionOsm.Shutdown();
+                }
+                else
+                {
+                    // Fallback: update playtime directly if OnlineStateManager was unavailable
+                    try
+                    {
+                        await _sqlBackend.UpdatePlayerSession(Username, isLogin: false);
+                    }
+                    catch (Exception ptEx)
+                    {
+                        Console.Error.WriteLine($"[MUD] [{Username}] Fallback playtime update failed: {ptEx.Message}");
+                    }
+                }
             }
             catch (Exception ex)
             {

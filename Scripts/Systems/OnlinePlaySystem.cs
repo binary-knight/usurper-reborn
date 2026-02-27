@@ -721,6 +721,11 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
             }
 
+            // Flag set when server disconnect is detected by any path.
+            // Checked by input loops to break out without waiting for user input.
+            // Wrapped in array for capture by lambdas (local bools can't be volatile).
+            var serverDead = new bool[] { false };
+
             // Read task: server → local terminal
             var readTask = Task.Run(async () =>
             {
@@ -730,53 +735,46 @@ namespace UsurperRemake.Systems
                     while (!ct.IsCancellationRequested)
                     {
                         int bytesRead = 0;
-                        bool dataAvailable = false;
 
                         if (useTcpMode)
                         {
-                            dataAvailable = tcpStream?.DataAvailable == true;
-                            if (dataAvailable)
-                                bytesRead = await tcpStream!.ReadAsync(buffer, 0, buffer.Length, ct);
+                            // ReadAsync blocks until data arrives or connection closes.
+                            // Returns 0 immediately on FIN — no stale IsConnected() polling.
+                            bytesRead = await tcpStream!.ReadAsync(buffer, 0, buffer.Length, ct);
                         }
                         else
                         {
-                            dataAvailable = shellStream?.DataAvailable == true;
-                            if (dataAvailable)
-                                bytesRead = shellStream!.Read(buffer, 0, buffer.Length);
+                            // SSH ShellStream: blocking read detects channel close instantly
+                            // (returns 0 or throws) instead of polling DataAvailable with
+                            // stale IsConnected() which can take seconds to update.
+                            // Cancellation handled by closing the stream from PipeIO cleanup.
+                            bytesRead = shellStream!.Read(buffer, 0, buffer.Length);
                         }
 
-                        if (dataAvailable)
-                        {
-                            if (bytesRead == 0) break; // Server closed connection
+                        if (bytesRead == 0) break; // Server closed connection
 
-                            if (bbsRawStream != null)
+                        if (bbsRawStream != null)
+                        {
+                            // Telnet BBS: write raw bytes directly to BBS socket.
+                            // Bypasses all terminal/encoding processing — ANSI colors preserved.
+                            bbsRawStream.Write(buffer, 0, bytesRead);
+                            bbsRawStream.Flush();
+                        }
+                        else
+                        {
+                            var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                            if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
                             {
-                                // Telnet BBS: write raw bytes directly to BBS socket.
-                                // Bypasses all terminal/encoding processing — ANSI colors preserved.
-                                bbsRawStream.Write(buffer, 0, bytesRead);
-                                bbsRawStream.Flush();
+                                terminal.WriteRawAnsi(text);
+                            }
+                            else if (vtProcessingEnabled)
+                            {
+                                Console.Write(text);
                             }
                             else
                             {
-                                var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                                if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
-                                {
-                                    terminal.WriteRawAnsi(text);
-                                }
-                                else if (vtProcessingEnabled)
-                                {
-                                    Console.Write(text);
-                                }
-                                else
-                                {
-                                    WriteAnsiToConsole(text);
-                                }
+                                WriteAnsiToConsole(text);
                             }
-                        }
-                        else
-                        {
-                            if (!IsConnected()) break;
-                            await Task.Delay(10, ct);
                         }
                     }
                 }
@@ -789,26 +787,63 @@ namespace UsurperRemake.Systems
                 }
                 finally
                 {
-                    if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
-                        terminal.WriteLine("\r\n  Server closed the connection. Press Enter to return.");
+                    serverDead[0] = true;
                 }
             }, ct);
+
+            // Watchdog task: detect stale SSH disconnects that shellStream.Read() misses.
+            // sshClient.IsConnected can lag seconds behind actual close, but this catches
+            // cases where Read() blocks indefinitely after the channel closes.
+            var watchdog = Task.Run(async () =>
+            {
+                try
+                {
+                    while (!ct.IsCancellationRequested && !serverDead[0])
+                    {
+                        await Task.Delay(500, ct);
+                        if (useTcpMode)
+                        {
+                            if (tcpClient != null && !tcpClient.Connected) break;
+                        }
+                        else
+                        {
+                            if (sshClient != null && !sshClient.IsConnected) break;
+                        }
+                    }
+                }
+                catch (OperationCanceledException) { }
+                serverDead[0] = true;
+            }, ct);
+
+            // Combined disconnect signal: fires when either read task or watchdog detects server gone.
+            var disconnectSignal = Task.WhenAny(readTask, watchdog);
 
             try
             {
                 if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
                 {
-                    // BBS mode: terminal.GetInput() routes through BBS adapter (socket or stdio).
-                    // Input is line-buffered — the player types a command and presses Enter.
-                    // IMPORTANT: Must send "\n" even for empty input — the game has many
-                    // "Press Enter to continue" prompts that require receiving a newline.
-                    while (!ct.IsCancellationRequested)
+                    // BBS mode: terminal.GetInput() blocks until Enter with no cancellation.
+                    // Race each GetInput call against the disconnect signal so we break
+                    // instantly when the server dies instead of waiting for the user to press Enter.
+                    while (!ct.IsCancellationRequested && !serverDead[0])
                     {
-                        if (readTask.IsCompleted) break;
-                        var line = await terminal.GetInput("");
-                        if (readTask.IsCompleted) break;
-                        if (line == null) continue; // null = error/EOF, skip
-                        WriteToServer(line + "\n");
+                        var inputTask = terminal.GetInput("");
+                        // Wait for either: user presses Enter, or server disconnects
+                        await Task.WhenAny(inputTask, disconnectSignal);
+
+                        if (serverDead[0] || readTask.IsCompleted || watchdog.IsCompleted) break;
+
+                        // inputTask completed — send the line to the server
+                        var line = await inputTask;
+                        if (line == null) continue;
+                        try
+                        {
+                            WriteToServer(line + "\n");
+                        }
+                        catch
+                        {
+                            break; // Server dead — stop immediately
+                        }
                     }
                 }
                 else
@@ -818,7 +853,7 @@ namespace UsurperRemake.Systems
                     var inputBuffer = new StringBuilder();
                     while (!ct.IsCancellationRequested)
                     {
-                        if (readTask.IsCompleted)
+                        if (readTask.IsCompleted || serverDead[0])
                             break;
 
                         if (Console.KeyAvailable)
@@ -833,7 +868,14 @@ namespace UsurperRemake.Systems
 
                             if (keyInfo.Key == ConsoleKey.Enter)
                             {
-                                WriteToServer(inputBuffer.ToString() + "\n");
+                                try
+                                {
+                                    WriteToServer(inputBuffer.ToString() + "\n");
+                                }
+                                catch
+                                {
+                                    break; // Server dead — stop immediately
+                                }
                                 Console.Write("\r\n"); // Local newline echo
                                 inputBuffer.Clear();
                             }
@@ -867,14 +909,19 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("ONLINE_PLAY", $"Write error: {ex.Message}");
             }
 
-            // Wait for read task to finish
+            // Wait for read task and watchdog to finish.
+            // Close streams first to unblock any blocking Read/ReadAsync in the read task.
+            serverDead[0] = true;
             cancellationSource?.Cancel();
+            try { shellStream?.Close(); } catch { }
+            try { tcpStream?.Close(); } catch { }
             try { await readTask; } catch { }
+            try { await watchdog; } catch { }
 
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine("  Disconnected from server.");
-            await terminal.PressAnyKey();
+            await Task.Delay(1500);
         }
 
         // =====================================================================
