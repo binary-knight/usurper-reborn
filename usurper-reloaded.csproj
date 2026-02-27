@@ -8,6 +8,7 @@
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <ApplicationIcon>app.ico</ApplicationIcon>
         <InvariantGlobalization>true</InvariantGlobalization>
         <!-- Define available configurations -->
         <Configurations>Debug;Release;Steam;SteamRelease</Configurations>

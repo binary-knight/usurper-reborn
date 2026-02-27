@@ -163,6 +163,18 @@ public class MainStreetLocation : BaseLocation
         {
             HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer.HintsShown);
         }
+
+        // Show mana/spells hint if player has mana but no spells learned
+        if (currentPlayer.Mana > 0 && SpellSystem.GetAvailableSpells(currentPlayer).Count == 0)
+        {
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_MANA_SPELLS, terminal, currentPlayer.HintsShown);
+        }
+
+        // Show quest system hint for early players who have started fighting
+        if (currentPlayer.Level <= 3 && currentPlayer.Statistics.TotalMonstersKilled >= 1)
+        {
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_QUEST_SYSTEM, terminal, currentPlayer.HintsShown);
+        }
     }
 
     /// <summary>

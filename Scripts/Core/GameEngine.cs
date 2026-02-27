@@ -2906,10 +2906,17 @@ public partial class GameEngine
             await openingSystem.PlayOpeningSequence(currentPlayer, terminal);
         }
 
+        // Show Getting Started summary for brand new characters
+        if (currentPlayer.Statistics.TotalMonstersKilled == 0)
+        {
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_GETTING_STARTED, terminal, currentPlayer.HintsShown);
+            await terminal.PressAnyKey();
+        }
+
         // Enter the game world
         await EnterGameWorld();
     }
-    
+
     /// <summary>
     /// Enter the main game world
     /// </summary>

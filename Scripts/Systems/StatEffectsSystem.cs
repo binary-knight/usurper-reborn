@@ -143,14 +143,33 @@ public static class StatEffectsSystem
 
     /// <summary>
     /// Spell damage multiplier from Intelligence
-    /// Formula: 1.0 + (Intelligence - 10) * 0.04 (so 20 INT = 1.4x, 30 INT = 1.8x spell damage)
-    /// This is doubled from the original to make Intelligence investment more impactful
-    /// for spellcasters, similar to how Strength benefits physical damage dealers.
+    /// Uses soft cap with diminishing returns so Magicians scale into endgame
+    /// without uncapped exponential damage:
+    /// - Below INT 85: full scaling at 0.04 per point (reaches 4.0x)
+    /// - Above INT 85: diminished scaling at 0.015 per point
+    /// - Hard ceiling at 8.0x
     /// </summary>
     public static float GetSpellDamageMultiplier(long intelligence)
     {
-        float multiplier = 1.0f + Math.Max(0, (intelligence - 10) * 0.04f);
-        return Math.Min(multiplier, 4.0f); // Cap at 4x to prevent exponential damage at high INT
+        const float fullScalingRate = 0.04f;
+        const float diminishedRate = 0.015f;
+        const long softCapThreshold = 85;
+        const float hardCeiling = 8.0f;
+
+        float multiplier;
+        if (intelligence <= softCapThreshold)
+        {
+            multiplier = 1.0f + Math.Max(0, (intelligence - 10) * fullScalingRate);
+        }
+        else
+        {
+            // Full scaling up to threshold, then diminished returns beyond
+            float baseMultiplier = 1.0f + (softCapThreshold - 10) * fullScalingRate; // 4.0x at threshold
+            float bonusMultiplier = (intelligence - softCapThreshold) * diminishedRate;
+            multiplier = baseMultiplier + bonusMultiplier;
+        }
+
+        return Math.Min(multiplier, hardCeiling);
     }
 
     /// <summary>

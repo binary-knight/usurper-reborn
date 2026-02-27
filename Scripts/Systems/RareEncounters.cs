@@ -1888,7 +1888,7 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Portal to arena - fight for glory
+        /// Portal to arena - fight for glory (real interactive combat)
         /// </summary>
         private static async Task ArenaPortalEncounter(TerminalEmulator terminal, Character player, int level)
         {
@@ -1931,53 +1931,53 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("The crowd roars as you enter the arena!");
                 terminal.WriteLine("");
 
-                // Three rounds of combat
-                for (int round = 1; round <= 3; round++)
+                // Generate an arena champion from the dungeon level's monster pool
+                var monsters = MonsterGenerator.GenerateMonsterGroup(level);
+                if (monsters.Count > 0)
                 {
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine($"=== ROUND {round} ===");
+                    var champion = monsters[0];
+                    champion.Name = $"Arena {champion.Name}";
+                    champion.IsMiniBoss = true;
+                    // Mini-boss bonuses applied by Monster class
 
-                    // Simulate a fight
-                    int enemyPower = level * round * 10;
-                    int playerPower = (int)(player.Strength + player.WeapPow);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"Your opponent: {champion.Name}!");
+                    terminal.WriteLine("");
+                    await Task.Delay(500);
 
-                    bool won = playerPower + random.Next(50) > enemyPower;
+                    // Real interactive combat
+                    var combatEngine = new CombatEngine(terminal);
+                    var result = await combatEngine.PlayerVsMonster(player, champion, offerMonkEncounter: false);
 
-                    if (won)
+                    if (result.Outcome == CombatOutcome.Victory)
                     {
+                        terminal.WriteLine("");
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine("The arena master approaches...");
+                        terminal.WriteLine("\"Magnificent! A true gladiator!\"");
+                        player.Chivalry += 25;
                         terminal.SetColor("green");
-                        terminal.WriteLine("VICTORY!");
-                        player.Experience += level * 50 * round;
+                        terminal.WriteLine("+25 Chivalry!");
+                    }
+                    else if (result.Outcome == CombatOutcome.PlayerDied)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("You are dragged from the arena...");
+                        // Prevent permadeath from arena — leave at 1 HP
+                        if (player.HP <= 0)
+                            player.HP = 1;
                     }
                     else
                     {
-                        terminal.SetColor("red");
-                        terminal.WriteLine("DEFEAT!");
-                        int damage = (int)(player.MaxHP / 4);
-                        player.HP -= damage;
-                        terminal.WriteLine($"-{damage} HP!");
-
-                        if (player.HP <= 0)
-                        {
-                            player.HP = 1;
-                            terminal.WriteLine("You are dragged from the arena...");
-                            break;
-                        }
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("You retreat from the arena. The crowd boos.");
                     }
-
-                    await Task.Delay(1000);
                 }
-
-                // Rewards based on performance
-                terminal.WriteLine("");
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine("The arena master approaches...");
-                terminal.WriteLine("\"Well fought! Here is your prize!\"");
-
-                long prize = level * 300;
-                player.Gold += prize;
-                player.Chivalry += 50;
-                terminal.WriteLine($"+{prize} gold, +50 Chivalry!");
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("The arena is empty today. No challenger appears.");
+                }
             }
             else
             {

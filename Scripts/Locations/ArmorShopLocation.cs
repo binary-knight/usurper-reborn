@@ -639,6 +639,9 @@ public class ArmorShopLocation : BaseLocation
         currentPlayer.Gold -= armorTotalWithTax;
         currentPlayer.Statistics.RecordPurchase(armorTotalWithTax);
 
+        // Show tax hint on first purchase
+        HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_PURCHASE_TAX, terminal, currentPlayer.HintsShown);
+
         // Process city tax share from this sale
         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
 

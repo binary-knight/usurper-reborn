@@ -24,6 +24,11 @@ namespace UsurperRemake.Systems
         public const string HINT_INVENTORY = "inventory";
         public const string HINT_SAVE_GAME = "save_game";
         public const string HINT_TEAM_COMBAT = "team_combat";
+        public const string HINT_FIRST_PURCHASE_TAX = "first_purchase_tax";
+        public const string HINT_LEVEL_MASTER = "level_master";
+        public const string HINT_MANA_SPELLS = "mana_spells";
+        public const string HINT_QUEST_SYSTEM = "quest_system";
+        public const string HINT_GETTING_STARTED = "getting_started";
 
         // Hint definitions
         private readonly Dictionary<string, HintDefinition> hints = new()
@@ -77,6 +82,31 @@ namespace UsurperRemake.Systems
                 "Team Combat Tip",
                 "Fighting with companions gives you a 15% bonus to XP and gold!",
                 "bright_green"
+            ),
+            [HINT_FIRST_PURCHASE_TAX] = new HintDefinition(
+                "Tax Info",
+                "Purchases include the King's Tax (5%) and City Tax (2%). The City Tax goes to whichever faction controls the town.",
+                "bright_cyan"
+            ),
+            [HINT_LEVEL_MASTER] = new HintDefinition(
+                "Training Available!",
+                "Visit the Level Master [M] on Main Street to spend training points on skill proficiencies and check your progress.",
+                "bright_green"
+            ),
+            [HINT_MANA_SPELLS] = new HintDefinition(
+                "Magic Tip",
+                "Your class has Mana for casting spells! Visit the Magic Shop [G] to learn spells, then cast them in combat with 'C'.",
+                "bright_cyan"
+            ),
+            [HINT_QUEST_SYSTEM] = new HintDefinition(
+                "Quests Available!",
+                "The Quest Hall [Q] offers bounties and missions for bonus gold and XP rewards!",
+                "bright_green"
+            ),
+            [HINT_GETTING_STARTED] = new HintDefinition(
+                "Getting Started",
+                "Visit Shops [W/A] to gear up, enter the Dungeons [D] to fight monsters, complete Quests [Q] for rewards, and spend training points at the Master [M] when you level up.",
+                "bright_cyan"
             )
         };
 

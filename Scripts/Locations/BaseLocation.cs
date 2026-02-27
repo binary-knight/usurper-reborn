@@ -510,8 +510,20 @@ public abstract class BaseLocation
                         terminal.WriteLine($"  You earned training points! Visit the Level Master to spend them.");
                     terminal.SetColor("white");
                     terminal.WriteLine("");
+
+                    // Show Level Master hint on first level-up
+                    HintSystem.Instance.TryShowHint(HintSystem.HINT_LEVEL_MASTER, terminal, currentPlayer.HintsShown);
+
                     await terminal.PressAnyKey();
                 }
+            }
+
+            // Show deferred daily reset banner at a clean display boundary
+            // (instead of mid-shop or mid-interaction where PeriodicUpdate fires)
+            if (DailySystemManager.Instance.PendingDailyResetDisplay)
+            {
+                DailySystemManager.Instance.PendingDailyResetDisplay = false;
+                await DailySystemManager.Instance.DisplayDailyResetMessage();
             }
 
             // In MUD streaming mode: show the full location display only on the first iteration

@@ -29,6 +29,13 @@ public class DailySystemManager
     public DailyCycleMode CurrentMode => currentMode;
     public DateTime LastResetTime => lastResetTime;
     public bool AutoSaveEnabled => autoSaveEnabled;
+
+    /// <summary>
+    /// When true, a daily reset occurred but the banner hasn't been displayed yet.
+    /// BaseLocation checks this at the top of LocationLoop to show the banner
+    /// at a clean display boundary instead of mid-interaction.
+    /// </summary>
+    public bool PendingDailyResetDisplay { get; set; }
     
     public DailySystemManager()
     {
@@ -168,8 +175,16 @@ public class DailySystemManager
         // Log the daily reset
         DebugLogger.Instance.LogDailyReset(currentDay);
 
-        // Display reset message
-        await DisplayDailyResetMessage();
+        // Display reset message: if forced (manual from settings menu), show immediately.
+        // Otherwise, defer display to next location boundary to avoid mid-interaction interruption.
+        if (forced)
+        {
+            await DisplayDailyResetMessage();
+        }
+        else
+        {
+            PendingDailyResetDisplay = true;
+        }
         
         // Use MaintenanceSystem for complete Pascal-compatible maintenance
         if (maintenanceSystem != null)
@@ -205,7 +220,7 @@ public class DailySystemManager
     /// <summary>
     /// Display daily reset message based on mode
     /// </summary>
-    private async Task DisplayDailyResetMessage()
+    public async Task DisplayDailyResetMessage()
     {
         if (terminal == null) return;
         

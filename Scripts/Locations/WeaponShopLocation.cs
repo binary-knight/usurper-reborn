@@ -641,6 +641,14 @@ public class WeaponShopLocation : BaseLocation
                 RequestRedisplay();
                 return false;
 
+            case "D":
+                await DualWieldSetup();
+                return false;
+
+            case "S":
+                await SellWeapon();
+                return false;
+
             default:
                 if (int.TryParse(choice, out int itemNum) && itemNum >= 1 && currentCategory.HasValue)
                 {
@@ -760,6 +768,9 @@ public class WeaponShopLocation : BaseLocation
 
         currentPlayer.Gold -= totalWithTax;
         currentPlayer.Statistics.RecordPurchase(totalWithTax);
+
+        // Show tax hint on first purchase
+        HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_PURCHASE_TAX, terminal, currentPlayer.HintsShown);
 
         // Process city tax share from this sale
         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
