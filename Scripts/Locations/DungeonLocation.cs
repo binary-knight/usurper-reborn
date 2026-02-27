@@ -160,8 +160,13 @@ public class DungeonLocation : BaseLocation
         // Restore NPC teammates (spouses, team members, lovers) from saved state
         await RestoreNPCTeammates(term);
 
-        // Restore player echoes (cooperative dungeon allies) from saved state
-        await RestorePlayerTeammates(term);
+        // Restore player echoes ONLY if not in a real player group
+        // (real group members join live via EnterAsGroupFollower, not as AI echoes)
+        var myGroup = GroupSystem.Instance?.GetGroupFor(SessionContext.Current?.Username ?? "");
+        if (myGroup == null)
+        {
+            await RestorePlayerTeammates(term);
+        }
 
         // Add royal mercenaries (hired bodyguards for king players)
         AddRoyalMercenariesToParty(player, term);

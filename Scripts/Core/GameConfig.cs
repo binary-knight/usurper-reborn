@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.47.4";
+    public const string Version = "0.47.5";
     public const string VersionName = "Prestige";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -852,7 +852,14 @@ public static partial class GameConfig
     public const int RelationAnger = 90;
     public const int RelationEnemy = 100;
     public const int RelationHate = 110;
-    
+
+    // Conway Neighbor Pressure thresholds (NPC population density behavior)
+    public const int NeighborIsolationMax = 2;      // ≤ this total neighbors = isolated
+    public const int NeighborStabilityMin = 2;      // ally count for stability zone
+    public const int NeighborStabilityMax = 3;      // ally count for stability zone
+    public const int NeighborOvercrowdingMin = 6;   // ≥ this total neighbors = overcrowded
+    public const int NeighborRivalThreshold = 2;    // ≥ this rivals at location = hostile
+
     // Love Corner Settings
     public const string DefaultLoveCornerName = "Lover's Corner";
     public const string DefaultGossipMongerName = "Elvira the Gossip Monger";

@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.47.4** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.47.6** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,20 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.47.6 - Enchantments & Companion Combat
+
+**Enchantments on Abilities:** Equipment enchantments (lifesteal, elemental procs, poison coating, Sunforged Blade healing) now apply to class ability damage, not just regular attacks. Abilities can also critically hit using the same DEX-based crit system as regular attacks. Previously, ability-focused builds got zero value from enchantment gear.
+
+**Companion Dual-Wield:** Companions and teammates now properly dual-wield — they get off-hand attacks with the correct 50% damage penalty, matching how player dual-wielding works. Previously companions always attacked once regardless of weapon setup.
+
+**Multi-Monster Attack Enchantments:** Regular attacks in multi-monster combat were missing lifesteal, elemental procs, and Sunforged Blade healing. AoE abilities were missing divine lifesteal, divine boon lifesteal, poison on-hit, and Sunforged healing. All damage paths now use a unified enchantment pipeline.
+
+### Completed in v0.47.5 - Combat Balance & Group Fix
+
+**Combat Balance:** Monster HP increased ~45%, monster defense penalty removed, Warrior/Barbarian STR growth reduced, weapon damage double-dip fixed. Based on live telemetry showing 31% one-hit kills and 2.7 avg rounds — fights should now last 4-6 rounds.
+
+**Bug Fixes:** Player echoes no longer spawn when real players are grouped in the dungeon. Shadows faction standing check relaxed so high Darkness overrides minor negative standing.
 
 ### Completed in v0.47.4 - Playtest Fixes, Magician Balance & Onboarding
 

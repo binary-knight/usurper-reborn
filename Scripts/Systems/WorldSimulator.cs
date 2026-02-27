@@ -1773,11 +1773,12 @@ public class WorldSimulator
 
         if (activities.Count == 0) return;
 
-        // Apply personality-driven, time-of-day, memory, relationship, and world event weight modifiers
+        // Apply personality-driven, time-of-day, memory, relationship, neighbor pressure, and world event weight modifiers
         ApplyPersonalityWeights(activities, npc);
         ApplyTimeOfDayWeights(activities);
         ApplyMemoryWeights(activities, npc);
         ApplyRelationshipWeights(activities, npc);
+        ApplyNeighborPressure(activities, npc);
         ApplyWorldEventWeights(activities, npc);
         CulturalMemeSystem.Instance?.ApplyMemeWeights(activities, npc);
         SocialInfluenceSystem.ApplyRoleWeights(activities, npc);
@@ -2195,6 +2196,70 @@ public class WorldSimulator
                 MultiplyWeight(activities, activity, 1.0 + presence.friends * 0.15); // +15% per friend
             if (presence.enemies > 0)
                 MultiplyWeight(activities, activity, Math.Max(0.3, 1.0 - presence.enemies * 0.3)); // -30% per enemy
+        }
+    }
+
+    /// <summary>
+    /// Conway-inspired neighbor pressure. NPCs react to population density at their current location:
+    /// isolation drives movement, small groups stabilize, overcrowding drives dispersal,
+    /// rival presence drives flight or aggression, safe havens encourage recovery.
+    /// </summary>
+    private void ApplyNeighborPressure(List<(string action, double weight)> activities, NPC npc)
+    {
+        if (string.IsNullOrEmpty(npc.CurrentLocation)) return;
+
+        int totalNeighbors = 0;
+        int allies = 0;
+        int rivals = 0;
+
+        foreach (var other in npcs)
+        {
+            if (other == npc || !other.IsAlive || other.IsDead) continue;
+            if (other.CurrentLocation != npc.CurrentLocation) continue;
+
+            totalNeighbors++;
+            int rel = RelationshipSystem.GetRelationshipLevel(npc, other);
+            if (rel <= GameConfig.RelationFriendship)
+                allies++;
+            else if (rel >= GameConfig.RelationEnemy)
+                rivals++;
+        }
+
+        // Isolation: few neighbors, few allies → seek company
+        if (totalNeighbors <= GameConfig.NeighborIsolationMax && allies <= 1)
+        {
+            MultiplyWeight(activities, "move", 1.5);
+        }
+
+        // Stability: healthy ally count → settle in and socialize
+        if (allies >= GameConfig.NeighborStabilityMin && allies <= GameConfig.NeighborStabilityMax)
+        {
+            MultiplyWeight(activities, "inn", 1.3);
+            MultiplyWeight(activities, "temple", 1.3);
+            MultiplyWeight(activities, "team_recruit", 1.3);
+        }
+
+        // Overcrowding: too many NPCs at one location → disperse
+        if (totalNeighbors >= GameConfig.NeighborOvercrowdingMin)
+        {
+            MultiplyWeight(activities, "move", 1.4);
+            MultiplyWeight(activities, "inn", 0.7);
+            MultiplyWeight(activities, "temple", 0.7);
+            MultiplyWeight(activities, "team_recruit", 0.7);
+        }
+
+        // Hostile territory: rivals present → flee or fight
+        if (rivals >= GameConfig.NeighborRivalThreshold)
+        {
+            MultiplyWeight(activities, "move", 1.6);
+            MultiplyWeight(activities, "dungeon", 1.2);
+        }
+
+        // Safe haven: allies present, no rivals → rest and improve
+        if (allies >= GameConfig.NeighborStabilityMin && rivals == 0)
+        {
+            MultiplyWeight(activities, "heal", 1.3);
+            MultiplyWeight(activities, "train", 1.2);
         }
     }
 
@@ -3038,6 +3103,25 @@ public class WorldSimulator
                 }
                 break;
             }
+        }
+
+        // Conway density pressure: penalize overcrowded destinations, favor small groups
+        var locationDensity = new Dictionary<string, int>();
+        foreach (var other in npcs)
+        {
+            if (other == npc || !other.IsAlive || other.IsDead) continue;
+            if (string.IsNullOrEmpty(other.CurrentLocation)) continue;
+            if (!locationDensity.ContainsKey(other.CurrentLocation))
+                locationDensity[other.CurrentLocation] = 0;
+            locationDensity[other.CurrentLocation]++;
+        }
+        for (int i = 0; i < locationWeights.Count; i++)
+        {
+            locationDensity.TryGetValue(locationWeights[i].location, out int density);
+            if (density >= GameConfig.NeighborOvercrowdingMin)
+                locationWeights[i] = (locationWeights[i].location, locationWeights[i].weight * 0.5);
+            else if (density >= 1 && density <= 3)
+                locationWeights[i] = (locationWeights[i].location, locationWeights[i].weight * 1.3);
         }
 
         // Zero out current location so NPC always moves somewhere new

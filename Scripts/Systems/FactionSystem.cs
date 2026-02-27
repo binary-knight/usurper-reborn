@@ -236,8 +236,13 @@ namespace UsurperRemake.Systems
                 return (false, "You must reach Level 10 before joining any faction.");
 
             // No faction will accept someone they despise
+            // Shadows are more tolerant — they only reject at Hostile (-50) or worse,
+            // and high Darkness overrides even that (criminals are welcome)
             var standing = FactionStanding[faction];
-            if (standing < 0)
+            bool standingBlocked = faction == Faction.TheShadows
+                ? standing <= -50 && player.Darkness <= 200
+                : standing < 0;
+            if (standingBlocked)
             {
                 string standingLabel = standing switch
                 {

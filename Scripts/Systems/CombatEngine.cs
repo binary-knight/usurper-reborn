@@ -2228,12 +2228,11 @@ public partial class CombatEngine
         if (attacker.HasStatus(StatusEffect.Weakened))
             attackPower = Math.Max(1, attackPower - attacker.Level / 10 - 4);
 
-        // Add weapon power with level scaling (soft cap prevents extreme stacking)
+        // Add weapon power (v0.47.5: removed double-dip — was adding weaponBonus + random(weaponBonus))
         if (attacker.WeapPow > 0)
         {
             long effectiveWeap = GetEffectiveWeapPow(attacker.WeapPow);
-            long weaponBonus = effectiveWeap + (attacker.Level / 10);
-            attackPower += weaponBonus + random.Next(0, (int)Math.Min(int.MaxValue, weaponBonus + 1));
+            attackPower += effectiveWeap + random.Next(0, (int)Math.Min(int.MaxValue, effectiveWeap / 2 + 1));
         }
 
         // Random attack variation - scales with level
@@ -2438,57 +2437,8 @@ public partial class CombatEngine
 
         result.CombatLog.Add($"Player attacks {target.Name} for {actualDamage} damage (roll: {attackRoll.NaturalRoll})");
 
-        // Apply divine lifesteal
-        int lifesteal = DivineBlessingSystem.Instance.CalculateLifesteal(attacker, (int)actualDamage);
-        if (lifesteal > 0)
-        {
-            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + lifesteal);
-            terminal.WriteLine($"Dark power drains {lifesteal} life from your enemy!", "dark_magenta");
-        }
-
-        // Equipment lifesteal (Lifedrinker enchant)
-        int equipLifeSteal = attacker.GetEquipmentLifeSteal();
-        if (equipLifeSteal > 0 && actualDamage > 0)
-        {
-            long stolen = Math.Max(1, actualDamage * equipLifeSteal / 100);
-            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + stolen);
-            terminal.WriteLine($"Your weapon drains {stolen} life! (Lifedrinker)", "dark_green");
-        }
-
-        // Divine Boon lifesteal (from worshipped player-god)
-        if (attacker.CachedBoonEffects?.LifestealPercent > 0 && actualDamage > 0)
-        {
-            long boonSteal = Math.Max(1, (long)(actualDamage * attacker.CachedBoonEffects.LifestealPercent));
-            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + boonSteal);
-            terminal.WriteLine($"Divine power drains {boonSteal} life! (Boon)", "dark_cyan");
-        }
-
-        // Elemental enchant procs (v0.30.9)
-        CheckElementalEnchantProcs(attacker, target, actualDamage, result);
-
-        // Sunforged Blade: heals lowest-HP ally for 10% of damage dealt
-        if (actualDamage > 0 && ArtifactSystem.Instance.HasSunforgedBlade() && currentTeammates != null && currentTeammates.Count > 0)
-        {
-            var injuredAlly = currentTeammates
-                .Where(t => t.IsAlive && t.HP < t.MaxHP)
-                .OrderBy(t => (double)t.HP / t.MaxHP)
-                .FirstOrDefault();
-            if (injuredAlly != null)
-            {
-                long allyHeal = Math.Max(1, actualDamage / 10);
-                long oldHP = injuredAlly.HP;
-                injuredAlly.HP = Math.Min(injuredAlly.MaxHP, injuredAlly.HP + allyHeal);
-                long actualHeal = injuredAlly.HP - oldHP;
-                if (actualHeal > 0)
-                {
-                    terminal.WriteLine($"Radiant light heals {injuredAlly.DisplayName} for {actualHeal} HP!", "bright_yellow");
-                }
-            }
-        }
-
-        // Apply poison coating effects on hit
-        if (actualDamage > 0 && target.IsAlive)
-            ApplyPoisonEffectsOnHit(attacker, target);
+        // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
+        ApplyPostHitEnchantments(attacker, target, actualDamage, result);
 
         // Chance to improve basic attack skill from successful use
         if (TrainingSystem.TryImproveFromUse(attacker, "basic_attack", random))
@@ -4281,16 +4231,37 @@ public partial class CombatEngine
         }
         else
         {
-            // Attack (with weapon soft cap)
-            long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
-            long defense = monster.GetDefensePower();
-            long damage = Math.Max(1, attackPower - defense);
-            
-            monster.HP = Math.Max(0, monster.HP - damage);
-            terminal.WriteLine($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage!", "cyan");
-            result.CombatLog.Add($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage");
+            // Loop through all attacks (dual-wield, extra attacks, etc.)
+            int swings = GetAttackCount(teammate);
+            int baseSwings = 1 + teammate.GetClassCombatModifiers().ExtraAttacks;
+
+            for (int s = 0; s < swings && monster.IsAlive; s++)
+            {
+                bool isOffHandAttack = teammate.IsDualWielding && s >= baseSwings;
+
+                // Attack (with weapon soft cap)
+                long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
+
+                // Apply weapon configuration damage modifier (includes off-hand penalty)
+                double damageModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
+                attackPower = (long)(attackPower * damageModifier);
+
+                long defense = monster.GetDefensePower();
+                long damage = Math.Max(1, attackPower - defense);
+
+                monster.HP = Math.Max(0, monster.HP - damage);
+
+                if (isOffHandAttack)
+                    terminal.WriteLine($"{teammate.DisplayName} strikes with off-hand at {monster.Name} for {damage} damage!", "cyan");
+                else
+                    terminal.WriteLine($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage!", "cyan");
+                result.CombatLog.Add($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage");
+
+                if (s < swings - 1 && monster.IsAlive)
+                    await Task.Delay(GetCombatDelay(500));
+            }
         }
-        
+
         await Task.Delay(GetCombatDelay(1000));
     }
     
@@ -4819,6 +4790,67 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.WriteLine($"You purchase {amount} {potionType} potion{(amount > 1 ? "s" : "")} for {totalCost:N0} gold.", color);
         terminal.WriteLine($"Gold remaining: {player.Gold:N0}", "yellow");
+    }
+
+    /// <summary>
+    /// Apply all post-hit enchantment effects after any damage source (attack or ability).
+    /// Consolidates lifesteal, elemental procs, sunforged healing, and poison coating.
+    /// </summary>
+    private void ApplyPostHitEnchantments(Character attacker, Monster target, long damage, CombatResult result)
+    {
+        if (damage <= 0 || target == null) return;
+
+        // Divine lifesteal
+        int lifesteal = DivineBlessingSystem.Instance.CalculateLifesteal(attacker, (int)damage);
+        if (lifesteal > 0)
+        {
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + lifesteal);
+            terminal.WriteLine($"Dark power drains {lifesteal} life from your enemy!", "dark_magenta");
+        }
+
+        // Equipment lifesteal (Lifedrinker enchant)
+        int equipLifeSteal = attacker.GetEquipmentLifeSteal();
+        if (equipLifeSteal > 0)
+        {
+            long stolen = Math.Max(1, damage * equipLifeSteal / 100);
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + stolen);
+            terminal.WriteLine($"Your weapon drains {stolen} life! (Lifedrinker)", "dark_green");
+        }
+
+        // Divine Boon lifesteal (from worshipped player-god)
+        if (attacker.CachedBoonEffects?.LifestealPercent > 0)
+        {
+            long boonSteal = Math.Max(1, (long)(damage * attacker.CachedBoonEffects.LifestealPercent));
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + boonSteal);
+            terminal.WriteLine($"Divine power drains {boonSteal} life! (Boon)", "dark_cyan");
+        }
+
+        // Elemental enchant procs
+        CheckElementalEnchantProcs(attacker, target, damage, result);
+
+        // Sunforged Blade: heals lowest-HP ally for 10% of damage dealt
+        if (ArtifactSystem.Instance.HasSunforgedBlade() && currentTeammates != null && currentTeammates.Count > 0)
+        {
+            var injuredAlly = currentTeammates
+                .Where(t => t.IsAlive && t.HP < t.MaxHP)
+                .OrderBy(t => (double)t.HP / t.MaxHP)
+                .FirstOrDefault();
+            if (injuredAlly != null)
+            {
+                long allyHeal = Math.Max(1, damage / 10);
+                long oldHP = injuredAlly.HP;
+                injuredAlly.HP = Math.Min(injuredAlly.MaxHP, injuredAlly.HP + allyHeal);
+                long actualHeal = injuredAlly.HP - oldHP;
+                if (actualHeal > 0)
+                {
+                    terminal.WriteLine($"Radiant light heals {injuredAlly.DisplayName} for {actualHeal} HP!", "bright_yellow");
+                }
+            }
+        }
+
+        // Apply poison coating effects on hit
+        if (target.IsAlive)
+            ApplyPoisonEffectsOnHit(attacker, target);
     }
 
     /// <summary>
@@ -7219,21 +7251,9 @@ public partial class CombatEngine
             terminal.SetColor("red");
             terminal.WriteLine($"-{actualDamage} HP");
 
-            // Elemental enchant procs (v0.30.9)
+            // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
             if (result.Player != null)
-                CheckElementalEnchantProcsMonster(result.Player, monster, actualDamage);
-
-            // Equipment lifesteal (Lifedrinker enchant)
-            if (result.Player != null && actualDamage > 0)
-            {
-                int equipLS = result.Player.GetEquipmentLifeSteal();
-                if (equipLS > 0)
-                {
-                    long stolen = Math.Max(1, actualDamage * equipLS / 100);
-                    result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + stolen);
-                    terminal.WriteLine($"  Your weapon drains {stolen} life! (Lifedrinker)", "dark_green");
-                }
-            }
+                ApplyPostHitEnchantments(result.Player, monster, actualDamage, result);
 
             if (monster.HP <= 0)
             {
@@ -7775,9 +7795,8 @@ public partial class CombatEngine
                         long damage = Math.Max(1, attackPower);
                         await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player);
 
-                        // Apply poison coating effects on hit
-                        if (damage > 0 && target.IsAlive)
-                            ApplyPoisonEffectsOnHit(player, target);
+                        // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
+                        ApplyPostHitEnchantments(player, target, damage, result);
                     }
                 }
                 break;
@@ -8332,6 +8351,15 @@ public partial class CombatEngine
                 actualDamage = 0; // Taunt is not a damage ability
             }
 
+            // Critical hit roll for abilities
+            bool abilityCrit = StatEffectsSystem.RollCriticalHit(player);
+            if (abilityCrit && actualDamage > 0)
+            {
+                float critMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                actualDamage = (long)(actualDamage * critMult);
+                terminal.WriteLine("CRITICAL ABILITY!", "bright_yellow");
+            }
+
             // Apply single target damage (unless AoE)
             if (actualDamage > 0)
             {
@@ -8346,12 +8374,15 @@ public partial class CombatEngine
                 result.TotalDamageDealt += actualDamage;
 
                 // Track damage dealt statistics
-                result.Player?.Statistics.RecordDamageDealt(actualDamage, false);
+                result.Player?.Statistics.RecordDamageDealt(actualDamage, abilityCrit);
 
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(isPlayer
                     ? $"You deal {actualDamage} damage to {target.Name}!"
                     : $"{actorName} deals {actualDamage} damage to {target.Name}!");
+
+                // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
+                ApplyPostHitEnchantments(player, target, actualDamage, result);
 
                 if (target.HP <= 0)
                 {
@@ -10936,21 +10967,43 @@ public partial class CombatEngine
 
         if (weakestMonster != null)
         {
-            terminal.WriteLine("");
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"{teammate.DisplayName} attacks {weakestMonster.Name}!");
-            await Task.Delay(GetCombatDelay(500));
+            // Loop through all attacks (dual-wield, extra attacks, etc.)
+            int swings = GetAttackCount(teammate);
+            int baseSwings = 1 + teammate.GetClassCombatModifiers().ExtraAttacks;
+            var target = weakestMonster;
 
-            // Calculate teammate attack damage (with weapon soft cap)
-            long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
+            for (int s = 0; s < swings && target != null && target.IsAlive; s++)
+            {
+                bool isOffHandAttack = teammate.IsDualWielding && s >= baseSwings;
 
-            // Apply weapon configuration damage modifier (includes alignment bonuses)
-            double damageModifier = GetWeaponConfigDamageModifier(teammate);
-            attackPower = (long)(attackPower * damageModifier);
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                if (isOffHandAttack)
+                    terminal.WriteLine($"{teammate.DisplayName} strikes with off-hand at {target.Name}!");
+                else
+                    terminal.WriteLine($"{teammate.DisplayName} attacks {target.Name}!");
+                await Task.Delay(GetCombatDelay(500));
 
-            long damage = Math.Max(1, attackPower);
-            damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
-            await ApplySingleMonsterDamage(weakestMonster, damage, result, $"{teammate.DisplayName}'s attack", teammate);
+                // Calculate teammate attack damage (with weapon soft cap)
+                long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
+
+                // Apply weapon configuration damage modifier (includes alignment bonuses, off-hand penalty)
+                double damageModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
+                attackPower = (long)(attackPower * damageModifier);
+
+                long damage = Math.Max(1, attackPower);
+                damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+                await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate);
+
+                // Apply post-hit enchantment effects
+                ApplyPostHitEnchantments(teammate, target, damage, result);
+
+                // If target died, retarget to next weakest
+                if (!target.IsAlive)
+                {
+                    target = monsters.Where(m => m.IsAlive).OrderBy(m => m.HP).FirstOrDefault();
+                }
+            }
         }
     }
 
@@ -13309,6 +13362,15 @@ public partial class CombatEngine
                 terminal.WriteLine("Critical strike from the shadows!", "bright_yellow");
             }
 
+            // Critical hit roll for abilities (same as regular attacks)
+            bool abilityCrit = StatEffectsSystem.RollCriticalHit(player);
+            if (abilityCrit)
+            {
+                float critMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                actualDamage = (long)(actualDamage * critMult);
+                terminal.WriteLine("CRITICAL ABILITY!", "bright_yellow");
+            }
+
             // Apply defense unless armor_pierce
             if (abilityResult.SpecialEffect != "armor_pierce")
             {
@@ -13318,10 +13380,13 @@ public partial class CombatEngine
 
             monster.HP -= actualDamage;
             result.TotalDamageDealt += actualDamage;
-            player.Statistics.RecordDamageDealt(actualDamage, false);
+            player.Statistics.RecordDamageDealt(actualDamage, abilityCrit);
 
             terminal.SetColor("bright_red");
             terminal.WriteLine($"You deal {actualDamage} damage to {monster.Name}!");
+
+            // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
+            ApplyPostHitEnchantments(player, monster, actualDamage, result);
 
             if (monster.HP <= 0)
             {

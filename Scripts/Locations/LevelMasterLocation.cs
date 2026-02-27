@@ -636,7 +636,7 @@ public class LevelMasterLocation : BaseLocation
 
             // Warrior classes - focus on Strength, Constitution, HP
             case CharacterClass.Warrior:
-                player.BaseStrength += 4;
+                player.BaseStrength += 3;     // v0.47.5: was 4, reduced to curb one-shot damage
                 player.BaseConstitution += 3;
                 player.BaseMaxHP += 12;
                 player.BaseDexterity += 2;
@@ -644,7 +644,7 @@ public class LevelMasterLocation : BaseLocation
                 break;
 
             case CharacterClass.Barbarian:
-                player.BaseStrength += 5;
+                player.BaseStrength += 4;     // v0.47.5: was 5, reduced to curb one-shot damage
                 player.BaseConstitution += 4;
                 player.BaseMaxHP += 15;
                 player.BaseStamina += 2;

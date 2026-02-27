@@ -171,10 +171,10 @@ public static class MonsterGenerator
         float bossMultiplier = isBoss ? 2.0f : (isMiniBoss ? 1.5f : 1.0f);
         float totalMultiplier = powerMultiplier * bossMultiplier;
 
-        // REBALANCED HP (v0.41.4: increased ~45% so fights last 4-5 hits instead of 2-3)
-        // Formula: 35*level + level^1.15 * 10 (was 25*level + level^1.1 * 8)
-        // Level 1: ~45, Level 20: ~1028, Level 50: ~2350, Level 100: ~5500 (before multiplier)
-        long baseHP = (long)((35 * level) + Math.Pow(level, 1.15) * 10);
+        // REBALANCED HP (v0.47.5: +45% so fights last 4-8 hits; was 35*level + level^1.15*10)
+        // Formula: 50*level + level^1.2 * 15
+        // Level 1: ~65, Level 10: ~738, Level 25: ~2,058, Level 50: ~5,085, Level 100: ~12,870
+        long baseHP = (long)((50 * level) + Math.Pow(level, 1.2) * 15);
         long hp = (long)(baseHP * totalMultiplier);
 
         // REBALANCED STRENGTH: Reduced to match new player damage scaling
@@ -182,10 +182,10 @@ public static class MonsterGenerator
         long baseStrength = (long)((2 * level) + Math.Pow(level, 1.05) * 1.5);
         long strength = (long)(baseStrength * totalMultiplier);
 
-        // Monster defence (v0.41.4: raised from 0.5f to 0.8f so monsters aren't defenseless)
+        // Monster defence (v0.47.5: removed 0.8x penalty — monsters need real defense)
         // Formula: level + level^1.02 * 0.5
         long baseDefence = (long)((level) + Math.Pow(level, 1.02) * 0.5);
-        long defence = (long)(baseDefence * totalMultiplier * 0.8f);
+        long defence = (long)(baseDefence * totalMultiplier);
 
         // REBALANCED PUNCH: Reduced natural attack bonus
         // Formula: level + level^1.02 * 0.5 (was 1.5*level + level^1.1 * 1)
