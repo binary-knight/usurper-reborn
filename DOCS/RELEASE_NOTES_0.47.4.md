@@ -47,3 +47,5 @@ This means a level 50 Magician now hits ~6.1x instead of being stuck at 4.0x, wh
 - `Scripts/Locations/ArmorShopLocation.cs` — Added tax hint trigger after first purchase
 - `Scripts/Core/GameEngine.cs` — Added Getting Started hint display after opening story sequence for new characters (0 kills)
 - `Scripts/Systems/StatEffectsSystem.cs` — Spell damage multiplier: replaced hard 4.0x cap with soft cap (full scaling to INT 85, diminished 0.015/point above, hard ceiling 8.0x)
+- `usurper-reloaded.csproj` — Added `ApplicationIcon` property for Windows exe icon
+- `app.ico` — Windows application icon (embedded in exe at build time)

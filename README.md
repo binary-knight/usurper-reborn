@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.47.3** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.47.4** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,16 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.47.4 - Playtest Fixes, Magician Balance & Onboarding
+
+**Bug Fixes:** Arena portal encounter rewritten — now runs real interactive combat through CombatEngine instead of instant simulated rolls. Weapon shop dual-wield [D] and sell [S] now work from category sub-menus. Daily reset banner deferred to next clean location boundary instead of interrupting mid-interaction.
+
+**Balance:** Magician spell damage scaling reworked — INT multiplier previously hard-capped at 4.0x (reached at level ~15), now uses soft cap with diminishing returns up to 8.0x ceiling. Magicians are now the highest single-hit damage class while Warriors win on sustained DPS.
+
+**Onboarding:** Five new contextual hints for new players — tax explanation on first purchase, Level Master tip after first level-up, Magic Shop suggestion for unused mana, Quest Hall pointer after first kill, and a Getting Started summary after character creation.
+
+**Other:** Windows application icon added to executable.
 
 ### Completed in v0.47.3 - Onboarding, All-Slot Loot & Balance
 
