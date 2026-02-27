@@ -400,6 +400,149 @@ jobs:
           path: build/mac-arm64/
 
   # ============================================
+  # DESKTOP (WEZTERM) BUNDLES
+  # Bundle game + WezTerm terminal for standalone/Steam play
+  # Existing plain builds remain unchanged for BBS/server use
+  # ============================================
+
+  build-desktop:
+    name: Build Desktop (WezTerm) Bundles
+    runs-on: ubuntu-latest
+    needs: [build]
+    env:
+      WEZTERM_VERSION: "20240203-110809-5046fc22"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download plain build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-build"
+
+      - name: Cache WezTerm downloads
+        uses: actions/cache@v4
+        with:
+          path: wezterm-cache
+          key: wezterm-${{ env.WEZTERM_VERSION }}
+
+      - name: Download WezTerm portables
+        run: |
+          mkdir -p wezterm-cache
+          BASE="https://github.com/wezterm/wezterm/releases/download/$WEZTERM_VERSION"
+          [ -f "wezterm-cache/wezterm-win.zip" ] || \
+            curl -fSL -o "wezterm-cache/wezterm-win.zip" \
+              "$BASE/WezTerm-windows-${WEZTERM_VERSION}.zip"
+          [ -f "wezterm-cache/wezterm-linux.AppImage" ] || \
+            curl -fSL -o "wezterm-cache/wezterm-linux.AppImage" \
+              "$BASE/WezTerm-${WEZTERM_VERSION}-Ubuntu20.04.AppImage"
+          [ -f "wezterm-cache/wezterm-macos.zip" ] || \
+            curl -fSL -o "wezterm-cache/wezterm-macos.zip" \
+              "$BASE/WezTerm-macos-${WEZTERM_VERSION}.zip"
+
+      - name: Bundle Windows x64 Desktop
+        run: |
+          mkdir -p desktop/UsurperReborn-win64/wezterm
+          # Extract WezTerm
+          unzip -qo wezterm-cache/wezterm-win.zip -d desktop/wez-tmp
+          mv desktop/wez-tmp/*/* desktop/UsurperReborn-win64/wezterm/ 2>/dev/null || \
+            mv desktop/wez-tmp/* desktop/UsurperReborn-win64/wezterm/ 2>/dev/null || true
+          rm -rf desktop/wez-tmp
+          # Copy game files from plain build
+          cp -r windows-x64-build/* desktop/UsurperReborn-win64/
+          # Copy WezTerm config, launcher, and fonts
+          cp wezterm.lua desktop/UsurperReborn-win64/
+          cp launchers/Play.bat desktop/UsurperReborn-win64/
+          cp -r fonts desktop/UsurperReborn-win64/
+
+      - name: Patch WezTerm icon (Windows)
+        run: |
+          # Use wine + rcedit to replace WezTerm icon with game icon
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wine64 > /dev/null 2>&1
+          # Download rcedit
+          curl -fSL -o /tmp/rcedit-x64.exe \
+            "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
+          # Patch the icon
+          wine /tmp/rcedit-x64.exe \
+            "desktop/UsurperReborn-win64/wezterm/wezterm-gui.exe" \
+            --set-icon "app.ico" 2>/dev/null && \
+            echo "✅ WezTerm icon patched with game icon" || \
+            echo "⚠️ Icon patching failed (non-critical, continuing)"
+
+      - name: Bundle Linux x64 Desktop
+        run: |
+          mkdir -p desktop/UsurperReborn-linux64/wezterm
+          cp wezterm-cache/wezterm-linux.AppImage desktop/UsurperReborn-linux64/wezterm/wezterm-gui
+          chmod +x desktop/UsurperReborn-linux64/wezterm/wezterm-gui
+          # Copy game files from plain build
+          cp -r linux-x64-build/* desktop/UsurperReborn-linux64/
+          chmod +x desktop/UsurperReborn-linux64/UsurperReborn
+          # Copy WezTerm config, launcher, and fonts
+          cp wezterm.lua desktop/UsurperReborn-linux64/
+          cp launchers/play.sh desktop/UsurperReborn-linux64/
+          chmod +x desktop/UsurperReborn-linux64/play.sh
+          cp -r fonts desktop/UsurperReborn-linux64/
+
+      - name: Bundle macOS x64 Desktop
+        run: |
+          mkdir -p desktop/UsurperReborn-macos/wezterm
+          unzip -qo wezterm-cache/wezterm-macos.zip -d desktop/wez-tmp
+          if [ -d "desktop/wez-tmp/WezTerm.app" ]; then
+            cp desktop/wez-tmp/WezTerm.app/Contents/MacOS/wezterm-gui desktop/UsurperReborn-macos/wezterm/
+          else
+            mv desktop/wez-tmp/*/* desktop/UsurperReborn-macos/wezterm/ 2>/dev/null || \
+              mv desktop/wez-tmp/* desktop/UsurperReborn-macos/wezterm/ 2>/dev/null || true
+          fi
+          chmod +x desktop/UsurperReborn-macos/wezterm/wezterm-gui
+          rm -rf desktop/wez-tmp
+          # Copy game executable from plain build (extract from app bundle)
+          if [ -f "mac-build/usurper-reborn.app/Contents/MacOS/usurper-reborn" ]; then
+            cp mac-build/usurper-reborn.app/Contents/MacOS/usurper-reborn desktop/UsurperReborn-macos/UsurperReborn
+          elif [ -f "mac-build/UsurperReborn" ]; then
+            cp mac-build/UsurperReborn desktop/UsurperReborn-macos/
+          fi
+          chmod +x desktop/UsurperReborn-macos/UsurperReborn 2>/dev/null || true
+          # Copy GPL files from plain build
+          cp mac-build/LICENSE desktop/UsurperReborn-macos/ 2>/dev/null || true
+          cp mac-build/GPL_NOTICE.txt desktop/UsurperReborn-macos/ 2>/dev/null || true
+          cp mac-build/README.txt desktop/UsurperReborn-macos/ 2>/dev/null || true
+          # Copy WezTerm config, launcher, and fonts
+          cp wezterm.lua desktop/UsurperReborn-macos/
+          cp launchers/play.sh desktop/UsurperReborn-macos/
+          chmod +x desktop/UsurperReborn-macos/play.sh
+          cp -r fonts desktop/UsurperReborn-macos/
+
+      - name: Create desktop distribution archives
+        run: |
+          cd desktop
+          zip -qr ../UsurperReborn-Desktop-Windows-x64.zip UsurperReborn-win64/
+          tar -czf ../UsurperReborn-Desktop-Linux-x64.tar.gz UsurperReborn-linux64/
+          zip -qr ../UsurperReborn-Desktop-macOS-x64.zip UsurperReborn-macos/
+          cd ..
+          echo "=== Desktop bundles ==="
+          ls -lh UsurperReborn-Desktop-*.zip UsurperReborn-Desktop-*.tar.gz
+
+      - name: Upload Desktop Windows x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64
+          path: UsurperReborn-Desktop-Windows-x64.zip
+
+      - name: Upload Desktop Linux x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux-x64
+          path: UsurperReborn-Desktop-Linux-x64.tar.gz
+
+      - name: Upload Desktop macOS x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-x64
+          path: UsurperReborn-Desktop-macOS-x64.zip
+
+  # ============================================
   # PLATFORM SMOKE TESTS
   # Verify builds actually run on target platforms
   # ============================================
@@ -529,7 +672,7 @@ jobs:
   attach-to-release:
     name: Attach Builds to Release
     runs-on: ubuntu-latest
-    needs: [build, test-windows, test-linux, test-macos-intel, test-macos-arm]
+    needs: [build, build-desktop, test-windows, test-linux, test-macos-intel, test-macos-arm]
     if: github.event_name == 'release'
     permissions:
       contents: write
@@ -539,9 +682,14 @@ jobs:
         with:
           pattern: "*-build"
 
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "desktop-*"
+
       - name: Create release zip files
         run: |
-          # Create zip archives for each platform
+          # Plain builds (BBS/server/terminal users)
           cd windows-x64-build && zip -r ../UsurperReborn-${{ github.ref_name }}-Windows-x64.zip . && cd ..
           cd windows-x86-build && zip -r ../UsurperReborn-${{ github.ref_name }}-Windows-x86.zip . && cd ..
           cd linux-x64-build && zip -r ../UsurperReborn-${{ github.ref_name }}-Linux-x64.zip . && cd ..
@@ -549,7 +697,15 @@ jobs:
           cd mac-build && zip -r ../UsurperReborn-${{ github.ref_name }}-macOS-Intel.zip . && cd ..
           cd mac-arm64-build && zip -r ../UsurperReborn-${{ github.ref_name }}-macOS-AppleSilicon.zip . && cd ..
 
-          ls -la *.zip
+          # Desktop bundles (WezTerm included) — already zipped by build-desktop
+          cp desktop-windows-x64/UsurperReborn-Desktop-Windows-x64.zip \
+            "UsurperReborn-${{ github.ref_name }}-Desktop-Windows-x64.zip"
+          cp desktop-linux-x64/UsurperReborn-Desktop-Linux-x64.tar.gz \
+            "UsurperReborn-${{ github.ref_name }}-Desktop-Linux-x64.tar.gz"
+          cp desktop-macos-x64/UsurperReborn-Desktop-macOS-x64.zip \
+            "UsurperReborn-${{ github.ref_name }}-Desktop-macOS-x64.zip"
+
+          ls -la *.zip *.tar.gz
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v1
@@ -561,6 +717,9 @@ jobs:
             UsurperReborn-${{ github.ref_name }}-Linux-ARM64.zip
             UsurperReborn-${{ github.ref_name }}-macOS-Intel.zip
             UsurperReborn-${{ github.ref_name }}-macOS-AppleSilicon.zip
+            UsurperReborn-${{ github.ref_name }}-Desktop-Windows-x64.zip
+            UsurperReborn-${{ github.ref_name }}-Desktop-Linux-x64.tar.gz
+            UsurperReborn-${{ github.ref_name }}-Desktop-macOS-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -584,7 +743,7 @@ jobs:
           dotnet publish usurper-reloaded.csproj -c Steam -r win-x64 -o steam-build/depot-windows \
             -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
           if [ -f "steam-build/depot-windows/UsurperReborn.exe" ]; then
-            cp launchers/UsurperReborn.bat steam-build/depot-windows/
+            cp launchers/Play.bat steam-build/depot-windows/
             echo "✅ Steam Windows build successful (with STEAM_BUILD flag)"
           else
             echo "❌ Steam Windows build failed"
@@ -598,8 +757,8 @@ jobs:
             -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
           if [ -f "steam-build/depot-linux/UsurperReborn" ]; then
             chmod +x "steam-build/depot-linux/UsurperReborn"
-            cp launchers/usurper-reborn.sh steam-build/depot-linux/
-            chmod +x steam-build/depot-linux/usurper-reborn.sh
+            cp launchers/play.sh steam-build/depot-linux/
+            chmod +x steam-build/depot-linux/play.sh
             echo "✅ Steam Linux build successful (with STEAM_BUILD flag)"
           else
             echo "❌ Steam Linux build failed"
@@ -683,6 +842,54 @@ jobs:
             echo "❌ CRITICAL: libsteam_api.so missing - Steam integration will not work on Linux!"
           fi
 
+      - name: Bundle WezTerm into Steam depots
+        env:
+          WEZTERM_VERSION: "20240203-110809-5046fc22"
+        run: |
+          BASE="https://github.com/wezterm/wezterm/releases/download/$WEZTERM_VERSION"
+
+          # Download WezTerm for Windows and Linux
+          mkdir -p wezterm-cache
+          [ -f "wezterm-cache/wezterm-win.zip" ] || \
+            curl -fSL -o "wezterm-cache/wezterm-win.zip" \
+              "$BASE/WezTerm-windows-${WEZTERM_VERSION}.zip"
+          [ -f "wezterm-cache/wezterm-linux.AppImage" ] || \
+            curl -fSL -o "wezterm-cache/wezterm-linux.AppImage" \
+              "$BASE/WezTerm-${WEZTERM_VERSION}-Ubuntu20.04.AppImage"
+
+          # Windows depot: extract WezTerm
+          mkdir -p steam-build/depot-windows/wezterm
+          unzip -qo wezterm-cache/wezterm-win.zip -d /tmp/wez-tmp
+          mv /tmp/wez-tmp/*/* steam-build/depot-windows/wezterm/ 2>/dev/null || \
+            mv /tmp/wez-tmp/* steam-build/depot-windows/wezterm/ 2>/dev/null || true
+          rm -rf /tmp/wez-tmp
+
+          # Linux depot: copy AppImage
+          mkdir -p steam-build/depot-linux/wezterm
+          cp wezterm-cache/wezterm-linux.AppImage steam-build/depot-linux/wezterm/wezterm-gui
+          chmod +x steam-build/depot-linux/wezterm/wezterm-gui
+
+          # Copy config, fonts to both depots
+          for dir in steam-build/depot-windows steam-build/depot-linux; do
+            cp wezterm.lua "$dir/"
+            cp -r fonts "$dir/"
+          done
+
+          echo "✅ WezTerm bundled into Steam depots"
+
+      - name: Patch WezTerm icon for Steam (Windows)
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wine64 > /dev/null 2>&1
+          curl -fSL -o /tmp/rcedit-x64.exe \
+            "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
+          wine /tmp/rcedit-x64.exe \
+            "steam-build/depot-windows/wezterm/wezterm-gui.exe" \
+            --set-icon "app.ico" 2>/dev/null && \
+            echo "✅ Steam WezTerm icon patched" || \
+            echo "⚠️ Icon patching failed (non-critical)"
+
       - name: Add GPL compliance files to Steam builds
         run: |
           # Create source archive
@@ -751,19 +958,22 @@ jobs:
           ## Launch Targets (set in Steamworks Partner)
 
           ### Windows
-          - **Executable:** `UsurperReborn.bat`
+          - **Executable:** `Play.bat`
           - **Arguments:** (none needed)
           - **Launch Type:** Launch (Default)
+          - **Note:** Launches the game inside bundled WezTerm branded terminal
 
           ### Linux
-          - **Executable:** `usurper-reborn.sh`
+          - **Executable:** `play.sh`
           - **Arguments:** (none needed)
           - **Launch Type:** Launch (Default)
+          - **Note:** Launches the game inside bundled WezTerm branded terminal
 
           ## Notes
-          - The launchers spawn terminal windows to run the console game
-          - Linux launcher auto-detects available terminal emulators
-          - Windows .bat files open in cmd.exe
+          - WezTerm is bundled in the `wezterm/` directory inside each depot
+          - `wezterm.lua` configures the terminal appearance (colors, font, window title)
+          - Players can change fonts via the in-game Preferences menu
+          - Font choice is saved to `font-choice.txt` and applies on next launch
           EOF
 
       - name: Create release notes
@@ -877,7 +1087,7 @@ jobs:
   report:
     name: Build Report
     runs-on: ubuntu-latest
-    needs: [build, steam-prep]
+    needs: [build, build-desktop, steam-prep]
     if: always()
     steps:
       - name: Generate build report

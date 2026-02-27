@@ -9,8 +9,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.47.5";
-    public const string VersionName = "Prestige";
+    public const string Version = "0.48.0";
+    public const string VersionName = "WezTerm Desktop";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // From Pascal global_maxXX constants

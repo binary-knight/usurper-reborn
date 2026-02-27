@@ -90,22 +90,22 @@ namespace UsurperRemake.Systems
             ),
             [HINT_LEVEL_MASTER] = new HintDefinition(
                 "Training Available!",
-                "Visit the Level Master [M] on Main Street to spend training points on skill proficiencies and check your progress.",
+                "Visit the Level Master [V] on Main Street to spend training points on skill proficiencies and check your progress.",
                 "bright_green"
             ),
             [HINT_MANA_SPELLS] = new HintDefinition(
                 "Magic Tip",
-                "Your class has Mana for casting spells! Visit the Magic Shop [G] to learn spells, then cast them in combat with 'C'.",
+                "Your class has Mana for casting spells! Visit the Magic Shop [M] to learn spells, then cast them in combat with 'C'.",
                 "bright_cyan"
             ),
             [HINT_QUEST_SYSTEM] = new HintDefinition(
                 "Quests Available!",
-                "The Quest Hall [Q] offers bounties and missions for bonus gold and XP rewards!",
+                "The Quest Hall [2] offers bounties and missions for bonus gold and XP rewards!",
                 "bright_green"
             ),
             [HINT_GETTING_STARTED] = new HintDefinition(
                 "Getting Started",
-                "Visit Shops [W/A] to gear up, enter the Dungeons [D] to fight monsters, complete Quests [Q] for rewards, and spend training points at the Master [M] when you level up.",
+                "Visit Shops [W/A] to gear up, enter the Dungeons [D] to fight monsters, complete Quests [2] for rewards, and spend training points at the Master [V] when you level up.",
                 "bright_cyan"
             )
         };

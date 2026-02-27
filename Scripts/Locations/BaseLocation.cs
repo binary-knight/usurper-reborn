@@ -6,6 +6,7 @@ using UsurperRemake.UI;
 using UsurperRemake.BBS;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -2977,6 +2978,12 @@ public abstract class BaseLocation
 
             // Color Theme
             terminal.WriteLine($"  Color Theme: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)} - {ColorTheme.GetThemeDescription(currentPlayer.ColorTheme)}", "yellow");
+
+            // Terminal Font (only in WezTerm/local mode)
+            if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                terminal.WriteLine($"  Terminal Font: {ReadCurrentFont()}", "yellow");
+            }
             terminal.WriteLine("");
 
             terminal.SetColor("white");
@@ -3011,6 +3018,14 @@ public abstract class BaseLocation
             terminal.Write("6");
             terminal.SetColor("white");
             terminal.WriteLine($"] Color Theme (Current: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)})");
+            if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("7");
+                terminal.SetColor("white");
+                terminal.WriteLine($"] Terminal Font (Current: {ReadCurrentFont()})");
+            }
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
             terminal.Write("0");
@@ -3114,6 +3129,21 @@ public abstract class BaseLocation
                     await Task.Delay(800);
                     break;
 
+                case "7":
+                    // Cycle terminal font (only in WezTerm/local mode)
+                    if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    {
+                        var fonts = new[] { "JetBrains Mono", "Cascadia Code", "Fira Code", "Iosevka", "Hack" };
+                        var currentFont = ReadCurrentFont();
+                        int idx = Array.IndexOf(fonts, currentFont);
+                        int next = (idx + 1) % fonts.Length;
+                        WriteTerminalFont(fonts[next]);
+                        terminal.WriteLine($"Terminal font set to: {fonts[next]}", "green");
+                        terminal.WriteLine("  Font will update in the terminal momentarily.", "white");
+                        await Task.Delay(800);
+                    }
+                    break;
+
                 case "0":
                 case "":
                     exitPrefs = true;
@@ -3125,6 +3155,39 @@ public abstract class BaseLocation
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// Read the current terminal font preference from font-choice.txt.
+    /// Returns "JetBrains Mono" if no preference file exists.
+    /// </summary>
+    private static string ReadCurrentFont()
+    {
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "font-choice.txt");
+            if (File.Exists(path))
+            {
+                var line = File.ReadAllText(path).Trim();
+                if (!string.IsNullOrEmpty(line)) return line;
+            }
+        }
+        catch { }
+        return "JetBrains Mono";
+    }
+
+    /// <summary>
+    /// Write the terminal font preference to font-choice.txt.
+    /// WezTerm auto-reloads its config and picks up the change.
+    /// </summary>
+    private static void WriteTerminalFont(string fontName)
+    {
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "font-choice.txt");
+            File.WriteAllText(path, fontName);
+        }
+        catch { }
     }
 
     /// <summary>

@@ -1125,21 +1125,28 @@ public partial class GameEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_red");
-        terminal.WriteLine("  ══════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("  ╔══════════════════════════════════════════════════════════════════════════╗");
         terminal.Write("  ║ ");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine("[!] ALPHA BUILD - Expect bugs, balance issues, and missing content. [!]");
+        terminal.Write("[!] ALPHA BUILD - Expect bugs, balance issues, and missing content. [!]");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine(" ║");
         terminal.Write("  ║ ");
         terminal.SetColor("white");
-        terminal.WriteLine("Character data may be wiped at any time (full wipe planned at Beta).");
+        terminal.Write("Character data may be wiped at any time (full wipe planned at Beta).  ");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine(" ║");
         terminal.Write("  ║ ");
         terminal.SetColor("white");
-        terminal.WriteLine("Report bugs via /bug in-game or join our Discord:");
+        terminal.Write("Report bugs via /bug in-game or join our Discord:                     ");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine(" ║");
         terminal.Write("  ║ ");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine(GameConfig.DiscordInvite);
+        terminal.Write(GameConfig.DiscordInvite);
         terminal.SetColor("bright_red");
-        terminal.WriteLine("  ══════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("                                                    ║");
+        terminal.WriteLine("  ╚══════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
     }
 
