@@ -7022,15 +7022,46 @@ public class DungeonLocation : BaseLocation
 
             if (result.Outcome == CombatOutcome.Victory)
             {
-                // Loot the merchant
-                long loot = currentDungeonLevel * 100 + dungeonRandom.Next(200);
-                player.Gold += loot;
-                player.Healing = Math.Min(player.MaxPotions, player.Healing + 3);
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"You loot {loot} gold and 3 healing potions from the merchant!");
+                // Loot the merchant — split among group if in a party
+                long totalLoot = currentDungeonLevel * 100 + dungeonRandom.Next(200);
+                var aliveGroupMembers = teammates.Where(t => t != null && t.IsAlive && t.IsGroupedPlayer).ToList();
+
+                if (aliveGroupMembers.Count > 0)
+                {
+                    int totalMembers = 1 + aliveGroupMembers.Count;
+                    long goldPerMember = totalLoot / totalMembers;
+
+                    player.Gold += goldPerMember;
+                    player.Healing = Math.Min(player.MaxPotions, player.Healing + 3);
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"You loot {goldPerMember} gold and 3 healing potions from the merchant! (split {totalMembers} ways)");
+
+                    foreach (var mate in aliveGroupMembers)
+                    {
+                        mate.Gold += goldPerMember;
+                        mate.Healing = Math.Min(mate.MaxPotions, mate.Healing + 3);
+                        mate.Darkness += 10;
+                        mate.Statistics?.RecordGoldChange(mate.Gold);
+
+                        if (mate.RemoteTerminal != null)
+                        {
+                            mate.RemoteTerminal.SetColor("yellow");
+                            mate.RemoteTerminal.WriteLine($"You loot {goldPerMember} gold and 3 healing potions from the merchant!");
+                            mate.RemoteTerminal.SetColor("red");
+                            mate.RemoteTerminal.WriteLine("+10 Darkness for attacking an innocent merchant!");
+                        }
+                    }
+                }
+                else
+                {
+                    player.Gold += totalLoot;
+                    player.Healing = Math.Min(player.MaxPotions, player.Healing + 3);
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"You loot {totalLoot} gold and 3 healing potions from the merchant!");
+                }
             }
 
-            // Evil deed
+            // Evil deed (leader always gets darkness — group members handled above)
             player.Darkness += 10;
             terminal.SetColor("red");
             terminal.WriteLine("+10 Darkness for attacking an innocent merchant!");

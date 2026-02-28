@@ -1944,8 +1944,12 @@ public abstract class BaseLocation
                     terminal.Write($" {player.Mana}mp", "cyan");
                 terminal.Write("] ", "white");
             }
-            terminal.SetColor("bright_white");
-            return await terminal.GetInput($"{GetMudPromptName()} > ");
+            var promptName = GetMudPromptName();
+            if (player != null && player.Level < 5)
+                terminal.Write($"{promptName} > (type 'look' to redraw) ", "bright_white");
+            else
+                terminal.Write($"{promptName} > ", "bright_white");
+            return await terminal.GetInput("");
         }
         terminal.SetColor("bright_white");
         return await terminal.GetInput("Your choice: ");

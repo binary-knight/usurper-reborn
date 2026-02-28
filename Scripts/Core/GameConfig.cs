@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.48.0";
+    public const string Version = "0.48.1";
     public const string VersionName = "WezTerm Desktop";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 

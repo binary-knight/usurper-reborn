@@ -236,22 +236,46 @@ public partial class CombatEngine
         await ShowPvPIntroduction(attacker, defender, result);
         
         // Main PvP combat loop
-        
+
         while (attacker.IsAlive && defender.IsAlive && !globalEscape)
         {
-            // Attacker's turn
+            // Attacker's turn — check for status effects that prevent action
             if (attacker.IsAlive && defender.IsAlive)
             {
-                var attackerAction = await GetPlayerAction(attacker, null, result, defender);
-                await ProcessPlayerVsPlayerAction(attackerAction, attacker, defender, result);
+                var preventingStatus = attacker.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
+                if (preventingStatus != StatusEffect.None)
+                {
+                    terminal.WriteLine($"You are {preventingStatus.GetDescription().ToLower()}!", "red");
+                    await Task.Delay(GetCombatDelay(800));
+                }
+                else
+                {
+                    var attackerAction = await GetPlayerAction(attacker, null, result, defender);
+                    await ProcessPlayerVsPlayerAction(attackerAction, attacker, defender, result);
+                }
             }
-            
-            // Defender's turn (if AI controlled)
-            if (defender.IsAlive && defender.AI == CharacterAI.Computer)
+
+            // Defender's turn (if AI controlled) — check for status effects
+            if (defender.IsAlive && attacker.IsAlive && defender.AI == CharacterAI.Computer)
             {
-                await ProcessComputerPlayerAction(defender, attacker, result);
+                var defenderPreventing = defender.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
+                if (defenderPreventing != StatusEffect.None)
+                {
+                    terminal.WriteLine($"{defender.DisplayName} is {defenderPreventing.GetDescription().ToLower()}!", "cyan");
+                    await Task.Delay(GetCombatDelay(800));
+                }
+                else
+                {
+                    await ProcessComputerPlayerAction(defender, attacker, result);
+                }
             }
-            
+
+            // Process status effects (tick durations, apply DoT, remove expired)
+            foreach (var (msg, color) in attacker.ProcessStatusEffects())
+                terminal.WriteLine(msg, color);
+            foreach (var (msg, color) in defender.ProcessStatusEffects())
+                terminal.WriteLine(msg, color);
+
             // Tick down cooldowns for both sides
             foreach (var key in abilityCooldowns.Keys.ToList())
                 if (abilityCooldowns[key] > 0) abilityCooldowns[key]--;
@@ -14261,19 +14285,40 @@ public partial class CombatEngine
         var spellResult = SpellSystem.CastSpell(attacker, chosen.Level, defender);
         terminal.WriteLine(spellResult.Message, "magenta");
 
-        // Apply spell effects - damage spells work on Character
-        if (spellResult.Success && spellResult.Damage > 0)
+        if (spellResult.Success)
         {
-            defender.HP = Math.Max(0, defender.HP - spellResult.Damage);
-            terminal.WriteLine($"{defender.DisplayName} takes {spellResult.Damage} magical damage!", "bright_magenta");
-        }
+            // Apply damage to defender
+            if (spellResult.Damage > 0)
+            {
+                defender.HP = Math.Max(0, defender.HP - spellResult.Damage);
+                terminal.WriteLine($"{defender.DisplayName} takes {spellResult.Damage} magical damage!", "bright_magenta");
+            }
 
-        // Apply healing spells to self
-        if (spellResult.Success && spellResult.Healing > 0)
-        {
-            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + spellResult.Healing);
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"You recover {spellResult.Healing} HP!");
+            // Apply healing to self
+            if (spellResult.Healing > 0)
+            {
+                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + spellResult.Healing);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"You recover {spellResult.Healing} HP!");
+            }
+
+            // Apply buff effects to caster
+            if (spellResult.ProtectionBonus > 0)
+            {
+                int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
+                attacker.MagicACBonus = spellResult.ProtectionBonus;
+                attacker.ApplyStatus(StatusEffect.Blessed, dur);
+                terminal.WriteLine($"You are magically protected! (+{spellResult.ProtectionBonus} AC for {dur} rounds)", "blue");
+            }
+            if (spellResult.AttackBonus > 0)
+            {
+                int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
+                attacker.ApplyStatus(StatusEffect.PowerStance, dur);
+                terminal.WriteLine($"Your power surges! (+50% damage for {dur} rounds)", "red");
+            }
+
+            // Apply special effects to defender (stun, poison, sleep, etc.)
+            ApplyPvPSpellEffect(attacker, defender, spellResult);
         }
 
         result.CombatLog.Add($"{attacker.DisplayName} casts {chosen.Name}");
@@ -14522,8 +14567,10 @@ public partial class CombatEngine
                 var chosen = spells[random.Next(spells.Count)];
                 var spellResult = SpellSystem.CastSpell(computer, chosen.Level, opponent);
                 terminal.WriteLine(spellResult.Message, "magenta");
-                // For now only self-affecting or damage spells ignored in PvP; skip Monster
+                // Apply damage/healing via Monster path (self-buff), then PvP effects on opponent
                 ApplySpellEffects(computer, null, spellResult);
+                if (spellResult.Success)
+                    ApplyPvPSpellEffect(computer, opponent, spellResult);
                 result.CombatLog.Add($"{computer.DisplayName} casts {chosen.Name}");
                 await Task.Delay(GetCombatDelay(1000));
                 return;
@@ -15109,6 +15156,130 @@ public partial class CombatEngine
                 caster.HasStatusImmunity = true;
                 caster.StatusImmunityDuration = 999;
                 terminal.WriteLine($"{caster.DisplayName}'s mind becomes an impenetrable fortress!", "bright_white");
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Apply spell special effects to a Character target in PvP combat.
+    /// Maps spell effect strings to the Character StatusEffect system.
+    /// </summary>
+    private void ApplyPvPSpellEffect(Character caster, Character target, SpellSystem.SpellResult spellResult)
+    {
+        if (string.IsNullOrEmpty(spellResult.SpecialEffect) || !target.IsAlive) return;
+
+        int duration = spellResult.Duration > 0 ? spellResult.Duration : 2;
+
+        switch (spellResult.SpecialEffect.ToLower())
+        {
+            case "lightning":
+            case "stun":
+                target.ApplyStatus(StatusEffect.Stunned, duration);
+                terminal.WriteLine($"{target.DisplayName} is stunned!", "bright_yellow");
+                break;
+
+            case "poison":
+                target.ApplyStatus(StatusEffect.Poisoned, Math.Max(duration, 5));
+                terminal.WriteLine($"{target.DisplayName} is poisoned!", "dark_green");
+                break;
+
+            case "sleep":
+                target.ApplyStatus(StatusEffect.Sleeping, duration);
+                terminal.WriteLine($"{target.DisplayName} falls into a magical slumber!", "cyan");
+                break;
+
+            case "freeze":
+            case "frost":
+                target.ApplyStatus(StatusEffect.Frozen, duration);
+                terminal.WriteLine($"{target.DisplayName} is frozen!", "bright_cyan");
+                break;
+
+            case "fear":
+                target.ApplyStatus(StatusEffect.Feared, duration);
+                terminal.WriteLine($"{target.DisplayName} cowers in fear!", "yellow");
+                break;
+
+            case "slow":
+                target.ApplyStatus(StatusEffect.Slow, duration);
+                terminal.WriteLine($"{target.DisplayName} is slowed!", "gray");
+                break;
+
+            case "blind":
+                target.ApplyStatus(StatusEffect.Blinded, duration);
+                terminal.WriteLine($"{target.DisplayName} is blinded!", "gray");
+                break;
+
+            case "silence":
+                target.ApplyStatus(StatusEffect.Silenced, duration);
+                terminal.WriteLine($"{target.DisplayName} is silenced!", "magenta");
+                break;
+
+            case "weaken":
+                target.ApplyStatus(StatusEffect.Weakened, duration);
+                terminal.WriteLine($"{target.DisplayName} is weakened!", "yellow");
+                break;
+
+            case "curse":
+                target.ApplyStatus(StatusEffect.Cursed, duration);
+                terminal.WriteLine($"{target.DisplayName} is cursed!", "dark_red");
+                break;
+
+            case "escape":
+                terminal.WriteLine($"{caster.DisplayName} vanishes in a whirl of arcane energy!", "magenta");
+                globalEscape = true;
+                break;
+
+            case "blur":
+            case "fog":
+            case "duplicate":
+            case "mirror":
+            case "invisible":
+            case "shadow":
+                caster.ApplyStatus(StatusEffect.Blur, 999);
+                terminal.WriteLine($"{caster.DisplayName}'s outline shimmers and blurs!", "cyan");
+                break;
+
+            case "stoneskin":
+                caster.DamageAbsorptionPool = 10 * caster.Level;
+                caster.ApplyStatus(StatusEffect.Stoneskin, 999);
+                terminal.WriteLine($"{caster.DisplayName}'s skin hardens to stone!", "dark_gray");
+                break;
+
+            case "haste":
+                caster.ApplyStatus(StatusEffect.Haste, 3);
+                terminal.WriteLine($"{caster.DisplayName} moves with supernatural speed!", "bright_green");
+                break;
+
+            case "avatar":
+                caster.TempAttackBonus += 55;
+                caster.TempDefenseBonus += 55;
+                terminal.WriteLine($"{caster.DisplayName} channels divine power! (+55 ATK/DEF)", "bright_yellow");
+                break;
+
+            case "wish":
+                caster.TempAttackBonus += (int)caster.Strength;
+                caster.TempDefenseBonus += (int)caster.Defense;
+                terminal.WriteLine($"{caster.DisplayName}'s wish reshapes reality!", "bright_magenta");
+                break;
+
+            case "timestop":
+                caster.DodgeNextAttack = true;
+                caster.TempAttackBonus += 35;
+                caster.TempDefenseBonus += 35;
+                terminal.WriteLine($"{caster.DisplayName} freezes time! (+35 ATK/DEF, dodge next)", "bright_cyan");
+                break;
+
+            case "mindblank":
+                caster.HasStatusImmunity = true;
+                caster.StatusImmunityDuration = 999;
+                terminal.WriteLine($"{caster.DisplayName}'s mind becomes impenetrable!", "bright_white");
+                break;
+
+            case "cure_disease":
+                if (caster.HasStatus(StatusEffect.Poisoned)) caster.RemoveStatus(StatusEffect.Poisoned);
+                if (caster.HasStatus(StatusEffect.Diseased)) caster.RemoveStatus(StatusEffect.Diseased);
+                if (caster.Poison > 0) caster.Poison = 0;
+                terminal.WriteLine($"{caster.DisplayName} is purified!", "bright_green");
                 break;
         }
     }
@@ -16919,6 +17090,9 @@ public partial class CombatEngine
                 groupedPlayer.Statistics.RecordMonsterKill(playerExp / Math.Max(1, result.DefeatedMonsters.Count),
                     goldPerPlayer / Math.Max(1, result.DefeatedMonsters.Count),
                     monster.IsBoss, monster.IsUnique);
+
+                // Update quest progress for grouped player (kill quests, bounties, etc.)
+                QuestSystem.OnMonsterKilled(groupedPlayer, monster.Name, monster.IsBoss);
             }
             groupedPlayer.Statistics.RecordGoldChange(groupedPlayer.Gold);
 

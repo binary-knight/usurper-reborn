@@ -1133,19 +1133,19 @@ public partial class GameEngine
         terminal.WriteLine(" ║");
         terminal.Write("  ║ ");
         terminal.SetColor("white");
-        terminal.Write("Character data may be wiped at any time (full wipe planned at Beta).  ");
+        terminal.Write("Character data may be wiped at any time (full wipe planned at Beta).    ");
         terminal.SetColor("bright_red");
         terminal.WriteLine(" ║");
         terminal.Write("  ║ ");
         terminal.SetColor("white");
-        terminal.Write("Report bugs via /bug in-game or join our Discord:                     ");
+        terminal.Write("Report bugs via /bug in-game or join our Discord:                       ");
         terminal.SetColor("bright_red");
         terminal.WriteLine(" ║");
         terminal.Write("  ║ ");
         terminal.SetColor("bright_cyan");
         terminal.Write(GameConfig.DiscordInvite);
         terminal.SetColor("bright_red");
-        terminal.WriteLine("                                                    ║");
+        terminal.WriteLine("                                                  ║");
         terminal.WriteLine("  ╚══════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
     }
@@ -2148,6 +2148,14 @@ public partial class GameEngine
                 if (!string.IsNullOrEmpty(displayName))
                 {
                     await OnlineStateManager.Instance!.UpdateDisplayName(displayName);
+
+                    // Update RoomRegistry session so "Also here" shows display name, not account name
+                    var ctx = UsurperRemake.Server.SessionContext.Current;
+                    var srv = UsurperRemake.Server.MudServer.Instance;
+                    if (ctx != null && srv != null && srv.ActiveSessions.TryGetValue(ctx.Username?.ToLowerInvariant() ?? "", out var sess))
+                    {
+                        sess.ActiveCharacterName = displayName;
+                    }
                 }
             }
 
@@ -2897,6 +2905,14 @@ public partial class GameEngine
                 $"A new adventurer arrives! {displayName} the {className} begins their journey.", "quest");
             // Update online_players display_name from BBS username to character name
             await OnlineStateManager.Instance!.UpdateDisplayName(displayName);
+
+            // Update RoomRegistry session so "Also here" shows display name, not account name
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            var srv = UsurperRemake.Server.MudServer.Instance;
+            if (ctx != null && srv != null && srv.ActiveSessions.TryGetValue(ctx.Username?.ToLowerInvariant() ?? "", out var sess))
+            {
+                sess.ActiveCharacterName = displayName;
+            }
         }
 
         // Play the opening story sequence

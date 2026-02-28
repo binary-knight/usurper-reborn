@@ -472,6 +472,7 @@ jobs:
           # Copy WezTerm config, launcher, and fonts
           cp wezterm.lua desktop/UsurperReborn-win64/
           cp launchers/Play.bat desktop/UsurperReborn-win64/
+          cp launchers/Play-Accessible.bat desktop/UsurperReborn-win64/
           cp -r fonts desktop/UsurperReborn-win64/
 
       - name: Patch WezTerm icon (Windows)
@@ -501,7 +502,9 @@ jobs:
           # Copy WezTerm config, launcher, and fonts
           cp wezterm.lua desktop/UsurperReborn-linux64/
           cp launchers/play.sh desktop/UsurperReborn-linux64/
+          cp launchers/play-accessible.sh desktop/UsurperReborn-linux64/
           chmod +x desktop/UsurperReborn-linux64/play.sh
+          chmod +x desktop/UsurperReborn-linux64/play-accessible.sh
           cp -r fonts desktop/UsurperReborn-linux64/
 
       - name: Bundle macOS x64 Desktop
@@ -534,7 +537,9 @@ jobs:
           # Copy WezTerm config, launcher, and fonts
           cp wezterm.lua desktop/UsurperReborn-macos/
           cp launchers/play.sh desktop/UsurperReborn-macos/
+          cp launchers/play-accessible.sh desktop/UsurperReborn-macos/
           chmod +x desktop/UsurperReborn-macos/play.sh
+          chmod +x desktop/UsurperReborn-macos/play-accessible.sh
           cp -r fonts desktop/UsurperReborn-macos/
 
       - name: Create desktop distribution archives
@@ -767,6 +772,7 @@ jobs:
             -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
           if [ -f "steam-build/depot-windows/UsurperReborn.exe" ]; then
             cp launchers/Play.bat steam-build/depot-windows/
+            cp launchers/Play-Accessible.bat steam-build/depot-windows/
             echo "✅ Steam Windows build successful (with STEAM_BUILD flag)"
           else
             echo "❌ Steam Windows build failed"
@@ -781,7 +787,9 @@ jobs:
           if [ -f "steam-build/depot-linux/UsurperReborn" ]; then
             chmod +x "steam-build/depot-linux/UsurperReborn"
             cp launchers/play.sh steam-build/depot-linux/
+            cp launchers/play-accessible.sh steam-build/depot-linux/
             chmod +x steam-build/depot-linux/play.sh
+            chmod +x steam-build/depot-linux/play-accessible.sh
             echo "✅ Steam Linux build successful (with STEAM_BUILD flag)"
           else
             echo "❌ Steam Linux build failed"

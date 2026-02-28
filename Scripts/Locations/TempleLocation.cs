@@ -839,10 +839,36 @@ public partial class TempleLocation : BaseLocation
     {
         terminal.WriteLine("");
         terminal.WriteLine("");
-        
+
         var rankedGods = godSystem.ListGods(true);
-        
-        if (rankedGods.Count == 0)
+
+        // Build a unified ranking list: (name, title, followers, isPlayer)
+        var ranking = new List<(string Name, string Title, int Followers, bool IsPlayer)>();
+
+        foreach (var god in rankedGods)
+            ranking.Add((god.Name, god.GetTitle(), god.Believers, false));
+
+        // Add player immortals
+        var playerImmortals = await GetImmortalGodsAsync();
+        foreach (var ig in playerImmortals)
+        {
+            int titleIdx = Math.Clamp(ig.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
+            ranking.Add((ig.DivineName, GameConfig.GodTitles[titleIdx], ig.Believers, true));
+        }
+
+        // Also include current player if they're an immortal and not already listed
+        if (currentPlayer.IsImmortal && !string.IsNullOrEmpty(currentPlayer.DivineName)
+            && !ranking.Any(r => r.Name.Equals(currentPlayer.DivineName, StringComparison.OrdinalIgnoreCase)))
+        {
+            int titleIdx = Math.Clamp(currentPlayer.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
+            int believers = PantheonLocation.CountBelievers(currentPlayer.DivineName);
+            ranking.Add((currentPlayer.DivineName, GameConfig.GodTitles[titleIdx], believers, true));
+        }
+
+        // Sort by followers descending
+        ranking = ranking.OrderByDescending(r => r.Followers).ToList();
+
+        if (ranking.Count == 0)
         {
             terminal.WriteLine("No gods exist in this realm.", "gray");
         }
@@ -850,15 +876,15 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine("   Immortals                Rank                Followers", "white");
             terminal.WriteLine("═══════════════════════════════════════════════════════════", "magenta");
-            
-            for (int i = 0; i < rankedGods.Count; i++)
+
+            for (int i = 0; i < ranking.Count; i++)
             {
-                var god = rankedGods[i];
-                string line = $"{(i + 1).ToString().PadLeft(3)}. {god.Name.PadRight(25)} {god.GetTitle().PadRight(20)} {god.Believers.ToString().PadLeft(10)}";
-                terminal.WriteLine(line, "yellow");
+                var entry = ranking[i];
+                string line = $"{(i + 1).ToString().PadLeft(3)}. {entry.Name.PadRight(25)} {entry.Title.PadRight(20)} {entry.Followers.ToString().PadLeft(10)}";
+                terminal.WriteLine(line, entry.IsPlayer ? "bright_cyan" : "yellow");
             }
         }
-        
+
         await terminal.GetInputAsync("Press Enter to continue...");
     }
     

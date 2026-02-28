@@ -19,7 +19,7 @@ config.enable_scroll_bar = false
 config.window_decorations = 'RESIZE'
 config.window_close_confirmation = 'NeverPrompt'
 config.initial_cols = 80
-config.initial_rows = 30
+config.initial_rows = 50
 config.window_padding = { left = 8, right = 8, top = 8, bottom = 8 }
 
 -- Close window immediately when game exits
