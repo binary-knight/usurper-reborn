@@ -38,6 +38,12 @@ namespace UsurperRemake.Systems
         private int cachedOnlinePlayerCount = 1; // Default to 1 (self)
         private long lastSeenMessageId = 0; // Track last processed message to avoid re-fetching broadcasts
 
+        /// <summary>
+        /// Connection type saved at auth time, used by GameEngine.LoadSaveByFileName()
+        /// to fire StartOnlineTracking after character load (not at the main menu).
+        /// </summary>
+        public string DeferredConnectionType { get; set; } = "Unknown";
+
         // World state keys in the database
         public const string KEY_NPCS = "npcs";
         public const string KEY_KING = "king";

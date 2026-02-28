@@ -1130,7 +1130,7 @@ public partial class GameEngine
         terminal.SetColor("bright_yellow");
         terminal.Write("[!] ALPHA BUILD - Expect bugs, balance issues, and missing content. [!]");
         terminal.SetColor("bright_red");
-        terminal.WriteLine(" ║");
+        terminal.WriteLine("  ║");
         terminal.Write("  ║ ");
         terminal.SetColor("white");
         terminal.Write("Character data may be wiped at any time (full wipe planned at Beta).    ");
@@ -1145,7 +1145,7 @@ public partial class GameEngine
         terminal.SetColor("bright_cyan");
         terminal.Write(GameConfig.DiscordInvite);
         terminal.SetColor("bright_red");
-        terminal.WriteLine("                                                  ║");
+        terminal.WriteLine("                                                    ║");
         terminal.WriteLine("  ╚══════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
     }
@@ -1177,7 +1177,7 @@ public partial class GameEngine
             terminal.SetColor("bright_yellow");
             terminal.Write("                USURPER REBORN");
             terminal.SetColor("white");
-            terminal.Write(" - Halls of Avarice                            ");
+            terminal.Write(" - Halls of Avarice                             ");
             terminal.SetColor("cyan");
             terminal.WriteLine("║");
             terminal.SetColor("cyan");
@@ -2200,10 +2200,31 @@ public partial class GameEngine
             // Mark session as in-game so broadcasts (gossip, shouts) are delivered
             var mudServer = UsurperRemake.Server.MudServer.Instance;
             var sessionKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? "";
-            if (mudServer != null && sessionKey.Length > 0 &&
-                mudServer.ActiveSessions.TryGetValue(sessionKey, out var playerSession))
-            {
+            UsurperRemake.Server.PlayerSession? playerSession = null;
+            if (mudServer != null && sessionKey.Length > 0)
+                mudServer.ActiveSessions.TryGetValue(sessionKey, out playerSession);
+            if (playerSession != null)
                 playerSession.IsInGame = true;
+
+            // NOW register online presence and broadcast login — deferred from auth time
+            // so players sitting at the main menu don't appear as "in the game"
+            if (OnlineStateManager.IsActive)
+            {
+                var displayName = currentPlayer?.Name2 ?? currentPlayer?.Name1 ?? UsurperRemake.BBS.DoorMode.GetPlayerName() ?? "Unknown";
+                var connType = OnlineStateManager.Instance!.DeferredConnectionType;
+                await OnlineStateManager.Instance!.StartOnlineTracking(displayName, connType);
+
+                // Notify WizNet of wizard login
+                if (playerSession != null && playerSession.WizardLevel >= UsurperRemake.Server.WizardLevel.Builder)
+                    UsurperRemake.Server.WizNet.SystemNotify($"{UsurperRemake.Server.WizardConstants.GetTitle(playerSession.WizardLevel)} {displayName} has connected.");
+
+                // Global login announcement (suppress for invisible wizards)
+                if (mudServer != null && playerSession != null && !playerSession.IsWizInvisible)
+                {
+                    mudServer.BroadcastToAll(
+                        $"\u001b[1;33m  {displayName} has entered the realm. [{connType}]\u001b[0m",
+                        excludeUsername: sessionKey);
+                }
             }
 
             // Online mode: check if a daily reset was missed while offline (7 PM ET boundary crossed)
@@ -2934,6 +2955,31 @@ public partial class GameEngine
         {
             HintSystem.Instance.TryShowHint(HintSystem.HINT_GETTING_STARTED, terminal, currentPlayer.HintsShown);
             await terminal.PressAnyKey();
+        }
+
+        // Register online presence and broadcast login now that character is created
+        if (OnlineStateManager.IsActive)
+        {
+            var ngDisplayName = currentPlayer.Name2 ?? currentPlayer.Name1 ?? UsurperRemake.BBS.DoorMode.GetPlayerName() ?? "Unknown";
+            var ngConnType = OnlineStateManager.Instance!.DeferredConnectionType;
+            await OnlineStateManager.Instance!.StartOnlineTracking(ngDisplayName, ngConnType);
+
+            // Mark session as in-game
+            var ngMudServer = UsurperRemake.Server.MudServer.Instance;
+            var ngSessionKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? "";
+            UsurperRemake.Server.PlayerSession? ngPlayerSession = null;
+            if (ngMudServer != null && ngSessionKey.Length > 0)
+                ngMudServer.ActiveSessions.TryGetValue(ngSessionKey, out ngPlayerSession);
+            if (ngPlayerSession != null)
+                ngPlayerSession.IsInGame = true;
+
+            // Global login announcement
+            if (ngMudServer != null && ngPlayerSession != null && !ngPlayerSession.IsWizInvisible)
+            {
+                ngMudServer.BroadcastToAll(
+                    $"\u001b[1;33m  {ngDisplayName} has entered the realm. [{ngConnType}]\u001b[0m",
+                    excludeUsername: ngSessionKey);
+            }
         }
 
         // Enter the game world
@@ -4813,6 +4859,20 @@ public partial class GameEngine
         // Stop background simulation threads
         worldSimulator?.StopSimulation();
 
+        // Clean up online presence BEFORE exit so session doesn't stay stale
+        if (OnlineStateManager.IsActive)
+        {
+            try
+            {
+                OnlineStateManager.Instance!.Shutdown().GetAwaiter().GetResult();
+            }
+            catch { /* best-effort cleanup */ }
+        }
+        if (OnlineChatSystem.IsActive)
+        {
+            try { OnlineChatSystem.Instance!.Shutdown(); } catch { }
+        }
+
         terminal.WriteLine("Goodbye!", "green");
         await Task.Delay(1000);
 
@@ -4961,7 +5021,21 @@ public partial class GameEngine
         terminal.SetColor("gray");
         terminal.Write("Synchronet  ");
         terminal.SetColor("bright_green");
-        terminal.WriteLine("x-bit.org -p 22222");
+        terminal.WriteLine("x-bit.org:23 / ssh -p 22222");
+
+        terminal.SetColor("bright_white");
+        terminal.Write("  The UNIX-BIT BBS               ");
+        terminal.SetColor("gray");
+        terminal.Write("Synchronet  ");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("x-bit.org:1336 / ssh -p 1337");
+
+        terminal.SetColor("bright_white");
+        terminal.Write("  Lunatics Unleashed             ");
+        terminal.SetColor("gray");
+        terminal.Write("Mystic      ");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("lunaticsunleashed.ddns.net:2333");
 
         // --- End BBS Entries ---
 
@@ -5070,6 +5144,8 @@ public partial class GameEngine
         terminal.WriteLine("  ANSI ART:");
         terminal.SetColor("cyan");
         terminal.WriteLine("    xbit (x-bit.org)          - Race & Class Portrait Art");
+        terminal.WriteLine("    Sudden Death              - rez2ans ANSI Conversion Tool");
+        terminal.WriteLine("    Cozmo / Lunatics Unleashed - ANSI Art Knowledge & Guidance");
         terminal.WriteLine("");
 
         terminal.SetColor("bright_white");

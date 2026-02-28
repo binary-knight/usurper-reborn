@@ -239,12 +239,10 @@ namespace UsurperConsole
                     await sqlBackend.UpdatePlayerSession(onlineUsername, isLogin: true);
 
                     // Detect connection type for Who's Online display
+                    // (presence tracking deferred to after character load in GameEngine.LoadSaveByFileName)
                     var connectionType = DetectConnectionType();
                     DoorMode.Log($"Connection type detected: {connectionType}");
-
-                    // Start online presence tracking (heartbeat, player list)
-                    await OnlineStateManager.Instance!.StartOnlineTracking(onlineUsername, connectionType);
-                    DoorMode.Log("Online presence tracking started");
+                    OnlineStateManager.Instance!.DeferredConnectionType = connectionType;
                 }
 
                 // BBS Online mode: start embedded world simulator if no other is running

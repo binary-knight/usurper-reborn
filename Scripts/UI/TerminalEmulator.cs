@@ -1949,7 +1949,7 @@ public partial class TerminalEmulator
             if (read == 0) // EOF / disconnected
             {
                 // Update idle tracker before returning
-                UpdateMudIdleTimeout();
+                UpdateMudIdleTimeout(force: true);
                 return buffer.ToString();
             }
 
@@ -1993,7 +1993,7 @@ public partial class TerminalEmulator
                 {
                     lock (_streamWriterLock) { _streamWriter.Write("\r\n"); _streamWriter.Flush(); }
                 }
-                UpdateMudIdleTimeout();
+                UpdateMudIdleTimeout(force: true);
                 return buffer.ToString();
             }
             else if (c == '\n')
@@ -2012,7 +2012,7 @@ public partial class TerminalEmulator
                 {
                     lock (_streamWriterLock) { _streamWriter.Write("\r\n"); _streamWriter.Flush(); }
                 }
-                UpdateMudIdleTimeout();
+                UpdateMudIdleTimeout(force: true);
                 return buffer.ToString();
             }
             else if (c == (char)0x7F || c == (char)0x08) // DEL or BS
@@ -2026,6 +2026,7 @@ public partial class TerminalEmulator
                         lock (_streamWriterLock) { _streamWriter.Write("\b \b"); _streamWriter.Flush(); }
                     }
                 }
+                UpdateMudIdleTimeout(); // any keystroke resets idle (throttled)
             }
             else if (c >= ' ') // printable ASCII
             {
@@ -2035,6 +2036,7 @@ public partial class TerminalEmulator
                 {
                     lock (_streamWriterLock) { _streamWriter.Write(c); _streamWriter.Flush(); }
                 }
+                UpdateMudIdleTimeout(); // any keystroke resets idle (throttled)
             }
             // Control chars other than the above are silently dropped.
 
@@ -2083,13 +2085,19 @@ public partial class TerminalEmulator
     }
 
     /// <summary>Updates the MUD session's last-activity timestamp (idle timeout).</summary>
-    private void UpdateMudIdleTimeout()
+    private DateTime _lastIdleUpdate = DateTime.MinValue;
+    private void UpdateMudIdleTimeout(bool force = false)
     {
+        // Throttle to once per 5 seconds unless forced (e.g., on Enter/submit)
+        var now = DateTime.UtcNow;
+        if (!force && (now - _lastIdleUpdate).TotalSeconds < 5) return;
+        _lastIdleUpdate = now;
+
         var ctx = UsurperRemake.Server.SessionContext.Current;
         if (ctx == null) return;
         var server = UsurperRemake.Server.MudServer.Instance;
         if (server != null && server.ActiveSessions.TryGetValue(ctx.Username.ToLowerInvariant(), out var session))
-            session.LastActivityTime = DateTime.UtcNow;
+            session.LastActivityTime = now;
     }
 
     /// <summary>

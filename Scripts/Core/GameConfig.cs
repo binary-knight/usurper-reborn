@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.48.3";
+    public const string Version = "0.48.4";
     public const string VersionName = "World Boss Raids";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 

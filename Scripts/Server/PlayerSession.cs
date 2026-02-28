@@ -199,8 +199,9 @@ public class PlayerSession : IDisposable
             // Initialize chat system
             OnlineChatSystem.Initialize(OnlineStateManager.Instance!);
 
-            // Start online presence tracking
-            await OnlineStateManager.Instance!.StartOnlineTracking(Username, ConnectionType);
+            // Defer online presence tracking and login broadcast to after character load
+            // (GameEngine.LoadSaveByFileName handles this so players don't appear online at the menu)
+            OnlineStateManager.Instance!.DeferredConnectionType = ConnectionType;
 
             // Create a per-session GameEngine that uses the session's terminal
             var engine = new GameEngine();
@@ -211,18 +212,6 @@ public class PlayerSession : IDisposable
             ctx.LocationManager = locManager;
 
             Console.Error.WriteLine($"[MUD] [{Username}] Session systems initialized, entering game loop");
-
-            // Notify WizNet of wizard login
-            if (WizardLevel >= WizardLevel.Builder)
-                WizNet.SystemNotify($"{WizardConstants.GetTitle(WizardLevel)} {Username} has connected.");
-
-            // Global login announcement (suppress for invisible wizards)
-            if (!IsWizInvisible)
-            {
-                _server.BroadcastToAll(
-                    $"\u001b[1;33m  {Username} has entered the realm. [{ConnectionType}]\u001b[0m",
-                    excludeUsername: Username);
-            }
 
             // Run the standard BBS door mode game loop
             // This is the same path SSH players use today, but now backed by
