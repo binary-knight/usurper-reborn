@@ -309,64 +309,75 @@ namespace UsurperConsole
             }
             finally
             {
-                // Shut down embedded world simulator if this session was hosting it
-                if (embeddedWorldSimCts != null && embeddedWorldSimTask != null)
-                {
-                    DoorMode.Log("Shutting down embedded world simulator...");
-                    embeddedWorldSimCts.Cancel();
-                    try
-                    {
-                        // Give it up to 10 seconds to save final state and release lock
-                        await Task.WhenAny(embeddedWorldSimTask, Task.Delay(10000));
-                    }
-                    catch (Exception ex)
-                    {
-                        DoorMode.Log($"Error during worldsim shutdown: {ex.Message}");
-                    }
-                    embeddedWorldSimCts.Dispose();
-                    DoorMode.Log("Embedded world simulator stopped");
-                }
-                // Release lock as a safety net (in case worldsim didn't release it)
-                else if (worldSimOwnerId != null && sqlBackend != null)
-                {
-                    sqlBackend.ReleaseWorldSimLock(worldSimOwnerId);
-                }
-
-                // Register as dormitory sleeper if not already sleeping (online mode only)
-                // Catches unclean disconnects where player didn't use Dormitory/Inn/Quit menu
-                if (DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sleepBackend)
+                // All cleanup wrapped in a hard 5-second timeout.
+                // If ANY async operation hangs (SQLite lock, dead socket, etc.),
+                // we MUST still reach Environment.Exit(0) or the BBS thinks the door
+                // is still running and the user gets stuck.
+                var cleanupTask = Task.Run(async () =>
                 {
                     try
                     {
-                        var username = DoorMode.OnlineUsername;
-                        if (!string.IsNullOrEmpty(username))
+                        // Shut down embedded world simulator if this session was hosting it
+                        if (embeddedWorldSimCts != null && embeddedWorldSimTask != null)
                         {
-                            var sleepInfo = await sleepBackend.GetSleepingPlayerInfo(username);
-                            if (sleepInfo == null)
+                            DoorMode.Log("Shutting down embedded world simulator...");
+                            embeddedWorldSimCts.Cancel();
+                            try
                             {
-                                await sleepBackend.RegisterSleepingPlayer(username, "dormitory", "[]", 0);
-                                DoorMode.Log($"Registered '{username}' as dormitory sleeper (unclean disconnect)");
+                                await Task.WhenAny(embeddedWorldSimTask, Task.Delay(3000));
                             }
+                            catch { }
+                            embeddedWorldSimCts.Dispose();
+                            DoorMode.Log("Embedded world simulator stopped");
+                        }
+                        else if (worldSimOwnerId != null && sqlBackend != null)
+                        {
+                            sqlBackend.ReleaseWorldSimLock(worldSimOwnerId);
+                        }
+
+                        // Register as dormitory sleeper if not already sleeping (online mode only)
+                        if (DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sleepBackend)
+                        {
+                            try
+                            {
+                                var username = DoorMode.OnlineUsername;
+                                if (!string.IsNullOrEmpty(username))
+                                {
+                                    var sleepInfo = await sleepBackend.GetSleepingPlayerInfo(username);
+                                    if (sleepInfo == null)
+                                    {
+                                        await sleepBackend.RegisterSleepingPlayer(username, "dormitory", "[]", 0);
+                                        DoorMode.Log($"Registered '{username}' as dormitory sleeper (unclean disconnect)");
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                DoorMode.Log($"Failed to register dormitory sleep: {ex.Message}");
+                            }
+                        }
+
+                        // Shutdown chat system
+                        if (OnlineChatSystem.IsActive)
+                        {
+                            try { OnlineChatSystem.Instance!.Shutdown(); } catch { }
+                        }
+
+                        // Shutdown online state manager (heartbeat, tracking, session)
+                        if (OnlineStateManager.IsActive)
+                        {
+                            DoorMode.Log("Shutting down online state manager...");
+                            try { await OnlineStateManager.Instance!.Shutdown(); } catch { }
                         }
                     }
                     catch (Exception ex)
                     {
-                        DoorMode.Log($"Failed to register dormitory sleep: {ex.Message}");
+                        DoorMode.Log($"Cleanup error: {ex.Message}");
                     }
-                }
+                });
 
-                // Shutdown chat system
-                if (OnlineChatSystem.IsActive)
-                {
-                    OnlineChatSystem.Instance!.Shutdown();
-                }
-
-                // Shutdown online state manager (heartbeat, tracking, session)
-                if (OnlineStateManager.IsActive)
-                {
-                    DoorMode.Log("Shutting down online state manager...");
-                    await OnlineStateManager.Instance!.Shutdown();
-                }
+                // Wait up to 5 seconds for cleanup, then force exit regardless
+                cleanupTask.Wait(5000);
 
                 DoorMode.Log("Shutting down door mode...");
                 DoorMode.Shutdown();
