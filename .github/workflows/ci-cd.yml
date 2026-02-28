@@ -409,8 +409,6 @@ jobs:
     name: Build Desktop (WezTerm) Bundles
     runs-on: ubuntu-latest
     needs: [build]
-    env:
-      WEZTERM_VERSION: "20240203-110809-5046fc22"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -420,11 +418,24 @@ jobs:
         with:
           pattern: "*-build"
 
+      - name: Resolve latest WezTerm version
+        id: wezterm-version
+        run: |
+          LATEST=$(curl -sL https://api.github.com/repos/wezterm/wezterm/releases/latest | \
+            python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
+          if [ -z "$LATEST" ]; then
+            echo "ERROR: Could not resolve latest WezTerm version from GitHub API"
+            exit 1
+          fi
+          echo "WEZTERM_VERSION=$LATEST" >> "$GITHUB_ENV"
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "Latest WezTerm version: $LATEST"
+
       - name: Cache WezTerm downloads
         uses: actions/cache@v4
         with:
           path: wezterm-cache
-          key: wezterm-${{ env.WEZTERM_VERSION }}
+          key: wezterm-${{ steps.wezterm-version.outputs.version }}
 
       - name: Download WezTerm portables
         run: |
@@ -443,10 +454,18 @@ jobs:
       - name: Bundle Windows x64 Desktop
         run: |
           mkdir -p desktop/UsurperReborn-win64/wezterm
-          # Extract WezTerm
+          # Extract WezTerm — ZIP has a version-named subdirectory
           unzip -qo wezterm-cache/wezterm-win.zip -d desktop/wez-tmp
-          mv desktop/wez-tmp/*/* desktop/UsurperReborn-win64/wezterm/ 2>/dev/null || \
-            mv desktop/wez-tmp/* desktop/UsurperReborn-win64/wezterm/ 2>/dev/null || true
+          # Find the directory containing wezterm-gui.exe and copy all its contents
+          WEZDIR=$(find desktop/wez-tmp -name "wezterm-gui.exe" -type f -printf '%h\n' 2>/dev/null | head -1)
+          if [ -n "$WEZDIR" ]; then
+            cp -r "$WEZDIR"/* desktop/UsurperReborn-win64/wezterm/
+            echo "Extracted WezTerm from: $WEZDIR"
+          else
+            echo "ERROR: wezterm-gui.exe not found in Windows ZIP"
+            find desktop/wez-tmp -type f
+            exit 1
+          fi
           rm -rf desktop/wez-tmp
           # Copy game files from plain build
           cp -r windows-x64-build/* desktop/UsurperReborn-win64/
@@ -489,11 +508,15 @@ jobs:
         run: |
           mkdir -p desktop/UsurperReborn-macos/wezterm
           unzip -qo wezterm-cache/wezterm-macos.zip -d desktop/wez-tmp
-          if [ -d "desktop/wez-tmp/WezTerm.app" ]; then
-            cp desktop/wez-tmp/WezTerm.app/Contents/MacOS/wezterm-gui desktop/UsurperReborn-macos/wezterm/
+          # Find wezterm-gui binary regardless of ZIP nesting depth
+          WEZGUI=$(find desktop/wez-tmp -name "wezterm-gui" -type f 2>/dev/null | head -1)
+          if [ -n "$WEZGUI" ]; then
+            cp "$WEZGUI" desktop/UsurperReborn-macos/wezterm/wezterm-gui
+            echo "Found wezterm-gui at: $WEZGUI"
           else
-            mv desktop/wez-tmp/*/* desktop/UsurperReborn-macos/wezterm/ 2>/dev/null || \
-              mv desktop/wez-tmp/* desktop/UsurperReborn-macos/wezterm/ 2>/dev/null || true
+            echo "ERROR: wezterm-gui not found in macOS ZIP"
+            find desktop/wez-tmp -type f
+            exit 1
           fi
           chmod +x desktop/UsurperReborn-macos/wezterm/wezterm-gui
           rm -rf desktop/wez-tmp
@@ -842,9 +865,18 @@ jobs:
             echo "❌ CRITICAL: libsteam_api.so missing - Steam integration will not work on Linux!"
           fi
 
+      - name: Resolve latest WezTerm version (Steam)
+        run: |
+          LATEST=$(curl -sL https://api.github.com/repos/wezterm/wezterm/releases/latest | \
+            python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
+          if [ -z "$LATEST" ]; then
+            echo "ERROR: Could not resolve latest WezTerm version from GitHub API"
+            exit 1
+          fi
+          echo "WEZTERM_VERSION=$LATEST" >> "$GITHUB_ENV"
+          echo "Latest WezTerm version: $LATEST"
+
       - name: Bundle WezTerm into Steam depots
-        env:
-          WEZTERM_VERSION: "20240203-110809-5046fc22"
         run: |
           BASE="https://github.com/wezterm/wezterm/releases/download/$WEZTERM_VERSION"
 
@@ -860,8 +892,13 @@ jobs:
           # Windows depot: extract WezTerm
           mkdir -p steam-build/depot-windows/wezterm
           unzip -qo wezterm-cache/wezterm-win.zip -d /tmp/wez-tmp
-          mv /tmp/wez-tmp/*/* steam-build/depot-windows/wezterm/ 2>/dev/null || \
-            mv /tmp/wez-tmp/* steam-build/depot-windows/wezterm/ 2>/dev/null || true
+          WEZDIR=$(find /tmp/wez-tmp -name "wezterm-gui.exe" -type f -printf '%h\n' 2>/dev/null | head -1)
+          if [ -n "$WEZDIR" ]; then
+            cp -r "$WEZDIR"/* steam-build/depot-windows/wezterm/
+          else
+            echo "WARNING: wezterm-gui.exe not found in ZIP, trying fallback"
+            mv /tmp/wez-tmp/*/* steam-build/depot-windows/wezterm/ 2>/dev/null || true
+          fi
           rm -rf /tmp/wez-tmp
 
           # Linux depot: copy AppImage
