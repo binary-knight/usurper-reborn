@@ -323,6 +323,9 @@ public class DailySystemManager
             player.HomeRestsToday = 0;
             player.HerbsGatheredToday = 0;
 
+            // Reset companion daily flags
+            CompanionSystem.Instance?.ResetDailyFlags();
+
             // Servants' Quarters daily gold income (v0.44.0)
             if (player.HasServants)
             {

@@ -330,6 +330,7 @@ namespace UsurperRemake.Systems
         public DateTime StartedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
         public string Status { get; set; } = "active";
+        public string BossDataJson { get; set; } = "{}";
     }
 
     public class WorldBossDamageEntry

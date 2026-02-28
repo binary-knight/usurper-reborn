@@ -1216,6 +1216,8 @@ public class InnLocation : BaseLocation
             armpow: npc.ArmPow,
             weappow: npc.WeapPow
         );
+        npcMonster.IsProperName = true;
+        npcMonster.CanSpeak = true;
 
         var combatEngine = new CombatEngine(terminal);
         var result = await combatEngine.PlayerVsMonster(currentPlayer, npcMonster);
@@ -2556,8 +2558,27 @@ public class InnLocation : BaseLocation
             terminal.WriteLine($"  HP: {companion.BaseStats.HP} | ATK: {companion.BaseStats.Attack} | DEF: {companion.BaseStats.Defense}");
         }
 
-        terminal.SetColor("white");
-        terminal.WriteLine($"  Abilities: {string.Join(", ", companion.Abilities)}");
+        // Show abilities from class ability system (matches toggle menu)
+        var abilityCharClass = companion.CombatRole switch
+        {
+            CombatRole.Tank => CharacterClass.Warrior,
+            CombatRole.Healer => CharacterClass.Cleric,
+            CombatRole.Damage => CharacterClass.Assassin,
+            CombatRole.Hybrid => CharacterClass.Paladin,
+            _ => CharacterClass.Warrior
+        };
+        var abilityChar = new Character { Class = abilityCharClass, Level = companion.Level };
+        var companionAbilities = ClassAbilitySystem.GetAvailableAbilities(abilityChar);
+        if (companionAbilities.Count > 0)
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Abilities ({companionAbilities.Count}): {string.Join(", ", companionAbilities.Select(a => a.Name))}");
+        }
+        else
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine($"  Abilities: {string.Join(", ", companion.Abilities)}");
+        }
         terminal.WriteLine("");
 
         // Menu options
@@ -2585,8 +2606,21 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("bright_yellow");
             terminal.Write("  [R]");
-            terminal.SetColor("bright_magenta");
-            terminal.WriteLine(" Deepen your bond...");
+            if (companion.RomancedToday)
+            {
+                terminal.SetColor("dark_gray");
+                terminal.WriteLine(" Deepen your bond (already visited today)");
+            }
+            else if (companion.RomanceLevel >= 10)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(" Spend time together (Max bond)");
+            }
+            else
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine(" Deepen your bond...");
+            }
         }
 
         terminal.SetColor("bright_yellow");
@@ -2749,6 +2783,20 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("═══ A Quiet Moment ═══");
         terminal.WriteLine("");
 
+        // Already romanced today — once per day limit
+        if (companion.RomancedToday)
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine($"You've already spent quality time with {companion.Name} today.");
+            terminal.SetColor("gray");
+            terminal.WriteLine("Perhaps tomorrow you can share another moment together.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Mark as used for today
+        companion.RomancedToday = true;
+
         if (companion.RomanceLevel < 1)
         {
             terminal.SetColor("white");
@@ -2776,13 +2824,35 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("");
 
         // Advance romance if loyalty is high enough
-        if (companion.LoyaltyLevel >= 60)
+        if (companion.RomanceLevel >= 10)
         {
-            bool advanced = CompanionSystem.Instance.AdvanceRomance(companion.Id, 1);
-            if (advanced)
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"Your bond with {companion.Name} is as deep as it can be.");
+        }
+        else if (companion.LoyaltyLevel >= 60)
+        {
+            // CHA-based success chance: 30% base + 1% per CHA point, cap 80%
+            int charisma = (int)(currentPlayer?.Charisma ?? 10);
+            int successChance = Math.Min(80, 30 + charisma);
+            int roll = new Random().Next(100);
+
+            if (roll < successChance)
             {
-                terminal.SetColor("bright_magenta");
-                terminal.WriteLine("Your bond has grown stronger.");
+                bool advanced = CompanionSystem.Instance.AdvanceRomance(companion.Id, 1);
+                if (advanced)
+                {
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine("Your bond has grown stronger.");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  (Romance: {companion.RomanceLevel}/10)");
+                }
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine($"You enjoy the moment, but {companion.Name} seems distracted tonight.");
+                terminal.SetColor("gray");
+                terminal.WriteLine("(Higher Charisma improves your chances)");
             }
         }
         else
@@ -3019,6 +3089,8 @@ public class InnLocation : BaseLocation
             CompanionDisplayEquipmentSlot(target, EquipmentSlot.Hands, "Hands");
             CompanionDisplayEquipmentSlot(target, EquipmentSlot.Legs, "Legs");
             CompanionDisplayEquipmentSlot(target, EquipmentSlot.Feet, "Feet");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Waist, "Belt");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Face, "Face");
             CompanionDisplayEquipmentSlot(target, EquipmentSlot.Cloak, "Cloak");
             CompanionDisplayEquipmentSlot(target, EquipmentSlot.Neck, "Neck");
             CompanionDisplayEquipmentSlot(target, EquipmentSlot.LFinger, "Left Ring");

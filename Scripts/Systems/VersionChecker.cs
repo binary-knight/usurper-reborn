@@ -445,10 +445,13 @@ namespace UsurperRemake.Systems
             }
 
             // Find the matching asset (looking for .zip file with platform name)
+            // Exclude WezTerm/Desktop bundles — they have nested folders that break the updater
             return releaseAssets.FirstOrDefault(a =>
                 a.name != null &&
                 a.name.Contains(platformPattern, StringComparison.OrdinalIgnoreCase) &&
-                a.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+                a.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                !a.name.Contains("WezTerm", StringComparison.OrdinalIgnoreCase) &&
+                !a.name.Contains("Desktop", StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>
@@ -526,6 +529,9 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogInfo("UPDATE", "Extracting update...");
                 ZipFile.ExtractToDirectory(zipPath, extractDir, overwriteFiles: true);
 
+                // If the ZIP had a single nested folder (e.g., UsurperReborn-win64/), flatten it
+                extractDir = FlattenExtractedDirectory(extractDir);
+
                 // Create the updater script (skip relaunch in BBS door mode — BBS handles restarts)
                 var updaterPath = CreateUpdaterScript(appDir, extractDir, tempDir, BBS.DoorMode.IsInDoorMode);
                 if (string.IsNullOrEmpty(updaterPath))
@@ -550,6 +556,36 @@ namespace UsurperRemake.Systems
             {
                 IsDownloading = false;
             }
+        }
+
+        /// <summary>
+        /// If the extracted ZIP contains a single subdirectory with all the files, return that
+        /// subdirectory path instead. This handles ZIPs that wrap everything in a folder.
+        /// </summary>
+        private string FlattenExtractedDirectory(string extractDir)
+        {
+            try
+            {
+                var entries = Directory.GetFileSystemEntries(extractDir);
+                if (entries.Length == 1 && Directory.Exists(entries[0]))
+                {
+                    // Single subdirectory — check if it contains the actual game files
+                    var subDir = entries[0];
+                    var subFiles = Directory.GetFiles(subDir);
+                    if (subFiles.Any(f => Path.GetFileName(f).Equals("UsurperReborn.exe", StringComparison.OrdinalIgnoreCase) ||
+                                          Path.GetFileName(f).Equals("UsurperReborn", StringComparison.OrdinalIgnoreCase) ||
+                                          Path.GetFileName(f).Equals("UsurperReborn.dll", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        DebugLogger.Instance.LogInfo("UPDATE", $"Flattened nested directory: {Path.GetFileName(subDir)}");
+                        return subDir;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("UPDATE", $"Error checking for nested directory: {ex.Message}");
+            }
+            return extractDir;
         }
 
         /// <summary>
@@ -588,11 +624,16 @@ echo Update complete! The BBS will launch the new version on next connection."
 echo Update complete! Starting game...
 start """" ""{exePath}""";
 
+            var logFile = Path.Combine(appDir, "update.log");
+
             var script = $@"@echo off
 echo Usurper Reborn Auto-Updater
 echo ===========================
 echo.
 echo Waiting for game to close...
+echo [%date% %time%] Updater started > ""{logFile}""
+echo [%date% %time%] Source: {extractDir} >> ""{logFile}""
+echo [%date% %time%] Target: {appDir} >> ""{logFile}""
 timeout /t 3 /nobreak >nul
 
 :waitloop
@@ -602,17 +643,32 @@ if not errorlevel 1 (
     goto waitloop
 )
 
+echo [%date% %time%] Game process exited >> ""{logFile}""
 echo.
 echo Installing update...
+
+REM Try xcopy with retries for transient file locks
+set RETRY=0
+:copyretry
 xcopy /E /Y /Q ""{extractDir}\*"" ""{appDir}""
 if errorlevel 1 (
+    set /A RETRY+=1
+    echo [%date% %time%] xcopy attempt %RETRY% failed >> ""{logFile}""
+    if %RETRY% LSS 3 (
+        echo Retry %RETRY%/3 - waiting for file locks to release...
+        timeout /t 2 /nobreak >nul
+        goto copyretry
+    )
     echo.
-    echo ERROR: Failed to copy update files.
+    echo ERROR: Failed to copy update files after 3 attempts.
     echo Please download the update manually from:
     echo {ReleaseUrl}
+    echo [%date% %time%] FAILED after 3 attempts >> ""{logFile}""
     pause
     goto cleanup
 )
+
+echo [%date% %time%] Files copied successfully >> ""{logFile}""
 
 {relaunchSection}
 
@@ -635,13 +691,19 @@ rd /S /Q ""{tempDir}"" 2>nul
             // Build script with explicit \n to avoid CRLF issues when compiled on Windows.
             // C# verbatim strings embed the source file's line endings (CRLF on Windows),
             // which causes "bad interpreter" errors when bash tries to run the script on Linux.
+            var logFile = Path.Combine(appDir, "update.log");
+
             var lines = new List<string>
             {
                 "#!/bin/bash",
+                $"LOGFILE=\"{logFile}\"",
                 "echo \"Usurper Reborn Auto-Updater\"",
                 "echo \"===========================\"",
                 "echo \"\"",
                 "echo \"Waiting for game to close...\"",
+                "echo \"[$(date)] Updater started\" > \"$LOGFILE\"",
+                $"echo \"[$(date)] Source: {extractDir}\" >> \"$LOGFILE\"",
+                $"echo \"[$(date)] Target: {appDir}\" >> \"$LOGFILE\"",
                 "sleep 3",
                 "",
                 "# Wait for any running instances to close",
@@ -649,6 +711,7 @@ rd /S /Q ""{tempDir}"" 2>nul
                 "    sleep 1",
                 "done",
                 "",
+                "echo \"[$(date)] Game process exited\" >> \"$LOGFILE\"",
                 "echo \"\"",
                 "echo \"Installing update...\"",
                 $"cp -rf \"{extractDir}/\". \"{appDir}/\"",

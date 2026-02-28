@@ -1115,16 +1115,19 @@ public class WeaponShopLocation : BaseLocation
 
         if (affordableWeapons.Count == 0)
         {
+            terminal.WriteLine("");
             if (currentWeapon != null)
             {
-                terminal.SetColor("gray");
-                terminal.WriteLine($"Your {currentWeapon.Name} is already the best weapon you can afford.");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"No upgrades available. Your {currentWeapon.Name} (WP: {currentPow}) is already");
+                terminal.WriteLine($"the best weapon you can afford with {FormatNumber(currentPlayer.Gold)} gold.");
             }
             else
             {
-                terminal.SetColor("gray");
-                terminal.WriteLine("No affordable weapons found.");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"No affordable weapons found. You have {FormatNumber(currentPlayer.Gold)} gold.");
             }
+            terminal.WriteLine("");
             await Pause();
             return;
         }

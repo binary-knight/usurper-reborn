@@ -29,6 +29,8 @@ public partial class CombatEngine
     // Ability cooldowns - reset each combat
     private Dictionary<string, int> abilityCooldowns = new();
     private Dictionary<string, int> pvpDefenderCooldowns = new();
+    // Per-teammate ability cooldowns (keyed by teammate DisplayName)
+    private Dictionary<string, Dictionary<string, int>> teammateCooldowns = new();
 
     // Current player reference for combat speed setting
     private Character currentPlayer;
@@ -195,6 +197,7 @@ public partial class CombatEngine
         attacker.StatusImmunityDuration = 0;
         abilityCooldowns.Clear();
         pvpDefenderCooldowns.Clear();
+        teammateCooldowns.Clear();
 
         // Initialize combat stamina for abilities
         attacker.InitializeCombatStamina();
@@ -256,7 +259,8 @@ public partial class CombatEngine
             }
 
             // Defender's turn (if AI controlled) — check for status effects
-            if (defender.IsAlive && attacker.IsAlive && defender.AI == CharacterAI.Computer)
+            // Skip if attacker fled — no retaliation
+            if (defender.IsAlive && attacker.IsAlive && !globalEscape && defender.AI == CharacterAI.Computer)
             {
                 var defenderPreventing = defender.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
                 if (defenderPreventing != StatusEffect.None)
@@ -281,6 +285,9 @@ public partial class CombatEngine
                 if (abilityCooldowns[key] > 0) abilityCooldowns[key]--;
             foreach (var key in pvpDefenderCooldowns.Keys.ToList())
                 if (pvpDefenderCooldowns[key] > 0) pvpDefenderCooldowns[key]--;
+            foreach (var tcEntry in teammateCooldowns.Values)
+                foreach (var key in tcEntry.Keys.ToList())
+                    if (tcEntry[key] > 0) tcEntry[key]--;
 
             // Check for combat end conditions
             if (!attacker.IsAlive || !defender.IsAlive || globalEscape)
@@ -333,6 +340,7 @@ public partial class CombatEngine
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
         abilityCooldowns.Clear();
+        teammateCooldowns.Clear();
 
         // Initialize combat stamina for player and teammates
         player.InitializeCombatStamina();
@@ -390,9 +398,9 @@ public partial class CombatEngine
             {
                 terminal.SetColor("yellow");
                 if (monster.CanSpeak)
-                    terminal.WriteLine($"The {monster.Name} says: \"{monster.Phrase}\"");
+                    terminal.WriteLine($"{monster.TheNameOrName} says: \"{monster.Phrase}\"");
                 else
-                    terminal.WriteLine($"The {monster.Name} {monster.Phrase}");
+                    terminal.WriteLine($"{monster.TheNameOrName} {monster.Phrase}");
                 terminal.WriteLine("");
             }
             terminal.SetColor("white");
@@ -463,9 +471,9 @@ public partial class CombatEngine
                 if (!string.IsNullOrEmpty(m.Phrase))
                 {
                     if (m.CanSpeak)
-                        introSb.AppendLine($"\u001b[33m  The {m.Name} says: \"{m.Phrase}\"\u001b[0m");
+                        introSb.AppendLine($"\u001b[33m  {m.TheNameOrName} says: \"{m.Phrase}\"\u001b[0m");
                     else
-                        introSb.AppendLine($"\u001b[33m  The {m.Name} {m.Phrase}\u001b[0m");
+                        introSb.AppendLine($"\u001b[33m  {m.TheNameOrName} {m.Phrase}\u001b[0m");
                 }
                 introSb.AppendLine($"\u001b[37m  Facing: {m.GetDisplayInfo()}\u001b[0m");
             }
@@ -775,6 +783,10 @@ public partial class CombatEngine
             if (!monsters.Any(m => m.IsAlive))
                 break;
 
+            // Check if player fled — end combat immediately, no monster retaliation
+            if (globalEscape)
+                break;
+
             // Check if player died during their own action (e.g., spell backfired)
             if (!player.IsAlive)
                 break;
@@ -805,6 +817,10 @@ public partial class CombatEngine
 
             // Check if all monsters defeated
             if (!monsters.Any(m => m.IsAlive))
+                break;
+
+            // Check if party fled — end combat immediately, no monster retaliation
+            if (globalEscape)
                 break;
 
             // === ALL MONSTERS' TURNS ===
@@ -1044,9 +1060,9 @@ public partial class CombatEngine
         {
             terminal.SetColor("yellow");
             if (monster.CanSpeak)
-                terminal.WriteLine($"The {monster.Name} says: \"{monster.Phrase}\"");
+                terminal.WriteLine($"{monster.TheNameOrName} says: \"{monster.Phrase}\"");
             else
-                terminal.WriteLine($"The {monster.Name} {monster.Phrase}");
+                terminal.WriteLine($"{monster.TheNameOrName} {monster.Phrase}");
             terminal.WriteLine("");
         }
         
@@ -2381,6 +2397,15 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * (attacker.PermanentDamageBonus / 100.0));
         }
 
+        // BossSlayer effect: +10% damage vs bosses (from world boss exclusive loot)
+        if (target is Monster monsterTarget && (monsterTarget.IsBoss || monsterTarget.IsMiniBoss))
+        {
+            if (WorldBossSystem.HasSpecialEffect(attacker, LootGenerator.SpecialEffect.BossSlayer))
+            {
+                attackPower += (long)(attackPower * 0.10);
+            }
+        }
+
         // Divine Boon passive damage bonus (from worshipped player-god's configured boons)
         var boons = attacker.CachedBoonEffects;
         if (boons != null && (boons.DamagePercent > 0 || boons.FlatAttack > 0))
@@ -2786,6 +2811,35 @@ public partial class CombatEngine
     /// Execute retreat - Pascal retreat mechanics
     /// Based on Retreat function from PLVSMON.PAS
     /// </summary>
+    /// <summary>
+    /// Unified flee chance formula used by all combat paths.
+    /// Boss fights: flat 20%. Normal: base 40% + DEX/2 + Level/3 + class bonus + faction + boon, capped at 75%.
+    /// </summary>
+    private int CalculateFleeChance(Character player, bool isBossFight)
+    {
+        if (isBossFight)
+            return 20;
+
+        int chance = 40;
+        chance += (int)(player.Dexterity / 2);
+        chance += player.Level / 3;
+
+        // Class bonuses for agile classes
+        if (player.Class == CharacterClass.Ranger || player.Class == CharacterClass.Assassin)
+            chance += 15;
+        if (player.Class == CharacterClass.Jester || player.Class == CharacterClass.Bard)
+            chance += 10;
+
+        // Shadows faction escape bonus
+        chance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
+
+        // Divine boon flee bonus
+        if (player.CachedBoonEffects?.FleePercent > 0)
+            chance += (int)(player.CachedBoonEffects.FleePercent * 100);
+
+        return Math.Min(75, chance);
+    }
+
     private async Task ExecuteRetreat(Character player, Monster monster, CombatResult result)
     {
         // Check if fleeing is allowed on current difficulty
@@ -2801,29 +2855,7 @@ public partial class CombatEngine
         terminal.WriteLine("You attempt to flee from combat!");
         await Task.Delay(GetCombatDelay(1000));
 
-        // IMPROVED ESCAPE FORMULA:
-        // Base 40% + Dexterity bonus (each 10 dex = +5%) + Level bonus (each 10 levels = +3%)
-        // Rangers/Assassins get +15% bonus
-        // Maximum 75% chance to escape (prevents guaranteed escapes)
-        int escapeChance = 40;
-        escapeChance += (int)(player.Dexterity / 2); // Dex contributes significantly
-        escapeChance += player.Level / 3; // Level helps too
-
-        // Class bonuses for agile classes
-        if (player.Class == CharacterClass.Ranger || player.Class == CharacterClass.Assassin)
-            escapeChance += 15;
-        if (player.Class == CharacterClass.Jester || player.Class == CharacterClass.Bard)
-            escapeChance += 10;
-
-        // Shadows faction escape bonus
-        escapeChance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
-
-        // Divine boon flee bonus
-        if (player.CachedBoonEffects?.FleePercent > 0)
-            escapeChance += (int)(player.CachedBoonEffects.FleePercent * 100);
-
-        // Cap at 75% to prevent guaranteed escapes
-        escapeChance = Math.Min(75, escapeChance);
+        int escapeChance = CalculateFleeChance(player, monster.IsBoss);
 
         // Smoke bomb: guaranteed escape from non-boss combat
         if (player.SmokeBombs > 0 && !monster.IsBoss)
@@ -3185,11 +3217,11 @@ public partial class CombatEngine
             if (monsterRoll.IsCriticalFailure)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"The {monster.Name} stumbles and misses badly!");
+                terminal.WriteLine($"{monster.TheNameOrName} stumbles and misses badly!");
             }
             else
             {
-                terminal.WriteLine($"The {monster.Name} attacks but misses!");
+                terminal.WriteLine($"{monster.TheNameOrName} attacks but misses!");
             }
             result.CombatLog.Add($"{monster.Name} misses player (roll: {monsterRoll.NaturalRoll})");
             await Task.Delay(GetCombatDelay(1500));
@@ -3301,6 +3333,12 @@ public partial class CombatEngine
         if (player.PermanentDefenseBonus > 0)
         {
             playerDefense += (long)(playerDefense * (player.PermanentDefenseBonus / 100.0));
+        }
+
+        // TitanResolve effect: +5% defense (from world boss exclusive loot)
+        if (WorldBossSystem.HasSpecialEffect(player, LootGenerator.SpecialEffect.TitanResolve))
+        {
+            playerDefense += (long)(playerDefense * 0.05);
         }
 
         // Divine Boon passive defense bonus (from worshipped player-god's configured boons)
@@ -4243,47 +4281,55 @@ public partial class CombatEngine
     private async Task ProcessTeammateAction(Character teammate, Monster monster, CombatResult result)
     {
         if (!teammate.IsAlive || !monster.IsAlive) return;
-        
-        // Simple AI: attack if healthy, heal if low HP
-        if (teammate.HP < teammate.MaxHP / 3 && teammate.HP < teammate.MaxHP)
+
+        // Build party list for healing decisions
+        var allPartyMembers = new List<Character> { currentPlayer };
+        if (currentTeammates != null)
+            allPartyMembers.AddRange(currentTeammates.Where(t => t.IsAlive));
+
+        // Wrap single monster in a list for the multi-monster ability/spell methods
+        var monsterList = new List<Monster> { monster };
+
+        // Check if teammate should heal instead of attack
+        var healAction = await TryTeammateHealAction(teammate, allPartyMembers, result);
+        if (healAction) return;
+
+        // Check if teammate should cast an offensive spell
+        var spellAction = await TryTeammateOffensiveSpell(teammate, monsterList, result);
+        if (spellAction) return;
+
+        // Check if teammate should use a class ability
+        var abilityAction = await TryTeammateClassAbility(teammate, monsterList, result);
+        if (abilityAction) return;
+
+        // Otherwise, basic attack
+        int swings = GetAttackCount(teammate);
+        int baseSwings = 1 + teammate.GetClassCombatModifiers().ExtraAttacks;
+
+        for (int s = 0; s < swings && monster.IsAlive; s++)
         {
-            // Heal
-            long healAmount = Math.Min(15, teammate.MaxHP - teammate.HP);
-            teammate.HP += healAmount;
-            terminal.WriteLine($"{teammate.DisplayName} heals for {healAmount} HP.", "green");
-            result.CombatLog.Add($"{teammate.DisplayName} heals for {healAmount} HP");
-        }
-        else
-        {
-            // Loop through all attacks (dual-wield, extra attacks, etc.)
-            int swings = GetAttackCount(teammate);
-            int baseSwings = 1 + teammate.GetClassCombatModifiers().ExtraAttacks;
+            bool isOffHandAttack = teammate.IsDualWielding && s >= baseSwings;
 
-            for (int s = 0; s < swings && monster.IsAlive; s++)
-            {
-                bool isOffHandAttack = teammate.IsDualWielding && s >= baseSwings;
+            long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
+            double damageModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
+            attackPower = (long)(attackPower * damageModifier);
 
-                // Attack (with weapon soft cap)
-                long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
+            long defense = monster.GetDefensePower();
+            long damage = Math.Max(1, attackPower - defense);
 
-                // Apply weapon configuration damage modifier (includes off-hand penalty)
-                double damageModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
-                attackPower = (long)(attackPower * damageModifier);
+            monster.HP = Math.Max(0, monster.HP - damage);
 
-                long defense = monster.GetDefensePower();
-                long damage = Math.Max(1, attackPower - defense);
+            if (isOffHandAttack)
+                terminal.WriteLine($"{teammate.DisplayName} strikes with off-hand at {monster.Name} for {damage} damage!", "cyan");
+            else
+                terminal.WriteLine($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage!", "cyan");
+            result.CombatLog.Add($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage");
 
-                monster.HP = Math.Max(0, monster.HP - damage);
+            // Apply post-hit enchantment effects
+            ApplyPostHitEnchantments(teammate, monster, damage, result);
 
-                if (isOffHandAttack)
-                    terminal.WriteLine($"{teammate.DisplayName} strikes with off-hand at {monster.Name} for {damage} damage!", "cyan");
-                else
-                    terminal.WriteLine($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage!", "cyan");
-                result.CombatLog.Add($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage");
-
-                if (s < swings - 1 && monster.IsAlive)
-                    await Task.Delay(GetCombatDelay(500));
-            }
+            if (s < swings - 1 && monster.IsAlive)
+                await Task.Delay(GetCombatDelay(500));
         }
 
         await Task.Delay(GetCombatDelay(1000));
@@ -4463,16 +4509,34 @@ public partial class CombatEngine
                 goldReward += (long)(goldReward * victoryBoons.GoldPercent);
         }
 
+        // Apply team XP share mode
+        long fullExpForSharing = expReward;
+        if (result.Teammates != null && result.Teammates.Count > 0 && result.Player.TeamXPShare == XPShareMode.EvenSplit)
+        {
+            int partySize = 1 + result.Teammates.Count;
+            expReward = expReward / partySize;
+        }
+
         result.Player.Experience += expReward;
         result.Player.Gold += goldReward;
         bool isFirstKill = result.Player.MKills == 0;
         result.Player.MKills++;
 
-        // Award experience to active companions (50% of player's XP)
-        CompanionSystem.Instance?.AwardCompanionExperience(expReward, terminal);
+        // Award experience to active companions (50% of player's XP, or split share, or nothing)
+        if (result.Player.TeamXPShare != XPShareMode.KillerTakes)
+        {
+            long companionXP = result.Player.TeamXPShare == XPShareMode.EvenSplit ? fullExpForSharing / (1 + (result.Teammates?.Count ?? 0)) : expReward;
+            CompanionSystem.Instance?.AwardCompanionExperience(companionXP, terminal);
+        }
+        // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
+        CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
-        // Award experience to NPC teammates (spouses/lovers) - 50% of player's XP
-        AwardTeammateExperience(result.Teammates, expReward, terminal);
+        // Award experience to NPC teammates (spouses/lovers) - 50% of player's XP, or split, or nothing
+        if (result.Player.TeamXPShare != XPShareMode.KillerTakes)
+        {
+            long teammateXP = result.Player.TeamXPShare == XPShareMode.EvenSplit ? fullExpForSharing / (1 + (result.Teammates?.Count ?? 0)) : expReward;
+            AwardTeammateExperience(result.Teammates, teammateXP, terminal);
+        }
 
         // Grant god XP share from believer kill
         GrantGodKillXP(result.Player, expReward, result.Monster?.Name ?? "a monster");
@@ -4570,6 +4634,18 @@ public partial class CombatEngine
             terminal.WriteLine($"  (Team bonus: +{teamXPBonus} XP, +{teamGoldBonus} gold)");
         }
 
+        // Show XP share mode info if not default
+        if (result.Player.TeamXPShare == XPShareMode.EvenSplit && result.Teammates != null && result.Teammates.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  (XP split evenly among {1 + result.Teammates.Count} party members)");
+        }
+        else if (result.Player.TeamXPShare == XPShareMode.KillerTakes && result.Teammates != null && result.Teammates.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  (Killer takes all XP — teammates receive nothing)");
+        }
+
         // First kill bonus for brand new players
         if (isFirstKill)
         {
@@ -4656,7 +4732,7 @@ public partial class CombatEngine
         double hpPercent = (double)result.Player.HP / result.Player.MaxHP;
         AchievementSystem.CheckCombatAchievements(result.Player, tookDamage, hpPercent);
         AchievementSystem.CheckAchievements(result.Player);
-        await AchievementSystem.ShowPendingNotifications(terminal);
+        await AchievementSystem.ShowPendingNotifications(terminal, result.Player);
 
         // Check for dungeon loot drops using new LootGenerator system
         // Single-monster combat still needs equipment drops!
@@ -5864,6 +5940,8 @@ public partial class CombatEngine
                             if (teammate.EquipItem(teammateEquip, out _))
                             {
                                 teammate.RecalculateStats();
+                                // Sync equipment back to Companion object so it persists
+                                CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
                                 string teammateName = teammate.Name2 ?? teammate.Name1 ?? "Your ally";
                                 terminal.SetColor("bright_green");
                                 terminal.WriteLine($"{teammateName} picks {lootItem.Name} off the ground and equips it — a {upgradePercent}% upgrade!");
@@ -7880,21 +7958,7 @@ public partial class CombatEngine
                     break;
                 }
 
-                // Boss fights have flat 20% flee chance; normal combat is dex-based
-                int retreatChance;
-                if (BossContext != null)
-                    retreatChance = 20;
-                else
-                    retreatChance = (int)(player.Dexterity / 2);
-
-                // Shadows faction escape bonus
-                retreatChance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
-
-                // Divine boon flee bonus
-                if (player.CachedBoonEffects?.FleePercent > 0)
-                    retreatChance += (int)(player.CachedBoonEffects.FleePercent * 100);
-
-                retreatChance = Math.Min(75, retreatChance);
+                int retreatChance = CalculateFleeChance(player, BossContext != null);
 
                 int retreatRoll = random.Next(1, 101);
 
@@ -11389,64 +11453,96 @@ public partial class CombatEngine
             }
         }
 
-        // Filter to abilities the teammate can afford (stamina-wise)
+        // Get or create this teammate's cooldown tracker
+        if (!teammateCooldowns.TryGetValue(teammate.DisplayName, out var myCooldowns))
+        {
+            myCooldowns = new Dictionary<string, int>();
+            teammateCooldowns[teammate.DisplayName] = myCooldowns;
+        }
+
+        // Filter to abilities the teammate can afford AND that are off cooldown
         var affordableAbilities = availableAbilities
-            .Where(a => teammate.CurrentCombatStamina >= a.StaminaCost)
+            .Where(a => teammate.CurrentCombatStamina >= a.StaminaCost
+                     && (!myCooldowns.TryGetValue(a.Id, out int cd) || cd <= 0))
             .ToList();
         if (affordableAbilities.Count == 0) return false;
 
-        // 30% chance to use an ability (don't spam every round)
-        if (random.Next(100) >= 30) return false;
+        // 50% chance to use an ability each round (was 30% — too conservative)
+        if (random.Next(100) >= 50) return false;
 
-        // AI: Pick the best ability for the situation
+        // AI: Pick an ability with situational awareness + randomized variety
         ClassAbilitySystem.ClassAbility? chosenAbility = null;
 
-        // Prefer attack abilities — pick the strongest one available
+        // Categorize available abilities
         var attackAbilities = affordableAbilities
             .Where(a => a.Type == ClassAbilitySystem.AbilityType.Attack || a.Type == ClassAbilitySystem.AbilityType.Debuff)
-            .OrderByDescending(a => a.LevelRequired)
+            .ToList();
+        var buffDefenseAbilities = affordableAbilities
+            .Where(a => a.Type == ClassAbilitySystem.AbilityType.Buff || a.Type == ClassAbilitySystem.AbilityType.Defense)
             .ToList();
 
-        // If multiple monsters alive, prefer AoE abilities
+        // Situational priority: AoE when many monsters, execute when low HP target
         if (livingMonsters.Count >= 3)
         {
             var aoeAbility = attackAbilities.FirstOrDefault(a =>
                 a.SpecialEffect == "aoe" || a.SpecialEffect == "whirlwind" ||
-                a.SpecialEffect == "fire" || a.SpecialEffect == "holy_aoe");
-            if (aoeAbility != null) chosenAbility = aoeAbility;
+                a.SpecialEffect == "fire" || a.SpecialEffect == "holy_aoe" ||
+                a.SpecialEffect == "aoe_holy" || a.SpecialEffect == "aoe_taunt");
+            if (aoeAbility != null && random.Next(100) < 60)
+                chosenAbility = aoeAbility;
         }
 
-        // If a monster is low HP, prefer execute-type abilities
         if (chosenAbility == null && livingMonsters.Any(m => m.HP < m.MaxHP * 0.3))
         {
             var executeAbility = attackAbilities.FirstOrDefault(a =>
                 a.SpecialEffect == "execute" || a.SpecialEffect == "assassinate");
-            if (executeAbility != null) chosenAbility = executeAbility;
+            if (executeAbility != null && random.Next(100) < 50)
+                chosenAbility = executeAbility;
         }
 
-        // Otherwise use the strongest attack ability
-        if (chosenAbility == null && attackAbilities.Count > 0)
+        // No situational pick — weighted random from ALL ability types
+        if (chosenAbility == null && affordableAbilities.Count > 0)
         {
-            chosenAbility = attackAbilities[0]; // Highest level required = strongest
-        }
+            // 65% attack/debuff, 25% buff/defense, 10% heal (if categories exist)
+            int roll = random.Next(100);
+            List<ClassAbilitySystem.ClassAbility> pool;
 
-        // If no attack abilities, try buff/defense (20% chance)
-        if (chosenAbility == null && random.Next(100) < 20)
-        {
-            chosenAbility = affordableAbilities
-                .Where(a => a.Type == ClassAbilitySystem.AbilityType.Buff || a.Type == ClassAbilitySystem.AbilityType.Defense || a.Type == ClassAbilitySystem.AbilityType.Heal)
-                .OrderByDescending(a => a.LevelRequired)
-                .FirstOrDefault();
+            if (roll < 65 && attackAbilities.Count > 0)
+                pool = attackAbilities;
+            else if (roll < 90 && buffDefenseAbilities.Count > 0)
+                pool = buffDefenseAbilities;
+            else
+                pool = affordableAbilities; // fallback to any ability
+
+            // Weighted random pick: higher-level abilities are more likely but not guaranteed
+            // Weight = LevelRequired + 10 (so level 1 ability has weight 11, level 20 has 30)
+            int totalWeight = pool.Sum(a => a.LevelRequired + 10);
+            int pick = random.Next(totalWeight);
+            int cumulative = 0;
+            foreach (var ability in pool)
+            {
+                cumulative += ability.LevelRequired + 10;
+                if (pick < cumulative)
+                {
+                    chosenAbility = ability;
+                    break;
+                }
+            }
+            chosenAbility ??= pool[random.Next(pool.Count)];
         }
 
         if (chosenAbility == null) return false;
 
-        // Deduct stamina before executing
-        teammate.SpendStamina(chosenAbility.StaminaCost);
-
         // Use the ability through the proper system (calculates damage, scaling, effects)
         var abilityResult = ClassAbilitySystem.UseAbility(teammate, chosenAbility.Id, random);
         if (!abilityResult.Success) return false;
+
+        // Deduct stamina AFTER confirming success (was before, wasting stamina on failures)
+        teammate.SpendStamina(chosenAbility.StaminaCost);
+
+        // Track cooldown
+        if (chosenAbility.Cooldown > 0)
+            myCooldowns[chosenAbility.Id] = chosenAbility.Cooldown;
 
         // Display ability usage
         terminal.WriteLine("");
@@ -11772,7 +11868,7 @@ public partial class CombatEngine
     private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result)
     {
         terminal.SetColor("red");
-        terminal.WriteLine($"The {monster.Name} turns its attention to {companion.DisplayName}!");
+        terminal.WriteLine($"{monster.TheNameOrName} turns its attention to {companion.DisplayName}!");
         await Task.Delay(GetCombatDelay(500));
 
         // Monster special abilities can also fire against companions
@@ -12252,6 +12348,14 @@ public partial class CombatEngine
             adjustedExp = (long)(adjustedExp * result.Player.CycleExpMultiplier);
         }
 
+        // Apply team XP share mode
+        long fullExpForSharingMM = adjustedExp;
+        if (result.Teammates != null && result.Teammates.Count > 0 && result.Player.TeamXPShare == XPShareMode.EvenSplit)
+        {
+            int partySize = 1 + result.Teammates.Count;
+            adjustedExp = adjustedExp / partySize;
+        }
+
         // Apply rewards
         result.Player.Experience += adjustedExp;
         result.Player.Gold += adjustedGold;
@@ -12285,11 +12389,21 @@ public partial class CombatEngine
             result.Player.Class.ToString()
         );
 
-        // Award experience to active companions (50% of player's XP)
-        CompanionSystem.Instance?.AwardCompanionExperience(adjustedExp, terminal);
+        // Award experience to active companions (50% of player's XP, or split share, or nothing)
+        if (result.Player.TeamXPShare != XPShareMode.KillerTakes)
+        {
+            long companionXPmm = result.Player.TeamXPShare == XPShareMode.EvenSplit ? fullExpForSharingMM / (1 + (result.Teammates?.Count ?? 0)) : adjustedExp;
+            CompanionSystem.Instance?.AwardCompanionExperience(companionXPmm, terminal);
+        }
+        // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
+        CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
-        // Award experience to NPC teammates (spouses/lovers) - 50% of player's XP
-        AwardTeammateExperience(result.Teammates, adjustedExp, terminal);
+        // Award experience to NPC teammates (spouses/lovers) - split share, or nothing
+        if (result.Player.TeamXPShare != XPShareMode.KillerTakes)
+        {
+            long teammateXPmm = result.Player.TeamXPShare == XPShareMode.EvenSplit ? fullExpForSharingMM / (1 + (result.Teammates?.Count ?? 0)) : adjustedExp;
+            AwardTeammateExperience(result.Teammates, teammateXPmm, terminal);
+        }
 
         // Distribute rewards to grouped players (independent XP calculation per player)
         await DistributeGroupRewards(result, totalExp, totalGold);
@@ -12316,6 +12430,19 @@ public partial class CombatEngine
             terminal.SetColor("cyan");
             terminal.WriteLine($"  (Team bonus: +{teamXPBonus} XP, +{teamGoldBonus} gold)");
         }
+
+        // Show XP share mode info if not default
+        if (result.Player.TeamXPShare == XPShareMode.EvenSplit && result.Teammates != null && result.Teammates.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  (XP split evenly among {1 + result.Teammates.Count} party members)");
+        }
+        else if (result.Player.TeamXPShare == XPShareMode.KillerTakes && result.Teammates != null && result.Teammates.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  (Killer takes all XP — teammates receive nothing)");
+        }
+
         terminal.WriteLine($"Gold gained: {adjustedGold:N0}");
 
         // Show bonus from world events if any
@@ -12367,7 +12494,7 @@ public partial class CombatEngine
         double hpPercent = (double)result.Player.HP / result.Player.MaxHP;
         AchievementSystem.CheckCombatAchievements(result.Player, tookDamage, hpPercent);
         AchievementSystem.CheckAchievements(result.Player);
-        await AchievementSystem.ShowPendingNotifications(terminal);
+        await AchievementSystem.ShowPendingNotifications(terminal, result.Player);
 
         await Task.Delay(GetCombatDelay(2000));
 
@@ -12531,6 +12658,8 @@ public partial class CombatEngine
 
         // Award experience to active companions (50% of player's XP)
         CompanionSystem.Instance?.AwardCompanionExperience(adjustedExp, terminal);
+        // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
+        CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
         // Award experience to NPC teammates (spouses/lovers) - 50% of player's XP
         AwardTeammateExperience(result.Teammates, adjustedExp, terminal);
@@ -13968,6 +14097,18 @@ public partial class CombatEngine
             if (abilityCooldowns[key] <= 0)
             {
                 abilityCooldowns.Remove(key);
+            }
+        }
+
+        // Decrement teammate ability cooldowns
+        foreach (var tcEntry in teammateCooldowns.Values)
+        {
+            var tcKeys = tcEntry.Keys.ToList();
+            foreach (var key in tcKeys)
+            {
+                tcEntry[key]--;
+                if (tcEntry[key] <= 0)
+                    tcEntry.Remove(key);
             }
         }
 
@@ -15696,6 +15837,11 @@ public partial class CombatEngine
     {
         int attacks = 1;
 
+        // No weapon equipped — only 1 basic attack (no bonus swings/procs)
+        bool hasWeapon = attacker.EquippedItems.TryGetValue(EquipmentSlot.MainHand, out var mainHandId) && mainHandId > 0;
+        if (!hasWeapon)
+            return 1;
+
         // Warrior extra swings
         var mods = attacker.GetClassCombatModifiers();
         attacks += mods.ExtraAttacks;
@@ -16572,8 +16718,7 @@ public partial class CombatEngine
             // so it doesn't set globalEscape which would end combat for everyone
             if (action.Type == CombatActionType.Retreat)
             {
-                int retreatChance = Math.Min(75, 30 + (int)(teammate.Dexterity / 2));
-                retreatChance += FactionSystem.Instance?.GetEscapeChanceBonus() ?? 0;
+                int retreatChance = CalculateFleeChance(teammate, BossContext != null);
                 int retreatRoll = random.Next(1, 101);
 
                 if (retreatRoll <= retreatChance)

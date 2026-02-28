@@ -1426,6 +1426,8 @@ public class StreetEncounterSystem
             armpow: (int)npc.ArmPow,
             weappow: (int)npc.WeapPow
         );
+        monster.IsProperName = true; // NPC — no "The" prefix
+        monster.CanSpeak = true;     // NPCs can speak
 
         // Include player's companions and bodyguards in street combat
         var teammates = GetStreetCombatTeammates(player);
@@ -2872,6 +2874,8 @@ public class StreetEncounterSystem
             armpow: (int)npc.ArmPow,
             weappow: (int)npc.WeapPow
         );
+        monster.IsProperName = true; // NPC — no "The" prefix
+        monster.CanSpeak = true;     // NPCs can speak
 
         // Show backstab message
         if (backstabBonus > 0.15f)

@@ -1600,8 +1600,8 @@ public class WorldSimulator
         // Weight activities based on NPC state
         var activities = new List<(string action, double weight)>();
 
-        // Dungeon exploration - if HP is decent and level appropriate
-        if (npc.HP > npc.MaxHP * 0.4 && npc.Level >= 1)
+        // Dungeon exploration - only if HP is healthy
+        if (npc.HP > npc.MaxHP * 0.7 && npc.Level >= 1)
         {
             activities.Add(("dungeon", 0.15));
         }
@@ -2655,8 +2655,24 @@ public class WorldSimulator
         {
             rounds++;
 
+            // Team members flee when badly wounded (below 25% HP)
+            if (rounds > 2)
+            {
+                foreach (var member in team.Where(m => m.IsAlive && m.HP < m.MaxHP * 0.25).ToList())
+                {
+                    int fleeChance = 55 + (int)(member.Agility / 3);
+                    if (random.Next(100) < Math.Min(85, fleeChance))
+                    {
+                        // Flee — remove from combat but keep alive
+                        member.UpdateLocation("Healer");
+                    }
+                }
+                // If all team members fled, end combat
+                if (!team.Any(m => m.IsAlive && m.Location == "Dungeon")) break;
+            }
+
             // Team attacks monsters
-            foreach (var member in team.Where(m => m.IsAlive))
+            foreach (var member in team.Where(m => m.IsAlive && m.Location == "Dungeon"))
             {
                 var target = monsters.Where(m => m.IsAlive).OrderBy(_ => random.Next()).FirstOrDefault();
                 if (target == null) break;
@@ -2675,10 +2691,10 @@ public class WorldSimulator
                 }
             }
 
-            // Monsters attack team
+            // Monsters attack team (only members still in dungeon)
             foreach (var monster in monsters.Where(m => m.IsAlive))
             {
-                var target = team.Where(m => m.IsAlive).OrderBy(_ => random.Next()).FirstOrDefault();
+                var target = team.Where(m => m.IsAlive && m.Location == "Dungeon").OrderBy(_ => random.Next()).FirstOrDefault();
                 if (target == null) break;
 
                 // Monster attack - slightly reduced against teams (they help each other)
@@ -2703,13 +2719,13 @@ public class WorldSimulator
 
         npc.UpdateLocation("Dungeon");
 
-        // Determine dungeon level based on NPC level - sometimes they push too deep
-        int dungeonLevel = Math.Max(1, npc.Level + random.Next(-3, 6));
-        // Ambitious/courageous NPCs push even deeper
+        // Determine dungeon level based on NPC level
+        int dungeonLevel = Math.Max(1, npc.Level + random.Next(-3, 4));
+        // Ambitious/courageous NPCs push slightly deeper
         if (npc.Brain?.Personality != null &&
             (npc.Brain.Personality.Courage > 0.7f || npc.Brain.Personality.Ambition > 0.7f))
         {
-            dungeonLevel += random.Next(0, 5);
+            dungeonLevel += random.Next(0, 3);
         }
         dungeonLevel = Math.Min(dungeonLevel, 100);
 
@@ -2720,9 +2736,22 @@ public class WorldSimulator
         int rounds = 0;
         bool npcWon = false;
 
+        bool fled = false;
         while (npc.IsAlive && monster.IsAlive && rounds < 50)
         {
             rounds++;
+
+            // NPC flees when HP drops below 30% (smarter survival behavior)
+            if (npc.HP < npc.MaxHP * 0.3 && rounds > 2)
+            {
+                // Higher AGI = better flee chance; base 60%
+                int fleeChance = 60 + (int)(npc.Agility / 3);
+                if (random.Next(100) < Math.Min(90, fleeChance))
+                {
+                    fled = true;
+                    break;
+                }
+            }
 
             // NPC attacks
             long npcDamage = Math.Max(1, npc.Strength + npc.WeapPow - monster.Defence);
@@ -2782,9 +2811,8 @@ public class WorldSimulator
         }
         else
         {
-            // Fled or timeout
-            npc.UpdateLocation("Main Street");
-            // GD.Print($"[WorldSim] {npc.Name} fled from {monster.Name}");
+            // Fled or timeout — head to healer if wounded
+            npc.UpdateLocation(npc.HP < npc.MaxHP * 0.5 ? "Healer" : "Main Street");
         }
     }
 

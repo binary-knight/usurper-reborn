@@ -699,6 +699,25 @@ namespace UsurperRemake.Systems
         {
             SyncCompanionHP(charWrapper);
             SyncCompanionPotions(charWrapper);
+            SyncCompanionEquipment(charWrapper);
+        }
+
+        /// <summary>
+        /// Sync companion equipment from Character wrapper after combat/loot pickup
+        /// </summary>
+        public void SyncCompanionEquipment(Character charWrapper)
+        {
+            if (charWrapper.IsCompanion && charWrapper.CompanionId.HasValue)
+            {
+                if (companions.TryGetValue(charWrapper.CompanionId.Value, out var companion))
+                {
+                    companion.EquippedItems.Clear();
+                    foreach (var kvp in charWrapper.EquippedItems)
+                    {
+                        companion.EquippedItems[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -805,6 +824,10 @@ namespace UsurperRemake.Systems
                 return false;
 
             if (!companion.RomanceAvailable)
+                return false;
+
+            // Already at max romance
+            if (companion.RomanceLevel >= 10)
                 return false;
 
             companion.RomanceLevel = Math.Clamp(companion.RomanceLevel + amount, 0, 10);
@@ -1363,6 +1386,17 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Reset daily companion flags (called on daily reset)
+        /// </summary>
+        public void ResetDailyFlags()
+        {
+            foreach (var companion in companions.Values)
+            {
+                companion.RomancedToday = false;
+            }
+        }
+
+        /// <summary>
         /// Reset all companions to their initial state (not recruited, not dead)
         /// Called before loading a save to prevent state bleeding between characters
         /// </summary>
@@ -1377,6 +1411,7 @@ namespace UsurperRemake.Systems
                 companion.LoyaltyLevel = 50;
                 companion.TrustLevel = 50;
                 companion.RomanceLevel = 0;
+                companion.RomancedToday = false;
                 companion.PersonalQuestStarted = false;
                 companion.PersonalQuestCompleted = false;
                 companion.PersonalQuestSuccess = false;
@@ -1588,6 +1623,53 @@ namespace UsurperRemake.Systems
 
                 // Calculate next threshold
                 xpForNextLevel = GetExperienceForLevel(companion.Level + 1);
+            }
+        }
+
+        /// <summary>
+        /// Sync companion level and stats to active Character wrappers used in combat.
+        /// Call after AwardCompanionExperience to ensure level-ups are reflected immediately.
+        /// </summary>
+        public void SyncCompanionLevelToWrappers(List<Character>? teammates)
+        {
+            if (teammates == null) return;
+
+            foreach (var wrapper in teammates)
+            {
+                if (!wrapper.IsCompanion || !wrapper.CompanionId.HasValue) continue;
+
+                if (companions.TryGetValue(wrapper.CompanionId.Value, out var companion))
+                {
+                    if (wrapper.Level == companion.Level) continue;
+
+                    // Level changed — update the wrapper's base stats and recalculate
+                    wrapper.Level = companion.Level;
+                    wrapper.BaseStrength = companion.BaseStats.Attack;
+                    wrapper.BaseDefence = companion.BaseStats.Defense;
+                    wrapper.BaseDexterity = companion.BaseStats.Speed;
+                    wrapper.BaseAgility = companion.BaseStats.Speed;
+                    wrapper.BaseIntelligence = companion.BaseStats.MagicPower;
+                    wrapper.BaseWisdom = companion.BaseStats.HealingPower;
+                    wrapper.BaseConstitution = 10 + companion.Level;
+                    wrapper.BaseStamina = 10 + companion.Level;
+                    wrapper.BaseMaxHP = companion.BaseStats.HP;
+                    wrapper.BaseMaxMana = companion.BaseStats.MagicPower * 5;
+
+                    // Recalculate with equipment bonuses
+                    long hpBefore = wrapper.MaxHP;
+                    wrapper.RecalculateStats();
+
+                    // Grant the HP increase (don't reset current HP, just add the gain)
+                    long hpGain = wrapper.MaxHP - hpBefore;
+                    if (hpGain > 0)
+                    {
+                        wrapper.HP += hpGain;
+                        // Update tracked combat HP too
+                        companionCurrentHP[companion.Id] = (int)wrapper.HP;
+                    }
+
+                    wrapper.Mana = companion.BaseStats.MagicPower * 5;
+                }
             }
         }
 
@@ -1916,6 +1998,7 @@ namespace UsurperRemake.Systems
         public int LoyaltyLevel { get; set; } = 50;
         public int TrustLevel { get; set; } = 50;
         public int RomanceLevel { get; set; } = 0;
+        public bool RomancedToday { get; set; } = false;
         public int RecruitedDay { get; set; }
 
         // Experience and leveling

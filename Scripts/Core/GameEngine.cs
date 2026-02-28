@@ -3179,6 +3179,8 @@ public partial class GameEngine
             SkipIntimateScenes = playerData.SkipIntimateScenes,
             ScreenReaderMode = playerData.ScreenReaderMode,
             ColorTheme = playerData.ColorTheme,
+            AutoLevelUp = playerData.AutoLevelUp,
+            TeamXPShare = playerData.TeamXPShare,
             Loyalty = playerData.Loyalty,
             Haunt = playerData.Haunt,
             Master = playerData.Master,

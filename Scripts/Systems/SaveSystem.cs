@@ -599,6 +599,8 @@ namespace UsurperRemake.Systems
                 SkipIntimateScenes = player.SkipIntimateScenes,
                 ScreenReaderMode = player.ScreenReaderMode,
                 ColorTheme = player.ColorTheme,
+                AutoLevelUp = player.AutoLevelUp,
+                TeamXPShare = player.TeamXPShare,
                 Loyalty = player.Loyalty,
                 Haunt = player.Haunt,
                 Master = player.Master,

@@ -125,6 +125,12 @@ public class PlayerAchievements
     }
 
     /// <summary>
+    /// Per-player pending achievement notifications (not serialized)
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Queue<Achievement> PendingNotifications { get; } = new();
+
+    /// <summary>
     /// Get count of unlocked achievements
     /// </summary>
     public int UnlockedCount => UnlockedAchievements.Count;
@@ -927,6 +933,56 @@ public static class AchievementSystem
             GoldReward = 2000,
             UnlockMessage = "The underground bows to your authority!"
         });
+
+        // ============ WORLD BOSS ACHIEVEMENTS ============
+
+        Register(new Achievement
+        {
+            Id = "world_boss_first",
+            Name = "World Slayer",
+            Description = "Participate in defeating a world boss",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Gold,
+            PointValue = 50,
+            GoldReward = 5000,
+            UnlockMessage = "You helped bring down a titan!"
+        });
+
+        Register(new Achievement
+        {
+            Id = "world_boss_5_unique",
+            Name = "Boss Hunter",
+            Description = "Help defeat 5 different world bosses",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Platinum,
+            PointValue = 100,
+            GoldReward = 25000,
+            UnlockMessage = "No boss is safe from your blade!"
+        });
+
+        Register(new Achievement
+        {
+            Id = "world_boss_25_total",
+            Name = "Legend Killer",
+            Description = "Participate in 25 world boss kills",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Diamond,
+            PointValue = 200,
+            GoldReward = 100000,
+            UnlockMessage = "Your legend echoes across the realm!"
+        });
+
+        Register(new Achievement
+        {
+            Id = "world_boss_mvp",
+            Name = "MVP",
+            Description = "Deal the most damage in a world boss fight",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Gold,
+            PointValue = 50,
+            GoldReward = 10000,
+            UnlockMessage = "You were the realm's greatest champion!"
+        });
     }
 
     /// <summary>
@@ -975,8 +1031,8 @@ public static class AchievementSystem
             if (achievement.ExperienceReward > 0)
                 player.Experience += achievement.ExperienceReward;
 
-            // Queue notification
-            PendingNotifications.Enqueue(achievement);
+            // Queue notification on per-player queue (not the static one)
+            player.Achievements.PendingNotifications.Enqueue(achievement);
 
             // Update statistics
             player.Statistics.TotalExperienceEarned += achievement.ExperienceReward;
@@ -1134,15 +1190,17 @@ public static class AchievementSystem
     /// Show any pending achievement notifications
     /// Shows consolidated view if multiple achievements unlocked at once
     /// </summary>
-    public static async System.Threading.Tasks.Task ShowPendingNotifications(TerminalEmulator terminal)
+    public static async System.Threading.Tasks.Task ShowPendingNotifications(TerminalEmulator terminal, Character? player = null)
     {
-        if (PendingNotifications.Count == 0) return;
+        // Use per-player queue if available, fall back to static queue for backwards compat
+        var queue = player?.Achievements.PendingNotifications ?? PendingNotifications;
+        if (queue.Count == 0) return;
 
         // Collect all pending achievements
         var achievements = new List<Achievement>();
-        while (PendingNotifications.Count > 0)
+        while (queue.Count > 0)
         {
-            achievements.Add(PendingNotifications.Dequeue());
+            achievements.Add(queue.Dequeue());
         }
 
         // Single achievement - show full display

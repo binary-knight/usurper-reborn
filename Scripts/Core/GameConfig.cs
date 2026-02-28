@@ -9,8 +9,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.48.1";
-    public const string VersionName = "WezTerm Desktop";
+    public const string Version = "0.48.2";
+    public const string VersionName = "World Boss Raids";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // From Pascal global_maxXX constants
@@ -521,6 +521,30 @@ public static partial class GameConfig
     };
     public const float GroupXPPenaltyMinimum = 0.10f;           // 31+ level gap: 10% XP (floor)
 
+    // ============================================================
+    // World Boss System (v0.48.2) — Online Mode Only
+    // ============================================================
+    public const int WorldBossMinPlayersToSpawn = 2;            // Min online players to trigger spawn
+    public const int WorldBossSpawnCooldownTicks = 120;         // ~1 hour (120 ticks * 30s) between bosses
+    public const int WorldBossDurationHours = 1;                // Fight window in hours before despawn
+    public const int WorldBossMinLevel = 10;                    // Min player level to participate
+    public const int WorldBossMaxRoundsPerSession = 50;         // Max combat rounds per session
+    public const int WorldBossDeathCooldownSeconds = 60;        // Cooldown after dying before re-entry
+    public const float WorldBossHPScalePerPlayer = 0.10f;       // +10% HP per online player
+    public const float WorldBossAuraBaseDamage = 0.05f;         // 5% MaxHP unavoidable damage per round
+    public const float WorldBossAuraPhase2Mult = 1.5f;          // Aura x1.5 in Phase 2
+    public const float WorldBossAuraPhase3Mult = 2.0f;          // Aura x2.0 in Phase 3
+    public const float WorldBossPhase2Threshold = 0.65f;        // Phase 2 at 65% HP
+    public const float WorldBossPhase3Threshold = 0.30f;        // Phase 3 at 30% HP
+    // Reward multipliers by contribution rank
+    public const float WorldBossMVPXPMult = 3.0f;               // #1 damage dealer
+    public const float WorldBossTop3XPMult = 2.5f;              // Top 3
+    public const float WorldBossTop25XPMult = 2.0f;             // Top 25%
+    public const float WorldBossTop50XPMult = 1.5f;             // Top 50%
+    public const float WorldBossBaseXPMult = 1.0f;              // Any contributor
+    public const long WorldBossBaseXPPerLevel = 10;             // XP = bossLevel * playerLevel * this
+    public const long WorldBossBaseGoldPerLevel = 200;          // Gold = bossLevel * this
+
     // Faction System (v0.40.2)
     public const string FactionInitiatorCrown = "The Crown";
     public const string FactionInitiatorShadows = "The Shadows";
@@ -619,8 +643,8 @@ public static partial class GameConfig
     public const int MaxStatTrainingsPerStat = 5;             // Max times each stat can be trained for gold
 
     // Training Respec (v0.43.3)
-    public const int RespecBaseGoldCost = 500;                // Base gold cost to reset skill proficiency
-    public const int RespecGoldPerLevel = 100;                // Additional gold cost per player level
+    public const int RespecBaseGoldCost = 4000;               // Base gold cost to reset skill proficiency
+    public const int RespecGoldPerLevel = 1000;               // Additional gold cost per player level
 
     // Home Overhaul (v0.44.0)
     // Living Quarters: recovery % and uses/day per level
@@ -1774,4 +1798,11 @@ public enum CombatSpeed
     Normal = 0,   // Full delays (default, best for reading)
     Fast = 1,     // 50% delays
     Instant = 2   // No delays (0ms)
-} 
+}
+
+public enum XPShareMode
+{
+    FullEach = 0,   // Each player gets full XP (default, current behavior)
+    EvenSplit = 1,  // XP divided equally among all party members
+    KillerTakes = 2 // Only the killing blow character gets XP
+}

@@ -137,7 +137,11 @@ public static class LootGenerator
             Wisdom,          // +X wisdom
             AllStats,        // +X to all stats
             MaxHP,           // +X max HP
-            MaxMana          // +X max mana
+            MaxMana,         // +X max mana
+
+            // World Boss exclusive
+            BossSlayer,      // +X% damage to all bosses
+            TitanResolve     // +X% max HP bonus
         }
 
         private static readonly Dictionary<SpecialEffect, (string Name, string Prefix, string Suffix, bool IsOffensive)> EffectInfo = new()
@@ -172,7 +176,10 @@ public static class LootGenerator
             { SpecialEffect.Wisdom, ("Wisdom", "Wise ", " of Insight", false) },
             { SpecialEffect.AllStats, ("All Stats", "Empowering ", " of Perfection", false) },
             { SpecialEffect.MaxHP, ("Max HP", "Robust ", " of Vitality", false) },
-            { SpecialEffect.MaxMana, ("Max Mana", "Arcane ", " of Power", false) }
+            { SpecialEffect.MaxMana, ("Max Mana", "Arcane ", " of Power", false) },
+
+            { SpecialEffect.BossSlayer, ("Boss Slayer", "Titansbane ", " of the World Slayer", true) },
+            { SpecialEffect.TitanResolve, ("Titan's Resolve", "Titan's ", " of the Colossus", false) }
         };
 
         /// <summary>
@@ -754,6 +761,44 @@ public static class LootGenerator
                 return GenerateWeaponWithRarity(dungeonLevel, playerClass, rarity);
             else
                 return GenerateArmorWithRarity(dungeonLevel, playerClass, rarity);
+        }
+
+        /// <summary>
+        /// Generate world boss exclusive loot with guaranteed minimum rarity and boss-specific effects.
+        /// </summary>
+        public static Item GenerateWorldBossLoot(int bossLevel, ItemRarity minRarity, string bossElement, CharacterClass playerClass)
+        {
+            // Roll rarity with +30 level bonus, then enforce minimum
+            var rarity = RollRarity(bossLevel + 30);
+            if (rarity < minRarity)
+                rarity = minRarity;
+
+            // 50/50 weapon vs armor
+            Item item;
+            if (random.NextDouble() < 0.50)
+                item = GenerateWeaponWithRarity(bossLevel, playerClass, rarity);
+            else
+                item = GenerateArmorWithRarity(bossLevel, playerClass, rarity);
+
+            // Add element-themed prefix from the boss
+            string elementPrefix = UsurperRemake.Data.WorldBossDatabase.GetElementPrefix(bossElement);
+            item.Name = $"{elementPrefix} {item.Name}";
+
+            // Legendary+ items get BossSlayer effect (+10% damage to bosses)
+            if (rarity >= ItemRarity.Legendary)
+            {
+                item.LootEffects ??= new List<(int, int)>();
+                item.LootEffects.Add(((int)SpecialEffect.BossSlayer, 10));
+            }
+
+            // Epic+ armor gets TitanResolve effect (+5% max HP)
+            if (rarity >= ItemRarity.Epic && item.Type != ObjType.Weapon)
+            {
+                item.LootEffects ??= new List<(int, int)>();
+                item.LootEffects.Add(((int)SpecialEffect.TitanResolve, 5));
+            }
+
+            return item;
         }
 
         /// <summary>

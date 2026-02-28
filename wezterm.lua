@@ -6,7 +6,9 @@ local wezterm = require 'wezterm'
 local config = wezterm.config_builder()
 
 -- Resolve game executable relative to this config file's directory
-local config_dir = wezterm.config_dir
+-- NOTE: config_file_dir = directory containing THIS .lua file (the game folder)
+--       config_dir = WezTerm's own config directory (wrong for bundled configs)
+local config_dir = wezterm.config_file_dir or wezterm.config_dir
 local is_windows = wezterm.target_triple:find('windows') ~= nil
 local sep = is_windows and '\\' or '/'
 local exe = config_dir .. sep .. (is_windows and 'UsurperReborn.exe' or 'UsurperReborn')
@@ -22,8 +24,8 @@ config.initial_cols = 80
 config.initial_rows = 50
 config.window_padding = { left = 8, right = 8, top = 8, bottom = 8 }
 
--- Close window immediately when game exits
-config.exit_behavior = 'Close'
+-- Close window on clean exit, hold open on crash so user can see the error
+config.exit_behavior = 'CloseOnCleanExit'
 
 -- Font: load bundled fonts from fonts/ directory, read player preference
 config.font_dirs = { config_dir .. sep .. 'fonts' }

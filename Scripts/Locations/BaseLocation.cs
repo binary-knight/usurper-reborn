@@ -47,6 +47,9 @@ public abstract class BaseLocation
     /// </summary>
     protected void RequestRedisplay() => _locationEntryDisplayed = false;
 
+    // World boss notification tracking
+    private bool _worldBossNotifiedThisVisit = false;
+
     // Ambient message state (MUD mode only)
     private DateTime _lastAmbientTime = DateTime.MinValue;
     private int _ambientIndex = 0;
@@ -161,7 +164,7 @@ public abstract class BaseLocation
 
         // Check for achievements on location entry (catches non-combat achievements)
         AchievementSystem.CheckAchievements(player);
-        await AchievementSystem.ShowPendingNotifications(term);
+        await AchievementSystem.ShowPendingNotifications(term, player);
 
         // Show any pending game notifications (team events, etc.)
         await ShowPendingGameNotifications(term);
@@ -494,11 +497,12 @@ public abstract class BaseLocation
 
         // Reset on every location entry so the banner always shows once on arrival
         _locationEntryDisplayed = false;
+        _worldBossNotifiedThisVisit = false;
 
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {
             // Auto-level-up check — catches ALL XP sources (combat, quests, seals, events, etc.)
-            if (currentPlayer != null && currentPlayer.AI == CharacterAI.Human)
+            if (currentPlayer != null && currentPlayer.AI == CharacterAI.Human && currentPlayer.AutoLevelUp)
             {
                 int levelsGained = LevelMasterLocation.CheckAutoLevelUp(currentPlayer);
                 if (levelsGained > 0)
@@ -598,6 +602,19 @@ public abstract class BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.WriteLine($"*** SYSTEM MESSAGE: {broadcast} ***", "bright_red");
+            }
+
+            // World boss active notification (online mode, once per visit)
+            if (!_worldBossNotifiedThisVisit && UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                var activeBossName = WorldBossSystem.Instance.ActiveBossName;
+                if (!string.IsNullOrEmpty(activeBossName))
+                {
+                    _worldBossNotifiedThisVisit = true;
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"  *** {activeBossName} is rampaging across the realm! Type /boss to join the fight! ***");
+                }
             }
 
             // Ambient messages (MUD mode only) — fire every 30-60s, flowing inline
@@ -2176,6 +2193,18 @@ public abstract class BaseLocation
                 await ShowMaterials();
                 return (true, false);
 
+            case "boss":
+            case "worldboss":
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    await WorldBossSystem.Instance.ShowWorldBossUI(currentPlayer, terminal);
+                else
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  World Boss is only available in online mode.");
+                    await Task.Delay(1500);
+                }
+                return (true, false);
+
             default:
                 terminal.WriteLine("");
                 terminal.SetColor("red");
@@ -2309,6 +2338,13 @@ public abstract class BaseLocation
         terminal.Write("/auction  ");
         terminal.SetColor("white");
         terminal.WriteLine("        - Buy and sell items (Auction House)                   ║");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("║  ");
+        terminal.SetColor("cyan");
+        terminal.Write("/boss     ");
+        terminal.SetColor("white");
+        terminal.WriteLine("        - World Boss status and combat (online)                  ║");
 
         terminal.SetColor("bright_yellow");
         terminal.Write("║  ");
@@ -2983,6 +3019,9 @@ public abstract class BaseLocation
             // Color Theme
             terminal.WriteLine($"  Color Theme: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)} - {ColorTheme.GetThemeDescription(currentPlayer.ColorTheme)}", "yellow");
 
+            // Auto-Level
+            terminal.WriteLine($"  Auto-Level Up: {(currentPlayer.AutoLevelUp ? "Enabled (Level up automatically)" : "Disabled (Visit Level Master to level up)")}", "yellow");
+
             // Terminal Font (only in WezTerm/local mode)
             if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
@@ -3030,6 +3069,11 @@ public abstract class BaseLocation
                 terminal.SetColor("white");
                 terminal.WriteLine($"] Terminal Font (Current: {ReadCurrentFont()})");
             }
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("8");
+            terminal.SetColor("white");
+            terminal.WriteLine($"] Toggle Auto-Level Up (Current: {(currentPlayer.AutoLevelUp ? "ON" : "OFF")})");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
             terminal.Write("0");
@@ -3146,6 +3190,22 @@ public abstract class BaseLocation
                         terminal.WriteLine("  Font will update in the terminal momentarily.", "white");
                         await Task.Delay(800);
                     }
+                    break;
+
+                case "8":
+                    currentPlayer.AutoLevelUp = !currentPlayer.AutoLevelUp;
+                    if (currentPlayer.AutoLevelUp)
+                    {
+                        terminal.WriteLine("Auto-Level Up ENABLED", "green");
+                        terminal.WriteLine("You will level up automatically when you have enough XP.", "white");
+                    }
+                    else
+                    {
+                        terminal.WriteLine("Auto-Level Up DISABLED", "green");
+                        terminal.WriteLine("Visit the Level Master to level up manually.", "white");
+                    }
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(1000);
                     break;
 
                 case "0":
@@ -4592,7 +4652,7 @@ public abstract class BaseLocation
             terminal.SetColor("white");
             terminal.Write("Ancient Seals: ");
             terminal.SetColor(sealsCollected > 0 ? "bright_yellow" : "gray");
-            terminal.WriteLine($"{sealsCollected}/6 collected");
+            terminal.WriteLine($"{sealsCollected}/7 collected");
         }
         terminal.WriteLine("");
 
@@ -4602,6 +4662,9 @@ public abstract class BaseLocation
         terminal.SetColor("white");
         terminal.Write("Worshipped God: ");
         string worshippedGod = UsurperRemake.GodSystemSingleton.Instance?.GetPlayerGod(currentPlayer.Name2) ?? "";
+        // Also check player-created (immortal) god worship
+        if (string.IsNullOrEmpty(worshippedGod) && !string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+            worshippedGod = currentPlayer.WorshippedGod;
         if (!string.IsNullOrEmpty(worshippedGod))
         {
             // Get god alignment indicator from the GodSystem (Darkness > Goodness = Evil)
@@ -7078,6 +7141,7 @@ public abstract class BaseLocation
             MaxManaBonus = invItem.Mana,
             Value = invItem.Value,
             IsCursed = invItem.IsCursed,
+            IsIdentified = invItem.IsIdentified,
             MinLevel = invItem.MinLevel,
             Rarity = EquipmentRarity.Common
         };

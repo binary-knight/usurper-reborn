@@ -1196,7 +1196,7 @@ public class DungeonLocation : BaseLocation
 
                 // Check achievements
                 AchievementSystem.CheckAchievements(player);
-                await AchievementSystem.ShowPendingNotifications(term);
+                await AchievementSystem.ShowPendingNotifications(term, player);
 
                 // Online news: Old God defeated
                 if (UsurperRemake.Systems.OnlineStateManager.IsActive)
@@ -5784,6 +5784,8 @@ public class DungeonLocation : BaseLocation
                 false, false, (long)(currentPlayer.Dexterity * strengthMod), (long)(currentPlayer.Wisdom * 0.8), 0
             );
             duelistMonster.Level = duelistLevel;
+            duelistMonster.IsProperName = true;
+            duelistMonster.CanSpeak = true;
 
             var combatEngine = new CombatEngine(terminal);
             var result = await combatEngine.PlayerVsMonster(currentPlayer, duelistMonster, null);
@@ -5910,6 +5912,8 @@ public class DungeonLocation : BaseLocation
                 false, false, currentPlayer.Dexterity, currentPlayer.Wisdom, 0
             );
             angryDuelist.Level = rageLevel;
+            angryDuelist.IsProperName = true;
+            angryDuelist.CanSpeak = true;
 
             var combatEngine = new CombatEngine(terminal);
             var result = await combatEngine.PlayerVsMonster(currentPlayer, angryDuelist, teammates);
@@ -8222,6 +8226,18 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine("]emove ally from party");
         }
+        // XP share mode
+        string xpModeDesc = player.TeamXPShare switch
+        {
+            XPShareMode.EvenSplit => "Even Split",
+            XPShareMode.KillerTakes => "Killer Takes All",
+            _ => "Full Each"
+        };
+        terminal.Write("  [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("X");
+        terminal.SetColor("white");
+        terminal.WriteLine($"] XP Distribution: {xpModeDesc}");
         terminal.Write("  [");
         terminal.SetColor("bright_yellow");
         terminal.Write("B");
@@ -8285,6 +8301,26 @@ public class DungeonLocation : BaseLocation
                     await Task.Delay(1500);
                 }
                 break;
+
+            case "X":
+                // Cycle XP share mode
+                player.TeamXPShare = player.TeamXPShare switch
+                {
+                    XPShareMode.FullEach => XPShareMode.EvenSplit,
+                    XPShareMode.EvenSplit => XPShareMode.KillerTakes,
+                    _ => XPShareMode.FullEach
+                };
+                string newMode = player.TeamXPShare switch
+                {
+                    XPShareMode.EvenSplit => "Even Split — XP divided equally among party members",
+                    XPShareMode.KillerTakes => "Killer Takes All — only you get XP (allies get nothing)",
+                    _ => "Full Each — everyone gets full XP (default)"
+                };
+                terminal.SetColor("green");
+                terminal.WriteLine($"XP Distribution set to: {newMode}");
+                await GameEngine.Instance.SaveCurrentGame();
+                await Task.Delay(1500);
+                return;
 
             case "B":
             default:

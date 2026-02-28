@@ -2635,6 +2635,32 @@ namespace UsurperRemake.Systems
             }
         }
 
+        public async Task AddXPToPlayer(string username, long xpAmount)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players
+                    SET player_data = json_set(
+                        player_data,
+                        '$.player.experience',
+                        CAST(json_extract(player_data, '$.player.experience') AS INTEGER) + @xp
+                    )
+                    WHERE LOWER(username) = LOWER(@username)
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@xp", xpAmount);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to add XP to {username}: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Atomically set DaysInPrison on a player's save data.
         /// Used when the king imprisons another player via Royal Orders.
@@ -3708,18 +3734,19 @@ namespace UsurperRemake.Systems
     // World Bosses
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public async Task<int> SpawnWorldBoss(string bossName, int bossLevel, long maxHp, int hoursToExpire = 24)
+    public async Task<int> SpawnWorldBoss(string bossName, int bossLevel, long maxHp, int hoursToExpire = 24, string bossDataJson = "{}")
     {
         try
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"INSERT INTO world_bosses (boss_name, boss_level, max_hp, current_hp, expires_at)
-                                VALUES (@name, @level, @hp, @hp, datetime('now', '+' || @hours || ' hours'))
+            cmd.CommandText = @"INSERT INTO world_bosses (boss_name, boss_level, max_hp, current_hp, boss_data_json, expires_at)
+                                VALUES (@name, @level, @hp, @hp, @json, datetime('now', '+' || @hours || ' hours'))
                                 RETURNING id;";
             cmd.Parameters.AddWithValue("@name", bossName);
             cmd.Parameters.AddWithValue("@level", bossLevel);
             cmd.Parameters.AddWithValue("@hp", maxHp);
+            cmd.Parameters.AddWithValue("@json", bossDataJson);
             cmd.Parameters.AddWithValue("@hours", hoursToExpire);
             var result = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(result);
@@ -3733,7 +3760,7 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"SELECT id, boss_name, boss_level, max_hp, current_hp, started_at, expires_at
+            cmd.CommandText = @"SELECT id, boss_name, boss_level, max_hp, current_hp, started_at, expires_at, boss_data_json
                                 FROM world_bosses WHERE status = 'active' AND expires_at > datetime('now')
                                 ORDER BY started_at DESC LIMIT 1;";
             using var reader = await cmd.ExecuteReaderAsync();
@@ -3747,7 +3774,8 @@ namespace UsurperRemake.Systems
                     MaxHP = reader.GetInt64(3),
                     CurrentHP = reader.GetInt64(4),
                     StartedAt = DateTime.TryParse(reader.GetString(5), out var st) ? st : DateTime.Now,
-                    ExpiresAt = DateTime.TryParse(reader.GetString(6), out var et) ? et : DateTime.Now
+                    ExpiresAt = DateTime.TryParse(reader.GetString(6), out var et) ? et : DateTime.Now,
+                    BossDataJson = reader.IsDBNull(7) ? "{}" : reader.GetString(7)
                 };
             }
         }
@@ -3852,6 +3880,45 @@ namespace UsurperRemake.Systems
             await cmd.ExecuteNonQueryAsync();
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to expire world bosses: {ex.Message}"); }
+    }
+
+    public async Task UpdateWorldBossData(int bossId, string bossDataJson)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE world_bosses SET boss_data_json = @json WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", bossId);
+            cmd.Parameters.AddWithValue("@json", bossDataJson);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to update world boss data: {ex.Message}"); }
+    }
+
+    public int GetOnlinePlayerCount()
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT COUNT(*) FROM online_players WHERE last_heartbeat > datetime('now', '-2 minutes');";
+            return Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+        }
+        catch { return 0; }
+    }
+
+    public int GetAverageOnlineLevel()
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"SELECT AVG(level) FROM online_players WHERE last_heartbeat > datetime('now', '-2 minutes') AND level > 0;";
+            var result = cmd.ExecuteScalar();
+            return result == DBNull.Value || result == null ? 20 : Convert.ToInt32(result);
+        }
+        catch { return 20; }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

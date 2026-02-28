@@ -1377,16 +1377,9 @@ public partial class QuestSystem
     /// </summary>
     public static void InitializeStarterQuests()
     {
-        // Remove unclaimed Royal Council starter quests so they get regenerated
-        // with updated monster names and objectives. Claimed quests are preserved.
-        questDatabase.RemoveAll(q =>
-            q.Initiator == "Royal Council" &&
-            string.IsNullOrEmpty(q.Occupier) &&
-            !q.Deleted);
-
-        // Don't add if there are already Royal Council quests (player has claimed some)
-        if (questDatabase.Any(q => q.Initiator == "Royal Council"))
-            return;
+        // Don't add starter quests that already exist in the database (by stable ID).
+        // This prevents the QuestDeleted bug in MUD mode where quests got new IDs
+        // each time they were regenerated, invalidating cached quest references.
 
         // Beginner quests (levels 1-15)
         CreateStarterQuest("Wolf Pack",
@@ -1457,6 +1450,14 @@ public partial class QuestSystem
         byte difficulty, int minLevel, int maxLevel,
         (string name, int count)[]? monsters = null, int floorTarget = 0)
     {
+        // Use deterministic ID based on title so starter quests survive
+        // the remove/recreate cycle in MUD mode without changing IDs
+        string stableId = "STARTER_" + title.ToUpper().Replace(" ", "_");
+
+        // Skip if this starter quest already exists (claimed or unclaimed)
+        if (questDatabase.Any(q => q.Id == stableId))
+            return;
+
         var quest = new Quest
         {
             Title = title,
@@ -1470,6 +1471,8 @@ public partial class QuestSystem
             MaxLevel = maxLevel,
             DaysToComplete = 14 // Generous time limit for starter quests
         };
+        // Override the auto-generated ID with our stable one
+        quest.Id = stableId;
 
         // Add monsters if specified
         if (monsters != null)
@@ -1488,7 +1491,7 @@ public partial class QuestSystem
             {
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillSpecificMonster,
-                    $"Kill {count} {name}{(count > 1 ? "s" : "")}",
+                    $"Kill {count} {(count > 1 ? GetPluralName(name) : name)}",
                     count,
                     name.ToLower().Replace(" ", "_"),
                     name
@@ -1537,6 +1540,32 @@ public partial class QuestSystem
 
         // Also ensure equipment quests exist
         EnsureEquipmentQuestsExist(playerLevel);
+    }
+
+    /// <summary>
+    /// Get the plural form of a monster name using English pluralization rules.
+    /// </summary>
+    private static string GetPluralName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+        var lower = name.ToLower();
+
+        // Irregular plurals
+        if (lower.EndsWith("wolf")) return name.Substring(0, name.Length - 4) + "olves";
+        if (lower.EndsWith("thief")) return name.Substring(0, name.Length - 4) + "ieves";
+        if (lower.EndsWith("elf")) return name.Substring(0, name.Length - 3) + "lves";
+        if (lower.EndsWith("man")) return name.Substring(0, name.Length - 3) + "men";
+
+        // Words ending in s, x, z, ch, sh → add "es"
+        if (lower.EndsWith("s") || lower.EndsWith("x") || lower.EndsWith("z") ||
+            lower.EndsWith("ch") || lower.EndsWith("sh"))
+            return name + "es";
+
+        // Words ending in consonant + y → change y to ies
+        if (lower.EndsWith("y") && lower.Length > 1 && !"aeiou".Contains(lower[lower.Length - 2]))
+            return name.Substring(0, name.Length - 1) + "ies";
+
+        return name + "s";
     }
 
     #endregion

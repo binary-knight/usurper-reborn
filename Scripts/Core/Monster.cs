@@ -59,6 +59,12 @@ public class Monster
     public bool IsMiniBoss { get; set; } = false;       // Champion/elite monsters (10% random encounters)
     public bool IsUnique { get; set; } = false;
     public bool CanSpeak { get; set; } = false;         // From Pascal mon_talk setting
+    public bool IsProperName { get; set; } = false;     // Named NPCs (no "The" prefix)
+
+    /// <summary>
+    /// Returns name with appropriate article: "The Drake" for generic monsters, "Dahlia Coldstream" for named NPCs
+    /// </summary>
+    public string TheNameOrName => IsProperName ? Name : $"The {Name}";
 
     // Taunt mechanic — forced targeting
     public string? TauntedBy { get; set; }              // DisplayName of character who taunted this monster

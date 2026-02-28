@@ -1207,7 +1207,7 @@ namespace UsurperRemake.Locations
 
             // Unlock the secret achievement
             AchievementSystem.TryUnlock(currentPlayer, "easter_egg_1");
-            await AchievementSystem.ShowPendingNotifications(terminal);
+            await AchievementSystem.ShowPendingNotifications(terminal, currentPlayer);
 
             terminal.SetColor("gray");
             terminal.WriteLine("The shadows shift, and the words fade from view.");
@@ -1634,7 +1634,7 @@ namespace UsurperRemake.Locations
             if ((currentPlayer.Statistics?.TotalGoldFromGambling ?? 0) >= 1000)
             {
                 AchievementSystem.TryUnlock(currentPlayer, "dark_alley_gambler");
-                await AchievementSystem.ShowPendingNotifications(terminal);
+                await AchievementSystem.ShowPendingNotifications(terminal, currentPlayer);
             }
 
             terminal.SetColor("gray");
@@ -1994,7 +1994,7 @@ namespace UsurperRemake.Locations
                 if ((currentPlayer.Statistics?.TotalPickpocketSuccesses ?? 0) >= 20)
                 {
                     AchievementSystem.TryUnlock(currentPlayer, "dark_alley_pickpocket");
-                    await AchievementSystem.ShowPendingNotifications(terminal);
+                    await AchievementSystem.ShowPendingNotifications(terminal, currentPlayer);
                 }
             }
             else
@@ -2146,7 +2146,7 @@ namespace UsurperRemake.Locations
                     if ((currentPlayer.Statistics?.TotalPitFightsWon ?? 0) >= 10)
                     {
                         AchievementSystem.TryUnlock(currentPlayer, "dark_alley_pit_champion");
-                        await AchievementSystem.ShowPendingNotifications(terminal);
+                        await AchievementSystem.ShowPendingNotifications(terminal, currentPlayer);
                     }
                 }
                 else
@@ -2274,7 +2274,7 @@ namespace UsurperRemake.Locations
                     if ((currentPlayer.Statistics?.TotalPitFightsWon ?? 0) >= 10)
                     {
                         AchievementSystem.TryUnlock(currentPlayer, "dark_alley_pit_champion");
-                        await AchievementSystem.ShowPendingNotifications(terminal);
+                        await AchievementSystem.ShowPendingNotifications(terminal, currentPlayer);
                     }
                 }
                 else
@@ -2452,7 +2452,7 @@ namespace UsurperRemake.Locations
                         currentPlayer.Statistics?.RecordGoldSpent(totalOwed);
 
                         AchievementSystem.TryUnlock(currentPlayer, "dark_alley_debt_free");
-                        await AchievementSystem.ShowPendingNotifications(terminal);
+                        await AchievementSystem.ShowPendingNotifications(terminal, currentPlayer);
                     }
                     else
                     {
@@ -2493,7 +2493,7 @@ namespace UsurperRemake.Locations
                             terminal.WriteLine("Debt fully paid! \"You're clean.\"");
 
                             AchievementSystem.TryUnlock(currentPlayer, "dark_alley_debt_free");
-                            await AchievementSystem.ShowPendingNotifications(terminal);
+                            await AchievementSystem.ShowPendingNotifications(terminal, currentPlayer);
                         }
                         else
                         {

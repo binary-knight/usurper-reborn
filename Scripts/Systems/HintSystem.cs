@@ -45,12 +45,12 @@ namespace UsurperRemake.Systems
             ),
             [HINT_FIRST_COMBAT] = new HintDefinition(
                 "Combat Tip",
-                "Press 'A' to Attack, 'F' to Flee, 'U' to Use items, or 'S' to check your Status.",
+                "Press 'A' to Attack, 'F' to Flee, 'I' to use Items/potions, or 'S' to check your Status.",
                 "bright_cyan"
             ),
             [HINT_LOW_HP] = new HintDefinition(
                 "Health Warning",
-                "Your HP is low! Visit the Healer (H) on Main Street, or use healing potions (U) in combat.",
+                "Your HP is low! Visit the Healer [1] on Main Street, or use healing potions [I] in combat.",
                 "bright_yellow"
             ),
             [HINT_FIRST_SHOP] = new HintDefinition(

@@ -102,6 +102,12 @@ public class PlayerStatistics
     public int CurrentStreak { get; set; }          // Consecutive days played
     public int LongestStreak { get; set; }
 
+    // === WORLD BOSS STATISTICS ===
+    public long WorldBossesKilled { get; set; }
+    public long WorldBossDamageDealt { get; set; }
+    public long WorldBossMVPCount { get; set; }
+    public HashSet<string> UniqueWorldBossTypes { get; set; } = new();
+
     // === ACHIEVEMENT TRIGGERS ===
     public int QuestsCompleted { get; set; }
     public int BountiesCompleted { get; set; }
@@ -240,6 +246,18 @@ public class PlayerStatistics
         ExperienceFromMonsters += xpGained;
         TotalGoldEarned += goldGained;
         TotalGoldFromMonsters += goldGained;
+    }
+
+    /// <summary>
+    /// Record a world boss kill contribution
+    /// </summary>
+    public void RecordWorldBossKill(string bossType, long damageDealt, bool isMVP)
+    {
+        WorldBossesKilled++;
+        WorldBossDamageDealt += damageDealt;
+        if (isMVP) WorldBossMVPCount++;
+        UniqueWorldBossTypes ??= new HashSet<string>();
+        UniqueWorldBossTypes.Add(bossType);
     }
 
     /// <summary>
@@ -685,6 +703,12 @@ public class PlayerStatistics
         LongestSession = TimeSpan.Zero;
         CurrentStreak = 0;
         LongestStreak = 0;
+
+        // World boss stats
+        WorldBossesKilled = 0;
+        WorldBossDamageDealt = 0;
+        WorldBossMVPCount = 0;
+        UniqueWorldBossTypes?.Clear();
 
         // Achievement triggers
         QuestsCompleted = 0;

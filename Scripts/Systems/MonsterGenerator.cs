@@ -68,6 +68,10 @@ public static class MonsterGenerator
             _ => true
         };
 
+        // Override for specific non-speaking members of speaking families
+        if (tier.Name is "Drake")
+            monster.CanSpeak = false;
+
         // Add special abilities
         foreach (var ability in tier.SpecialAbilities)
         {
@@ -338,11 +342,11 @@ public static class MonsterGenerator
             "Draconic" => tier.Name switch
             {
                 "Kobold" => "You no scare kobold!",
-                "Drake" => "*Roars and breathes fire*",
+                "Drake" => "roars and breathes a gout of fire!",
                 "Wyvern" => "You shall burn!",
                 "Young Dragon" => "I am fire incarnate!",
                 "Ancient Dragon" => "Mortals... such fleeting things.",
-                _ => "*Roars*"
+                _ => "roars menacingly!"
             },
             "Demonic" => "Your soul is mine!",
             "Giant" => "Fe Fi Fo Fum!",
@@ -429,6 +433,10 @@ public static class MonsterGenerator
                     "Beast" or "Insectoid" or "Construct" or "Aquatic" or "Aberration" or "Elemental" => false,
                     _ => true
                 };
+
+                // Override for specific non-speaking members of speaking families
+                if (tier.Name is "Drake")
+                    monster.CanSpeak = false;
 
                 foreach (var ability in tier.SpecialAbilities)
                 {

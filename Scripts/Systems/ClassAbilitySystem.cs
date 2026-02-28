@@ -438,6 +438,146 @@ public static class ClassAbilitySystem
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
+        // CLERIC ABILITIES - Divine healers and protectors
+        // BALANCE: Clerics are the strongest healers with moderate holy damage.
+        // WIS and CON scale their healing, while holy attacks scale with WIS.
+        // ═══════════════════════════════════════════════════════════════════════════════
+        ["prayer_of_mending"] = new ClassAbility
+        {
+            Id = "prayer_of_mending",
+            Name = "Prayer of Mending",
+            Description = "A fervent prayer that restores health over time.",
+            LevelRequired = 1,
+            StaminaCost = 20,
+            Cooldown = 3,
+            Type = AbilityType.Heal,
+            BaseHealing = 40,  // Stronger than Paladin's Lay on Hands
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["holy_smite"] = new ClassAbility
+        {
+            Id = "holy_smite",
+            Name = "Holy Smite",
+            Description = "Channel divine wrath to strike your enemy with holy fire.",
+            LevelRequired = 8,
+            StaminaCost = 30,
+            Cooldown = 2,
+            Type = AbilityType.Attack,
+            BaseDamage = 45,  // Moderate damage, scales with WIS
+            SpecialEffect = "holy",
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["sanctuary"] = new ClassAbility
+        {
+            Id = "sanctuary",
+            Name = "Sanctuary",
+            Description = "Create a sacred barrier that greatly reduces incoming damage.",
+            LevelRequired = 16,
+            StaminaCost = 35,
+            Cooldown = 5,
+            Type = AbilityType.Defense,
+            DefenseBonus = 45,
+            Duration = 3,
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["purifying_flame"] = new ClassAbility
+        {
+            Id = "purifying_flame",
+            Name = "Purifying Flame",
+            Description = "Sacred fire that burns the unholy and purges afflictions.",
+            LevelRequired = 24,
+            StaminaCost = 40,
+            Cooldown = 3,
+            Type = AbilityType.Attack,
+            BaseDamage = 70,
+            SpecialEffect = "cleanse",
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["greater_heal"] = new ClassAbility
+        {
+            Id = "greater_heal",
+            Name = "Greater Heal",
+            Description = "A powerful healing prayer that restores a large amount of health.",
+            LevelRequired = 32,
+            StaminaCost = 45,
+            Cooldown = 4,
+            Type = AbilityType.Heal,
+            BaseHealing = 90,
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["divine_aegis"] = new ClassAbility
+        {
+            Id = "divine_aegis",
+            Name = "Divine Aegis",
+            Description = "Surround yourself in holy light that heals and protects.",
+            LevelRequired = 44,
+            StaminaCost = 55,
+            Cooldown = 6,
+            Type = AbilityType.Buff,
+            BaseHealing = 60,
+            DefenseBonus = 50,
+            Duration = 4,
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["wrath_of_heaven"] = new ClassAbility
+        {
+            Id = "wrath_of_heaven",
+            Name = "Wrath of Heaven",
+            Description = "Call down holy fire upon all enemies.",
+            LevelRequired = 56,
+            StaminaCost = 65,
+            Cooldown = 5,
+            Type = AbilityType.Attack,
+            BaseDamage = 110,
+            SpecialEffect = "aoe_holy",
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["resurrection_prayer"] = new ClassAbility
+        {
+            Id = "resurrection_prayer",
+            Name = "Resurrection Prayer",
+            Description = "A desperate prayer that massively heals and fortifies your body.",
+            LevelRequired = 68,
+            StaminaCost = 75,
+            Cooldown = 7,
+            Type = AbilityType.Heal,
+            BaseHealing = 160,
+            DefenseBonus = 30,
+            Duration = 2,
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["divine_intervention"] = new ClassAbility
+        {
+            Id = "divine_intervention",
+            Name = "Divine Intervention",
+            Description = "The gods themselves intervene, shielding you from all harm.",
+            LevelRequired = 80,
+            StaminaCost = 85,
+            Cooldown = 8,
+            Type = AbilityType.Defense,
+            DefenseBonus = 200,
+            Duration = 2,
+            SpecialEffect = "invulnerable",
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+        ["avatar_of_grace"] = new ClassAbility
+        {
+            Id = "avatar_of_grace",
+            Name = "Avatar of Grace",
+            Description = "Become a living conduit of divine power, healing and empowering yourself.",
+            LevelRequired = 95,
+            StaminaCost = 100,
+            Cooldown = 8,
+            Type = AbilityType.Buff,
+            BaseHealing = 200,
+            AttackBonus = 50,
+            DefenseBonus = 60,
+            Duration = 5,
+            SpecialEffect = "avatar_light",
+            AvailableToClasses = new[] { CharacterClass.Cleric }
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
         // ASSASSIN ABILITIES - Shadow killers, servants of Noctura
         // BALANCE: Assassins have high single-target burst. DEX adds to attack scaling
         // via the formula, so Assassins benefit from both STR and DEX for damage.
@@ -961,7 +1101,7 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -980,7 +1120,7 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -998,7 +1138,7 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -1017,7 +1157,7 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -1037,7 +1177,7 @@ public static class ClassAbilitySystem
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
-                CharacterClass.Bard, CharacterClass.Alchemist,
+                CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
