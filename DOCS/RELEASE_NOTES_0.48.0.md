@@ -59,13 +59,13 @@ The GitHub Actions workflow now produces **desktop bundles** alongside the exist
 - Downloads WezTerm portables for Windows, Linux, and macOS
 - Bundles game executable + WezTerm + `wezterm.lua` + fonts + launchers
 - Patches the Windows WezTerm icon with the game icon (via wine + rcedit on Linux CI)
-- Produces 3 new artifacts: `Desktop-Windows-x64.zip`, `Desktop-Linux-x64.tar.gz`, `Desktop-macOS-x64.zip`
+- Produces 3 new artifacts: `WezTerm-Windows-x64.zip`, `WezTerm-Linux-x64.tar.gz`, `WezTerm-macOS-x64.zip`
 - WezTerm downloads cached by version to avoid re-downloading on every build
 
 ### Release Assets
 GitHub releases now include **9 artifacts** (up from 6):
 - 6 plain builds (unchanged): Windows x64/x86, Linux x64/ARM64, macOS Intel/Apple Silicon
-- 3 new desktop builds: Windows x64, Linux x64, macOS x64
+- 3 new WezTerm builds: Windows x64, Linux x64, macOS x64
 
 ### Steam Depot Updates
 - Steam depots now bundle WezTerm in `wezterm/` with fonts and config

@@ -540,30 +540,30 @@ jobs:
       - name: Create desktop distribution archives
         run: |
           cd desktop
-          zip -qr ../UsurperReborn-Desktop-Windows-x64.zip UsurperReborn-win64/
-          tar -czf ../UsurperReborn-Desktop-Linux-x64.tar.gz UsurperReborn-linux64/
-          zip -qr ../UsurperReborn-Desktop-macOS-x64.zip UsurperReborn-macos/
+          zip -qr ../UsurperReborn-WezTerm-Windows-x64.zip UsurperReborn-win64/
+          tar -czf ../UsurperReborn-WezTerm-Linux-x64.tar.gz UsurperReborn-linux64/
+          zip -qr ../UsurperReborn-WezTerm-macOS-x64.zip UsurperReborn-macos/
           cd ..
-          echo "=== Desktop bundles ==="
-          ls -lh UsurperReborn-Desktop-*.zip UsurperReborn-Desktop-*.tar.gz
+          echo "=== WezTerm bundles ==="
+          ls -lh UsurperReborn-WezTerm-*.zip UsurperReborn-WezTerm-*.tar.gz
 
-      - name: Upload Desktop Windows x64
+      - name: Upload WezTerm Windows x64
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-x64
-          path: UsurperReborn-Desktop-Windows-x64.zip
+          path: UsurperReborn-WezTerm-Windows-x64.zip
 
-      - name: Upload Desktop Linux x64
+      - name: Upload WezTerm Linux x64
         uses: actions/upload-artifact@v4
         with:
           name: desktop-linux-x64
-          path: UsurperReborn-Desktop-Linux-x64.tar.gz
+          path: UsurperReborn-WezTerm-Linux-x64.tar.gz
 
-      - name: Upload Desktop macOS x64
+      - name: Upload WezTerm macOS x64
         uses: actions/upload-artifact@v4
         with:
           name: desktop-macos-x64
-          path: UsurperReborn-Desktop-macOS-x64.zip
+          path: UsurperReborn-WezTerm-macOS-x64.zip
 
   # ============================================
   # PLATFORM SMOKE TESTS
@@ -705,7 +705,7 @@ jobs:
         with:
           pattern: "*-build"
 
-      - name: Download desktop artifacts
+      - name: Download WezTerm artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: "desktop-*"
@@ -720,13 +720,13 @@ jobs:
           cd mac-build && zip -r ../UsurperReborn-${{ github.ref_name }}-macOS-Intel.zip . && cd ..
           cd mac-arm64-build && zip -r ../UsurperReborn-${{ github.ref_name }}-macOS-AppleSilicon.zip . && cd ..
 
-          # Desktop bundles (WezTerm included) — already zipped by build-desktop
-          cp desktop-windows-x64/UsurperReborn-Desktop-Windows-x64.zip \
-            "UsurperReborn-${{ github.ref_name }}-Desktop-Windows-x64.zip"
-          cp desktop-linux-x64/UsurperReborn-Desktop-Linux-x64.tar.gz \
-            "UsurperReborn-${{ github.ref_name }}-Desktop-Linux-x64.tar.gz"
-          cp desktop-macos-x64/UsurperReborn-Desktop-macOS-x64.zip \
-            "UsurperReborn-${{ github.ref_name }}-Desktop-macOS-x64.zip"
+          # WezTerm bundles — already zipped by build-desktop
+          cp desktop-windows-x64/UsurperReborn-WezTerm-Windows-x64.zip \
+            "UsurperReborn-${{ github.ref_name }}-WezTerm-Windows-x64.zip"
+          cp desktop-linux-x64/UsurperReborn-WezTerm-Linux-x64.tar.gz \
+            "UsurperReborn-${{ github.ref_name }}-WezTerm-Linux-x64.tar.gz"
+          cp desktop-macos-x64/UsurperReborn-WezTerm-macOS-x64.zip \
+            "UsurperReborn-${{ github.ref_name }}-WezTerm-macOS-x64.zip"
 
           ls -la *.zip *.tar.gz
 
@@ -740,9 +740,9 @@ jobs:
             UsurperReborn-${{ github.ref_name }}-Linux-ARM64.zip
             UsurperReborn-${{ github.ref_name }}-macOS-Intel.zip
             UsurperReborn-${{ github.ref_name }}-macOS-AppleSilicon.zip
-            UsurperReborn-${{ github.ref_name }}-Desktop-Windows-x64.zip
-            UsurperReborn-${{ github.ref_name }}-Desktop-Linux-x64.tar.gz
-            UsurperReborn-${{ github.ref_name }}-Desktop-macOS-x64.zip
+            UsurperReborn-${{ github.ref_name }}-WezTerm-Windows-x64.zip
+            UsurperReborn-${{ github.ref_name }}-WezTerm-Linux-x64.tar.gz
+            UsurperReborn-${{ github.ref_name }}-WezTerm-macOS-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
