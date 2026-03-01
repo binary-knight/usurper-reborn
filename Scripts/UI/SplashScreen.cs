@@ -43,14 +43,30 @@ namespace UsurperRemake.UI
         {
             terminal.ClearScreen();
 
-            // Render each line of ANSI art
-            foreach (var line in SplashArt)
-            {
-                terminal.WriteRawAnsi("          " + line.TrimEnd() + "\r\n");
-            }
+            bool isPlainText = false;
+            try { isPlainText = terminal.IsPlainText; } catch { }
 
-            // Reset colors after art
-            terminal.WriteRawAnsi("\x1b[0m");
+            if (GameConfig.ScreenReaderMode || isPlainText)
+            {
+                // Screen reader: plain text title instead of ANSI art
+                terminal.WriteLine("");
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("  USURPER REBORN");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  A modern recreation of the classic 1993 BBS door game");
+                terminal.WriteLine("");
+            }
+            else
+            {
+                // Render each line of ANSI art
+                foreach (var line in SplashArt)
+                {
+                    terminal.WriteRawAnsi("          " + line.TrimEnd() + "\r\n");
+                }
+
+                // Reset colors after art
+                terminal.WriteRawAnsi("\x1b[0m");
+            }
 
             // Version info and press any key
             string version = $"v{GameConfig.Version} \"{GameConfig.VersionName}\"";

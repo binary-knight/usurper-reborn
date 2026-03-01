@@ -575,6 +575,9 @@ public class ArmorShopLocation : BaseLocation
         if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
             adjustedPrice = (long)(adjustedPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
 
+        // Apply difficulty-based price multiplier
+        adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
+
         // Calculate total with tax
         var (armorKingTax, armorCityTax, armorTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
 

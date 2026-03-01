@@ -51,7 +51,7 @@ public class HealerLocation : BaseLocation
         var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
         // Apply faction discount (The Faith gets 25% off at healers)
         var factionModifier = UsurperRemake.Systems.FactionSystem.Instance.GetHealingPriceModifier();
-        return (long)(basePrice * alignmentModifier * worldEventModifier * factionModifier);
+        return (long)(basePrice * alignmentModifier * worldEventModifier * factionModifier * DifficultySystem.GetShopPriceMultiplier());
     }
 
     public HealerLocation() : base(

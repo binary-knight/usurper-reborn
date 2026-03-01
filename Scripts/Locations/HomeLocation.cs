@@ -3725,6 +3725,17 @@ toResurrect.IsDead = false;
         }
         else
         {
+            // Check if off-hand is empty because of a two-handed weapon
+            if (slot == EquipmentSlot.OffHand)
+            {
+                var mainHand = target.GetEquipment(EquipmentSlot.MainHand);
+                if (mainHand?.Handedness == WeaponHandedness.TwoHanded)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine("(using 2H weapon)");
+                    return;
+                }
+            }
             terminal.SetColor("darkgray");
             terminal.WriteLine("(empty)");
         }

@@ -99,6 +99,11 @@ public partial class GameEngine
     public bool PendingImmortalAscension { get; set; }
 
     /// <summary>
+    /// Flag indicating the player died in Nightmare mode (permadeath) — save deleted, exit to menu
+    /// </summary>
+    public bool IsPermadeath { get; set; }
+
+    /// <summary>
     /// Thread-safe singleton accessor. In MUD mode, returns the per-session engine.
     /// In single-player/BBS, returns the static fallback instance.
     /// </summary>
@@ -3226,7 +3231,7 @@ public partial class GameEngine
             ScreenReaderMode = playerData.ScreenReaderMode,
             ColorTheme = playerData.ColorTheme,
             AutoLevelUp = playerData.AutoLevelUp,
-            TeamXPShare = playerData.TeamXPShare,
+            TeamXPPercent = playerData.TeamXPPercent ?? TeamXPConfig.DefaultTeamXPPercent.ToArray(),
             Loyalty = playerData.Loyalty,
             Haunt = playerData.Haunt,
             Master = playerData.Master,

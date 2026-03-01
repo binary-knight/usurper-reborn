@@ -693,6 +693,9 @@ public class WeaponShopLocation : BaseLocation
         if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
             adjustedPrice = (long)(adjustedPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
 
+        // Apply difficulty-based price multiplier
+        adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
+
         // Calculate total with tax
         var (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
 
@@ -1148,6 +1151,8 @@ public class WeaponShopLocation : BaseLocation
             long adjustedPrice = CityControlSystem.Instance.ApplyDiscount(weapon.Value, currentPlayer);
             // Apply faction discount (The Crown gets 10% off at shops)
             adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
+            // Apply difficulty-based price multiplier
+            adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
 
             // Calculate total with tax
             var (abKingTax, abCityTax, abTotal) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);

@@ -493,6 +493,9 @@ public class AdvancedMagicShopLocation : BaseLocation
         if (player.CachedBoonEffects?.ShopDiscountPercent > 0)
             adjustedPrice = (long)(adjustedPrice * (1.0 - player.CachedBoonEffects.ShopDiscountPercent));
 
+        // Apply difficulty-based price multiplier
+        adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
+
         // Calculate total with tax
         var (buyKingTax, buyCityTax, buyTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
 

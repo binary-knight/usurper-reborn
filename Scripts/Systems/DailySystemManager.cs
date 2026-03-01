@@ -268,7 +268,7 @@ public class DailySystemManager
         var player = GameEngine.Instance?.CurrentPlayer;
         if (player == null) return;
         
-        // Reset daily parameters based on mode
+        // Turn-based resets only apply in non-Endless modes
         if (currentMode != DailyCycleMode.Endless)
         {
             // Restore turns based on mode
@@ -281,59 +281,8 @@ public class DailySystemManager
                 DailyCycleMode.Accelerated12Hour => GameConfig.TurnsPerDay / 2,
                 _ => GameConfig.TurnsPerDay
             };
-            
+
             player.TurnsRemaining = turnsToRestore;
-            
-            // Reset daily attempt counters
-            player.Fights = GameConfig.DefaultDungeonFights;
-            player.PFights = GameConfig.DefaultPlayerFights;
-            player.TFights = GameConfig.DefaultTeamFights;
-            player.Thiefs = GameConfig.DefaultThiefAttempts;
-            player.Brawls = GameConfig.DefaultBrawls;
-            player.Assa = GameConfig.DefaultAssassinAttempts;
-            
-            // Reset class daily abilities
-            player.IsRaging = false; // Rage refreshed each combat anyway, but ensure off
-            if (player.Class == CharacterClass.Paladin)
-            {
-                var mods = player.GetClassCombatModifiers();
-                player.SmiteChargesRemaining = mods.SmiteCharges;
-            }
-            else
-            {
-                player.SmiteChargesRemaining = 0;
-            }
-            
-            // Reset haggling attempts
-            HagglingEngine.ResetDailyHaggling(player);
-
-            // Reset Dark Alley daily counters (v0.41.0)
-            player.GamblingRoundsToday = 0;
-            player.PitFightsToday = 0;
-
-            // Reset real-world-date daily tracking (online mode persistence)
-            player.SethFightsToday = 0;
-            player.ArmWrestlesToday = 0;
-            player.RoyQuestsToday = 0;
-            player.LastPrayerRealDate = DateTime.MinValue;
-            player.LastInnerSanctumRealDate = DateTime.MinValue;
-            player.LastBindingOfSoulsRealDate = DateTime.MinValue;
-
-            // Reset home daily counters (v0.44.0)
-            player.HomeRestsToday = 0;
-            player.HerbsGatheredToday = 0;
-
-            // Reset companion daily flags
-            CompanionSystem.Instance?.ResetDailyFlags();
-
-            // Servants' Quarters daily gold income (v0.44.0)
-            if (player.HasServants)
-            {
-                long servantsGold = GameConfig.ServantsDailyGoldBase + (player.Level * GameConfig.ServantsDailyGoldPerLevel);
-                player.Gold += servantsGold;
-                terminal?.WriteLine($"Your servants collected {servantsGold:N0} gold in rent and services.", "bright_yellow");
-            }
-
             terminal?.WriteLine($"Your daily limits have been restored! ({turnsToRestore} turns)", "bright_green");
         }
         else
@@ -344,6 +293,58 @@ public class DailySystemManager
                 player.TurnsRemaining += 25;
                 terminal?.WriteLine("Your energy has been partially restored!", "bright_green");
             }
+        }
+
+        // Daily activity counter resets — always apply regardless of mode.
+        // These are time-gated limits (quest counts, fight counts, etc.) that must
+        // reset each day even in Endless mode and online mode.
+        player.Fights = GameConfig.DefaultDungeonFights;
+        player.PFights = GameConfig.DefaultPlayerFights;
+        player.TFights = GameConfig.DefaultTeamFights;
+        player.Thiefs = GameConfig.DefaultThiefAttempts;
+        player.Brawls = GameConfig.DefaultBrawls;
+        player.Assa = GameConfig.DefaultAssassinAttempts;
+
+        // Reset class daily abilities
+        player.IsRaging = false;
+        if (player.Class == CharacterClass.Paladin)
+        {
+            var mods = player.GetClassCombatModifiers();
+            player.SmiteChargesRemaining = mods.SmiteCharges;
+        }
+        else
+        {
+            player.SmiteChargesRemaining = 0;
+        }
+
+        // Reset haggling attempts
+        HagglingEngine.ResetDailyHaggling(player);
+
+        // Reset Dark Alley daily counters (v0.41.0)
+        player.GamblingRoundsToday = 0;
+        player.PitFightsToday = 0;
+
+        // Reset real-world-date daily tracking (online mode persistence)
+        player.SethFightsToday = 0;
+        player.ArmWrestlesToday = 0;
+        player.RoyQuestsToday = 0;
+        player.LastPrayerRealDate = DateTime.MinValue;
+        player.LastInnerSanctumRealDate = DateTime.MinValue;
+        player.LastBindingOfSoulsRealDate = DateTime.MinValue;
+
+        // Reset home daily counters (v0.44.0)
+        player.HomeRestsToday = 0;
+        player.HerbsGatheredToday = 0;
+
+        // Reset companion daily flags
+        CompanionSystem.Instance?.ResetDailyFlags();
+
+        // Servants' Quarters daily gold income (v0.44.0)
+        if (player.HasServants)
+        {
+            long servantsGold = GameConfig.ServantsDailyGoldBase + (player.Level * GameConfig.ServantsDailyGoldPerLevel);
+            player.Gold += servantsGold;
+            terminal?.WriteLine($"Your servants collected {servantsGold:N0} gold in rent and services.", "bright_yellow");
         }
         
         // Process daily events

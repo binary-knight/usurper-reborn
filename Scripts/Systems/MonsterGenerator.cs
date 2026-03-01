@@ -209,6 +209,9 @@ public static class MonsterGenerator
         // Apply server-wide SysOp HP multiplier
         hp = (long)(hp * GameConfig.MonsterHPMultiplier);
 
+        // Apply difficulty-based HP multiplier
+        hp = DifficultySystem.ApplyMonsterHPMultiplier(hp);
+
         return new MonsterStats
         {
             HP = Math.Max(15, hp),

@@ -40,10 +40,10 @@ public static class DifficultySystem
     /// </summary>
     public static string GetDescription(DifficultyMode mode) => mode switch
     {
-        DifficultyMode.Easy => "Relaxed gameplay. +50% XP, +50% Gold, -25% monster damage.",
+        DifficultyMode.Easy => "Relaxed gameplay. +50% XP/Gold, -25% monster damage, -15% monster HP, cheaper shops, stronger potions, lighter death penalties.",
         DifficultyMode.Normal => "Balanced challenge. Standard rewards and combat.",
-        DifficultyMode.Hard => "For veterans. -25% XP, -25% Gold, +25% monster damage.",
-        DifficultyMode.Nightmare => "Brutal challenge. -50% XP, -50% Gold, +50% monster damage, no fleeing.",
+        DifficultyMode.Hard => "For veterans. -25% XP/Gold, +25% monster damage, +20% monster HP, pricier shops, harsher death penalties.",
+        DifficultyMode.Nightmare => "Permadeath. -50% XP/Gold, +50% monster damage, +40% monster HP, no fleeing. Death is permanent.",
         _ => "Balanced challenge."
     };
 
@@ -115,6 +115,23 @@ public static class DifficultySystem
         DifficultyMode.Nightmare => false, // No fleeing in Nightmare
         _ => true
     };
+
+    /// <summary>
+    /// Monster HP multiplier based on difficulty
+    /// </summary>
+    public static float GetMonsterHPMultiplier(DifficultyMode mode) => mode switch
+    {
+        DifficultyMode.Easy => 0.85f,     // -15% monster HP
+        DifficultyMode.Normal => 1.0f,    // Standard
+        DifficultyMode.Hard => 1.2f,      // +20% monster HP
+        DifficultyMode.Nightmare => 1.4f, // +40% monster HP
+        _ => 1.0f
+    };
+
+    /// <summary>
+    /// Whether this difficulty mode has permadeath (save deleted on death)
+    /// </summary>
+    public static bool IsPermadeath(DifficultyMode mode) => mode == DifficultyMode.Nightmare;
 
     /// <summary>
     /// Healing potion effectiveness multiplier
@@ -231,6 +248,16 @@ public static class DifficultySystem
     public static bool CanFlee() => CanFlee(CurrentDifficulty);
 
     /// <summary>
+    /// Get monster HP multiplier for current difficulty
+    /// </summary>
+    public static float GetMonsterHPMultiplier() => GetMonsterHPMultiplier(CurrentDifficulty);
+
+    /// <summary>
+    /// Check if current difficulty has permadeath
+    /// </summary>
+    public static bool IsPermadeath() => IsPermadeath(CurrentDifficulty);
+
+    /// <summary>
     /// Get healing multiplier for current difficulty
     /// </summary>
     public static float GetHealingMultiplier() => GetHealingMultiplier(CurrentDifficulty);
@@ -338,5 +365,13 @@ public static class DifficultySystem
     public static long ApplyShopPriceMultiplier(long basePrice)
     {
         return (long)(basePrice * GetShopPriceMultiplier());
+    }
+
+    /// <summary>
+    /// Apply monster HP multiplier to a base HP value
+    /// </summary>
+    public static long ApplyMonsterHPMultiplier(long baseHP)
+    {
+        return (long)(baseHP * GetMonsterHPMultiplier());
     }
 }

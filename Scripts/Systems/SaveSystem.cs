@@ -600,7 +600,7 @@ namespace UsurperRemake.Systems
                 ScreenReaderMode = player.ScreenReaderMode,
                 ColorTheme = player.ColorTheme,
                 AutoLevelUp = player.AutoLevelUp,
-                TeamXPShare = player.TeamXPShare,
+                TeamXPPercent = player.TeamXPPercent,
                 Loyalty = player.Loyalty,
                 Haunt = player.Haunt,
                 Master = player.Master,

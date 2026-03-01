@@ -4660,8 +4660,7 @@ public class DungeonLocation : BaseLocation
             SaveFloorState(player);
         }
 
-        // MUD mode: broadcast dungeon descent
-        UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} descends deeper into the dungeon.");
+        // Dungeon descent broadcast removed — too spammy with multiple players online.
 
         // Screen reader mode: skip ClearScreen to avoid double separators.
         // Transition text flows naturally; DisplayLocation adds one clean separator.
@@ -6554,32 +6553,39 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine("Divine light fills you!", "bright_yellow");
                     currentPlayer.HP = currentPlayer.MaxHP;
                     terminal.WriteLine("You are fully healed!", "green");
+                    BroadcastDungeonEvent($"\u001b[32m  {currentPlayer.Name2} prays at a shrine and is fully healed!\u001b[0m");
                     break;
                 case 1:
                     var strBonus = dungeonRandom.Next(5) + 1;
                     currentPlayer.Strength += strBonus;
                     terminal.WriteLine($"You feel stronger! +{strBonus} Strength!", "green");
+                    BroadcastDungeonEvent($"\u001b[32m  {currentPlayer.Name2} prays at a shrine and gains +{strBonus} Strength!\u001b[0m");
                     break;
                 case 2:
                     var expBonus = currentDungeonLevel * 500;
                     currentPlayer.Experience += expBonus;
                     terminal.WriteLine($"Ancient wisdom flows into you! +{expBonus} EXP!", "yellow");
+                    ShareEventRewardsWithGroup(currentPlayer, 0, expBonus, "Mysterious Shrine");
+                    BroadcastDungeonEvent($"\u001b[33m  {currentPlayer.Name2} prays at a shrine and gains +{expBonus} EXP!\u001b[0m");
                     break;
                 case 3:
                     terminal.WriteLine("The shrine is silent...", "gray");
                     terminal.WriteLine("Nothing happens.", "gray");
+                    BroadcastDungeonEvent($"\u001b[90m  {currentPlayer.Name2} prays at a shrine... nothing happens.\u001b[0m");
                     break;
                 case 4:
                     var hpLoss = currentPlayer.HP / 4;
                     currentPlayer.HP = Math.Max(1, currentPlayer.HP - hpLoss);
                     terminal.WriteLine("The shrine drains your life force!", "red");
                     terminal.WriteLine($"You lose {hpLoss} HP!", "red");
+                    BroadcastDungeonEvent($"\u001b[31m  {currentPlayer.Name2} prays at a shrine and loses {hpLoss} HP!\u001b[0m");
                     break;
                 case 5:
                     var goldLoss = currentPlayer.Gold / 5;
                     currentPlayer.Gold -= goldLoss;
                     terminal.WriteLine("Your gold dissolves into the altar!", "red");
                     terminal.WriteLine($"You lose {goldLoss} gold!", "red");
+                    BroadcastDungeonEvent($"\u001b[31m  {currentPlayer.Name2} prays at a shrine and loses {goldLoss} gold!\u001b[0m");
                     break;
             }
         }
@@ -6596,6 +6602,7 @@ public class DungeonLocation : BaseLocation
 
             currentPlayer.Gold += stolen;
             currentPlayer.Darkness += darkGain;
+            ShareEventRewardsWithGroup(currentPlayer, stolen, 0, "Desecrated Shrine");
 
             // Chance of angering spirits
             if (dungeonRandom.NextDouble() < 0.3)
@@ -8226,18 +8233,14 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine("]emove ally from party");
         }
-        // XP share mode
-        string xpModeDesc = player.TeamXPShare switch
-        {
-            XPShareMode.EvenSplit => "Even Split",
-            XPShareMode.KillerTakes => "Killer Takes All",
-            _ => "Full Each"
-        };
+        // XP distribution percentages (only count non-grouped, non-echo teammates)
+        int xpEligibleCount = teammates.Count(t => t != null && !t.IsGroupedPlayer && !t.IsEcho);
+        int totalPct = player.TeamXPPercent.Take(1 + xpEligibleCount).Sum();
         terminal.Write("  [");
         terminal.SetColor("bright_yellow");
         terminal.Write("X");
         terminal.SetColor("white");
-        terminal.WriteLine($"] XP Distribution: {xpModeDesc}");
+        terminal.WriteLine($"] XP Distribution ({totalPct}% allocated)");
         terminal.Write("  [");
         terminal.SetColor("bright_yellow");
         terminal.Write("B");
@@ -8303,23 +8306,7 @@ public class DungeonLocation : BaseLocation
                 break;
 
             case "X":
-                // Cycle XP share mode
-                player.TeamXPShare = player.TeamXPShare switch
-                {
-                    XPShareMode.FullEach => XPShareMode.EvenSplit,
-                    XPShareMode.EvenSplit => XPShareMode.KillerTakes,
-                    _ => XPShareMode.FullEach
-                };
-                string newMode = player.TeamXPShare switch
-                {
-                    XPShareMode.EvenSplit => "Even Split — XP divided equally among party members",
-                    XPShareMode.KillerTakes => "Killer Takes All — only you get XP (allies get nothing)",
-                    _ => "Full Each — everyone gets full XP (default)"
-                };
-                terminal.SetColor("green");
-                terminal.WriteLine($"XP Distribution set to: {newMode}");
-                await GameEngine.Instance.SaveCurrentGame();
-                await Task.Delay(1500);
+                await ShowXPDistributionMenu();
                 return;
 
             case "B":
@@ -8509,6 +8496,163 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("Invalid selection.", "red");
         }
         await Task.Delay(1500);
+    }
+
+    private async Task ShowXPDistributionMenu()
+    {
+        var player = GetCurrentPlayer();
+
+        while (true)
+        {
+            // Build list of XP-eligible teammates (skip grouped players and echoes — they have their own XP)
+            var xpTeammates = teammates.Where(t => t != null && !t.IsGroupedPlayer && !t.IsEcho).ToList();
+
+            terminal.ClearScreen();
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("═══ XP Distribution ═══");
+            terminal.WriteLine("");
+
+            // Show grouped players note if any
+            int groupedCount = teammates.Count(t => t != null && t.IsGroupedPlayer);
+            if (groupedCount > 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  ({groupedCount} grouped player(s) earn XP independently)");
+                terminal.WriteLine("");
+            }
+
+            // Show current party with percentages
+            terminal.SetColor("white");
+            terminal.WriteLine("Current party:");
+
+            // Slot 0 — Player
+            terminal.SetColor("bright_white");
+            string youLabel = $"  [0] You ({player.Class} Lv.{player.Level})";
+            terminal.Write(youLabel.PadRight(40));
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($": {player.TeamXPPercent[0],3}%");
+
+            // Slots 1-4 — XP-eligible teammates only
+            for (int i = 0; i < 4; i++)
+            {
+                int slotIndex = i + 1;
+                int pct = slotIndex < player.TeamXPPercent.Length ? player.TeamXPPercent[slotIndex] : 0;
+
+                if (i < xpTeammates.Count)
+                {
+                    var tm = xpTeammates[i];
+                    string tmLabel = tm.IsCompanion
+                        ? $"  [{slotIndex}] {tm.DisplayName} (Companion Lv.{tm.Level})"
+                        : $"  [{slotIndex}] {tm.DisplayName} (Lv.{tm.Level} {tm.Class})";
+                    terminal.SetColor("cyan");
+                    terminal.Write(tmLabel.PadRight(40));
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($": {pct,3}%");
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    string emptyLabel = $"  [{slotIndex}] (empty)";
+                    terminal.Write(emptyLabel.PadRight(40));
+                    terminal.WriteLine($": {pct,3}%");
+                }
+            }
+
+            // Total across occupied slots
+            int occupiedSlots = 1 + xpTeammates.Count;
+            int total = player.TeamXPPercent.Take(Math.Min(occupiedSlots, player.TeamXPPercent.Length)).Sum();
+            terminal.SetColor("white");
+            terminal.Write("".PadRight(40));
+            string totalColor = total > 100 ? "red" : total == 100 ? "bright_green" : "yellow";
+            terminal.SetColor(totalColor);
+            terminal.WriteLine($"  Total: {total}%");
+
+            if (total < 100)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  Warning: {100 - total}% of XP is unallocated!");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine("Enter slot number to adjust, [E]ven split, or [B]ack:");
+            terminal.WriteLine("");
+
+            var input = (await terminal.GetInput("Choice: ")).Trim().ToUpper();
+
+            if (input == "B" || string.IsNullOrEmpty(input))
+            {
+                break;
+            }
+            else if (input == "E")
+            {
+                // Even split across occupied slots
+                int evenShare = 100 / occupiedSlots;
+                int remainder = 100 - (evenShare * occupiedSlots);
+                for (int s = 0; s < player.TeamXPPercent.Length; s++)
+                {
+                    if (s < occupiedSlots)
+                        player.TeamXPPercent[s] = evenShare + (s == 0 ? remainder : 0);
+                    else
+                        player.TeamXPPercent[s] = 0;
+                }
+                terminal.SetColor("green");
+                terminal.WriteLine($"XP split evenly: {evenShare + remainder}% for you, {evenShare}% per teammate.");
+                await GameEngine.Instance.SaveCurrentGame();
+                await Task.Delay(1500);
+            }
+            else if (int.TryParse(input, out int slot) && slot >= 0 && slot < TeamXPConfig.MaxTeamSlots)
+            {
+                // Check if slot is occupied (slot 0 = player, 1-4 = xpTeammates)
+                if (slot > xpTeammates.Count)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("That slot is empty.");
+                    await Task.Delay(1500);
+                    continue;
+                }
+
+                string slotName = slot == 0 ? "You" : (slot <= xpTeammates.Count ? xpTeammates[slot - 1].DisplayName : "(empty)");
+
+                // Calculate how much room is left (excluding this slot's current value)
+                int currentSlotPct = player.TeamXPPercent[slot];
+                int otherSlotsTotal = player.TeamXPPercent.Take(Math.Min(occupiedSlots, player.TeamXPPercent.Length)).Sum() - currentSlotPct;
+                int maxAllowed = 100 - otherSlotsTotal;
+
+                terminal.SetColor("cyan");
+                var pctInput = await terminal.GetInput($"Set XP % for {slotName} (0-{maxAllowed}, currently {currentSlotPct}%): ");
+
+                if (int.TryParse(pctInput, out int newPct) && newPct >= 0)
+                {
+                    if (newPct > maxAllowed)
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"Total would be {otherSlotsTotal + newPct}%. Maximum is 100%.");
+                        await Task.Delay(2000);
+                    }
+                    else
+                    {
+                        player.TeamXPPercent[slot] = newPct;
+                        terminal.SetColor("green");
+                        terminal.WriteLine($"{slotName} set to {newPct}% XP.");
+                        await GameEngine.Instance.SaveCurrentGame();
+                        await Task.Delay(1000);
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine("Invalid percentage.");
+                    await Task.Delay(1500);
+                }
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("Invalid choice.");
+                await Task.Delay(1000);
+            }
+        }
     }
 
     /// <summary>
@@ -9731,6 +9875,12 @@ public class DungeonLocation : BaseLocation
                     // MoveToRoom handles traps, events, combat — stop if anything happened
                     if (currentPlayer.HP <= 0) break;
                     if (currentPlayer.HP < startHP) break;
+                    // Apply poison tick for each room traversed
+                    if (currentPlayer.Poison > 0)
+                    {
+                        await ApplyPoisonDamage();
+                        if (currentPlayer.HP <= 0) break;
+                    }
                     var rm = currentFloor.GetCurrentRoom();
                     if (rm != null && rm.HasMonsters && !rm.IsCleared) break;
                 }
@@ -10285,6 +10435,7 @@ public class DungeonLocation : BaseLocation
                         room.IsCleared = true;
                 }
                 terminal.WriteLine("You gain knowledge of the dungeon layout!", "green");
+                BroadcastDungeonEvent($"\u001b[32m  {player.Name2} receives a map from a wounded adventurer — dungeon layout revealed!\u001b[0m");
                 break;
 
             case 2: // Rival adventurer
@@ -10341,12 +10492,67 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("A lost explorer stumbles towards you!", "white");
                 terminal.WriteLine("\"Oh thank the gods! I've been lost for days!\"", "yellow");
                 terminal.WriteLine("");
-                terminal.WriteLine("You guide them to safety.", "green");
-                long reward = currentDungeonLevel * 150;
-                player.Gold += reward;
-                player.Chivalry += 20;
-                terminal.WriteLine($"They reward you with {reward} gold!", "yellow");
-                terminal.WriteLine("Your chivalry increases!", "white");
+
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("G");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Guide them to safety");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("R");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Rob them and leave");
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("L");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine("Leave them be");
+
+                var explorerChoice = await terminal.GetInput("Choice: ");
+                long reward;
+                if (explorerChoice.ToUpper() == "R")
+                {
+                    reward = currentDungeonLevel * 200;
+                    terminal.WriteLine("");
+                    terminal.WriteLine("You shove the explorer against the wall and take their belongings.", "red");
+                    terminal.WriteLine("\"No! Please! That's all I have!\"", "yellow");
+                    player.Gold += reward;
+                    player.Darkness += 25;
+                    terminal.WriteLine($"You take {reward} gold from them.", "red");
+                    terminal.WriteLine("Your darkness increases...", "dark_magenta");
+                    ShareEventRewardsWithGroup(player, reward, 0, "Robbed Explorer");
+                    BroadcastDungeonEvent($"\u001b[31m  {player.Name2} robs a lost explorer for {reward} gold!\u001b[0m");
+                }
+                else if (explorerChoice.ToUpper() != "L")
+                {
+                    // Default / G = guide to safety
+                    terminal.WriteLine("");
+                    terminal.WriteLine("You guide them to safety.", "green");
+                    reward = currentDungeonLevel * 150;
+                    player.Gold += reward;
+                    player.Chivalry += 20;
+                    terminal.WriteLine($"They reward you with {reward} gold!", "yellow");
+                    terminal.WriteLine("Your chivalry increases!", "white");
+                    ShareEventRewardsWithGroup(player, reward, 0, "Lost Explorer Rescue");
+                    BroadcastDungeonEvent($"\u001b[33m  {player.Name2} rescues a lost explorer and receives {reward} gold!\u001b[0m");
+                }
+                else
+                {
+                    terminal.WriteLine("");
+                    terminal.WriteLine("You walk past without a word.", "gray");
+                    terminal.WriteLine("\"Wait! Please don't leave me here!\"", "yellow");
+                    terminal.WriteLine("Their voice fades behind you.", "gray");
+                }
                 break;
 
             case 4: // Mysterious stranger
@@ -10421,6 +10627,7 @@ public class DungeonLocation : BaseLocation
             player.Gold += goldReward;
             player.Experience += expReward;
             terminal.WriteLine($"You receive {goldReward} gold and {expReward} experience!");
+            ShareEventRewardsWithGroup(player, goldReward, expReward, "Riddle Solved");
 
             // Chance for Ocean Philosophy fragment on high difficulty riddles
             if (difficulty >= 3 && dungeonRandom.Next(100) < 30)
@@ -10541,6 +10748,7 @@ public class DungeonLocation : BaseLocation
             player.Gold += goldReward;
             player.Experience += expReward;
             terminal.WriteLine($"You gain {goldReward} gold and {expReward} experience!");
+            ShareEventRewardsWithGroup(player, goldReward, expReward, "Puzzle Solved");
 
             PuzzleSystem.Instance.MarkPuzzleSolved(currentDungeonLevel, puzzle.Title);
         }
@@ -10738,6 +10946,29 @@ public class DungeonLocation : BaseLocation
 
             hasRestThisFloor = true;
 
+            // Share rest healing with grouped players
+            if (teammates != null)
+            {
+                foreach (var mate in teammates.Where(t => t != null && t.IsAlive && t.IsGroupedPlayer))
+                {
+                    long mateHeal = mate.MaxHP / 3;
+                    mate.HP = Math.Min(mate.MaxHP, mate.HP + mateHeal);
+                    long mateMana = mate.MaxMana / 3;
+                    mate.Mana = Math.Min(mate.MaxMana, mate.Mana + mateMana);
+                    long mateSta = mate.MaxCombatStamina / 3;
+                    mate.CurrentCombatStamina = Math.Min(mate.MaxCombatStamina, mate.CurrentCombatStamina + mateSta);
+                    if (mate.Poison > 0) mate.Poison = 0;
+
+                    var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
+                    session?.EnqueueMessage(
+                        $"\u001b[32m  ═══ Safe Haven Rest ═══\u001b[0m\n" +
+                        $"\u001b[32m  +{mateHeal} HP" +
+                        (mateMana > 0 ? $"  +{mateMana} MP" : "") +
+                        (mateSta > 0 ? $"  +{mateSta} STA" : "") + "\u001b[0m");
+                }
+            }
+            BroadcastDungeonEvent($"\u001b[32m  The party rests in a safe haven and recovers their strength.\u001b[0m");
+
             // Trigger dream sequences through the Amnesia System
             // Dreams reveal the player's forgotten past as a fragment of Manwe
             await Task.Delay(1500);
@@ -10784,6 +11015,7 @@ public class DungeonLocation : BaseLocation
                         room.IsCleared = true;
                 }
                 terminal.WriteLine("All rooms are now revealed on your map!", "green");
+                BroadcastDungeonEvent($"\u001b[36m  A vision reveals the entire floor layout!\u001b[0m");
                 break;
 
             case 1: // Time warp
@@ -10795,6 +11027,8 @@ public class DungeonLocation : BaseLocation
                 long timeWarpXp = (long)(Math.Pow(currentDungeonLevel, 1.5) * 22);
                 player.Experience += timeWarpXp;
                 terminal.WriteLine($"+{timeWarpXp} experience!");
+                ShareEventRewardsWithGroup(player, 0, timeWarpXp, "Time Warp");
+                BroadcastDungeonEvent($"\u001b[32m  Reality warps! {player.Name2} gains +{timeWarpXp} XP!\u001b[0m");
                 break;
 
             case 2: // Ghostly message
@@ -10824,6 +11058,8 @@ public class DungeonLocation : BaseLocation
                 long goldRain = currentDungeonLevel * 100 + dungeonRandom.Next(500);
                 player.Gold += goldRain;
                 terminal.WriteLine($"You gather {goldRain} gold!");
+                ShareEventRewardsWithGroup(player, goldRain, 0, "Treasure Rain");
+                BroadcastDungeonEvent($"\u001b[33m  Gold coins rain from the ceiling! {player.Name2} gathers {goldRain} gold!\u001b[0m");
                 break;
         }
 
@@ -11087,6 +11323,7 @@ public class DungeonLocation : BaseLocation
             long xpReward = (long)(Math.Pow(currentDungeonLevel, 1.5) * 15 * (1 + riddle.Difficulty * 0.5));
             player.Experience += xpReward;
             terminal.WriteLine($"You gain {xpReward} experience!", "cyan");
+            ShareEventRewardsWithGroup(player, 0, xpReward, "Riddle Gate Solved");
 
             // Ocean philosophy riddles grant awakening insight
             if (riddle.IsOceanPhilosophy)
@@ -12624,6 +12861,67 @@ public class DungeonLocation : BaseLocation
         var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
         if (group == null || !group.IsLeader(ctx.Username)) return;
         GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message, excludeUsername: ctx.Username);
+    }
+
+    /// <summary>
+    /// Share gold and/or XP from a dungeon event with all grouped players.
+    /// The leader has already received the full amount — this gives each grouped player their share
+    /// and reduces the leader's gold to their fair share. XP uses level-gap multiplier.
+    /// </summary>
+    private void ShareEventRewardsWithGroup(Character leader, long goldAmount, long xpAmount, string source)
+    {
+        if (teammates == null || teammates.Count == 0) return;
+        if (goldAmount <= 0 && xpAmount <= 0) return;
+
+        var groupedPlayers = teammates.Where(t => t != null && t.IsAlive && t.IsGroupedPlayer).ToList();
+        if (groupedPlayers.Count == 0) return;
+
+        int totalMembers = 1 + groupedPlayers.Count;
+
+        // Split gold
+        long goldPerMember = goldAmount > 0 ? goldAmount / totalMembers : 0;
+        if (goldAmount > 0)
+        {
+            leader.Gold -= (goldAmount - goldPerMember); // Reduce leader to their share
+        }
+
+        // Calculate XP for each grouped player and notify
+        int highestLevel = Math.Max(leader.Level, groupedPlayers.Max(t => t.Level));
+        foreach (var mate in groupedPlayers)
+        {
+            if (goldPerMember > 0)
+            {
+                mate.Gold += goldPerMember;
+                mate.Statistics?.RecordGoldChange(mate.Gold);
+            }
+
+            long xpShare = 0;
+            if (xpAmount > 0)
+            {
+                float mult = GroupSystem.GetGroupXPMultiplier(mate.Level, highestLevel);
+                xpShare = (long)(xpAmount * mult);
+                mate.Experience += xpShare;
+            }
+
+            // Notify grouped player of their share
+            var parts = new System.Collections.Generic.List<string>();
+            if (goldPerMember > 0) parts.Add($"+{goldPerMember:N0} gold");
+            if (xpShare > 0) parts.Add($"+{xpShare:N0} XP");
+            if (parts.Count > 0)
+            {
+                var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
+                session?.EnqueueMessage(
+                    $"\u001b[1;32m  ═══ {source} (Your Share) ═══\u001b[0m\n" +
+                    $"\u001b[33m  {string.Join("  ", parts)}\u001b[0m");
+            }
+        }
+
+        // Notify leader about the split
+        if (goldAmount > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"(Gold split {totalMembers} ways: {goldPerMember} each)");
+        }
     }
 
     /// <summary>

@@ -453,8 +453,15 @@ public class CharacterCreationSystem
 
                 case "!":
                     terminal.WriteLine("");
-                    terminal.WriteLine("NIGHTMARE MODE - You dare to walk the path of pain?", DifficultySystem.GetColor(DifficultyMode.Nightmare));
-                    var confirm = await terminal.GetInputAsync("Are you SURE? (y/N): ");
+                    terminal.WriteLine("═══════════════════════════════════════════", "bright_red");
+                    terminal.WriteLine("    NIGHTMARE MODE — PERMADEATH", DifficultySystem.GetColor(DifficultyMode.Nightmare));
+                    terminal.WriteLine("═══════════════════════════════════════════", "bright_red");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("Death is permanent. Your save will be", "red");
+                    terminal.WriteLine("deleted if you die. No resurrections.", "red");
+                    terminal.WriteLine("No mercy. No second chances.", "red");
+                    terminal.WriteLine("");
+                    var confirm = await terminal.GetInputAsync("Death is PERMANENT. Are you SURE? (y/N): ");
                     if (confirm.ToUpper() == "Y")
                     {
                         terminal.WriteLine("Your fate is sealed. May the gods have mercy.", "bright_red");

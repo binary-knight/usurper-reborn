@@ -397,6 +397,53 @@ public class FeatureInteractionSystem
                     GrantsExperience = true
                 }
             },
+            DungeonTheme.Sewers => new List<LoreFragment>
+            {
+                new()
+                {
+                    Text = new[]
+                    {
+                        "Scratched into the slimy brick with a rusted nail:",
+                        "\"The water flows down. Always down.\"",
+                        "\"But I have seen it flow backward.\"",
+                        "\"Time itself is confused in this place.\""
+                    },
+                    GrantsExperience = true
+                },
+                new()
+                {
+                    Text = new[]
+                    {
+                        "A waterlogged journal, barely legible:",
+                        "\"They built these tunnels to forget what lies beneath.\"",
+                        "\"But the water remembers. It always remembers.\""
+                    },
+                    GrantsExperience = true
+                }
+            },
+            DungeonTheme.Caverns => new List<LoreFragment>
+            {
+                new()
+                {
+                    Text = new[]
+                    {
+                        "Luminous fungi spell out words on the cave wall:",
+                        "\"The stone was here before the gods.\"",
+                        "\"It will be here after they are forgotten.\""
+                    },
+                    GrantsExperience = true
+                },
+                new()
+                {
+                    Text = new[]
+                    {
+                        "An old prospector's last entry, carved into bedrock:",
+                        "\"I dug too deep and found the Ocean.\"",
+                        "\"Not water — something older. Something that knows my name.\""
+                    },
+                    GrantsExperience = true
+                }
+            },
             DungeonTheme.AncientRuins => new List<LoreFragment>
             {
                 new()
@@ -418,6 +465,102 @@ public class FeatureInteractionSystem
                         "\"Seven Seals. Seven Truths. Seven chances.\"",
                         "\"But the eighth truth was hidden from us.\"",
                         "\"Find it, and the cycle ends.\""
+                    },
+                    GrantsExperience = true
+                }
+            },
+            DungeonTheme.DemonLair => new List<LoreFragment>
+            {
+                new()
+                {
+                    Text = new[]
+                    {
+                        "Words burned into the stone floor, still smoldering:",
+                        "\"We were not always demons.\"",
+                        "\"We were the first to remember — and the gods punished us for it.\""
+                    },
+                    GrantsExperience = true
+                },
+                new()
+                {
+                    Text = new[]
+                    {
+                        "A warning scrawled in ash across a charred altar:",
+                        "\"Manwe fears what sleeps beneath his throne.\"",
+                        "\"The Ocean does not serve the gods. The gods serve it.\""
+                    },
+                    GrantsExperience = true
+                }
+            },
+            DungeonTheme.FrozenDepths => new List<LoreFragment>
+            {
+                new()
+                {
+                    Text = new[]
+                    {
+                        "Words preserved in the ice, as if spoken yesterday:",
+                        "\"I froze myself so I would not forget.\"",
+                        "\"When the thaw comes, tell them: the cycle can be broken.\""
+                    },
+                    GrantsExperience = true
+                },
+                new()
+                {
+                    Text = new[]
+                    {
+                        "A frozen traveler's final thought, etched into frost:",
+                        "\"Cold stops the cycle. Nothing changes here.\"",
+                        "\"Perhaps that is its own kind of mercy.\""
+                    },
+                    GrantsExperience = true
+                }
+            },
+            DungeonTheme.VolcanicPit => new List<LoreFragment>
+            {
+                new()
+                {
+                    Text = new[]
+                    {
+                        "Letters forged in cooled magma, impossibly precise:",
+                        "\"The fire remembers every soul it has consumed.\"",
+                        "\"Each one returns. Each one burns again.\"",
+                        "\"This is Manwe's mercy.\""
+                    },
+                    GrantsExperience = true
+                },
+                new()
+                {
+                    Text = new[]
+                    {
+                        "A blacksmith's prayer, hammered into volcanic glass:",
+                        "\"I forge weapons to fight gods.\"",
+                        "\"They break. I reforge. They break again.\"",
+                        "\"But each blade is sharper than the last.\""
+                    },
+                    GrantsExperience = true
+                }
+            },
+            DungeonTheme.AbyssalVoid => new List<LoreFragment>
+            {
+                new()
+                {
+                    Text = new[]
+                    {
+                        "The darkness itself seems to whisper:",
+                        "\"You have reached the edge of what Manwe created.\"",
+                        "\"Beyond this, only the Ocean remains.\"",
+                        "\"Step forward, and remember everything.\""
+                    },
+                    GrantsExperience = true
+                },
+                new()
+                {
+                    Text = new[]
+                    {
+                        "Floating in the void, glowing faintly with their own light:",
+                        "\"This is where the first cycle began.\"",
+                        "\"And where the last one will end.\"",
+                        "\"Are you the one who finally remembers?\""
                     },
                     GrantsExperience = true
                 }

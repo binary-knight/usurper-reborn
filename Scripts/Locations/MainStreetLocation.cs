@@ -50,7 +50,7 @@ public class MainStreetLocation : BaseLocation
             "World Events",        // ($) World Events
             "List Characters",     // (L)ist Characters
             "Fame",                // (F)ame
-            "Relations",           // (R)elations
+            // "Relations",        // Removed — redundant with Status screen
             "Inventory"            // (*) Inventory
         };
     }
@@ -859,7 +859,6 @@ public class MainStreetLocation : BaseLocation
             {
                 terminal.WriteLine("  = - Stats Record");
                 terminal.WriteLine("  P - Progress");
-                terminal.WriteLine("  R - Relations");
             }
             terminal.WriteLine("");
         }
@@ -2825,7 +2824,6 @@ public class MainStreetLocation : BaseLocation
         // terminal.WriteLine("  [L] List Players  - See other characters in the realm");  // Merged into Fame
         terminal.WriteLine("  [N] News          - Read the daily news");
         terminal.WriteLine("  [F] Fame          - View the hall of fame");
-        terminal.WriteLine("  [R] Relations     - Check your relationships with NPCs");
         terminal.WriteLine("  [$] World Events  - See current events affecting the realm");
         terminal.WriteLine("");
 

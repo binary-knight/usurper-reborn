@@ -1800,9 +1800,9 @@ public enum CombatSpeed
     Instant = 2   // No delays (0ms)
 }
 
-public enum XPShareMode
+// Per-slot XP percentage distribution constants
+public static class TeamXPConfig
 {
-    FullEach = 0,   // Each player gets full XP (default, current behavior)
-    EvenSplit = 1,  // XP divided equally among all party members
-    KillerTakes = 2 // Only the killing blow character gets XP
+    public const int MaxTeamSlots = 5; // Player (0) + 4 teammate slots (1-4)
+    public static readonly int[] DefaultTeamXPPercent = { 100, 0, 0, 0, 0 };
 }

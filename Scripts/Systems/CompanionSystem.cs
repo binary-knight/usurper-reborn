@@ -1596,6 +1596,18 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Award XP to a specific companion by name (used by per-slot XP distribution)
+        /// </summary>
+        public void AwardSpecificCompanionXP(string companionName, long xp, TerminalEmulator? terminal)
+        {
+            if (xp <= 0) return;
+            var companion = GetActiveCompanions()?.FirstOrDefault(c => c.Name == companionName);
+            if (companion == null || companion.IsDead || companion.Level >= 100) return;
+            companion.Experience += xp;
+            CheckCompanionLevelUp(companion, terminal);
+        }
+
+        /// <summary>
         /// Check if a companion should level up and apply stat gains
         /// </summary>
         private void CheckCompanionLevelUp(Companion companion, TerminalEmulator? terminal)

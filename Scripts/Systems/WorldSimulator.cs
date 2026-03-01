@@ -4821,7 +4821,7 @@ public class WorldSimulator
                 other.Id != npc.Id &&
                 !npc.Enemies.Contains(other.Id) &&
                 other.CurrentLocation == npc.CurrentLocation &&
-                !npc.IsMarried || (npc.SpouseName != (other.Name2 ?? other.Name)) // Don't rival your spouse
+                (!npc.IsMarried || npc.SpouseName != (other.Name2 ?? other.Name)) // Don't rival your spouse
             ).ToList();
 
             if (potentialRivals.Count == 0) continue;

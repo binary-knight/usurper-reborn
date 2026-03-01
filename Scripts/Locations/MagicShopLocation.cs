@@ -397,6 +397,7 @@ public partial class MagicShopLocation : BaseLocation
 
         long adjusted = (long)(basePrice * alignmentModifier * worldEventModifier * factionModifier * loyaltyModifier);
         adjusted = CityControlSystem.Instance.ApplyDiscount(adjusted, player);
+        adjusted = DifficultySystem.ApplyShopPriceMultiplier(adjusted);
         return Math.Max(1, adjusted);
     }
 

@@ -47,8 +47,9 @@ public abstract class BaseLocation
     /// </summary>
     protected void RequestRedisplay() => _locationEntryDisplayed = false;
 
-    // World boss notification tracking
-    private bool _worldBossNotifiedThisVisit = false;
+    // World boss notification tracking — static so it persists across location changes
+    private static string? _lastNotifiedBossName = null;
+    private static DateTime _lastBossNotifyTime = DateTime.MinValue;
 
     // Ambient message state (MUD mode only)
     private DateTime _lastAmbientTime = DateTime.MinValue;
@@ -497,10 +498,13 @@ public abstract class BaseLocation
 
         // Reset on every location entry so the banner always shows once on arrival
         _locationEntryDisplayed = false;
-        _worldBossNotifiedThisVisit = false;
 
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {
+            // Nightmare permadeath — save deleted, exit immediately
+            if (GameEngine.Instance.IsPermadeath)
+                return;
+
             // Auto-level-up check — catches ALL XP sources (combat, quests, seals, events, etc.)
             if (currentPlayer != null && currentPlayer.AI == CharacterAI.Human && currentPlayer.AutoLevelUp)
             {
@@ -604,16 +608,28 @@ public abstract class BaseLocation
                 terminal.WriteLine($"*** SYSTEM MESSAGE: {broadcast} ***", "bright_red");
             }
 
-            // World boss active notification (online mode, once per visit)
-            if (!_worldBossNotifiedThisVisit && UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            // World boss active notification (online mode)
+            // Shows once when a new boss spawns, then reminds every 5 minutes
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer.Level >= 10)
             {
                 var activeBossName = WorldBossSystem.Instance.ActiveBossName;
                 if (!string.IsNullOrEmpty(activeBossName))
                 {
-                    _worldBossNotifiedThisVisit = true;
-                    terminal.WriteLine("");
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine($"  *** {activeBossName} is rampaging across the realm! Type /boss to join the fight! ***");
+                    bool isNewBoss = _lastNotifiedBossName != activeBossName;
+                    bool reminderDue = (DateTime.Now - _lastBossNotifyTime).TotalMinutes >= 5;
+                    if (isNewBoss || reminderDue)
+                    {
+                        _lastNotifiedBossName = activeBossName;
+                        _lastBossNotifyTime = DateTime.Now;
+                        terminal.WriteLine("");
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine($"  *** {activeBossName} is rampaging across the realm! Type /boss to join the fight! ***");
+                    }
+                }
+                else
+                {
+                    // Boss died or despawned — reset so next boss triggers immediately
+                    _lastNotifiedBossName = null;
                 }
             }
 
@@ -1142,7 +1158,7 @@ public abstract class BaseLocation
     /// <summary>
     /// Apply poison damage each turn if player is poisoned
     /// </summary>
-    private async Task ApplyPoisonDamage()
+    protected async Task ApplyPoisonDamage()
     {
         if (currentPlayer == null || currentPlayer.Poison <= 0)
             return;
@@ -4817,6 +4833,17 @@ public abstract class BaseLocation
         }
         else
         {
+            // Check if off-hand is empty because of a two-handed weapon
+            if (slot == EquipmentSlot.OffHand)
+            {
+                var mainHand = currentPlayer.GetEquipment(EquipmentSlot.MainHand);
+                if (mainHand?.Handedness == WeaponHandedness.TwoHanded)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine("(using 2H weapon)");
+                    return;
+                }
+            }
             terminal.SetColor("darkgray");
             terminal.WriteLine("Empty");
         }

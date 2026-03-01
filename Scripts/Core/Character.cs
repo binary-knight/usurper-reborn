@@ -118,7 +118,7 @@ public class Character
     public bool ScreenReaderMode { get; set; }      // simplified text output for screen readers (accessibility)
     public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // player-selected color theme
     public bool AutoLevelUp { get; set; } = true;  // auto-level when XP threshold met (on by default)
-    public XPShareMode TeamXPShare { get; set; } = XPShareMode.FullEach;  // how XP is distributed in team combat
+    public int[] TeamXPPercent { get; set; } = new int[] { 100, 0, 0, 0, 0 };  // per-slot XP percentage (player + 4 teammates, aggregate <= 100)
     public CharacterClass Class { get; set; }       // class
     public int Loyalty { get; set; }                // loyalty% (0-100)
     public int Haunt { get; set; }                  // how many demons haunt player

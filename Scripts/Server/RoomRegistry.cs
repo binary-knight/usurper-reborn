@@ -50,11 +50,8 @@ public class RoomRegistry
         room[usernameKey] = session;
         _playerLocations[usernameKey] = location;
 
-        // Broadcast arrival to others already in the room (suppress for invisible wizards)
-        if (!session.IsWizInvisible)
-        {
-            BroadcastToRoom(location, $"\u001b[36m{session.ActiveCharacterName} arrives.\u001b[0m", excludeUsername: session.Username);
-        }
+        // Room arrival broadcast removed — too spammy with multiple players online.
+        // Players can see who's here via "Also here:" display.
     }
 
     /// <summary>
@@ -73,12 +70,7 @@ public class RoomRegistry
                 _rooms.TryRemove(location, out _);
         }
 
-        // Broadcast departure (suppress for invisible wizards)
-        if (!session.IsWizInvisible)
-        {
-            var destName = destination.HasValue ? BaseLocation.GetLocationName(destination.Value) : "elsewhere";
-            BroadcastToRoom(location, $"\u001b[90m{session.ActiveCharacterName} leaves toward {destName}.\u001b[0m", excludeUsername: session.Username);
-        }
+        // Room departure broadcast removed — too spammy with multiple players online.
     }
 
     /// <summary>

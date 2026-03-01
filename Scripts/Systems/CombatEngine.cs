@@ -375,11 +375,7 @@ public partial class CombatEngine
         globalBegged = false;
         globalEscape = false;
 
-        // MUD mode: broadcast combat start to room
-        if (monsters.Count == 1)
-            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} draws their weapon and attacks {monsters[0].Name}!");
-        else
-            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} draws their weapon and engages {monsters.Count} enemies!");
+        // Combat start broadcast removed — too spammy with multiple players online.
 
         // Show combat introduction
         terminal.ClearScreen();
@@ -917,7 +913,6 @@ public partial class CombatEngine
         if (globalEscape)
         {
             result.Outcome = CombatOutcome.PlayerEscaped;
-            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} fled from combat!");
             terminal.SetColor("yellow");
             terminal.WriteLine("You escaped from combat!");
 
@@ -2533,6 +2528,7 @@ public partial class CombatEngine
             // Quick heal uses one potion
             player.Healing--;
             long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+            healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
             player.Statistics?.RecordPotionUsed(healAmount);
@@ -2567,6 +2563,7 @@ public partial class CombatEngine
             {
                 player.Healing--;
                 long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+                healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
                 healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
                 player.HP += healAmount;
                 totalHeal += healAmount;
@@ -4418,17 +4415,23 @@ public partial class CombatEngine
         terminal.WriteLine($"You have slain the {result.Monster.Name}!");
         terminal.WriteLine("");
 
-        // MUD mode: broadcast victory to room
+        // MUD mode: broadcast boss kills only (regular kills too spammy)
         if (isBoss)
             UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} has defeated the mighty {result.Monster.Name}!");
-        else
-            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} defeated {result.Monster.Name}.");
 
         QuestSystem.OnMonsterKilled(result.Player, result.Monster.Name, isBoss);
 
         // Calculate rewards (Pascal-compatible) with world event and difficulty modifiers
         long baseExpReward = result.Monster.GetExperienceReward();
         long baseGoldReward = result.Monster.GetGoldReward();
+
+        // Level difference modifier: +5% per level above (max +25%), -15% per level below (min 25%)
+        // Base XP curve (level^1.5) already rewards higher-level monsters inherently
+        long singleLevelDiff = result.Monster.Level - result.Player.Level;
+        double singleLevelMult = singleLevelDiff > 0
+            ? Math.Min(1.25, 1.0 + singleLevelDiff * 0.05)
+            : Math.Max(0.25, 1.0 + singleLevelDiff * 0.15);
+        baseExpReward = Math.Max(10, (long)(baseExpReward * singleLevelMult));
 
         // Apply world event modifiers
         long expReward = WorldEventSystem.Instance.GetAdjustedXP(baseExpReward);
@@ -4509,44 +4512,29 @@ public partial class CombatEngine
                 goldReward += (long)(goldReward * victoryBoons.GoldPercent);
         }
 
-        // Apply team XP share mode
-        long fullExpForSharing = expReward;
-        if (result.Teammates != null && result.Teammates.Count > 0 && result.Player.TeamXPShare == XPShareMode.EvenSplit)
-        {
-            int partySize = 1 + result.Teammates.Count;
-            expReward = expReward / partySize;
-        }
+        // Apply per-slot XP percentage distribution
+        long totalXPPot = expReward;
+        long playerXP = (long)(totalXPPot * result.Player.TeamXPPercent[0] / 100.0);
 
-        result.Player.Experience += expReward;
+        result.Player.Experience += playerXP;
         result.Player.Gold += goldReward;
         bool isFirstKill = result.Player.MKills == 0;
         result.Player.MKills++;
 
-        // Award experience to active companions (50% of player's XP, or split share, or nothing)
-        if (result.Player.TeamXPShare != XPShareMode.KillerTakes)
-        {
-            long companionXP = result.Player.TeamXPShare == XPShareMode.EvenSplit ? fullExpForSharing / (1 + (result.Teammates?.Count ?? 0)) : expReward;
-            CompanionSystem.Instance?.AwardCompanionExperience(companionXP, terminal);
-        }
+        // Award per-slot XP to teammates based on percentage allocation
+        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPot, terminal);
         // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
         CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
-        // Award experience to NPC teammates (spouses/lovers) - 50% of player's XP, or split, or nothing
-        if (result.Player.TeamXPShare != XPShareMode.KillerTakes)
-        {
-            long teammateXP = result.Player.TeamXPShare == XPShareMode.EvenSplit ? fullExpForSharing / (1 + (result.Teammates?.Count ?? 0)) : expReward;
-            AwardTeammateExperience(result.Teammates, teammateXP, terminal);
-        }
+        // Grant god XP share from believer kill (based on player's actual XP)
+        GrantGodKillXP(result.Player, playerXP, result.Monster?.Name ?? "a monster");
 
-        // Grant god XP share from believer kill
-        GrantGodKillXP(result.Player, expReward, result.Monster?.Name ?? "a monster");
-
-        // Track statistics
-        result.Player.Statistics.RecordMonsterKill(expReward, goldReward, isBoss, result.Monster.IsUnique);
+        // Track statistics (player's actual share)
+        result.Player.Statistics.RecordMonsterKill(playerXP, goldReward, isBoss, result.Monster.IsUnique);
         result.Player.Statistics.RecordGoldChange(result.Player.Gold);
 
         // Log to balance dashboard
-        LogCombatEventToDb(result, "victory", expReward, goldReward);
+        LogCombatEventToDb(result, "victory", playerXP, goldReward);
 
         // Track telemetry for combat victory
         TelemetrySystem.Instance.TrackCombat(
@@ -4591,7 +4579,7 @@ public partial class CombatEngine
         QuestSystem.OnGoldCollected(result.Player, goldReward);
 
         terminal.SetColor("green");
-        terminal.WriteLine($"You gain {expReward} experience!");
+        terminal.WriteLine($"You gain {playerXP} experience!");
         terminal.WriteLine($"You find {goldReward} gold!");
 
         // Show bonus from world events if any
@@ -4634,16 +4622,11 @@ public partial class CombatEngine
             terminal.WriteLine($"  (Team bonus: +{teamXPBonus} XP, +{teamGoldBonus} gold)");
         }
 
-        // Show XP share mode info if not default
-        if (result.Player.TeamXPShare == XPShareMode.EvenSplit && result.Teammates != null && result.Teammates.Count > 0)
+        // Show XP distribution percentage if teammates present
+        if (result.Teammates != null && result.Teammates.Count > 0 && result.Player.TeamXPPercent[0] < 100)
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  (XP split evenly among {1 + result.Teammates.Count} party members)");
-        }
-        else if (result.Player.TeamXPShare == XPShareMode.KillerTakes && result.Teammates != null && result.Teammates.Count > 0)
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"  (Killer takes all XP — teammates receive nothing)");
+            terminal.WriteLine($"  (Your share: {result.Player.TeamXPPercent[0]}% of {totalXPPot} XP)");
         }
 
         // First kill bonus for brand new players
@@ -4982,6 +4965,7 @@ public partial class CombatEngine
         {
             long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
             target.HP = Math.Max(0, target.HP - lightningDamage);
+            target.StunRounds = Math.Max(target.StunRounds, 1);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine($"Lightning arcs from your strike! {lightningDamage} shock damage! {target.Name} is stunned! (Thunderstrike)");
             result.TotalDamageDealt += lightningDamage;
@@ -5065,6 +5049,7 @@ public partial class CombatEngine
         {
             long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
             target.HP -= lightningDamage;
+            target.StunRounds = Math.Max(target.StunRounds, 1);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine($"  Lightning arcs! {lightningDamage} shock damage to {target.Name}! Stunned! (Thunderstrike)");
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
@@ -7451,8 +7436,20 @@ public partial class CombatEngine
         }
 
         // Use new colored combat messages - different message for player vs allies
+        // Spell damage already shows its own flavor text — only show the final damage number
+        bool isSpellDamage = damageSource != "attack" && damageSource != "your attack"
+            && damageSource != "off-hand strike" && damageSource != "backstab"
+            && damageSource != "power attack" && damageSource != "smite"
+            && damageSource != "soul strike" && damageSource != "ranged attack"
+            && !damageSource.Contains("'s attack") && !damageSource.Contains("'s off-hand");
+
         string attackMessage;
-        if (attacker != null && attacker != currentPlayer && attacker.IsCompanion)
+        if (isSpellDamage)
+        {
+            // Spell/ability — show damage without melee flavor verbs
+            attackMessage = $"{target.Name} takes [bright_magenta]{actualDamage}[/] damage!";
+        }
+        else if (attacker != null && attacker != currentPlayer && attacker.IsCompanion)
         {
             // Companion/ally attack
             attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP);
@@ -12215,17 +12212,15 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandleVictoryMultiMonster(CombatResult result, bool offerMonkEncounter)
     {
-        // MUD mode: broadcast victory
+        // MUD mode: broadcast boss kills only (regular kills too spammy)
         if (result.DefeatedMonsters.Count > 0)
         {
-            var monsterNames = string.Join(", ", result.DefeatedMonsters.Select(m => m.Name).Distinct());
             bool anyBoss = result.DefeatedMonsters.Any(m => m.IsBoss);
             if (anyBoss)
+            {
+                var monsterNames = string.Join(", ", result.DefeatedMonsters.Select(m => m.Name).Distinct());
                 UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} has defeated the mighty {monsterNames}!");
-            else if (result.DefeatedMonsters.Count == 1)
-                UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} defeated {monsterNames}.");
-            else
-                UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} defeated {result.DefeatedMonsters.Count} enemies!");
+            }
         }
 
         terminal.WriteLine("");
@@ -12268,11 +12263,11 @@ public partial class CombatEngine
             long baseExp = monster.Experience;
             long levelDiff = monster.Level - result.Player.Level;
 
-            // Percentage-based bonus/penalty: 15% per level difference
-            // Fighting higher level monsters gives significant bonus (up to 100% extra)
-            // Fighting lower level monsters gives penalty (minimum 25% of base)
-            double levelMultiplier = 1.0 + (levelDiff * 0.15);
-            levelMultiplier = Math.Clamp(levelMultiplier, 0.25, 2.0);
+            // Level difference modifier: +5% per level above (max +25%), -15% per level below (min 25%)
+            // Base XP curve (level^1.5) already rewards higher-level monsters inherently
+            double levelMultiplier = levelDiff > 0
+                ? Math.Min(1.25, 1.0 + levelDiff * 0.05)
+                : Math.Max(0.25, 1.0 + levelDiff * 0.15);
             long expReward = (long)(baseExp * levelMultiplier);
             expReward = Math.Max(10, expReward); // Never less than 10 XP
 
@@ -12348,31 +12343,27 @@ public partial class CombatEngine
             adjustedExp = (long)(adjustedExp * result.Player.CycleExpMultiplier);
         }
 
-        // Apply team XP share mode
-        long fullExpForSharingMM = adjustedExp;
-        if (result.Teammates != null && result.Teammates.Count > 0 && result.Player.TeamXPShare == XPShareMode.EvenSplit)
-        {
-            int partySize = 1 + result.Teammates.Count;
-            adjustedExp = adjustedExp / partySize;
-        }
+        // Apply per-slot XP percentage distribution
+        long totalXPPotMM = adjustedExp;
+        long playerXPmm = (long)(totalXPPotMM * result.Player.TeamXPPercent[0] / 100.0);
 
-        // Apply rewards
-        result.Player.Experience += adjustedExp;
+        // Apply rewards (player's percentage share)
+        result.Player.Experience += playerXPmm;
         result.Player.Gold += adjustedGold;
-        result.ExperienceGained = adjustedExp;
+        result.ExperienceGained = playerXPmm;
         result.GoldGained = adjustedGold;
 
         // Track peak gold
         result.Player.Statistics.RecordGoldChange(result.Player.Gold);
 
-        // Grant god XP share from believer kill (multi-monster path)
+        // Grant god XP share from believer kill (based on player's actual XP)
         string mmMonsterDesc = result.DefeatedMonsters.Count == 1
             ? result.DefeatedMonsters[0].Name
             : $"{result.DefeatedMonsters.Count} monsters";
-        GrantGodKillXP(result.Player, adjustedExp, mmMonsterDesc);
+        GrantGodKillXP(result.Player, playerXPmm, mmMonsterDesc);
 
         // Log to balance dashboard
-        LogCombatEventToDb(result, "victory", adjustedExp, adjustedGold);
+        LogCombatEventToDb(result, "victory", playerXPmm, adjustedGold);
 
         // Track telemetry for multi-monster combat victory
         bool hasBoss = result.DefeatedMonsters.Any(m => m.IsBoss);
@@ -12389,21 +12380,10 @@ public partial class CombatEngine
             result.Player.Class.ToString()
         );
 
-        // Award experience to active companions (50% of player's XP, or split share, or nothing)
-        if (result.Player.TeamXPShare != XPShareMode.KillerTakes)
-        {
-            long companionXPmm = result.Player.TeamXPShare == XPShareMode.EvenSplit ? fullExpForSharingMM / (1 + (result.Teammates?.Count ?? 0)) : adjustedExp;
-            CompanionSystem.Instance?.AwardCompanionExperience(companionXPmm, terminal);
-        }
+        // Award per-slot XP to teammates based on percentage allocation
+        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPotMM, terminal);
         // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
         CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
-
-        // Award experience to NPC teammates (spouses/lovers) - split share, or nothing
-        if (result.Player.TeamXPShare != XPShareMode.KillerTakes)
-        {
-            long teammateXPmm = result.Player.TeamXPShare == XPShareMode.EvenSplit ? fullExpForSharingMM / (1 + (result.Teammates?.Count ?? 0)) : adjustedExp;
-            AwardTeammateExperience(result.Teammates, teammateXPmm, terminal);
-        }
 
         // Distribute rewards to grouped players (independent XP calculation per player)
         await DistributeGroupRewards(result, totalExp, totalGold);
@@ -12414,12 +12394,12 @@ public partial class CombatEngine
         // Display rewards
         terminal.SetColor("yellow");
         terminal.WriteLine($"Defeated {result.DefeatedMonsters.Count} monster(s)!");
-        terminal.WriteLine($"Experience gained: {adjustedExp}");
+        terminal.WriteLine($"Experience gained: {playerXPmm}");
 
         // Show team balance XP penalty if applicable
         if (teamXPMult < 1.0f)
         {
-            long xpLost = preTeamBalanceExp - adjustedExp;
+            long xpLost = preTeamBalanceExp - totalXPPotMM;
             terminal.SetColor("yellow");
             terminal.WriteLine($"  (High-level ally penalty: -{xpLost} XP, {(int)(teamXPMult * 100)}% rate)");
         }
@@ -12431,16 +12411,11 @@ public partial class CombatEngine
             terminal.WriteLine($"  (Team bonus: +{teamXPBonus} XP, +{teamGoldBonus} gold)");
         }
 
-        // Show XP share mode info if not default
-        if (result.Player.TeamXPShare == XPShareMode.EvenSplit && result.Teammates != null && result.Teammates.Count > 0)
+        // Show XP distribution percentage if teammates present
+        if (result.Teammates != null && result.Teammates.Count > 0 && result.Player.TeamXPPercent[0] < 100)
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  (XP split evenly among {1 + result.Teammates.Count} party members)");
-        }
-        else if (result.Player.TeamXPShare == XPShareMode.KillerTakes && result.Teammates != null && result.Teammates.Count > 0)
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"  (Killer takes all XP — teammates receive nothing)");
+            terminal.WriteLine($"  (Your share: {result.Player.TeamXPPercent[0]}% of {totalXPPotMM} XP)");
         }
 
         terminal.WriteLine($"Gold gained: {adjustedGold:N0}");
@@ -12647,24 +12622,25 @@ public partial class CombatEngine
             adjustedExp = (long)(adjustedExp * result.Player.CycleExpMultiplier);
         }
 
-        result.Player.Experience += adjustedExp;
+        // Apply per-slot XP percentage distribution
+        long totalXPPotPV = adjustedExp;
+        long playerXPpv = (long)(totalXPPotPV * result.Player.TeamXPPercent[0] / 100.0);
+
+        result.Player.Experience += playerXPpv;
         result.Player.Gold += adjustedGold;
 
-        // Grant god XP share from believer kill (partial victory path)
+        // Grant god XP share from believer kill (based on player's actual XP)
         string pvMonsterDesc = result.DefeatedMonsters.Count == 1
             ? result.DefeatedMonsters[0].Name
             : $"{result.DefeatedMonsters.Count} monsters";
-        GrantGodKillXP(result.Player, adjustedExp, pvMonsterDesc);
+        GrantGodKillXP(result.Player, playerXPpv, pvMonsterDesc);
 
-        // Award experience to active companions (50% of player's XP)
-        CompanionSystem.Instance?.AwardCompanionExperience(adjustedExp, terminal);
+        // Award per-slot XP to teammates based on percentage allocation
+        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPotPV, terminal);
         // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
         CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
-        // Award experience to NPC teammates (spouses/lovers) - 50% of player's XP
-        AwardTeammateExperience(result.Teammates, adjustedExp, terminal);
-
-        terminal.WriteLine($"Experience gained: {adjustedExp}");
+        terminal.WriteLine($"Experience gained: {playerXPpv}");
 
         // Show team balance XP penalty if applicable
         if (teamXPMult < 1.0f)
@@ -12758,6 +12734,35 @@ public partial class CombatEngine
             result.Monster?.Name ?? "unknown",
             result.Monster?.Level ?? 0 // use monster level as proxy for dungeon depth
         );
+
+        // Nightmare mode = permadeath — no resurrection, save deleted
+        if (DifficultySystem.IsPermadeath())
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine("═══════════════════════════════════════════", "bright_red");
+            terminal.WriteLine("        N I G H T M A R E   M O D E", "bright_red");
+            terminal.WriteLine("              P E R M A D E A T H", "bright_red");
+            terminal.WriteLine("═══════════════════════════════════════════", "bright_red");
+            terminal.WriteLine("");
+            await Task.Delay(GetCombatDelay(2000));
+            terminal.WriteLine("There is no resurrection. There is no mercy.", "red");
+            terminal.WriteLine("Your journey ends here, forever.", "red");
+            terminal.WriteLine("");
+            await Task.Delay(GetCombatDelay(2000));
+
+            // Delete the save
+            string playerName = !string.IsNullOrEmpty(result.Player.Name1) ? result.Player.Name1 : result.Player.Name2;
+            SaveSystem.Instance.DeleteSave(playerName);
+
+            terminal.WriteLine("Your save has been erased from existence.", "dark_red");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+
+            result.IsPermadeath = true;
+            result.ShouldReturnToTemple = false;
+            GameEngine.Instance.IsPermadeath = true;
+            return;
+        }
 
         // Present resurrection options
         var resurrectionResult = await PresentResurrectionChoices(result);
@@ -13001,14 +13006,17 @@ public partial class CombatEngine
             canLoseItems = true;
         }
 
-        long expLoss = (long)(player.Experience * xpLossRate);
+        // Apply difficulty-based death penalty multiplier
+        float penaltyMultiplier = DifficultySystem.GetDeathPenaltyMultiplier();
+
+        long expLoss = (long)(player.Experience * xpLossRate * penaltyMultiplier);
         player.Experience = Math.Max(0, player.Experience - expLoss);
         terminal.WriteLine($"You lose {expLoss:N0} experience points!");
 
         // Crown Tax Exemption reduces gold loss
         float taxExemption = FactionSystem.Instance?.GetTaxExemptionRate() ?? 0f;
         if (taxExemption > 0) goldLossRate *= (1.0 - taxExemption);
-        long goldLoss = (long)(player.Gold * goldLossRate);
+        long goldLoss = (long)(player.Gold * goldLossRate * penaltyMultiplier);
         player.Gold = Math.Max(0, player.Gold - goldLoss);
         if (goldLoss > 0)
         {
@@ -15820,6 +15828,77 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// Distribute XP to teammates based on per-slot percentage allocation.
+    /// Each teammate's slot index (1-4) maps to TeamXPPercent[1-4].
+    /// </summary>
+    private void DistributeTeamSlotXP(Character player, List<Character>? teammates, long totalXPPot, TerminalEmulator terminal)
+    {
+        if (teammates == null || teammates.Count == 0 || totalXPPot <= 0) return;
+
+        bool headerShown = false;
+        int xpSlot = 0; // Tracks which XP slot we're on (1-4), skipping grouped players/echoes
+
+        for (int i = 0; i < teammates.Count; i++)
+        {
+            var teammate = teammates[i];
+            if (teammate == null) continue;
+            // Grouped players and echoes don't consume XP slots — they have their own XP paths
+            if (teammate.IsEcho || teammate.IsGroupedPlayer) continue;
+
+            xpSlot++; // Next eligible teammate gets the next XP slot (1, 2, 3, 4)
+            if (xpSlot >= player.TeamXPPercent.Length) break;
+
+            if (!teammate.IsAlive || teammate.Level >= 100) continue;
+
+            int percent = player.TeamXPPercent[xpSlot];
+            if (percent <= 0) continue;
+
+            long slotXP = (long)(totalXPPot * percent / 100.0);
+            if (slotXP <= 0) continue;
+
+            if (!headerShown)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("Team XP Distribution:");
+                headerShown = true;
+            }
+
+            if (teammate.IsCompanion)
+            {
+                // Award to companion through CompanionSystem
+                CompanionSystem.Instance?.AwardSpecificCompanionXP(teammate.DisplayName, slotXP, terminal);
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"  {teammate.DisplayName} ({percent}%): +{slotXP} XP");
+            }
+            else
+            {
+                // NPC teammate — award directly and check level-up
+                teammate.Experience += slotXP;
+                long xpNeeded = GetExperienceForLevel(teammate.Level + 1);
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  {teammate.DisplayName} ({percent}%): +{slotXP} XP ({teammate.Experience:N0}/{xpNeeded:N0})");
+
+                // Check for level up
+                long xpForNextLevel = GetExperienceForLevel(teammate.Level + 1);
+                while (teammate.Experience >= xpForNextLevel && teammate.Level < 100)
+                {
+                    teammate.Level++;
+                    var random = new Random();
+                    teammate.BaseMaxHP += 10 + random.Next(5, 15);
+                    teammate.BaseStrength += random.Next(1, 3);
+                    teammate.BaseDefence += random.Next(1, 2);
+                    teammate.RecalculateStats();
+                    teammate.HP = teammate.MaxHP;
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  {teammate.DisplayName} leveled up! (Lv {teammate.Level})");
+                    NewsSystem.Instance?.Newsy(true, $"{teammate.DisplayName} has achieved Level {teammate.Level}!");
+                    xpForNextLevel = GetExperienceForLevel(teammate.Level + 1);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// XP formula matching the player's curve (level^2.0 * 50)
     /// </summary>
     private static long GetExperienceForLevel(int level)
@@ -17191,8 +17270,9 @@ public partial class CombatEngine
             {
                 long baseExp = monster.Experience;
                 long levelDiff = monster.Level - groupedPlayer.Level;
-                double levelMultiplier = 1.0 + (levelDiff * 0.15);
-                levelMultiplier = Math.Clamp(levelMultiplier, 0.25, 2.0);
+                double levelMultiplier = levelDiff > 0
+                    ? Math.Min(1.25, 1.0 + levelDiff * 0.05)
+                    : Math.Max(0.25, 1.0 + levelDiff * 0.15);
                 playerExp += Math.Max(10, (long)(baseExp * levelMultiplier));
             }
 
@@ -17472,6 +17552,9 @@ public class CombatResult
 
     // Resurrection flags
     public bool ShouldReturnToTemple { get; set; }
+
+    // Nightmare permadeath — save was deleted, exit to menu
+    public bool IsPermadeath { get; set; }
 }
 
 /// <summary>

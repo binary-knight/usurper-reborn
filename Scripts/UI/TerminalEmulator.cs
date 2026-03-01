@@ -1926,6 +1926,7 @@ public partial class TerminalEmulator
         var buffer = new System.Text.StringBuilder();
         var charBuf = new char[1];
         int escState = 0; // 0 = normal, 1 = after ESC, 2 = inside CSI (ESC [)
+        var lastKeystrokeTime = DateTime.MinValue; // track typing activity
 
         // Kick off the first async read.  We reuse this task across the poll loop
         // so we never have two concurrent ReadAsync calls on the same stream.
@@ -1939,8 +1940,12 @@ public partial class TerminalEmulator
 
             if (completed != readTask)
             {
-                // No character yet — check/deliver queued messages.
-                DeliverPendingMessagesWithRedraw(prompt, buffer);
+                // No character yet — only deliver messages if the user isn't
+                // actively typing (500ms grace period prevents input stomping).
+                bool userIsTyping = buffer.Length > 0
+                    && (DateTime.Now - lastKeystrokeTime).TotalMilliseconds < 500;
+                if (!userIsTyping)
+                    DeliverPendingMessagesWithRedraw(prompt, buffer);
                 continue; // readTask is still the same pending call
             }
 
@@ -2026,6 +2031,7 @@ public partial class TerminalEmulator
                         lock (_streamWriterLock) { _streamWriter.Write("\b \b"); _streamWriter.Flush(); }
                     }
                 }
+                lastKeystrokeTime = DateTime.Now;
                 UpdateMudIdleTimeout(); // any keystroke resets idle (throttled)
             }
             else if (c >= ' ') // printable ASCII
@@ -2036,6 +2042,7 @@ public partial class TerminalEmulator
                 {
                     lock (_streamWriterLock) { _streamWriter.Write(c); _streamWriter.Flush(); }
                 }
+                lastKeystrokeTime = DateTime.Now;
                 UpdateMudIdleTimeout(); // any keystroke resets idle (throttled)
             }
             // Control chars other than the above are silently dropped.
