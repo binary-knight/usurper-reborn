@@ -654,13 +654,16 @@ public abstract class BaseLocation
             // Process choice
             exitLocation = await ProcessChoice(choice);
 
-            // Increment turn count (drives world simulation)
+            // Increment turn count and advance game time
             if (currentPlayer != null && !string.IsNullOrWhiteSpace(choice))
             {
                 currentPlayer.TurnCount++;
 
                 // Apply poison damage each turn
-                await ApplyPoisonDamage();
+                // Dungeon suppresses this — it handles poison ticks on room movement instead,
+                // so invalid keys and guide navigation don't double-tick poison
+                if (!SuppressBasePoisonTick)
+                    await ApplyPoisonDamage();
 
                 // 5% chance per turn: an NPC with strong opinions approaches the player
                 if (!exitLocation && currentPlayer.IsAlive && _npcRandom.Next(100) < 5)
@@ -668,14 +671,43 @@ public abstract class BaseLocation
                     await TryNPCApproach();
                 }
 
-                // Run world simulation every 5 turns
-                if (currentPlayer.TurnCount % 5 == 0)
+                // Advance game time and run world sim on hour boundaries (single-player)
+                // Online mode keeps the old turn-based trigger
+                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 {
-                    await RunWorldSimulationTick();
+                    int hoursCrossed = DailySystemManager.Instance.AdvanceGameTime(
+                        currentPlayer, GameConfig.MinutesPerAction);
+                    for (int i = 0; i < hoursCrossed; i++)
+                    {
+                        await RunWorldSimulationTick();
+                    }
+
+                    // Show atmospheric time transition message if period changed
+                    var transition = DailySystemManager.Instance.CheckTimeTransition(currentPlayer);
+                    if (transition != null)
+                    {
+                        terminal.WriteLine("");
+                        terminal.SetColor(DailySystemManager.GetTimePeriodColor(currentPlayer));
+                        terminal.WriteLine(transition);
+                    }
+                }
+                else
+                {
+                    // Online mode: world simulation every 5 turns (legacy behavior)
+                    if (currentPlayer.TurnCount % 5 == 0)
+                    {
+                        await RunWorldSimulationTick();
+                    }
                 }
             }
         }
     }
+
+    /// <summary>
+    /// When true, the base location loop skips its per-input poison tick.
+    /// Dungeon overrides this because it handles poison on room movement instead.
+    /// </summary>
+    protected virtual bool SuppressBasePoisonTick => false;
 
     /// <summary>
     /// Check if this location should have random encounters
@@ -1216,11 +1248,27 @@ public abstract class BaseLocation
         // Breadcrumb navigation
         ShowBreadcrumb();
 
-        // Location header
+        // Location header (with time-of-day for single-player, non-dungeon locations)
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Name);
-        terminal.SetColor("yellow");
-        terminal.WriteLine(new string('═', Name.Length));
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null
+            && LocationId != GameLocation.Dungeons)
+        {
+            var timePeriod = DailySystemManager.GetTimePeriodString(currentPlayer);
+            var timeColor = DailySystemManager.GetTimePeriodColor(currentPlayer);
+            terminal.Write(Name);
+            terminal.SetColor("gray");
+            terminal.Write(" — ");
+            terminal.SetColor(timeColor);
+            terminal.WriteLine(timePeriod);
+            terminal.SetColor("yellow");
+            terminal.WriteLine(new string('═', Name.Length + 3 + timePeriod.Length));
+        }
+        else
+        {
+            terminal.WriteLine(Name);
+            terminal.SetColor("yellow");
+            terminal.WriteLine(new string('═', Name.Length));
+        }
         terminal.WriteLine("");
         
         // Location description
@@ -1280,7 +1328,7 @@ public abstract class BaseLocation
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs ?? new List<NPC>();
 
         return allNPCs
-            .Where(npc => npc.IsAlive &&
+            .Where(npc => npc.IsAlive && !npc.IsDead &&
                    npc.CurrentLocation?.Equals(locationString, StringComparison.OrdinalIgnoreCase) == true)
             .ToList();
     }
@@ -2075,6 +2123,8 @@ public abstract class BaseLocation
                 return (true, false);
             case "0":
             case "TALK":
+                if (LocationId == GameLocation.Dungeons)
+                    return (false, false); // No NPCs to talk to in the dungeon
                 await TalkToNPC();
                 return (true, false);
             case "?":
@@ -2143,6 +2193,12 @@ public abstract class BaseLocation
             case "pot":
             case "potion":
                 await UseQuickPotion();
+                return (true, false);
+
+            case "j":
+            case "herb":
+            case "herbs":
+                await HomeLocation.UseHerbMenu(currentPlayer, terminal);
                 return (true, false);
 
             case "bug":
@@ -2311,6 +2367,17 @@ public abstract class BaseLocation
         terminal.Write("/pot");
         terminal.SetColor("white");
         terminal.WriteLine("- Use a healing potion                                   ║");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("║  ");
+        terminal.SetColor("cyan");
+        terminal.Write("/herb     ");
+        terminal.SetColor("gray");
+        terminal.Write("or ");
+        terminal.SetColor("cyan");
+        terminal.Write("/j  ");
+        terminal.SetColor("white");
+        terminal.WriteLine("- Use an herb from your pouch                            ║");
 
         terminal.SetColor("bright_yellow");
         terminal.Write("║  ");

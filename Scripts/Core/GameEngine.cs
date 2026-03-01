@@ -3116,6 +3116,7 @@ public partial class GameEngine
             // Game state
             TurnCount = playerData.TurnCount,  // World simulation turn counter
             TurnsRemaining = playerData.TurnsRemaining,
+            GameTimeMinutes = playerData.GameTimeMinutes > 0 ? playerData.GameTimeMinutes : GameConfig.NewGameStartHour * 60,
             DaysInPrison = (byte)playerData.DaysInPrison,
             CellDoorOpen = playerData.CellDoorOpen,
             RescuedBy = playerData.RescuedBy ?? "",
@@ -3538,6 +3539,13 @@ public partial class GameEngine
         player.LastWrestling = playerData.LastWrestling;
 
         // Set the global difficulty mode based on the loaded player
+        // Defense-in-depth: online mode is always Normal difficulty regardless of saved data
+        // (some legacy characters were created before the online gate was added)
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Difficulty != DifficultyMode.Normal)
+        {
+            DebugLogger.Instance.LogWarning("ONLINE", $"Player {player.Name2 ?? player.Name1} had non-Normal difficulty ({player.Difficulty}) in online mode — forcing Normal");
+            player.Difficulty = DifficultyMode.Normal;
+        }
         DifficultySystem.CurrentDifficulty = player.Difficulty;
 
         // Load player statistics (or initialize if not present)
@@ -3593,6 +3601,17 @@ public partial class GameEngine
         player.LoversBlissBonus = playerData.LoversBlissBonus;
         player.CycleExpMultiplier = playerData.CycleExpMultiplier;
 
+        // Restore herb pouch inventory (v0.48.5)
+        player.HerbHealing = playerData.HerbHealing;
+        player.HerbIronbark = playerData.HerbIronbark;
+        player.HerbFirebloom = playerData.HerbFirebloom;
+        player.HerbSwiftthistle = playerData.HerbSwiftthistle;
+        player.HerbStarbloom = playerData.HerbStarbloom;
+        player.HerbBuffType = playerData.HerbBuffType;
+        player.HerbBuffCombats = playerData.HerbBuffCombats;
+        player.HerbBuffValue = playerData.HerbBuffValue;
+        player.HerbExtraAttacks = playerData.HerbExtraAttacks;
+
         // Restore chest contents
         var playerKey = (player is Player pp ? pp.RealName : player.Name2) ?? player.Name2;
         if (playerData.ChestContents != null && playerData.ChestContents.Count > 0)
@@ -3640,6 +3659,8 @@ public partial class GameEngine
         player.SethFightsToday = playerData.SethFightsToday;
         player.ArmWrestlesToday = playerData.ArmWrestlesToday;
         player.RoyQuestsToday = playerData.RoyQuestsToday;
+        player.Quests = playerData.Quests;
+        player.RoyQuests = playerData.RoyQuests;
 
         // Dark Alley Overhaul (v0.41.0)
         player.GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex;

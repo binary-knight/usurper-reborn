@@ -165,14 +165,19 @@ public class FeatureInteractionSystem
 
         if (lore.AffectsAlignment)
         {
-            // Use ChivNr (good deeds) and DarkNr (dark deeds) for alignment
+            int amount = Math.Abs(lore.AlignmentShift);
             if (lore.AlignmentShift > 0)
-                player.ChivNr += Math.Abs(lore.AlignmentShift);
+            {
+                player.Chivalry += amount;
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"You feel drawn toward the light... (+{amount} Chivalry)");
+            }
             else
-                player.DarkNr += Math.Abs(lore.AlignmentShift);
-            string direction = lore.AlignmentShift > 0 ? "light" : "darkness";
-            terminal.SetColor(lore.AlignmentShift > 0 ? "bright_yellow" : "dark_magenta");
-            terminal.WriteLine($"You feel drawn toward the {direction}...");
+            {
+                player.Darkness += amount;
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine($"You feel drawn toward the darkness... (+{amount} Darkness)");
+            }
         }
 
         if (lore.RevealsOldGod != null)
@@ -797,15 +802,20 @@ public class FeatureInteractionSystem
         terminal.WriteLine("");
         await Task.Delay(500);
 
-        // Apply alignment shift using ChivNr (good) and DarkNr (dark)
+        // Apply alignment shift to Chivalry/Darkness
         if (option.AlignmentShift != 0)
         {
+            int amount = Math.Abs(option.AlignmentShift);
             if (option.AlignmentShift > 0)
-                player.ChivNr += option.AlignmentShift;
+            {
+                player.Chivalry += amount;
+                terminal.WriteLine($"Your soul shifts toward the light... (+{amount} Chivalry)", "bright_cyan");
+            }
             else
-                player.DarkNr += Math.Abs(option.AlignmentShift);
-            string direction = option.AlignmentShift > 0 ? "light" : "darkness";
-            terminal.WriteLine($"Your soul shifts toward the {direction}...");
+            {
+                player.Darkness += amount;
+                terminal.WriteLine($"Your soul shifts toward the darkness... (+{amount} Darkness)", "dark_red");
+            }
         }
 
         // Apply rewards/consequences

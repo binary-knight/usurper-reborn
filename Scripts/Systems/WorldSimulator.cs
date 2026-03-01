@@ -2022,7 +2022,7 @@ public class WorldSimulator
     /// </summary>
     private static void ApplyTimeOfDayWeights(List<(string action, double weight)> activities)
     {
-        int hour = DateTime.Now.Hour;
+        int hour = DailySystemManager.GetCurrentGameHour();
 
         if (hour >= 6 && hour < 12) // Morning
         {
@@ -4898,6 +4898,7 @@ public class WorldSimulator
         float escalationChance = isOnline ? 0.03f : 0.12f;
 
         var enemies = npcs.Where(npc => npc.IsAlive && !npc.IsDead && npc.Enemies.Count > 0).ToList();
+        var processedPairs = new HashSet<string>(); // Prevent A→B and B→A both firing in same tick
 
         foreach (var npc in enemies)
         {
@@ -4918,6 +4919,11 @@ public class WorldSimulator
                 if (!enemy.IsAlive || enemy.IsDead) continue;
                 if (IsPlayerTeam(enemy.Team)) continue; // Don't target player team members
                 if ((float)Random.Shared.NextDouble() >= escalationChance) continue;
+
+                // Skip if this pair already had a conflict this tick (prevents duplicate news)
+                string pairId = string.Compare(npc.Id, enemyId, StringComparison.Ordinal) < 0
+                    ? $"{npc.Id}:{enemyId}" : $"{enemyId}:{npc.Id}";
+                if (!processedPairs.Add(pairId)) continue;
 
                 // Must be at same location to escalate
                 if (npc.CurrentLocation != enemy.CurrentLocation) continue;
@@ -5111,8 +5117,8 @@ public class WorldSimulator
         if (!loser.Enemies.Contains(winner.Id))
             loser.Enemies.Add(winner.Id);
 
-        // Witnesses observe the challenge
-        SocialInfluenceSystem.RecordWitnesses(npcs, challenger.CurrentLocation, winnerName, loserName, WitnessEventType.SawChallenge);
+        // Witnesses observe the challenge (suppress auto-news — we generate our own below)
+        SocialInfluenceSystem.RecordWitnesses(npcs, challenger.CurrentLocation, challengerName, targetName, WitnessEventType.SawChallenge, suppressNews: true);
 
         // Generate news
         NewsSystem.Instance?.Newsy($"{challengerName} publicly challenged {targetName} at the {challenger.CurrentLocation}! {winnerName} emerged victorious.");

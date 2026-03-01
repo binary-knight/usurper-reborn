@@ -125,9 +125,9 @@ public partial class Quest
             },
             QuestRewardType.Money => Reward switch
             {
-                1 => playerLevel * 1100,  // Low gold
-                2 => playerLevel * 5100,  // Medium gold
-                3 => playerLevel * 11000, // High gold
+                1 => playerLevel * 150,   // Low gold (~5-10 monster kills)
+                2 => playerLevel * 500,   // Medium gold (~15-25 monster kills)
+                3 => playerLevel * 1000,  // High gold (~30-50 monster kills)
                 _ => 0
             },
             QuestRewardType.Potions => Reward switch
@@ -210,14 +210,12 @@ public partial class Quest
     public bool AreAllObjectivesComplete()
     {
         if (Objectives == null || Objectives.Count == 0) return true;
-        // Primary check: all required (non-optional) objectives are complete
-        if (Objectives.Where(o => !o.IsOptional).All(o => o.IsComplete))
-            return true;
-        // Alternative: for RescueNPC quests, completing ALL optional objectives
-        // also satisfies the quest (the NPC may be dead and untalkable)
-        if (QuestTarget == QuestTarget.RescueNPC && Objectives.Any(o => o.IsOptional))
-            return Objectives.Where(o => o.IsOptional).All(o => o.IsComplete);
-        return false;
+        // All required (non-optional) objectives must be complete
+        // Optional objectives are tracked but don't block completion
+        // Note: RescueNPC quests no longer need an alternative path — dead NPCs
+        // have their TalkToNPC objective auto-completed when the player reaches
+        // the target dungeon floor (handled in QuestSystem.OnDungeonFloorReached)
+        return Objectives.Where(o => !o.IsOptional).All(o => o.IsComplete);
     }
 
     /// <summary>

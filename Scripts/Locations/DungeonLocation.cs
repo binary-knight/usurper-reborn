@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.Locations;
 using UsurperRemake.Data;
 using UsurperRemake.BBS;
 using UsurperRemake.Server;
@@ -34,6 +35,10 @@ public class DungeonLocation : BaseLocation
     private int consecutiveMonsterRooms = 0;
     private int roomsExploredThisFloor = 0;
     private bool hasRestThisFloor = false;
+
+    // Dungeon handles poison ticks on room movement, not on every menu input.
+    // This prevents invalid keys and guide navigation from double-ticking poison.
+    protected override bool SuppressBasePoisonTick => true;
 
     public DungeonLocation() : base(
         GameLocation.Dungeons,
@@ -1930,6 +1935,18 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("white");
         terminal.Write("Potions  ");
 
+        if (currentPlayer.TotalHerbCount > 0)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("J");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_green");
+            terminal.Write($"Herbs({currentPlayer.TotalHerbCount})  ");
+        }
+
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
@@ -2915,6 +2932,9 @@ public class DungeonLocation : BaseLocation
         if (direction.HasValue && room.Exits.ContainsKey(direction.Value))
         {
             await MoveToRoom(room.Exits[direction.Value].TargetRoomId);
+            // Poison ticks on room movement (base loop poison is suppressed for dungeon)
+            if (currentPlayer?.Poison > 0)
+                await ApplyPoisonDamage();
             return false;
         }
 
@@ -2980,6 +3000,11 @@ public class DungeonLocation : BaseLocation
 
             case "P":
                 await UsePotions();
+                RequestRedisplay();
+                return false;
+
+            case "J":
+                await HomeLocation.UseHerbMenu(currentPlayer, terminal);
                 RequestRedisplay();
                 return false;
 
@@ -3051,6 +3076,14 @@ public class DungeonLocation : BaseLocation
         {
             targetRoom.IsExplored = true;
             roomsExploredThisFloor++;
+
+            // Advance game time for room exploration (single-player)
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                var timePlayer = GetCurrentPlayer();
+                if (timePlayer != null)
+                    DailySystemManager.Instance.AdvanceGameTime(timePlayer, GameConfig.MinutesPerDungeonRoom);
+            }
 
             // Room discovery message
             terminal.SetColor(GetThemeColor(currentFloor.Theme));
@@ -10978,6 +11011,18 @@ public class DungeonLocation : BaseLocation
             await Task.Delay(1000);
 
             await AmnesiaSystem.Instance.OnPlayerRest(terminal, player);
+
+            // In single-player, dungeon rest can advance the day if it's nighttime
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && DailySystemManager.CanRestForNight(player))
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("You sleep deeply in the sanctuary's protection...");
+                await Task.Delay(1500);
+                await DailySystemManager.Instance.RestAndAdvanceToMorning(player);
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"You awaken refreshed. A new day has begun. (Day {DailySystemManager.Instance.CurrentDay})");
+            }
         }
         else
         {

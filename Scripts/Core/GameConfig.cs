@@ -9,8 +9,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.48.4";
-    public const string VersionName = "World Boss Raids";
+    public const string Version = "0.48.5";
+    public const string VersionName = "Combat Balance, Day Cycle & Dreams";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // From Pascal global_maxXX constants
@@ -659,12 +659,30 @@ public static partial class GameConfig
     public static readonly int[] HearthCombatDuration = { 0, 3, 5, 8, 12, 15 };
     // Herb Garden: herbs per day per level
     public static readonly int[] HerbsPerDay = { 0, 1, 2, 3, 4, 5 };
-    public const float HerbHealPercent = 0.20f;               // Each herb heals 20% of max HP
+    // Herb types (unlocked by garden level): 1=Healing, 2=Ironbark, 3=Firebloom, 4=Swiftthistle, 5=Starbloom
+    public const float HerbHealPercent = 0.25f;               // Healing Herb: heals 25% of max HP
+    public const float HerbDefenseBonus = 0.15f;              // Ironbark Root: +15% defense
+    public const float HerbDamageBonus = 0.15f;               // Firebloom Petal: +15% damage
+    public const int HerbExtraAttackCount = 1;                // Swiftthistle: +1 extra attack/round
+    public const int HerbSwiftDuration = 3;                   // Swiftthistle: lasts 3 combats
+    public const int HerbBuffDuration = 5;                    // Ironbark/Firebloom/Starbloom: lasts 5 combats
+    public const float HerbManaRestorePercent = 0.30f;        // Starbloom: restores 30% max mana
+    public const float HerbSpellBonus = 0.20f;                // Starbloom: +20% spell damage
+    public static readonly int[] HerbMaxCarry = { 0, 10, 5, 5, 3, 3 }; // Max carry per herb type (indexed by HerbType)
     // Study / Library
     public const float StudyXPBonus = 0.05f;                  // +5% XP from combat
     // Servants' Quarters
     public const int ServantsDailyGoldBase = 100;              // Base daily gold income
     public const int ServantsDailyGoldPerLevel = 10;           // Additional gold per player level
+
+    // Single-Player Time-of-Day System (v0.48.5)
+    public const int MinutesPerAction = 10;         // Game-minutes per player action (menu choice, etc.)
+    public const int MinutesPerTravel = 20;         // Bonus game-minutes per location transition
+    public const int MinutesPerCombatRound = 3;     // Bonus game-minutes per combat round
+    public const int MinutesPerDungeonRoom = 10;    // Bonus game-minutes per dungeon room explored
+    public const int DayStartHour = 6;              // 6 AM — time after resting for the night
+    public const int RestAvailableHour = 20;        // 8 PM — earliest you can rest for the night
+    public const int NewGameStartHour = 8;          // 8 AM — starting time for new characters
 
     // Immortal Ascension System (v0.45.0) — from original 1993 Usurper GodRec
     public const int GodMaxLevel = 9;

@@ -628,8 +628,13 @@ public static class SpellSystem
         var drugEffects = DrugSystem.GetDrugEffects(caster);
         double drugSpellMult = 1.0 + drugEffects.SpellPowerBonus / 100.0;
 
+        // Starbloom Essence herb spell damage bonus
+        double herbSpellMult = 1.0;
+        if (caster.HerbBuffType == (int)HerbType.StarbloomEssence && caster.HerbBuffCombats > 0)
+            herbSpellMult = 1.0 + caster.HerbBuffValue;
+
         // Calculate final effect including proficiency bonus
-        double scaledEffect = baseEffect * levelMultiplier * statBonus * variance * proficiencyMult * drugSpellMult;
+        double scaledEffect = baseEffect * levelMultiplier * statBonus * variance * proficiencyMult * drugSpellMult * herbSpellMult;
 
         return Math.Max(1, (int)scaledEffect);
     }

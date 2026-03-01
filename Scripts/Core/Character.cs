@@ -402,6 +402,62 @@ public class Character
     public float LoversBlissBonus { get; set; } = 0f;  // Damage/defense % bonus from perfect intimacy
     public float CycleExpMultiplier { get; set; } = 1.0f; // NG+ XP multiplier (scales with cycle)
 
+    // Herb pouch inventory (v0.48.5)
+    public int HerbHealing { get; set; }        // Healing Herbs (garden lv1)
+    public int HerbIronbark { get; set; }       // Ironbark Root (garden lv2)
+    public int HerbFirebloom { get; set; }      // Firebloom Petal (garden lv3)
+    public int HerbSwiftthistle { get; set; }   // Swiftthistle (garden lv4)
+    public int HerbStarbloom { get; set; }      // Starbloom Essence (garden lv5)
+    // Active herb buff tracking
+    public int HerbBuffType { get; set; }       // 0=none, 2=Ironbark, 3=Firebloom, 4=Swiftthistle, 5=Starbloom
+    public int HerbBuffCombats { get; set; }    // Remaining combats for active herb buff
+    public float HerbBuffValue { get; set; }    // Buff multiplier (0.15 = 15%)
+    public int HerbExtraAttacks { get; set; }   // Extra attacks from Swiftthistle
+
+    public int GetHerbCount(HerbType type) => type switch
+    {
+        HerbType.HealingHerb => HerbHealing,
+        HerbType.IronbarkRoot => HerbIronbark,
+        HerbType.FirebloomPetal => HerbFirebloom,
+        HerbType.Swiftthistle => HerbSwiftthistle,
+        HerbType.StarbloomEssence => HerbStarbloom,
+        _ => 0
+    };
+
+    public bool ConsumeHerb(HerbType type)
+    {
+        if (GetHerbCount(type) <= 0) return false;
+        switch (type)
+        {
+            case HerbType.HealingHerb: HerbHealing--; break;
+            case HerbType.IronbarkRoot: HerbIronbark--; break;
+            case HerbType.FirebloomPetal: HerbFirebloom--; break;
+            case HerbType.Swiftthistle: HerbSwiftthistle--; break;
+            case HerbType.StarbloomEssence: HerbStarbloom--; break;
+            default: return false;
+        }
+        return true;
+    }
+
+    public bool AddHerb(HerbType type)
+    {
+        int max = GameConfig.HerbMaxCarry[(int)type];
+        if (GetHerbCount(type) >= max) return false;
+        switch (type)
+        {
+            case HerbType.HealingHerb: HerbHealing++; break;
+            case HerbType.IronbarkRoot: HerbIronbark++; break;
+            case HerbType.FirebloomPetal: HerbFirebloom++; break;
+            case HerbType.Swiftthistle: HerbSwiftthistle++; break;
+            case HerbType.StarbloomEssence: HerbStarbloom++; break;
+            default: return false;
+        }
+        return true;
+    }
+
+    public int TotalHerbCount => HerbHealing + HerbIronbark + HerbFirebloom + HerbSwiftthistle + HerbStarbloom;
+    public bool HasActiveHerbBuff => HerbBuffType > 0 && HerbBuffCombats > 0;
+
     // Faction consumable properties (v0.40.2)
     public int PoisonCoatingCombats { get; set; } = 0;  // Combats remaining with poison coating
     public PoisonType ActivePoisonType { get; set; } = PoisonType.None; // Which poison is coating the blade
@@ -1091,6 +1147,9 @@ public class Character
     // Additional properties for API compatibility
     // TurnCount - counts UP from 0, drives world simulation (single-player persistent system)
     public int TurnCount { get; set; } = 0;
+
+    // Single-player time-of-day: minutes since midnight (0-1439). Default 480 = 8:00 AM.
+    public int GameTimeMinutes { get; set; } = GameConfig.NewGameStartHour * 60;
 
     // Legacy properties for compatibility (no longer used for limiting gameplay)
     private int? _manualTurnsRemaining;
@@ -1921,6 +1980,51 @@ public class RoyalMercenary
 /// Poison types that Assassins unlock at various levels.
 /// Each poison has a unique combat effect when coated on a blade.
 /// </summary>
+public enum HerbType
+{
+    None = 0,
+    HealingHerb = 1,       // Garden Lv1 — Heals 25% MaxHP
+    IronbarkRoot = 2,      // Garden Lv2 — +15% defense for 5 combats
+    FirebloomPetal = 3,    // Garden Lv3 — +15% damage for 5 combats
+    Swiftthistle = 4,      // Garden Lv4 — +1 extra attack for 3 combats
+    StarbloomEssence = 5   // Garden Lv5 — 30% mana + 20% spell damage for 5 combats
+}
+
+public static class HerbData
+{
+    public static string GetName(HerbType type) => type switch
+    {
+        HerbType.HealingHerb => "Healing Herb",
+        HerbType.IronbarkRoot => "Ironbark Root",
+        HerbType.FirebloomPetal => "Firebloom Petal",
+        HerbType.Swiftthistle => "Swiftthistle",
+        HerbType.StarbloomEssence => "Starbloom Essence",
+        _ => "Unknown"
+    };
+
+    public static string GetDescription(HerbType type) => type switch
+    {
+        HerbType.HealingHerb => $"Heals {(int)(GameConfig.HerbHealPercent * 100)}% of max HP",
+        HerbType.IronbarkRoot => $"+{(int)(GameConfig.HerbDefenseBonus * 100)}% defense for {GameConfig.HerbBuffDuration} combats",
+        HerbType.FirebloomPetal => $"+{(int)(GameConfig.HerbDamageBonus * 100)}% damage for {GameConfig.HerbBuffDuration} combats",
+        HerbType.Swiftthistle => $"+{GameConfig.HerbExtraAttackCount} extra attack for {GameConfig.HerbSwiftDuration} combats",
+        HerbType.StarbloomEssence => $"Restores {(int)(GameConfig.HerbManaRestorePercent * 100)}% mana, +{(int)(GameConfig.HerbSpellBonus * 100)}% spell damage for {GameConfig.HerbBuffDuration} combats",
+        _ => ""
+    };
+
+    public static string GetColor(HerbType type) => type switch
+    {
+        HerbType.HealingHerb => "bright_green",
+        HerbType.IronbarkRoot => "bright_cyan",
+        HerbType.FirebloomPetal => "bright_red",
+        HerbType.Swiftthistle => "bright_yellow",
+        HerbType.StarbloomEssence => "bright_magenta",
+        _ => "white"
+    };
+
+    public static int GetGardenLevelRequired(HerbType type) => (int)type;
+}
+
 public enum PoisonType
 {
     None = 0,

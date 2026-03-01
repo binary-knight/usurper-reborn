@@ -219,7 +219,7 @@ public class SocialInfluenceSystem
     /// Called from event sites (brawls, challenges, theft, murder, etc.)
     /// </summary>
     public static void RecordWitnesses(List<NPC> npcs, string location,
-        string actorName, string targetName, WitnessEventType eventType)
+        string actorName, string targetName, WitnessEventType eventType, bool suppressNews = false)
     {
         if (npcs == null || string.IsNullOrEmpty(location)) return;
 
@@ -298,8 +298,8 @@ public class SocialInfluenceSystem
             }
         }
 
-        // Generate news for multiple witnesses
-        if (witnesses.Count >= 2)
+        // Generate news for multiple witnesses (unless caller already generates its own news)
+        if (!suppressNews && witnesses.Count >= 2)
         {
             string verb = GetWitnessVerb(eventType);
             NewsSystem.Instance?.Newsy($"Several townsfolk witnessed {actorName} {verb} {targetName} at the {location}");

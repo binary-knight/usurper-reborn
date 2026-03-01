@@ -663,6 +663,7 @@ public partial class QuestSystem
 
             case QuestRewardType.Money:
                 player.Gold += rewardAmount;
+                player.Statistics?.RecordQuestGoldReward(rewardAmount);
                 terminal.WriteLine($"  Reward: {rewardAmount} gold!", "bright_yellow");
                 break;
 
@@ -682,8 +683,10 @@ public partial class QuestSystem
                 break;
 
             default:
-                player.Gold += player.Level * 100;
-                terminal.WriteLine($"  Reward: {player.Level * 100} gold!", "bright_yellow");
+                long fallbackGold = player.Level * 100;
+                player.Gold += fallbackGold;
+                player.Statistics?.RecordQuestGoldReward(fallbackGold);
+                terminal.WriteLine($"  Reward: {fallbackGold} gold!", "bright_yellow");
                 break;
         }
     }
@@ -1112,16 +1115,30 @@ public partial class QuestSystem
         foreach (var quest in playerQuests)
         {
             // Update floor objectives - set progress to floor number reached
+            bool floorObjectiveJustCompleted = false;
             foreach (var objective in quest.Objectives.Where(o =>
                 o.ObjectiveType == QuestObjectiveType.ReachDungeonFloor && !o.IsComplete))
             {
                 if (floorNumber >= objective.RequiredProgress)
                 {
                     objective.CurrentProgress = objective.RequiredProgress;
+                    floorObjectiveJustCompleted = true;
                 }
                 else if (floorNumber > objective.CurrentProgress)
                 {
                     objective.CurrentProgress = floorNumber;
+                }
+            }
+
+            // For RescueNPC quests: when reaching the target floor, auto-complete
+            // the TalkToNPC objective if the target NPC is dead (you "learned their fate")
+            if (floorObjectiveJustCompleted && quest.QuestTarget == QuestTarget.RescueNPC
+                && !string.IsNullOrEmpty(quest.TargetNPCName))
+            {
+                var targetNPC = NPCSpawnSystem.Instance?.GetNPCByName(quest.TargetNPCName);
+                if (targetNPC == null || targetNPC.IsDead || !targetNPC.IsAlive)
+                {
+                    quest.UpdateObjectiveProgress(QuestObjectiveType.TalkToNPC, 1, quest.TargetNPCName);
                 }
             }
         }

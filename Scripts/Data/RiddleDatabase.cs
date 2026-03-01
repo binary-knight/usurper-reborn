@@ -196,8 +196,8 @@ namespace UsurperRemake.Data
             terminal.WriteLine("'You speak true. The way is open to you.'", "green");
             terminal.WriteLine("");
 
-            player.Experience += riddle.RewardXP;
-            terminal.WriteLine($"(+{riddle.RewardXP} Experience)", "cyan");
+            // Note: XP reward is handled by the calling encounter (RiddleGateEncounter/RiddleEncounter)
+            // to avoid double-rewarding. Those methods give properly scaled rewards.
 
             // Ocean philosophy revelation for special riddles
             if (riddle.IsOceanPhilosophy)

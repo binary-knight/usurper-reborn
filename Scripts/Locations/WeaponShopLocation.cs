@@ -785,8 +785,10 @@ public class WeaponShopLocation : BaseLocation
             targetSlot = await PromptForWeaponSlot();
             if (targetSlot == null)
             {
-                // Player cancelled - refund and add to inventory instead
+                // Player cancelled - refund gold and undo stats
                 currentPlayer.Gold += totalWithTax;
+                currentPlayer.Statistics.TotalGoldSpent -= totalWithTax;
+                currentPlayer.Statistics.TotalItemsBought--;
                 terminal.SetColor("yellow");
                 terminal.WriteLine("Purchase cancelled.");
                 await Pause();
@@ -1206,8 +1208,10 @@ public class WeaponShopLocation : BaseLocation
                         targetSlot = await PromptForWeaponSlot();
                         if (targetSlot == null)
                         {
-                            // Player cancelled - refund
+                            // Player cancelled - refund gold and undo stats
                             currentPlayer.Gold += abTotal;
+                            currentPlayer.Statistics.TotalGoldSpent -= abTotal;
+                            currentPlayer.Statistics.TotalItemsBought--;
                             terminal.SetColor("yellow");
                             terminal.WriteLine("Purchase cancelled.");
                             await Pause();

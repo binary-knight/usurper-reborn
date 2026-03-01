@@ -349,15 +349,6 @@ public class BankLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("gray");
-        terminal.Write(" Return to Main Street  ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("Q");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("gray");
         terminal.WriteLine(" Return to Main Street");
 
         terminal.WriteLine("");
@@ -1273,10 +1264,11 @@ public class BankLocation : BaseLocation
 
         await Task.Delay(1000);
 
-        // Simple combat simulation
-        bool victory = SimulateBankRobberyCombat(monsters);
+        // Real interactive combat against the guards
+        var combatEngine = new CombatEngine(terminal);
+        var result = await combatEngine.PlayerVsMonsters(currentPlayer, monsters, offerMonkEncounter: false);
 
-        if (victory)
+        if (result.Outcome == CombatOutcome.Victory)
         {
             // Calculate loot (25% of safe) with overflow protection
             long stolenGold = _safeContents / 4;
@@ -1293,12 +1285,16 @@ public class BankLocation : BaseLocation
             terminal.SetColor("yellow");
             terminal.WriteLine("You grab handfuls of gold and flee into the night!");
             terminal.WriteLine("The authorities will be looking for you...");
+            terminal.WriteLine($"The bank vault now holds {_safeContents:N0} gold.");
 
             NewsSystem.Instance.Newsy(true, $"BANK ROBBERY! {currentPlayer.DisplayName} robbed the Ironvault Bank of {stolenGold:N0} gold!");
         }
-        else
+        else if (result.Outcome == CombatOutcome.PlayerDied)
         {
-            // Defeat
+            // Prevent permadeath from bank robbery — leave at 1 HP
+            if (currentPlayer.HP <= 0)
+                currentPlayer.HP = 1;
+
             terminal.SetColor("red");
             terminal.WriteLine("");
             terminal.WriteLine("+=============================================================================+");
@@ -1306,43 +1302,35 @@ public class BankLocation : BaseLocation
             terminal.WriteLine("+=============================================================================+");
             terminal.WriteLine("");
 
-            // Take damage and lose gold
-            currentPlayer.HP = Math.Max(1, currentPlayer.HP / 2);
-            long fine = Math.Min(currentPlayer.Gold, currentPlayer.Level * 2000);
-            currentPlayer.Gold -= fine;
+            // Confiscate gold on hand + some bank deposits as damages
+            long fineOnHand = currentPlayer.Gold;
+            long fineFromBank = Math.Min(currentPlayer.BankGold, (long)(currentPlayer.Level * 500));
+            currentPlayer.Gold = 0;
+            currentPlayer.BankGold -= fineFromBank;
+            long totalFine = fineOnHand + fineFromBank;
 
             terminal.SetColor("white");
-            terminal.WriteLine("You are beaten badly and thrown out of the bank.");
-            if (fine > 0)
+            terminal.WriteLine("You are beaten unconscious and dragged to the gutter.");
+            if (totalFine > 0)
             {
-                terminal.WriteLine($"The guards confiscate {fine:N0} gold as 'damages'.");
+                terminal.WriteLine($"The guards confiscate {totalFine:N0} gold as 'damages'.");
+                if (fineFromBank > 0)
+                    terminal.WriteLine($"({fineFromBank:N0} seized from your bank account)");
             }
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} attempted to rob the Ironvault Bank but was defeated by guards!");
         }
-    }
+        else
+        {
+            // Fled — still take consequences but no gold stolen
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine("You flee the bank empty-handed!");
+            terminal.SetColor("gray");
+            terminal.WriteLine("At least you're alive... but the guards got a good look at your face.");
 
-    private bool SimulateBankRobberyCombat(List<Monster> monsters)
-    {
-        // Simplified combat for bank robbery
-        // Player needs to defeat all guards
-        var random = new Random();
-
-        long playerPower = currentPlayer.Strength + currentPlayer.WeapPow + (currentPlayer.Level * 5);
-        long guardPower = monsters.Sum(m => m.Strength + m.WeapPow);
-
-        // Add some randomness
-        playerPower += random.Next(0, (int)playerPower / 4);
-        guardPower += random.Next(0, (int)guardPower / 4);
-
-        // Player has advantage if well-prepared
-        if (currentPlayer.HP >= currentPlayer.MaxHP * 0.8)
-            playerPower += playerPower / 5;
-
-        // Higher level players are more successful
-        playerPower += currentPlayer.Level * 3;
-
-        return playerPower > guardPower;
+            NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} attempted to rob the Ironvault Bank but fled!");
+        }
     }
 
     private int CalculateGuardCount()

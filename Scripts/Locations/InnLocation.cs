@@ -502,6 +502,20 @@ public class InnLocation : BaseLocation
             terminal.WriteLine("Attack a sleeper");
         }
 
+        // Single-player: Wait until nightfall option
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null
+            && !DailySystemManager.CanRestForNight(currentPlayer))
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Z");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("dark_cyan");
+            terminal.WriteLine("Wait until nightfall");
+        }
+
         terminal.SetColor("yellow");
         terminal.WriteLine("Navigation:");
 
@@ -678,6 +692,11 @@ public class InnLocation : BaseLocation
             case "K":
                 if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
                     await AttackInnSleeper();
+                return false;
+
+            case "Z":
+                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
+                    await DailySystemManager.Instance.WaitUntilEvening(currentPlayer, terminal);
                 return false;
 
             case "Q":
@@ -2004,8 +2023,31 @@ public class InnLocation : BaseLocation
         {
             await Task.Delay(2000);
         }
+
+        // In single-player, resting at the Inn advances the day if it's nighttime
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            if (DailySystemManager.CanRestForNight(currentPlayer))
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("You settle in for a proper night's rest...");
+                await Task.Delay(1500);
+                await DailySystemManager.Instance.RestAndAdvanceToMorning(currentPlayer);
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"A new day dawns. (Day {DailySystemManager.Instance.CurrentDay})");
+                await Task.Delay(1500);
+            }
+            else
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                var period = DailySystemManager.GetTimePeriodString(currentPlayer);
+                terminal.WriteLine($"It's only {period}. You rest briefly but it's too early to sleep for the night.");
+            }
+        }
     }
-    
+
     /// <summary>
     /// Order food for stamina boost
     /// </summary>

@@ -368,6 +368,7 @@ namespace UsurperRemake.Systems
                 CurrentLocation = player.Location.ToString(),
                 TurnCount = player.TurnCount,  // World simulation turn counter
                 TurnsRemaining = player.TurnsRemaining,
+                GameTimeMinutes = player.GameTimeMinutes,
                 DaysInPrison = player.DaysInPrison,
                 CellDoorOpen = player.CellDoorOpen,
                 RescuedBy = player.RescuedBy ?? "",
@@ -718,6 +719,17 @@ namespace UsurperRemake.Systems
                 CycleExpMultiplier = player.CycleExpMultiplier,
                 ChestContents = SerializeChestContents(player),
 
+                // Herb pouch inventory (v0.48.5)
+                HerbHealing = player.HerbHealing,
+                HerbIronbark = player.HerbIronbark,
+                HerbFirebloom = player.HerbFirebloom,
+                HerbSwiftthistle = player.HerbSwiftthistle,
+                HerbStarbloom = player.HerbStarbloom,
+                HerbBuffType = player.HerbBuffType,
+                HerbBuffCombats = player.HerbBuffCombats,
+                HerbBuffValue = player.HerbBuffValue,
+                HerbExtraAttacks = player.HerbExtraAttacks,
+
                 // Faction consumable properties (v0.40.2)
                 PoisonCoatingCombats = player.PoisonCoatingCombats,
                 ActivePoisonType = (int)player.ActivePoisonType,
@@ -733,6 +745,8 @@ namespace UsurperRemake.Systems
                 SethFightsToday = player.SethFightsToday,
                 ArmWrestlesToday = player.ArmWrestlesToday,
                 RoyQuestsToday = player.RoyQuestsToday,
+                Quests = player.Quests,
+                RoyQuests = player.RoyQuests,
 
                 // Dark Alley Overhaul (v0.41.0)
                 GroggoShadowBlessingDex = player.GroggoShadowBlessingDex,

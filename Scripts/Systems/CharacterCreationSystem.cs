@@ -2061,10 +2061,18 @@ public class CharacterCreationSystem
         character.HP = Roll2d6() + (classAttrib.HP * 3) + raceAttrib.HPBonus + constitutionBonus;
         character.MaxHP = character.HP;
 
-        // Mana for spellcasters - base from class + Intelligence bonus
-        int intelligenceBonus = (int)(character.Intelligence / 4); // Intelligence adds to mana
-        character.Mana = classAttrib.Mana + intelligenceBonus;
-        character.MaxMana = classAttrib.MaxMana + intelligenceBonus;
+        // Mana for spellcasters only - base from class + Intelligence bonus
+        if (classAttrib.MaxMana > 0)
+        {
+            int intelligenceBonus = (int)(character.Intelligence / 4); // Intelligence adds to mana
+            character.Mana = classAttrib.Mana + intelligenceBonus;
+            character.MaxMana = classAttrib.MaxMana + intelligenceBonus;
+        }
+        else
+        {
+            character.Mana = 0;
+            character.MaxMana = 0;
+        }
     }
 
     /// <summary>

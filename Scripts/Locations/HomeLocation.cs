@@ -90,34 +90,65 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine($"{currentPlayer.Healing}");
         terminal.WriteLine("");
 
-        // Description based on home level
+        // Dynamic description based on all upgrades
         terminal.SetColor("white");
+        // Living quarters base description
         switch (currentPlayer.HomeLevel)
         {
             case 0:
-                terminal.WriteLine("You stand in a drafty, dilapidated shack. The walls are thin,");
-                terminal.WriteLine("the roof leaks, and the only furniture is a moth-eaten straw pile.");
+                terminal.Write("You stand in a drafty, dilapidated shack. The walls are thin and the roof leaks.");
                 break;
             case 1:
-                terminal.WriteLine("Your home has seen some repairs. The walls are patched, keeping");
-                terminal.WriteLine("out the worst of the wind. A simple hearth provides some warmth.");
+                terminal.Write("Your home has seen some repairs. The walls are patched, keeping out the worst of the wind.");
                 break;
             case 2:
-                terminal.WriteLine("A sturdy cottage with solid walls and a proper door. It feels");
-                terminal.WriteLine("like a real home, with decent furniture and a warm atmosphere.");
+                terminal.Write("A sturdy cottage with solid walls and a proper door. It feels like a real home.");
                 break;
             case 3:
-                terminal.WriteLine("A comfortable home with good furniture and warm light. The rooms");
-                terminal.WriteLine("are well-appointed and you feel truly safe here.");
+                terminal.Write("A comfortable home with good furniture and warm light.");
                 break;
             case 4:
-                terminal.WriteLine("A fine manor with quality furnishings. Your home is the envy of");
-                terminal.WriteLine("many townsfolk, with elegant decor and spacious rooms.");
+                terminal.Write("A fine manor with quality furnishings and elegant decor.");
                 break;
             default:
-                terminal.WriteLine("A grand estate befitting a hero. Every room is beautifully");
-                terminal.WriteLine("appointed, and the atmosphere is one of luxury and serenity.");
+                terminal.Write("A grand estate befitting a hero, beautifully appointed throughout.");
                 break;
+        }
+        // Bed detail
+        switch (currentPlayer.BedLevel)
+        {
+            case 0: terminal.Write(" A moth-eaten straw pile serves as your bed."); break;
+            case 1: terminal.Write(" A simple cot sits in the corner."); break;
+            case 2: terminal.Write(" A sturdy wooden bed frame holds a thin mattress."); break;
+            case 3: terminal.Write(" A plush feather mattress promises restful sleep."); break;
+            case 4: terminal.Write(" An ornate four-poster bed dominates the bedroom."); break;
+            default: terminal.Write(" A magnificent canopy bed draped in silk awaits you."); break;
+        }
+        // Hearth detail
+        switch (currentPlayer.HearthLevel)
+        {
+            case 0: terminal.Write(" A cold firepit sits unused."); break;
+            case 1: terminal.Write(" A simple hearth crackles with warmth."); break;
+            case 2: terminal.Write(" A stone fireplace radiates steady heat."); break;
+            case 3: terminal.Write(" An iron stove fills the room with comforting warmth."); break;
+            case 4: terminal.Write(" A grand fireplace roars with inviting flames."); break;
+            default: terminal.Write(" An eternal flame burns without fuel, filling every room with warmth."); break;
+        }
+        terminal.WriteLine("");
+        // Chest and garden on second line if upgraded
+        var extras = new List<string>();
+        if (currentPlayer.ChestLevel > 0)
+            extras.Add(ChestNames[Math.Clamp(currentPlayer.ChestLevel, 0, 5)].ToLower());
+        if (currentPlayer.GardenLevel > 0)
+            extras.Add(GardenNames[Math.Clamp(currentPlayer.GardenLevel, 0, 5)].ToLower());
+        if (currentPlayer.HasStudy)
+            extras.Add("a study lined with books");
+        if (currentPlayer.HasServants)
+            extras.Add("servants' quarters");
+        if (extras.Count > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("You also have " + string.Join(", ", extras) + ".");
         }
         terminal.WriteLine("");
 
@@ -236,10 +267,12 @@ public class HomeLocation : BaseLocation
         WriteMenuCol("", "W", "Withdraw Item", hasChest);
         WriteMenuNL("", "L", "List Chest", hasChest);
 
-        // Row 3: Garden, Trophies, Family
+        // Row 3: Garden, Herbs, Trophies, Family
         WriteMenuCol(" ", "A", "Gather Herbs", hasGarden);
-        WriteMenuCol("", "T", "Trophies", hasTrophies);
-        WriteMenuNL("", "F", "Family", true);
+        WriteMenuCol("", "J", "Use Herb", currentPlayer.TotalHerbCount > 0);
+        WriteMenuNL("", "T", "Trophies", hasTrophies);
+
+        WriteMenuCol(" ", "F", "Family", true);
 
         // Row 4: Romance
         WriteMenuCol(" ", "P", "Partner Time", true);
@@ -252,6 +285,20 @@ public class HomeLocation : BaseLocation
         WriteMenuNL("", "H", "Heal (Potion)", true);
 
         terminal.WriteLine("");
+
+        // Single-player: Wait until nightfall
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null
+            && !DailySystemManager.CanRestForNight(currentPlayer))
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Z");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("dark_cyan");
+            terminal.WriteLine("Wait until nightfall");
+        }
 
         // Navigation row
         WriteMenuNL(" ", "R", "Return", true);
@@ -429,6 +476,9 @@ public class HomeLocation : BaseLocation
             case "A":
                 await GatherHerbs();
                 return false;
+            case "J":
+                await UseHerbMenu();
+                return false;
             case "T":
                 ShowTrophies();
                 await terminal.WaitForKey();
@@ -459,6 +509,10 @@ public class HomeLocation : BaseLocation
                 return false;
             case "U":
                 await ShowHomeUpgrades();
+                return false;
+            case "Z":
+                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
+                    await DailySystemManager.Instance.WaitUntilEvening(currentPlayer, terminal);
                 return false;
             case "R":
             case "Q":
@@ -585,6 +639,29 @@ public class HomeLocation : BaseLocation
             DreamSystem.Instance.ExperienceDream(dream.Id);
         }
 
+        // In single-player, resting at home advances the day if it's nighttime
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            if (DailySystemManager.CanRestForNight(currentPlayer))
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("You settle in for a proper night's rest...");
+                await Task.Delay(1500);
+                await DailySystemManager.Instance.RestAndAdvanceToMorning(currentPlayer);
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"A new day dawns. (Day {DailySystemManager.Instance.CurrentDay})");
+                await Task.Delay(1500);
+            }
+            else
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                var period = DailySystemManager.GetTimePeriodString(currentPlayer);
+                terminal.WriteLine($"It's only {period}. You rest briefly but it's too early to sleep for the night.");
+            }
+        }
+
         await terminal.WaitForKey();
     }
 
@@ -611,18 +688,193 @@ public class HomeLocation : BaseLocation
             return;
         }
 
-        terminal.SetColor("bright_green");
-        terminal.WriteLine($"You gather healing herbs from your garden...");
-        await Task.Delay(1000);
+        while (herbsLeft > 0)
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("═══ HERB GARDEN ═══");
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"Gathers remaining today: {herbsLeft}");
+            terminal.WriteLine("");
 
-        // Gather all available herbs at once
-        currentPlayer.Healing += herbsLeft;
-        currentPlayer.HerbsGatheredToday += herbsLeft;
+            // Show available herb types based on garden level
+            terminal.SetColor("white");
+            terminal.WriteLine("Which herb would you like to gather?");
+            terminal.WriteLine("");
 
-        terminal.SetColor("green");
-        terminal.WriteLine($"Collected {herbsLeft} healing herb{(herbsLeft != 1 ? "s" : "")}! (Potions: {currentPlayer.Healing})");
+            var available = new List<HerbType>();
+            for (int i = 1; i <= gardenLevel && i <= 5; i++)
+            {
+                var type = (HerbType)i;
+                int count = currentPlayer.GetHerbCount(type);
+                int max = GameConfig.HerbMaxCarry[i];
+                bool full = count >= max;
+                string color = full ? "darkgray" : HerbData.GetColor(type);
+                string fullTag = full ? " [FULL]" : "";
+                terminal.SetColor(color);
+                terminal.WriteLine($"  [{i}] {HerbData.GetName(type)} ({count}/{max}){fullTag}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"      {HerbData.GetDescription(type)}");
+                if (!full) available.Add(type);
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  [Q] Done gathering");
+            terminal.WriteLine("");
+            terminal.Write("Choice: ", "white");
+
+            string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+            if (input == "Q" || string.IsNullOrEmpty(input)) break;
+
+            if (int.TryParse(input, out int choice) && choice >= 1 && choice <= gardenLevel && choice <= 5)
+            {
+                var herbType = (HerbType)choice;
+                int count = currentPlayer.GetHerbCount(herbType);
+                int max = GameConfig.HerbMaxCarry[choice];
+                if (count >= max)
+                {
+                    terminal.WriteLine($"Your pouch is full of {HerbData.GetName(herbType)}! ({count}/{max})", "yellow");
+                    await terminal.WaitForKey();
+                    continue;
+                }
+
+                currentPlayer.AddHerb(herbType);
+                currentPlayer.HerbsGatheredToday++;
+                herbsLeft--;
+
+                terminal.SetColor(HerbData.GetColor(herbType));
+                terminal.WriteLine($"Gathered a {HerbData.GetName(herbType)}! ({currentPlayer.GetHerbCount(herbType)}/{max})");
+                await Task.Delay(500);
+            }
+        }
+
         terminal.SetColor("gray");
-        terminal.WriteLine("Each herb works just like a healing potion in combat.");
+        terminal.WriteLine("You brush the dirt from your hands and head inside.");
+        await terminal.WaitForKey();
+    }
+
+    /// <summary>
+    /// Show herb pouch and let player use an herb. Shared by Home, Dungeon, and BaseLocation.
+    /// </summary>
+    public static async Task UseHerbMenu(Character player, TerminalEmulator terminal)
+    {
+        if (player.TotalHerbCount <= 0)
+        {
+            terminal.WriteLine("Your herb pouch is empty. Gather herbs from your garden at home.", "yellow");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("═══ HERB POUCH ═══");
+        terminal.WriteLine("");
+
+        if (player.HasActiveHerbBuff)
+        {
+            var buffName = HerbData.GetName((HerbType)player.HerbBuffType);
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"Active buff: {buffName} ({player.HerbBuffCombats} combats remaining)");
+            terminal.WriteLine("");
+        }
+
+        terminal.SetColor("white");
+        terminal.WriteLine("Select an herb to use:");
+        terminal.WriteLine("");
+
+        var options = new List<HerbType>();
+        int idx = 1;
+        foreach (HerbType type in Enum.GetValues(typeof(HerbType)))
+        {
+            if (type == HerbType.None) continue;
+            int count = player.GetHerbCount(type);
+            if (count <= 0) continue;
+
+            options.Add(type);
+            terminal.SetColor(HerbData.GetColor(type));
+            terminal.Write($"  [{idx}] {HerbData.GetName(type)} x{count}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($" — {HerbData.GetDescription(type)}");
+            idx++;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("  [Q] Cancel");
+        terminal.WriteLine("");
+        terminal.Write("Choice: ", "white");
+
+        string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
+        if (input == "Q" || string.IsNullOrEmpty(input)) return;
+
+        if (int.TryParse(input, out int sel) && sel >= 1 && sel <= options.Count)
+        {
+            var herbType = options[sel - 1];
+            await ApplyHerbEffect(player, herbType, terminal);
+        }
+    }
+
+    private async Task UseHerbMenu()
+    {
+        await UseHerbMenu(currentPlayer, terminal);
+    }
+
+    /// <summary>
+    /// Apply an herb's effect to the player. Consumes 1 herb from inventory.
+    /// </summary>
+    public static async Task ApplyHerbEffect(Character player, HerbType type, TerminalEmulator terminal)
+    {
+        if (!player.ConsumeHerb(type)) return;
+
+        string herbName = HerbData.GetName(type);
+        terminal.SetColor(HerbData.GetColor(type));
+
+        switch (type)
+        {
+            case HerbType.HealingHerb:
+                long healAmount = (long)(player.MaxHP * GameConfig.HerbHealPercent);
+                healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
+                player.HP += healAmount;
+                terminal.WriteLine($"You crush a {herbName} and drink the extract. Restored {healAmount} HP! ({player.HP}/{player.MaxHP})");
+                break;
+
+            case HerbType.IronbarkRoot:
+                player.HerbBuffType = (int)HerbType.IronbarkRoot;
+                player.HerbBuffCombats = GameConfig.HerbBuffDuration;
+                player.HerbBuffValue = GameConfig.HerbDefenseBonus;
+                player.HerbExtraAttacks = 0;
+                terminal.WriteLine($"You chew a tough {herbName}. Your skin hardens! (+{(int)(GameConfig.HerbDefenseBonus * 100)}% defense for {GameConfig.HerbBuffDuration} combats)");
+                break;
+
+            case HerbType.FirebloomPetal:
+                player.HerbBuffType = (int)HerbType.FirebloomPetal;
+                player.HerbBuffCombats = GameConfig.HerbBuffDuration;
+                player.HerbBuffValue = GameConfig.HerbDamageBonus;
+                player.HerbExtraAttacks = 0;
+                terminal.WriteLine($"You inhale the fiery scent of a {herbName}. Your strikes burn with power! (+{(int)(GameConfig.HerbDamageBonus * 100)}% damage for {GameConfig.HerbBuffDuration} combats)");
+                break;
+
+            case HerbType.Swiftthistle:
+                player.HerbBuffType = (int)HerbType.Swiftthistle;
+                player.HerbBuffCombats = GameConfig.HerbSwiftDuration;
+                player.HerbBuffValue = 0;
+                player.HerbExtraAttacks = GameConfig.HerbExtraAttackCount;
+                terminal.WriteLine($"The {herbName} sends energy coursing through your limbs! (+{GameConfig.HerbExtraAttackCount} extra attack for {GameConfig.HerbSwiftDuration} combats)");
+                break;
+
+            case HerbType.StarbloomEssence:
+                long manaRestore = (long)(player.MaxMana * GameConfig.HerbManaRestorePercent);
+                manaRestore = Math.Min(manaRestore, player.MaxMana - player.Mana);
+                player.Mana += manaRestore;
+                player.HerbBuffType = (int)HerbType.StarbloomEssence;
+                player.HerbBuffCombats = GameConfig.HerbBuffDuration;
+                player.HerbBuffValue = GameConfig.HerbSpellBonus;
+                player.HerbExtraAttacks = 0;
+                terminal.WriteLine($"Starbloom essence floods your mind with arcane clarity! Restored {manaRestore} mana. (+{(int)(GameConfig.HerbSpellBonus * 100)}% spell damage for {GameConfig.HerbBuffDuration} combats)");
+                break;
+        }
 
         await terminal.WaitForKey();
     }
@@ -3243,7 +3495,13 @@ public class HomeLocation : BaseLocation
                         int lvl = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"Upgraded to {GardenNames[lvl]}!");
-                        terminal.WriteLine($"Gather up to {GameConfig.HerbsPerDay[lvl]} healing herbs per day.");
+                        terminal.WriteLine($"Gather up to {GameConfig.HerbsPerDay[lvl]} herbs per day.");
+                        if (lvl >= 1 && lvl <= 5)
+                        {
+                            var newHerb = (HerbType)lvl;
+                            terminal.SetColor(HerbData.GetColor(newHerb));
+                            terminal.WriteLine($"New herb unlocked: {HerbData.GetName(newHerb)} — {HerbData.GetDescription(newHerb)}");
+                        }
                     });
                 break;
             case 6:

@@ -292,9 +292,38 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("red");
                         terminal.WriteLine("A shadowy figure whispers to you...");
                         terminal.SetColor("gray");
-                        terminal.WriteLine("\"I know of treasure in the dungeon. Seek the third level...\"");
-                        player.Experience += 50;
-                        terminal.WriteLine("(+50 XP from forbidden knowledge)");
+
+                        // Dynamic hints based on player level
+                        int playerLevel = player.Level;
+                        int[] sealFloors = { 15, 30, 45, 60, 80, 99 };
+                        int[] godFloors = { 25, 40, 55, 70, 85, 95, 100 };
+                        string[] godNames = { "Maelketh", "Veloura", "Thorgrim", "Noctura", "Aurelion", "Terravok", "Manwe" };
+
+                        var hints = new List<string>();
+
+                        int nearestSeal = sealFloors.FirstOrDefault(f => f > playerLevel);
+                        if (nearestSeal > 0 && nearestSeal - playerLevel <= 15)
+                            hints.Add($"\"Something ancient is sealed near floor {nearestSeal}. Worth investigating...\"");
+
+                        int godIdx = -1;
+                        for (int i = 0; i < godFloors.Length; i++)
+                        {
+                            if (godFloors[i] > playerLevel) { godIdx = i; break; }
+                        }
+                        if (godIdx >= 0 && godFloors[godIdx] - playerLevel <= 20)
+                            hints.Add($"\"I've heard whispers of {godNames[godIdx]} near floor {godFloors[godIdx]}. Dangerous... but profitable.\"");
+
+                        if (playerLevel < 10)
+                            hints.Add($"\"The dungeon rewards those who push deeper. Floor {playerLevel + 5} holds richer prey.\"");
+                        else if (playerLevel < 40)
+                            hints.Add("\"The shadows in the deep have secrets the surface folk never learn.\"");
+                        else
+                            hints.Add("\"Even I fear what stirs in the lowest depths. But you... you might survive.\"");
+
+                        terminal.WriteLine(hints[_random.Next(hints.Count)]);
+                        int xpGain = Math.Max(50, playerLevel * 10);
+                        player.Experience += xpGain;
+                        terminal.WriteLine($"(+{xpGain} XP from forbidden knowledge)");
                         await Task.Delay(2000);
                         return true;
                     }

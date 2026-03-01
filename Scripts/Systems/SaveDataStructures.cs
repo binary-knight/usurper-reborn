@@ -224,6 +224,7 @@ namespace UsurperRemake.Systems
         public string CurrentLocation { get; set; } = "";
         public int TurnCount { get; set; }  // World simulation turn counter (counts up from 0)
         public int TurnsRemaining { get; set; }  // Legacy: now just stores manual override
+        public int GameTimeMinutes { get; set; }  // Single-player time-of-day: minutes since midnight (0-1439)
         public int DaysInPrison { get; set; }
         public bool CellDoorOpen { get; set; }  // Has been rescued
         public string RescuedBy { get; set; } = "";  // Name of rescuer
@@ -464,6 +465,17 @@ namespace UsurperRemake.Systems
         public float CycleExpMultiplier { get; set; } = 1.0f;
         public List<InventoryItemData>? ChestContents { get; set; }
 
+        // Herb pouch inventory (v0.48.5)
+        public int HerbHealing { get; set; }
+        public int HerbIronbark { get; set; }
+        public int HerbFirebloom { get; set; }
+        public int HerbSwiftthistle { get; set; }
+        public int HerbStarbloom { get; set; }
+        public int HerbBuffType { get; set; }
+        public int HerbBuffCombats { get; set; }
+        public float HerbBuffValue { get; set; }
+        public int HerbExtraAttacks { get; set; }
+
         // Faction consumable properties (v0.40.2)
         public int PoisonCoatingCombats { get; set; }
         public int ActivePoisonType { get; set; }   // PoisonType enum cast to int
@@ -479,6 +491,8 @@ namespace UsurperRemake.Systems
         public int SethFightsToday { get; set; }
         public int ArmWrestlesToday { get; set; }
         public int RoyQuestsToday { get; set; }
+        public int Quests { get; set; }            // total completed missions/quests
+        public long RoyQuests { get; set; }        // royal quests accomplished
 
         // Dark Alley Overhaul (v0.41.0)
         public int GroggoShadowBlessingDex { get; set; }

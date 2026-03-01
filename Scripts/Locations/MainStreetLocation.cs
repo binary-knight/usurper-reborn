@@ -164,8 +164,8 @@ public class MainStreetLocation : BaseLocation
             HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer.HintsShown);
         }
 
-        // Show mana/spells hint if player has mana but no spells learned
-        if (currentPlayer.Mana > 0 && SpellSystem.GetAvailableSpells(currentPlayer).Count == 0)
+        // Show mana/spells hint if player's class has mana but no spells learned
+        if (currentPlayer.MaxMana > 0 && SpellSystem.GetAvailableSpells(currentPlayer).Count == 0)
         {
             HintSystem.Instance.TryShowHint(HintSystem.HINT_MANA_SPELLS, terminal, currentPlayer.HintsShown);
         }
@@ -2211,13 +2211,19 @@ public class MainStreetLocation : BaseLocation
             
             terminal.SetColor("white");
             terminal.WriteLine("Current Settings:");
-            terminal.WriteLine($"  Daily Cycle Mode: {GetDailyCycleModeDescription(currentMode)}", "yellow");
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                terminal.WriteLine($"  Daily Cycle Mode: {GetDailyCycleModeDescription(currentMode)}", "yellow");
+            else if (currentPlayer != null)
+                terminal.WriteLine($"  Time of Day: {DailySystemManager.GetTimePeriodString(currentPlayer)} ({DailySystemManager.GetTimeString(currentPlayer)})", "yellow");
             terminal.WriteLine($"  Auto-save: {(dailyManager.AutoSaveEnabled ? "Enabled" : "Disabled")}", "yellow");
             terminal.WriteLine($"  Current Day: {dailyManager.CurrentDay}", "yellow");
             terminal.WriteLine("");
-            
+
             terminal.WriteLine("Options:");
-            terminal.WriteLine("1. Change Daily Cycle Mode");
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                terminal.WriteLine("1. Change Daily Cycle Mode");
+            else
+                terminal.WriteLine("1. (Time advances with your actions; rest at nightfall)", "gray");
             terminal.WriteLine("2. Configure Auto-save Settings");
             terminal.WriteLine("3. Save Game Now");
             terminal.WriteLine("4. Load Different Save");
@@ -2229,11 +2235,12 @@ public class MainStreetLocation : BaseLocation
             terminal.WriteLine("");
 
             var choice = await terminal.GetInput("Enter your choice (1-9): ");
-            
+
             switch (choice)
             {
                 case "1":
-                    await ChangeDailyCycleMode();
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                        await ChangeDailyCycleMode();
                     break;
                     
                 case "2":

@@ -213,6 +213,16 @@ public partial class CombatEngine
         if (attacker.WellRestedCombats > 0) attacker.WellRestedCombats--;
         if (attacker.LoversBlissCombats > 0) attacker.LoversBlissCombats--;
         if (attacker.DivineBlessingCombats > 0) attacker.DivineBlessingCombats--;
+        if (attacker.HerbBuffCombats > 0)
+        {
+            attacker.HerbBuffCombats--;
+            if (attacker.HerbBuffCombats <= 0)
+            {
+                attacker.HerbBuffType = 0;
+                attacker.HerbBuffValue = 0;
+                attacker.HerbExtraAttacks = 0;
+            }
+        }
 
         // Ensure abilities are learned based on current level (fixes abilities not showing in quickbar)
         if (!ClassAbilitySystem.IsSpellcaster(attacker.Class))
@@ -303,6 +313,13 @@ public partial class CombatEngine
             attacker.Mana = godModeMana;
         }
 
+        // Advance game time based on combat duration (single-player only)
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.CurrentRound > 0)
+        {
+            DailySystemManager.Instance.AdvanceGameTime(
+                attacker, result.CurrentRound * GameConfig.MinutesPerCombatRound);
+        }
+
         return result;
     }
 
@@ -356,6 +373,16 @@ public partial class CombatEngine
         if (player.WellRestedCombats > 0) player.WellRestedCombats--;
         if (player.LoversBlissCombats > 0) player.LoversBlissCombats--;
         if (player.DivineBlessingCombats > 0) player.DivineBlessingCombats--;
+        if (player.HerbBuffCombats > 0)
+        {
+            player.HerbBuffCombats--;
+            if (player.HerbBuffCombats <= 0)
+            {
+                player.HerbBuffType = 0;
+                player.HerbBuffValue = 0f;
+                player.HerbExtraAttacks = 0;
+            }
+        }
 
         // Ensure abilities are learned based on current level (fixes abilities not showing)
         if (!ClassAbilitySystem.IsSpellcaster(player.Class))
@@ -672,6 +699,19 @@ public partial class CombatEngine
                         terminal.WriteLine($"[Drug Side Effect] The drugs drain {drainAmount} HP from your body!");
                     }
                 }
+            }
+
+            // Poison counter tick (player.Poison from traps/monster attacks — separate from StatusEffect.Poisoned)
+            if (player.Poison > 0 && player.IsAlive)
+            {
+                int poisonBase = 2 + new Random().Next(4); // 2-5
+                int poisonLevel = (int)(player.Level / 10);
+                int poisonIntensity = player.Poison / 5;
+                int poisonDmg = Math.Min(poisonBase + poisonLevel + poisonIntensity,
+                    (int)Math.Max(3, player.MaxHP / 10));
+                player.HP = Math.Max(0, player.HP - poisonDmg);
+                terminal.SetColor("dark_green");
+                terminal.WriteLine($"Poison courses through your veins! (-{poisonDmg} HP)");
             }
 
             // Broadcast status effects / regen / drug drain to followers
@@ -1033,6 +1073,13 @@ public partial class CombatEngine
             player.Mana = godModeMana;
         }
 
+        // Advance game time based on combat duration (single-player only)
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.CurrentRound > 0)
+        {
+            DailySystemManager.Instance.AdvanceGameTime(
+                player, result.CurrentRound * GameConfig.MinutesPerCombatRound);
+        }
+
         return result;
     }
 
@@ -1256,6 +1303,10 @@ public partial class CombatEngine
         else
             terminal.WriteLine("  H - Heal, No Potions");
 
+        // Herb pouch
+        if (player.TotalHerbCount > 0)
+            terminal.WriteLine($"  J - Herb Pouch ({player.TotalHerbCount} herbs)");
+
         // Class-specific
         if (player.Class == CharacterClass.Barbarian && !player.IsRaging)
             terminal.WriteLine("  G - Rage, Berserker fury");
@@ -1389,6 +1440,15 @@ public partial class CombatEngine
             terminal.Write($"Poison({player.PoisonVials}) ");
         }
 
+        // Herb Pouch
+        if (player.TotalHerbCount > 0)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[J]");
+            terminal.SetColor("bright_green");
+            terminal.Write($"Herbs({player.TotalHerbCount}) ");
+        }
+
         string speedLabel = player.CombatSpeed switch
         {
             CombatSpeed.Instant => "Inst",
@@ -1493,6 +1553,15 @@ public partial class CombatEngine
             terminal.Write("[B]");
             terminal.SetColor("dark_green");
             terminal.Write($"Poison({player.PoisonVials}) ");
+        }
+
+        // Herb Pouch
+        if (player.TotalHerbCount > 0)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[J]");
+            terminal.SetColor("bright_green");
+            terminal.Write($"Herbs({player.TotalHerbCount}) ");
         }
 
         if (!isFollower)
@@ -1637,6 +1706,19 @@ public partial class CombatEngine
             terminal.Write("[H] ");
             terminal.SetColor("darkgray");
             terminal.Write($"{"Heal (No Potions)",-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+
+        // Herb Pouch
+        if (player.TotalHerbCount > 0)
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[J] ");
+            terminal.SetColor("bright_green");
+            string herbDesc = $"Herb Pouch ({player.TotalHerbCount} herbs)";
+            terminal.Write($"{herbDesc,-34}");
             terminal.SetColor("green");
             terminal.WriteLine("║");
         }
@@ -1842,6 +1924,10 @@ public partial class CombatEngine
         if (player.PoisonVials > 0)
             terminal.WriteLine($"  B - Coat Blade with Poison, Vials: {player.PoisonVials}");
 
+        // Herb Pouch
+        if (player.TotalHerbCount > 0)
+            terminal.WriteLine($"  J - Herb Pouch ({player.TotalHerbCount} herbs)");
+
         // Boss Save option (only when fighting saveable Old God with artifact)
         if (BossContext?.CanSave == true)
             terminal.WriteLine("  V - Attempt to Save, uses Soulweaver's Loom");
@@ -1975,6 +2061,19 @@ public partial class CombatEngine
             terminal.WriteLine("║");
         }
 
+        // Herb Pouch
+        if (player.TotalHerbCount > 0)
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[J] ");
+            terminal.SetColor("bright_green");
+            string herbDesc = $"Herb Pouch ({player.TotalHerbCount} herbs)";
+            terminal.Write($"{herbDesc,-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+
         // Boss Save option (only when fighting saveable Old God with artifact)
         if (BossContext?.CanSave == true)
         {
@@ -2047,6 +2146,7 @@ public partial class CombatEngine
             "T" => new CombatAction { Type = CombatActionType.Taunt },
             "L" => new CombatAction { Type = CombatActionType.Hide },
             "B" when player.PoisonVials > 0 => new CombatAction { Type = CombatActionType.CoatBlade },
+            "J" when player.TotalHerbCount > 0 => new CombatAction { Type = CombatActionType.UseHerb },
             _ => new CombatAction { Type = CombatActionType.Attack } // Default to attack
         };
     }
@@ -2148,6 +2248,10 @@ public partial class CombatEngine
 
             case CombatActionType.CoatBlade:
                 await ExecuteCoatBlade(player, result);
+                break;
+
+            case CombatActionType.UseHerb:
+                await ExecuteUseHerb(player, result);
                 break;
         }
     }
@@ -2380,6 +2484,12 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * attacker.LoversBlissBonus);
         }
 
+        // Firebloom Petal herb damage bonus
+        if (attacker.HerbBuffType == (int)HerbType.FirebloomPetal && attacker.HerbBuffCombats > 0)
+        {
+            attackPower += (long)(attackPower * attacker.HerbBuffValue);
+        }
+
         // Divine Blessing bonus damage (god's blessing on a mortal)
         if (attacker.DivineBlessingCombats > 0 && attacker.DivineBlessingBonus > 0f)
         {
@@ -2581,6 +2691,48 @@ public partial class CombatEngine
     /// Execute Coat Blade action — player selects a poison type and applies it to their weapon.
     /// Consumes 1 poison vial. Costs the player's turn for the round.
     /// </summary>
+    private async Task ExecuteUseHerb(Character player, CombatResult result)
+    {
+        if (player.TotalHerbCount <= 0)
+        {
+            terminal.WriteLine("Your herb pouch is empty!", "red");
+            return;
+        }
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("=== HERB POUCH ===");
+        terminal.WriteLine("");
+
+        var options = new List<HerbType>();
+        int idx = 1;
+        foreach (HerbType type in Enum.GetValues(typeof(HerbType)))
+        {
+            if (type == HerbType.None) continue;
+            int count = player.GetHerbCount(type);
+            if (count <= 0) continue;
+            options.Add(type);
+            terminal.SetColor(HerbData.GetColor(type));
+            terminal.Write($"  [{idx}] {HerbData.GetName(type)} x{count}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($" — {HerbData.GetDescription(type)}");
+            idx++;
+        }
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine("  [0] Cancel");
+        terminal.Write("Choice: ", "white");
+
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (int.TryParse(input, out int sel) && sel >= 1 && sel <= options.Count)
+        {
+            await HomeLocation.ApplyHerbEffect(player, options[sel - 1], terminal);
+        }
+        else
+        {
+            terminal.WriteLine("Cancelled.", "gray");
+        }
+    }
+
     private async Task ExecuteCoatBlade(Character player, CombatResult result)
     {
         if (player.PoisonVials <= 0)
@@ -3249,7 +3401,7 @@ public partial class CombatEngine
         var attackMessage = CombatMessages.GetMonsterAttackMessage(monster.Name, monster.MonsterColor, monsterAttack, player.MaxHP);
         terminal.WriteLine(attackMessage);
 
-        // Check for shield block (20% chance to double shield AC)
+        // Check for shield block (20% chance to block, halves incoming damage)
         var (blocked, blockBonus) = TryShieldBlock(player);
         if (blocked)
         {
@@ -3269,8 +3421,6 @@ public partial class CombatEngine
             int armAbsorbMax = (int)(Math.Sqrt(player.ArmPow) * 5);
             playerDefense += random.Next(0, armAbsorbMax + 1);
         }
-
-        playerDefense += blockBonus;
 
         double defenseModifier = GetWeaponConfigDefenseModifier(player);
         playerDefense = (long)(playerDefense * defenseModifier);
@@ -3314,6 +3464,12 @@ public partial class CombatEngine
             playerDefense += (long)(playerDefense * player.WellRestedBonus);
         }
 
+        // Ironbark Root herb defense bonus
+        if (player.HerbBuffType == (int)HerbType.IronbarkRoot && player.HerbBuffCombats > 0)
+        {
+            playerDefense += (long)(playerDefense * player.HerbBuffValue);
+        }
+
         // Lover's Bliss defense bonus (perfect intimacy match)
         if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
         {
@@ -3347,6 +3503,15 @@ public partial class CombatEngine
         }
 
         long actualDamage = Math.Max(1, monsterAttack - playerDefense);
+
+        // Shield block: halve incoming damage on successful block
+        if (blocked)
+        {
+            long blockedAmount = actualDamage / 2;
+            actualDamage = Math.Max(1, actualDamage - blockedAmount);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"Your shield absorbs {blockedAmount} damage!");
+        }
 
         // Cap monster damage per hit to prevent one-shots
         // Non-bosses: 75% of max HP; Bosses: 85% of max HP
@@ -7667,6 +7832,16 @@ public partial class CombatEngine
                     await Task.Delay(GetCombatDelay(1000));
                     continue;
 
+                case "J":
+                    if (player.TotalHerbCount > 0)
+                    {
+                        action.Type = CombatActionType.UseHerb;
+                        return (action, false);
+                    }
+                    terminal.WriteLine("Your herb pouch is empty!", "yellow");
+                    await Task.Delay(GetCombatDelay(1000));
+                    continue;
+
                 case "V":
                     if (BossContext?.CanSave == true)
                     {
@@ -7860,11 +8035,13 @@ public partial class CombatEngine
                         if (player is Player attackingKing && attackingKing.King)
                             attackPower = (long)(attackPower * GameConfig.KingCombatStrengthBonus);
 
-                        // Buff bonuses (well-rested, lover's bliss, divine blessing, poison coating)
+                        // Buff bonuses (well-rested, lover's bliss, divine blessing, poison coating, herbs)
                         if (player.WellRestedCombats > 0 && player.WellRestedBonus > 0f)
                             attackPower += (long)(attackPower * player.WellRestedBonus);
                         if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
                             attackPower += (long)(attackPower * player.LoversBlissBonus);
+                        if (player.HerbBuffType == (int)HerbType.FirebloomPetal && player.HerbBuffCombats > 0)
+                            attackPower += (long)(attackPower * player.HerbBuffValue);
                         if (player.DivineBlessingCombats > 0 && player.DivineBlessingBonus > 0f)
                             attackPower += (long)(attackPower * player.DivineBlessingBonus);
                         if (player.PoisonCoatingCombats > 0 && PoisonData.HasDamageBonus(player.ActivePoisonType))
@@ -7930,6 +8107,10 @@ public partial class CombatEngine
 
             case CombatActionType.CoatBlade:
                 await ExecuteCoatBlade(player, result);
+                break;
+
+            case CombatActionType.UseHerb:
+                await ExecuteUseHerb(player, result);
                 break;
 
             case CombatActionType.Retreat:
@@ -8086,13 +8267,16 @@ public partial class CombatEngine
         var target = targetIndex.HasValue ? monsters[targetIndex.Value] : GetRandomLivingMonster(monsters);
         if (target == null || !target.IsAlive) return;
 
+        // Apply PowerStance status
+        player.ApplyStatus(StatusEffect.PowerStance, 1);
+
         terminal.WriteLine("");
         terminal.SetColor("bright_red");
         terminal.WriteLine($"You wind up for a powerful strike at {target.Name}!");
         await Task.Delay(GetCombatDelay(500));
 
-        // Power Attack: +50% damage (with weapon soft cap)
-        long powerDamage = (long)((player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 1.5);
+        // Power Attack: +75% damage (with weapon soft cap), no defense penalty
+        long powerDamage = (long)((player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 1.75);
         powerDamage += random.Next(5, 25);
         powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage);
 
@@ -8100,6 +8284,26 @@ public partial class CombatEngine
         terminal.WriteLine($"POWER ATTACK! You deal {powerDamage} damage!");
 
         await ApplySingleMonsterDamage(target, powerDamage, result, "power attack", player);
+
+        // Follow up with off-hand attack if dual-wielding
+        if (player.IsDualWielding)
+        {
+            var offHandTarget = target.IsAlive ? target : GetRandomLivingMonster(monsters);
+            if (offHandTarget != null && offHandTarget.IsAlive)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"Off-hand strike at {offHandTarget.Name}!");
+                await Task.Delay(GetCombatDelay(500));
+
+                long ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
+                double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
+                ohDamage = (long)(ohDamage * ohMod);
+                ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
+
+                await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player);
+            }
+        }
     }
 
     private async Task ExecutePreciseStrikeMultiMonster(Character player, List<Monster> monsters, int? targetIndex, CombatResult result)
@@ -15457,14 +15661,14 @@ public partial class CombatEngine
         // Apply PowerStance status so any extra attacks this round follow the same rules
         attacker.ApplyStatus(StatusEffect.PowerStance, 1);
 
-        // Higher damage, lower accuracy – modelled via larger damage multiplier but higher chance of minimal absorption.
+        // Empowered main-hand strike: 1.75x STR + 1.75x WeapPow
         long originalStrength = attacker.Strength;
-        long attackPower = (long)(originalStrength * 1.5);
+        long attackPower = (long)(originalStrength * 1.75);
 
         if (attacker.WeapPow > 0)
         {
             long effectiveWeap = GetEffectiveWeapPow(attacker.WeapPow);
-            attackPower += (long)(effectiveWeap * 1.5) + random.Next(0, (int)Math.Min(effectiveWeap + 1, int.MaxValue));
+            attackPower += (long)(effectiveWeap * 1.75) + random.Next(0, (int)Math.Min(effectiveWeap + 1, int.MaxValue));
         }
 
         attackPower += random.Next(1, 21); // variation
@@ -15473,9 +15677,8 @@ public partial class CombatEngine
         double damageModifier = GetWeaponConfigDamageModifier(attacker);
         attackPower = (long)(attackPower * damageModifier);
 
-        // Reduce "accuracy": enemy gains extra defense in calculation (25 % boost)
+        // Normal defense calculation (no accuracy penalty — stamina cost is the tradeoff)
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
-        defense = (long)(defense * 1.25); // built-in accuracy penalty
         if (target.ArmPow > 0)
         {
             long effectiveArm = GetEffectiveArmPow(target.ArmPow);
@@ -15492,7 +15695,14 @@ public partial class CombatEngine
         target.HP = Math.Max(0, target.HP - damage);
         result.CombatLog.Add($"Player power-attacks {target.Name} for {damage} dmg (PowerStance)");
 
+        ApplyPostHitEnchantments(attacker, target, damage, result);
         await Task.Delay(GetCombatDelay(1000));
+
+        // Follow up with off-hand attack(s) if dual-wielding
+        if (attacker.IsDualWielding && target.HP > 0)
+        {
+            await ExecuteSingleAttack(attacker, target, result, true, isOffHandAttack: true);
+        }
     }
 
     private async Task ExecutePreciseStrike(Character attacker, Monster target, CombatResult result)
@@ -15941,6 +16151,10 @@ public partial class CombatEngine
         var drugEffects = DrugSystem.GetDrugEffects(attacker);
         attacks += drugEffects.ExtraAttacks;
 
+        // Swiftthistle herb extra attacks
+        if (attacker.HerbBuffType == (int)HerbType.Swiftthistle && attacker.HerbBuffCombats > 0)
+            attacks += attacker.HerbExtraAttacks;
+
         // Speed penalty from drugs
         if (drugEffects.SpeedPenalty > 15)
             attacks = Math.Max(1, attacks - 1);
@@ -15993,9 +16207,9 @@ public partial class CombatEngine
     {
         double modifier = 1.0;
 
-        // Two-handed weapons get 25% damage bonus
+        // Two-handed weapons get 45% damage bonus (compensates for no off-hand/shield)
         if (attacker.IsTwoHanding)
-            modifier = 1.25;
+            modifier = 1.45;
 
         // Off-hand attacks in dual-wield do 50% damage
         if (isOffHandAttack && attacker.IsDualWielding)
@@ -17485,7 +17699,8 @@ public enum CombatActionType
     RangedAttack,
     HealAlly,       // Heal a teammate with potion or spell
     BossSave,       // Attempt to save an Old God boss mid-combat
-    CoatBlade       // Coat weapon with poison from vial inventory
+    CoatBlade,      // Coat weapon with poison from vial inventory
+    UseHerb         // Use an herb from herb pouch
 }
 
 /// <summary>

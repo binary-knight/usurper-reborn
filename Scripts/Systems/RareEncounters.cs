@@ -2193,8 +2193,60 @@ namespace UsurperRemake.Systems
             else if (choice.ToUpper() == "I")
             {
                 terminal.SetColor("cyan");
-                terminal.WriteLine("\"The noble's tomb to the east holds great treasure.\"");
-                terminal.WriteLine("\"But beware the curse that guards it.\"");
+
+                // Give dynamic, useful information based on current floor
+                int[] sealFloors = { 15, 30, 45, 60, 80, 99 };
+                int[] godFloors = { 25, 40, 55, 70, 85, 95, 100 };
+                string[] godNames = { "Maelketh", "Veloura", "Thorgrim", "Noctura", "Aurelion", "Terravok", "Manwe" };
+
+                // Find nearest seal floor above current level
+                int nearestSeal = sealFloors.FirstOrDefault(f => f > level);
+                // Find nearest god floor above current level
+                int nearestGodIdx = -1;
+                for (int i = 0; i < godFloors.Length; i++)
+                {
+                    if (godFloors[i] > level) { nearestGodIdx = i; break; }
+                }
+
+                var rng = new Random();
+                var hints = new List<(string line1, string line2)>();
+
+                if (nearestSeal > 0 && nearestSeal - level <= 15)
+                {
+                    hints.Add(($"\"I've felt ancient power sealed nearby... around floor {nearestSeal}.\"",
+                               "\"Something waits to be claimed there.\""));
+                }
+                if (nearestGodIdx >= 0 && godFloors[nearestGodIdx] - level <= 20)
+                {
+                    hints.Add(($"\"A presence stirs below — {godNames[nearestGodIdx]} dwells near floor {godFloors[nearestGodIdx]}.\"",
+                               "\"Tread carefully. The old ones do not forgive trespassers.\""));
+                }
+                if (level >= 10 && level <= 30)
+                {
+                    hints.Add(("\"The deeper you go, the richer the dead become.\"",
+                               "\"But so do the things that guard them.\""));
+                }
+                if (level >= 40 && level <= 60)
+                {
+                    hints.Add(("\"These middle depths are treacherous. The monsters here have learned to hunt.\"",
+                               $"\"A warrior of your caliber should be cautious below floor {level + 10}.\""));
+                }
+                if (level >= 70)
+                {
+                    hints.Add(("\"Few return from where you tread. The catacombs remember every soul they take.\"",
+                               "\"The deepest floors hold secrets that predate the kingdom itself.\""));
+                }
+
+                // Always have at least one generic hint
+                if (hints.Count == 0)
+                {
+                    hints.Add(("\"The dead whisper of treasure deeper below.\"",
+                               "\"Explore carefully — not every room reveals its secrets at first glance.\""));
+                }
+
+                var hint = hints[rng.Next(hints.Count)];
+                terminal.WriteLine(hint.line1);
+                terminal.WriteLine(hint.line2);
                 player.Experience += level * 50;
             }
 

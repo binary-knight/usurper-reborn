@@ -1654,25 +1654,28 @@ namespace UsurperRemake.Systems
                             OfferedTo = player.Name2
                         };
 
-                        investigateQuest.Objectives.Add(new QuestObjective(
-                            QuestObjectiveType.TalkToNPC,
-                            $"Find {missingName} or learn their fate",
-                            1,
-                            missingName,
-                            missingName
-                        ));
-
+                        // Required: investigate the dungeon floor where they went missing
                         investigateQuest.Objectives.Add(new QuestObjective(
                             QuestObjectiveType.ReachDungeonFloor,
                             $"Search dungeon floor {investigateFloor} where {missingName} was last seen",
                             investigateFloor,
                             "",
                             $"Floor {investigateFloor}"
+                        ));
+
+                        // Optional: find the missing NPC alive (auto-completes on floor reach if dead)
+                        investigateQuest.Objectives.Add(new QuestObjective(
+                            QuestObjectiveType.TalkToNPC,
+                            $"Find {missingName} alive",
+                            1,
+                            missingName,
+                            missingName
                         ) { IsOptional = true });
 
+                        // Optional: clear out monsters near where they disappeared
                         investigateQuest.Objectives.Add(new QuestObjective(
                             QuestObjectiveType.KillMonsters,
-                            $"Slay {monstersToKill} monsters to uncover what happened",
+                            $"Slay {monstersToKill} monsters to secure the area",
                             monstersToKill,
                             "",
                             "Monsters"
@@ -1687,8 +1690,8 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("bright_green");
                         terminal.WriteLine($"\n  New Quest: {investigateQuest.Title}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  — Find {missingName} (talk to them if alive)");
-                        terminal.WriteLine($"  — OR search dungeon floor {investigateFloor} and slay {monstersToKill} monsters");
+                        terminal.WriteLine($"  — Investigate dungeon floor {investigateFloor} where they were last seen");
+                        terminal.WriteLine($"  — (Bonus) Find {missingName} alive and slay {monstersToKill} monsters nearby");
 
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {

@@ -686,7 +686,7 @@ public partial class NPC : Character
         return new WorldState
         {
             CurrentLocation = CurrentLocation,
-            TimeOfDay = DateTime.Now.Hour,
+            TimeOfDay = DailySystemManager.GetCurrentGameHour(),
             PlayersInArea = GetPlayersInLocation(CurrentLocation),
             NPCsInArea = GetNPCsInLocation(CurrentLocation),
             DangerLevel = CalculateDangerLevel()

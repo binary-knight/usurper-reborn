@@ -118,6 +118,8 @@ public class PlayerStatistics
     // Session tracking (not saved, used for calculations)
     [System.Text.Json.Serialization.JsonIgnore]
     public DateTime SessionStart { get; set; } = DateTime.Now;
+    [System.Text.Json.Serialization.JsonIgnore]
+    private DateTime _lastAccumulatedAt = DateTime.Now; // Tracks last TotalPlayTime accumulation point
 
     // Session snapshot - captures stats at session start for summary calculation
     [System.Text.Json.Serialization.JsonIgnore]
@@ -138,18 +140,22 @@ public class PlayerStatistics
     private long _sessionStartItemsSold;
 
     /// <summary>
-    /// Update session time when saving
+    /// Update session time when saving. Accumulates time since last call
+    /// without resetting SessionStart (which is used for session summary).
     /// </summary>
     public void UpdateSessionTime()
     {
-        var sessionDuration = DateTime.Now - SessionStart;
-        TotalPlayTime += sessionDuration;
+        var now = DateTime.Now;
+        var elapsed = now - _lastAccumulatedAt;
+        TotalPlayTime += elapsed;
+        _lastAccumulatedAt = now;
 
-        if (sessionDuration > LongestSession)
-            LongestSession = sessionDuration;
+        // Check longest session using the true session start
+        var fullSessionDuration = now - SessionStart;
+        if (fullSessionDuration > LongestSession)
+            LongestSession = fullSessionDuration;
 
-        LastPlayed = DateTime.Now;
-        SessionStart = DateTime.Now; // Reset for next calculation
+        LastPlayed = now;
     }
 
     /// <summary>
@@ -159,6 +165,7 @@ public class PlayerStatistics
     {
         TotalSessionsPlayed++;
         SessionStart = DateTime.Now;
+        _lastAccumulatedAt = DateTime.Now;
 
         // Capture snapshot of current stats for session summary
         CaptureSessionSnapshot();
@@ -375,6 +382,12 @@ public class PlayerStatistics
     public void RecordQuestComplete()
     {
         QuestsCompleted++;
+    }
+
+    public void RecordQuestGoldReward(long amount)
+    {
+        TotalGoldFromQuests += amount;
+        TotalGoldEarned += amount;
     }
 
     /// <summary>
@@ -595,16 +608,17 @@ public class PlayerStatistics
     }
 
     /// <summary>
-    /// Get formatted play time string
+    /// Get formatted play time string (includes current session without accumulating)
     /// </summary>
     public string GetFormattedPlayTime()
     {
-        UpdateSessionTime();
+        // Peek at total including current un-accumulated time, without side effects
+        var currentTotal = TotalPlayTime + (DateTime.Now - _lastAccumulatedAt);
 
-        if (TotalPlayTime.TotalHours >= 1)
-            return $"{(int)TotalPlayTime.TotalHours}h {TotalPlayTime.Minutes}m";
+        if (currentTotal.TotalHours >= 1)
+            return $"{(int)currentTotal.TotalHours}h {currentTotal.Minutes}m";
         else
-            return $"{TotalPlayTime.Minutes}m {TotalPlayTime.Seconds}s";
+            return $"{currentTotal.Minutes}m {currentTotal.Seconds}s";
     }
 
     /// <summary>

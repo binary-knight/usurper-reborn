@@ -253,6 +253,12 @@ public class LocationManager
                 UsurperRemake.Server.RoomRegistry.Instance.PlayerEntered(locationId, session);
         }
 
+        // Advance game time for travel between locations (single-player only)
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && previousLocation != locationId)
+        {
+            DailySystemManager.Instance.AdvanceGameTime(player, GameConfig.MinutesPerTravel);
+        }
+
         // Enter the location
         try
         {

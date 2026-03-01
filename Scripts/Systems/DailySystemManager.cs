@@ -653,6 +653,9 @@ public class DailySystemManager
             }
         }
 
+        // Decrement NPC prison sentences (once per day, not per sim tick)
+        PrisonActivitySystem.Instance.ProcessDailyPrisonCountdown();
+
         // Process World Event System - this handles all major events
         await WorldEventSystem.Instance.ProcessDailyEvents(currentDay);
 
@@ -1101,6 +1104,235 @@ public class DailySystemManager
         {
             NewsSystem.Instance?.Newsy(false, $"Royal treasury crisis! Guards and monsters go unpaid!");
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Single-Player Time-of-Day System
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Time periods for the single-player day/night cycle</summary>
+    public enum GameTimePeriod { Dawn, Morning, Afternoon, Evening, Night }
+
+    /// <summary>Track the last displayed time period for atmospheric transition messages</summary>
+    private GameTimePeriod? _lastDisplayedPeriod;
+
+    /// <summary>Get the current time period for a player</summary>
+    public static GameTimePeriod GetTimeOfDay(Character player)
+    {
+        int hour = player.GameTimeMinutes / 60;
+        if (hour >= 5 && hour < 7) return GameTimePeriod.Dawn;
+        if (hour >= 7 && hour < 12) return GameTimePeriod.Morning;
+        if (hour >= 12 && hour < 17) return GameTimePeriod.Afternoon;
+        if (hour >= 17 && hour < 21) return GameTimePeriod.Evening;
+        return GameTimePeriod.Night;
+    }
+
+    /// <summary>Get a display string for the current time period</summary>
+    public static string GetTimePeriodString(Character player)
+    {
+        return GetTimeOfDay(player) switch
+        {
+            GameTimePeriod.Dawn => "Dawn",
+            GameTimePeriod.Morning => "Morning",
+            GameTimePeriod.Afternoon => "Afternoon",
+            GameTimePeriod.Evening => "Evening",
+            GameTimePeriod.Night => "Night",
+            _ => "Day"
+        };
+    }
+
+    /// <summary>Get the display color for the current time period</summary>
+    public static string GetTimePeriodColor(Character player)
+    {
+        return GetTimeOfDay(player) switch
+        {
+            GameTimePeriod.Dawn => "bright_yellow",
+            GameTimePeriod.Morning => "yellow",
+            GameTimePeriod.Afternoon => "white",
+            GameTimePeriod.Evening => "bright_red",
+            GameTimePeriod.Night => "dark_cyan",
+            _ => "white"
+        };
+    }
+
+    /// <summary>Get a formatted time string like "8:00 AM" for the player's game time</summary>
+    public static string GetTimeString(Character player)
+    {
+        int totalMinutes = player.GameTimeMinutes;
+        int hour = totalMinutes / 60;
+        int minute = totalMinutes % 60;
+        string ampm = hour >= 12 ? "PM" : "AM";
+        int displayHour = hour % 12;
+        if (displayHour == 0) displayHour = 12;
+        return $"{displayHour}:{minute:D2} {ampm}";
+    }
+
+    /// <summary>Get the current game hour (0-23). Uses game time in single-player, real time in online.</summary>
+    public static int GetCurrentGameHour()
+    {
+        if (DoorMode.IsOnlineMode)
+            return DateTime.Now.Hour;
+        var player = GameEngine.Instance?.CurrentPlayer;
+        if (player == null)
+            return DateTime.Now.Hour;
+        return player.GameTimeMinutes / 60;
+    }
+
+    /// <summary>Can the player rest for the night? (advances day)</summary>
+    public static bool CanRestForNight(Character player)
+    {
+        if (DoorMode.IsOnlineMode) return true; // Online always can
+        int hour = player.GameTimeMinutes / 60;
+        return hour >= GameConfig.RestAvailableHour || hour < 5;
+    }
+
+    /// <summary>
+    /// Advance the player's game clock by the given minutes.
+    /// Returns true if one or more hour boundaries were crossed (world sim should tick).
+    /// Single-player only — no-op in online mode.
+    /// </summary>
+    public int AdvanceGameTime(Character player, int minutes)
+    {
+        if (DoorMode.IsOnlineMode) return 0;
+        if (minutes <= 0) return 0;
+
+        int oldHour = player.GameTimeMinutes / 60;
+        player.GameTimeMinutes += minutes;
+
+        // Handle day overflow (shouldn't normally happen without rest, but safety)
+        if (player.GameTimeMinutes >= 1440)
+        {
+            player.GameTimeMinutes %= 1440;
+        }
+
+        int newHour = player.GameTimeMinutes / 60;
+
+        // Calculate hours crossed (handling midnight wrap)
+        int hoursCrossed;
+        if (newHour >= oldHour)
+            hoursCrossed = newHour - oldHour;
+        else
+            hoursCrossed = (24 - oldHour) + newHour;
+
+        return hoursCrossed;
+    }
+
+    /// <summary>
+    /// Rest and fast-forward to morning. Runs world sim ticks for sleeping hours.
+    /// Triggers daily reset. Single-player only.
+    /// </summary>
+    public async Task RestAndAdvanceToMorning(Character player)
+    {
+        if (DoorMode.IsOnlineMode) return;
+
+        int currentMinutes = player.GameTimeMinutes;
+        int morningMinutes = GameConfig.DayStartHour * 60; // 6:00 AM = 360
+
+        // Calculate hours until morning
+        int minutesUntilMorning;
+        if (currentMinutes >= morningMinutes)
+            minutesUntilMorning = (1440 - currentMinutes) + morningMinutes;
+        else
+            minutesUntilMorning = morningMinutes - currentMinutes;
+
+        int hoursSleeping = minutesUntilMorning / 60;
+
+        // Run world sim ticks for the sleeping period (world advances while you sleep)
+        for (int i = 0; i < hoursSleeping; i++)
+        {
+            var gameEngine = GameEngine.Instance;
+            if (gameEngine != null)
+                await gameEngine.PeriodicUpdate();
+        }
+
+        // Set time to morning
+        player.GameTimeMinutes = morningMinutes;
+
+        // Trigger daily reset
+        await ForceDailyReset();
+    }
+
+    /// <summary>
+    /// Check if the time period changed and return an atmospheric message if so.
+    /// Returns null if no transition occurred.
+    /// </summary>
+    public string? CheckTimeTransition(Character player)
+    {
+        if (DoorMode.IsOnlineMode) return null;
+
+        var currentPeriod = GetTimeOfDay(player);
+        if (_lastDisplayedPeriod == currentPeriod) return null;
+
+        var previousPeriod = _lastDisplayedPeriod;
+        _lastDisplayedPeriod = currentPeriod;
+
+        // Don't show transition on first check (game start)
+        if (previousPeriod == null) return null;
+
+        return currentPeriod switch
+        {
+            GameTimePeriod.Dawn => "The first light of dawn creeps across the sky.",
+            GameTimePeriod.Morning => "The morning sun warms the cobblestones.",
+            GameTimePeriod.Afternoon => "The sun climbs high overhead as afternoon begins.",
+            GameTimePeriod.Evening => "The sky turns to gold and crimson as evening approaches.",
+            GameTimePeriod.Night => "Stars emerge as darkness settles over the realm.",
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Wait until rest time (fast-forward without heal/daily reset).
+    /// Runs world sim ticks for each hour that passes.
+    /// </summary>
+    public async Task WaitUntilEvening(Character player, TerminalUI term)
+    {
+        if (DoorMode.IsOnlineMode) return;
+
+        int currentHour = player.GameTimeMinutes / 60;
+        if (currentHour >= GameConfig.RestAvailableHour || currentHour < 5)
+        {
+            term.WriteLine("It's already late enough to rest for the night.", "gray");
+            return;
+        }
+
+        int targetMinutes = GameConfig.RestAvailableHour * 60;
+        int minutesToWait = targetMinutes - player.GameTimeMinutes;
+        int hoursToWait = minutesToWait / 60;
+
+        term.WriteLine("", "white");
+        term.WriteLine("You settle in and while away the hours...", "gray");
+        await Task.Delay(1000);
+
+        for (int i = 0; i < hoursToWait; i++)
+        {
+            // Show progress every few hours
+            int simHour = (currentHour + i + 1) % 24;
+            var period = simHour switch
+            {
+                >= 5 and < 7 => "Dawn",
+                >= 7 and < 12 => "Morning",
+                >= 12 and < 17 => "Afternoon",
+                >= 17 and < 21 => "Evening",
+                _ => "Night"
+            };
+
+            if (i == 0 || (i + 1) == hoursToWait || (i % 3 == 0))
+            {
+                term.WriteLine($"  ...{period}...", "gray");
+                await Task.Delay(400);
+            }
+
+            // Run world sim tick for each hour
+            var gameEngine = GameEngine.Instance;
+            if (gameEngine != null)
+                await gameEngine.PeriodicUpdate();
+        }
+
+        player.GameTimeMinutes = targetMinutes;
+        _lastDisplayedPeriod = GameTimePeriod.Night;
+
+        term.WriteLine("", "white");
+        term.WriteLine("Night has fallen. You can now rest for the night.", "dark_cyan");
     }
 }
 

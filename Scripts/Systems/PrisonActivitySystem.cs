@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -264,8 +265,9 @@ public class PrisonActivitySystem
     }
 
     /// <summary>
-    /// Process all NPC prisoners' daily activities
-    /// Called by WorldSimulator during maintenance
+    /// Process all NPC prisoners' activities (stat building, personality shifts)
+    /// Called by WorldSimulator during maintenance (every sim tick)
+    /// Note: Prison day countdown is handled separately by ProcessDailyPrisonCountdown()
     /// </summary>
     public void ProcessAllPrisonerActivities()
     {
@@ -275,14 +277,25 @@ public class PrisonActivitySystem
         foreach (var prisoner in prisoners)
         {
             ProcessNPCPrisonerActivity(prisoner);
+        }
+    }
 
-            // Decrease prison days
+    /// <summary>
+    /// Decrement prison sentences and release NPCs whose time is served.
+    /// Called once per game day (from DailySystemManager), NOT every sim tick.
+    /// </summary>
+    public void ProcessDailyPrisonCountdown()
+    {
+        var prisoners = UsurperRemake.Systems.NPCSpawnSystem.Instance?.GetPrisoners();
+        if (prisoners == null) return;
+
+        foreach (var prisoner in prisoners.ToList())
+        {
             if (prisoner.DaysInPrison > 0)
             {
                 prisoner.DaysInPrison--;
                 if (prisoner.DaysInPrison <= 0)
                 {
-                    // Release prisoner
                     UsurperRemake.Systems.NPCSpawnSystem.Instance?.ReleaseNPC(prisoner);
                     NewsSystem.Instance?.Newsy(true, $"{prisoner.Name} has been released from prison.");
                 }
