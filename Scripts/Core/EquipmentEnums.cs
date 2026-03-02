@@ -65,6 +65,13 @@ public enum WeaponType
     Staff = 13,         // Magic bonus
     Maul = 14,          // Armor crushing
 
+    // Special
+    Fist = 16,          // Hand wraps, unarmed
+    Instrument = 17,    // Musical instruments (Bard-only, one-handed)
+
+    // Ranged
+    Bow = 15,           // Two-handed ranged, DEX-based
+
     // Shields
     Shield = 20,        // Block chance + AC
     Buckler = 21,       // Light, less AC, can still attack

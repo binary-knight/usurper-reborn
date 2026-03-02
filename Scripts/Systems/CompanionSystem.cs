@@ -288,6 +288,65 @@ namespace UsurperRemake.Systems
                 TeachesAcceptance = true
             };
 
+            // ═══════════════════════════════════════════════════════════════
+            // MELODIA - The Songweaver (Music Shop companion)
+            // ═══════════════════════════════════════════════════════════════
+            companions[CompanionId.Melodia] = new Companion
+            {
+                Id = CompanionId.Melodia,
+                Name = "Melodia",
+                Title = "The Songweaver",
+                Type = CompanionType.Support,
+
+                Description = "A master bard who runs the Music Shop. Her songs can heal wounds, " +
+                             "inspire courage, and some say even stir the dreams of sleeping gods.",
+
+                BackstoryBrief = "Melodia once traveled with a legendary adventuring party, chronicling " +
+                                "their deeds in song. When they fell one by one to the dungeon's depths, " +
+                                "she opened a shop in town — but the call of adventure never truly faded. " +
+                                "She knows more about the Old Gods than she lets on.",
+
+                RecruitLevel = 20,
+                RecruitLocation = "Music Shop — after sharing your story",
+
+                BaseStats = new CompanionStats
+                {
+                    HP = 200,
+                    Attack = 20,
+                    Defense = 18,
+                    MagicPower = 45,
+                    Speed = 30,
+                    HealingPower = 40
+                },
+
+                CombatRole = CombatRole.Hybrid,
+                Abilities = new[] { "Inspiring Melody", "Soothing Song", "Discordant Note", "Ballad of Heroes" },
+
+                PersonalQuestName = "The Lost Opus",
+                PersonalQuestDescription = "Help Melodia recover a legendary musical score from the dungeon depths.",
+                PersonalQuestLocationHint = "Dungeon floors 50-60 (ancient music chamber)",
+
+                RomanceAvailable = true,
+                CanDiePermanently = true,
+
+                DeathTriggers = new Dictionary<DeathType, string>
+                {
+                    [DeathType.Sacrifice] = "Shields you with a final, impossibly beautiful song that echoes long after she falls",
+                    [DeathType.Combat] = "Can fall in battle, her last notes lingering in the air"
+                },
+
+                DialogueHints = new[]
+                {
+                    "Every song tells a truth the singer doesn't know yet.",
+                    "I've played for kings and beggars. The beggars listen better.",
+                    "Music is the only honest language.",
+                    "Some melodies haunt you because they're trying to tell you something."
+                },
+
+                OceanPhilosophyAwareness = 2,
+                TeachesLettingGo = true
+            };
+
         }
 
         #region Companion Management
@@ -1920,7 +1979,8 @@ namespace UsurperRemake.Systems
         Lyris,
         Aldric,
         Mira,
-        Vex
+        Vex,
+        Melodia
     }
 
     public enum CompanionType

@@ -487,7 +487,8 @@ namespace UsurperRemake.Systems
         ForgaveBetrayerMercy,   // Chose to forgive someone who betrayed you
         AcceptedGrief,          // Completed the grief cycle with wisdom
         RejectedParadise,       // Refused to create a false utopia
-        AbsorbedDarkness        // Took on the world's darkness to save it
+        AbsorbedDarkness,       // Took on the world's darkness to save it
+        HeardOldGodLoreSong     // Heard a lore song about an Old God at the Music Shop
     }
 
     /// <summary>

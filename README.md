@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.48.1** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.49.0** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,22 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### Completed in v0.49.0 - Swords and Lutes
+
+**Music Shop:** New location on Main Street (`[U]`). Run by Melodia the Songweaver (and her apprentice Cadence when Melodia is adventuring). Four services: instrument purchasing (Bard-only), performance buffs with lore-rich songs (all classes), Melodia companion recruitment (level 20+), and Old God lore ballads that grant awakening points.
+
+**Compact Mode:** Toggle for mobile/small screen SSH users — activates space-efficient BBS-style menus across all 15+ locations and combat. Three toggle methods: pre-login `[Z]`, preferences `[9]`, `/compact` command. Touch-friendly number keys on Main Street.
+
+**Weapon & Armor Shop Overhaul:** Procedural inventory from all loot templates — full level 1-100 coverage, economy-scaled pricing, 85% power of dungeon loot. Class restriction tags. Level-filtered display.
+
+**New Weapon Types:** Bows (10 templates, Rangers), Instruments (10 templates, Bards), Fist (unarmed). Weapon requirements for class abilities — Rangers need Bow, Assassins need Dagger, Warriors need Shield for Shield Wall, Magicians/Sages need Staff for spells.
+
+**5th Companion — Melodia:** Support/Hybrid companion with music-themed abilities. Personal quest "The Lost Opus" on dungeon floors 50-60. When recruited, apprentice Cadence takes over running the shop.
+
+**Song Buffs:** 4 purchasable combat buffs (War March, Lullaby of Iron, Fortune's Tune, Battle Hymn) lasting 5 combats each. 12 lore-rich performance songs mixing tavern humor and dramatic ballads.
+
+**Loot Fixes:** Two-handed weapons and shields now drop from monsters (35 + 24 new templates). Dungeon loot weapon type inference fix. Round-robin group loot distribution.
 
 ### Completed in v0.47.6 - Enchantments & Companion Combat
 
@@ -972,7 +988,7 @@ Join our Discord server for discussions, feedback, and updates:
 - Romance/marriage/family systems
 - Story progression and endings
 
-### Known Issues (Alpha v0.44.3)
+### Known Issues (Alpha v0.49.0)
 - Some edge cases in combat may cause unexpected behavior
 - NPC AI occasionally makes suboptimal decisions
 - Save files from earlier alpha versions may not be fully compatible
@@ -987,4 +1003,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.45.0 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.49.0 — The world is running. [Watch it live.](https://usurper-reborn.net)

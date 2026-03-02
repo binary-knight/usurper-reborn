@@ -103,7 +103,7 @@ public partial class TempleLocation : BaseLocation
                 await DisplayMenu(refreshMenu);
                 refreshMenu = false;
                 
-                var choice = await terminal.GetInputAsync("Temple area (? for menu) :");
+                var choice = await terminal.GetInputAsync("Your choice: ");
                 
                 switch (choice.ToUpper())
                 {
@@ -190,7 +190,7 @@ public partial class TempleLocation : BaseLocation
                         break;
                         
                     default:
-                        terminal.WriteLine("Invalid choice. Press ? for menu.", "red");
+                        terminal.WriteLine("Invalid choice. Type 'look' to redraw menu.", "red");
                         await Task.Delay(1000);
                         break;
                 }
@@ -1163,7 +1163,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("(S)tatus", "yellow");
             terminal.WriteLine("(R)eturn", "yellow");
             
-            var choice = await terminal.GetInputAsync("Sacrifice (? for menu): ");
+            var choice = await terminal.GetInputAsync("Your choice: ");
             
             switch (choice.ToUpper())
             {

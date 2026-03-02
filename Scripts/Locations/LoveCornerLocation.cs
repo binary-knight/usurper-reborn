@@ -98,11 +98,11 @@ public class LoveCornerLocation : BaseLocation
     {
         if (player.Expert)
         {
-            terminal.Write($"{GameConfig.DefaultLoveCornerName} (A,C,D,E,V,M,P,G,S,R,L,?) :");
+            terminal.Write($"{GameConfig.DefaultLoveCornerName} (A,C,D,E,V,M,P,G,S,R,L) :");
         }
         else
         {
-            terminal.Write($"{GameConfig.DefaultLoveCornerName} (? for menu) :");
+            terminal.Write("Your choice: ");
         }
     }
 
@@ -770,7 +770,7 @@ public class LoveCornerLocation : BaseLocation
         terminal.WriteLine("(L)oved players, Top List    (R)eturn");
         terminal.WriteLine();
 
-        string choice = await terminal.GetInput("History Room (? for menu): ");
+        string choice = await terminal.GetInput("Your choice: ");
 
         switch (choice?.ToUpper())
         {

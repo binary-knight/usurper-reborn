@@ -173,7 +173,7 @@ public class SpellSystemTests
 
     private static Character CreateTestMage(int level)
     {
-        return new Character
+        var mage = new Character
         {
             Name2 = "TestMage",
             Class = CharacterClass.Magician,
@@ -185,6 +185,11 @@ public class SpellSystemTests
             Wisdom = 15,
             Intelligence = 20
         };
+        // Magicians require a Staff to cast spells
+        var staff = new Equipment { Name = "Test Staff", WeaponType = WeaponType.Staff, Slot = EquipmentSlot.MainHand };
+        int staffId = EquipmentDatabase.RegisterDynamic(staff);
+        mage.EquippedItems[EquipmentSlot.MainHand] = staffId;
+        return mage;
     }
 
     private static Character CreateTestCleric(int level)

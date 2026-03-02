@@ -442,7 +442,11 @@ public static class SpellSystem
             character.Class != CharacterClass.Magician &&
             character.Class != CharacterClass.Sage)
             return false;
-            
+
+        // Check weapon requirement for spell casting
+        if (!HasRequiredSpellWeapon(character))
+            return false;
+
         // Level requirement
         if (character.Level < GetLevelRequired(character.Class, spellLevel))
             return false;
@@ -459,6 +463,27 @@ public static class SpellSystem
         return effectiveMana >= manaCost;
     }
     
+    /// <summary>
+    /// Get the weapon type required for a class to cast spells (null = no requirement)
+    /// </summary>
+    public static WeaponType? GetSpellWeaponRequirement(CharacterClass cls) => cls switch
+    {
+        CharacterClass.Magician => WeaponType.Staff,
+        CharacterClass.Sage => WeaponType.Staff,
+        _ => null,  // Cleric: divine magic (no weapon needed), prestige classes: no requirement
+    };
+
+    /// <summary>
+    /// Check if a character has the required weapon equipped to cast spells
+    /// </summary>
+    public static bool HasRequiredSpellWeapon(Character character)
+    {
+        var required = GetSpellWeaponRequirement(character.Class);
+        if (required == null) return true;
+        var mainHand = character.GetEquipment(EquipmentSlot.MainHand);
+        return mainHand != null && mainHand.WeaponType == required.Value;
+    }
+
     /// <summary>
     /// Cast spell - main spell casting function (Pascal CAST.PAS recreation)
     /// </summary>

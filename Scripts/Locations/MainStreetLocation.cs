@@ -256,7 +256,9 @@ public class MainStreetLocation : BaseLocation
             terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("N"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write("ews        ");
             terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("F"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.WriteLine("ame");
+            terminal.SetColor("white"); terminal.Write("ame       ");
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("U"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("cyan"); terminal.WriteLine("Music Shop");
         }
 
         // Tier 3 (Level 5+): Full menu
@@ -294,6 +296,13 @@ public class MainStreetLocation : BaseLocation
         terminal.SetColor("gray"); terminal.Write("uit        ");
         terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("~"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("gray"); terminal.WriteLine("Settings");
+
+        // Compact mode number-key hint (offline only — online mode has its own number row)
+        if (GameConfig.CompactMode && !DoorMode.IsOnlineMode)
+        {
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(" Numpad: 1=Healer 2=Quests 3=Wpn 4=Armor 5=Temple 6=Castle 7=Home 8=Master");
+        }
 
         // Online multiplayer row (only in online mode)
         if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
@@ -608,8 +617,18 @@ public class MainStreetLocation : BaseLocation
             terminal.SetColor("white");
             terminal.Write("ome         ");
 
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("U");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("cyan");
+            terminal.Write("Music Shop");
+
             if (tier >= 3)
             {
+                terminal.Write("  ");
                 terminal.SetColor("darkgray");
                 terminal.Write("[");
                 terminal.SetColor("bright_yellow");
@@ -838,6 +857,7 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine("  W - Weapon Shop");
         terminal.WriteLine("  A - Armor Shop");
         terminal.WriteLine("  M - Magic Shop");
+        terminal.WriteLine("  U - Music Shop");
         if (tier >= 3) terminal.WriteLine("  J - Auction House");
         if (tier >= 2) terminal.WriteLine("  B - Bank");
         terminal.WriteLine("  1 - Healer");
@@ -906,6 +926,23 @@ public class MainStreetLocation : BaseLocation
             return false;
 
         var upperChoice = choice.ToUpper().Trim();
+
+        // Compact mode: map number keys to common locations for touch-friendly input
+        // Only in offline mode — online mode already uses 3-7 for online features
+        if (GameConfig.CompactMode && !DoorMode.IsOnlineMode)
+        {
+            upperChoice = upperChoice switch
+            {
+                "3" => "W",  // Weapon Shop
+                "4" => "A",  // Armor Shop
+                "5" => "T",  // Temple
+                "6" => "K",  // Castle
+                "7" => "H",  // Home
+                "8" => "V",  // Level Master
+                "0" => "Q",  // Quit
+                _ => upperChoice
+            };
+        }
 
         // Handle Main Street specific commands
         switch (upperChoice)
@@ -1026,6 +1063,10 @@ public class MainStreetLocation : BaseLocation
             case "=":
                 await ShowStatistics();
                 return false;
+
+            case "U":
+                await NavigateToLocation(GameLocation.MusicShop);
+                return true;
 
             // Achievements removed - available via Trophy Room at Home
             // case "!":

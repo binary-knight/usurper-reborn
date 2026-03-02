@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 
 /// <summary>
 /// Weapon Shop Location - Modern RPG weapon and shield system
-/// Sells One-Handed Weapons, Two-Handed Weapons, and Shields
-/// Supports dual-wielding configuration
+/// Sells One-Handed Weapons, Two-Handed Weapons, Bows, and Shields
+/// One-handed weapon purchases prompt for Main Hand or Off-Hand slot
 /// </summary>
 public class WeaponShopLocation : BaseLocation
 {
@@ -22,8 +22,8 @@ public class WeaponShopLocation : BaseLocation
     {
         OneHanded,
         TwoHanded,
-        Shields,
-        DualWield
+        Bows,
+        Shields
     }
 
     public WeaponShopLocation() : base(
@@ -162,7 +162,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine("Two-Handed Weapons (high damage, both hands occupied)");
 
-        // Shields
+        // Bows
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
@@ -170,19 +170,19 @@ public class WeaponShopLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.WriteLine("Shields (off-hand defense)");
+        terminal.WriteLine("Bows (ranged, two-handed)");
 
-        terminal.WriteLine("");
-
-        // Dual-wield setup
+        // Shields
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
-        terminal.Write("D");
+        terminal.Write("4");
         terminal.SetColor("darkgray");
         terminal.Write("] ");
-        terminal.SetColor("magenta");
-        terminal.WriteLine("ual-Wield Setup (equip second weapon in off-hand)");
+        terminal.SetColor("white");
+        terminal.WriteLine("Shields (off-hand defense)");
+
+        terminal.WriteLine("");
 
         // Sell option
         terminal.SetColor("darkgray");
@@ -254,7 +254,7 @@ public class WeaponShopLocation : BaseLocation
         // Menu
         terminal.SetColor("cyan");
         terminal.WriteLine(" Categories:");
-        ShowBBSMenuRow(("1", "bright_yellow", "One-Hand"), ("2", "bright_yellow", "Two-Hand"), ("3", "bright_yellow", "Shields"), ("D", "bright_magenta", "ual-Wield"));
+        ShowBBSMenuRow(("1", "bright_yellow", "One-Hand"), ("2", "bright_yellow", "Two-Hand"), ("3", "bright_yellow", "Bows"), ("4", "bright_yellow", "Shields"));
         ShowBBSMenuRow(("S", "bright_green", "ell"), ("A", "bright_cyan", "uto-Buy"), ("R", "bright_red", "eturn"));
 
         // Footer
@@ -352,28 +352,40 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine($"{totalPow}");
     }
 
+    /// <summary>
+    /// Get filtered shop items for a weapon category, scoped to player level
+    /// </summary>
+    private List<Equipment> GetShopItemsForCategory(WeaponCategory category)
+    {
+        var items = category switch
+        {
+            WeaponCategory.OneHanded => EquipmentDatabase.GetShopWeapons(WeaponHandedness.OneHanded)
+                .Where(w => w.WeaponType != WeaponType.Instrument).ToList(),
+            WeaponCategory.TwoHanded => EquipmentDatabase.GetShopWeapons(WeaponHandedness.TwoHanded)
+                .Where(w => w.WeaponType != WeaponType.Bow).ToList(),
+            WeaponCategory.Bows => EquipmentDatabase.GetShopWeapons(WeaponHandedness.TwoHanded)
+                .Where(w => w.WeaponType == WeaponType.Bow).ToList(),
+            WeaponCategory.Shields => EquipmentDatabase.GetShopShields(),
+            _ => new List<Equipment>()
+        };
+
+        int playerLevel = currentPlayer.Level;
+        return items.Where(i => i.MinLevel <= playerLevel + 15 && i.MinLevel >= Math.Max(1, playerLevel - 20)).ToList();
+    }
+
     private void ShowCategoryItems(WeaponCategory category)
     {
-        List<Equipment> items;
-        string categoryName;
-
-        switch (category)
+        string categoryName = category switch
         {
-            case WeaponCategory.OneHanded:
-                items = EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.OneHanded).OrderBy(i => i.Value).ToList();
-                categoryName = "One-Handed Weapons";
-                break;
-            case WeaponCategory.TwoHanded:
-                items = EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.TwoHanded).OrderBy(i => i.Value).ToList();
-                categoryName = "Two-Handed Weapons";
-                break;
-            case WeaponCategory.Shields:
-                items = EquipmentDatabase.GetShields().OrderBy(i => i.Value).ToList();
-                categoryName = "Shields";
-                break;
-            default:
-                return;
-        }
+            WeaponCategory.OneHanded => "One-Handed Weapons",
+            WeaponCategory.TwoHanded => "Two-Handed Weapons",
+            WeaponCategory.Bows => "Bows",
+            WeaponCategory.Shields => "Shields",
+            _ => ""
+        };
+        if (string.IsNullOrEmpty(categoryName)) return;
+
+        List<Equipment> items = GetShopItemsForCategory(category);
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine($"═══ {categoryName} ═══");
@@ -435,7 +447,9 @@ public class WeaponShopLocation : BaseLocation
         {
             bool canAfford = currentPlayer.Gold >= item.Value;
             bool meetsLevel = currentPlayer.Level >= item.MinLevel;
-            bool canBuy = canAfford && meetsLevel;
+            bool meetsClass = item.ClassRestrictions == null || item.ClassRestrictions.Count == 0
+                || item.ClassRestrictions.Contains(currentPlayer.Class);
+            bool canBuy = canAfford && meetsLevel && meetsClass;
 
             terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
             terminal.Write($"{num,3}. ");
@@ -477,6 +491,14 @@ public class WeaponShopLocation : BaseLocation
             {
                 terminal.SetColor(canBuy ? "green" : "darkgray");
                 terminal.Write(bonuses);
+            }
+
+            // Show class restriction tag
+            var classTag = GetClassTag(item);
+            if (!string.IsNullOrEmpty(classTag))
+            {
+                terminal.SetColor(!meetsClass ? "red" : "gray");
+                terminal.Write($" [{classTag}]");
             }
 
             terminal.WriteLine("");
@@ -530,13 +552,45 @@ public class WeaponShopLocation : BaseLocation
     {
         var bonuses = new List<string>();
 
-        if (item.StrengthBonus != 0) bonuses.Add($"Str{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
-        if (item.DexterityBonus != 0) bonuses.Add($"Dex{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
+        if (item.StrengthBonus != 0) bonuses.Add($"Str+{item.StrengthBonus}");
+        if (item.DexterityBonus != 0) bonuses.Add($"Dex+{item.DexterityBonus}");
+        if (item.IntelligenceBonus != 0) bonuses.Add($"Int+{item.IntelligenceBonus}");
+        if (item.WisdomBonus != 0) bonuses.Add($"Wis+{item.WisdomBonus}");
+        if (item.ConstitutionBonus != 0) bonuses.Add($"Con+{item.ConstitutionBonus}");
+        if (item.DefenceBonus != 0) bonuses.Add($"Def+{item.DefenceBonus}");
+        if (item.AgilityBonus != 0) bonuses.Add($"Agi+{item.AgilityBonus}");
+        if (item.MaxHPBonus != 0) bonuses.Add($"HP+{item.MaxHPBonus}");
+        if (item.MaxManaBonus != 0) bonuses.Add($"MP+{item.MaxManaBonus}");
         if (item.CriticalChanceBonus != 0) bonuses.Add($"Crit+{item.CriticalChanceBonus}%");
+        if (item.CriticalDamageBonus != 0) bonuses.Add($"CritD+{item.CriticalDamageBonus}%");
+        if (item.ArmorPiercing != 0) bonuses.Add($"APen+{item.ArmorPiercing}%");
+        if (item.MagicResistance != 0) bonuses.Add($"MR+{item.MagicResistance}%");
         if (item.LifeSteal != 0) bonuses.Add($"Leech{item.LifeSteal}%");
-        if (item.PoisonDamage != 0) bonuses.Add($"Poison+{item.PoisonDamage}");
+        if (item.PoisonDamage != 0) bonuses.Add($"Psn+{item.PoisonDamage}");
 
         return string.Join(" ", bonuses.Take(3));
+    }
+
+    private static string GetClassTag(Equipment item)
+    {
+        if (item.ClassRestrictions == null || item.ClassRestrictions.Count == 0)
+            return "";
+        var abbrevs = item.ClassRestrictions.Select(c => c switch
+        {
+            CharacterClass.Warrior => "War",
+            CharacterClass.Paladin => "Pal",
+            CharacterClass.Barbarian => "Bar",
+            CharacterClass.Ranger => "Rng",
+            CharacterClass.Assassin => "Asn",
+            CharacterClass.Magician => "Mag",
+            CharacterClass.Sage => "Sag",
+            CharacterClass.Cleric => "Clr",
+            CharacterClass.Bard => "Brd",
+            CharacterClass.Alchemist => "Alc",
+            CharacterClass.Jester => "Jst",
+            _ => c.ToString().Substring(0, 3),
+        });
+        return string.Join("/", abbrevs);
     }
 
     protected override async Task<bool> ProcessChoice(string choice)
@@ -581,13 +635,15 @@ public class WeaponShopLocation : BaseLocation
                 return false;
 
             case "3":
-                currentCategory = WeaponCategory.Shields;
+                currentCategory = WeaponCategory.Bows;
                 currentPage = 0;
                 RequestRedisplay();
                 return false;
 
-            case "D":
-                await DualWieldSetup();
+            case "4":
+                currentCategory = WeaponCategory.Shields;
+                currentPage = 0;
+                RequestRedisplay();
                 return false;
 
             case "S":
@@ -629,20 +685,10 @@ public class WeaponShopLocation : BaseLocation
                 return false;
 
             case "N":
-                List<Equipment> items = currentCategory switch
-                {
-                    WeaponCategory.OneHanded => EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.OneHanded),
-                    WeaponCategory.TwoHanded => EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.TwoHanded),
-                    WeaponCategory.Shields => EquipmentDatabase.GetShields(),
-                    _ => new List<Equipment>()
-                };
+                List<Equipment> items = GetShopItemsForCategory(currentCategory.Value);
                 int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
                 if (currentPage < totalPages - 1) currentPage++;
                 RequestRedisplay();
-                return false;
-
-            case "D":
-                await DualWieldSetup();
                 return false;
 
             case "S":
@@ -660,13 +706,7 @@ public class WeaponShopLocation : BaseLocation
 
     private async Task BuyItem(WeaponCategory category, int itemIndex)
     {
-        List<Equipment> items = category switch
-        {
-            WeaponCategory.OneHanded => EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.OneHanded).OrderBy(i => i.Value).ToList(),
-            WeaponCategory.TwoHanded => EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.TwoHanded).OrderBy(i => i.Value).ToList(),
-            WeaponCategory.Shields => EquipmentDatabase.GetShields().OrderBy(i => i.Value).ToList(),
-            _ => new List<Equipment>()
-        };
+        List<Equipment> items = GetShopItemsForCategory(category);
 
         int actualIndex = currentPage * ItemsPerPage + itemIndex - 1;
         if (actualIndex < 0 || actualIndex >= items.Count)
@@ -704,6 +744,19 @@ public class WeaponShopLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("red");
             terminal.WriteLine($"You need {FormatNumber(totalWithTax)} gold but only have {FormatNumber(currentPlayer.Gold)}!");
+            await Pause();
+            return;
+        }
+
+        // Check class restriction
+        if (item.ClassRestrictions != null && item.ClassRestrictions.Count > 0
+            && !item.ClassRestrictions.Contains(currentPlayer.Class))
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.Write($"{item.Name} can only be used by: ");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(GetClassTag(item));
             await Pause();
             return;
         }
@@ -823,120 +876,6 @@ public class WeaponShopLocation : BaseLocation
             terminal.WriteLine($"Failed to equip: {message}");
             currentPlayer.Gold += totalWithTax;
         }
-
-        // Auto-save after purchase
-        await SaveSystem.Instance.AutoSave(currentPlayer);
-
-        await Pause();
-    }
-
-    private async Task DualWieldSetup()
-    {
-        terminal.ClearScreen();
-        terminal.SetColor("bright_magenta");
-        terminal.WriteLine("═══ Dual-Wield Setup ═══");
-        terminal.WriteLine("");
-
-        // Check if using 2H weapon
-        if (currentPlayer.IsTwoHanding)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine("Cannot dual-wield while using a two-handed weapon!");
-            terminal.WriteLine("Equip a one-handed weapon first.");
-            await Pause();
-            return;
-        }
-
-        var mainHand = currentPlayer.GetEquipment(EquipmentSlot.MainHand);
-        if (mainHand == null || mainHand.Handedness != WeaponHandedness.OneHanded)
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("You need a one-handed weapon in your main hand to dual-wield.");
-            await Pause();
-            return;
-        }
-
-        terminal.SetColor("white");
-        terminal.WriteLine("Select a one-handed weapon for your off-hand:");
-        terminal.WriteLine("");
-
-        var oneHandedWeapons = EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.OneHanded)
-            .Where(w => currentPlayer.Gold >= w.Value)
-            .OrderBy(w => w.Value)
-            .Take(15)
-            .ToList();
-
-        if (oneHandedWeapons.Count == 0)
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine("No affordable one-handed weapons available.");
-            await Pause();
-            return;
-        }
-
-        int num = 1;
-        foreach (var weapon in oneHandedWeapons)
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.Write($"{num}. ");
-            terminal.SetColor("white");
-            terminal.Write($"{weapon.Name,-28}");
-            terminal.SetColor("bright_cyan");
-            terminal.Write($"Pow:{weapon.WeaponPower,3}  ");
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"{FormatNumber(weapon.Value)}");
-            num++;
-        }
-
-        terminal.WriteLine("");
-        terminal.Write("Select weapon (0 to cancel): ");
-        var input = await terminal.GetInput("");
-
-        if (!int.TryParse(input, out int selection) || selection < 1 || selection > oneHandedWeapons.Count)
-        {
-            return;
-        }
-
-        var selectedWeapon = oneHandedWeapons[selection - 1];
-
-        // Apply city control discount
-        long adjustedWeaponPrice = CityControlSystem.Instance.ApplyDiscount(selectedWeapon.Value, currentPlayer);
-
-        // Apply divine boon shop discount
-        if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
-            adjustedWeaponPrice = (long)(adjustedWeaponPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
-
-        // Calculate total with tax
-        var (_, _, dualWieldTotal) = CityControlSystem.CalculateTaxedPrice(adjustedWeaponPrice);
-
-        if (currentPlayer.Gold < dualWieldTotal)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine($"You need {FormatNumber(dualWieldTotal)} gold (incl. tax) but only have {FormatNumber(currentPlayer.Gold)}!");
-            await Pause();
-            return;
-        }
-
-        // Show tax breakdown
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, selectedWeapon.Name, adjustedWeaponPrice);
-
-        currentPlayer.Gold -= dualWieldTotal;
-
-        // Process city tax share from this sale
-        CityControlSystem.Instance.ProcessSaleTax(adjustedWeaponPrice);
-
-        // Directly equip to off-hand
-        currentPlayer.UnequipSlot(EquipmentSlot.OffHand);
-        currentPlayer.EquippedItems[EquipmentSlot.OffHand] = selectedWeapon.Id;
-        selectedWeapon.ApplyToCharacter(currentPlayer);
-
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("");
-        terminal.WriteLine($"Equipped {selectedWeapon.Name} in your off-hand!");
-        terminal.SetColor("bright_magenta");
-        terminal.WriteLine("You are now dual-wielding! (+1 attack, -10% defense)");
-
-        currentPlayer.RecalculateStats();
 
         // Auto-save after purchase
         await SaveSystem.Instance.AutoSave(currentPlayer);
@@ -1107,8 +1046,8 @@ public class WeaponShopLocation : BaseLocation
 
         // Get all affordable upgrades sorted by power (best first)
         // Filter by CanEquip to exclude items the player can't use (level/stat requirements)
-        var affordableWeapons = EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.OneHanded)
-            .Concat(EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.TwoHanded))
+        var affordableWeapons = EquipmentDatabase.GetShopWeapons(WeaponHandedness.OneHanded)
+            .Concat(EquipmentDatabase.GetShopWeapons(WeaponHandedness.TwoHanded))
             .Where(w => w.WeaponPower > currentPow)
             .Where(w => w.CanEquip(currentPlayer, out _))
             .Where(w => w.Value <= currentPlayer.Gold)

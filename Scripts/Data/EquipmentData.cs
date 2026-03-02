@@ -52,8 +52,20 @@ public static class EquipmentDatabase
         InitializeNeckAccessories();
         InitializeRings();
 
+        // Generate shop items from loot templates (IDs 50000-99999)
+        var shopItems = ShopItemGenerator.GenerateAllShopItems();
+        foreach (var item in shopItems)
+        {
+            AddEquipment(item);
+        }
+
         _initialized = true;
     }
+
+    // Shop-generated items use IDs 50000-99999
+    public const int ShopGeneratedStart = 50000;
+    public const int ShopGeneratedEnd = 99999;
+    public static bool IsShopGenerated(int id) => id >= ShopGeneratedStart && id <= ShopGeneratedEnd;
 
     // Dynamic equipment starts at high ID to avoid conflicts
     private const int DynamicEquipmentStart = 100000;
@@ -250,6 +262,46 @@ public static class EquipmentDatabase
             .Where(e => e.Slot == slot && e.Id < DynamicEquipmentStart)
             .OrderBy(e => Math.Abs((e.WeaponPower + e.ArmorClass + e.ShieldBonus) - power))
             .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Get shop-generated weapons by handedness (for weapon shop display)
+    /// </summary>
+    public static List<Equipment> GetShopWeapons(WeaponHandedness handedness)
+    {
+        EnsureInitialized();
+        return _allEquipment.Values
+            .Where(e => e.Handedness == handedness && IsShopGenerated(e.Id))
+            .OrderBy(e => e.MinLevel)
+            .ThenBy(e => e.Value)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get shop-generated armor by slot (for armor shop display)
+    /// </summary>
+    public static List<Equipment> GetShopArmor(EquipmentSlot slot)
+    {
+        EnsureInitialized();
+        return _allEquipment.Values
+            .Where(e => e.Slot == slot && IsShopGenerated(e.Id))
+            .OrderBy(e => e.MinLevel)
+            .ThenBy(e => e.Value)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Get shop-generated shields (for weapon shop display)
+    /// </summary>
+    public static List<Equipment> GetShopShields()
+    {
+        EnsureInitialized();
+        return _allEquipment.Values
+            .Where(e => (e.WeaponType == WeaponType.Shield || e.WeaponType == WeaponType.Buckler || e.WeaponType == WeaponType.TowerShield)
+                     && IsShopGenerated(e.Id))
+            .OrderBy(e => e.MinLevel)
+            .ThenBy(e => e.Value)
+            .ToList();
     }
 
     private static void EnsureInitialized()

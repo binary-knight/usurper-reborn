@@ -335,6 +335,7 @@ namespace UsurperRemake.Systems
         public CombatSpeed CombatSpeed { get; set; } = CombatSpeed.Normal;  // Combat text speed
         public bool SkipIntimateScenes { get; set; }  // Skip detailed intimate scenes (fade to black)
         public bool ScreenReaderMode { get; set; }  // Simplified text for screen readers (accessibility)
+        public bool CompactMode { get; set; }  // Compact menus for mobile/small screen SSH
         public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // Player-selected color theme
         public bool AutoLevelUp { get; set; } = true;  // Auto-level on XP threshold (default on)
         public int[]? TeamXPPercent { get; set; }  // Per-slot XP percentage distribution (player + 4 teammates)
@@ -475,6 +476,13 @@ namespace UsurperRemake.Systems
         public int HerbBuffCombats { get; set; }
         public float HerbBuffValue { get; set; }
         public int HerbExtraAttacks { get; set; }
+
+        // Song buff properties (Music Shop performances)
+        public int SongBuffType { get; set; }
+        public int SongBuffCombats { get; set; }
+        public float SongBuffValue { get; set; }
+        public float SongBuffValue2 { get; set; }
+        public List<int> HeardLoreSongs { get; set; } = new();
 
         // Faction consumable properties (v0.40.2)
         public int PoisonCoatingCombats { get; set; }

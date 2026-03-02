@@ -26,6 +26,10 @@ public static class ClassAbilitySystem
         public AbilityType Type { get; set; }
         public CharacterClass[] AvailableToClasses { get; set; } = Array.Empty<CharacterClass>();
 
+        // Weapon requirements (null = any weapon OK)
+        public WeaponType[]? RequiredWeaponTypes { get; set; }
+        public bool RequiresShield { get; set; }
+
         // Effect values
         public int BaseDamage { get; set; }
         public int BaseHealing { get; set; }
@@ -83,6 +87,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Defense,
             DefenseBonus = 30,
             Duration = 3,
+            RequiresShield = true,
             AvailableToClasses = new[] { CharacterClass.Warrior, CharacterClass.Paladin }
         },
         ["battle_cry"] = new ClassAbility
@@ -593,6 +598,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Attack,
             BaseDamage = 40,  // Low cooldown, scales with STR+DEX
             SpecialEffect = "critical",
+            RequiredWeaponTypes = new[] { WeaponType.Dagger },
             AvailableToClasses = new[] { CharacterClass.Assassin }
         },
         ["poison_blade"] = new ClassAbility
@@ -607,6 +613,7 @@ public static class ClassAbilitySystem
             BaseDamage = 30,  // Initial hit + poison DoT
             SpecialEffect = "poison",
             Duration = 5,
+            RequiredWeaponTypes = new[] { WeaponType.Dagger },
             AvailableToClasses = new[] { CharacterClass.Assassin }
         },
         ["shadow_step"] = new ClassAbility
@@ -648,6 +655,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Attack,
             BaseDamage = 160,  // Signature move, scales with STR+DEX
             SpecialEffect = "instant_kill",
+            RequiredWeaponTypes = new[] { WeaponType.Dagger },
             AvailableToClasses = new[] { CharacterClass.Assassin }
         },
         ["vanish"] = new ClassAbility
@@ -690,6 +698,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Attack,
             BaseDamage = 85,  // AoE, scales with STR+DEX
             SpecialEffect = "aoe",
+            RequiredWeaponTypes = new[] { WeaponType.Dagger },
             AvailableToClasses = new[] { CharacterClass.Assassin }
         },
         ["death_blossom"] = new ClassAbility
@@ -703,6 +712,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Attack,
             BaseDamage = 250,  // Capstone AoE - scales heavily with STR+DEX
             SpecialEffect = "execute_all",
+            RequiredWeaponTypes = new[] { WeaponType.Dagger },
             AvailableToClasses = new[] { CharacterClass.Assassin }
         },
 
@@ -722,6 +732,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Attack,
             BaseDamage = 30,  // Starter ability - scales with STR+DEX
             SpecialEffect = "guaranteed_hit",
+            RequiredWeaponTypes = new[] { WeaponType.Bow },
             AvailableToClasses = new[] { CharacterClass.Ranger }
         },
         ["hunters_mark"] = new ClassAbility
@@ -775,6 +786,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Attack,
             BaseDamage = 45,  // Mid-tier AoE - scales with STR+DEX
             SpecialEffect = "aoe",
+            RequiredWeaponTypes = new[] { WeaponType.Bow },
             AvailableToClasses = new[] { CharacterClass.Ranger }
         },
         ["camouflage"] = new ClassAbility
@@ -816,6 +828,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Attack,
             BaseDamage = 100,  // High level AoE - scales with STR+DEX
             SpecialEffect = "aoe",
+            RequiredWeaponTypes = new[] { WeaponType.Bow },
             AvailableToClasses = new[] { CharacterClass.Ranger }
         },
         ["legendary_shot"] = new ClassAbility
@@ -829,6 +842,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Attack,
             BaseDamage = 200,  // Capstone single-target - scales with STR+DEX
             SpecialEffect = "legendary",
+            RequiredWeaponTypes = new[] { WeaponType.Bow },
             AvailableToClasses = new[] { CharacterClass.Ranger }
         },
 
@@ -861,6 +875,7 @@ public static class ClassAbilitySystem
             AttackBonus = 20,  // Buff - scales with CHA
             DefenseBonus = 20,  // Defense - scales with CON
             Duration = 4,
+            RequiredWeaponTypes = new[] { WeaponType.Instrument },
             AvailableToClasses = new[] { CharacterClass.Bard }
         },
         ["song_of_rest"] = new ClassAbility
@@ -873,6 +888,7 @@ public static class ClassAbilitySystem
             Cooldown = 5,
             Type = AbilityType.Heal,
             BaseHealing = 45,  // Healing - scales with CON+WIS
+            RequiredWeaponTypes = new[] { WeaponType.Instrument },
             AvailableToClasses = new[] { CharacterClass.Bard }
         },
         ["charm"] = new ClassAbility
@@ -926,6 +942,7 @@ public static class ClassAbilitySystem
             AttackBonus = 30,  // Buff - scales with CHA
             DefenseBonus = 30,  // Defense - scales with CON
             Duration = 4,
+            RequiredWeaponTypes = new[] { WeaponType.Instrument },
             AvailableToClasses = new[] { CharacterClass.Bard }
         },
         ["grand_finale"] = new ClassAbility
@@ -954,6 +971,7 @@ public static class ClassAbilitySystem
             DefenseBonus = 55,  // Defense - scales with CON
             Duration = 5,
             SpecialEffect = "legend",
+            RequiredWeaponTypes = new[] { WeaponType.Instrument },
             AvailableToClasses = new[] { CharacterClass.Bard }
         },
 
@@ -1085,8 +1103,8 @@ public static class ClassAbilitySystem
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
-        // UNIVERSAL ABILITIES - Available to all non-spellcaster classes
-        // BALANCE: Basic utility abilities available to all martial classes.
+        // UNIVERSAL ABILITIES - Available to ALL classes (including spellcasters)
+        // BALANCE: Basic utility abilities available to every class.
         // ═══════════════════════════════════════════════════════════════════════════════
         ["second_wind"] = new ClassAbility
         {
@@ -1102,6 +1120,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
+                CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -1121,6 +1140,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
+                CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -1139,6 +1159,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
+                CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -1158,6 +1179,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
+                CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -1178,6 +1200,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
+                CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
                 CharacterClass.Abysswarden, CharacterClass.Voidreaver
             }
@@ -1823,7 +1846,48 @@ public static class ClassAbilitySystem
         if (cooldowns.TryGetValue(abilityId, out int remainingCooldown) && remainingCooldown > 0)
             return false;
 
+        // Check weapon requirement
+        if (ability.RequiredWeaponTypes != null && ability.RequiredWeaponTypes.Length > 0)
+        {
+            var mainHand = character.GetEquipment(EquipmentSlot.MainHand);
+            if (mainHand == null || !ability.RequiredWeaponTypes.Contains(mainHand.WeaponType))
+                return false;
+        }
+
+        // Check shield requirement
+        if (ability.RequiresShield)
+        {
+            var offHand = character.GetEquipment(EquipmentSlot.OffHand);
+            if (offHand == null || (offHand.WeaponType != WeaponType.Shield &&
+                offHand.WeaponType != WeaponType.Buckler && offHand.WeaponType != WeaponType.TowerShield))
+                return false;
+        }
+
         return true;
+    }
+
+    /// <summary>
+    /// Get a human-readable reason why a weapon requirement isn't met, or null if requirements are satisfied
+    /// </summary>
+    public static string? GetWeaponRequirementReason(Character character, ClassAbility ability)
+    {
+        if (ability.RequiredWeaponTypes != null && ability.RequiredWeaponTypes.Length > 0)
+        {
+            var mainHand = character.GetEquipment(EquipmentSlot.MainHand);
+            if (mainHand == null || !ability.RequiredWeaponTypes.Contains(mainHand.WeaponType))
+            {
+                var names = string.Join("/", ability.RequiredWeaponTypes.Select(w => w.ToString()));
+                return $"Requires {names}";
+            }
+        }
+        if (ability.RequiresShield)
+        {
+            var offHand = character.GetEquipment(EquipmentSlot.OffHand);
+            if (offHand == null || (offHand.WeaponType != WeaponType.Shield &&
+                offHand.WeaponType != WeaponType.Buckler && offHand.WeaponType != WeaponType.TowerShield))
+                return "Requires Shield";
+        }
+        return null;
     }
 
     /// <summary>

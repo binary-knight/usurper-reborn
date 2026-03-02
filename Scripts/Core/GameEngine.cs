@@ -448,6 +448,7 @@ public partial class GameEngine
             WriteMenuKey("B", "BBS List");
             WriteMenuKey("C", "Credits");
             WriteMenuKey("A", GameConfig.ScreenReaderMode ? "Screen Reader: ON" : "Screen Reader: OFF");
+            WriteMenuKey("Z", GameConfig.CompactMode ? "Compact: ON" : "Compact: OFF");
             if (UsurperRemake.Server.SessionContext.IsActive)
                 WriteMenuKey("S", "Spectate");
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
@@ -511,6 +512,22 @@ public partial class GameEngine
             {
                 terminal.SetColor("white");
                 terminal.WriteLine("Screen Reader Mode: OFF");
+            }
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Z");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            if (GameConfig.CompactMode)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("Compact Mode: ON (Mobile/Small Screen)");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("Compact Mode: OFF");
             }
             if (UsurperRemake.Server.SessionContext.IsActive)
                 WriteMenuKey("S", "Spectate a Player");
@@ -688,6 +705,23 @@ public partial class GameEngine
                 {
                     terminal.WriteLine("Screen Reader Mode DISABLED", "white");
                     terminal.WriteLine("Menus will use visual ASCII art format.", "white");
+                }
+                await Task.Delay(1500);
+                await RunBBSDoorMode();
+                return;
+
+            case "Z":
+                GameConfig.CompactMode = !GameConfig.CompactMode;
+                terminal.WriteLine("");
+                if (GameConfig.CompactMode)
+                {
+                    terminal.WriteLine("Compact Mode ENABLED", "bright_green");
+                    terminal.WriteLine("Menus optimized for mobile and small screens.", "white");
+                }
+                else
+                {
+                    terminal.WriteLine("Compact Mode DISABLED", "white");
+                    terminal.WriteLine("Full-size menus restored.", "white");
                 }
                 await Task.Delay(1500);
                 await RunBBSDoorMode();
@@ -1291,6 +1325,22 @@ public partial class GameEngine
                 terminal.SetColor("white");
                 terminal.WriteLine("Screen Reader Mode: OFF");
             }
+            terminal.SetColor("darkgray");
+            terminal.Write("  [");
+            terminal.SetColor("bright_cyan");
+            terminal.Write("Z");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            if (GameConfig.CompactMode)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("Compact Mode: ON (Mobile/Small Screen)");
+            }
+            else
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine("Compact Mode: OFF");
+            }
 
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
@@ -1350,6 +1400,21 @@ public partial class GameEngine
                     {
                         terminal.WriteLine("Screen Reader Mode DISABLED", "white");
                         terminal.WriteLine("Menus will use visual ASCII art format.", "white");
+                    }
+                    await Task.Delay(1500);
+                    break;
+                case "Z":
+                    GameConfig.CompactMode = !GameConfig.CompactMode;
+                    terminal.WriteLine("");
+                    if (GameConfig.CompactMode)
+                    {
+                        terminal.WriteLine("Compact Mode ENABLED", "bright_green");
+                        terminal.WriteLine("Menus optimized for mobile and small screens.", "white");
+                    }
+                    else
+                    {
+                        terminal.WriteLine("Compact Mode DISABLED", "white");
+                        terminal.WriteLine("Full-size menus restored.", "white");
                     }
                     await Task.Delay(1500);
                     break;
@@ -2890,6 +2955,9 @@ public partial class GameEngine
         // Inherit pre-login screen reader toggle into new character
         currentPlayer.ScreenReaderMode = GameConfig.ScreenReaderMode;
 
+        // Inherit pre-login compact mode toggle into new character
+        currentPlayer.CompactMode = GameConfig.CompactMode;
+
         // Auto-populate quickbar with starting spells/abilities
         AutoPopulateQuickbar(currentPlayer);
 
@@ -3230,6 +3298,7 @@ public partial class GameEngine
             CombatSpeed = playerData.CombatSpeed,
             SkipIntimateScenes = playerData.SkipIntimateScenes,
             ScreenReaderMode = playerData.ScreenReaderMode,
+            CompactMode = playerData.CompactMode,
             ColorTheme = playerData.ColorTheme,
             AutoLevelUp = playerData.AutoLevelUp,
             TeamXPPercent = playerData.TeamXPPercent ?? TeamXPConfig.DefaultTeamXPPercent.ToArray(),
@@ -3612,6 +3681,13 @@ public partial class GameEngine
         player.HerbBuffValue = playerData.HerbBuffValue;
         player.HerbExtraAttacks = playerData.HerbExtraAttacks;
 
+        // Restore song buff properties (Music Shop performances)
+        player.SongBuffType = playerData.SongBuffType;
+        player.SongBuffCombats = playerData.SongBuffCombats;
+        player.SongBuffValue = playerData.SongBuffValue;
+        player.SongBuffValue2 = playerData.SongBuffValue2;
+        player.HeardLoreSongs = playerData.HeardLoreSongs != null ? new HashSet<int>(playerData.HeardLoreSongs) : new HashSet<int>();
+
         // Restore chest contents
         var playerKey = (player is Player pp ? pp.RealName : player.Name2) ?? player.Name2;
         if (playerData.ChestContents != null && playerData.ChestContents.Count > 0)
@@ -3770,6 +3846,9 @@ public partial class GameEngine
 
         // Sync screen reader mode from player save to global
         GameConfig.ScreenReaderMode = player.ScreenReaderMode;
+
+        // Sync compact mode from player save to global
+        GameConfig.CompactMode = player.CompactMode;
 
         return player;
     }

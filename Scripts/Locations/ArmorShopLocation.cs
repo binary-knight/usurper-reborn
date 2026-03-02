@@ -293,11 +293,19 @@ public class ArmorShopLocation : BaseLocation
         terminal.WriteLine($"{totalAC}");
     }
 
+    /// <summary>
+    /// Get filtered shop armor for a slot, scoped to player level
+    /// </summary>
+    private List<Equipment> GetShopArmorForSlot(EquipmentSlot slot)
+    {
+        var items = EquipmentDatabase.GetShopArmor(slot);
+        int playerLevel = currentPlayer.Level;
+        return items.Where(i => i.MinLevel <= playerLevel + 15 && i.MinLevel >= Math.Max(1, playerLevel - 20)).ToList();
+    }
+
     private void ShowSlotItems(EquipmentSlot slot)
     {
-        var items = EquipmentDatabase.GetBySlot(slot)
-            .OrderBy(i => i.Value)
-            .ToList();
+        var items = GetShopArmorForSlot(slot);
 
         var currentItem = currentPlayer.GetEquipment(slot);
 
@@ -335,7 +343,9 @@ public class ArmorShopLocation : BaseLocation
         {
             bool canAfford = currentPlayer.Gold >= item.Value;
             bool meetsLevel = currentPlayer.Level >= item.MinLevel;
-            bool canBuy = canAfford && meetsLevel;
+            bool meetsClass = item.ClassRestrictions == null || item.ClassRestrictions.Count == 0
+                || item.ClassRestrictions.Contains(currentPlayer.Class);
+            bool canBuy = canAfford && meetsLevel && meetsClass;
             bool isUpgrade = currentItem == null || item.ArmorClass > currentItem.ArmorClass;
 
             terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
@@ -368,6 +378,14 @@ public class ArmorShopLocation : BaseLocation
             {
                 terminal.SetColor(canBuy ? "green" : "darkgray");
                 terminal.Write(bonuses);
+            }
+
+            // Show class restriction tag
+            var classTag = GetClassTag(item);
+            if (!string.IsNullOrEmpty(classTag))
+            {
+                terminal.SetColor(!meetsClass ? "red" : "gray");
+                terminal.Write($" [{classTag}]");
             }
 
             // Show upgrade indicator
@@ -433,16 +451,41 @@ public class ArmorShopLocation : BaseLocation
     {
         var bonuses = new List<string>();
 
-        if (item.StrengthBonus != 0) bonuses.Add($"Str{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
-        if (item.DexterityBonus != 0) bonuses.Add($"Dex{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
-        if (item.ConstitutionBonus != 0) bonuses.Add($"Con{(item.ConstitutionBonus > 0 ? "+" : "")}{item.ConstitutionBonus}");
-        if (item.IntelligenceBonus != 0) bonuses.Add($"Int{(item.IntelligenceBonus > 0 ? "+" : "")}{item.IntelligenceBonus}");
-        if (item.WisdomBonus != 0) bonuses.Add($"Wis{(item.WisdomBonus > 0 ? "+" : "")}{item.WisdomBonus}");
+        if (item.StrengthBonus != 0) bonuses.Add($"Str+{item.StrengthBonus}");
+        if (item.DexterityBonus != 0) bonuses.Add($"Dex+{item.DexterityBonus}");
+        if (item.IntelligenceBonus != 0) bonuses.Add($"Int+{item.IntelligenceBonus}");
+        if (item.WisdomBonus != 0) bonuses.Add($"Wis+{item.WisdomBonus}");
+        if (item.ConstitutionBonus != 0) bonuses.Add($"Con+{item.ConstitutionBonus}");
+        if (item.DefenceBonus != 0) bonuses.Add($"Def+{item.DefenceBonus}");
+        if (item.AgilityBonus != 0) bonuses.Add($"Agi+{item.AgilityBonus}");
         if (item.MaxHPBonus != 0) bonuses.Add($"HP+{item.MaxHPBonus}");
         if (item.MaxManaBonus != 0) bonuses.Add($"MP+{item.MaxManaBonus}");
-        if (item.MagicResistance != 0) bonuses.Add($"MR{item.MagicResistance}%");
+        if (item.CriticalChanceBonus != 0) bonuses.Add($"Crit+{item.CriticalChanceBonus}%");
+        if (item.MagicResistance != 0) bonuses.Add($"MR+{item.MagicResistance}%");
 
         return string.Join(" ", bonuses.Take(3)); // Limit to 3 to fit
+    }
+
+    private static string GetClassTag(Equipment item)
+    {
+        if (item.ClassRestrictions == null || item.ClassRestrictions.Count == 0)
+            return "";
+        var abbrevs = item.ClassRestrictions.Select(c => c switch
+        {
+            CharacterClass.Warrior => "War",
+            CharacterClass.Paladin => "Pal",
+            CharacterClass.Barbarian => "Bar",
+            CharacterClass.Ranger => "Rng",
+            CharacterClass.Assassin => "Asn",
+            CharacterClass.Magician => "Mag",
+            CharacterClass.Sage => "Sag",
+            CharacterClass.Cleric => "Clr",
+            CharacterClass.Bard => "Brd",
+            CharacterClass.Alchemist => "Alc",
+            CharacterClass.Jester => "Jst",
+            _ => c.ToString().Substring(0, 3),
+        });
+        return string.Join("/", abbrevs);
     }
 
     protected override async Task<bool> ProcessChoice(string choice)
@@ -525,7 +568,7 @@ public class ArmorShopLocation : BaseLocation
             case "N":
                 if (currentSlotCategory.HasValue)
                 {
-                    var items = EquipmentDatabase.GetBySlot(currentSlotCategory.Value);
+                    var items = GetShopArmorForSlot(currentSlotCategory.Value);
                     int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
                     if (currentPage < totalPages - 1) currentPage++;
                 }
@@ -545,9 +588,7 @@ public class ArmorShopLocation : BaseLocation
 
     private async Task BuyItem(EquipmentSlot slot, int itemIndex)
     {
-        var items = EquipmentDatabase.GetBySlot(slot)
-            .OrderBy(i => i.Value)
-            .ToList();
+        var items = GetShopArmorForSlot(slot);
 
         int actualIndex = currentPage * ItemsPerPage + itemIndex - 1;
         if (actualIndex < 0 || actualIndex >= items.Count)
@@ -586,6 +627,19 @@ public class ArmorShopLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("red");
             terminal.WriteLine($"You need {FormatNumber(armorTotalWithTax)} gold but only have {FormatNumber(currentPlayer.Gold)}!");
+            await Pause();
+            return;
+        }
+
+        // Check class restriction
+        if (item.ClassRestrictions != null && item.ClassRestrictions.Count > 0
+            && !item.ClassRestrictions.Contains(currentPlayer.Class))
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.Write($"{item.Name} can only be used by: ");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(GetClassTag(item));
             await Pause();
             return;
         }
@@ -849,7 +903,7 @@ public class ArmorShopLocation : BaseLocation
 
             // Get all affordable upgrades for this slot, sorted by armor class (best first)
             // Filter by CanEquip to exclude items the player can't use (level/stat requirements)
-            var affordableArmor = EquipmentDatabase.GetBySlot(slot)
+            var affordableArmor = EquipmentDatabase.GetShopArmor(slot)
                 .Where(i => i.ArmorClass > currentAC)
                 .Where(i => i.CanEquip(currentPlayer, out _))
                 .Where(i => !i.RequiresGood || currentPlayer.Chivalry > currentPlayer.Darkness)

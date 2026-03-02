@@ -116,6 +116,7 @@ public class Character
     public CombatSpeed CombatSpeed { get; set; } = CombatSpeed.Normal;  // combat text speed
     public bool SkipIntimateScenes { get; set; }    // skip detailed intimate scenes (fade to black)
     public bool ScreenReaderMode { get; set; }      // simplified text output for screen readers (accessibility)
+    public bool CompactMode { get; set; }             // compact menus for mobile/small screen SSH
     public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // player-selected color theme
     public bool AutoLevelUp { get; set; } = true;  // auto-level when XP threshold met (on by default)
     public int[] TeamXPPercent { get; set; } = new int[] { 100, 0, 0, 0, 0 };  // per-slot XP percentage (player + 4 teammates, aggregate <= 100)
@@ -457,6 +458,16 @@ public class Character
 
     public int TotalHerbCount => HerbHealing + HerbIronbark + HerbFirebloom + HerbSwiftthistle + HerbStarbloom;
     public bool HasActiveHerbBuff => HerbBuffType > 0 && HerbBuffCombats > 0;
+
+    // Song buff tracking (Music Shop performances)
+    public int SongBuffType { get; set; }       // 0=none, 1=WarMarch, 2=IronLullaby, 3=Fortune, 4=BattleHymn
+    public int SongBuffCombats { get; set; }    // Remaining combats for active song buff
+    public float SongBuffValue { get; set; }    // Primary buff multiplier
+    public float SongBuffValue2 { get; set; }   // Secondary (for BattleHymn defense component)
+    public bool HasActiveSongBuff => SongBuffType > 0 && SongBuffCombats > 0;
+
+    // Old God lore songs heard (for awakening tracking)
+    public HashSet<int> HeardLoreSongs { get; set; } = new();
 
     // Faction consumable properties (v0.40.2)
     public int PoisonCoatingCombats { get; set; } = 0;  // Combats remaining with poison coating

@@ -291,11 +291,11 @@ public static class LootGenerator
             ("Assassin's Blade", new[] { "Assassin" }, 30, 80, 35),
             ("Shadow Fang", new[] { "Assassin" }, 50, 100, 60),
 
-            // Swords - Balanced
+            // Swords - Balanced (Assassin included for dual-wield builds)
             ("Short Sword", new[] { "All" }, 1, 25, 10),
-            ("Long Sword", new[] { "Warrior", "Paladin", "Ranger" }, 10, 50, 20),
-            ("Broadsword", new[] { "Warrior", "Paladin", "Barbarian" }, 20, 70, 35),
-            ("Bastard Sword", new[] { "Warrior", "Paladin" }, 35, 85, 55),
+            ("Long Sword", new[] { "Warrior", "Paladin", "Ranger", "Assassin" }, 10, 50, 20),
+            ("Broadsword", new[] { "Warrior", "Paladin", "Barbarian", "Assassin" }, 20, 70, 35),
+            ("Bastard Sword", new[] { "Warrior", "Paladin", "Assassin" }, 35, 85, 55),
             ("Greatsword", new[] { "Warrior", "Barbarian" }, 50, 100, 80),
             ("Executioner's Blade", new[] { "Warrior" }, 70, 100, 110),
 
@@ -315,17 +315,17 @@ public static class LootGenerator
             ("Scepter of Judgment", new[] { "Paladin" }, 80, 100, 120),
 
             // Staves - Magic focused
-            ("Quarterstaff", new[] { "Magician", "Sage", "Monk", "Cleric" }, 1, 35, 8),
+            ("Quarterstaff", new[] { "Magician", "Sage", "Cleric" }, 1, 35, 8),
             ("Magic Staff", new[] { "Magician", "Sage" }, 15, 55, 22),
             ("Staff of Power", new[] { "Magician", "Sage" }, 35, 80, 45),
             ("Archmage's Staff", new[] { "Magician", "Sage" }, 60, 100, 75),
             ("Staff of the Cosmos", new[] { "Sage" }, 85, 100, 110),
 
-            // Monk weapons
-            ("Bo Staff", new[] { "Monk" }, 5, 45, 15),
-            ("Nunchaku", new[] { "Monk" }, 20, 65, 30),
-            ("Dragon Fist Wraps", new[] { "Monk" }, 45, 90, 55),
-            ("Celestial Hand Wraps", new[] { "Monk" }, 75, 100, 95),
+            // Unarmed / light weapons
+            ("Bo Staff", new[] { "Barbarian", "Ranger" }, 5, 45, 15),
+            ("Nunchaku", new[] { "Assassin", "Barbarian" }, 20, 65, 30),
+            ("Dragon Fist Wraps", new[] { "Assassin", "Barbarian" }, 45, 90, 55),
+            ("Celestial Hand Wraps", new[] { "Assassin", "Barbarian" }, 75, 100, 95),
 
             // Ranger weapons
             ("Hunting Bow", new[] { "Ranger" }, 5, 40, 16),
@@ -337,6 +337,90 @@ public static class LootGenerator
             ("Silver Blade", new[] { "Paladin" }, 35, 75, 50),
             ("Holy Avenger", new[] { "Paladin" }, 60, 100, 90),
             ("Blade of the Righteous", new[] { "Paladin" }, 85, 100, 135),
+
+            // Two-Handed Greatswords - High damage, balanced
+            ("Wooden Greatsword", new[] { "Warrior", "Barbarian", "Paladin" }, 1, 20, 8),
+            ("Iron Greatsword", new[] { "Warrior", "Barbarian", "Paladin" }, 8, 35, 12),
+            ("Steel Greatsword", new[] { "Warrior", "Barbarian", "Paladin" }, 15, 50, 16),
+            ("Claymore", new[] { "Warrior", "Barbarian", "Paladin" }, 25, 65, 22),
+            ("Zweihander", new[] { "Warrior", "Barbarian" }, 40, 80, 28),
+            ("Bloodreaver", new[] { "Warrior", "Barbarian" }, 55, 90, 34),
+            ("Dragonslayer", new[] { "Warrior", "Barbarian", "Paladin" }, 65, 100, 40),
+            ("Flamberge", new[] { "Warrior", "Barbarian" }, 75, 100, 46),
+
+            // Two-Handed Great Axes - Highest damage, crit focused
+            ("Woodcutter's Axe", new[] { "Barbarian", "Warrior" }, 1, 25, 10),
+            ("Greataxe", new[] { "Barbarian", "Warrior" }, 12, 45, 18),
+            ("Barbarian's Greataxe", new[] { "Barbarian" }, 25, 65, 26),
+            ("Demon Cleaver", new[] { "Barbarian", "Warrior" }, 40, 80, 35),
+            ("Headsman's Pride", new[] { "Barbarian", "Warrior" }, 55, 90, 42),
+            ("Annihilator", new[] { "Barbarian" }, 70, 100, 50),
+
+            // Two-Handed Staves (magic) - Mana focused
+            ("Wooden Staff", new[] { "Magician", "Sage", "Cleric" }, 1, 20, 5),
+            ("Oak Staff", new[] { "Magician", "Sage", "Cleric" }, 8, 35, 8),
+            ("Mage's Staff", new[] { "Magician", "Sage" }, 15, 50, 12),
+            ("Archmage Staff", new[] { "Magician", "Sage" }, 30, 65, 18),
+            ("Soulstaff", new[] { "Magician", "Sage" }, 55, 90, 40),
+            ("Void Staff", new[] { "Magician", "Sage" }, 70, 100, 48),
+
+            // Two-Handed Polearms - Reach, versatile
+            ("Spear", new[] { "Warrior", "Paladin", "Ranger", "Barbarian" }, 1, 25, 9),
+            ("Halberd", new[] { "Warrior", "Paladin" }, 12, 50, 15),
+            ("Glaive", new[] { "Warrior", "Paladin", "Ranger" }, 20, 60, 20),
+            ("Bardiche", new[] { "Warrior", "Barbarian" }, 35, 75, 28),
+            ("Dragon Lance", new[] { "Warrior", "Paladin" }, 50, 90, 36),
+            ("Voulge of Rending", new[] { "Warrior", "Barbarian" }, 65, 100, 45),
+
+            // Two-Handed Mauls - Heavy crushing
+            ("Sledgehammer", new[] { "Warrior", "Barbarian", "Paladin" }, 5, 35, 14),
+            ("War Maul", new[] { "Warrior", "Barbarian" }, 15, 55, 22),
+            ("Crusher", new[] { "Warrior", "Barbarian" }, 30, 70, 32),
+            ("Earthshaker", new[] { "Warrior", "Barbarian", "Paladin" }, 45, 85, 44),
+            ("Skullbreaker", new[] { "Warrior", "Barbarian" }, 65, 100, 54),
+
+            // Bard weapons - Performance blades (raw damage, no musical abilities)
+            ("Rapier", new[] { "Bard", "Jester", "Assassin" }, 5, 40, 12),
+            ("Dueling Blade", new[] { "Bard", "Jester" }, 20, 60, 25),
+            ("Songblade", new[] { "Bard" }, 35, 80, 45),
+            ("Virtuoso's Rapier", new[] { "Bard" }, 60, 100, 75),
+
+            // Bard instruments - Musical instruments (required for musical abilities)
+            ("Wooden Flute", new[] { "Bard" }, 1, 25, 7),
+            ("Travel Lute", new[] { "Bard" }, 5, 35, 10),
+            ("Silver Lyre", new[] { "Bard" }, 15, 50, 16),
+            ("War Drum", new[] { "Bard" }, 25, 60, 22),
+            ("Enchanted Harp", new[] { "Bard" }, 35, 70, 30),
+            ("Battle Horn", new[] { "Bard" }, 45, 80, 38),
+            ("Mythril Lute", new[] { "Bard" }, 55, 85, 48),
+            ("Celestial Harp", new[] { "Bard" }, 65, 95, 58),
+            ("Songweaver's Opus", new[] { "Bard" }, 75, 100, 70),
+            ("Instrument of the Spheres", new[] { "Bard" }, 85, 100, 85),
+
+            // Jester weapons - Trick weapons and gadgets
+            ("Throwing Knife", new[] { "Jester", "Assassin" }, 5, 35, 10),
+            ("Trick Blade", new[] { "Jester" }, 20, 60, 22),
+            ("Jester's Scepter", new[] { "Jester" }, 40, 80, 42),
+            ("Fool's Edge", new[] { "Jester" }, 65, 100, 70),
+
+            // Alchemist weapons - Enchanted and chemical weapons
+            ("Pestle Club", new[] { "Alchemist" }, 1, 30, 8),
+            ("Alchemist's Blade", new[] { "Alchemist" }, 15, 50, 20),
+            ("Venom-Etched Dagger", new[] { "Alchemist", "Assassin" }, 30, 70, 38),
+            ("Transmuter's Staff", new[] { "Alchemist" }, 45, 85, 55),
+            ("Philosopher's Edge", new[] { "Alchemist" }, 70, 100, 85),
+
+            // Two-Handed Bows - Ranged weapons
+            ("Short Bow", new[] { "All" }, 1, 30, 8),
+            ("Hunting Bow", new[] { "All" }, 5, 40, 10),
+            ("Longbow", new[] { "All" }, 10, 50, 14),
+            ("Composite Bow", new[] { "All" }, 20, 60, 18),
+            ("War Bow", new[] { "All" }, 30, 70, 22),
+            ("Elven Bow", new[] { "All" }, 40, 80, 26),
+            ("Shadow Bow", new[] { "All" }, 50, 90, 30),
+            ("Dragonbone Bow", new[] { "All" }, 60, 100, 34),
+            ("Celestial Bow", new[] { "All" }, 75, 100, 38),
+            ("Bow of the Planes", new[] { "All" }, 85, 100, 42),
         };
 
         #endregion
@@ -354,7 +438,7 @@ public static class LootGenerator
 
             // Leather (Light classes)
             ("Leather Armor", new[] { "All" }, 1, 30, 8),
-            ("Studded Leather", new[] { "Ranger", "Assassin", "Monk" }, 15, 50, 18),
+            ("Studded Leather", new[] { "Ranger", "Assassin", "Barbarian" }, 15, 50, 18),
             ("Hard Leather", new[] { "Ranger", "Assassin" }, 30, 70, 32),
             ("Shadow Leather", new[] { "Assassin" }, 50, 90, 55),
             ("Night Stalker Armor", new[] { "Assassin" }, 75, 100, 85),
@@ -364,11 +448,11 @@ public static class LootGenerator
             ("Forest Guardian Armor", new[] { "Ranger" }, 45, 85, 50),
             ("Elven Chainweave", new[] { "Ranger" }, 70, 100, 80),
 
-            // Monk specific
-            ("Training Gi", new[] { "Monk" }, 5, 35, 10),
-            ("Reinforced Gi", new[] { "Monk" }, 25, 65, 28),
-            ("Master's Gi", new[] { "Monk" }, 50, 90, 52),
-            ("Dragon Scale Gi", new[] { "Monk" }, 80, 100, 88),
+            // Light fighter armor
+            ("Training Gi", new[] { "Assassin", "Barbarian" }, 5, 35, 10),
+            ("Reinforced Gi", new[] { "Assassin", "Barbarian" }, 25, 65, 28),
+            ("Master's Gi", new[] { "Assassin", "Barbarian" }, 50, 90, 52),
+            ("Dragon Scale Gi", new[] { "Assassin", "Barbarian" }, 80, 100, 88),
 
             // Chain (Medium classes)
             ("Chain Shirt", new[] { "Warrior", "Paladin", "Cleric", "Ranger" }, 10, 45, 15),
@@ -407,7 +491,7 @@ public static class LootGenerator
             ("Chain Coif", new[] { "Warrior", "Paladin", "Cleric", "Ranger" }, 15, 55, 16),
             ("Steel Helm", new[] { "Warrior", "Paladin", "Barbarian" }, 25, 65, 25),
             ("Wizard's Hat", new[] { "Magician", "Sage" }, 15, 60, 10),
-            ("Monk's Headband", new[] { "Monk" }, 10, 55, 8),
+            ("Fighter's Headband", new[] { "Assassin", "Barbarian", "Ranger" }, 10, 55, 8),
             ("Shadow Hood", new[] { "Assassin", "Ranger" }, 20, 70, 18),
             ("Battle Crown", new[] { "Warrior", "Paladin" }, 40, 80, 38),
             ("Mithril Helm", new[] { "All" }, 55, 90, 52),
@@ -423,7 +507,7 @@ public static class LootGenerator
             ("Chain Sleeves", new[] { "Warrior", "Paladin", "Cleric" }, 15, 55, 14),
             ("Studded Armguards", new[] { "Ranger", "Assassin" }, 15, 50, 12),
             ("Steel Vambraces", new[] { "Warrior", "Paladin" }, 25, 65, 22),
-            ("Silk Arm Wraps", new[] { "Magician", "Sage", "Monk" }, 10, 50, 7),
+            ("Silk Arm Wraps", new[] { "Magician", "Sage", "Assassin" }, 10, 50, 7),
             ("Barbarian Arm Guards", new[] { "Barbarian" }, 20, 65, 18),
             ("Mithril Armguards", new[] { "All" }, 45, 85, 40),
             ("Shadow Bracers", new[] { "Assassin" }, 40, 80, 35),
@@ -439,9 +523,9 @@ public static class LootGenerator
             ("Chain Gauntlets", new[] { "Warrior", "Paladin", "Cleric" }, 15, 55, 14),
             ("Thief's Gloves", new[] { "Assassin", "Ranger" }, 10, 50, 10),
             ("Iron Gauntlets", new[] { "Warrior", "Paladin", "Barbarian" }, 20, 60, 18),
-            ("Silk Handwraps", new[] { "Magician", "Sage", "Monk" }, 10, 50, 7),
+            ("Silk Handwraps", new[] { "Magician", "Sage", "Assassin" }, 10, 50, 7),
             ("Steel Gauntlets", new[] { "Warrior", "Paladin" }, 35, 75, 30),
-            ("Spiked Fists", new[] { "Barbarian", "Monk" }, 30, 70, 25),
+            ("Spiked Fists", new[] { "Barbarian", "Warrior" }, 30, 70, 25),
             ("Mithril Gloves", new[] { "All" }, 50, 85, 42),
             ("Shadow Handwraps", new[] { "Assassin" }, 45, 85, 38),
             ("Plate Gauntlets", new[] { "Warrior", "Paladin" }, 60, 95, 55),
@@ -475,7 +559,7 @@ public static class LootGenerator
             ("Steel Sabatons", new[] { "Warrior", "Paladin" }, 35, 75, 28),
             ("Shadow Treads", new[] { "Assassin" }, 30, 70, 22),
             ("Mithril Boots", new[] { "All" }, 50, 85, 42),
-            ("Monk's Sandals", new[] { "Monk" }, 20, 70, 15),
+            ("Traveler's Sandals", new[] { "Assassin", "Ranger" }, 20, 70, 15),
             ("Plate Sabatons", new[] { "Warrior", "Paladin" }, 60, 95, 52),
             ("Dragonhide Boots", new[] { "All" }, 80, 100, 70),
         };
@@ -485,7 +569,7 @@ public static class LootGenerator
             ("Rope Belt", new[] { "All" }, 1, 20, 2),
             ("Leather Belt", new[] { "All" }, 5, 30, 4),
             ("Chain Belt", new[] { "Warrior", "Paladin", "Cleric" }, 15, 50, 10),
-            ("Sash of Focus", new[] { "Magician", "Sage", "Monk" }, 10, 50, 7),
+            ("Sash of Focus", new[] { "Magician", "Sage", "Assassin" }, 10, 50, 7),
             ("War Belt", new[] { "Warrior", "Barbarian" }, 20, 60, 15),
             ("Thief's Girdle", new[] { "Assassin", "Ranger" }, 15, 55, 11),
             ("Steel Girdle", new[] { "Warrior", "Paladin" }, 35, 75, 25),
@@ -523,6 +607,35 @@ public static class LootGenerator
             ("Mithril Weave Cloak", new[] { "All" }, 55, 90, 45),
             ("Cloak of the Archmage", new[] { "Magician", "Sage" }, 65, 100, 55),
             ("Dragonwing Cape", new[] { "All" }, 80, 100, 68),
+        };
+
+        private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> ShieldTemplates = new()
+        {
+            // Bucklers (light shields - usable by more classes)
+            ("Wooden Buckler", new[] { "All" }, 1, 20, 3),
+            ("Iron Buckler", new[] { "All" }, 8, 35, 8),
+            ("Steel Buckler", new[] { "Warrior", "Paladin", "Ranger", "Assassin" }, 15, 50, 14),
+            ("Duelist's Buckler", new[] { "Warrior", "Paladin", "Ranger", "Assassin" }, 30, 70, 22),
+            ("Elven Buckler", new[] { "All" }, 50, 85, 38),
+            ("Phantom Buckler", new[] { "Assassin", "Ranger" }, 70, 100, 55),
+
+            // Standard Shields (balanced protection)
+            ("Leather Shield", new[] { "All" }, 1, 25, 5),
+            ("Wooden Shield", new[] { "All" }, 5, 30, 7),
+            ("Iron Shield", new[] { "Warrior", "Paladin", "Cleric", "Barbarian" }, 10, 40, 11),
+            ("Steel Shield", new[] { "Warrior", "Paladin", "Cleric", "Barbarian" }, 20, 55, 18),
+            ("Knight's Shield", new[] { "Warrior", "Paladin" }, 30, 65, 25),
+            ("Heater Shield", new[] { "Warrior", "Paladin", "Cleric" }, 40, 75, 32),
+            ("Paladin's Shield", new[] { "Paladin", "Cleric" }, 50, 85, 40),
+            ("Dragon Scale Shield", new[] { "Warrior", "Paladin" }, 60, 95, 52),
+            ("Aegis", new[] { "Warrior", "Paladin" }, 75, 100, 65),
+
+            // Tower Shields (heavy - strength classes)
+            ("Tower Shield", new[] { "Warrior", "Paladin", "Barbarian" }, 25, 60, 28),
+            ("Fortress Shield", new[] { "Warrior", "Paladin" }, 40, 80, 42),
+            ("Wall of Faith", new[] { "Paladin" }, 55, 90, 55),
+            ("Titan's Bulwark", new[] { "Warrior", "Barbarian" }, 65, 95, 65),
+            ("Wall of Eternity", new[] { "Warrior", "Paladin" }, 80, 100, 80),
         };
 
         #endregion
@@ -578,6 +691,40 @@ public static class LootGenerator
 
         #endregion
 
+        #region Template Accessors (for ShopItemGenerator)
+
+        // One-handed weapons are indices 0-36, two-handed start at index 37
+        internal const int TwoHandedWeaponStartIndex = 37;
+
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetWeaponTemplates() => WeaponTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetBodyArmorTemplates() => ArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetHeadArmorTemplates() => HeadArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetArmsArmorTemplates() => ArmsArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetHandsArmorTemplates() => HandsArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetLegsArmorTemplates() => LegsArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetFeetArmorTemplates() => FeetArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetWaistArmorTemplates() => WaistArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetFaceArmorTemplates() => FaceArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetCloakArmorTemplates() => CloakArmorTemplates;
+        internal static IReadOnlyList<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)>
+            GetShieldTemplates() => ShieldTemplates;
+        internal static IReadOnlyList<(string Name, int MinLevel, int MaxLevel, float BasePower)>
+            GetRingTemplates() => RingTemplates;
+        internal static IReadOnlyList<(string Name, int MinLevel, int MaxLevel, float BasePower)>
+            GetNecklaceTemplates() => NecklaceTemplates;
+
+        #endregion
+
         #region Main Generation Methods
 
         /// <summary>
@@ -589,9 +736,11 @@ public static class LootGenerator
             var rarity = RollRarity(dungeonLevel);
 
             // Find appropriate weapon templates
+            // NG+ prestige classes can use any weapon
+            bool isPrestige = playerClass >= CharacterClass.Tidesworn;
             var candidates = WeaponTemplates
                 .Where(w => dungeonLevel >= w.MinLevel && dungeonLevel <= w.MaxLevel)
-                .Where(w => w.Classes.Contains("All") || w.Classes.Contains(playerClass.ToString()))
+                .Where(w => isPrestige || w.Classes.Contains("All") || w.Classes.Contains(playerClass.ToString()))
                 .ToList();
 
             if (candidates.Count == 0)
@@ -630,9 +779,10 @@ public static class LootGenerator
             if (objType == ObjType.Neck)
                 return GenerateNecklace(dungeonLevel, rarity);
 
+            bool isPrestige = playerClass >= CharacterClass.Tidesworn;
             var candidates = slotTemplates
                 .Where(a => dungeonLevel >= a.MinLevel && dungeonLevel <= a.MaxLevel)
-                .Where(a => a.Classes.Contains("All") || a.Classes.Contains(playerClass.ToString()))
+                .Where(a => isPrestige || a.Classes.Contains("All") || a.Classes.Contains(playerClass.ToString()))
                 .ToList();
 
             if (candidates.Count == 0)
@@ -658,17 +808,18 @@ public static class LootGenerator
         /// </summary>
         private static (List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> templates, ObjType objType) RollArmorSlot()
         {
-            // Weighted distribution: body favored, accessories rare
+            // Weighted distribution: body favored, shields included, accessories rare
             double roll = random.NextDouble();
-            if (roll < 0.25) return (ArmorTemplates, ObjType.Body);        // 25%
-            if (roll < 0.37) return (HeadArmorTemplates, ObjType.Head);    // 12%
-            if (roll < 0.46) return (ArmsArmorTemplates, ObjType.Arms);    // 9%
-            if (roll < 0.55) return (HandsArmorTemplates, ObjType.Hands);  // 9%
-            if (roll < 0.64) return (LegsArmorTemplates, ObjType.Legs);    // 9%
-            if (roll < 0.73) return (FeetArmorTemplates, ObjType.Feet);    // 9%
-            if (roll < 0.80) return (WaistArmorTemplates, ObjType.Waist);  // 7%
-            if (roll < 0.85) return (FaceArmorTemplates, ObjType.Face);    // 5%
-            if (roll < 0.92) return (CloakArmorTemplates, ObjType.Abody);  // 7%
+            if (roll < 0.22) return (ArmorTemplates, ObjType.Body);        // 22%
+            if (roll < 0.32) return (HeadArmorTemplates, ObjType.Head);    // 10%
+            if (roll < 0.40) return (ArmsArmorTemplates, ObjType.Arms);    // 8%
+            if (roll < 0.48) return (HandsArmorTemplates, ObjType.Hands);  // 8%
+            if (roll < 0.57) return (LegsArmorTemplates, ObjType.Legs);    // 9%
+            if (roll < 0.66) return (FeetArmorTemplates, ObjType.Feet);    // 9%
+            if (roll < 0.72) return (ShieldTemplates, ObjType.Shield);     // 6%
+            if (roll < 0.79) return (WaistArmorTemplates, ObjType.Waist);  // 7%
+            if (roll < 0.84) return (FaceArmorTemplates, ObjType.Face);    // 5%
+            if (roll < 0.92) return (CloakArmorTemplates, ObjType.Abody);  // 8%
             if (roll < 0.96) return (new List<(string, string[], int, int, float)>(), ObjType.Fingers); // 4% — delegates to GenerateRing
             return (new List<(string, string[], int, int, float)>(), ObjType.Neck); // 4% — delegates to GenerateNecklace
         }
@@ -841,9 +992,10 @@ public static class LootGenerator
             if (objType == ObjType.Neck)
                 return GenerateNecklace(dungeonLevel, rarity);
 
+            bool isPrestige = playerClass >= CharacterClass.Tidesworn;
             var candidates = slotTemplates
                 .Where(a => dungeonLevel >= a.MinLevel && dungeonLevel <= a.MaxLevel)
-                .Where(a => a.Classes.Contains("All") || a.Classes.Contains(playerClass.ToString()))
+                .Where(a => isPrestige || a.Classes.Contains("All") || a.Classes.Contains(playerClass.ToString()))
                 .ToList();
 
             if (candidates.Count == 0)
@@ -1429,6 +1581,59 @@ public static class LootGenerator
             string curse = item.Cursed || item.IsCursed ? " [CURSED]" : "";
 
             return $"[{color}]{item.Name}[/] ({stats}, {item.Value:N0}g){curse}";
+        }
+
+        /// <summary>
+        /// Check if a character class can use a loot item based on weapon/shield template class restrictions.
+        /// Returns (true, null) if usable, (false, reason) if not.
+        /// Only weapons and shields have class restrictions — armor/accessories return true.
+        /// </summary>
+        public static (bool canUse, string? reason) CanClassUseLootItem(CharacterClass playerClass, Item lootItem)
+        {
+            // Only weapons and shields have class restrictions
+            if (lootItem.Type != ObjType.Weapon && lootItem.Type != ObjType.Shield)
+                return (true, null);
+
+            // NG+ prestige classes can use any weapon/shield
+            if (playerClass >= CharacterClass.Tidesworn)
+                return (true, null);
+
+            // Build a combined list of all weapon + shield templates with their class arrays
+            // Sort by longest name first to avoid false matches (e.g., "Bastard Sword" before "Sword")
+            var allTemplates = new List<(string Name, string[] Classes)>();
+
+            foreach (var t in WeaponTemplates)
+                allTemplates.Add((t.Name, t.Classes));
+            foreach (var t in ShieldTemplates)
+                allTemplates.Add((t.Name, t.Classes));
+
+            // Sort longest name first for accurate matching
+            allTemplates.Sort((a, b) => b.Name.Length.CompareTo(a.Name.Length));
+
+            // Find the first template whose name appears in the loot item name
+            // Handles prefixed/suffixed names like "Blazing Longbow of the Phoenix" matching "Longbow"
+            foreach (var (templateName, classes) in allTemplates)
+            {
+                if (lootItem.Name.Contains(templateName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // "All" means any class can use it
+                    if (classes.Any(c => c.Equals("All", StringComparison.OrdinalIgnoreCase)))
+                        return (true, null);
+
+                    // Check if this class is in the allowed list
+                    string className = playerClass.ToString();
+                    if (classes.Any(c => c.Equals(className, StringComparison.OrdinalIgnoreCase)))
+                        return (true, null);
+
+                    // Class not in the allowed list
+                    string classList = string.Join(", ", classes);
+                    string itemType = lootItem.Type == ObjType.Shield ? "shield" : "weapon";
+                    return (false, $"Only {classList} can equip this {itemType}.");
+                }
+            }
+
+            // No template match found — allow usage (unknown item type)
+            return (true, null);
         }
 
         #endregion

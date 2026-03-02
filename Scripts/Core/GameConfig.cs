@@ -9,8 +9,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.48.5";
-    public const string VersionName = "Combat Balance, Day Cycle & Dreams";
+    public const string Version = "0.49.0";
+    public const string VersionName = "Swords and Lutes";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // From Pascal global_maxXX constants
@@ -132,6 +132,26 @@ public static partial class GameConfig
                 _screenReaderAsync.Value = value;
             else
                 _screenReaderGlobal = value;
+        }
+    }
+
+    /// <summary>
+    /// Compact mode for mobile/small screen SSH sessions.
+    /// Uses AsyncLocal so each MUD session has its own value.
+    /// When true, activates compact BBS-style menus across all locations.
+    /// </summary>
+    private static readonly System.Threading.AsyncLocal<bool?> _compactModeAsync = new();
+    private static bool _compactModeGlobal = false;
+
+    public static bool CompactMode
+    {
+        get => _compactModeAsync.Value ?? _compactModeGlobal;
+        set
+        {
+            if (UsurperRemake.Server.SessionContext.IsActive)
+                _compactModeAsync.Value = value;
+            else
+                _compactModeGlobal = value;
         }
     }
 
@@ -561,6 +581,10 @@ public static partial class GameConfig
     public const int InformantCost = 100;                    // Gold cost for Shadows informant
     public const float CrownTaxExemptionRate = 0.20f;        // 20% gold loss reduction on death for Crown
 
+    // Shop Item Generation (v0.49.0)
+    public const float ShopPowerMultiplier = 0.85f;      // Shop items are 15% weaker than Common dungeon loot
+    public const float ShopPriceMultiplier = 300f;        // Base price = level^1.5 * 300
+
     // Dark Alley Overhaul (v0.41.0)
     // Shop Caps
     public const int MaxSteroidShopPurchases = 3;                // Lifetime steroid purchases cap
@@ -669,6 +693,12 @@ public static partial class GameConfig
     public const float HerbManaRestorePercent = 0.30f;        // Starbloom: restores 30% max mana
     public const float HerbSpellBonus = 0.20f;                // Starbloom: +20% spell damage
     public static readonly int[] HerbMaxCarry = { 0, 10, 5, 5, 3, 3 }; // Max carry per herb type (indexed by HerbType)
+    // Song buffs (Music Shop performances)
+    public const int SongBuffDuration = 5;                    // Song buffs last 5 combats
+    public const float SongWarMarchBonus = 0.15f;             // War March: +15% attack damage
+    public const float SongIronLullabyBonus = 0.15f;          // Lullaby of Iron: +15% defense
+    public const float SongFortuneBonus = 0.25f;              // Fortune's Tune: +25% gold from kills
+    public const float SongBattleHymnBonus = 0.10f;           // Battle Hymn: +10% attack AND +10% defense
     // Study / Library
     public const float StudyXPBonus = 0.05f;                  // +5% XP from combat
     // Servants' Quarters
@@ -1804,6 +1834,9 @@ public enum GameLocation
 
     // Immortal Pantheon (god ascension system)
     Pantheon = 502,      // The Divine Realm (immortals only)
+
+    // Music Shop (instruments & bard services)
+    MusicShop = 503,     // Music Shop
 
     Closed = 30000       // onloc_closed (for fake players)
 }

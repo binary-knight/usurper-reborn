@@ -7028,7 +7028,7 @@ public class DungeonLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("green");
         terminal.WriteLine("╔═══════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║            ♦ TRAVELING MERCHANT ♦                     ║");
+        terminal.WriteLine("║             ♦ TRAVELING MERCHANT ♦                    ║");
         terminal.WriteLine("╚═══════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
         terminal.SetColor("white");
@@ -7134,7 +7134,7 @@ public class DungeonLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("green");
             terminal.WriteLine("╔═══════════════════════════════════════════════════════╗");
-            terminal.WriteLine("║            MERCHANT'S WARES                           ║");
+            terminal.WriteLine("║               MERCHANT'S WARES                        ║");
             terminal.WriteLine("╚═══════════════════════════════════════════════════════╝");
             terminal.WriteLine("");
 
@@ -7360,344 +7360,147 @@ public class DungeonLocation : BaseLocation
         public string Name { get; set; } = "";
         public string Description { get; set; } = "";
         public long Price { get; set; }
-        public string Type { get; set; } = ""; // weapon, armor, ring, amulet, special
-        public int Power { get; set; }
+        public string Type { get; set; } = ""; // weapon, armor, accessory
         public bool Sold { get; set; } = false;
-        public Func<Character, Task>? EffectAsync { get; set; }
+        public Item? LootItem { get; set; }
     }
 
     private List<MerchantRareItem> GenerateMerchantRareItems(int level)
     {
         var items = new List<MerchantRareItem>();
-        int basePower = level + 5;
-        long basePrice = level * 500;
+        var player = GetCurrentPlayer();
+        var playerClass = player.Class;
 
-        // Weapon options
-        var weapons = new[]
+        // Generate 4 real loot items at guaranteed Uncommon+ rarity
+        // Merchant has curated goods — better than random drops but at a premium price
+        int attempts = 0;
+        int maxAttempts = 50;
+
+        // Item 1: Weapon
+        while (attempts++ < maxAttempts)
         {
-            ("Shadow Blade", "Strikes from darkness", basePower + 3),
-            ("Flame Tongue", "Burns with eternal fire", basePower + 4),
-            ("Frost Brand", "Chills to the bone", basePower + 4),
-            ("Thunderclap", "Echoes with lightning", basePower + 5),
-            ("Venom Fang", "Drips with poison", basePower + 3),
-            ("Soul Reaver", "Drains life force", basePower + 6),
-            ("Demon Slayer", "Bane of evil", basePower + 5),
-            ("Dragon Tooth", "From an ancient wyrm", basePower + 7),
-        };
-
-        // Armor options
-        var armors = new[]
-        {
-            ("Shadowmail", "Blends with darkness", basePower + 2),
-            ("Dragonscale Vest", "Resistant to fire", basePower + 4),
-            ("Mithril Chain", "Light as a feather", basePower + 3),
-            ("Void Armor", "Absorbs magic", basePower + 5),
-            ("Phoenix Plate", "Regenerates slowly", basePower + 4),
-            ("Titan's Guard", "Immense protection", basePower + 6),
-        };
-
-        // Ring options
-        var rings = new[]
-        {
-            ("Ring of Might", "+5 Strength", 5),
-            ("Ring of Vitality", "+50 Max HP", 50),
-            ("Ring of the Thief", "+5 Dexterity", 5),
-            ("Ring of Wisdom", "+5 Intelligence", 5),
-            ("Ring of Fortune", "+10% Gold Find", 10),
-            ("Ring of Protection", "+3 Defense", 3),
-        };
-
-        // Amulet/Special options
-        var specials = new[]
-        {
-            ("Amulet of Life", "+100 Max HP", 100),
-            ("Charm of Speed", "+1 Attack per round", 1),
-            ("Talisman of Power", "+10 All Stats", 10),
-            ("Lucky Coin", "Extra gold from enemies", 0),
-        };
-
-        // Pick random items for this merchant
-        var weaponChoice = weapons[dungeonRandom.Next(weapons.Length)];
-        var weaponPower = weaponChoice.Item3;
-        var weaponName = weaponChoice.Item1;
-        var weaponDesc = weaponChoice.Item2;
-        items.Add(new MerchantRareItem
-        {
-            Name = weaponName,
-            Description = $"+{weaponPower} Weapon Power - {weaponDesc}",
-            Price = basePrice + (weaponPower * 100),
-            Type = "weapon",
-            Power = weaponPower,
-            EffectAsync = async (p) => {
-                // Create actual equipment and equip it
-                var weapon = Equipment.CreateWeapon(
-                    id: 9000 + dungeonRandom.Next(1000),
-                    name: weaponName,
-                    handedness: WeaponHandedness.OneHanded,
-                    weaponType: WeaponType.Sword,
-                    power: weaponPower,
-                    value: basePrice + (weaponPower * 100),
-                    rarity: EquipmentRarity.Rare
-                );
-                weapon.Description = weaponDesc;
-                EquipmentDatabase.RegisterDynamic(weapon);
-
-                // For one-handed weapons, ask which slot to use
-                EquipmentSlot? targetSlot = null;
-                if (Character.RequiresSlotSelection(weapon))
+            var item = LootGenerator.GenerateWeapon(level, playerClass);
+            if (item != null && item.Attack > 0)
+            {
+                long merchantPrice = Math.Max(500, (long)(item.Value * 1.5));
+                items.Add(new MerchantRareItem
                 {
-                    targetSlot = await PromptForWeaponSlotDungeon(p);
-                }
-
-                if (p.EquipItem(weapon, targetSlot, out string msg))
-                {
-                    terminal?.WriteLine(msg, "green");
-                }
-                else
-                {
-                    // Fallback: add permanent bonus if equip fails
-                    p.BonusWeapPow += weaponPower;
-                    p.RecalculateStats();
-                    terminal?.WriteLine($"Weapon power permanently increased by {weaponPower}!", "yellow");
-                }
+                    Name = item.Name,
+                    Description = $"Atk +{item.Attack}" + FormatItemBonuses(item),
+                    Price = merchantPrice,
+                    Type = "weapon",
+                    LootItem = item
+                });
+                break;
             }
-        });
+        }
 
-        var armorChoice = armors[dungeonRandom.Next(armors.Length)];
-        var armorPower = armorChoice.Item3;
-        var armorName = armorChoice.Item1;
-        var armorDesc = armorChoice.Item2;
-        items.Add(new MerchantRareItem
+        // Item 2: Armor (body/head/legs/etc.)
+        attempts = 0;
+        while (attempts++ < maxAttempts)
         {
-            Name = armorName,
-            Description = $"+{armorPower} Armor Power - {armorDesc}",
-            Price = basePrice + (armorPower * 80),
-            Type = "armor",
-            Power = armorPower,
-            EffectAsync = async (p) => {
-                // Create actual equipment and equip it
-                var armor = Equipment.CreateArmor(
-                    id: 9000 + dungeonRandom.Next(1000),
-                    name: armorName,
-                    slot: EquipmentSlot.Body,
-                    armorType: ArmorType.Chain,
-                    ac: armorPower,
-                    value: basePrice + (armorPower * 80),
-                    rarity: EquipmentRarity.Rare
-                );
-                armor.Description = armorDesc;
-                EquipmentDatabase.RegisterDynamic(armor);
-                if (p.EquipItem(armor, out string msg))
+            var item = LootGenerator.GenerateArmor(level, playerClass);
+            if (item != null && item.Armor > 0)
+            {
+                long merchantPrice = Math.Max(500, (long)(item.Value * 1.5));
+                items.Add(new MerchantRareItem
                 {
-                    terminal?.WriteLine(msg, "green");
-                }
-                else
-                {
-                    // Fallback: add permanent bonus if equip fails
-                    p.BonusArmPow += armorPower;
-                    p.RecalculateStats();
-                    terminal?.WriteLine($"Armor power permanently increased by {armorPower}!", "yellow");
-                }
-                await Task.CompletedTask; // Make method async
+                    Name = item.Name,
+                    Description = $"Def +{item.Armor}" + FormatItemBonuses(item),
+                    Price = merchantPrice,
+                    Type = "armor",
+                    LootItem = item
+                });
+                break;
             }
-        });
+        }
 
-        var ringChoice = rings[dungeonRandom.Next(rings.Length)];
-        var ringName = ringChoice.Item1;
-        var ringDesc = ringChoice.Item2;
-        var ringPower = ringChoice.Item3;
-        var ringPrice = basePrice / 2 + (ringPower * 50);
-        items.Add(new MerchantRareItem
+        // Item 3: Another weapon or armor (variety)
+        attempts = 0;
+        while (attempts++ < maxAttempts)
         {
-            Name = ringName,
-            Description = ringDesc,
-            Price = ringPrice,
-            Type = "ring",
-            Power = ringPower,
-            EffectAsync = async (p) => {
-                // Create actual ring equipment
-                var ring = Equipment.CreateAccessory(
-                    id: 9000 + dungeonRandom.Next(1000),
-                    name: ringName,
-                    slot: EquipmentSlot.LFinger,
-                    value: ringPrice,
-                    rarity: EquipmentRarity.Rare
-                );
-                ring.Description = ringDesc;
+            var item = LootGenerator.GenerateDungeonLoot(level, playerClass);
+            if (item != null && (item.Attack > 0 || item.Armor > 0))
+            {
+                // Avoid duplicates
+                if (items.Any(i => i.Name == item.Name)) continue;
 
-                // Apply appropriate bonuses based on ring type
-                switch (ringName)
+                long merchantPrice = Math.Max(500, (long)(item.Value * 1.5));
+                string stats = item.Type == ObjType.Weapon
+                    ? $"Atk +{item.Attack}" + FormatItemBonuses(item)
+                    : $"Def +{item.Armor}" + FormatItemBonuses(item);
+                items.Add(new MerchantRareItem
                 {
-                    case "Ring of Might":
-                        ring = ring.WithStrength(5);
-                        break;
-                    case "Ring of Vitality":
-                        ring = ring.WithMaxHP(50);
-                        break;
-                    case "Ring of the Thief":
-                        ring = ring.WithDexterity(5);
-                        break;
-                    case "Ring of Wisdom":
-                        ring = ring.WithWisdom(5);
-                        break;
-                    case "Ring of Fortune":
-                        // Passive gold find effect - just equip it
-                        break;
-                    case "Ring of Protection":
-                        ring = ring.WithDefence(3);
-                        break;
-                }
-
-                EquipmentDatabase.RegisterDynamic(ring);
-                if (p.EquipItem(ring, out string msg))
-                {
-                    terminal?.WriteLine(msg, "green");
-                }
-                else
-                {
-                    // Try RFinger slot if LFinger is occupied
-                    ring.Slot = EquipmentSlot.RFinger;
-                    if (p.EquipItem(ring, out string msg2))
-                    {
-                        terminal?.WriteLine(msg2, "green");
-                    }
-                    else
-                    {
-                        // Fallback: apply stats directly
-                        switch (ringName)
-                        {
-                            case "Ring of Might": p.BaseStrength += 5; p.Strength += 5; break;
-                            case "Ring of Vitality": p.BonusMaxHP += 50; break;
-                            case "Ring of the Thief": p.BaseDexterity += 5; p.Dexterity += 5; break;
-                            case "Ring of Wisdom": p.BaseIntelligence += 5; p.Intelligence += 5; break;
-                            case "Ring of Protection": p.BonusArmPow += 3; break;
-                        }
-                        p.RecalculateStats();
-                        terminal?.WriteLine($"Ring power applied!", "yellow");
-                    }
-                }
-                await Task.CompletedTask; // Make method async
+                    Name = item.Name,
+                    Description = stats,
+                    Price = merchantPrice,
+                    Type = item.Type == ObjType.Weapon ? "weapon" : "armor",
+                    LootItem = item
+                });
+                break;
             }
-        });
+        }
 
-        var specialChoice = specials[dungeonRandom.Next(specials.Length)];
-        var specialName = specialChoice.Item1;
-        var specialDesc = specialChoice.Item2;
-        var specialPower = specialChoice.Item3;
-        var specialPrice = basePrice + 1000;
-        items.Add(new MerchantRareItem
+        // Item 4: Ring or Necklace
+        attempts = 0;
+        while (attempts++ < maxAttempts)
         {
-            Name = specialName,
-            Description = specialDesc,
-            Price = specialPrice,
-            Type = "special",
-            Power = specialPower,
-            EffectAsync = async (p) => {
-                // Create actual amulet/accessory equipment
-                var amulet = Equipment.CreateAccessory(
-                    id: 9000 + dungeonRandom.Next(1000),
-                    name: specialName,
-                    slot: EquipmentSlot.Neck,
-                    value: specialPrice,
-                    rarity: EquipmentRarity.Epic
-                );
-                amulet.Description = specialDesc;
+            Item item;
+            if (dungeonRandom.NextDouble() < 0.5)
+                item = LootGenerator.GenerateRing(level);
+            else
+                item = LootGenerator.GenerateNecklace(level);
 
-                // Apply appropriate bonuses based on item type
-                switch (specialName)
+            if (item != null)
+            {
+                long merchantPrice = Math.Max(300, (long)(item.Value * 1.5));
+                string stats = FormatAccessoryStats(item);
+                items.Add(new MerchantRareItem
                 {
-                    case "Amulet of Life":
-                        amulet = amulet.WithMaxHP(100);
-                        break;
-                    case "Charm of Speed":
-                        amulet = amulet.WithDexterity(10).WithAgility(10);
-                        break;
-                    case "Talisman of Power":
-                        amulet = amulet.WithStrength(10).WithIntelligence(10).WithWisdom(10)
-                            .WithDexterity(10).WithConstitution(10).WithCharisma(10);
-                        break;
-                    case "Lucky Coin":
-                        // Passive gold find effect - just equip it
-                        break;
-                }
-
-                EquipmentDatabase.RegisterDynamic(amulet);
-                if (p.EquipItem(amulet, out string msg))
-                {
-                    terminal?.WriteLine(msg, "green");
-                }
-                else
-                {
-                    // Fallback: apply stats directly
-                    switch (specialName)
-                    {
-                        case "Amulet of Life": p.MaxHP += 100; p.HP += 100; break;
-                        case "Charm of Speed": p.Dexterity += 10; p.Agility += 10; break;
-                        case "Talisman of Power":
-                            p.Strength += 10; p.Intelligence += 10; p.Wisdom += 10;
-                            p.Dexterity += 10; p.Constitution += 10; p.Charisma += 10;
-                            break;
-                    }
-                    terminal?.WriteLine($"Amulet power applied!", "yellow");
-                }
-                await Task.CompletedTask; // Make method async
+                    Name = item.Name,
+                    Description = stats,
+                    Price = merchantPrice,
+                    Type = "accessory",
+                    LootItem = item
+                });
+                break;
             }
-        });
+        }
 
         return items;
     }
 
-    /// <summary>
-    /// Prompt player to choose which hand to equip a one-handed weapon in (dungeon version)
-    /// </summary>
-    private async Task<EquipmentSlot?> PromptForWeaponSlotDungeon(Character player)
+    private static string FormatItemBonuses(Item item)
     {
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.WriteLine("This is a one-handed weapon. Where would you like to equip it?");
-        terminal.WriteLine("");
+        var bonuses = new List<string>();
+        if (item.Strength > 0) bonuses.Add($"STR +{item.Strength}");
+        if (item.Defence > 0) bonuses.Add($"DEF +{item.Defence}");
+        if (item.HP > 0) bonuses.Add($"HP +{item.HP}");
+        if (item.Dexterity > 0) bonuses.Add($"DEX +{item.Dexterity}");
+        if (item.Wisdom > 0) bonuses.Add($"WIS +{item.Wisdom}");
+        if (item.Agility > 0) bonuses.Add($"AGI +{item.Agility}");
+        if (item.Charisma > 0) bonuses.Add($"CHA +{item.Charisma}");
+        if (item.Stamina > 0) bonuses.Add($"STA +{item.Stamina}");
+        if (item.Mana > 0) bonuses.Add($"Mana +{item.Mana}");
+        if (bonuses.Count > 0) return ", " + string.Join(", ", bonuses);
+        return "";
+    }
 
-        // Show current equipment in both slots
-        var mainHandItem = player.GetEquipment(EquipmentSlot.MainHand);
-        var offHandItem = player.GetEquipment(EquipmentSlot.OffHand);
-
-        terminal.SetColor("white");
-        terminal.Write("  (M) Main Hand: ");
-        if (mainHandItem != null)
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine(mainHandItem.Name);
-        }
-        else
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine("Empty");
-        }
-
-        terminal.SetColor("white");
-        terminal.Write("  (O) Off-Hand:  ");
-        if (offHandItem != null)
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine(offHandItem.Name);
-        }
-        else
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine("Empty");
-        }
-
-        terminal.WriteLine("");
-
-        terminal.Write("Your choice: ");
-        var slotChoice = await terminal.GetInput("");
-
-        return slotChoice.ToUpper() switch
-        {
-            "M" => EquipmentSlot.MainHand,
-            "O" => EquipmentSlot.OffHand,
-            _ => EquipmentSlot.MainHand // Default to main hand
-        };
+    private static string FormatAccessoryStats(Item item)
+    {
+        var stats = new List<string>();
+        if (item.Attack > 0) stats.Add($"Atk +{item.Attack}");
+        if (item.Armor > 0) stats.Add($"Def +{item.Armor}");
+        if (item.Strength > 0) stats.Add($"STR +{item.Strength}");
+        if (item.Defence > 0) stats.Add($"DEF +{item.Defence}");
+        if (item.HP > 0) stats.Add($"HP +{item.HP}");
+        if (item.Dexterity > 0) stats.Add($"DEX +{item.Dexterity}");
+        if (item.Wisdom > 0) stats.Add($"WIS +{item.Wisdom}");
+        if (item.Agility > 0) stats.Add($"AGI +{item.Agility}");
+        if (item.Charisma > 0) stats.Add($"CHA +{item.Charisma}");
+        if (item.Stamina > 0) stats.Add($"STA +{item.Stamina}");
+        if (item.Mana > 0) stats.Add($"Mana +{item.Mana}");
+        return stats.Count > 0 ? string.Join(", ", stats) : "Accessory";
     }
 
     private async Task PurchaseRareItem(Character player, MerchantRareItem item)
@@ -7719,6 +7522,28 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
+        // Show item comparison if it's a weapon or armor
+        if (item.LootItem != null)
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine("");
+            terminal.WriteLine($"  {item.Name}");
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {item.Description}");
+
+            if (item.LootItem.Type == ObjType.Weapon)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Your current weapon power: {player.WeapPow}");
+            }
+            else if (item.LootItem.Armor > 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Your current armor power: {player.ArmPow}");
+            }
+            terminal.WriteLine("");
+        }
+
         terminal.SetColor("cyan");
         terminal.WriteLine($"Purchase {item.Name} for {item.Price:N0} gold? (Y/N)");
         var confirm = (await terminal.GetInput("")).Trim().ToUpper();
@@ -7727,8 +7552,14 @@ public class DungeonLocation : BaseLocation
         {
             player.Gold -= item.Price;
             item.Sold = true;
-            if (item.EffectAsync != null)
-                await item.EffectAsync(player);
+            player.Statistics?.RecordPurchase(item.Price);
+            player.Statistics?.RecordGoldSpent(item.Price);
+            player.Statistics?.RecordGoldChange(player.Gold);
+
+            if (item.LootItem != null)
+            {
+                player.Inventory.Add(item.LootItem);
+            }
 
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("");
@@ -7737,6 +7568,8 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("═══════════════════════════════════════");
             terminal.SetColor("green");
             terminal.WriteLine($"{item.Description}");
+            terminal.SetColor("white");
+            terminal.WriteLine("Added to your inventory.");
             terminal.WriteLine("");
             terminal.SetColor("gray");
             terminal.WriteLine("\"A fine choice! Use it well.\"");
@@ -11618,9 +11451,16 @@ public class DungeonLocation : BaseLocation
     
     private Monster CreateMerchantMonster()
     {
-        return Monster.CreateMonster(1, "Frightened Merchant", 30, 10, 0,
-            "Help me!", false, false, "Walking Stick", "Robes", 
-            false, false, 5, 1, 3);
+        int level = Math.Max(1, currentDungeonLevel);
+        long hp = 40 + level * 15;
+        long str = 8 + level * 2;
+        long def = 5 + level;
+        long punch = 3 + level;
+        long armPow = 1 + level / 2;
+        long weapPow = 2 + level;
+        return Monster.CreateMonster(level, "Traveling Merchant", hp, str, def,
+            "You'll regret this!", false, false, "Merchant's Blade", "Leather Armor",
+            false, false, punch, armPow, weapPow);
     }
     
     private Monster CreateUndeadMonster()
@@ -11783,6 +11623,7 @@ public class DungeonLocation : BaseLocation
                 UsurperRemake.Systems.CompanionId.Aldric => await CheckAldricQuestEncounter(player, companion, room, story),
                 UsurperRemake.Systems.CompanionId.Mira => await CheckMiraQuestEncounter(player, companion, room, story),
                 UsurperRemake.Systems.CompanionId.Vex => await CheckVexQuestEncounter(player, companion, room, story),
+                UsurperRemake.Systems.CompanionId.Melodia => await CheckMelodiaQuestEncounter(player, companion, room, story),
                 _ => false
             };
 
@@ -12690,6 +12531,207 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine("");
         terminal.WriteLine("[Bucket List: Tell Someone the Truth - COMPLETE]");
+    }
+
+    /// <summary>
+    /// Melodia Quest: "The Lost Opus" - Recover a legendary musical score
+    /// Triggers on floors 50-60
+    /// </summary>
+    private async Task<bool> CheckMelodiaQuestEncounter(Character player, UsurperRemake.Systems.Companion melodia,
+        DungeonRoom room, UsurperRemake.Systems.StoryProgressionSystem story)
+    {
+        // Melodia's quest triggers on floors 50-60
+        if (currentDungeonLevel < 50 || currentDungeonLevel > 60)
+            return false;
+
+        // Only trigger once
+        if (story.HasStoryFlag("melodia_quest_opus_found"))
+            return false;
+
+        // 15% chance per room on correct floors
+        if (dungeonRandom.NextDouble() > 0.15)
+            return false;
+
+        // Trigger the quest event
+        terminal.ClearScreen();
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("                       THE LOST OPUS                                        ");
+        terminal.WriteLine("══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("");
+
+        await Task.Delay(1000);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("A faint melody echoes through the stone corridors — impossible,");
+        terminal.WriteLine("yet unmistakable. Melodia freezes mid-step.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"Do you hear that?\" she whispers, her eyes wide.");
+        terminal.WriteLine("\"That melody... I've only ever read about it in the oldest texts.\"");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("She follows the sound through a narrow passage you hadn't noticed,");
+        terminal.WriteLine("her fingers tracing symbols carved into the walls — musical notation");
+        terminal.WriteLine("in a language older than any living tongue.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("The passage opens into a small chamber. In its center stands a");
+        terminal.WriteLine("stone lectern, and upon it rests pages of crumbling parchment.");
+        terminal.WriteLine("The air hums with resonance, as if the room itself is singing.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("\"The Lost Opus,\" Melodia breathes, barely audible.");
+        terminal.WriteLine("\"A composition said to capture the essence of the world itself —\"");
+        terminal.WriteLine("\"every joy, every sorrow, every truth, woven into a single song.\"");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("She reaches toward the score, then hesitates.");
+        terminal.WriteLine("\"The legends say it was hidden here to protect it. That only");
+        terminal.WriteLine("someone who truly understands music's power should claim it.\"");
+        terminal.WriteLine("");
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("1");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Encourage her — this is her destiny");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("2");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Help her transcribe it carefully before it crumbles");
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("3");
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("yellow");
+        terminal.WriteLine("Take the pages yourself for safekeeping");
+        terminal.WriteLine("");
+
+        var choice = await terminal.GetInput("What do you do? ");
+
+        switch (choice)
+        {
+            case "1":
+                terminal.SetColor("white");
+                terminal.WriteLine("");
+                terminal.WriteLine("\"This is what you were meant to find,\" you say. \"Take it.\"");
+                terminal.WriteLine("");
+                await Task.Delay(1000);
+
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("Melodia lifts the score with reverent hands. As her fingers");
+                terminal.WriteLine("touch the parchment, the room erupts in light and sound —");
+                terminal.WriteLine("a harmony so beautiful it brings tears to your eyes.");
+                terminal.WriteLine("");
+                await Task.Delay(1500);
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("\"I can hear it all,\" she whispers, tears streaming.");
+                terminal.WriteLine("\"Every song I've ever played was just an echo of this.\"");
+                terminal.WriteLine("\"Now I understand what music truly is.\"");
+                terminal.WriteLine("");
+
+                UsurperRemake.Systems.CompanionSystem.Instance.ModifyLoyalty(
+                    UsurperRemake.Systems.CompanionId.Melodia, 20, "Trusted her with the Lost Opus");
+                break;
+
+            case "2":
+                terminal.SetColor("white");
+                terminal.WriteLine("");
+                terminal.WriteLine("\"Let's work together — I'll hold the pages while you copy them.\"");
+                terminal.WriteLine("");
+                await Task.Delay(1000);
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("\"Brilliant idea,\" she says, pulling out blank parchment.");
+                terminal.WriteLine("Together you work in the humming chamber, Melodia transcribing");
+                terminal.WriteLine("each note with a master's precision while you steady the fragile originals.");
+                terminal.WriteLine("");
+                await Task.Delay(1500);
+
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine("When she plays the first bars from her copy, the chamber resonates.");
+                terminal.WriteLine("The original pages glow bright, then dissolve into motes of light");
+                terminal.WriteLine("that sink into the stone — returning to the world they described.");
+                terminal.WriteLine("");
+                await Task.Delay(1500);
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("\"We saved it,\" she says, clutching the transcription to her chest.");
+                terminal.WriteLine("\"You and I — we saved a piece of eternity.\"");
+                terminal.WriteLine("");
+
+                UsurperRemake.Systems.CompanionSystem.Instance.ModifyLoyalty(
+                    UsurperRemake.Systems.CompanionId.Melodia, 25, "Helped transcribe the Lost Opus together");
+                break;
+
+            case "3":
+            default:
+                terminal.SetColor("white");
+                terminal.WriteLine("");
+                terminal.WriteLine("You reach for the score. The moment your fingers touch the");
+                terminal.WriteLine("parchment, a discordant shriek fills the chamber!");
+                terminal.WriteLine("");
+                await Task.Delay(1000);
+
+                terminal.SetColor("red");
+                var opusDmg = player.MaxHP / 5;
+                player.HP = Math.Max(1, player.HP - opusDmg);
+                terminal.WriteLine($"The dissonance tears through you! You take {opusDmg} damage!");
+                terminal.WriteLine("");
+                await Task.Delay(1000);
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("Melodia gently steadies you and takes the score.");
+                terminal.WriteLine("\"It's not just paper — it's a living song. It chooses its keeper.\"");
+                terminal.WriteLine("She studies it, her expression softening. \"But thank you for trying.\"");
+                terminal.WriteLine("");
+
+                UsurperRemake.Systems.CompanionSystem.Instance.ModifyLoyalty(
+                    UsurperRemake.Systems.CompanionId.Melodia, -5, "Tried to take the Opus");
+                break;
+        }
+
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("              QUEST COMPLETE: THE LOST OPUS                                  ");
+        terminal.WriteLine("══════════════════════════════════════════════════════════════════════════════");
+        terminal.WriteLine("");
+
+        story.SetStoryFlag("melodia_quest_opus_found", true);
+        UsurperRemake.Systems.CompanionSystem.Instance.CompletePersonalQuest(
+            UsurperRemake.Systems.CompanionId.Melodia, true);
+
+        // Bonus: Melodia gains power from understanding the world's true song
+        melodia.BaseStats.MagicPower += 30;
+        melodia.BaseStats.HealingPower += 20;
+        terminal.WriteLine("Melodia's understanding of music has deepened profoundly!", "bright_cyan");
+        terminal.WriteLine("Her magical power and healing ability have increased!", "bright_cyan");
+
+        await terminal.PressAnyKey();
+        return true;
     }
 
     #endregion

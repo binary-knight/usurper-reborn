@@ -105,6 +105,9 @@ public class LocationManager
         // Immortal Pantheon (god ascension system)
         locations[GameLocation.Pantheon] = new PantheonLocation();
 
+        // Music Shop (instruments & bard services)
+        locations[GameLocation.MusicShop] = new MusicShopLocation();
+
         // Note: Gym removed - stat training doesn't fit single-player endless format
 
         // GD.Print($"[LocationManager] Initialized {locations.Count} locations");
@@ -137,7 +140,8 @@ public class LocationManager
             GameLocation.AnchorRoad,   // loc14
             GameLocation.Home,         // loc15 – your personal dwelling
             GameLocation.Arena,        // loc16 – PvP arena (online only)
-            GameLocation.Dormitory     // loc17 – lodging
+            GameLocation.Dormitory,    // loc17 – lodging
+            GameLocation.MusicShop     // loc18 – music shop
         };
         
         navigationTable[GameLocation.TheInn] = new List<GameLocation>
@@ -209,6 +213,11 @@ public class LocationManager
         };
 
         navigationTable[GameLocation.Arena] = new List<GameLocation>
+        {
+            GameLocation.MainStreet
+        };
+
+        navigationTable[GameLocation.MusicShop] = new List<GameLocation>
         {
             GameLocation.MainStreet
         };

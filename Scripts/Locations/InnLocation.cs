@@ -2727,6 +2727,7 @@ public class InnLocation : BaseLocation
                 CompanionId.Aldric => "You remind me of what I used to fight for. It's... good to feel that again.",
                 CompanionId.Mira => "With you, healing feels like it means something. Thank you for that.",
                 CompanionId.Vex => "You know, for once... I'm glad I'm still here. Don't tell anyone I said that.",
+                CompanionId.Melodia => "Every adventure is a verse in a song that's still being written. Ours is becoming my favorite.",
                 _ => "We've been through a lot together."
             };
         }
@@ -2739,6 +2740,7 @@ public class InnLocation : BaseLocation
                 CompanionId.Aldric => "You fight well. I'm glad to have my shield at your side.",
                 CompanionId.Mira => "I've been thinking about what you said. Maybe there is a reason to keep going.",
                 CompanionId.Vex => "Not bad for an adventurer. Maybe I'll stick around a bit longer.",
+                CompanionId.Melodia => "You have an interesting rhythm to you. I might write a song about it someday.",
                 _ => "We're starting to understand each other."
             };
         }

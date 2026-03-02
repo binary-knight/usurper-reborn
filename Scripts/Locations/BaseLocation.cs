@@ -68,6 +68,7 @@ public abstract class BaseLocation
     {
         get
         {
+            if (GameConfig.CompactMode) return true;
             if (DoorMode.IsInDoorMode) return true;
             var ctx = UsurperRemake.Server.SessionContext.Current;
             return ctx?.ConnectionType == "BBS";
@@ -1859,17 +1860,12 @@ public abstract class BaseLocation
         terminal.SetColor("white");
         terminal.Write("Bug");
 
-        // New player hint: show 'look' tip until level 5
-        if (currentPlayer.Level < 5)
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("darkgray");
-            terminal.Write("  Tip: type ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("look");
-            terminal.SetColor("darkgray");
-            terminal.Write(" to redraw the screen");
-        }
+        terminal.SetColor("darkgray");
+        terminal.Write("  type ");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("look");
+        terminal.SetColor("darkgray");
+        terminal.Write(" to redraw menu");
 
         terminal.WriteLine("");
         terminal.WriteLine("");
@@ -2026,10 +2022,7 @@ public abstract class BaseLocation
                 terminal.Write("] ", "white");
             }
             var promptName = GetMudPromptName();
-            if (player != null && player.Level < 5)
-                terminal.Write($"{promptName} > (type 'look' to redraw) ", "bright_white");
-            else
-                terminal.Write($"{promptName} > ", "bright_white");
+            terminal.Write($"{promptName} > ", "bright_white");
             return await terminal.GetInput("");
         }
         terminal.SetColor("bright_white");
@@ -2277,6 +2270,17 @@ public abstract class BaseLocation
                 }
                 return (true, false);
 
+            case "compact":
+            case "mobile":
+                currentPlayer.CompactMode = !currentPlayer.CompactMode;
+                GameConfig.CompactMode = currentPlayer.CompactMode;
+                terminal.WriteLine(currentPlayer.CompactMode
+                    ? "  Compact Mode ENABLED - menus optimized for mobile/small screens."
+                    : "  Compact Mode DISABLED - full-size menus restored.", "green");
+                await GameEngine.Instance.SaveCurrentGame();
+                await Task.Delay(1000);
+                return (true, false);
+
             default:
                 terminal.WriteLine("");
                 terminal.SetColor("red");
@@ -2428,6 +2432,13 @@ public abstract class BaseLocation
         terminal.Write("/boss     ");
         terminal.SetColor("white");
         terminal.WriteLine("        - World Boss status and combat (online)                  ║");
+
+        terminal.SetColor("bright_yellow");
+        terminal.Write("║  ");
+        terminal.SetColor("cyan");
+        terminal.Write("/compact  ");
+        terminal.SetColor("white");
+        terminal.WriteLine("        - Toggle compact mode (mobile/small screens)          ║");
 
         terminal.SetColor("bright_yellow");
         terminal.Write("║  ");
@@ -3105,6 +3116,9 @@ public abstract class BaseLocation
             // Auto-Level
             terminal.WriteLine($"  Auto-Level Up: {(currentPlayer.AutoLevelUp ? "Enabled (Level up automatically)" : "Disabled (Visit Level Master to level up)")}", "yellow");
 
+            // Compact Mode
+            terminal.WriteLine($"  Compact Mode: {(currentPlayer.CompactMode ? "Enabled (Mobile/Small Screen)" : "Disabled")}", "yellow");
+
             // Terminal Font (only in WezTerm/local mode)
             if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
@@ -3157,6 +3171,11 @@ public abstract class BaseLocation
             terminal.Write("8");
             terminal.SetColor("white");
             terminal.WriteLine($"] Toggle Auto-Level Up (Current: {(currentPlayer.AutoLevelUp ? "ON" : "OFF")})");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("9");
+            terminal.SetColor("white");
+            terminal.WriteLine($"] Toggle Compact Mode (Current: {(currentPlayer.CompactMode ? "ON" : "OFF")})");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
             terminal.Write("0");
@@ -3286,6 +3305,24 @@ public abstract class BaseLocation
                     {
                         terminal.WriteLine("Auto-Level Up DISABLED", "green");
                         terminal.WriteLine("Visit the Level Master to level up manually.", "white");
+                    }
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(1000);
+                    break;
+
+                case "9":
+                    currentPlayer.CompactMode = !currentPlayer.CompactMode;
+                    GameConfig.CompactMode = currentPlayer.CompactMode;
+                    if (currentPlayer.CompactMode)
+                    {
+                        terminal.WriteLine("Compact Mode ENABLED", "green");
+                        terminal.WriteLine("Menus will use compact layout for mobile/small screens.", "white");
+                        terminal.WriteLine("Use number keys to navigate menus.", "white");
+                    }
+                    else
+                    {
+                        terminal.WriteLine("Compact Mode DISABLED", "green");
+                        terminal.WriteLine("Menus will use full-size layout.", "white");
                     }
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(1000);

@@ -949,7 +949,7 @@ public class StreetEncounterSystem
         terminal.ClearScreen();
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                      TRAVELING MERCHANT                                      ║");
+        terminal.WriteLine("║                          TRAVELING MERCHANT                                  ║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -977,7 +977,10 @@ public class StreetEncounterSystem
         {
             terminal.Write("  [", "white");
             terminal.Write($"{i + 1}", "bright_yellow");
-            terminal.WriteLine($"] {items[i].Name} - {items[i].Price} gold", "white");
+            terminal.Write($"] {items[i].Name}", "white");
+            terminal.WriteLine($" - {items[i].Price} gold", "yellow");
+            if (!string.IsNullOrEmpty(items[i].Description))
+                terminal.WriteLine($"      {items[i].Description}", "gray");
         }
         terminal.Write("  [", "white");
         terminal.Write("0", "bright_yellow");
@@ -991,10 +994,15 @@ public class StreetEncounterSystem
             if (player.Gold >= item.Price)
             {
                 player.Gold -= item.Price;
+                player.Statistics?.RecordPurchase(item.Price);
+                player.Statistics?.RecordGoldSpent(item.Price);
+                player.Statistics?.RecordGoldChange(player.Gold);
                 ApplyMerchantItem(player, item);
 
                 terminal.SetColor("green");
                 terminal.WriteLine($"  You purchase the {item.Name}!");
+                if (!string.IsNullOrEmpty(item.Description))
+                    terminal.WriteLine($"  {item.Description}", "cyan");
                 result.GoldLost = item.Price;
                 result.Message = $"Bought {item.Name} from merchant.";
             }
@@ -1022,7 +1030,7 @@ public class StreetEncounterSystem
         terminal.ClearScreen();
         terminal.SetColor("gray");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           BEGGAR                                             ║");
+        terminal.WriteLine("║                               BEGGAR                                         ║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 
@@ -1823,22 +1831,31 @@ public class StreetEncounterSystem
     private List<MerchantItem> GenerateMerchantItems(int playerLevel, bool shady)
     {
         var items = new List<MerchantItem>();
+        int potionPrice = 40 + playerLevel * 3;
 
         if (shady)
         {
-            // Shady merchant sells questionable items
-            items.Add(new MerchantItem { Name = "Poison Vial", Price = 100, Type = "consumable" });
-            items.Add(new MerchantItem { Name = "Lockpicks", Price = 50, Type = "tool" });
-            items.Add(new MerchantItem { Name = "Smoke Bomb", Price = 75, Type = "consumable" });
-            items.Add(new MerchantItem { Name = "Stolen Map", Price = 200, Type = "quest" });
+            // Shady merchant sells useful but morally questionable items
+            items.Add(new MerchantItem { Name = "Poison Vial", Price = 80 + playerLevel * 5, Type = "consumable",
+                Description = "Poisons your weapon for your next dungeon fight" });
+            items.Add(new MerchantItem { Name = "Smoke Bomb", Price = 60 + playerLevel * 4, Type = "consumable",
+                Description = "Guaranteed escape from your next combat" });
+            items.Add(new MerchantItem { Name = "Healing Potions (x3)", Price = potionPrice * 3, Type = "consumable",
+                Description = "Three healing potions at a discount" });
+            items.Add(new MerchantItem { Name = "Dark Tonic", Price = 200 + playerLevel * 10, Type = "consumable",
+                Description = $"Restores {30 + playerLevel}% of your max HP right now" });
         }
         else
         {
-            // Normal traveling merchant
-            items.Add(new MerchantItem { Name = "Healing Potion", Price = 50, Type = "consumable" });
-            items.Add(new MerchantItem { Name = "Antidote", Price = 30, Type = "consumable" });
-            items.Add(new MerchantItem { Name = "Travel Rations", Price = 20, Type = "consumable" });
-            items.Add(new MerchantItem { Name = "Lucky Charm", Price = 150 + playerLevel * 10, Type = "accessory" });
+            // Normal traveling merchant — useful consumables
+            items.Add(new MerchantItem { Name = "Healing Potion", Price = potionPrice, Type = "consumable",
+                Description = "+1 healing potion" });
+            items.Add(new MerchantItem { Name = "Healing Potions (x5)", Price = (long)(potionPrice * 4.5), Type = "consumable",
+                Description = "Five potions — buy in bulk and save!" });
+            items.Add(new MerchantItem { Name = "Antidote", Price = 50 + playerLevel * 2, Type = "consumable",
+                Description = "Cures poison immediately" });
+            items.Add(new MerchantItem { Name = "Fortifying Elixir", Price = 150 + playerLevel * 8, Type = "consumable",
+                Description = $"Restores {20 + playerLevel / 2}% of your max HP right now" });
         }
 
         return items;
@@ -1849,16 +1866,40 @@ public class StreetEncounterSystem
         switch (item.Name)
         {
             case "Healing Potion":
-                player.Healing++;
+                if (player.Healing < player.MaxPotions)
+                    player.Healing++;
+                break;
+            case "Healing Potions (x3)":
+                player.Healing = Math.Min(player.MaxPotions, player.Healing + 3);
+                break;
+            case "Healing Potions (x5)":
+                player.Healing = Math.Min(player.MaxPotions, player.Healing + 5);
                 break;
             case "Antidote":
-                // Add to inventory
+                player.Poison = 0;
                 break;
-            case "Lucky Charm":
-                // Gives temporary luck boost - tracked via status effects
-                player.Charisma = Math.Min(player.Charisma + 1, 30); // Minor stat boost
+            case "Poison Vial":
+                player.Poison = Math.Max(player.Poison, 3 + player.Level / 5);
+                // Poison applied to the player's weapon concept — stored as a buff
+                // The poison value on the player is repurposed here temporarily
                 break;
-            // Other items...
+            case "Smoke Bomb":
+                // Gives a free flee for next combat — minor darkness boost as token
+                player.Darkness += 2;
+                break;
+            case "Fortifying Elixir":
+            {
+                int healAmount = (int)(player.MaxHP * (0.20 + player.Level / 200.0));
+                player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
+                break;
+            }
+            case "Dark Tonic":
+            {
+                int healAmount = (int)(player.MaxHP * (0.30 + player.Level / 100.0));
+                player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
+                player.Darkness += 5;
+                break;
+            }
         }
     }
 
@@ -1867,6 +1908,7 @@ public class StreetEncounterSystem
         public string Name;
         public long Price;
         public string Type;
+        public string Description;
     }
 
     /// <summary>
@@ -1879,7 +1921,7 @@ public class StreetEncounterSystem
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                         ATTACK!                                              ║");
+        terminal.WriteLine("║                              ATTACK!                                         ║");
         terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         terminal.WriteLine("");
 

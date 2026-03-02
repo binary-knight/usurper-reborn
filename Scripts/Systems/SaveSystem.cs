@@ -156,6 +156,13 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool DeleteSave(string playerName)
         {
+            // Clear in-memory god worship mapping so it doesn't persist to a new character with the same name
+            try
+            {
+                UsurperRemake.GodSystemSingleton.Instance?.SetPlayerGod(playerName, "");
+            }
+            catch { /* GodSystem not initialized */ }
+
             return backend.DeleteGameData(playerName);
         }
         
@@ -599,6 +606,7 @@ namespace UsurperRemake.Systems
                 CombatSpeed = player.CombatSpeed,
                 SkipIntimateScenes = player.SkipIntimateScenes,
                 ScreenReaderMode = player.ScreenReaderMode,
+                CompactMode = player.CompactMode,
                 ColorTheme = player.ColorTheme,
                 AutoLevelUp = player.AutoLevelUp,
                 TeamXPPercent = player.TeamXPPercent,
@@ -729,6 +737,13 @@ namespace UsurperRemake.Systems
                 HerbBuffCombats = player.HerbBuffCombats,
                 HerbBuffValue = player.HerbBuffValue,
                 HerbExtraAttacks = player.HerbExtraAttacks,
+
+                // Song buff properties (Music Shop performances)
+                SongBuffType = player.SongBuffType,
+                SongBuffCombats = player.SongBuffCombats,
+                SongBuffValue = player.SongBuffValue,
+                SongBuffValue2 = player.SongBuffValue2,
+                HeardLoreSongs = player.HeardLoreSongs?.ToList() ?? new List<int>(),
 
                 // Faction consumable properties (v0.40.2)
                 PoisonCoatingCombats = player.PoisonCoatingCombats,

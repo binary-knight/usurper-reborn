@@ -311,7 +311,7 @@ public class AnchorRoadLocation : BaseLocation
 
             default:
                 terminal.SetColor("red");
-                terminal.WriteLine("Invalid choice! Press ? for menu.");
+                terminal.WriteLine("Invalid choice! Type 'look' to redraw menu.");
                 await Task.Delay(1500);
                 return false;
         }

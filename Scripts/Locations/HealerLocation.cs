@@ -181,7 +181,7 @@ public class HealerLocation : BaseLocation
                 await terminal.PressAnyKey();
                 return false; // Stay in location
             default:
-                terminal.WriteLine("Invalid choice. Press ? for menu.", "red");
+                terminal.WriteLine("Invalid choice. Type 'look' to redraw menu.", "red");
                 await Task.Delay(1000);
                 return false; // Stay in location
         }
@@ -190,8 +190,8 @@ public class HealerLocation : BaseLocation
     protected override async Task<string> GetUserChoice()
     {
         var prompt = GetCurrentPlayer()?.Expert == true ?
-            "Healing Hut (H,F,B,M,P,C,D,A,S,R,?) :" :
-            "Healing Hut (? for menu) :";
+            "Healing Hut (H,F,B,M,P,C,D,A,S,R) :" :
+            "Your choice: ";
 
         terminal.SetColor("yellow");
         return await terminal.GetInput(prompt);
