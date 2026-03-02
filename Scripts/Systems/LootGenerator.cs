@@ -321,12 +321,6 @@ public static class LootGenerator
             ("Archmage's Staff", new[] { "Magician", "Sage" }, 60, 100, 75),
             ("Staff of the Cosmos", new[] { "Sage" }, 85, 100, 110),
 
-            // Unarmed / light weapons
-            ("Bo Staff", new[] { "Barbarian", "Ranger" }, 5, 45, 15),
-            ("Nunchaku", new[] { "Assassin", "Barbarian" }, 20, 65, 30),
-            ("Dragon Fist Wraps", new[] { "Assassin", "Barbarian" }, 45, 90, 55),
-            ("Celestial Hand Wraps", new[] { "Assassin", "Barbarian" }, 75, 100, 95),
-
             // Ranger weapons
             ("Hunting Bow", new[] { "Ranger" }, 5, 40, 16),
             ("Longbow", new[] { "Ranger" }, 25, 70, 38),

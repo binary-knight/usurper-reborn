@@ -66,7 +66,6 @@ public enum WeaponType
     Maul = 14,          // Armor crushing
 
     // Special
-    Fist = 16,          // Hand wraps, unarmed
     Instrument = 17,    // Musical instruments (Bard-only, one-handed)
 
     // Ranged

@@ -269,7 +269,7 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 
 **Weapon & Armor Shop Overhaul:** Procedural inventory from all loot templates — full level 1-100 coverage, economy-scaled pricing, 85% power of dungeon loot. Class restriction tags. Level-filtered display.
 
-**New Weapon Types:** Bows (10 templates, Rangers), Instruments (10 templates, Bards), Fist (unarmed). Weapon requirements for class abilities — Rangers need Bow, Assassins need Dagger, Warriors need Shield for Shield Wall, Magicians/Sages need Staff for spells.
+**New Weapon Types:** Bows (10 templates, Rangers), Instruments (10 templates, Bards). Weapon requirements for class abilities — Rangers need Bow, Assassins need Dagger, Warriors need Shield for Shield Wall, Magicians/Sages need Staff for spells.
 
 **5th Companion — Melodia:** Support/Hybrid companion with music-themed abilities. Personal quest "The Lost Opus" on dungeon floors 50-60. When recruited, apprentice Cadence takes over running the shop.
 

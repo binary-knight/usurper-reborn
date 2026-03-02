@@ -308,12 +308,6 @@ public static class ShopItemGenerator
                 if (level >= 25) equip.ArmorPiercing = 3 + (int)(s * 12); // 3-15%
                 break;
 
-            case WeaponType.Fist:
-                equip.DexterityBonus = 1 + (int)(s * 8);             // 1-9
-                equip.AgilityBonus = 1 + (int)(s * 6);               // 1-7
-                if (level >= 30) equip.CriticalChanceBonus = 3 + (int)(s * 15); // 3-18%
-                break;
-
             case WeaponType.Staff:
                 equip.IntelligenceBonus = 1 + (int)(s * 10);         // 1-11
                 equip.WisdomBonus = (int)(s * 6);                    // 0-6
@@ -657,11 +651,6 @@ public static class ShopItemGenerator
         if (name.Contains("Sword") || name.Contains("Blade") || name.Contains("Brand") ||
             name.Contains("Avenger") || name.Contains("Executioner"))
             return WeaponType.Sword;
-        // Fist weapons
-        if (name.Contains("Wraps") || name.Contains("Fist") || name.Contains("Nunchaku") ||
-            name.Contains("Bo Staff"))
-            return WeaponType.Fist;
-
         return WeaponType.Sword; // Default fallback
     }
 
