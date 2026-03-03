@@ -431,6 +431,7 @@ public class Character
     public bool HasVitalityFountain { get; set; } = false;
     public bool HasStudy { get; set; } = false;       // +5% XP bonus
     public bool HasServants { get; set; } = false;     // Daily gold income
+    public bool HasReinforcedDoor { get; set; } = false; // Safe sleep at home (online)
     public int PermanentDamageBonus { get; set; } = 0;
     public int PermanentDefenseBonus { get; set; } = 0;
     public long BonusMaxHP { get; set; } = 0;
@@ -514,6 +515,12 @@ public class Character
 
     public int TotalHerbCount => HerbHealing + HerbIronbark + HerbFirebloom + HerbSwiftthistle + HerbStarbloom;
     public bool HasActiveHerbBuff => HerbBuffType > 0 && HerbBuffCombats > 0;
+
+    // God Slayer buff (post-Old God victory, v0.49.3)
+    public int GodSlayerCombats { get; set; } = 0;       // Remaining combats with divine power buff
+    public float GodSlayerDamageBonus { get; set; } = 0f; // +damage% while buff active
+    public float GodSlayerDefenseBonus { get; set; } = 0f; // +defense% while buff active
+    public bool HasGodSlayerBuff => GodSlayerCombats > 0;
 
     // Song buff tracking (Music Shop performances)
     public int SongBuffType { get; set; }       // 0=none, 1=WarMarch, 2=IronLullaby, 3=Fortune, 4=BattleHymn

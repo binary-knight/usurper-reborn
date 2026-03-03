@@ -212,6 +212,17 @@ public static class MonsterGenerator
         // Apply difficulty-based HP multiplier
         hp = DifficultySystem.ApplyMonsterHPMultiplier(hp);
 
+        // Floor 1 reduction: make first dungeon floor easier for new players (v0.49.3)
+        if (level == 1)
+        {
+            float f1m = GameConfig.Floor1MonsterStatMultiplier;
+            hp = (long)(hp * f1m);
+            strength = (long)(strength * f1m);
+            defence = (long)(defence * f1m);
+            punch = (long)(punch * f1m);
+            weaponPower = (long)(weaponPower * f1m);
+        }
+
         return new MonsterStats
         {
             HP = Math.Max(15, hp),

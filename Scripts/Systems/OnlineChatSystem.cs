@@ -348,9 +348,10 @@ namespace UsurperRemake.Systems
                     var message = parts.Substring(spaceIdx + 1).Trim();
                     if (!string.IsNullOrEmpty(message))
                     {
-                        // Validate recipient exists
+                        // Validate and resolve recipient (handles username or display name)
                         var sqlBackend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                        if (sqlBackend != null && !sqlBackend.PlayerExists(targetPlayer))
+                        string? resolvedTarget = sqlBackend?.ResolvePlayerDisplayName(targetPlayer);
+                        if (sqlBackend != null && resolvedTarget == null)
                         {
                             terminal.SetColor("red");
                             terminal.WriteLine($"Player '{targetPlayer}' not found.");
@@ -358,6 +359,7 @@ namespace UsurperRemake.Systems
                         }
                         else
                         {
+                            if (resolvedTarget != null) targetPlayer = resolvedTarget;
                             await Tell(targetPlayer, message);
                             terminal.SetColor("magenta");
                             terminal.WriteLine($"[To {targetPlayer}] {message}");

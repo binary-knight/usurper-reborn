@@ -458,6 +458,7 @@ namespace UsurperRemake.Systems
         public bool HasVitalityFountain { get; set; } = false;
         public bool HasStudy { get; set; } = false;
         public bool HasServants { get; set; } = false;
+        public bool HasReinforcedDoor { get; set; } = false;
         public int PermanentDamageBonus { get; set; } = 0;
         public int PermanentDefenseBonus { get; set; } = 0;
         public long BonusMaxHP { get; set; } = 0;
@@ -483,6 +484,11 @@ namespace UsurperRemake.Systems
         public int HerbBuffCombats { get; set; }
         public float HerbBuffValue { get; set; }
         public int HerbExtraAttacks { get; set; }
+
+        // God Slayer buff (post-Old God victory, v0.49.3)
+        public int GodSlayerCombats { get; set; }
+        public float GodSlayerDamageBonus { get; set; }
+        public float GodSlayerDefenseBonus { get; set; }
 
         // Song buff properties (Music Shop performances)
         public int SongBuffType { get; set; }

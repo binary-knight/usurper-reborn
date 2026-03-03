@@ -1886,16 +1886,6 @@ public abstract class BaseLocation
         terminal.SetColor("white");
         terminal.Write("Bug");
 
-        if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write("  type ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("look");
-            terminal.SetColor("darkgray");
-            terminal.Write(" to redraw menu");
-        }
-
         terminal.WriteLine("");
         terminal.WriteLine("");
     }
@@ -2051,7 +2041,11 @@ public abstract class BaseLocation
                 terminal.Write("] ", "white");
             }
             var promptName = GetMudPromptName();
-            terminal.Write($"{promptName} > ", "bright_white");
+            terminal.Write($"{promptName}", "bright_white");
+            terminal.Write(" | ", "darkgray");
+            terminal.Write("look", "bright_yellow");
+            terminal.Write(" to redraw", "darkgray");
+            terminal.Write(" > ", "bright_white");
             return await terminal.GetInput("");
         }
         terminal.SetColor("bright_white");
@@ -2359,234 +2353,115 @@ public abstract class BaseLocation
     /// </summary>
     protected async Task ShowQuickCommandsHelp()
     {
+        // Helper: write colored content then pad to 78 visible chars + closing ║
+        void WriteBoxLine(Action writeContent, int contentChars)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.Write("║");
+            writeContent();
+            int pad = 78 - contentChars;
+            if (pad > 0) terminal.Write(new string(' ', pad));
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("║");
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        terminal.WriteLine("║                           QUICK COMMANDS                                     ║");
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write("                           QUICK COMMANDS"); }, 40);
+        terminal.SetColor("bright_cyan");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
-        terminal.SetColor("white");
-        terminal.WriteLine("║  These commands work from any location:                                      ║");
-        terminal.WriteLine("║                                                                              ║");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/stats    ");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/s  ");
-        terminal.SetColor("white");
-        terminal.WriteLine(" - View your character stats                              ║");
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write("  These commands work from any location:"); }, 39);
+        WriteBoxLine(() => { }, 0);
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/inventory");
-        terminal.SetColor("gray");
-        terminal.Write(" or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/i  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- View your inventory                                    ║");
+        // Slash commands with aliases
+        void WriteCmdAlias(string cmd, string alias, string desc)
+        {
+            WriteBoxLine(() => {
+                terminal.Write(" ");
+                terminal.SetColor("cyan");
+                terminal.Write(cmd.PadRight(10));
+                terminal.SetColor("gray");
+                terminal.Write(" or ");
+                terminal.SetColor("cyan");
+                terminal.Write(alias.PadRight(4));
+                terminal.SetColor("white");
+                terminal.Write($" {desc}");
+            }, 10 + 4 + 4 + 1 + desc.Length + 1);
+        }
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/quests   ");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/q  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- View active quests                                     ║");
+        // Slash commands without aliases
+        void WriteCmd(string cmd, string desc)
+        {
+            WriteBoxLine(() => {
+                terminal.Write(" ");
+                terminal.SetColor("cyan");
+                terminal.Write(cmd.PadRight(18));
+                terminal.SetColor("white");
+                terminal.Write($" {desc}");
+            }, 18 + 1 + desc.Length + 1);
+        }
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/gold     ");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/g  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Show gold and bank balance                             ║");
+        WriteCmdAlias("/stats", "/s", "- View your character stats");
+        WriteCmdAlias("/inventory", "/i", "- View your inventory");
+        WriteCmdAlias("/quests", "/q", "- View active quests");
+        WriteCmdAlias("/gold", "/g", "- Show gold and bank balance");
+        WriteCmdAlias("/health", "/hp", "- Show health and mana status");
+        WriteCmdAlias("/potion", "/pot", "- Use a healing potion");
+        WriteCmdAlias("/herb", "/j", "- Use an herb from your pouch");
+        WriteCmdAlias("/materials", "/mat", "- View crafting materials");
+        WriteCmdAlias("/time", "/t", "- Show current time of day");
+        WriteCmdAlias("/prefs", "/p", "- Open preferences menu");
+        WriteCmd("/mail", "- Open your mailbox (online)");
+        WriteCmd("/trade", "- View trade packages (online)");
+        WriteCmd("/auction", "- Buy and sell items (Auction House)");
+        WriteCmd("/boss", "- World Boss status and combat (online)");
+        WriteCmd("/compact", "- Toggle compact mode (mobile/small screens)");
+        WriteCmd("/bug", "- Report a bug (opens GitHub)");
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/health   ");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/hp ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Show health and mana status                            ║");
+        WriteBoxLine(() => { }, 0);
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write("  Quick keys (single character):"); }, 31);
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/potion   ");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/pot");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Use a healing potion                                   ║");
+        void WriteQuickKey(string key, string desc)
+        {
+            WriteBoxLine(() => {
+                terminal.Write(" ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(key.PadRight(2));
+                terminal.SetColor("white");
+                terminal.Write($" {desc}");
+            }, 2 + 1 + desc.Length + 1);
+        }
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/herb     ");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/j  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Use an herb from your pouch                            ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/materials");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/mat");
-        terminal.SetColor("white");
-        terminal.WriteLine("- View crafting materials                                 ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/time     ");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/t  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Show current time of day                               ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/prefs    ");
-        terminal.SetColor("gray");
-        terminal.Write("or ");
-        terminal.SetColor("cyan");
-        terminal.Write("/p  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Open preferences menu                                  ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/mail     ");
-        terminal.SetColor("white");
-        terminal.WriteLine("        - Open your mailbox (online)                          ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/trade    ");
-        terminal.SetColor("white");
-        terminal.WriteLine("        - View trade packages (online)                        ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/auction  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("        - Buy and sell items (Auction House)                   ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/boss     ");
-        terminal.SetColor("white");
-        terminal.WriteLine("        - World Boss status and combat (online)                  ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/compact  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("        - Toggle compact mode (mobile/small screens)          ║");
-
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("cyan");
-        terminal.Write("/bug      ");
-        terminal.SetColor("white");
-        terminal.WriteLine("        - Report a bug (opens GitHub)                        ║");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("║                                                                              ║");
-        terminal.WriteLine("║  Quick keys (single character):                                              ║");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("║  ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("*  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Inventory    ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("~  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Preferences    ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("S  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Status    ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("?  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- This help    ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("!  ");
-        terminal.SetColor("white");
-        terminal.WriteLine("- Report bug         ║");
+        WriteQuickKey("*", "- Inventory");
+        WriteQuickKey("~", "- Preferences");
+        WriteQuickKey("S", "- Status");
+        WriteQuickKey("?", "- This help");
+        WriteQuickKey("!", "- Report bug");
 
         // Online/MUD chat commands
         if (UsurperRemake.Server.SessionContext.IsActive || OnlineChatSystem.IsActive)
         {
-            terminal.SetColor("white");
-            terminal.WriteLine("║                                                                              ║");
-            terminal.WriteLine("║  Online commands:                                                            ║");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("║  ");
-            terminal.SetColor("bright_green");
-            terminal.Write("/say <msg>          ");
-            terminal.SetColor("white");
-            terminal.WriteLine("- Chat to players at your location                   ║");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("║  ");
-            terminal.SetColor("bright_green");
-            terminal.Write("/shout <msg>        ");
-            terminal.SetColor("white");
-            terminal.WriteLine("- Shout to all online players                        ║");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("║  ");
-            terminal.SetColor("bright_green");
-            terminal.Write("/tell <name> <msg>  ");
-            terminal.SetColor("white");
-            terminal.WriteLine("- Private message to a player                        ║");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("║  ");
-            terminal.SetColor("bright_green");
-            terminal.Write("/emote <action>     ");
-            terminal.SetColor("white");
-            terminal.WriteLine("- Emote (e.g. /emote waves hello)                    ║");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("║  ");
-            terminal.SetColor("bright_green");
-            terminal.Write("/who                ");
-            terminal.SetColor("white");
-            terminal.WriteLine("- See who's online                                   ║");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("║  ");
-            terminal.SetColor("bright_green");
-            terminal.Write("/gossip <msg>       ");
-            terminal.SetColor("white");
-            terminal.WriteLine("- Global out-of-character chat (/gos)                ║");
+            WriteBoxLine(() => { }, 0);
+            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write("  Online commands:"); }, 18);
+
+            void WriteOnlineCmd(string cmd, string desc)
+            {
+                WriteBoxLine(() => {
+                    terminal.Write(" ");
+                    terminal.SetColor("bright_green");
+                    terminal.Write(cmd.PadRight(20));
+                    terminal.SetColor("white");
+                    terminal.Write($" {desc}");
+                }, 20 + 1 + desc.Length + 1);
+            }
+
+            WriteOnlineCmd("/say <msg>", "- Chat to players at your location");
+            WriteOnlineCmd("/shout <msg>", "- Shout to all online players");
+            WriteOnlineCmd("/tell <name> <msg>", "- Private message to a player");
+            WriteOnlineCmd("/emote <action>", "- Emote (e.g. /emote waves hello)");
+            WriteOnlineCmd("/who", "- See who's online");
+            WriteOnlineCmd("/gossip <msg>", "- Global out-of-character chat (/gos)");
         }
 
         terminal.SetColor("bright_cyan");
@@ -4522,6 +4397,49 @@ public abstract class BaseLocation
             terminal.WriteLine("");
         }
 
+        // Show temporary combat buffs (well-rested, god slayer, song, herbs)
+        bool hasAnyBuff = currentPlayer.WellRestedCombats > 0 || currentPlayer.HasGodSlayerBuff
+            || currentPlayer.HasActiveSongBuff || currentPlayer.HasActiveHerbBuff
+            || currentPlayer.LoversBlissCombats > 0 || currentPlayer.DivineBlessingCombats > 0;
+        if (hasAnyBuff)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine("Active Buffs:");
+            if (currentPlayer.HasGodSlayerBuff)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  - God Slayer: +{(int)(currentPlayer.GodSlayerDamageBonus * 100)}% dmg, +{(int)(currentPlayer.GodSlayerDefenseBonus * 100)}% def ({currentPlayer.GodSlayerCombats} combats)");
+            }
+            if (currentPlayer.WellRestedCombats > 0)
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine($"  - Well-Rested: +{(int)(currentPlayer.WellRestedBonus * 100)}% dmg/def ({currentPlayer.WellRestedCombats} combats)");
+            }
+            if (currentPlayer.HasActiveSongBuff)
+            {
+                string songName = currentPlayer.SongBuffType switch { 1 => "War March", 2 => "Lullaby of Iron", 3 => "Fortune's Tune", 4 => "Battle Hymn", _ => "Song" };
+                terminal.SetColor("magenta");
+                terminal.WriteLine($"  - {songName} ({currentPlayer.SongBuffCombats} combats)");
+            }
+            if (currentPlayer.HasActiveHerbBuff)
+            {
+                string herbName = ((HerbType)currentPlayer.HerbBuffType).ToString();
+                terminal.SetColor("green");
+                terminal.WriteLine($"  - {herbName} ({currentPlayer.HerbBuffCombats} combats)");
+            }
+            if (currentPlayer.LoversBlissCombats > 0)
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"  - Lover's Bliss ({currentPlayer.LoversBlissCombats} combats)");
+            }
+            if (currentPlayer.DivineBlessingCombats > 0)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  - Divine Blessing ({currentPlayer.DivineBlessingCombats} combats)");
+            }
+            terminal.WriteLine("");
+        }
+
         // Wealth
         terminal.SetColor("yellow");
         terminal.WriteLine("═══ WEALTH ═══");
@@ -5714,17 +5632,19 @@ public abstract class BaseLocation
 
         if (string.IsNullOrWhiteSpace(recipient)) return;
 
-        // Validate recipient exists
-        if (!backend.PlayerExists(recipient))
+        // Resolve recipient (handles username or display name input)
+        string? resolvedMailName = backend.ResolvePlayerDisplayName(recipient);
+        if (resolvedMailName == null)
         {
             terminal.SetColor("red");
             terminal.WriteLine($"Player '{recipient}' not found.");
             await Task.Delay(2000);
             return;
         }
+        recipient = resolvedMailName;
 
         terminal.SetColor("cyan");
-        terminal.Write("Message (max 200 chars): ");
+        terminal.Write("Message (max 200 chars):");
         terminal.SetColor("white");
         string message = await terminal.ReadLineAsync();
 
@@ -6027,21 +5947,23 @@ public abstract class BaseLocation
 
         if (string.IsNullOrWhiteSpace(recipient)) return;
 
+        // Resolve recipient display name (handles username or display name input)
+        string? resolvedName = backend.ResolvePlayerDisplayName(recipient);
+        if (resolvedName == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"Player '{recipient}' not found.");
+            await Task.Delay(2000);
+            return;
+        }
+        recipient = resolvedName;
+
         // Block self-trading
         if (recipient.Equals(currentPlayer.DisplayName, StringComparison.OrdinalIgnoreCase))
         {
             terminal.SetColor("red");
             terminal.WriteLine("You can't send packages to yourself!");
             await Task.Delay(1500);
-            return;
-        }
-
-        // Validate recipient
-        if (!backend.PlayerExists(recipient))
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine($"Player '{recipient}' not found.");
-            await Task.Delay(2000);
             return;
         }
 

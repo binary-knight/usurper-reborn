@@ -29,6 +29,7 @@ namespace UsurperRemake.Systems
         public const string HINT_MANA_SPELLS = "mana_spells";
         public const string HINT_QUEST_SYSTEM = "quest_system";
         public const string HINT_GETTING_STARTED = "getting_started";
+        public const string HINT_FIRST_COMBAT_CLASS = "first_combat_class";
 
         // Hint definitions
         private readonly Dictionary<string, HintDefinition> hints = new()
@@ -45,7 +46,7 @@ namespace UsurperRemake.Systems
             ),
             [HINT_FIRST_COMBAT] = new HintDefinition(
                 "Combat Tip",
-                "Press 'A' to Attack, 'F' to Flee, 'I' to use Items/potions, or 'S' to check your Status.",
+                "Press [A] to Attack, [R] to Retreat, [H] to use a Healing Potion, or [S] to check your Status.",
                 "bright_cyan"
             ),
             [HINT_LOW_HP] = new HintDefinition(
@@ -107,7 +108,31 @@ namespace UsurperRemake.Systems
                 "Getting Started",
                 "Visit Shops [W/A] to gear up, enter the Dungeons [D] to fight monsters, complete Quests [2] for rewards, and spend training points at the Master [V] when you level up.",
                 "bright_cyan"
+            ),
+            [HINT_FIRST_COMBAT_CLASS] = new HintDefinition(
+                "Class Tip",
+                "", // Placeholder — actual message set dynamically per class
+                "bright_green"
             )
+        };
+
+        /// <summary>
+        /// Get a class-specific first combat tip for the player.
+        /// </summary>
+        public static string GetClassCombatTip(CharacterClass playerClass) => playerClass switch
+        {
+            CharacterClass.Magician => "Your power is in your spells! Press [1] to cast Magic Missile for heavy damage.",
+            CharacterClass.Cleric => "You can heal yourself in combat! Press [1] to cast Cure Light, or [A] to Attack.",
+            CharacterClass.Sage => "Press [1] to cast Fog of War for protection, then [A] to Attack!",
+            CharacterClass.Warrior => "Use [1] Power Strike for 1.75x damage, or [A] for a regular Attack.",
+            CharacterClass.Barbarian => "Use [1] Power Strike for 1.75x damage! Your raw strength makes every hit count.",
+            CharacterClass.Paladin => "Use [1] Lay on Hands to heal yourself, or [2] Power Strike for damage.",
+            CharacterClass.Assassin => "Use [1] Backstab for critical damage! Make sure you have a dagger equipped.",
+            CharacterClass.Ranger => "Use [1] Precise Shot — it never misses! Make sure you have a bow equipped.",
+            CharacterClass.Jester => "Use [1] Vicious Mockery for quick damage — low cost, low cooldown!",
+            CharacterClass.Bard => "Use [1] Vicious Mockery for quick damage, or [A] to Attack. Charm is your weapon!",
+            CharacterClass.Alchemist => "Use [1] Throw Bomb for elemental damage! Alchemy is your edge.",
+            _ => "Press [A] to Attack, or use [1]-[9] for your abilities and spells."
         };
 
         /// <summary>

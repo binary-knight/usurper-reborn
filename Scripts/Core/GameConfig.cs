@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.49.2";
+    public const string Version = "0.49.3";
     public const string VersionName = "Swords and Lutes";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -508,6 +508,20 @@ public static partial class GameConfig
     public const float DeathXPLossTier2 = 0.10f;               // 10% XP loss at levels 4-5
     public const float DeathGoldLossTier2 = 0.30f;             // 30% gold loss at levels 4-5
 
+    // God Slayer Buff (v0.49.3) — temporary power boost after Old God encounter
+    public const int GodSlayerBuffDuration = 20;         // Number of combats the buff lasts
+    public const float GodSlayerDamageBonus = 0.20f;     // +20% damage while active
+    public const float GodSlayerDefenseBonus = 0.10f;    // +10% defense while active
+
+    // Floor 1 Difficulty (v0.49.3) — make first dungeon floor easier for new players
+    public const float Floor1MonsterStatMultiplier = 0.5f; // 50% stats on floor 1
+
+    // Straggler Encounters (v0.49.3) — occasional easy fights for power fantasy
+    public const float StragglerEncounterChance = 0.15f; // 15% chance of weaker monster
+    public const int StragglerMinFloor = 6;              // Only on floor 6+
+    public const int StragglerLevelReductionMin = 5;     // Min levels below current floor
+    public const int StragglerLevelReductionMax = 9;     // Max levels below (exclusive upper bound for Random.Next)
+
     // Blood Price / Murder Weight System (v0.42.0)
     public const float MurderWeightPerDeliberateMurder = 3.0f;  // Weight from deliberate murder
     public const float MurderWeightPerDarkMagicKill = 2.5f;     // Weight from dark magic assassination
@@ -725,6 +739,9 @@ public static partial class GameConfig
     // Servants' Quarters
     public const int ServantsDailyGoldBase = 100;              // Base daily gold income
     public const int ServantsDailyGoldPerLevel = 10;           // Additional gold per player level
+
+    // Reinforced Door (safe home sleep in online mode)
+    public const long ReinforcedDoorCost = 250_000;
 
     // Armor Weight Class System (v0.49.1)
     public const int LightArmorStaminaBonus = 20;           // +20 max combat stamina

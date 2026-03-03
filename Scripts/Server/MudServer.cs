@@ -32,6 +32,9 @@ public class MudServer
     /// <summary>Idle timeout: disconnect players with no input for this long.</summary>
     public static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(15);
 
+    /// <summary>How long before idle timeout to show a warning.</summary>
+    public static readonly TimeSpan IdleWarningBefore = TimeSpan.FromMinutes(2);
+
     /// <summary>Persistent broadcast banner shown to all players on every screen refresh.
     /// Set by /broadcast wizard command or sysop console. Null = no active broadcast.</summary>
     public static volatile string? ActiveBroadcast;
@@ -757,7 +760,7 @@ public class MudServer
         {
             while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(60), ct);
+                await Task.Delay(TimeSpan.FromSeconds(30), ct);
 
                 var now = DateTime.UtcNow;
                 foreach (var kvp in ActiveSessions)
@@ -769,10 +772,35 @@ public class MudServer
                         continue;
 
                     var idleTime = now - session.LastActivityTime;
+
+                    // Reset warning flag when player becomes active again
+                    if (idleTime < IdleTimeout - IdleWarningBefore)
+                    {
+                        session.IdleWarningShown = false;
+                        continue;
+                    }
+
+                    // Show warning before disconnect
+                    if (idleTime >= IdleTimeout - IdleWarningBefore && !session.IdleWarningShown)
+                    {
+                        session.IdleWarningShown = true;
+                        var minutesLeft = (int)Math.Ceiling((IdleTimeout - idleTime).TotalMinutes);
+                        try
+                        {
+                            session.Context?.Terminal?.WriteLine("");
+                            session.Context?.Terminal?.SetColor("bright_yellow");
+                            session.Context?.Terminal?.WriteLine($"  *** WARNING: You will be disconnected in ~{minutesLeft} minute{(minutesLeft != 1 ? "s" : "")} due to inactivity! Press any key. ***");
+                            session.Context?.Terminal?.SetColor("white");
+                        }
+                        catch { }
+                        Console.Error.WriteLine($"[MUD] [{session.Username}] Idle warning sent ({idleTime.TotalMinutes:F0} min idle)");
+                    }
+
+                    // Disconnect after full timeout
                     if (idleTime >= IdleTimeout)
                     {
                         Console.Error.WriteLine($"[MUD] [{session.Username}] Idle timeout ({idleTime.TotalMinutes:F0} min) — disconnecting");
-                        _ = session.DisconnectAsync($"Disconnected: idle for {(int)idleTime.TotalMinutes} minutes.");
+                        await session.DisconnectAsync($"Disconnected: idle for {(int)idleTime.TotalMinutes} minutes.");
                     }
                 }
             }

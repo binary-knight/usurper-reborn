@@ -40,7 +40,19 @@ public static class PlayerCharacterLoader
             Gold = playerData.Gold,
             Poison = playerData.Poison,
             AI = CharacterAI.Computer,
-            IsEcho = isEcho
+            IsEcho = isEcho,
+            // Restore base stats for RecalculateStats
+            BaseStrength = playerData.BaseStrength > 0 ? playerData.BaseStrength : playerData.Strength,
+            BaseDexterity = playerData.BaseDexterity > 0 ? playerData.BaseDexterity : playerData.Dexterity,
+            BaseConstitution = playerData.BaseConstitution > 0 ? playerData.BaseConstitution : playerData.Constitution,
+            BaseIntelligence = playerData.BaseIntelligence > 0 ? playerData.BaseIntelligence : playerData.Intelligence,
+            BaseWisdom = playerData.BaseWisdom > 0 ? playerData.BaseWisdom : playerData.Wisdom,
+            BaseCharisma = playerData.BaseCharisma > 0 ? playerData.BaseCharisma : playerData.Charisma,
+            BaseMaxHP = playerData.BaseMaxHP > 0 ? playerData.BaseMaxHP : playerData.MaxHP,
+            BaseMaxMana = playerData.BaseMaxMana > 0 ? playerData.BaseMaxMana : playerData.MaxMana,
+            BaseDefence = playerData.BaseDefence > 0 ? playerData.BaseDefence : playerData.Defence,
+            BaseStamina = playerData.BaseStamina > 0 ? playerData.BaseStamina : playerData.Stamina,
+            BaseAgility = playerData.BaseAgility > 0 ? playerData.BaseAgility : playerData.Agility
         };
 
         // Restore spells so AI can cast them
@@ -55,6 +67,103 @@ public static class PlayerCharacterLoader
             character.LearnedAbilities = new HashSet<string>(playerData.LearnedAbilities);
         }
 
+        // Restore equipment so weapon requirements work (Magician needs Staff for spells, etc.)
+        RestoreEquipment(character, playerData);
+
         return character;
+    }
+
+    /// <summary>
+    /// Restore dynamic equipment and equipped items from save data.
+    /// Always uses fresh IDs (RegisterDynamic) since loaded characters are temporary.
+    /// </summary>
+    private static void RestoreEquipment(Character character, PlayerData playerData)
+    {
+        var equipIdRemap = new Dictionary<int, int>();
+
+        // Register dynamic equipment into the database with fresh IDs
+        if (playerData.DynamicEquipment != null && playerData.DynamicEquipment.Count > 0)
+        {
+            foreach (var equipData in playerData.DynamicEquipment)
+            {
+                var equipment = new Equipment
+                {
+                    Name = equipData.Name,
+                    Description = equipData.Description ?? "",
+                    Slot = (EquipmentSlot)equipData.Slot,
+                    WeaponPower = equipData.WeaponPower,
+                    ArmorClass = equipData.ArmorClass,
+                    ShieldBonus = equipData.ShieldBonus,
+                    BlockChance = equipData.BlockChance,
+                    StrengthBonus = equipData.StrengthBonus,
+                    DexterityBonus = equipData.DexterityBonus,
+                    ConstitutionBonus = equipData.ConstitutionBonus,
+                    IntelligenceBonus = equipData.IntelligenceBonus,
+                    WisdomBonus = equipData.WisdomBonus,
+                    CharismaBonus = equipData.CharismaBonus,
+                    MaxHPBonus = equipData.MaxHPBonus,
+                    MaxManaBonus = equipData.MaxManaBonus,
+                    DefenceBonus = equipData.DefenceBonus,
+                    MinLevel = equipData.MinLevel,
+                    Value = equipData.Value,
+                    IsCursed = equipData.IsCursed,
+                    Rarity = (EquipmentRarity)equipData.Rarity,
+                    WeaponType = (WeaponType)equipData.WeaponType,
+                    Handedness = (WeaponHandedness)equipData.Handedness,
+                    ArmorType = (ArmorType)equipData.ArmorType,
+                    StaminaBonus = equipData.StaminaBonus,
+                    AgilityBonus = equipData.AgilityBonus,
+                    CriticalChanceBonus = equipData.CriticalChanceBonus,
+                    CriticalDamageBonus = equipData.CriticalDamageBonus,
+                    MagicResistance = equipData.MagicResistance,
+                    PoisonDamage = equipData.PoisonDamage,
+                    LifeSteal = equipData.LifeSteal,
+                    HasFireEnchant = equipData.HasFireEnchant,
+                    HasFrostEnchant = equipData.HasFrostEnchant,
+                    HasLightningEnchant = equipData.HasLightningEnchant,
+                    HasPoisonEnchant = equipData.HasPoisonEnchant,
+                    HasHolyEnchant = equipData.HasHolyEnchant,
+                    HasShadowEnchant = equipData.HasShadowEnchant,
+                    ManaSteal = equipData.ManaSteal,
+                    ArmorPiercing = equipData.ArmorPiercing,
+                    Thorns = equipData.Thorns,
+                    HPRegen = equipData.HPRegen,
+                    ManaRegen = equipData.ManaRegen
+                };
+
+                // Always use fresh IDs — loaded characters are temporary combat entities
+                int newId = EquipmentDatabase.RegisterDynamic(equipment);
+                if (newId != equipData.Id)
+                {
+                    equipIdRemap[equipData.Id] = newId;
+                }
+            }
+        }
+
+        // Restore equipped items dictionary with remapped IDs
+        if (playerData.EquippedItems != null && playerData.EquippedItems.Count > 0)
+        {
+            character.EquippedItems = playerData.EquippedItems.ToDictionary(
+                kvp => (EquipmentSlot)kvp.Key,
+                kvp => equipIdRemap.TryGetValue(kvp.Value, out int newId) ? newId : kvp.Value
+            );
+
+            // Remove any orphaned references (equipment not found in database)
+            var slotsToRemove = new List<EquipmentSlot>();
+            foreach (var kvp in character.EquippedItems)
+            {
+                if (EquipmentDatabase.GetById(kvp.Value) == null)
+                    slotsToRemove.Add(kvp.Key);
+            }
+            foreach (var slot in slotsToRemove)
+                character.EquippedItems.Remove(slot);
+        }
+
+        // RecalculateStats applies equipment bonuses (weapon power, armor, stat bonuses)
+        var savedHP = character.HP;
+        var savedMana = character.Mana;
+        character.RecalculateStats();
+        character.HP = Math.Min(savedHP, character.MaxHP);
+        character.Mana = Math.Min(savedMana, character.MaxMana);
     }
 }

@@ -1105,10 +1105,11 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Prune all news categories by age, then enforce a global row cap.
-        /// Keeps the most recent maxTotal entries regardless of category.
+        /// Prune all news categories by age, then enforce per-category row caps.
+        /// NPC news is capped separately from player news so high-volume NPC events
+        /// don't push out player events.
         /// </summary>
-        public async Task PruneAllNews(int hoursToKeep = 48, int maxTotal = 500)
+        public async Task PruneAllNews(int hoursToKeep = 48, int maxNpcNews = 500, int maxPlayerNews = 200)
         {
             try
             {
@@ -1124,15 +1125,28 @@ namespace UsurperRemake.Systems
                     await cmd.ExecuteNonQueryAsync();
                 }
 
-                // 2. Enforce global row cap — keep only the newest maxTotal entries
+                // 2. Enforce per-category caps so NPC spam doesn't evict player news
+                // Cap NPC news
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = @"
-                        DELETE FROM news WHERE id NOT IN (
-                            SELECT id FROM news ORDER BY created_at DESC LIMIT @maxTotal
+                        DELETE FROM news WHERE category = 'npc' AND id NOT IN (
+                            SELECT id FROM news WHERE category = 'npc' ORDER BY created_at DESC LIMIT @maxNpc
                         );
                     ";
-                    cmd.Parameters.AddWithValue("@maxTotal", maxTotal);
+                    cmd.Parameters.AddWithValue("@maxNpc", maxNpcNews);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                // Cap player news (quest, combat, etc.)
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        DELETE FROM news WHERE category != 'npc' AND id NOT IN (
+                            SELECT id FROM news WHERE category != 'npc' ORDER BY created_at DESC LIMIT @maxPlayer
+                        );
+                    ";
+                    cmd.Parameters.AddWithValue("@maxPlayer", maxPlayerNews);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -2992,17 +3006,35 @@ namespace UsurperRemake.Systems
 
     // ========== Offline Mail ==========
 
-    public bool PlayerExists(string username)
+    public bool PlayerExists(string nameOrDisplay)
     {
         try
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT COUNT(*) FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0;";
-            cmd.Parameters.AddWithValue("@username", username);
+            cmd.CommandText = "SELECT COUNT(*) FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name)) AND is_banned = 0;";
+            cmd.Parameters.AddWithValue("@name", nameOrDisplay);
             return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
         }
         catch { return false; }
+    }
+
+    /// <summary>
+    /// Resolves a player name (username or display name) to their lowercase display name.
+    /// Returns null if the player doesn't exist.
+    /// </summary>
+    public string? ResolvePlayerDisplayName(string nameOrDisplay)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT display_name FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name)) AND is_banned = 0 AND username NOT LIKE 'emergency_%' LIMIT 1;";
+            cmd.Parameters.AddWithValue("@name", nameOrDisplay);
+            var result = cmd.ExecuteScalar();
+            return result?.ToString();
+        }
+        catch { return null; }
     }
 
     public async Task<List<PlayerMessage>> GetMailInbox(string username, int limit = 20, int offset = 0)

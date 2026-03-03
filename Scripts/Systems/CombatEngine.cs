@@ -398,6 +398,15 @@ public partial class CombatEngine
                 player.HerbExtraAttacks = 0;
             }
         }
+        if (player.GodSlayerCombats > 0)
+        {
+            player.GodSlayerCombats--;
+            if (player.GodSlayerCombats <= 0)
+            {
+                player.GodSlayerDamageBonus = 0f;
+                player.GodSlayerDefenseBonus = 0f;
+            }
+        }
         if (player.SongBuffCombats > 0)
         {
             player.SongBuffCombats--;
@@ -2537,6 +2546,12 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * attacker.WellRestedBonus);
         }
 
+        // God Slayer bonus damage (post-Old God victory buff)
+        if (attacker.HasGodSlayerBuff)
+        {
+            attackPower += (long)(attackPower * attacker.GodSlayerDamageBonus);
+        }
+
         // Fatigue damage penalty (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && attacker.Fatigue >= GameConfig.FatigueTiredThreshold)
         {
@@ -3543,6 +3558,12 @@ public partial class CombatEngine
         if (player.WellRestedCombats > 0 && player.WellRestedBonus > 0f)
         {
             playerDefense += (long)(playerDefense * player.WellRestedBonus);
+        }
+
+        // God Slayer defense bonus (post-Old God victory buff)
+        if (player.HasGodSlayerBuff)
+        {
+            playerDefense += (long)(playerDefense * player.GodSlayerDefenseBonus);
         }
 
         // Fatigue defense penalty (single-player only)
@@ -7971,9 +7992,9 @@ public partial class CombatEngine
             // Companion/ally attack
             attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP);
         }
-        else if (attacker != null && attacker != currentPlayer && attacker is NPC)
+        else if (attacker != null && attacker != currentPlayer)
         {
-            // NPC teammate attack
+            // Teammate attack (NPC, echo, or other non-player ally)
             attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP);
         }
         else
@@ -8109,6 +8130,23 @@ public partial class CombatEngine
                 terminal.WriteLine($"You are {preventingStatus.ToString().ToLower()} and cannot act!");
                 await Task.Delay(GetCombatDelay(1500));
                 return (new CombatAction { Type = CombatActionType.None }, false);
+            }
+
+            // First combat: show class-specific tip before menu (shown once per character)
+            if (player.MKills == 0 && player.HintsShown != null && !player.HintsShown.Contains(HintSystem.HINT_FIRST_COMBAT_CLASS))
+            {
+                player.HintsShown.Add(HintSystem.HINT_FIRST_COMBAT_CLASS);
+                var classTip = HintSystem.GetClassCombatTip(player.Class);
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("┌─── TIP ────────────────────────────────────────────────────────────────────┐");
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"│ Your First Battle!");
+                terminal.SetColor("white");
+                terminal.WriteLine($"│ {classTip}");
+                terminal.SetColor("gray");
+                terminal.WriteLine("└────────────────────────────────────────────────────────────────────────────┘");
+                terminal.WriteLine("");
             }
 
             // Show action menu (screen reader compatible or standard)
@@ -8430,9 +8468,11 @@ public partial class CombatEngine
                         if (player is Player attackingKing && attackingKing.King)
                             attackPower = (long)(attackPower * GameConfig.KingCombatStrengthBonus);
 
-                        // Buff bonuses (well-rested, lover's bliss, divine blessing, poison coating, herbs)
+                        // Buff bonuses (well-rested, god slayer, lover's bliss, divine blessing, poison coating, herbs)
                         if (player.WellRestedCombats > 0 && player.WellRestedBonus > 0f)
                             attackPower += (long)(attackPower * player.WellRestedBonus);
+                        if (player.HasGodSlayerBuff)
+                            attackPower += (long)(attackPower * player.GodSlayerDamageBonus);
                         // Fatigue damage penalty (single-player only, multi-monster path)
                         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Fatigue >= GameConfig.FatigueTiredThreshold)
                         {

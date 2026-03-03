@@ -533,6 +533,55 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Get a notification about an NPC with available story content (v0.49.3).
+        /// Returns a one-line message hinting the player should visit this NPC, or null.
+        /// Cycles through available NPCs, max 1 per call.
+        /// </summary>
+        private int _lastNotificationIndex = 0;
+        private readonly HashSet<string> _notifiedNPCs = new();
+
+        public string? GetNextNotification(Character player)
+        {
+            var available = new List<(string key, MemorableNPCData npc)>();
+            foreach (var kvp in MemorableNPCs)
+            {
+                var state = NPCStates[kvp.Key];
+                if (state.IsCompleted) continue;
+
+                // Only notify for NPCs that have completed at least one stage
+                // (don't spoil first encounters — player should discover those naturally)
+                if (state.CompletedStages.Count == 0) continue;
+
+                var nextStage = GetNextStage(kvp.Key, player);
+                if (nextStage != null && !_notifiedNPCs.Contains(kvp.Key))
+                    available.Add((kvp.Key, kvp.Value));
+            }
+
+            if (available.Count == 0)
+            {
+                _notifiedNPCs.Clear(); // Reset so notifications can cycle again
+                return null;
+            }
+
+            // Cycle through available NPCs
+            int idx = _lastNotificationIndex % available.Count;
+            _lastNotificationIndex++;
+            var (npcKey, npcData) = available[idx];
+            _notifiedNPCs.Add(npcKey);
+
+            return npcData.Name switch
+            {
+                "Marcus" => $"Word around town: Marcus at the Healer has been asking about you.",
+                "Elena" => $"The innkeeper mentions that Elena at the Temple seems troubled lately.",
+                "Bartholomew" => $"Old Bartholomew at the Inn has a tale he's been dying to tell.",
+                "Greta" => $"Greta the adventurer has been spotted pacing near the Healer's.",
+                "Pip" => $"That scruffy kid Pip was seen lurking around the Auction House.",
+                "Ezra" => $"The dying prophet Ezra whispers your name to anyone who'll listen.",
+                _ => $"{npcData.Name} at the {npcData.Location} has something to tell you."
+            };
+        }
+
+        /// <summary>
         /// Check if an NPC has an available encounter at this location
         /// </summary>
         public MemorableNPCData? GetAvailableNPCEncounter(string location, Character player)

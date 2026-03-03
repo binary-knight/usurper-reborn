@@ -286,7 +286,7 @@ public class HomeLocation : BaseLocation
 
         terminal.WriteLine("");
 
-        // Single-player: Sleep or Wait
+        // Sleep or Wait
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
         {
             terminal.SetColor("darkgray");
@@ -305,6 +305,17 @@ public class HomeLocation : BaseLocation
                 terminal.SetColor("dark_cyan");
                 terminal.WriteLine("Wait until nightfall");
             }
+        }
+        else if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null && currentPlayer.HasReinforcedDoor)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("Z");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("Sleep (safe — logout)");
         }
 
         // Navigation row
@@ -427,6 +438,10 @@ public class HomeLocation : BaseLocation
             string zLabel = DailySystemManager.CanRestForNight(currentPlayer) ? "Sleep" : "Wait";
             ShowBBSMenuRow(("Z", "bright_yellow", zLabel), ("R", "bright_yellow", "Return"));
         }
+        else if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null && currentPlayer.HasReinforcedDoor)
+        {
+            ShowBBSMenuRow(("Z", "bright_yellow", "Sleep(Safe)"), ("R", "bright_yellow", "Return"));
+        }
         else
         {
             ShowBBSMenuRow(("R", "bright_yellow", "Return"));
@@ -534,7 +549,12 @@ public class HomeLocation : BaseLocation
                 await ShowHomeUpgrades();
                 return false;
             case "Z":
-                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null && currentPlayer.HasReinforcedDoor)
+                {
+                    await SleepAtHomeOnline();
+                    return true;
+                }
+                else if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
                 {
                     if (DailySystemManager.CanRestForNight(currentPlayer))
                         await SleepAtHome();
@@ -677,6 +697,30 @@ public class HomeLocation : BaseLocation
         }
 
         await terminal.WaitForKey();
+    }
+
+    /// <summary>
+    /// Online mode: sleep at home behind the reinforced door.
+    /// Requires HasReinforcedDoor upgrade.
+    /// </summary>
+    private async Task SleepAtHomeOnline()
+    {
+        if (currentPlayer == null) return;
+
+        currentPlayer.HP = currentPlayer.MaxHP;
+        currentPlayer.Mana = currentPlayer.MaxMana;
+        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
+
+        var backend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
+        if (backend != null)
+        {
+            var username = UsurperRemake.BBS.DoorMode.OnlineUsername ?? currentPlayer.Name2;
+            await backend.RegisterSleepingPlayer(username, "home", "[]", 1);
+        }
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("\n  You bar the reinforced door and drift into a safe sleep...");
+        throw new LocationExitException(GameLocation.NoWhere);
     }
 
     private async Task SleepAtHome()
@@ -3570,6 +3614,9 @@ public class HomeLocation : BaseLocation
         // Servants' Quarters
         long servantsCost = 500_000;
         ShowOneTimePurchase(opt++, "Servants' Quarters", currentPlayer.HasServants, servantsCost, $"Daily gold income ({GameConfig.ServantsDailyGoldBase}+lvl*{GameConfig.ServantsDailyGoldPerLevel})");
+        // Reinforced Door
+        long reinforcedDoorCost = GameConfig.ReinforcedDoorCost;
+        ShowOneTimePurchase(opt++, "Reinforced Door", currentPlayer.HasReinforcedDoor, reinforcedDoorCost, "Sleep safely at home in online mode");
         // Legendary Armory
         long armoryCost = 2_500_000;
         ShowOneTimePurchase(opt++, "Legendary Armory", currentPlayer.HasLegendaryArmory, armoryCost, "+5% damage & defense permanently");
@@ -3674,10 +3721,19 @@ public class HomeLocation : BaseLocation
                     });
                 break;
             case 10:
+                await PurchaseUpgrade("Reinforced Door", reinforcedDoorCost,
+                    !currentPlayer.HasReinforcedDoor, () => {
+                        currentPlayer.HasReinforcedDoor = true;
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine("A heavy iron-banded door is installed!");
+                        terminal.WriteLine("You can now sleep safely at home in online mode.");
+                    });
+                break;
+            case 11:
                 await PurchaseUpgrade("Legendary Armory", armoryCost,
                     !currentPlayer.HasLegendaryArmory, () => { currentPlayer.HasLegendaryArmory = true; ApplyArmoryBonus(); });
                 break;
-            case 11:
+            case 12:
                 await PurchaseUpgrade("Fountain of Vitality", fountainCost,
                     !currentPlayer.HasVitalityFountain, () => { currentPlayer.HasVitalityFountain = true; ApplyFountainBonus(); });
                 break;

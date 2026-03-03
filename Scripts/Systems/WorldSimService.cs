@@ -371,8 +371,8 @@ namespace UsurperRemake.Systems
                 // Save world events (plagues, festivals, wars, etc.)
                 await SaveWorldEventsState();
 
-                // Prune old news across ALL categories (48-hour window, 500 entry global cap)
-                await sqlBackend.PruneAllNews(hoursToKeep: 48, maxTotal: 500);
+                // Prune old news with per-category caps (NPC news doesn't evict player news)
+                await sqlBackend.PruneAllNews(hoursToKeep: 48, maxNpcNews: 500, maxPlayerNews: 200);
             }
             catch (Exception ex)
             {

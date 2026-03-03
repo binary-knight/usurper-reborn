@@ -37,6 +37,7 @@ namespace UsurperRemake.Systems
         private CancellationTokenSource? cancellationSource;
         private bool vtProcessingEnabled = false;
         private bool useTcpMode = false;
+        private string? _authLeftover; // Game data that arrived in the same chunk as the auth OK response
 
         public OnlinePlaySystem(TerminalEmulator terminal)
         {
@@ -667,7 +668,18 @@ namespace UsurperRemake.Systems
                             {
                                 var trimmed = line.Trim();
                                 if (trimmed == "OK" || trimmed.StartsWith("ERR:"))
+                                {
+                                    // Save any game data that arrived after the OK/ERR line
+                                    // (e.g. splash screen sent before PipeIO starts reading)
+                                    int okIdx = text.IndexOf(trimmed, StringComparison.Ordinal);
+                                    int afterOk = okIdx + trimmed.Length;
+                                    // Skip past trailing \r\n after the OK line
+                                    while (afterOk < text.Length && (text[afterOk] == '\r' || text[afterOk] == '\n'))
+                                        afterOk++;
+                                    if (afterOk < text.Length)
+                                        _authLeftover = text.Substring(afterOk);
                                     return text;
+                                }
                             }
                         }
                     }
@@ -719,6 +731,26 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("gray");
                 terminal.WriteLine("  Press Ctrl+] to disconnect.");
                 terminal.WriteLine("");
+            }
+
+            // Flush any game data that arrived in the same chunk as the auth OK response
+            if (_authLeftover != null)
+            {
+                if (bbsRawStream != null)
+                {
+                    var leftoverBytes = Encoding.UTF8.GetBytes(_authLeftover);
+                    bbsRawStream.Write(leftoverBytes, 0, leftoverBytes.Length);
+                    bbsRawStream.Flush();
+                }
+                else if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
+                {
+                    terminal.WriteRawAnsi(_authLeftover);
+                }
+                else
+                {
+                    WriteAnsiToConsole(_authLeftover);
+                }
+                _authLeftover = null;
             }
 
             // Flag set when server disconnect is detected by any path.

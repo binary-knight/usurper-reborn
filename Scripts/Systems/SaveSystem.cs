@@ -715,6 +715,7 @@ namespace UsurperRemake.Systems
                 HasVitalityFountain = player.HasVitalityFountain,
                 HasStudy = player.HasStudy,
                 HasServants = player.HasServants,
+                HasReinforcedDoor = player.HasReinforcedDoor,
                 PermanentDamageBonus = player.PermanentDamageBonus,
                 PermanentDefenseBonus = player.PermanentDefenseBonus,
                 BonusMaxHP = player.BonusMaxHP,
@@ -740,6 +741,11 @@ namespace UsurperRemake.Systems
                 HerbBuffCombats = player.HerbBuffCombats,
                 HerbBuffValue = player.HerbBuffValue,
                 HerbExtraAttacks = player.HerbExtraAttacks,
+
+                // God Slayer buff (v0.49.3)
+                GodSlayerCombats = player.GodSlayerCombats,
+                GodSlayerDamageBonus = player.GodSlayerDamageBonus,
+                GodSlayerDefenseBonus = player.GodSlayerDefenseBonus,
 
                 // Song buff properties (Music Shop performances)
                 SongBuffType = player.SongBuffType,

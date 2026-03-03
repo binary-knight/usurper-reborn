@@ -176,6 +176,26 @@ public class MainStreetLocation : BaseLocation
         {
             HintSystem.Instance.TryShowHint(HintSystem.HINT_QUEST_SYSTEM, terminal, currentPlayer.HintsShown);
         }
+
+        // NPC story notification — hint about NPCs with available story content (v0.49.3)
+        if (currentPlayer.Level >= 3)
+        {
+            var npcNotification = TownNPCStorySystem.Instance?.GetNextNotification(currentPlayer);
+            if (npcNotification != null)
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine(npcNotification);
+                terminal.SetColor("white");
+            }
+        }
+
+        // God Slayer buff reminder
+        if (currentPlayer.HasGodSlayerBuff)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"Divine power courses through you. ({currentPlayer.GodSlayerCombats} combats remaining)");
+            terminal.SetColor("white");
+        }
     }
 
     /// <summary>
@@ -1732,11 +1752,74 @@ public class MainStreetLocation : BaseLocation
 
     private async Task<bool> QuitGame()
     {
-        // Online mode: auto-dormitory and quick exit (no prompts).
-        // Players who want protected sleep should visit the Inn first.
+        // Online mode: show sleep options with cancel
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
-            // Deduct dormitory cost
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  Where will you sleep tonight?");
+            terminal.SetColor("gray");
+            terminal.WriteLine("  Dormitory: 10 gold, vulnerable to attack.");
+            terminal.WriteLine("  Inn: protected sleep with +50% ATK/DEF if attacked.");
+            if (currentPlayer.HasReinforcedDoor)
+                terminal.WriteLine("  Home: safe behind your reinforced door.");
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.Write("  [D] ");
+            terminal.SetColor("gray");
+            terminal.Write("Dormitory   ");
+            terminal.SetColor("white");
+            terminal.Write("[I] ");
+            terminal.SetColor("gray");
+            terminal.WriteLine("Inn");
+            if (currentPlayer.HasReinforcedDoor)
+            {
+                terminal.SetColor("white");
+                terminal.Write("  [H] ");
+                terminal.SetColor("gray");
+                terminal.Write("Home        ");
+            }
+            else
+            {
+                terminal.Write("              ");
+            }
+            terminal.SetColor("white");
+            terminal.Write("[C] ");
+            terminal.SetColor("gray");
+            terminal.WriteLine("Cancel");
+            terminal.WriteLine("");
+
+            var choice = (await terminal.GetInput("  Your choice: ")).Trim().ToUpperInvariant();
+
+            if (choice == "C" || string.IsNullOrEmpty(choice))
+                return false; // Back to Main Street
+
+            if (choice == "I")
+            {
+                await NavigateToLocation(GameLocation.TheInn);
+                return true;
+            }
+
+            if (choice == "H" && currentPlayer.HasReinforcedDoor)
+            {
+                // Sleep at home — safe behind reinforced door
+                currentPlayer.HP = currentPlayer.MaxHP;
+                currentPlayer.Mana = currentPlayer.MaxMana;
+                currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
+
+                var backend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
+                if (backend != null)
+                {
+                    var username = UsurperRemake.BBS.DoorMode.OnlineUsername ?? currentPlayer.Name2;
+                    await backend.RegisterSleepingPlayer(username, "home", "[]", 1);
+                }
+
+                terminal.SetColor("gray");
+                terminal.WriteLine("\n  You bar the reinforced door and drift into a safe sleep...");
+                throw new LocationExitException(GameLocation.NoWhere);
+            }
+
+            // Default: dormitory sleep
             long dormCost = GameConfig.DormitorySleepCost;
             bool isBroke = false;
             if (currentPlayer.Gold >= dormCost)
@@ -1754,24 +1837,22 @@ public class MainStreetLocation : BaseLocation
                 isBroke = true;
             }
 
-            // Restore and save
             currentPlayer.HP = currentPlayer.MaxHP;
             currentPlayer.Mana = currentPlayer.MaxMana;
             currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
-            await GameEngine.Instance.SaveCurrentGame();
 
-            // Register as sleeping in dormitory (vulnerable)
-            var backend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
-            if (backend != null)
+            var dormBackend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
+            if (dormBackend != null)
             {
                 var username = UsurperRemake.BBS.DoorMode.OnlineUsername ?? currentPlayer.Name2;
-                await backend.RegisterSleepingPlayer(username, isBroke ? "street" : "dormitory", "[]", 0);
+                await dormBackend.RegisterSleepingPlayer(username, isBroke ? "street" : "dormitory", "[]", 0);
             }
 
             terminal.SetColor("gray");
             terminal.WriteLine(isBroke
                 ? "\n  You curl up in the street and drift off..."
                 : "\n  You head to the dormitory and drift off...");
+
             throw new LocationExitException(GameLocation.NoWhere);
         }
 

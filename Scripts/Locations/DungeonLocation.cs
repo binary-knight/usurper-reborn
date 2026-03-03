@@ -1280,6 +1280,15 @@ public class DungeonLocation : BaseLocation
             result.Outcome != BossOutcome.Fled &&
             result.Outcome != BossOutcome.PlayerDefeated)
         {
+            // Grant God Slayer buff — temporary divine power surge (v0.49.3)
+            player.GodSlayerCombats = GameConfig.GodSlayerBuffDuration;
+            player.GodSlayerDamageBonus = GameConfig.GodSlayerDamageBonus;
+            player.GodSlayerDefenseBonus = GameConfig.GodSlayerDefenseBonus;
+            term.WriteLine("");
+            term.SetColor("bright_yellow");
+            term.WriteLine($"  Divine power surges through you! (+{(int)(GameConfig.GodSlayerDamageBonus * 100)}% damage, +{(int)(GameConfig.GodSlayerDefenseBonus * 100)}% defense for {GameConfig.GodSlayerBuffDuration} combats)");
+            await Task.Delay(2000);
+
             await ShowTownReactionScene(result, player, term);
             throw new LocationExitException(GameLocation.MainStreet);
         }
@@ -1342,8 +1351,66 @@ public class DungeonLocation : BaseLocation
         term.WriteLine($"  {closing}", "white");
         await Task.Delay(2000);
 
+        // Next god breadcrumb — hint at what lies deeper (v0.49.3)
+        var nextGod = GetNextUnencounteredGod(result.God);
+        if (nextGod != null)
+        {
+            var nextGodData = OldGodsData.GetGodBossData(nextGod.Value);
+            term.WriteLine("");
+            await Task.Delay(1500);
+            term.SetColor("dark_cyan");
+            term.WriteLine("  As the crowd disperses, an old woman clutches your arm.");
+            await Task.Delay(1500);
+            term.SetColor("gray");
+            term.WriteLine($"  \"Don't rest too long, hero. They say {nextGodData.Name} still stirs in the depths below...\"");
+            await Task.Delay(2000);
+        }
+
         term.WriteLine("");
         await term.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Get the next Old God in floor order that hasn't been encountered yet.
+    /// Returns null if all gods have been dealt with (or only Manwe remains).
+    /// </summary>
+    private static OldGodType? GetNextUnencounteredGod(OldGodType justEncountered)
+    {
+        // Gods in floor order (excluding Manwe who has his own ending sequence)
+        OldGodType[] godOrder = {
+            OldGodType.Maelketh,  // Floor 25
+            OldGodType.Veloura,   // Floor 40
+            OldGodType.Thorgrim,  // Floor 55
+            OldGodType.Noctura,   // Floor 70
+            OldGodType.Aurelion,  // Floor 85
+            OldGodType.Terravok   // Floor 95
+        };
+
+        var story = StoryProgressionSystem.Instance;
+        bool passedCurrent = false;
+
+        foreach (var god in godOrder)
+        {
+            if (god == justEncountered)
+            {
+                passedCurrent = true;
+                continue;
+            }
+            if (!passedCurrent) continue;
+
+            // Check if this god hasn't been encountered yet
+            if (story.OldGodStates.TryGetValue(god, out var state))
+            {
+                if (state.Status == GodStatus.Unknown)
+                    return god;
+            }
+            else
+            {
+                return god; // No state entry means never encountered
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -3826,8 +3893,19 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1000);
 
+        // Straggler encounters: chance of weaker monsters from upper floors (v0.49.3)
+        int effectiveMonsterLevel = currentDungeonLevel;
+        if (currentDungeonLevel >= GameConfig.StragglerMinFloor && !room.IsBossRoom
+            && dungeonRandom.NextDouble() < GameConfig.StragglerEncounterChance)
+        {
+            effectiveMonsterLevel = Math.Max(1, currentDungeonLevel - dungeonRandom.Next(GameConfig.StragglerLevelReductionMin, GameConfig.StragglerLevelReductionMax));
+            terminal.SetColor("gray");
+            terminal.WriteLine("A straggler from the upper floors wanders into view...");
+            terminal.WriteLine("");
+        }
+
         // Generate monsters appropriate for this room
-        var monsters = MonsterGenerator.GenerateMonsterGroup(currentDungeonLevel, dungeonRandom);
+        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom);
 
         // Make boss room monsters tougher (HP only — STR boost removed to prevent
         // double-dipping with Monster.GetAttackPower()'s 1.3x IsBoss multiplier)

@@ -333,7 +333,9 @@ public partial class MagicShopLocation : BaseLocation
         WriteMenuRow("1", "bright_yellow", " Rings", "E", "bright_yellow", "nchant Equipment");
         WriteMenuRow("2", "bright_yellow", " Necklaces", "W", "bright_yellow", " Remove Enchantment");
         WriteMenuRow("S", "bright_yellow", "ell Accessories", "C", "bright_yellow", "urse Removal");
-        WriteMenuRow("I", "bright_yellow", "dentify Item", " ", "darkgray", "");
+        terminal.Write("  ");
+        WriteMenuKey("I", "bright_yellow", "dentify Item");
+        terminal.WriteLine("");
         terminal.WriteLine("");
         DisplayMessage("  ═══ Potions & Scrolls ═══             ═══ Arcane Arts ═══", "cyan");
         terminal.WriteLine("");

@@ -43,6 +43,7 @@ public partial class GameEngine
     }
     private static readonly Queue<string> _staticPendingNotifications = new();
     private bool _splashScreenShown = false;
+    private string? _sleepLocationOnLogin;
 
     /// <summary>
     /// Add a notification to be shown to the player
@@ -2258,9 +2259,10 @@ public partial class GameEngine
             }
 
             // Check if player was sleeping and handle offline attacks
+            _sleepLocationOnLogin = null;
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend)
             {
-                await HandleSleepReport(sqlBackend);
+                _sleepLocationOnLogin = await HandleSleepReport(sqlBackend);
                 await ShowWhileYouWereGone(sqlBackend);
             }
 
@@ -2368,8 +2370,26 @@ public partial class GameEngine
                 }
             }
 
-            // Route immortals directly to the Pantheon; mortals go to Main Street
-            var startLocation = currentPlayer!.IsImmortal ? GameLocation.Pantheon : GameLocation.MainStreet;
+            // Route immortals to Pantheon; sleeping players wake where they slept; others go to Main Street
+            GameLocation startLocation;
+            if (currentPlayer!.IsImmortal)
+            {
+                startLocation = GameLocation.Pantheon;
+            }
+            else if (_sleepLocationOnLogin != null)
+            {
+                startLocation = _sleepLocationOnLogin switch
+                {
+                    "inn" => GameLocation.TheInn,
+                    "home" => GameLocation.Home,
+                    "castle" => GameLocation.Castle,
+                    _ => GameLocation.MainStreet
+                };
+            }
+            else
+            {
+                startLocation = GameLocation.MainStreet;
+            }
             await locationManager.EnterLocation(startLocation, currentPlayer!);
         }
         catch (Exception ex)
@@ -2470,15 +2490,15 @@ public partial class GameEngine
     /// If the player was killed while sleeping, apply death state (reduced HP, no mana).
     /// Gold/item/XP losses are already applied by WorldSimulator — we just display the report.
     /// </summary>
-    private async Task HandleSleepReport(SqlSaveBackend backend)
+    private async Task<string?> HandleSleepReport(SqlSaveBackend backend)
     {
         try
         {
             var username = UsurperRemake.BBS.DoorMode.OnlineUsername;
-            if (string.IsNullOrEmpty(username)) return;
+            if (string.IsNullOrEmpty(username)) return null;
 
             var sleepInfo = await backend.GetSleepingPlayerInfo(username);
-            if (sleepInfo == null) return;
+            if (sleepInfo == null) return null;
 
             // Parse attack log
             var attackLog = new List<JsonNode>();
@@ -2500,7 +2520,13 @@ public partial class GameEngine
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
                 terminal.SetColor("bright_red");
-                string locationLabel = sleepInfo.SleepLocation == "inn" ? "INN ROOM" : "DORMITORY";
+                string locationLabel = sleepInfo.SleepLocation switch
+                {
+                    "inn" => "INN ROOM",
+                    "home" => "HOME",
+                    "castle" => "CASTLE",
+                    _ => "DORMITORY"
+                };
                 terminal.WriteLine($"\u2551                     SLEEP REPORT  ({locationLabel})                         \u2551");
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563");
@@ -2606,10 +2632,12 @@ public partial class GameEngine
 
             // Unregister from sleeping_players (whether attacked or not)
             await backend.UnregisterSleepingPlayer(username);
+            return sleepInfo.SleepLocation;
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("SLEEP", $"Failed to process sleep report: {ex.Message}");
+            return null;
         }
     }
 
@@ -3121,11 +3149,21 @@ public partial class GameEngine
         }
 
         // Enter main game using location system
-        // Immortals always go to the Pantheon; mortals use saved location or MainStreet
+        // Immortals always go to the Pantheon; sleeping players wake where they slept; others use saved location or MainStreet
         GameLocation startLocation;
         if (currentPlayer.IsImmortal)
         {
             startLocation = GameLocation.Pantheon;
+        }
+        else if (_sleepLocationOnLogin != null)
+        {
+            startLocation = _sleepLocationOnLogin switch
+            {
+                "inn" => GameLocation.TheInn,
+                "home" => GameLocation.Home,
+                "castle" => GameLocation.Castle,
+                _ => GameLocation.MainStreet  // dormitory, street, unknown
+            };
         }
         else
         {
@@ -3659,6 +3697,7 @@ public partial class GameEngine
         player.HasVitalityFountain = playerData.HasVitalityFountain;
         player.HasStudy = playerData.HasStudy;
         player.HasServants = playerData.HasServants;
+        player.HasReinforcedDoor = playerData.HasReinforcedDoor;
         player.PermanentDamageBonus = playerData.PermanentDamageBonus;
         player.PermanentDefenseBonus = playerData.PermanentDefenseBonus;
         player.BonusMaxHP = playerData.BonusMaxHP;
@@ -3683,6 +3722,11 @@ public partial class GameEngine
         player.HerbBuffCombats = playerData.HerbBuffCombats;
         player.HerbBuffValue = playerData.HerbBuffValue;
         player.HerbExtraAttacks = playerData.HerbExtraAttacks;
+
+        // Restore God Slayer buff (post-Old God power fantasy)
+        player.GodSlayerCombats = playerData.GodSlayerCombats;
+        player.GodSlayerDamageBonus = playerData.GodSlayerDamageBonus;
+        player.GodSlayerDefenseBonus = playerData.GodSlayerDefenseBonus;
 
         // Restore song buff properties (Music Shop performances)
         player.SongBuffType = playerData.SongBuffType;

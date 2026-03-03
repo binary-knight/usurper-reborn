@@ -46,6 +46,9 @@ public class PlayerSession : IDisposable
     /// <summary>Last time the player sent any input. Used for idle timeout detection.</summary>
     public DateTime LastActivityTime { get; set; } = DateTime.UtcNow;
 
+    /// <summary>True once we've shown the idle timeout warning for the current idle period.</summary>
+    public bool IdleWarningShown { get; set; }
+
     /// <summary>True once the player has loaded/created a character and entered the game world.
     /// While false, broadcast messages (gossip, shouts, etc.) are suppressed.</summary>
     public bool IsInGame { get; set; }
@@ -403,9 +406,11 @@ public class PlayerSession : IDisposable
             {
                 Context.Terminal.WriteLine("");
                 Context.Terminal.SetColor("bright_red");
-                Context.Terminal.WriteLine($"  {reason}");
+                Context.Terminal.WriteLine($"  *** {reason} ***");
+                Context.Terminal.SetColor("yellow");
+                Context.Terminal.WriteLine("  Your game has been auto-saved.");
                 Context.Terminal.SetColor("white");
-                await Task.Delay(500);
+                await Task.Delay(2000); // Give time for message to reach client
             }
         }
         catch { }
