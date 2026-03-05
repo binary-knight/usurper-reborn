@@ -3,12 +3,36 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using UsurperRemake.Server;
 
 namespace UsurperRemake.Systems
 {
+    /// <summary>
+    /// Tolerant JSON converter that handles empty arrays [] for Dictionary types.
+    /// This prevents deserialization crashes when an empty Dictionary was serialized as [].
+    /// </summary>
+    public class TolerantDictionaryConverter<TKey, TValue> : JsonConverter<Dictionary<TKey, TValue>> where TKey : notnull
+    {
+        public override Dictionary<TKey, TValue>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.StartArray)
+            {
+                // Skip the empty array
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndArray) { }
+                return new Dictionary<TKey, TValue>();
+            }
+            // Normal dictionary deserialization
+            return JsonSerializer.Deserialize<Dictionary<TKey, TValue>>(ref reader);
+        }
+
+        public override void Write(Utf8JsonWriter writer, Dictionary<TKey, TValue> value, JsonSerializerOptions options)
+        {
+            JsonSerializer.Serialize(writer, value);
+        }
+    }
     /// <summary>
     /// SQLite-based save backend for online multiplayer mode.
     /// All players share a single SQLite database on the server.
@@ -45,7 +69,12 @@ namespace UsurperRemake.Systems
             {
                 WriteIndented = false, // compact for database storage
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                IncludeFields = true
+                IncludeFields = true,
+                Converters =
+                {
+                    new TolerantDictionaryConverter<string, int>(),
+                    new TolerantDictionaryConverter<string, long>(),
+                }
             };
 
             InitializeDatabase();

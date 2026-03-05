@@ -124,6 +124,9 @@ namespace UsurperRemake.Systems
                 case "S":
                     await SetOnlineServer();
                     break;
+                case "R":
+                    await ShowRecoveryMenu();
+                    break;
                 case "Q":
                     return true;
             }
@@ -209,6 +212,9 @@ namespace UsurperRemake.Systems
                 case "S":
                     await SetOnlineServer();
                     break;
+                case "R":
+                    await ShowRecoveryMenu();
+                    break;
                 case "Q":
                     return true;
             }
@@ -292,6 +298,7 @@ namespace UsurperRemake.Systems
             {
                 SysOpMenuRow(("9", "Updates"));
             }
+            SysOpMenuRow(("R", "Recovery"));
             terminal.SetColor("white");
             terminal.SetColor("darkgray"); terminal.Write("[");
             terminal.SetColor("bright_yellow"); terminal.Write("Q");
@@ -335,7 +342,7 @@ namespace UsurperRemake.Systems
             SysOpMenuRow(("7", "Online"), ("8", "Stats"), ("K", "Kick"), ("D", "DebugLog"), ("N", "NPCs"));
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(" World:");
-            SysOpMenuRow(("V", "News"), ("C", "ClearNews"), ("B", "Broadcast"));
+            SysOpMenuRow(("V", "News"), ("C", "ClearNews"), ("B", "Broadcast"), ("R", "Recovery"));
             if (_updateCheckComplete && _updateAvailable)
             {
                 terminal.Write(" ");
@@ -2125,6 +2132,202 @@ namespace UsurperRemake.Systems
 
                 await terminal.GetInputAsync("Press Enter to continue...");
             }
+        }
+
+        #endregion
+
+        #region Recovery
+
+        private async Task ShowRecoveryMenu()
+        {
+            bool done = false;
+            while (!done)
+            {
+                terminal.ClearScreen();
+                ShowSysOpHeader("Recovery");
+                terminal.WriteLine("");
+
+                // Find database backups
+                var dbPath = BBS.DoorMode.OnlineDatabasePath;
+                var dbDir = Path.GetDirectoryName(dbPath) ?? ".";
+                var dbName = Path.GetFileNameWithoutExtension(dbPath);
+                var dbExt = Path.GetExtension(dbPath);
+                bool dbExists = File.Exists(dbPath);
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(" Database:");
+                if (dbExists)
+                {
+                    var dbInfo = new FileInfo(dbPath);
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"   Active: {dbPath}");
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"   Size: {dbInfo.Length / 1024:N0} KB  Modified: {dbInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}");
+                }
+                else
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"   No database found at: {dbPath}");
+                }
+                terminal.WriteLine("");
+
+                // List available backups
+                var backups = new List<(int num, string path, FileInfo info)>();
+                for (int i = 1; i <= 10; i++)
+                {
+                    var bkPath = Path.Combine(dbDir, $"{dbName}_backup_{i}{dbExt}");
+                    if (File.Exists(bkPath))
+                        backups.Add((i, bkPath, new FileInfo(bkPath)));
+                }
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(" Available Backups:");
+                if (backups.Count == 0)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("   No backups found. Backups are created automatically before updates.");
+                }
+                else
+                {
+                    foreach (var bk in backups)
+                    {
+                        terminal.SetColor("white");
+                        terminal.Write($"   [{bk.num}] backup_{bk.num}");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  {bk.info.Length / 1024:N0} KB  {bk.info.LastWriteTime:yyyy-MM-dd HH:mm:ss}");
+                    }
+                }
+                terminal.WriteLine("");
+
+                // Create backup now option
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(" Actions:");
+                SysOpMenuRow(("B", "Backup Now"));
+                if (backups.Count > 0)
+                    SysOpMenuRow(("R", "Restore Backup"));
+                terminal.SetColor("darkgray"); terminal.Write("[");
+                terminal.SetColor("bright_yellow"); terminal.Write("Q");
+                terminal.SetColor("darkgray"); terminal.Write("]");
+                terminal.SetColor("white"); terminal.WriteLine("Back");
+                terminal.WriteLine("");
+
+                terminal.SetColor("gray");
+                terminal.Write("Choice: ");
+                var choice = (await terminal.GetInputAsync("")).Trim().ToUpper();
+
+                switch (choice)
+                {
+                    case "B":
+                        await CreateManualBackup(dbPath, dbDir, dbName, dbExt);
+                        break;
+                    case "R":
+                        if (backups.Count > 0)
+                            await RestoreBackup(dbPath, dbDir, dbName, dbExt, backups);
+                        break;
+                    case "Q":
+                        done = true;
+                        break;
+                }
+            }
+        }
+
+        private async Task CreateManualBackup(string dbPath, string dbDir, string dbName, string dbExt)
+        {
+            if (!File.Exists(dbPath))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  No database to backup.");
+                await terminal.GetInputAsync("Press Enter...");
+                return;
+            }
+
+            try
+            {
+                // Use the same rotation logic as the auto-updater
+                VersionChecker.Instance.CreateDatabaseBackup();
+
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("");
+                terminal.WriteLine("  Database backed up successfully!");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Saved to: {dbName}_backup_1{dbExt}");
+            }
+            catch (Exception ex)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  Backup failed: {ex.Message}");
+            }
+            await terminal.GetInputAsync("Press Enter...");
+        }
+
+        private async Task RestoreBackup(string dbPath, string dbDir, string dbName, string dbExt,
+            List<(int num, string path, FileInfo info)> backups)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("");
+            terminal.Write("  Enter backup number to restore (1-" + backups.Max(b => b.num) + "): ");
+            var input = (await terminal.GetInputAsync("")).Trim();
+
+            if (!int.TryParse(input, out int backupNum))
+                return;
+
+            var selected = backups.FirstOrDefault(b => b.num == backupNum);
+            if (selected.path == null)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  Backup #{backupNum} not found.");
+                await terminal.GetInputAsync("Press Enter...");
+                return;
+            }
+
+            // Confirm
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine("  *** WARNING ***");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  This will replace the active database with backup_{backupNum}.");
+            terminal.WriteLine($"  Backup date: {selected.info.LastWriteTime:yyyy-MM-dd HH:mm:ss}");
+            terminal.WriteLine($"  The current database will be saved as backup_0 first.");
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.Write("  Type YES to confirm: ");
+            var confirm = (await terminal.GetInputAsync("")).Trim();
+
+            if (confirm != "YES")
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Restore cancelled.");
+                await terminal.GetInputAsync("Press Enter...");
+                return;
+            }
+
+            try
+            {
+                // Save current DB as backup_0 (safety net)
+                var safetyPath = Path.Combine(dbDir, $"{dbName}_backup_0{dbExt}");
+                if (File.Exists(dbPath))
+                    File.Copy(dbPath, safetyPath, overwrite: true);
+
+                // Copy the selected backup over the active database
+                File.Copy(selected.path, dbPath, overwrite: true);
+
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("");
+                terminal.WriteLine($"  Database restored from backup_{backupNum}!");
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  The game server must be restarted for changes to take effect.");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Previous database saved as: {dbName}_backup_0{dbExt}");
+
+                DebugLogger.Instance.LogInfo("RECOVERY", $"Database restored from backup_{backupNum} by sysop");
+            }
+            catch (Exception ex)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  Restore failed: {ex.Message}");
+                DebugLogger.Instance.LogWarning("RECOVERY", $"Database restore failed: {ex.Message}");
+            }
+            await terminal.GetInputAsync("Press Enter...");
         }
 
         #endregion

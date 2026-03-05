@@ -555,6 +555,9 @@ namespace UsurperRemake.Systems
                 // If the ZIP had a single nested folder (e.g., UsurperReborn-win64/), flatten it
                 extractDir = FlattenExtractedDirectory(extractDir);
 
+                // Backup online database before applying update (keeps 5 rotating backups)
+                CreateDatabaseBackup();
+
                 // Create the updater script (skip relaunch in BBS door mode — BBS handles restarts)
                 var updaterPath = CreateUpdaterScript(appDir, extractDir, tempDir, BBS.DoorMode.IsInDoorMode);
                 if (string.IsNullOrEmpty(updaterPath))
@@ -578,6 +581,54 @@ namespace UsurperRemake.Systems
             finally
             {
                 IsDownloading = false;
+            }
+        }
+
+        /// <summary>
+        /// Backup the online SQLite database before applying an update.
+        /// Keeps up to 5 rotating backups (backup_1 is newest, backup_5 is oldest).
+        /// </summary>
+        public void CreateDatabaseBackup()
+        {
+            try
+            {
+                var dbPath = BBS.DoorMode.OnlineDatabasePath;
+                if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath))
+                {
+                    DebugLogger.Instance.LogDebug("UPDATE", "No online database found to backup, skipping");
+                    return;
+                }
+
+                var dbDir = Path.GetDirectoryName(dbPath) ?? ".";
+                var dbName = Path.GetFileNameWithoutExtension(dbPath);
+                var dbExt = Path.GetExtension(dbPath);
+                const int maxBackups = 5;
+
+                // Rotate existing backups: 4→5, 3→4, 2→3, 1→2
+                for (int i = maxBackups - 1; i >= 1; i--)
+                {
+                    var src = Path.Combine(dbDir, $"{dbName}_backup_{i}{dbExt}");
+                    var dst = Path.Combine(dbDir, $"{dbName}_backup_{i + 1}{dbExt}");
+                    if (File.Exists(src))
+                    {
+                        if (File.Exists(dst)) File.Delete(dst);
+                        File.Move(src, dst);
+                    }
+                }
+
+                // Copy current database as backup_1
+                var backupPath = Path.Combine(dbDir, $"{dbName}_backup_1{dbExt}");
+                File.Copy(dbPath, backupPath, overwrite: true);
+
+                DebugLogger.Instance.LogInfo("UPDATE", $"Database backed up to: {backupPath}");
+
+                // Prune: delete anything beyond maxBackups
+                var oldest = Path.Combine(dbDir, $"{dbName}_backup_{maxBackups + 1}{dbExt}");
+                if (File.Exists(oldest)) File.Delete(oldest);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("UPDATE", $"Database backup failed (non-fatal): {ex.Message}");
             }
         }
 
