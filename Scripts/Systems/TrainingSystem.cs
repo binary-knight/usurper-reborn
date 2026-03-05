@@ -1069,7 +1069,6 @@ public static class TrainingSystem
             // Show new bonuses
             terminal.WriteLine($"  Roll Modifier: {GetRollModifier(newLevel):+#;-#;+0}", "cyan");
             terminal.WriteLine($"  Effect Power: {GetEffectMultiplier(newLevel) * 100:F0}%", "cyan");
-            terminal.WriteLine($"  Failure Chance: {GetFailureChance(newLevel)}%", "cyan");
             terminal.WriteLine($"  (Spent {trainingPointsToSpend} training points)", "gray");
         }
         else

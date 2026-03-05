@@ -60,7 +60,8 @@ namespace UsurperRemake.Systems
         public string ProposerName { get; set; }
         public int SupportVotes { get; set; }
         public int OpposeVotes { get; set; }
-        public int PlayerVoteWeight { get; set; }
+        public Dictionary<string, int> PlayerVotes { get; set; } = new();
+        public int PlayerVoteWeight => PlayerVotes.Values.Sum();
         public int TicksRemaining { get; set; }
     }
 
@@ -92,7 +93,7 @@ namespace UsurperRemake.Systems
         public Dictionary<string, ProposedBuildingState> ProposedBuildings { get; set; } = new();
         public ActiveProposal CurrentProposal { get; set; }
         public string ActiveProposedBuildingId { get; set; } // Which proposed building is under construction
-        public HashSet<string> ProposalCooldowns { get; set; } = new();
+        public Dictionary<string, int> ProposalCooldowns { get; set; } = new();
         public int ContributionBoostTicks { get; set; } // Memorial boost remaining ticks
 
         public SettlementState()
@@ -172,7 +173,7 @@ namespace UsurperRemake.Systems
                 OppositionCheck = p => p.Greed > 0.7f,
                 Precondition = s => s.Buildings.ContainsKey(SettlementBuilding.Watchtower) && s.Buildings[SettlementBuilding.Watchtower].Tier >= BuildingTier.Foundation },
             new() { Id = "library", Name = "Library", Description = "Shelves of ancient knowledge and scholarly works",
-                EffectDescription = "+5% XP buff (5 combats, stacks with Tavern)",
+                EffectDescription = "+5% XP buff (5 combats)",
                 TraitScorer = p => (p.Intelligence + p.Patience) / 2f,
                 OppositionCheck = p => p.Impulsiveness > 0.7f,
                 Precondition = s => s.Buildings.ContainsKey(SettlementBuilding.CouncilHall) && s.Buildings[SettlementBuilding.CouncilHall].Tier >= BuildingTier.Foundation },
@@ -434,22 +435,25 @@ namespace UsurperRemake.Systems
             int builtCount = State.Buildings.Values.Count(b => b.Tier >= BuildingTier.Foundation);
             if (builtCount < GameConfig.SettlementMinBuildingsForProposals) return;
 
-            // Don't propose while a core building or proposed building is under construction
-            if (State.ActiveBuilding != null) return;
-            if (State.ActiveProposedBuildingId != null) return;
-
-            // Process existing proposal deliberation
+            // Always process existing proposal deliberation (ticks should count down
+            // even while buildings are under construction)
             if (State.CurrentProposal != null)
             {
                 ProcessDeliberation(aliveNPCs);
                 return;
             }
 
-            // Decay cooldowns (remove one per tick)
+            // Don't generate NEW proposals while a core building or proposed building is under construction
+            if (State.ActiveBuilding != null) return;
+            if (State.ActiveProposedBuildingId != null) return;
+
+            // Decay cooldowns (decrement each tick, remove when expired)
             if (State.ProposalCooldowns.Count > 0)
             {
-                // Simple cooldown: we track IDs, remove the oldest each tick
-                // For proper tick counting we'd need a dict, but this is simpler
+                foreach (var key in State.ProposalCooldowns.Keys.ToList())
+                    State.ProposalCooldowns[key]--;
+                var expired = State.ProposalCooldowns.Where(kvp => kvp.Value <= 0).Select(kvp => kvp.Key).ToList();
+                foreach (var key in expired) State.ProposalCooldowns.Remove(key);
             }
 
             // Try to generate a new proposal
@@ -472,7 +476,7 @@ namespace UsurperRemake.Systems
                     continue;
 
                 // Skip if on cooldown
-                if (State.ProposalCooldowns.Contains(template.Id)) continue;
+                if (State.ProposalCooldowns.ContainsKey(template.Id)) continue;
 
                 // Check precondition
                 if (!template.Precondition(State)) continue;
@@ -509,7 +513,7 @@ namespace UsurperRemake.Systems
                     ProposerName = bestProposer,
                     SupportVotes = 0,
                     OpposeVotes = 0,
-                    PlayerVoteWeight = 0,
+                    PlayerVotes = new(),
                     TicksRemaining = GameConfig.SettlementProposalDeliberationTicks
                 };
 
@@ -528,7 +532,10 @@ namespace UsurperRemake.Systems
 
             var settlers = aliveNPCs.Where(n => State.SettlerNames.Contains(n.Name) && n.Brain?.Personality != null).ToList();
 
-            // Settlers vote each tick
+            // Recount NPC votes each tick (settler opinions may shift as NPCs arrive/leave)
+            // Player vote weight is preserved separately
+            proposal.SupportVotes = 0;
+            proposal.OpposeVotes = 0;
             foreach (var settler in settlers)
             {
                 float traitScore = template.TraitScorer(settler.Brain.Personality);
@@ -574,7 +581,7 @@ namespace UsurperRemake.Systems
             else
             {
                 // Proposal fails
-                State.ProposalCooldowns.Add(proposal.BuildingId);
+                State.ProposalCooldowns[proposal.BuildingId] = GameConfig.SettlementProposalCooldownTicks;
                 NewsSystem.Instance?.Newsy(true, $"The settlers reject the proposal to build a {template.Name}.");
                 DebugLogger.Instance?.LogDebug("SETTLEMENT", $"Proposal rejected: {template.Name} ({totalSupport} for, {totalOppose} against)");
             }
@@ -618,10 +625,10 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Player endorses (+) or opposes (-) the current proposal.
         /// </summary>
-        public bool VoteOnProposal(int weight)
+        public bool VoteOnProposal(string playerName, int weight)
         {
             if (State.CurrentProposal == null) return false;
-            State.CurrentProposal.PlayerVoteWeight += weight;
+            State.CurrentProposal.PlayerVotes[playerName] = weight;
             return true;
         }
 
@@ -822,7 +829,7 @@ namespace UsurperRemake.Systems
             }
 
             State.ActiveProposedBuildingId = data.ActiveProposedBuildingId;
-            State.ProposalCooldowns = data.ProposalCooldowns != null ? new HashSet<string>(data.ProposalCooldowns) : new();
+            State.ProposalCooldowns = data.ProposalCooldowns != null ? new Dictionary<string, int>(data.ProposalCooldowns) : new();
             State.ContributionBoostTicks = data.ContributionBoostTicks;
 
             // Restore active proposal
@@ -835,7 +842,7 @@ namespace UsurperRemake.Systems
                     TicksRemaining = data.ActiveProposalTicksLeft,
                     SupportVotes = data.ActiveProposalSupport,
                     OpposeVotes = data.ActiveProposalOppose,
-                    PlayerVoteWeight = data.ActiveProposalPlayerVote
+                    PlayerVotes = data.ActiveProposalPlayerVotes ?? new()
                 };
             }
         }
@@ -866,7 +873,7 @@ namespace UsurperRemake.Systems
                     kvp => kvp.Key,
                     kvp => kvp.Value.ResourcePool),
                 ActiveProposedBuildingId = State.ActiveProposedBuildingId,
-                ProposalCooldowns = State.ProposalCooldowns.ToList(),
+                ProposalCooldowns = State.ProposalCooldowns.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                 ContributionBoostTicks = State.ContributionBoostTicks,
                 // Active proposal
                 ActiveProposalId = State.CurrentProposal?.BuildingId,
@@ -874,7 +881,8 @@ namespace UsurperRemake.Systems
                 ActiveProposalTicksLeft = State.CurrentProposal?.TicksRemaining ?? 0,
                 ActiveProposalSupport = State.CurrentProposal?.SupportVotes ?? 0,
                 ActiveProposalOppose = State.CurrentProposal?.OpposeVotes ?? 0,
-                ActiveProposalPlayerVote = State.CurrentProposal?.PlayerVoteWeight ?? 0
+                ActiveProposalPlayerVotes = State.CurrentProposal?.PlayerVotes != null
+                    ? new Dictionary<string, int>(State.CurrentProposal.PlayerVotes) : null
             };
         }
     }
@@ -895,7 +903,7 @@ namespace UsurperRemake.Systems
         public Dictionary<string, int> ProposedBuildingTiers { get; set; } = new();
         public Dictionary<string, long> ProposedBuildingPools { get; set; } = new();
         public string ActiveProposedBuildingId { get; set; }
-        public List<string> ProposalCooldowns { get; set; } = new();
+        public Dictionary<string, int> ProposalCooldowns { get; set; } = new();
         public int ContributionBoostTicks { get; set; }
         // Active proposal deliberation
         public string ActiveProposalId { get; set; }
@@ -903,6 +911,6 @@ namespace UsurperRemake.Systems
         public int ActiveProposalTicksLeft { get; set; }
         public int ActiveProposalSupport { get; set; }
         public int ActiveProposalOppose { get; set; }
-        public int ActiveProposalPlayerVote { get; set; }
+        public Dictionary<string, int> ActiveProposalPlayerVotes { get; set; }
     }
 }

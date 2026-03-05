@@ -982,9 +982,16 @@ namespace UsurperRemake.Systems
                     }
                 }
 
-                // Random class from the 11 base classes
+                // Random class from the 11 base classes, respecting race restrictions
                 int classCount = 11; // Alchemist through Warrior
-                var npcClass = (CharacterClass)random.Next(classCount);
+                CharacterClass npcClass;
+                int attempts = 0;
+                do
+                {
+                    npcClass = (CharacterClass)random.Next(classCount);
+                    attempts++;
+                } while (attempts < 50 && GameConfig.InvalidCombinations.TryGetValue(race, out var invalid)
+                         && invalid.Contains(npcClass));
 
                 // Age 20-35
                 int age = 20 + random.Next(16);

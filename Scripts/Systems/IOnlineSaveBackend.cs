@@ -49,7 +49,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Register this player as online (called on connect).
         /// </summary>
-        Task RegisterOnline(string username, string displayName, string location, string connectionType = "Unknown");
+        Task RegisterOnline(string username, string displayName, string location, string connectionType = "Unknown", string ipAddress = "");
 
         /// <summary>
         /// Update heartbeat and current location (called every 30s).

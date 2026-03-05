@@ -1292,9 +1292,27 @@ public abstract class BaseLocation
         }
         else
         {
-            terminal.WriteLine(Name);
-            terminal.SetColor("yellow");
-            terminal.WriteLine(new string('═', Name.Length));
+            // Show fatigue in dungeon header (single-player only)
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null
+                && currentPlayer.Fatigue >= GameConfig.FatigueTiredThreshold)
+            {
+                var (fatigueLabel, fatigueColor) = currentPlayer.GetFatigueTier();
+                terminal.Write(Name);
+                terminal.SetColor("gray");
+                terminal.Write(" (");
+                terminal.SetColor(fatigueColor);
+                terminal.Write(fatigueLabel);
+                terminal.SetColor("gray");
+                terminal.WriteLine(")");
+                terminal.SetColor("yellow");
+                terminal.WriteLine(new string('═', Name.Length + 3 + fatigueLabel.Length));
+            }
+            else
+            {
+                terminal.WriteLine(Name);
+                terminal.SetColor("yellow");
+                terminal.WriteLine(new string('═', Name.Length));
+            }
         }
         terminal.WriteLine("");
         
@@ -5034,26 +5052,59 @@ public abstract class BaseLocation
         {
             int godsDefeated = storySystem.OldGodStates.Count(g => g.Value.Status == UsurperRemake.Systems.GodStatus.Defeated);
             int godsAllied = storySystem.OldGodStates.Count(g => g.Value.Status == UsurperRemake.Systems.GodStatus.Allied);
+            int godsSaved = storySystem.OldGodStates.Count(g => g.Value.Status == UsurperRemake.Systems.GodStatus.Saved);
+            var godsAwakened = storySystem.OldGodStates
+                .Where(g => g.Value.Status == UsurperRemake.Systems.GodStatus.Awakened)
+                .ToList();
 
             terminal.SetColor("white");
             terminal.Write("Old Gods: ");
+            bool hasAny = false;
             if (godsDefeated > 0)
             {
                 terminal.SetColor("bright_red");
                 terminal.Write($"{godsDefeated} defeated");
+                hasAny = true;
             }
             if (godsAllied > 0)
             {
-                if (godsDefeated > 0) terminal.Write(", ");
+                if (hasAny) terminal.Write(", ");
                 terminal.SetColor("bright_green");
                 terminal.Write($"{godsAllied} allied");
+                hasAny = true;
             }
-            if (godsDefeated == 0 && godsAllied == 0)
+            if (godsSaved > 0)
+            {
+                if (hasAny) terminal.Write(", ");
+                terminal.SetColor("bright_cyan");
+                terminal.Write($"{godsSaved} saved");
+                hasAny = true;
+            }
+            if (godsAwakened.Count > 0)
+            {
+                if (hasAny) terminal.Write(", ");
+                terminal.SetColor("bright_magenta");
+                terminal.Write($"{godsAwakened.Count} awaiting rescue");
+                hasAny = true;
+            }
+            if (!hasAny)
             {
                 terminal.SetColor("gray");
                 terminal.Write("None encountered");
             }
             terminal.WriteLine("");
+
+            // Show active save quests with hints
+            foreach (var god in godsAwakened)
+            {
+                string godName = god.Key.ToString();
+                bool hasLoom = UsurperRemake.Systems.ArtifactSystem.Instance.HasArtifact(UsurperRemake.Systems.ArtifactType.SoulweaversLoom);
+                terminal.SetColor("bright_magenta");
+                if (hasLoom)
+                    terminal.WriteLine($"  {godName}: You have the artifact. Return to their floor.");
+                else
+                    terminal.WriteLine($"  {godName}: Seek the artifact deeper in the dungeon.");
+            }
 
             // Show seals collected
             int sealsCollected = storySystem.CollectedSeals.Count;

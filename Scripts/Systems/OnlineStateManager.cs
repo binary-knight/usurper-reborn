@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using UsurperRemake.BBS;
+using UsurperRemake.Server;
 
 namespace UsurperRemake.Systems
 {
@@ -725,6 +726,50 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Load settlement state from world_state (authoritative source).
+        /// Called by player sessions on login so they get current settlement data
+        /// instead of stale data from their player save.
+        /// </summary>
+        public async Task LoadSettlementFromWorldState()
+        {
+            try
+            {
+                var json = await backend.LoadWorldState("settlement");
+                if (string.IsNullOrEmpty(json)) return;
+
+                var saveData = JsonSerializer.Deserialize<SettlementSaveData>(json, jsonOptions);
+                if (saveData != null)
+                {
+                    SettlementSystem.Instance.RestoreFromSaveData(saveData);
+                    DebugLogger.Instance.LogInfo("ONLINE", $"Settlement overridden from world_state: {SettlementSystem.Instance.GetSettlerCount()} settlers");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"Failed to load settlement from world_state: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Immediately persist current settlement state to world_state.
+        /// Called after player actions (contributions, votes) to prevent data loss
+        /// if the server restarts before the next world sim save cycle.
+        /// </summary>
+        public async Task SaveSettlementToWorldState()
+        {
+            try
+            {
+                var saveData = SettlementSystem.Instance.ToSaveData();
+                var json = JsonSerializer.Serialize(saveData, jsonOptions);
+                await backend.SaveWorldState("settlement", json);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"Failed to persist settlement to world_state: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Load all shared world state (called during game load).
         /// Returns true if shared state was found and loaded.
         /// </summary>
@@ -834,7 +879,8 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task StartOnlineTracking(string displayName, string connectionType = "Unknown")
         {
-            await backend.RegisterOnline(username, displayName, currentLocation, connectionType);
+            var ipAddress = SessionContext.Current?.RemoteIP ?? "";
+            await backend.RegisterOnline(username, displayName, currentLocation, connectionType, ipAddress);
             await backend.UpdatePlayerSession(username, isLogin: true);
 
             // Initialize message watermark to current max ID so we don't replay old broadcasts

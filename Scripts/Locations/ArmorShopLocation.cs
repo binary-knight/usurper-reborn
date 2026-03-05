@@ -18,7 +18,7 @@ public class ArmorShopLocation : BaseLocation
     private int currentPage = 0;
     private const int ItemsPerPage = 15;
 
-    // Armor slots sold in this shop (includes accessories like rings and necklaces)
+    // Armor slots sold in this shop (accessories are in the Magic Shop)
     private static readonly EquipmentSlot[] ArmorSlots = new[]
     {
         EquipmentSlot.Head,
@@ -29,10 +29,7 @@ public class ArmorShopLocation : BaseLocation
         EquipmentSlot.Feet,
         EquipmentSlot.Waist,
         EquipmentSlot.Face,
-        EquipmentSlot.Cloak,
-        EquipmentSlot.Neck,
-        EquipmentSlot.LFinger,
-        EquipmentSlot.RFinger
+        EquipmentSlot.Cloak
     };
 
     public ArmorShopLocation() : base(
@@ -258,12 +255,12 @@ public class ArmorShopLocation : BaseLocation
         ShowBBSNPCs();
         terminal.WriteLine("");
 
-        // Slot categories in compact rows (3 per row for 12 slots)
+        // Slot categories in compact rows (9 armor slots)
         terminal.SetColor("cyan");
         terminal.WriteLine(" Armor Slots:");
         ShowBBSMenuRow(("1", "bright_yellow", "Head"), ("2", "bright_yellow", "Body"), ("3", "bright_yellow", "Arms"), ("4", "bright_yellow", "Hands"));
         ShowBBSMenuRow(("5", "bright_yellow", "Legs"), ("6", "bright_yellow", "Feet"), ("7", "bright_yellow", "Waist"), ("8", "bright_yellow", "Face"));
-        ShowBBSMenuRow(("9", "bright_yellow", "Cloak"), ("10", "bright_yellow", "Neck"), ("11", "bright_yellow", "LRing"), ("12", "bright_yellow", "RRing"));
+        ShowBBSMenuRow(("9", "bright_yellow", "Cloak"));
 
         // Actions
         ShowBBSMenuRow(("S", "bright_green", "ell"), ("A", "bright_magenta", "uto-Buy"), ("R", "bright_red", "eturn"));

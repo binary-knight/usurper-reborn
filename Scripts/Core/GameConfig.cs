@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.49.8";
+    public const string Version = "0.49.9";
     public const string VersionName = "Swords and Lutes";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -753,6 +753,7 @@ public static partial class GameConfig
 
     // Wilderness Exploration (v0.48.5)
     public const int WildernessMaxDailyExplorations = 4;   // Trips per day
+    public const int WildernessMaxDailyRevisits = 2;       // Discovery revisits per day
     public const int WildernessTimeCostMinutes = 60;       // Game-time cost per trip
     public const int WildernessFatigueCost = 5;            // Fatigue per exploration trip
 

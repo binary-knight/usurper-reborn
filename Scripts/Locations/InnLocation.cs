@@ -53,7 +53,6 @@ public class InnLocation : BaseLocation
             "Talk to patrons",              // Social interaction  
             "Play drinking game",           // Drinking competition
             "Listen to gossip",             // Information gathering (real simulation events)
-            "Check bulletin board",         // News and messages
             "Rest at table",                // Minor healing
             "Order food (10 gold)"          // Stamina boost
         };
@@ -343,7 +342,6 @@ public class InnLocation : BaseLocation
             WriteSRMenuOption("F", "Challenge Seth Able");
             WriteSRMenuOption("G", "Play drinking game");
             WriteSRMenuOption("U", "Listen to gossip");
-            WriteSRMenuOption("B", "Check bulletin board");
             WriteSRMenuOption("E", "Rest at table");
             WriteSRMenuOption("O", "Order food (10 gold)");
             terminal.WriteLine("");
@@ -441,22 +439,13 @@ public class InnLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
-            terminal.Write("B");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine("Check bulletin board");
-
-            // Row 4
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
             terminal.Write("E");
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.Write("Rest at table             ");
+            terminal.WriteLine("Rest at table");
 
+            // Row 4
             terminal.SetColor("darkgray");
             terminal.Write("[");
             terminal.SetColor("bright_yellow");
@@ -644,7 +633,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine(" Inn Activities:");
         ShowBBSMenuRow(("D", "bright_yellow", "rink(5g)"), ("F", "bright_yellow", "ight Seth"), ("T", "bright_yellow", "alk"), ("G", "bright_yellow", "ame"));
-        ShowBBSMenuRow(("U", "bright_yellow", "Rumors"), ("B", "bright_yellow", "ulletin"), ("E", "bright_yellow", "Rest"), ("O", "bright_yellow", "rder(10g)"));
+        ShowBBSMenuRow(("U", "bright_yellow", "Rumors"), ("E", "bright_yellow", "Rest"), ("O", "bright_yellow", "rder(10g)"));
 
         terminal.SetColor("cyan");
         terminal.WriteLine(" Areas:");
@@ -718,10 +707,6 @@ public class InnLocation : BaseLocation
                 await NavigateToLocation(GameLocation.MainStreet);
                 return true;
 
-            case "B":
-                await CheckBulletinBoard();
-                return false;
-                
             case "E":
                 await RestAtTable();
                 return false;
@@ -1976,26 +1961,6 @@ public class InnLocation : BaseLocation
         await terminal.PressAnyKey();
     }
     
-    /// <summary>
-    /// Check bulletin board
-    /// </summary>
-    private async Task CheckBulletinBoard()
-    {
-        terminal.ClearScreen();
-        WriteSectionHeader("Inn Bulletin Board", "bright_cyan");
-        terminal.WriteLine("");
-        
-        terminal.SetColor("white");
-        terminal.WriteLine("NOTICES:");
-        terminal.WriteLine("- WANTED: Brave adventurers for dungeon exploration");
-        terminal.WriteLine("- REWARD: 500 gold for information on the missing merchant");
-        terminal.WriteLine("- WARNING: Increased bandit activity on eastern roads");
-        terminal.WriteLine("- FOR SALE: Enchanted leather armor, contact Gareth");
-        terminal.WriteLine("- TEAM RECRUITMENT: The Iron Wolves are seeking members");
-        terminal.WriteLine("");
-        
-        await terminal.PressAnyKey();
-    }
     
     /// <summary>
     /// Rest at table for minor healing
@@ -2145,7 +2110,10 @@ public class InnLocation : BaseLocation
         else
         {
             terminal.SetColor("green");
-            terminal.WriteLine($"Recovered {healAmount} HP, {manaAmount} mana, {staminaAmount} stamina. ({(int)(restEfficiency * 100)}% recovery)");
+            if (currentPlayer.IsManaClass)
+                terminal.WriteLine($"Recovered {healAmount} HP, {manaAmount} mana. ({(int)(restEfficiency * 100)}% recovery)");
+            else
+                terminal.WriteLine($"Recovered {healAmount} HP, {staminaAmount} stamina. ({(int)(restEfficiency * 100)}% recovery)");
         }
 
         // Check for dreams

@@ -601,10 +601,12 @@ public static class ShopItemGenerator
     {
         // Daggers (must be before Sword catch-all — "Assassin's Blade" contains "Blade")
         if (name.Contains("Dagger") || name.Contains("Stiletto") || name.Contains("Kris") ||
-            name.Contains("Fang") || name.StartsWith("Assassin"))
+            name.Contains("Fang") || name.Contains("Knife") || name.Contains("Razor") ||
+            name.Contains("Edge") || name.StartsWith("Assassin") || name.StartsWith("Trick") ||
+            name.StartsWith("Alchemist's Blade") || name.StartsWith("Elixir-Infused"))
             return WeaponType.Dagger;
-        // Rapiers
-        if (name.Contains("Rapier"))
+        // Rapiers (Bard performance blades are rapier-like)
+        if (name.Contains("Rapier") || name == "Dueling Blade" || name == "Songblade")
             return WeaponType.Rapier;
         // Greatswords (two-handed swords — must be before Sword catch-all)
         if (name.Contains("Greatsword") || name.Contains("Claymore") || name.Contains("Zweihander") ||

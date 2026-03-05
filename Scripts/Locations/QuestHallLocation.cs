@@ -496,9 +496,12 @@ public class QuestHallLocation : BaseLocation
             terminal.WriteLine("  Hint: Explore deeper into the Dungeon to reach the target floor.");
         else if (quest.QuestTarget == QuestTarget.FindArtifact)
             terminal.WriteLine("  Hint: Search dungeon rooms for the artifact.");
-        else if (quest.QuestTarget == QuestTarget.BuyWeapon || quest.QuestTarget == QuestTarget.BuyArmor ||
-                 quest.QuestTarget == QuestTarget.BuyAccessory || quest.QuestTarget == QuestTarget.BuyShield)
-            terminal.WriteLine("  Hint: Purchase the item from the appropriate shop in town.");
+        else if (quest.QuestTarget == QuestTarget.BuyWeapon || quest.QuestTarget == QuestTarget.BuyShield)
+            terminal.WriteLine("  Hint: Purchase the item from the Weapon Shop.");
+        else if (quest.QuestTarget == QuestTarget.BuyArmor)
+            terminal.WriteLine("  Hint: Purchase the item from the Armor Shop.");
+        else if (quest.QuestTarget == QuestTarget.BuyAccessory)
+            terminal.WriteLine("  Hint: Purchase the item from the Magic Shop.");
         else if (quest.QuestTarget == QuestTarget.DefeatNPC)
             terminal.WriteLine("  Hint: Find and defeat the target in combat.");
     }

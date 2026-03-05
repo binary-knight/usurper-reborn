@@ -354,13 +354,13 @@ public class MaintenanceSystem
             case CharacterClass.Bard:
                 // Reset bard songs (Pascal: bard song reset)
                 player.BardSongsLeft = GameConfig.DefaultBardSongs;
-                terminal.WriteLine($"  {player.Name2}: Bard songs restored", "cyan");
+                WriteIfNotSilent($"  {player.Name2}: Bard songs restored", "cyan");
                 break;
                 
             case CharacterClass.Assassin:
                 // Assassins get extra thief attempts (Pascal: assassin bonus)
                 player.Thiefs += GameConfig.AssassinThiefBonus;
-                terminal.WriteLine($"  {player.Name2}: Assassin thief bonus applied", "yellow");
+                WriteIfNotSilent($"  {player.Name2}: Assassin thief bonus applied", "yellow");
                 break;
         }
         return Task.CompletedTask;
@@ -422,7 +422,7 @@ public class MaintenanceSystem
             var increase = random.Next(1, GameConfig.MentalStabilityIncrease + 1);
             player.Mental = Math.Min(GameConfig.MaxMentalStability, player.Mental + increase);
             
-            terminal.WriteLine($"  {player.Name2}: Mental stability increased by {increase}", "bright_green");
+            WriteIfNotSilent($"  {player.Name2}: Mental stability increased by {increase}", "bright_green");
             
             // Send mail notification (Pascal: mental stability mail)
             MailSystem.SendSystemMail(player.Name2, "Mental Stability", 
@@ -445,7 +445,7 @@ public class MaintenanceSystem
             var spoiled = (int)(extraHealing * GameConfig.HealingSpoilageRate);
             player.Healing -= spoiled;
             
-            terminal.WriteLine($"  {player.Name2}: {spoiled} healing potions spoiled", "yellow");
+            WriteIfNotSilent($"  {player.Name2}: {spoiled} healing potions spoiled", "yellow");
             
             // Send mail notification (Pascal: spoilage mail)
             MailSystem.SendSystemMail(player.Name2, "Healing Potions",
@@ -464,7 +464,7 @@ public class MaintenanceSystem
         if (random.Next(365) == 0) // 1 in 365 chance for birthday
         {
             player.Age++;
-            terminal.WriteLine($"  {player.Name2}: Birthday! Now age {player.Age}", "bright_yellow");
+            WriteIfNotSilent($"  {player.Name2}: Birthday! Now age {player.Age}", "bright_yellow");
 
             // Send birthday mail with gift options (Pascal: birthday mail system)
             MailSystem.SendBirthdayMail(player.Name2, player.Age);
@@ -573,7 +573,7 @@ public class MaintenanceSystem
     private void ProcessTownPot(MaintenanceConfig config)
     {
         // Town pot value maintenance (Pascal implementation)
-        terminal.WriteLine($"  Town pot: {config.TownPotValue} gold", "white");
+        WriteIfNotSilent($"  Town pot: {config.TownPotValue} gold", "white");
     }
     
     /// <summary>
@@ -582,19 +582,20 @@ public class MaintenanceSystem
     /// </summary>
     private async Task CleanupSystems(MaintenanceConfig config)
     {
-        terminal.WriteLine("Running system cleanup...", "white");
-        
+        WriteIfNotSilent("Running system cleanup...", "white");
+
         // Clean up inactive players
         await CleanupInactivePlayers(config);
-        
+
         // Clean up bounty lists
         await CleanupBountyLists();
-        
+
         // Clean up royal guard
         await CleanupRoyalGuard();
-        
-        terminal.WriteLine("System cleanup complete.", "green");
-        await Task.Delay(500);
+
+        WriteIfNotSilent("System cleanup complete.", "green");
+        if (!silentMode)
+            await Task.Delay(500);
     }
     
     /// <summary>
@@ -603,19 +604,19 @@ public class MaintenanceSystem
     /// </summary>
     private Task CleanupInactivePlayers(MaintenanceConfig config)
     {
-        terminal.WriteLine("  Inactive players checked", "cyan");
+        WriteIfNotSilent("  Inactive players checked", "cyan");
         return Task.CompletedTask;
     }
 
     private Task CleanupBountyLists()
     {
-        terminal.WriteLine("  Bounty lists updated", "cyan");
+        WriteIfNotSilent("  Bounty lists updated", "cyan");
         return Task.CompletedTask;
     }
 
     private Task CleanupRoyalGuard()
     {
-        terminal.WriteLine("  Royal guard validated", "cyan");
+        WriteIfNotSilent("  Royal guard validated", "cyan");
         return Task.CompletedTask;
     }
     
@@ -625,14 +626,15 @@ public class MaintenanceSystem
     /// </summary>
     private async Task UpdateSystemRecords()
     {
-        terminal.WriteLine("Updating system records...", "white");
-        
+        WriteIfNotSilent("Updating system records...", "white");
+
         // Update various system records
-        terminal.WriteLine("  Player statistics updated", "cyan");
-        terminal.WriteLine("  Game records updated", "cyan");
-        terminal.WriteLine("  News files updated", "cyan");
-        
-        await Task.Delay(500);
+        WriteIfNotSilent("  Player statistics updated", "cyan");
+        WriteIfNotSilent("  Game records updated", "cyan");
+        WriteIfNotSilent("  News files updated", "cyan");
+
+        if (!silentMode)
+            await Task.Delay(500);
     }
     
     /// <summary>

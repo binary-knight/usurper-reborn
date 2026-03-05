@@ -1816,6 +1816,8 @@ public class WorldSimulator
             }
         }
 
+        bool isSettler = SettlementSystem.Instance?.State.SettlerNames.Contains(npc.Name) == true;
+
         switch (selectedAction)
         {
             case "dungeon":
@@ -1918,6 +1920,13 @@ public class WorldSimulator
                 npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.3f, 60);
                 npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.3f, 90);
                 break;
+        }
+
+        // Settlement residents: let them do activities (earn gold, train, etc.)
+        // but always snap their location back to Settlement afterward
+        if (isSettler && npc.CurrentLocation != "Settlement")
+        {
+            npc.CurrentLocation = "Settlement";
         }
     }
 
@@ -3155,6 +3164,13 @@ public class WorldSimulator
     /// </summary>
     private void MoveNPCToRandomLocation(NPC npc)
     {
+        // Settlement residents stay in the settlement — don't move them to town
+        if (SettlementSystem.Instance?.State.SettlerNames.Contains(npc.Name) == true)
+        {
+            npc.CurrentLocation = "Settlement";
+            return;
+        }
+
         // Build weighted location list — base weight 1.0 for all locations
         var locationWeights = new List<(string location, double weight)>();
         foreach (var loc in GameLocations)

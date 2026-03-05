@@ -14,6 +14,16 @@ public class SettlementLocation : BaseLocation
 {
     private static readonly Random _random = new();
 
+    /// <summary>
+    /// Immediately persist settlement state to world_state in online mode.
+    /// Prevents data loss if server restarts before the next world sim save cycle.
+    /// </summary>
+    private void PersistSettlementIfOnline()
+    {
+        if (!DoorMode.IsOnlineMode || OnlineStateManager.Instance == null) return;
+        _ = OnlineStateManager.Instance.SaveSettlementToWorldState();
+    }
+
     protected override void DisplayLocation()
     {
         if (IsBBSSession) { DisplayLocationBBS(); return; }
@@ -161,7 +171,9 @@ public class SettlementLocation : BaseLocation
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine($"  ** {state.CurrentProposal.ProposerName} proposes: {propTemplate.Name} **");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"     Votes: {state.CurrentProposal.SupportVotes} for / {state.CurrentProposal.OpposeVotes} against ({state.CurrentProposal.TicksRemaining} ticks left)");
+                int dispFor = state.CurrentProposal.SupportVotes + Math.Max(0, state.CurrentProposal.PlayerVoteWeight);
+                int dispAgainst = state.CurrentProposal.OpposeVotes + Math.Max(0, -state.CurrentProposal.PlayerVoteWeight);
+                terminal.WriteLine($"     Votes: {dispFor} for / {dispAgainst} against ({state.CurrentProposal.TicksRemaining} ticks left)");
                 terminal.WriteLine("");
             }
         }
@@ -199,7 +211,7 @@ public class SettlementLocation : BaseLocation
         terminal.WriteLine($"Settlers: {settlers}/{GameConfig.SettlementMaxNPCs}  Treasury: {state.CommunalTreasury:N0}g");
 
         // Compact building list
-        foreach (var kvp in state.Buildings.Where(b => b.Value.Tier > BuildingTier.None))
+        foreach (var kvp in state.Buildings.Where(b => b.Value.Tier > BuildingTier.None || state.ActiveBuilding == b.Key))
         {
             string name = SettlementSystem.GetBuildingDisplayName(kvp.Key);
             string tier = SettlementSystem.GetTierDisplayName(kvp.Value.Tier);
@@ -235,7 +247,9 @@ public class SettlementLocation : BaseLocation
             if (pt != null)
             {
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  Proposal: {pt.Name} ({state.CurrentProposal.SupportVotes}Y/{state.CurrentProposal.OpposeVotes}N)");
+                int bFor = state.CurrentProposal.SupportVotes + Math.Max(0, state.CurrentProposal.PlayerVoteWeight);
+                int bAgainst = state.CurrentProposal.OpposeVotes + Math.Max(0, -state.CurrentProposal.PlayerVoteWeight);
+                terminal.WriteLine($"  Proposal: {pt.Name} ({bFor}Y/{bAgainst}N)");
             }
         }
 
@@ -274,7 +288,7 @@ public class SettlementLocation : BaseLocation
                 throw new LocationExitException(GameLocation.MainStreet);
 
             default:
-                var (handled, shouldExit) = await TryProcessGlobalCommand(upper);
+                var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
                 if (handled) return shouldExit;
                 return false;
         }
@@ -374,6 +388,7 @@ public class SettlementLocation : BaseLocation
         terminal.WriteLine($"Your total contributions: {totalContrib:N0} gold");
 
         currentPlayer.Statistics?.RecordGoldSpent(amount);
+        PersistSettlementIfOnline();
         await terminal.PressAnyKey();
     }
 
@@ -468,10 +483,10 @@ public class SettlementLocation : BaseLocation
 
     private async Task UseTavernService()
     {
-        if (currentPlayer.SettlementBuffType == (int)SettlementBuffType.XPBonus && currentPlayer.SettlementBuffCombats > 0)
+        if (currentPlayer.HasSettlementBuff)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("You already have the Tavern's blessing active!");
+            terminal.WriteLine("You already have a settlement buff active!");
             await terminal.PressAnyKey();
             return;
         }
@@ -492,6 +507,14 @@ public class SettlementLocation : BaseLocation
 
     private async Task UseShrineService()
     {
+        if (currentPlayer.SettlementShrineUsedToday)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("The shrine's healing power is spent for today. Return tomorrow.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
         if (currentPlayer.HP >= currentPlayer.MaxHP)
         {
             terminal.SetColor("yellow");
@@ -503,6 +526,7 @@ public class SettlementLocation : BaseLocation
         int healAmount = (int)(currentPlayer.MaxHP * GameConfig.SettlementHealPercent);
         currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
         currentPlayer.Statistics?.RecordHealthRestored(healAmount);
+        currentPlayer.SettlementShrineUsedToday = true;
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("");
@@ -516,10 +540,10 @@ public class SettlementLocation : BaseLocation
 
     private async Task UsePalisadeService()
     {
-        if (currentPlayer.SettlementBuffType == (int)SettlementBuffType.DefenseBonus && currentPlayer.SettlementBuffCombats > 0)
+        if (currentPlayer.HasSettlementBuff)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("You already have the Palisade's protection active!");
+            terminal.WriteLine("You already have a settlement buff active!");
             await terminal.PressAnyKey();
             return;
         }
@@ -615,6 +639,14 @@ public class SettlementLocation : BaseLocation
     {
         var state = SettlementSystem.Instance.State;
 
+        if (currentPlayer.SettlementGoldClaimedToday)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("You've already claimed your share today. Come back tomorrow.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
         if (state.CommunalTreasury <= 0)
         {
             terminal.SetColor("yellow");
@@ -643,6 +675,7 @@ public class SettlementLocation : BaseLocation
 
         state.CommunalTreasury -= share;
         currentPlayer.Gold += share;
+        currentPlayer.SettlementGoldClaimedToday = true;
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("");
@@ -652,6 +685,7 @@ public class SettlementLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine($"  Remaining treasury: {state.CommunalTreasury:N0} gold");
 
+        PersistSettlementIfOnline();
         await terminal.PressAnyKey();
     }
 
@@ -746,7 +780,14 @@ public class SettlementLocation : BaseLocation
 
         if (input == "E" && proposal != null)
         {
-            if (currentPlayer.Gold < GameConfig.SettlementEndorsementCost)
+            string voterName = currentPlayer.Name;
+            int myVote = proposal.PlayerVotes.GetValueOrDefault(voterName, 0);
+            if (myVote != 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("You've already cast your vote on this proposal.");
+            }
+            else if (currentPlayer.Gold < GameConfig.SettlementEndorsementCost)
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"You need {GameConfig.SettlementEndorsementCost:N0} gold to endorse a proposal.");
@@ -754,18 +795,30 @@ public class SettlementLocation : BaseLocation
             else
             {
                 currentPlayer.Gold -= GameConfig.SettlementEndorsementCost;
-                SettlementSystem.Instance.VoteOnProposal(2);
+                SettlementSystem.Instance.VoteOnProposal(voterName, 2);
                 currentPlayer.Statistics?.RecordGoldSpent(GameConfig.SettlementEndorsementCost);
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("You endorse the proposal! Your influence sways the settlers.");
+                PersistSettlementIfOnline();
             }
             await terminal.PressAnyKey();
         }
         else if (input == "O" && proposal != null)
         {
-            SettlementSystem.Instance.VoteOnProposal(-2);
-            terminal.SetColor("yellow");
-            terminal.WriteLine("You speak against the proposal. The settlers reconsider.");
+            string voterName = currentPlayer.Name;
+            int myVote = proposal.PlayerVotes.GetValueOrDefault(voterName, 0);
+            if (myVote != 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("You've already cast your vote on this proposal.");
+            }
+            else
+            {
+                SettlementSystem.Instance.VoteOnProposal(voterName, -2);
+                terminal.SetColor("yellow");
+                terminal.WriteLine("You speak against the proposal. The settlers reconsider.");
+                PersistSettlementIfOnline();
+            }
             await terminal.PressAnyKey();
         }
     }
@@ -861,22 +914,55 @@ public class SettlementLocation : BaseLocation
 
     private async Task UseMysticCircleService()
     {
-        if (currentPlayer.Mana >= currentPlayer.MaxMana)
+        if (currentPlayer.SettlementCircleUsedToday)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("Your mana is already full.");
+            terminal.WriteLine("The mystic circle's energy is depleted for today. Return tomorrow.");
             await terminal.PressAnyKey();
             return;
         }
 
-        long restoreAmount = (long)(currentPlayer.MaxMana * GameConfig.SettlementManaRestorePercent);
-        currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + restoreAmount);
+        currentPlayer.SettlementCircleUsedToday = true;
 
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("");
-        terminal.WriteLine("The mystic circle hums with power. Arcane energy flows into you.");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"  Restored {restoreAmount} MP! (MP: {currentPlayer.Mana}/{currentPlayer.MaxMana})");
+        if (currentPlayer.IsManaClass)
+        {
+            if (currentPlayer.Mana >= currentPlayer.MaxMana)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("Your mana is already full.");
+                await terminal.PressAnyKey();
+                return;
+            }
+
+            long restoreAmount = (long)(currentPlayer.MaxMana * GameConfig.SettlementManaRestorePercent);
+            currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + restoreAmount);
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("");
+            terminal.WriteLine("The mystic circle hums with power. Arcane energy flows into you.");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Restored {restoreAmount} MP! (MP: {currentPlayer.Mana}/{currentPlayer.MaxMana})");
+        }
+        else
+        {
+            // Non-casters get HP restoration instead
+            if (currentPlayer.HP >= currentPlayer.MaxHP)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("You are already at full health.");
+                await terminal.PressAnyKey();
+                return;
+            }
+
+            long restoreAmount = (long)(currentPlayer.MaxHP * GameConfig.SettlementManaRestorePercent);
+            currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + restoreAmount);
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("");
+            terminal.WriteLine("The mystic circle pulses with restorative energy, mending your wounds.");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Restored {restoreAmount} HP! (HP: {currentPlayer.HP}/{currentPlayer.MaxHP})");
+        }
 
         await terminal.PressAnyKey();
     }
@@ -957,6 +1043,14 @@ public class SettlementLocation : BaseLocation
 
     private async Task UseHerbalistHutService()
     {
+        if (currentPlayer.SettlementHerbClaimedToday)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("The herbalist has already given you a herb today. Come back tomorrow.");
+            await terminal.PressAnyKey();
+            return;
+        }
+
         // Give a random herb
         var herbTypes = Enum.GetValues(typeof(HerbType)).Cast<HerbType>().Where(h => h != HerbType.None).ToArray();
         var herb = herbTypes[_random.Next(herbTypes.Length)];
@@ -975,6 +1069,7 @@ public class SettlementLocation : BaseLocation
 
         // Add herb
         currentPlayer.AddHerb(herb);
+        currentPlayer.SettlementHerbClaimedToday = true;
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("");

@@ -173,6 +173,7 @@ public class MudServer
             string? authLine = null;
             bool isInteractive = false;
             byte[]? firstBytes = null;
+            string? forwardedIP = null;
 
             try
             {
@@ -184,6 +185,25 @@ public class MudServer
             {
                 // Timeout — no AUTH header received, switch to interactive mode
                 isInteractive = true;
+            }
+
+            // Check for X-IP forwarded client IP from relay/proxy
+            if (authLine != null && authLine.StartsWith("X-IP:"))
+            {
+                forwardedIP = authLine.Substring(5).Trim();
+                Console.Error.WriteLine($"[MUD] Forwarded client IP: {forwardedIP}");
+                // Read the next line for AUTH header
+                authLine = null;
+                try
+                {
+                    using var authCts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    authCts2.CancelAfter(TimeSpan.FromMilliseconds(500));
+                    authLine = await ReadLineAsync(stream, authCts2.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    isInteractive = true;
+                }
             }
 
             if (authLine != null && !authLine.StartsWith("AUTH:"))
@@ -335,7 +355,8 @@ public class MudServer
                     sqlBackend: sqlBackend,
                     server: this,
                     cancellationToken: ct,
-                    isPlainText: isPlainText
+                    isPlainText: isPlainText,
+                    forwardedIP: forwardedIP
                 );
 
                 // If TryAdd fails (race condition), kick stale session and retry

@@ -183,6 +183,16 @@ public static class RelayClient
 
             var stream = client.GetStream();
 
+            // Forward real client IP from SSH_CLIENT env var (format: "client_ip client_port server_port")
+            var sshClient = Environment.GetEnvironmentVariable("SSH_CLIENT");
+            if (!string.IsNullOrEmpty(sshClient))
+            {
+                var clientIP = sshClient.Split(' ')[0];
+                var ipLine = $"X-IP:{clientIP}\n";
+                var ipBytes = Encoding.UTF8.GetBytes(ipLine);
+                await stream.WriteAsync(ipBytes, 0, ipBytes.Length, ct);
+            }
+
             // Send AUTH header
             string authLine;
             if (password != null && isRegistration)

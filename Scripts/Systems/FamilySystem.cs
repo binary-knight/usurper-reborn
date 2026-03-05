@@ -324,37 +324,35 @@ namespace UsurperRemake.Systems
         private CharacterClass DetermineChildClass(Child child)
         {
             var random = new Random();
+            var race = DetermineChildRace(child);
+            GameConfig.InvalidCombinations.TryGetValue(race, out var invalid);
 
-            // Soul influences class selection
+            CharacterClass[] candidates;
             if (child.Soul > 200)
             {
-                // Good children become paladins, clerics
-                return random.Next(3) switch
-                {
-                    0 => CharacterClass.Paladin,
-                    1 => CharacterClass.Cleric,
-                    _ => CharacterClass.Warrior
-                };
+                // Good children become paladins, clerics, warriors
+                candidates = new[] { CharacterClass.Paladin, CharacterClass.Cleric, CharacterClass.Warrior };
             }
             else if (child.Soul < -200)
             {
-                // Evil children become assassins, etc.
-                return random.Next(3) switch
-                {
-                    0 => CharacterClass.Assassin,
-                    1 => CharacterClass.Magician,
-                    _ => CharacterClass.Barbarian
-                };
+                // Evil children become assassins, magicians, barbarians
+                candidates = new[] { CharacterClass.Assassin, CharacterClass.Magician, CharacterClass.Barbarian };
             }
             else
             {
                 // Neutral children - random class
-                var classes = new[] {
+                candidates = new[] {
                     CharacterClass.Warrior, CharacterClass.Magician, CharacterClass.Assassin,
                     CharacterClass.Ranger, CharacterClass.Bard, CharacterClass.Sage
                 };
-                return classes[random.Next(classes.Length)];
             }
+
+            // Filter out invalid race/class combos
+            if (invalid != null)
+                candidates = candidates.Where(c => !invalid.Contains(c)).ToArray();
+
+            // Fallback to Warrior if all candidates invalid for this race
+            return candidates.Length > 0 ? candidates[random.Next(candidates.Length)] : CharacterClass.Warrior;
         }
 
         /// <summary>

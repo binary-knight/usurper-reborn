@@ -376,7 +376,7 @@ public class LevelMasterLocation : BaseLocation
         else
         {
             // Pure ability user — ability menu only
-            terminal.WriteLine($"\"Come, {currentPlayer.DisplayName}. Let me show you the way of the warrior...\"");
+            terminal.WriteLine($"\"Come, {currentPlayer.DisplayName}. Let me show you the way of the {currentPlayer.Class.ToString().ToLower()}...\"");
             await Task.Delay(800);
             await ClassAbilitySystem.ShowAbilityLearningMenu(currentPlayer, terminal);
         }

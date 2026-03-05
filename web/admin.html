@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Usurper Reborn - Server Admin</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
   :root {
     --bg: #0a0a0f;
@@ -277,6 +279,14 @@
     padding: 0.5rem 0.75rem; border-radius: 4px; margin-bottom: 0.75rem; font-size: 11px;
   }
 
+  /* Leaflet dark theme overrides */
+  .leaflet-popup-content-wrapper { background: #1a1a2e; color: #c8c8d4; border-radius: 6px; }
+  .leaflet-popup-tip { background: #1a1a2e; }
+  .leaflet-popup-close-button { color: #666680 !important; }
+  .leaflet-control-zoom a { background: #12121a !important; color: #c8c8d4 !important; border-color: #1e1e2e !important; }
+  .leaflet-control-attribution { background: rgba(10,10,15,0.7) !important; color: #666680 !important; font-size: 10px !important; }
+  .leaflet-control-attribution a { color: #666680 !important; }
+
   /* Editable fields */
   .field-grid {
     display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 1rem;
@@ -411,6 +421,15 @@
     <div class="section">
       <div class="section-title">Online Players</div>
       <div class="section-body" id="online-body">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Player Map -->
+  <div class="section">
+    <div class="section-title">Player Locations</div>
+    <div class="section-body">
+      <div id="player-map" style="height:340px;border-radius:6px;background:#1a1a2e;"></div>
+      <div id="map-status" style="color:var(--dim);font-size:11px;margin-top:6px;"></div>
     </div>
   </div>
 
@@ -730,16 +749,85 @@ function renderOnlinePlayers(data) {
     return;
   }
   el.innerHTML = `<table>
-    <tr><th>Name</th><th>Level</th><th>Class</th><th>Location</th><th>Type</th><th>Connected</th></tr>
+    <tr><th>Name</th><th>Level</th><th>Class</th><th>Location</th><th>Type</th><th>IP</th><th>Connected</th></tr>
     ${players.map(p => `<tr>
       <td>${p.name}</td>
       <td>${p.level}</td>
       <td>${p.className}</td>
       <td>${p.location}</td>
       <td>${connTag(p.connectionType)}</td>
+      <td style="color:var(--dim);font-size:11px">${p.ip || '—'}</td>
       <td>${fmtTimeAgo(p.connectedAt)}</td>
     </tr>`).join('')}
   </table>`;
+}
+
+// --- Player Map ---
+let playerMap = null;
+let mapMarkers = [];
+
+function initMap() {
+  if (playerMap) return;
+  const el = document.getElementById('player-map');
+  if (!el) return;
+  playerMap = L.map('player-map', {
+    center: [30, -20],
+    zoom: 2,
+    minZoom: 2,
+    maxZoom: 10,
+    zoomControl: true
+  });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(playerMap);
+}
+
+async function refreshPlayerMap() {
+  try {
+    initMap();
+    if (!playerMap) return;
+    const data = await apiFetch('/geolocate');
+    const players = data.players || [];
+
+    // Clear old markers
+    mapMarkers.forEach(m => playerMap.removeLayer(m));
+    mapMarkers = [];
+
+    const statusEl = document.getElementById('map-status');
+
+    if (players.length === 0) {
+      statusEl.textContent = 'No geolocatable players online (localhost/relay IPs excluded)';
+      return;
+    }
+
+    players.forEach(p => {
+      const marker = L.circleMarker([p.geo.lat, p.geo.lon], {
+        radius: 8,
+        fillColor: '#00e5ff',
+        color: '#00e5ff',
+        weight: 2,
+        opacity: 0.9,
+        fillOpacity: 0.5
+      }).addTo(playerMap);
+
+      marker.bindPopup(`
+        <div style="font-family:monospace;font-size:12px;line-height:1.4">
+          <strong style="color:#00e5ff">${p.name}</strong><br>
+          Lv ${p.level} ${p.className}<br>
+          ${p.connectionType} &mdash; ${p.ip}<br>
+          <span style="color:#999">${p.geo.city}, ${p.geo.country}</span>
+        </div>
+      `);
+      mapMarkers.push(marker);
+    });
+
+    statusEl.textContent = `${players.length} player${players.length !== 1 ? 's' : ''} located`;
+  } catch (e) {
+    const statusEl = document.getElementById('map-status');
+    if (statusEl) statusEl.textContent = 'Map unavailable: ' + e.message;
+  }
 }
 
 // --- Database + SSL + Version ---
@@ -896,6 +984,9 @@ async function refreshAll() {
     renderSslVersion(ssl, version);
     renderLogins(activity);
     renderNews(activity);
+
+    // Refresh player map (async, don't block dashboard render)
+    refreshPlayerMap();
 
     refreshEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
   } catch (e) {

@@ -37,11 +37,12 @@ const SSH_PASS = 'play';
 const DB_PATH = process.env.DB_PATH || '/var/usurper/usurper_online.db';
 
 // MUD mode: connect directly to MUD TCP server instead of through SSH
-// Default ON since the MUD server now listens directly on port 4000.
+// Default ON since the MUD server now listens directly on port 4001.
+// Connects to 4001 directly (bypassing sslh on 4000) so X-IP forwarding works.
 // Set MUD_MODE=0 to fall back to legacy SSH mode if needed.
 const MUD_MODE = process.env.MUD_MODE !== '0';
 const MUD_HOST = process.env.MUD_HOST || '127.0.0.1';
-const MUD_PORT = parseInt(process.env.MUD_PORT || '4000', 10);
+const MUD_PORT = parseInt(process.env.MUD_PORT || '4001', 10);
 const CACHE_TTL = 30000; // 30 seconds
 let _ghReleasesCache = null;
 let _ghReleasesCacheTime = 0;
@@ -1849,7 +1850,8 @@ function getAdminActivity() {
       SELECT op.username, op.display_name, op.location, op.connected_at,
              json_extract(p.player_data, '$.player.level') as level,
              json_extract(p.player_data, '$.player.class') as class_id,
-             COALESCE(op.connection_type, 'Unknown') as connection_type
+             COALESCE(op.connection_type, 'Unknown') as connection_type,
+             COALESCE(op.ip_address, '') as ip_address
       FROM online_players op
       LEFT JOIN players p ON LOWER(op.username) = LOWER(p.username)
       WHERE op.last_heartbeat >= datetime('now', '-120 seconds')
@@ -1860,7 +1862,8 @@ function getAdminActivity() {
       className: CLASS_NAMES[r.class_id] || 'Unknown',
       location: r.location || 'Unknown',
       connectionType: r.connection_type,
-      connectedAt: r.connected_at
+      connectedAt: r.connected_at,
+      ip: r.ip_address || ''
     }));
   } catch (e) { /* query failed */ }
 
@@ -2023,6 +2026,61 @@ async function handleAdminRequest(req, res) {
       } catch (e) { /* non-critical */ }
     }
     sendJson(res, 200, { success: true });
+    return true;
+  }
+
+  // GET /api/admin/geolocate — resolve IPs of online players to lat/lng/country/city
+  if (method === 'GET' && url === '/api/admin/geolocate') {
+    try {
+      const rows = db.prepare(`
+        SELECT display_name, ip_address, connection_type,
+               json_extract(p.player_data, '$.player.level') as level,
+               json_extract(p.player_data, '$.player.class') as class_id
+        FROM online_players op
+        LEFT JOIN players p ON LOWER(op.username) = LOWER(p.username)
+        WHERE op.last_heartbeat >= datetime('now', '-120 seconds')
+          AND op.ip_address IS NOT NULL AND op.ip_address != ''
+      `).all();
+
+      // Filter out localhost/relay IPs (127.x, ::1) — these are SSH relay connections
+      const validRows = rows.filter(r => r.ip_address && !r.ip_address.startsWith('127.') && r.ip_address !== '::1');
+      const uniqueIPs = [...new Set(validRows.map(r => r.ip_address))];
+
+      if (uniqueIPs.length === 0) {
+        sendJson(res, 200, { players: [] });
+        return true;
+      }
+
+      // Use ip-api.com batch endpoint (free, no key, 15 req/min for batch)
+      const geoRes = await fetch('http://ip-api.com/batch?fields=status,country,city,lat,lon,query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(uniqueIPs.map(ip => ({ query: ip })))
+      });
+      const geoData = await geoRes.json();
+
+      // Build IP -> geo lookup
+      const geoMap = {};
+      for (const g of geoData) {
+        if (g.status === 'success') {
+          geoMap[g.query] = { lat: g.lat, lon: g.lon, country: g.country, city: g.city };
+        }
+      }
+
+      // Map players to geo data
+      const players = validRows.map(r => ({
+        name: r.display_name,
+        level: r.level || 1,
+        className: CLASS_NAMES[r.class_id] || 'Unknown',
+        connectionType: r.connection_type || 'Unknown',
+        ip: r.ip_address,
+        geo: geoMap[r.ip_address] || null
+      })).filter(p => p.geo);
+
+      sendJson(res, 200, { players });
+    } catch (e) {
+      sendJson(res, 500, { error: 'Geolocation failed: ' + e.message });
+    }
     return true;
   }
 
@@ -2635,6 +2693,8 @@ wss.on('connection', (ws, req) => {
     // presents an interactive login/register menu directly to the user.
     const tcp = net.connect({ host: MUD_HOST, port: MUD_PORT }, () => {
       console.log(`[usurper-web] TCP connected to MUD server for ${clientIP}`);
+      // Forward real client IP to game server before interactive auth begins
+      tcp.write(`X-IP:${clientIP}\n`);
     });
 
     // TCP → WebSocket

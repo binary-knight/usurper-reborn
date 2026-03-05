@@ -74,9 +74,18 @@ public class HomeLocation : BaseLocation
         terminal.SetColor(currentPlayer.HP < currentPlayer.MaxHP / 4 ? "red" : (currentPlayer.HP < currentPlayer.MaxHP / 2 ? "yellow" : "bright_green"));
         terminal.Write($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
         terminal.SetColor("gray");
-        terminal.Write("  |  Mana: ");
-        terminal.SetColor("bright_blue");
-        terminal.Write($"{currentPlayer.Mana}/{currentPlayer.MaxMana}");
+        if (currentPlayer.IsManaClass)
+        {
+            terminal.Write("  |  Mana: ");
+            terminal.SetColor("bright_blue");
+            terminal.Write($"{currentPlayer.Mana}/{currentPlayer.MaxMana}");
+        }
+        else
+        {
+            terminal.Write("  |  Stamina: ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"{currentPlayer.CurrentCombatStamina}/{currentPlayer.MaxCombatStamina}");
+        }
         terminal.SetColor("gray");
         terminal.Write("  |  Gold: ");
         terminal.SetColor("bright_yellow");
@@ -658,7 +667,10 @@ public class HomeLocation : BaseLocation
         else
         {
             terminal.SetColor("green");
-            terminal.WriteLine($"Recovered {healAmount} HP and {manaAmount} mana. ({(int)(restEfficiency * 100)}% recovery)");
+            if (currentPlayer.IsManaClass)
+                terminal.WriteLine($"Recovered {healAmount} HP and {manaAmount} mana. ({(int)(restEfficiency * 100)}% recovery)");
+            else
+                terminal.WriteLine($"Recovered {healAmount} HP. ({(int)(restEfficiency * 100)}% recovery)");
         }
 
         currentPlayer.HomeRestsToday++;
@@ -808,7 +820,10 @@ public class HomeLocation : BaseLocation
         else
         {
             terminal.SetColor("green");
-            terminal.WriteLine($"Recovered {healAmount} HP, {manaAmount} mana, {staminaAmount} stamina. ({(int)(restEfficiency * 100)}% recovery)");
+            if (currentPlayer.IsManaClass)
+                terminal.WriteLine($"Recovered {healAmount} HP, {manaAmount} mana. ({(int)(restEfficiency * 100)}% recovery)");
+            else
+                terminal.WriteLine($"Recovered {healAmount} HP, {staminaAmount} stamina. ({(int)(restEfficiency * 100)}% recovery)");
         }
 
         // Apply Well-Rested buff from Hearth

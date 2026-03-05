@@ -2706,9 +2706,10 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("Gold piled higher than you've ever seen!");
             terminal.WriteLine("The dragon seems to be away...");
 
-            player.Gold += level * 3000;  // Increased from 1000 for economic balance
+            long hoardGold = level * 3000;
+            player.Gold += hoardGold;
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"You grab {level * 1000} gold and RUN!");
+            terminal.WriteLine($"You grab {hoardGold:N0} gold and RUN!");
             await terminal.PressAnyKey();
         }
 

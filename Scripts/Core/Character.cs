@@ -557,9 +557,14 @@ public class Character
     public int SettlementBuffCombats { get; set; }    // Remaining combats
     public float SettlementBuffValue { get; set; }    // Buff multiplier
     public bool HasSettlementBuff => SettlementBuffType > 0 && SettlementBuffCombats > 0;
+    public bool SettlementGoldClaimedToday { get; set; }
+    public bool SettlementHerbClaimedToday { get; set; }
+    public bool SettlementShrineUsedToday { get; set; }
+    public bool SettlementCircleUsedToday { get; set; }
 
     // Wilderness exploration (v0.49.4)
     public int WildernessExplorationsToday { get; set; } = 0;
+    public int WildernessRevisitsToday { get; set; } = 0;
     public HashSet<string> WildernessDiscoveries { get; set; } = new();
 
     // Faction consumable properties (v0.40.2)

@@ -104,6 +104,7 @@ namespace UsurperRemake.Systems
                         location TEXT,
                         node_id TEXT,
                         connection_type TEXT DEFAULT 'Unknown',
+                        ip_address TEXT DEFAULT '',
                         connected_at TEXT DEFAULT (datetime('now')),
                         last_heartbeat TEXT DEFAULT (datetime('now'))
                     );
@@ -352,6 +353,15 @@ namespace UsurperRemake.Systems
                 using var migCmd2 = connection.CreateCommand();
                 migCmd2.CommandText = "ALTER TABLE auction_listings ADD COLUMN gold_collected INTEGER DEFAULT 0;";
                 migCmd2.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
+            // Migration: add ip_address column to online_players
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE online_players ADD COLUMN ip_address TEXT DEFAULT '';";
+                migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
 
@@ -1296,20 +1306,21 @@ namespace UsurperRemake.Systems
             }
         }
 
-        public async Task RegisterOnline(string username, string displayName, string location, string connectionType = "Unknown")
+        public async Task RegisterOnline(string username, string displayName, string location, string connectionType = "Unknown", string ipAddress = "")
         {
             try
             {
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    INSERT INTO online_players (username, display_name, location, node_id, connection_type, connected_at, last_heartbeat)
-                    VALUES (@username, @displayName, @location, @nodeId, @connectionType, datetime('now'), datetime('now'))
+                    INSERT INTO online_players (username, display_name, location, node_id, connection_type, ip_address, connected_at, last_heartbeat)
+                    VALUES (@username, @displayName, @location, @nodeId, @connectionType, @ipAddress, datetime('now'), datetime('now'))
                     ON CONFLICT(username) DO UPDATE SET
                         display_name = @displayName,
                         location = @location,
                         node_id = @nodeId,
                         connection_type = @connectionType,
+                        ip_address = @ipAddress,
                         connected_at = datetime('now'),
                         last_heartbeat = datetime('now');
                 ";
@@ -1318,6 +1329,7 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@location", location);
                 cmd.Parameters.AddWithValue("@nodeId", Environment.ProcessId.ToString());
                 cmd.Parameters.AddWithValue("@connectionType", connectionType);
+                cmd.Parameters.AddWithValue("@ipAddress", ipAddress);
                 await cmd.ExecuteNonQueryAsync();
             }
             catch (Exception ex)

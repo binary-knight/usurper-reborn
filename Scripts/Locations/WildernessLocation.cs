@@ -52,8 +52,9 @@ public class WildernessLocation : BaseLocation
         int discoveryCount = currentPlayer.WildernessDiscoveries.Count;
         if (discoveryCount > 0)
         {
+            int revisitsLeft = GameConfig.WildernessMaxDailyRevisits - currentPlayer.WildernessRevisitsToday;
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  [D] Discoveries ({discoveryCount} found)");
+            terminal.WriteLine($"  [D] Discoveries ({discoveryCount} found, {revisitsLeft} revisits left)");
         }
 
         terminal.SetColor("gray");
@@ -82,7 +83,10 @@ public class WildernessLocation : BaseLocation
         }
 
         if (currentPlayer.WildernessDiscoveries.Count > 0)
-            terminal.WriteLine($"[D] Discoveries ({currentPlayer.WildernessDiscoveries.Count})");
+        {
+            int revisitsLeft = GameConfig.WildernessMaxDailyRevisits - currentPlayer.WildernessRevisitsToday;
+            terminal.WriteLine($"[D] Discoveries ({currentPlayer.WildernessDiscoveries.Count}, {revisitsLeft} revisits)");
+        }
         terminal.WriteLine("[R] Return");
         terminal.WriteLine("");
         ShowStatusLine();
@@ -113,7 +117,7 @@ public class WildernessLocation : BaseLocation
                 throw new LocationExitException(GameLocation.MainStreet);
 
             default:
-                var (handled, shouldExit) = await TryProcessGlobalCommand(upper);
+                var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
                 if (handled) return shouldExit;
                 return false;
         }
@@ -637,16 +641,16 @@ public class WildernessLocation : BaseLocation
         {
             var (region, discovery) = allDiscoveries[idx - 1];
 
-            // Visiting a discovery costs an exploration
-            if (currentPlayer.WildernessExplorationsToday >= GameConfig.WildernessMaxDailyExplorations)
+            // Visiting a discovery costs a revisit (separate from expeditions)
+            if (currentPlayer.WildernessRevisitsToday >= GameConfig.WildernessMaxDailyRevisits)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine("You're too tired for another expedition today.");
+                terminal.WriteLine("You've already revisited enough discoveries for today.");
                 await Task.Delay(2000);
                 return;
             }
 
-            currentPlayer.WildernessExplorationsToday++;
+            currentPlayer.WildernessRevisitsToday++;
 
             terminal.ClearScreen();
             terminal.SetColor("bright_cyan");

@@ -725,12 +725,66 @@ namespace UsurperRemake.Locations
 
             if (eligibleNPCs.Count == 0)
             {
-                terminal.WriteLine("\"However, I see no one who is ready to marry you.\"", "bright_yellow");
+                terminal.WriteLine("\"For marriage, both hearts must burn with love.\"", "bright_yellow");
+                terminal.WriteLine("\"Let me consult the spirits and see where your heart stands...\"", "bright_yellow");
                 terminal.WriteLine("");
-                terminal.WriteLine("To marry someone, you must first build a relationship with them.", "gray");
-                terminal.WriteLine("Visit the Love Corner to court potential partners.", "gray");
-                terminal.WriteLine("Both of you must be in love before marriage is possible.", "gray");
-                await Task.Delay(3000);
+
+                // Show the player's closest romantic relationships so they know how far they are
+                var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>();
+                var prospects = new List<(NPC npc, int playerFeeling, int npcFeeling)>();
+                foreach (var npc in allNPCs)
+                {
+                    if (!npc.IsAlive || npc.IsDead || npc.IsMarried) continue;
+                    var pf = RelationshipSystem.GetRelationshipLevel(currentPlayer, npc);
+                    var nf = RelationshipSystem.GetRelationshipLevel(npc, currentPlayer);
+                    // Only show NPCs the player has some relationship with (better than Normal)
+                    if (pf < GameConfig.RelationNormal || nf < GameConfig.RelationNormal)
+                        prospects.Add((npc, pf, nf));
+                }
+
+                if (prospects.Count > 0)
+                {
+                    // Sort by best combined feeling (lowest = closest to love)
+                    prospects.Sort((a, b) => (a.playerFeeling + a.npcFeeling).CompareTo(b.playerFeeling + b.npcFeeling));
+                    int shown = Math.Min(prospects.Count, 5);
+
+                    terminal.WriteLine("  Your closest relationships:", "cyan");
+                    terminal.WriteLine("  Name                     You → Them    Them → You", "darkgray");
+                    terminal.WriteLine("  ─────────────────────────────────────────────────────", "darkgray");
+                    for (int i = 0; i < shown; i++)
+                    {
+                        var (npc, pf, nf) = prospects[i];
+                        var pfInfo = GetRelationshipDisplayInfo(pf);
+                        var nfInfo = GetRelationshipDisplayInfo(nf);
+                        string name = (npc.Name2 ?? npc.DisplayName).PadRight(25);
+                        terminal.Write($"  {name}", "white");
+                        terminal.Write($"{pfInfo.text,-14}", pfInfo.color);
+                        terminal.WriteLine($"{nfInfo.text}", nfInfo.color);
+                    }
+                    terminal.WriteLine("");
+
+                    // Check if anyone is close and give specific advice
+                    var closest = prospects[0];
+                    if (closest.playerFeeling <= GameConfig.RelationLove && closest.npcFeeling <= GameConfig.RelationPassion)
+                        terminal.WriteLine($"\"Ah, {closest.npc.Name2} is nearly ready! Keep courting at Love Street.\"", "bright_yellow");
+                    else if (closest.playerFeeling <= GameConfig.RelationPassion || closest.npcFeeling <= GameConfig.RelationPassion)
+                        terminal.WriteLine("\"Passion stirs, but love has not yet bloomed. Visit Love Street.\"", "bright_yellow");
+                    else
+                        terminal.WriteLine("\"These bonds need much nurturing before wedding bells ring.\"", "bright_yellow");
+                }
+                else
+                {
+                    terminal.WriteLine("\"I sense no romantic connections in your heart at all.\"", "bright_yellow");
+                }
+
+                terminal.WriteLine("");
+                terminal.WriteLine("How to reach marriage:", "white");
+                terminal.WriteLine("  1. Visit Love Street [X] — compliments, drinks, dates, and gifts", "gray");
+                terminal.WriteLine("  2. Intimate scenes deepen bonds on both sides", "gray");
+                terminal.WriteLine("  3. Love potions at the Magic Shop [M] give a boost", "gray");
+                terminal.WriteLine("  4. Both you AND your partner must reach 'In Love' status", "gray");
+                terminal.WriteLine("  Note: Regular talking [0] only builds up to Friendship.", "gray");
+                await terminal.PressAnyKey();
                 return;
             }
 

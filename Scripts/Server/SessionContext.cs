@@ -39,6 +39,7 @@ public class SessionContext : IDisposable
     public string Username { get; init; } = "";
     public string CharacterKey { get; set; } = "";  // Save key — same as Username unless playing alt character
     public string ConnectionType { get; init; } = "Unknown"; // Web, SSH, BBS
+    public string RemoteIP { get; init; } = ""; // Client IP address
     public CancellationToken CancellationToken { get; init; }
 
     // --- Per-Session Terminal ---

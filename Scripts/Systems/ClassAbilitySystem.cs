@@ -958,6 +958,32 @@ public static class ClassAbilitySystem
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Bard, CharacterClass.Jester }
         },
+        ["carnival_of_chaos"] = new ClassAbility
+        {
+            Id = "carnival_of_chaos",
+            Name = "Carnival of Chaos",
+            Description = "Unleash a whirlwind of tricks, pranks, and mayhem on all enemies.",
+            LevelRequired = 82,
+            StaminaCost = 75,
+            Cooldown = 5,
+            Type = AbilityType.Attack,
+            BaseDamage = 140,  // High level AoE - scales with STR+DEX
+            SpecialEffect = "aoe",
+            AvailableToClasses = new[] { CharacterClass.Jester }
+        },
+        ["last_laugh"] = new ClassAbility
+        {
+            Id = "last_laugh",
+            Name = "Last Laugh",
+            Description = "The final punchline. A devastating trick that leaves your foe broken.",
+            LevelRequired = 93,
+            StaminaCost = 90,
+            Cooldown = 7,
+            Type = AbilityType.Attack,
+            BaseDamage = 230,  // Capstone single-target - scales with STR+DEX
+            SpecialEffect = "confusion",
+            AvailableToClasses = new[] { CharacterClass.Jester }
+        },
         ["legend_incarnate"] = new ClassAbility
         {
             Id = "legend_incarnate",
@@ -1423,10 +1449,10 @@ public static class ClassAbilitySystem
             SpecialEffect = "oceans_voice",
             AvailableToClasses = new[] { CharacterClass.Wavecaller }
         },
-        ["grand_finale"] = new ClassAbility
+        ["harmonic_crescendo"] = new ClassAbility
         {
-            Id = "grand_finale",
-            Name = "Grand Finale",
+            Id = "harmonic_crescendo",
+            Name = "Harmonic Crescendo",
             Description = "Devastating harmonic crescendo. 300 AoE damage + 50 per active buff on party. Consumes all buffs.",
             LevelRequired = 95, StaminaCost = 120, Cooldown = 8,
             Type = AbilityType.Attack, BaseDamage = 300,

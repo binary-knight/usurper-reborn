@@ -312,15 +312,9 @@ public class LocationManager
             }
             else
             {
-                // NoWhere means quit game - force save before exiting
-                try
-                {
-                    await GameEngine.Instance.SaveCurrentGame();
-                }
-                catch (Exception saveEx)
-                {
-                    Console.Error.WriteLine($"[LocationManager] Save on quit failed: {saveEx.Message}");
-                }
+                // NoWhere means quit game
+                // Note: MainStreetLocation.QuitGame() already saves before throwing NoWhere,
+                // so we don't save again here to avoid double "game saved" messages.
                 GameEngine.MarkIntentionalExit();
                 if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 {

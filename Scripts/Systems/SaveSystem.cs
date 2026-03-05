@@ -759,6 +759,7 @@ namespace UsurperRemake.Systems
                 VisitedSettlements = player.VisitedSettlements?.ToList() ?? new List<string>(),
                 SettlementLoreRead = player.SettlementLoreRead?.ToList() ?? new List<string>(),
                 WildernessExplorationsToday = player.WildernessExplorationsToday,
+                WildernessRevisitsToday = player.WildernessRevisitsToday,
                 WildernessDiscoveries = player.WildernessDiscoveries?.ToList() ?? new List<string>(),
 
                 // Dark Pact & Evil Deed tracking (v0.49.4)
@@ -771,6 +772,10 @@ namespace UsurperRemake.Systems
                 SettlementBuffType = player.SettlementBuffType,
                 SettlementBuffCombats = player.SettlementBuffCombats,
                 SettlementBuffValue = player.SettlementBuffValue,
+                SettlementGoldClaimedToday = player.SettlementGoldClaimedToday,
+                SettlementHerbClaimedToday = player.SettlementHerbClaimedToday,
+                SettlementShrineUsedToday = player.SettlementShrineUsedToday,
+                SettlementCircleUsedToday = player.SettlementCircleUsedToday,
 
                 // Faction consumable properties (v0.40.2)
                 PoisonCoatingCombats = player.PoisonCoatingCombats,

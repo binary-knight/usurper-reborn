@@ -502,6 +502,7 @@ namespace UsurperRemake.Systems
         public List<string> VisitedSettlements { get; set; } = new();
         public List<string> SettlementLoreRead { get; set; } = new();
         public int WildernessExplorationsToday { get; set; }
+        public int WildernessRevisitsToday { get; set; }
         public List<string> WildernessDiscoveries { get; set; } = new();
 
         // Dark Pact & Evil Deed tracking (v0.49.4)
@@ -514,6 +515,10 @@ namespace UsurperRemake.Systems
         public int SettlementBuffType { get; set; }
         public int SettlementBuffCombats { get; set; }
         public float SettlementBuffValue { get; set; }
+        public bool SettlementGoldClaimedToday { get; set; }
+        public bool SettlementHerbClaimedToday { get; set; }
+        public bool SettlementShrineUsedToday { get; set; }
+        public bool SettlementCircleUsedToday { get; set; }
 
         // Faction consumable properties (v0.40.2)
         public int PoisonCoatingCombats { get; set; }

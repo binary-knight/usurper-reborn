@@ -427,11 +427,15 @@ public partial class CombatEngine
         }
         if (player.SettlementBuffCombats > 0)
         {
-            player.SettlementBuffCombats--;
-            if (player.SettlementBuffCombats <= 0)
+            // TrapResist buff counts down per trap encounter, not per combat
+            if (player.SettlementBuffType != (int)UsurperRemake.Systems.SettlementBuffType.TrapResist)
             {
-                player.SettlementBuffType = 0;
-                player.SettlementBuffValue = 0f;
+                player.SettlementBuffCombats--;
+                if (player.SettlementBuffCombats <= 0)
+                {
+                    player.SettlementBuffType = 0;
+                    player.SettlementBuffValue = 0f;
+                }
             }
         }
 
@@ -947,6 +951,25 @@ public partial class CombatEngine
                             BroadcastGroupCombatEvent(result,
                                 $"\u001b[36m  {monster.Name} hesitates, confused by internal contradictions!\u001b[0m");
                         await Task.Delay(GetCombatDelay(500));
+                        continue;
+                    }
+
+                    // Skip "attacks!" message for incapacitated monsters — check status BEFORE
+                    // printing so the player doesn't see "Monster attacks!" followed by "Monster is asleep!"
+                    if (monster.IsSleeping || monster.IsFeared || monster.IsStunned || monster.IsFrozen)
+                    {
+                        // Still call ProcessMonsterAction to tick down durations and print status messages
+                        if (hasGroup) terminal.StartCapture();
+                        terminal.WriteLine("");
+                        await ProcessMonsterAction(monster, player, result);
+                        if (hasGroup)
+                        {
+                            string? statusOutput = terminal.StopCapture();
+                            if (!string.IsNullOrWhiteSpace(statusOutput))
+                                BroadcastGroupCombatEvent(result,
+                                    ConvertToThirdPerson(statusOutput, player.DisplayName));
+                        }
+                        await Task.Delay(GetCombatDelay(800));
                         continue;
                     }
 
@@ -3448,9 +3471,22 @@ public partial class CombatEngine
         // Roll monster attack against player AC
         var monsterRoll = TrainingSystem.RollMonsterAttack(monster, player, random);
 
-        // Show the roll result
-        terminal.SetColor("dark_gray");
-        terminal.WriteLine($"[{monster.Name} rolls: {monsterRoll.NaturalRoll} + {monsterRoll.Modifier} = {monsterRoll.Total} vs AC {monsterRoll.TargetDC}]");
+        // Distraction penalty: -5 to hit roll (Vicious Mockery, etc.)
+        if (monster.Distracted)
+        {
+            monsterRoll.Total -= 5;
+            monsterRoll.Modifier -= 5;
+            monsterRoll.Success = monsterRoll.Total >= monsterRoll.TargetDC;
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine($"[{monster.Name} rolls: {monsterRoll.NaturalRoll} + {monsterRoll.Modifier} = {monsterRoll.Total} vs AC {monsterRoll.TargetDC}] (distracted: -5)");
+            monster.Distracted = false;
+        }
+        else
+        {
+            // Show the roll result
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine($"[{monster.Name} rolls: {monsterRoll.NaturalRoll} + {monsterRoll.Modifier} = {monsterRoll.Total} vs AC {monsterRoll.TargetDC}]");
+        }
 
         // Blur / duplicate miss chance (20%) - additional miss chance on top of D20
         if (player.HasStatus(StatusEffect.Blur) && monsterRoll.Success)
@@ -3579,13 +3615,6 @@ public partial class CombatEngine
         if (player.King)
         {
             playerDefense = (long)(playerDefense * GameConfig.KingCombatDefenseBonus);
-        }
-
-        // Apply monster distraction (reduces monster accuracy effectively increasing defense)
-        if (monster.Distracted)
-        {
-            playerDefense += 15; // Distraction gives effective +15 defense
-            monster.Distracted = false;
         }
 
         // Well-Rested defense bonus (Home Hearth buff)
@@ -4839,7 +4868,7 @@ public partial class CombatEngine
         {
             expReward += (long)(expReward * result.Player.SettlementBuffValue);
         }
-        // Settlement Library XP bonus (stacks with Tavern via different buff type)
+        // Settlement Library XP bonus (separate buff type from Tavern)
         if (result.Player.HasSettlementBuff && result.Player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.LibraryXP)
         {
             expReward += (long)(expReward * result.Player.SettlementBuffValue);
@@ -4870,6 +4899,13 @@ public partial class CombatEngine
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
         {
             expReward += (long)(expReward * GameConfig.FatigueExhaustedXPPenalty);
+        }
+
+        // Auto-reset XP distribution when fighting solo — prevents 0% XP trap
+        bool hasXPTeammates = result.Teammates != null && result.Teammates.Any(t => t != null && !t.IsGroupedPlayer);
+        if (!hasXPTeammates && result.Player.TeamXPPercent[0] < 100)
+        {
+            result.Player.TeamXPPercent[0] = 100;
         }
 
         // Apply per-slot XP percentage distribution
@@ -5294,6 +5330,14 @@ public partial class CombatEngine
         // Apply poison coating effects on hit
         if (target.IsAlive)
             ApplyPoisonEffectsOnHit(attacker, target);
+
+        // Gnoll racial: Poisonous Bite — 15% chance to poison on hit
+        if (attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
+        {
+            target.Poisoned = true;
+            target.PoisonRounds = Math.Max(target.PoisonRounds, 3);
+            terminal.WriteLine($"Your venomous bite poisons {target.Name}!", "dark_green");
+        }
     }
 
     /// <summary>
@@ -6243,6 +6287,18 @@ public partial class CombatEngine
                             case LootGenerator.SpecialEffect.MagicResist:
                                 equipment.MagicResistance = Math.Max(equipment.MagicResistance, value);
                                 break;
+                            // Stat bonuses — STR/DEX/WIS already transferred from Item fields above,
+                            // but CON/INT have no Item field so only come through LootEffects
+                            case LootGenerator.SpecialEffect.Constitution:
+                                equipment.ConstitutionBonus += value; break;
+                            case LootGenerator.SpecialEffect.Intelligence:
+                                equipment.IntelligenceBonus += value; break;
+                            case LootGenerator.SpecialEffect.AllStats:
+                                // STR/DEX/WIS already applied from Item fields; add CON/INT/CHA
+                                equipment.ConstitutionBonus += value;
+                                equipment.IntelligenceBonus += value;
+                                equipment.CharismaBonus += value;
+                                break;
                         }
                     }
                 }
@@ -6529,6 +6585,11 @@ public partial class CombatEngine
                             case LootGenerator.SpecialEffect.Regeneration: equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
                             case LootGenerator.SpecialEffect.ManaRegen: equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
                             case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
+                            case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
+                            case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
+                            case LootGenerator.SpecialEffect.AllStats:
+                                equipment.ConstitutionBonus += value; equipment.IntelligenceBonus += value;
+                                equipment.CharismaBonus += value; break;
                         }
                     }
                 }
@@ -6990,6 +7051,11 @@ public partial class CombatEngine
                         equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
                     case LootGenerator.SpecialEffect.MagicResist:
                         equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
+                    case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
+                    case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
+                    case LootGenerator.SpecialEffect.AllStats:
+                        equipment.ConstitutionBonus += value; equipment.IntelligenceBonus += value;
+                        equipment.CharismaBonus += value; break;
                 }
             }
         }
@@ -7929,12 +7995,11 @@ public partial class CombatEngine
             if (monster.IsMarked)
                 actualDamage = (long)(actualDamage * 1.3);
 
-            // Wake sleeping monsters on damage
+            // Sleeping monsters take 50% bonus damage but stay asleep
             if (monster.IsSleeping)
             {
-                monster.IsSleeping = false;
-                monster.SleepDuration = 0;
-                terminal.WriteLine($"{monster.Name} wakes up from the attack!", "yellow");
+                long sleepBonus = actualDamage / 2;
+                actualDamage += sleepBonus;
             }
 
             monster.HP -= actualDamage;
@@ -8020,12 +8085,13 @@ public partial class CombatEngine
             }
         }
 
-        // Wake sleeping monsters on damage
+        // Sleeping monsters take 50% bonus damage (dream shatter) but stay asleep
         if (target.IsSleeping)
         {
-            target.IsSleeping = false;
-            target.SleepDuration = 0;
-            terminal.WriteLine($"{target.Name} wakes up from the attack!", "yellow");
+            long sleepBonus = actualDamage / 2;
+            actualDamage += sleepBonus;
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"{target.Name} writhes in its slumber! (+{sleepBonus} bonus damage)");
         }
 
         target.HP -= actualDamage;
@@ -9570,7 +9636,7 @@ public partial class CombatEngine
                         if (m.MonsterClass == MonsterClass.Undead || m.MonsterClass == MonsterClass.Demon || m.Undead > 0)
                             holyAoeDmg = (long)(holyAoeDmg * 1.5);
                         long actualHolyDmg = Math.Max(1, holyAoeDmg - m.ArmPow / 2);
-                        if (m.IsSleeping) { m.IsSleeping = false; m.SleepDuration = 0; }
+                        if (m.IsSleeping) { actualHolyDmg += actualHolyDmg / 2; }
                         m.HP -= actualHolyDmg;
                         result.Player?.Statistics.RecordDamageDealt(actualHolyDmg, false);
                         result.TotalDamageDealt += actualHolyDmg;
@@ -9724,7 +9790,7 @@ public partial class CombatEngine
                             terminal.SetColor("red");
                             terminal.Write($"  {m.Name}: ");
                         }
-                        if (m.IsSleeping) { m.IsSleeping = false; m.SleepDuration = 0; }
+                        if (m.IsSleeping) { blossomDmg += blossomDmg / 2; }
                         m.HP -= blossomDmg;
                         result.TotalDamageDealt += blossomDmg;
                         result.Player?.Statistics.RecordDamageDealt(blossomDmg, false);
@@ -12731,6 +12797,27 @@ public partial class CombatEngine
                         terminal.WriteLine($"{companion.DisplayName} takes {actualDmg} damage from {abilityName}!", "red");
                         result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {actualDmg}");
                     }
+                    // DamageMultiplier abilities (CrushingBlow, LifeDrain, etc.) — same logic as player path
+                    if (abilityResult.DamageMultiplier > 0 && abilityResult.DirectDamage == 0)
+                    {
+                        long abilityDefense = (long)(Math.Sqrt(companion.Defence) * 3);
+                        long dmg = Math.Max(1, (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier) - abilityDefense);
+                        if (monster.IsBoss)
+                            dmg = Math.Max(dmg, monster.Level * 2);
+                        companion.HP -= dmg;
+                        if (abilityResult.LifeStealPercent > 0)
+                        {
+                            long healAmt = dmg * abilityResult.LifeStealPercent / 100;
+                            monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
+                            terminal.WriteLine($"{companion.DisplayName} takes {dmg} damage! {monster.Name} heals {healAmt}!", "magenta");
+                            result.CombatLog.Add($"{monster.Name} life drains {companion.DisplayName} for {dmg}, heals {healAmt}");
+                        }
+                        else
+                        {
+                            terminal.WriteLine($"{companion.DisplayName} takes {dmg} damage from {abilityName}!", "red");
+                            result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {dmg}");
+                        }
+                    }
                     if (abilityResult.ManaDrain > 0)
                     {
                         companion.Mana = Math.Max(0, companion.Mana - abilityResult.ManaDrain);
@@ -13208,6 +13295,13 @@ public partial class CombatEngine
             adjustedExp += (long)(adjustedExp * GameConfig.FatigueExhaustedXPPenalty);
         }
 
+        // Auto-reset XP distribution when fighting solo — prevents 0% XP trap
+        bool hasXPTeammatesMM = result.Teammates != null && result.Teammates.Any(t => t != null && !t.IsGroupedPlayer);
+        if (!hasXPTeammatesMM && result.Player.TeamXPPercent[0] < 100)
+        {
+            result.Player.TeamXPPercent[0] = 100;
+        }
+
         // Apply per-slot XP percentage distribution
         long totalXPPotMM = adjustedExp;
         long playerXPmm = (long)(totalXPPotMM * result.Player.TeamXPPercent[0] / 100.0);
@@ -13501,6 +13595,13 @@ public partial class CombatEngine
         if (result.Player.CycleExpMultiplier > 1.0f)
         {
             adjustedExp = (long)(adjustedExp * result.Player.CycleExpMultiplier);
+        }
+
+        // Auto-reset XP distribution when fighting solo — prevents 0% XP trap
+        bool hasXPTeammatesPV = result.Teammates != null && result.Teammates.Any(t => t != null && !t.IsGroupedPlayer);
+        if (!hasXPTeammatesPV && result.Player.TeamXPPercent[0] < 100)
+        {
+            result.Player.TeamXPPercent[0] = 100;
         }
 
         // Apply per-slot XP percentage distribution
@@ -17364,7 +17465,21 @@ public partial class CombatEngine
             }
         }
 
-        // Handle ability quickbar slot
+        // Handle ability quickbar slot — prompt for target on Attack/Debuff abilities
+        var abilityDef = ClassAbilitySystem.GetAbility(matched.slotId);
+        if (abilityDef != null && (abilityDef.Type == ClassAbilitySystem.AbilityType.Attack || abilityDef.Type == ClassAbilitySystem.AbilityType.Debuff))
+        {
+            bool isAoe = abilityDef.SpecialEffect.Contains("aoe");
+            if (isAoe)
+            {
+                return (CombatActionType.ClassAbility, null, matched.slotId, 0, null, true);
+            }
+            else
+            {
+                var targetIdx = await GetTargetSelection(monsters, allowRandom: true);
+                return (CombatActionType.ClassAbility, targetIdx, matched.slotId, 0, null, false);
+            }
+        }
         return (CombatActionType.ClassAbility, null, matched.slotId, 0, null, false);
     }
 

@@ -60,7 +60,7 @@ public partial class Quest
     
     public Quest()
     {
-        Id = $"Q{DateTime.Now:yyyyMMddHHmmss}{Random.Shared.Next() % 1000:D3}";
+        Id = $"Q{Guid.NewGuid():N}";
         Date = DateTime.Now;
         DaysToComplete = 7; // Default 7 days
         Monsters = new List<QuestMonster>();

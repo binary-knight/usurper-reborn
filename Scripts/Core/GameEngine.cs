@@ -2163,6 +2163,8 @@ public partial class GameEngine
                     DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
                 }
 
+                // Load settlement from world_state (authoritative source, not stale player save)
+                await OnlineStateManager.Instance.LoadSettlementFromWorldState();
             }
 
             // In online mode, merge this player's quests into the shared database
@@ -2894,6 +2896,8 @@ public partial class GameEngine
                 DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
             }
 
+            // Load settlement from world_state (authoritative source, not stale player save)
+            await OnlineStateManager.Instance.LoadSettlementFromWorldState();
         }
 
         // Restore story systems (companions, children, seals, etc.)
@@ -3783,6 +3787,7 @@ public partial class GameEngine
         player.VisitedSettlements = playerData.VisitedSettlements != null ? new HashSet<string>(playerData.VisitedSettlements) : new HashSet<string>();
         player.SettlementLoreRead = playerData.SettlementLoreRead != null ? new HashSet<string>(playerData.SettlementLoreRead) : new HashSet<string>();
         player.WildernessExplorationsToday = playerData.WildernessExplorationsToday;
+        player.WildernessRevisitsToday = playerData.WildernessRevisitsToday;
         player.WildernessDiscoveries = playerData.WildernessDiscoveries != null ? new HashSet<string>(playerData.WildernessDiscoveries) : new HashSet<string>();
 
         // Dark Pact & Evil Deed tracking (v0.49.4)
@@ -3795,6 +3800,10 @@ public partial class GameEngine
         player.SettlementBuffType = playerData.SettlementBuffType;
         player.SettlementBuffCombats = playerData.SettlementBuffCombats;
         player.SettlementBuffValue = playerData.SettlementBuffValue;
+        player.SettlementGoldClaimedToday = playerData.SettlementGoldClaimedToday;
+        player.SettlementHerbClaimedToday = playerData.SettlementHerbClaimedToday;
+        player.SettlementShrineUsedToday = playerData.SettlementShrineUsedToday;
+        player.SettlementCircleUsedToday = playerData.SettlementCircleUsedToday;
 
         // Restore chest contents
         var playerKey = (player is Player pp ? pp.RealName : player.Name2) ?? player.Name2;
@@ -4097,8 +4106,8 @@ public partial class GameEngine
             // GD.Print($"[GameEngine] Restored {worldState.MarketplaceListings.Count} marketplace listings");
         }
 
-        // Restore NPC settlement state
-        if (worldState.Settlement != null)
+        // Restore NPC settlement state (single-player only — online mode loads from world_state)
+        if (worldState.Settlement != null && !UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
             UsurperRemake.Systems.SettlementSystem.Instance.RestoreFromSaveData(worldState.Settlement);
         }

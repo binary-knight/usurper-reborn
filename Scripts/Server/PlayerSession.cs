@@ -106,7 +106,8 @@ public class PlayerSession : IDisposable
         SqlSaveBackend sqlBackend,
         MudServer server,
         CancellationToken cancellationToken,
-        bool isPlainText = false)
+        bool isPlainText = false,
+        string? forwardedIP = null)
     {
         Username = username;
         ActiveCharacterName = username;
@@ -117,9 +118,11 @@ public class PlayerSession : IDisposable
         _server = server;
         _serverCancellationToken = cancellationToken;
         _isPlainText = isPlainText;
+        _forwardedIP = forwardedIP;
     }
 
     private readonly bool _isPlainText;
+    private readonly string? _forwardedIP;
 
     /// <summary>
     /// Run the game loop for this player session. Blocks until the player
@@ -137,6 +140,7 @@ public class PlayerSession : IDisposable
             Username = Username,
             CharacterKey = Username,  // Default to account name; updated if playing alt character
             ConnectionType = ConnectionType,
+            RemoteIP = _forwardedIP ?? (_tcpClient.Client.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString() ?? "",
             CancellationToken = _sessionCts.Token
         };
         Context = ctx;

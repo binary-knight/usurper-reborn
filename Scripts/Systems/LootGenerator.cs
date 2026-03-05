@@ -1232,14 +1232,63 @@ public static class LootGenerator
             };
 
             // Accessories primarily give stat bonuses rather than attack/armor
-            // Apply base power as a mix of stats
-            if (accessoryType == ObjType.Fingers) // Ring
+            // Apply base power themed to the template name so "Ring of Wisdom" actually gives Wisdom
+            string lowerName = template.Name.ToLowerInvariant();
+            if (lowerName.Contains("wisdom") || lowerName.Contains("insight"))
+            {
+                item.Wisdom += finalPower / 2;
+                item.Mana += finalPower;
+                item.HP += finalPower;
+            }
+            else if (lowerName.Contains("strength") || lowerName.Contains("power") || lowerName.Contains("heroes"))
+            {
+                item.Strength += finalPower / 2;
+                item.HP += finalPower * 2;
+            }
+            else if (lowerName.Contains("protection") || lowerName.Contains("ward") || lowerName.Contains("shield"))
+            {
+                item.Defence += finalPower / 3;
+                item.HP += finalPower * 2;
+            }
+            else if (lowerName.Contains("vitality") || lowerName.Contains("life") || lowerName.Contains("health"))
+            {
+                item.HP += finalPower * 3;
+            }
+            else if (lowerName.Contains("might") || lowerName.Contains("valor"))
+            {
+                item.Strength += finalPower / 3;
+                item.Dexterity += finalPower / 4;
+                item.HP += finalPower;
+            }
+            else if (lowerName.Contains("luck") || lowerName.Contains("fortune"))
+            {
+                item.Dexterity += finalPower / 3;
+                item.Charisma += finalPower / 3;
+                item.HP += finalPower;
+            }
+            else if (lowerName.Contains("fireball") || lowerName.Contains("planes") || lowerName.Contains("gods"))
+            {
+                item.Mana += finalPower * 2;
+                item.HP += finalPower;
+            }
+            else if (lowerName.Contains("mage") || lowerName.Contains("archmage") || lowerName.Contains("sorcery") || lowerName.Contains("sigil"))
+            {
+                item.Mana += finalPower * 2;
+                item.Wisdom += finalPower / 4;
+            }
+            else if (lowerName.Contains("dragon"))
+            {
+                item.Strength += finalPower / 4;
+                item.Defence += finalPower / 4;
+                item.HP += finalPower * 2;
+            }
+            else if (accessoryType == ObjType.Fingers) // Ring — generic fallback
             {
                 item.Strength += finalPower / 4;
                 item.Dexterity += finalPower / 4;
                 item.HP += finalPower * 2;
             }
-            else if (accessoryType == ObjType.Neck) // Necklace
+            else if (accessoryType == ObjType.Neck) // Necklace — generic fallback
             {
                 item.Wisdom += finalPower / 3;
                 item.Mana += finalPower * 2;

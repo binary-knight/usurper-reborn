@@ -332,6 +332,13 @@ public class DailySystemManager
 
         // Reset wilderness daily explorations (v0.48.5)
         player.WildernessExplorationsToday = 0;
+        player.WildernessRevisitsToday = 0;
+
+        // Reset settlement daily claims (v0.49.9)
+        player.SettlementGoldClaimedToday = false;
+        player.SettlementHerbClaimedToday = false;
+        player.SettlementShrineUsedToday = false;
+        player.SettlementCircleUsedToday = false;
 
         // Reset fatigue on full sleep (v0.49.1)
         player.Fatigue = 0;

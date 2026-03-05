@@ -137,11 +137,13 @@ namespace UsurperRemake.Systems
             hints.Add("");
 
             // Generate a hint for each position in the sequence
+            var ordinals = new[] { "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth" };
             for (int i = 0; i < solution.Count; i++)
             {
                 int leverNum = solution[i] + 1; // Convert to 1-indexed
                 string hint = GetLeverHint(leverNum, i, solution.Count);
-                hints.Add($"  {GetPositionNumeral(i + 1)}: {hint}");
+                string ordinal = i < ordinals.Length ? ordinals[i] : $"#{i + 1}";
+                hints.Add($"  Pull {ordinal}: {hint}");
             }
 
             return hints;

@@ -144,6 +144,23 @@ public class DungeonLocation : BaseLocation
                 BroadcastDungeonRespawn();
             }
 
+            // Remind player of active god save quests
+            var saveQuestStory = StoryProgressionSystem.Instance;
+            if (saveQuestStory != null)
+            {
+                foreach (var god in saveQuestStory.OldGodStates)
+                {
+                    if (god.Value.Status != GodStatus.Awakened) continue;
+                    string godName = god.Key.ToString();
+                    bool hasLoom = ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom);
+                    term.SetColor("bright_magenta");
+                    if (hasLoom)
+                        term.WriteLine($"  {godName} awaits your return. You have the artifact.");
+                    else
+                        term.WriteLine($"  {godName} awaits rescue. Seek the artifact on deeper floors.");
+                }
+            }
+
             term.WriteLine("");
             term.SetColor("darkgray");
             term.Write("  Press Enter to continue...");
@@ -3942,6 +3959,7 @@ public class DungeonLocation : BaseLocation
             {
                 monsters[0].IsBoss = true;
                 monsters[0].Name = GetBossName(currentFloor.Theme);
+                monsters[0].Phrase = GetBossPhrase(currentFloor.Theme);
             }
         }
 
@@ -4111,6 +4129,22 @@ public class DungeonLocation : BaseLocation
             return names[index];
         }
         return "Dungeon Boss";
+    }
+
+    private static string GetBossPhrase(DungeonTheme theme)
+    {
+        return theme switch
+        {
+            DungeonTheme.Catacombs => "The dead do not rest here...",
+            DungeonTheme.Sewers => "You shouldn't have come down here...",
+            DungeonTheme.Caverns => "These depths are mine to command!",
+            DungeonTheme.AncientRuins => "You disturb powers beyond your comprehension!",
+            DungeonTheme.DemonLair => "Your soul will fuel the inferno!",
+            DungeonTheme.FrozenDepths => "The cold will claim you, as it claims all things...",
+            DungeonTheme.VolcanicPit => "Burn in the fires of the deep!",
+            DungeonTheme.AbyssalVoid => "The void hungers for your essence...",
+            _ => "You dare challenge me?"
+        };
     }
 
     /// <summary>
@@ -5305,6 +5339,18 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine($"HP: {player.HP}/{player.MaxHP}  MP: {player.Mana}/{player.MaxMana}  ST: {player.CurrentCombatStamina}/{player.MaxCombatStamina}");
 
         hasCampedThisFloor = true;
+
+        // Advance game time for camping (single-player only)
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            DailySystemManager.Instance.AdvanceGameTime(player, 120); // 2 hours of rest
+
+            // Reduce fatigue from dungeon camping
+            int oldFatigue = player.Fatigue;
+            player.Fatigue = Math.Max(0, player.Fatigue - GameConfig.FatigueReductionDungeonRest);
+            if (oldFatigue > 0 && player.Fatigue < oldFatigue)
+                terminal.WriteLine($"You feel somewhat refreshed. (Fatigue -{oldFatigue - player.Fatigue})", "bright_green");
+        }
 
         // Check for nightmares in the dungeon
         var dream = UsurperRemake.Systems.DreamSystem.Instance.GetDreamForRest(player, currentDungeonLevel);
@@ -8947,7 +8993,14 @@ public class DungeonLocation : BaseLocation
 
                 if (int.TryParse(pctInput, out int newPct) && newPct >= 0)
                 {
-                    if (newPct > maxAllowed)
+                    // Player slot must always get at least 10% XP
+                    if (slot == 0 && newPct < 10)
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine("You must keep at least 10% XP for yourself.");
+                        await Task.Delay(2000);
+                    }
+                    else if (newPct > maxAllowed)
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine($"Total would be {otherSlotsTotal + newPct}%. Maximum is 100%.");
@@ -10768,7 +10821,7 @@ public class DungeonLocation : BaseLocation
                         if (player.WellRestedCombats <= 0)
                         {
                             player.WellRestedCombats = 5;
-                            player.WellRestedBonus = 15;
+                            player.WellRestedBonus = 0.15f;
                             terminal.SetColor("cyan");
                             terminal.WriteLine("A pixie blessing settles over you! (+15% damage/defense for 5 combats)");
                         }
@@ -11067,7 +11120,15 @@ public class DungeonLocation : BaseLocation
             int damage = riddle.FailureDamage * currentDungeonLevel / 5;
             // Settlement Prison trap resistance
             if (player.HasSettlementBuff && player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.TrapResist)
+            {
                 damage = (int)(damage * (1f - player.SettlementBuffValue));
+                player.SettlementBuffCombats--;
+                if (player.SettlementBuffCombats <= 0)
+                {
+                    player.SettlementBuffType = 0;
+                    player.SettlementBuffValue = 0f;
+                }
+            }
             if (damage > 0)
             {
                 player.HP = Math.Max(1, player.HP - damage);
@@ -11174,7 +11235,15 @@ public class DungeonLocation : BaseLocation
             int damage = (int)(player.MaxHP * (puzzle.FailureDamagePercent / 100.0));
             // Settlement Prison trap resistance
             if (player.HasSettlementBuff && player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.TrapResist)
+            {
                 damage = (int)(damage * (1f - player.SettlementBuffValue));
+                player.SettlementBuffCombats--;
+                if (player.SettlementBuffCombats <= 0)
+                {
+                    player.SettlementBuffType = 0;
+                    player.SettlementBuffValue = 0f;
+                }
+            }
             if (damage > 0)
             {
                 player.HP = Math.Max(1, player.HP - damage);
