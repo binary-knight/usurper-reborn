@@ -45,6 +45,7 @@ namespace UsurperRemake.Systems
             { "da", "Dansk" },
             { "no", "Norsk" },
             { "fi", "Suomi" },
+            { "hu", "Magyar (AI Translated)" },
         };
 
         /// <summary>

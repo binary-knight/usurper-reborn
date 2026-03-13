@@ -3675,14 +3675,6 @@ public partial class CombatEngine
             }
         }
 
-        // Tick down taunt duration
-        if (monster.TauntRoundsLeft > 0)
-        {
-            monster.TauntRoundsLeft--;
-            if (monster.TauntRoundsLeft <= 0)
-                monster.TauntedBy = null;
-        }
-
         // Check if player will dodge the next attack
         if (player.DodgeNextAttack)
         {
@@ -3712,6 +3704,14 @@ public partial class CombatEngine
                 await MonsterAttacksCompanion(monster, fallbackTarget, result);
                 return;
             }
+        }
+
+        // Tick down taunt duration AFTER target selection (so taunt applies for the full duration)
+        if (monster.TauntRoundsLeft > 0)
+        {
+            monster.TauntRoundsLeft--;
+            if (monster.TauntRoundsLeft <= 0)
+                monster.TauntedBy = null;
         }
 
         // If leader is dead and no teammates, skip (shouldn't happen — loop should have exited)
@@ -8787,8 +8787,8 @@ public partial class CombatEngine
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return;
 
-        // Split damage among all living monsters
-        long damagePerMonster = totalDamage / livingMonsters.Count;
+        // Full damage to each monster (AoE base damage is already balanced for multi-target)
+        long damagePerMonster = totalDamage;
 
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
@@ -10511,7 +10511,7 @@ public partial class CombatEngine
                     var livingMonsHoly = monsters.Where(m => m.IsAlive).ToList();
                     foreach (var m in livingMonsHoly)
                     {
-                        long holyAoeDmg = abilityResult.Damage / Math.Max(1, livingMonsHoly.Count);
+                        long holyAoeDmg = abilityResult.Damage;
                         if (m.MonsterClass == MonsterClass.Undead || m.MonsterClass == MonsterClass.Demon || m.Undead > 0)
                             holyAoeDmg = (long)(holyAoeDmg * 1.5);
                         long actualHolyDmg = Math.Max(1, holyAoeDmg - m.ArmPow / 2);

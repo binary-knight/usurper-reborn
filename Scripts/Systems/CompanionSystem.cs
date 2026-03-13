@@ -619,7 +619,7 @@ namespace UsurperRemake.Systems
                         CombatRole.Tank => CharacterClass.Warrior,
                         CombatRole.Healer => CharacterClass.Cleric,
                         CombatRole.Damage => CharacterClass.Assassin,
-                        CombatRole.Hybrid => CharacterClass.Paladin,
+                        CombatRole.Hybrid => CharacterClass.Ranger,
                         CombatRole.Bard => CharacterClass.Bard,
                         _ => CharacterClass.Warrior
                     },
@@ -1895,14 +1895,15 @@ namespace UsurperRemake.Systems
                     break;
 
                 case CombatRole.Hybrid:
-                    companion.BaseStats.HP += hpGain + 1;
+                    companion.BaseStats.HP += hpGain + 4;
                     companion.BaseStats.Attack += 1 + random.Next(0, 2);
-                    companion.BaseStats.Defense += 1 + random.Next(0, 2);
+                    companion.BaseStats.Defense += 2 + random.Next(0, 2);
                     companion.BaseStats.MagicPower += 2 + random.Next(0, 2);
                     companion.BaseStats.HealingPower += 1 + random.Next(0, 2);
                     companion.Intelligence += 2;
                     companion.Wisdom += 2;
                     companion.Charisma += 2;
+                    companion.Constitution += 2;
                     break;
 
                 case CombatRole.Bard:
@@ -2128,14 +2129,15 @@ namespace UsurperRemake.Systems
                         companion.Constitution += 1;
                         break;
                     case CombatRole.Hybrid:
-                        companion.BaseStats.HP += hpGain + 1;
+                        companion.BaseStats.HP += hpGain + 4;
                         companion.BaseStats.Attack += 1;
                         companion.BaseStats.MagicPower += 2;
                         companion.BaseStats.HealingPower += 1;
-                        companion.BaseStats.Defense += 1;
+                        companion.BaseStats.Defense += 2;
                         companion.Intelligence += 2;
                         companion.Wisdom += 2;
                         companion.Charisma += 2;
+                        companion.Constitution += 2;
                         break;
                     case CombatRole.Bard:
                         companion.BaseStats.HP += hpGain + 1;

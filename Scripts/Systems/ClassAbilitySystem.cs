@@ -165,7 +165,7 @@ public static class ClassAbilitySystem
             StaminaCost = 60,
             Cooldown = 3,
             Type = AbilityType.Attack,
-            BaseDamage = 90,  // AoE base, still scales well
+            BaseDamage = 40,  // AoE — full damage to each target
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Warrior, CharacterClass.Barbarian }
         },
@@ -294,7 +294,7 @@ public static class ClassAbilitySystem
             StaminaCost = 65,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 100,  // AoE base, scales with STR
+            BaseDamage = 45,  // AoE — full damage to each target
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Barbarian }
         },
@@ -435,7 +435,7 @@ public static class ClassAbilitySystem
             StaminaCost = 80,
             Cooldown = 6,
             Type = AbilityType.Attack,
-            BaseDamage = 140,  // High level AoE, scales with STR
+            BaseDamage = 60,  // AoE holy — full damage to each target
             SpecialEffect = "aoe_holy",
             AvailableToClasses = new[] { CharacterClass.Paladin }
         },
@@ -575,7 +575,7 @@ public static class ClassAbilitySystem
             StaminaCost = 65,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 110,
+            BaseDamage = 50,  // AoE holy — full damage to each target
             SpecialEffect = "aoe_holy",
             AvailableToClasses = new[] { CharacterClass.Cleric }
         },
@@ -751,7 +751,7 @@ public static class ClassAbilitySystem
             StaminaCost = 75,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 85,  // AoE, scales with STR+DEX
+            BaseDamage = 38,  // AoE — full damage to each target
             SpecialEffect = "aoe",
             RequiredWeaponTypes = new[] { WeaponType.Dagger },
             AvailableToClasses = new[] { CharacterClass.Assassin }
@@ -839,7 +839,7 @@ public static class ClassAbilitySystem
             StaminaCost = 50,
             Cooldown = 4,
             Type = AbilityType.Attack,
-            BaseDamage = 45,  // Mid-tier AoE - scales with STR+DEX
+            BaseDamage = 20,  // AoE — full damage to each target
             SpecialEffect = "aoe",
             RequiredWeaponTypes = new[] { WeaponType.Bow },
             AvailableToClasses = new[] { CharacterClass.Ranger }
@@ -881,7 +881,7 @@ public static class ClassAbilitySystem
             StaminaCost = 70,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 100,  // High level AoE - scales with STR+DEX
+            BaseDamage = 45,  // AoE — full damage to each target
             SpecialEffect = "aoe",
             RequiredWeaponTypes = new[] { WeaponType.Bow },
             AvailableToClasses = new[] { CharacterClass.Ranger }
@@ -1038,7 +1038,7 @@ public static class ClassAbilitySystem
             StaminaCost = 60,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 140,  // High level AoE - scales with CHA+DEX for Bard
+            BaseDamage = 60,  // AoE — full damage to each target, scales with CHA+DEX
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Bard, CharacterClass.Jester }
         },
@@ -1051,7 +1051,7 @@ public static class ClassAbilitySystem
             StaminaCost = 70,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 200,  // Strong AoE + confusion - scales with CHA+DEX
+            BaseDamage = 85,  // AoE + confusion — full damage to each target
             SpecialEffect = "aoe_confusion",
             AvailableToClasses = new[] { CharacterClass.Jester }
         },
@@ -1192,7 +1192,7 @@ public static class ClassAbilitySystem
             StaminaCost = 60,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 150,  // High level AoE - scales with INT+DEX
+            BaseDamage = 65,  // AoE — full damage to each target, scales with INT+DEX
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },
@@ -1245,7 +1245,7 @@ public static class ClassAbilitySystem
             StaminaCost = 40,
             Cooldown = 4,
             Type = AbilityType.Attack,
-            BaseDamage = 75,
+            BaseDamage = 35,  // AoE — full damage to each target
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },
@@ -1300,7 +1300,7 @@ public static class ClassAbilitySystem
             StaminaCost = 55,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 110,
+            BaseDamage = 50,  // AoE — full damage to each target + corrode
             SpecialEffect = "aoe_corrode",
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },
@@ -1342,7 +1342,7 @@ public static class ClassAbilitySystem
             StaminaCost = 80,
             Cooldown = 6,
             Type = AbilityType.Attack,
-            BaseDamage = 200,
+            BaseDamage = 85,  // AoE — full damage to each target, capstone
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },
@@ -1498,9 +1498,9 @@ public static class ClassAbilitySystem
         {
             Id = "maelstrom_faithful",
             Name = "Maelstrom of the Faithful",
-            Description = "Holy maelstrom: 160 damage to all enemies. Self: +50 attack, +50 defense for 3 rounds.",
+            Description = "Holy maelstrom: damages all enemies. Self: +50 attack, +50 defense for 3 rounds.",
             LevelRequired = 40, StaminaCost = 90, Cooldown = 7,
-            Type = AbilityType.Attack, BaseDamage = 160, AttackBonus = 50, DefenseBonus = 50, Duration = 3,
+            Type = AbilityType.Attack, BaseDamage = 70, AttackBonus = 50, DefenseBonus = 50, Duration = 3,
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Tidesworn }
         },
