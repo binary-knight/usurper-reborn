@@ -277,14 +277,20 @@ namespace UsurperRemake.Systems
 
                     // Capture world-sim-managed state BEFORE reloading from DB.
                     // Player sessions write stale NPC data that may overwrite active pregnancies,
-                    // marriage state changes, or other world-sim-driven mutations.
+                    // marriage state changes, equipment changes, or other world-sim-driven mutations.
                     var activePregnancies = new Dictionary<string, DateTime>();
+                    var activeEquipment = new Dictionary<string, Dictionary<EquipmentSlot, int>>();
                     foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
                     {
+                        var key = npc.Name2 ?? npc.Name1;
                         if (npc.PregnancyDueDate.HasValue)
                         {
-                            var key = npc.Name2 ?? npc.Name1;
                             activePregnancies[key] = npc.PregnancyDueDate.Value;
+                        }
+                        // Capture equipment — player may have given NPCs new gear between saves
+                        if (npc.EquippedItems != null && npc.EquippedItems.Count > 0)
+                        {
+                            activeEquipment[key] = new Dictionary<EquipmentSlot, int>(npc.EquippedItems);
                         }
                     }
 
@@ -309,6 +315,47 @@ namespace UsurperRemake.Systems
                         if (restored > 0)
                         {
                             DebugLogger.Instance.LogInfo("WORLDSIM", $"Restored {restored} pregnancies after player-triggered reload");
+                        }
+                    }
+
+                    // Merge back equipment that a player session may have given NPCs
+                    if (activeEquipment.Count > 0)
+                    {
+                        int restored = 0;
+                        foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
+                        {
+                            var key = npc.Name2 ?? npc.Name1;
+                            if (activeEquipment.TryGetValue(key, out var equip))
+                            {
+                                // Compare: if the reloaded NPC has different equipment, prefer the pre-reload version
+                                // (the in-memory version is more recent than what was in the DB)
+                                bool differs = npc.EquippedItems.Count != equip.Count;
+                                if (!differs)
+                                {
+                                    foreach (var kvp in equip)
+                                    {
+                                        if (!npc.EquippedItems.TryGetValue(kvp.Key, out var reloadedId) || reloadedId != kvp.Value)
+                                        {
+                                            differs = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (differs)
+                                {
+                                    npc.EquippedItems.Clear();
+                                    foreach (var kvp in equip)
+                                    {
+                                        npc.EquippedItems[kvp.Key] = kvp.Value;
+                                    }
+                                    npc.RecalculateStats();
+                                    restored++;
+                                }
+                            }
+                        }
+                        if (restored > 0)
+                        {
+                            DebugLogger.Instance.LogInfo("WORLDSIM", $"Restored equipment for {restored} NPCs after player-triggered reload");
                         }
                     }
 

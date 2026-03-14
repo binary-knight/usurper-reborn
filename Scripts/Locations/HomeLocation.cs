@@ -4143,6 +4143,16 @@ toResurrect.IsDead = false;
 
         // Auto-save after equipment changes to persist NPC equipment state
         await SaveSystem.Instance.AutoSave(currentPlayer);
+
+        // Force NPC world_state save so equipment survives world-sim reload cycles
+        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+                catch { /* best-effort */ }
+            });
+        }
     }
 
     /// <summary>

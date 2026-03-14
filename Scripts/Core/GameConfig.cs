@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.52.5";
+    public const string Version = "0.52.6";
     public const string VersionName = "The Hook";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
