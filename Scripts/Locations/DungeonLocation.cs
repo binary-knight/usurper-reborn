@@ -171,9 +171,16 @@ public class DungeonLocation : BaseLocation
                 {
                     if (god.Value.Status != GodStatus.Awakened) continue;
                     string godName = god.Key.ToString();
-                    bool hasLoom = ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom);
+                    // Check the correct artifact for each god's save quest
+                    var requiredArtifact = god.Key switch
+                    {
+                        OldGodType.Veloura => ArtifactType.SoulweaversLoom,
+                        OldGodType.Aurelion => ArtifactType.SunforgedBlade,
+                        _ => (ArtifactType?)null
+                    };
+                    bool hasArtifact = requiredArtifact != null && ArtifactSystem.Instance.HasArtifact(requiredArtifact.Value);
                     term.SetColor("bright_magenta");
-                    if (hasLoom)
+                    if (hasArtifact)
                         term.WriteLine(Loc.Get("dungeon.god_awaits_return", godName));
                     else
                         term.WriteLine(Loc.Get("dungeon.god_awaits_rescue", godName));
@@ -187,7 +194,7 @@ public class DungeonLocation : BaseLocation
         }
 
         // Refresh bounty board quests based on player level
-        QuestSystem.RefreshBountyBoard(player?.Level ?? 1);
+        QuestSystem.RefreshBountyBoard(player?.Level ?? 1, player?.Statistics?.DeepestDungeonLevel ?? 0);
 
         // Update quest progress for reaching this floor (dungeon entry)
         QuestSystem.OnDungeonFloorReached(player!, currentDungeonLevel);
@@ -895,6 +902,59 @@ public class DungeonLocation : BaseLocation
                 if (MoralParadoxSystem.Instance.IsParadoxAvailable("free_terravok", player))
                 {
                     await MoralParadoxSystem.Instance.PresentParadox("free_terravok", player, term);
+                }
+                break;
+
+            case 85:
+                // Aurelion save quest return - triggers when entering floor 85 with the Sunforged Blade
+                {
+                    var story85 = StoryProgressionSystem.Instance;
+                    if (story85.OldGodStates.TryGetValue(OldGodType.Aurelion, out var aurelionState) &&
+                        aurelionState.Status == GodStatus.Awakened &&
+                        ArtifactSystem.Instance.HasArtifact(ArtifactType.SunforgedBlade))
+                    {
+                        term.WriteLine("");
+                        term.SetColor("bright_yellow");
+                        term.WriteLine("The corridor blazes with golden light. Aurelion senses the blade's return.");
+                        await Task.Delay(1500);
+                        term.SetColor("bright_cyan");
+                        term.WriteLine("You feel the Sunforged Blade humming in resonance with the God of Light.");
+                        await Task.Delay(1500);
+                        term.WriteLine("");
+
+                        var saveResult = await OldGodBossSystem.Instance.CompleteSaveQuest(player, OldGodType.Aurelion, term);
+                        await HandleGodEncounterResult(saveResult, player, term);
+
+                        if (saveResult.Outcome == BossOutcome.Saved && currentFloor != null)
+                        {
+                            currentFloor.BossDefeated = true;
+                        }
+                    }
+                }
+                break;
+
+            case 90:
+                // Sunforged Blade discovery - triggered by Aurelion's save quest
+                if (StoryProgressionSystem.Instance.HasStoryFlag("aurelion_save_quest") &&
+                    !ArtifactSystem.Instance.HasArtifact(ArtifactType.SunforgedBlade))
+                {
+                    await ShowStoryMoment(term, "The Sunforged Blade",
+                        new[] {
+                            "The chamber ahead burns with a light that has no source.",
+                            "In the center, embedded in a pillar of crystallized sunlight,",
+                            "a blade radiates warmth that pushes back the dungeon's eternal cold.",
+                            "",
+                            "This is Aurelion's light, forged into steel.",
+                            "With this, you can restore what was taken from the God of Light.",
+                        }, "bright_yellow");
+
+                    // Grant the artifact
+                    await ArtifactSystem.Instance.CollectArtifact(player, ArtifactType.SunforgedBlade, term);
+
+                    term.WriteLine("");
+                    term.SetColor("bright_yellow");
+                    term.WriteLine("The blade settles into your hands, warm as a promise.");
+                    term.WriteLine("Return to Aurelion on floor 85 to complete the save quest.", "yellow");
                 }
                 break;
 
@@ -3207,6 +3267,17 @@ public class DungeonLocation : BaseLocation
             hint = Loc.Get("dungeon.hint_aurelion");
             color = "bright_yellow";
         }
+        else if (floor == 90)
+        {
+            var player90 = GetCurrentPlayer();
+            if (player90 != null &&
+                StoryProgressionSystem.Instance.HasStoryFlag("aurelion_save_quest") &&
+                !ArtifactSystem.Instance.HasArtifact(ArtifactType.SunforgedBlade))
+            {
+                hint = "You sense something blazing with ancient light nearby...";
+                color = "bright_yellow";
+            }
+        }
         else if (floor == 95)
         {
             var player95 = GetCurrentPlayer();
@@ -4405,7 +4476,6 @@ public class DungeonLocation : BaseLocation
                     (state.Status == GodStatus.Defeated ||
                      state.Status == GodStatus.Saved ||
                      state.Status == GodStatus.Allied ||
-                     state.Status == GodStatus.Awakened ||
                      state.Status == GodStatus.Consumed);
 
                 if (godResolved)
@@ -10399,7 +10469,7 @@ public class DungeonLocation : BaseLocation
     private async Task BuyPotionsFromMonk(Character player)
     {
         bool canBuyHealing = player.Healing < player.MaxPotions;
-        bool canBuyMana = SpellSystem.HasSpells(player) && player.ManaPotions < player.MaxManaPotions;
+        bool canBuyMana = player.ManaPotions < player.MaxManaPotions; // v0.52.5: non-casters can buy for teammates
 
         terminal.ClearScreen();
         terminal.SetColor("cyan");
@@ -11897,23 +11967,44 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("  " + string.Join(" - ", puzzle.Solution));
-        await Task.Delay(3000); // Show for 3 seconds
 
-        // Clear the sequence
+        // Scale display time: 2 seconds + 0.5s per symbol (harder puzzles have more symbols)
+        int displayMs = 2000 + (puzzle.Solution.Count * 500);
+        await Task.Delay(displayMs);
+
+        // Clear the sequence and ask about a random position
         terminal.ClearScreen();
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.memory_puzzle_header"));
         terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("dungeon.enter_sequence"), "white");
 
-        var input = await terminal.GetInput("> ");
-        var parts = input.Split(',', ' ', '-').Select(s => s.Trim().ToLower()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+        // Ask 2 questions about specific positions to prevent lucky guesses
+        int questionsNeeded = Math.Min(2, puzzle.Solution.Count);
+        var askedPositions = new HashSet<int>();
+        var random = new Random();
 
-        if (parts.Count != puzzle.Solution.Count) return false;
-
-        for (int i = 0; i < parts.Count; i++)
+        for (int q = 0; q < questionsNeeded; q++)
         {
-            if (parts[i] != puzzle.Solution[i].ToLower()) return false;
+            int pos;
+            do { pos = random.Next(puzzle.Solution.Count); } while (askedPositions.Contains(pos));
+            askedPositions.Add(pos);
+
+            string ordinal = (pos + 1) switch
+            {
+                1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{pos + 1}th"
+            };
+
+            terminal.WriteLine($"What was the {ordinal} symbol in the sequence?", "white");
+            var input = await terminal.GetInput("> ");
+
+            if (string.IsNullOrWhiteSpace(input) ||
+                !input.Trim().Equals(puzzle.Solution[pos], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (q < questionsNeeded - 1)
+                terminal.WriteLine("Correct!", "bright_green");
         }
 
         return true;

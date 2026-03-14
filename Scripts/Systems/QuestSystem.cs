@@ -375,7 +375,7 @@ public partial class QuestSystem
     /// Generate objectives for dungeon quests
     /// Floor targets are capped to player-accessible range (playerLevel ± 10)
     /// </summary>
-    private static void GenerateDungeonQuestObjectives(Quest quest, int playerLevel = 10)
+    private static void GenerateDungeonQuestObjectives(Quest quest, int playerLevel = 10, int deepestFloor = 0)
     {
         quest.Objectives.Clear();
 
@@ -419,18 +419,25 @@ public partial class QuestSystem
                 break;
 
             case QuestTarget.ReachFloor:
-                // Reach a specific floor - capped to accessible range
-                var targetFloor = CapFloor(playerLevel + quest.Difficulty * 2 + random.Next(1, 4));
+                // Reach a specific floor - must be beyond player's deepest cleared floor
+                int expeditionFloor = CapFloor(playerLevel + quest.Difficulty * 2 + random.Next(1, 4));
+                // Ensure target is at least 1 floor beyond what they've already reached
+                if (deepestFloor > 0 && expeditionFloor <= deepestFloor)
+                    expeditionFloor = Math.Min(maxAccessibleFloor, deepestFloor + random.Next(1, 4));
+                // If still can't go deeper (at max accessible), fall through to a different quest type
+                if (expeditionFloor <= deepestFloor && deepestFloor >= maxAccessibleFloor)
+                    expeditionFloor = maxAccessibleFloor; // At cap, just use max — kill req still adds challenge
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ReachDungeonFloor,
-                    $"Reach dungeon floor {targetFloor}",
-                    targetFloor, "", $"Floor {targetFloor}"));
-                // Optional: kill some monsters on the way
+                    $"Reach dungeon floor {expeditionFloor}",
+                    expeditionFloor, "", $"Floor {expeditionFloor}"));
+                // Required: kill monsters on the target floor to prove you fought there
+                int killCount = 3 + quest.Difficulty * 2;
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillMonsters,
-                    "Defeat monsters along the way",
-                    quest.Difficulty * 5, "", "Monsters") { IsOptional = true, BonusReward = 100 });
-                quest.Title = $"Expedition to Floor {targetFloor}";
+                    $"Defeat {killCount} monsters on the expedition",
+                    killCount, "", "Monsters"));
+                quest.Title = $"Expedition to Floor {expeditionFloor}";
                 break;
 
             case QuestTarget.ClearFloor:
@@ -482,7 +489,7 @@ public partial class QuestSystem
     /// <summary>
     /// Create a dungeon quest (bounty board style)
     /// </summary>
-    public static Quest CreateDungeonQuest(QuestTarget target, byte difficulty, string dungeonName = "The Dungeon", int playerLevel = 10)
+    public static Quest CreateDungeonQuest(QuestTarget target, byte difficulty, string dungeonName = "The Dungeon", int playerLevel = 10, int deepestFloor = 0)
     {
         if (target < QuestTarget.ClearBoss || target > QuestTarget.SurviveDungeon)
         {
@@ -503,7 +510,7 @@ public partial class QuestSystem
         };
 
         // Generate objectives based on quest type with player level consideration
-        GenerateDungeonQuestObjectives(quest, playerLevel);
+        GenerateDungeonQuestObjectives(quest, playerLevel, deepestFloor);
 
         // Set rewards based on difficulty
         SetDefaultRewards(quest);
@@ -533,7 +540,7 @@ public partial class QuestSystem
     /// <summary>
     /// Populate the bounty board with available quests (called on new day or when empty)
     /// </summary>
-    public static void RefreshBountyBoard(int playerLevel)
+    public static void RefreshBountyBoard(int playerLevel, int deepestFloor = 0)
     {
         // Remove old unclaimed bounty board quests
         questDatabase.RemoveAll(q => q.Initiator == "Bounty Board" && string.IsNullOrEmpty(q.Occupier) && q.Date < DateTime.Now.AddDays(-3));
@@ -552,7 +559,7 @@ public partial class QuestSystem
             var questTypes = new[] { QuestTarget.ClearBoss, QuestTarget.FindArtifact, QuestTarget.ReachFloor, QuestTarget.ClearFloor, QuestTarget.SurviveDungeon };
             var questType = questTypes[random.Next(questTypes.Length)];
 
-            CreateDungeonQuest(questType, difficulty, "The Dungeon", playerLevel);
+            CreateDungeonQuest(questType, difficulty, "The Dungeon", playerLevel, deepestFloor);
             existingCount++;
         }
 

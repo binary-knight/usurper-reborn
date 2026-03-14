@@ -766,7 +766,7 @@ namespace UsurperRemake.Systems
                 BossData = boss,
                 GodType = boss.Type,
                 AttacksPerRound = boss.AttacksPerRound,
-                CanSave = boss.CanBeSaved && ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom),
+                CanSave = boss.CanBeSaved && (GetArtifactForSave(boss.Type) == null || ArtifactSystem.Instance.HasArtifact(GetArtifactForSave(boss.Type)!.Value)),
                 DamageMultiplier = activeCombatModifiers.DamageMultiplier,
                 DefenseMultiplier = activeCombatModifiers.DefenseMultiplier,
                 BonusDamage = activeCombatModifiers.BonusDamage,

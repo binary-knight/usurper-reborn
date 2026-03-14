@@ -457,7 +457,7 @@ public class MudServer
                 await WriteAnsiAsync(stream, "\r\n  Choice: ", isCp437);
             }
 
-            var choice = (await ReadLineAsync(stream, ct, echo: true))?.Trim().ToUpperInvariant();
+            var choice = (await ReadLineAsync(stream, ct))?.Trim().ToUpperInvariant();
             if (string.IsNullOrEmpty(choice)) continue;
             if (choice == "Q") return null;
 
@@ -470,19 +470,19 @@ public class MudServer
                 if (isPlainText)
                 {
                     await WriteAnsiAsync(stream, "Username: ", isCp437);
-                    username = (await ReadLineAsync(stream, ct, echo: true))?.Trim();
+                    username = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     await WriteAnsiAsync(stream, "Password: ", isCp437);
-                    password = (await ReadLineAsync(stream, ct, echo: true, maskChar: '*'))?.Trim();
+                    password = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                 }
                 else
                 {
                     await WriteAnsiAsync(stream, "\r\n\u001b[1;37m  Username: \u001b[0m", isCp437);
-                    username = (await ReadLineAsync(stream, ct, echo: true))?.Trim();
+                    username = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     await WriteAnsiAsync(stream, "\u001b[1;37m  Password: \u001b[0m", isCp437);
-                    password = (await ReadLineAsync(stream, ct, echo: true, maskChar: '*'))?.Trim();
+                    password = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                 }
             }
@@ -491,7 +491,7 @@ public class MudServer
                 if (isPlainText)
                 {
                     await WriteAnsiAsync(stream, "Choose a username: ", isCp437);
-                    username = (await ReadLineAsync(stream, ct, echo: true))?.Trim();
+                    username = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     if (username.Length < 2 || username.Length > 20)
                     {
@@ -499,7 +499,7 @@ public class MudServer
                         continue;
                     }
                     await WriteAnsiAsync(stream, "Choose a password: ", isCp437);
-                    password = (await ReadLineAsync(stream, ct, echo: true, maskChar: '*'))?.Trim();
+                    password = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                     if (password.Length < 4)
                     {
@@ -507,7 +507,7 @@ public class MudServer
                         continue;
                     }
                     await WriteAnsiAsync(stream, "Confirm password: ", isCp437);
-                    var confirm = (await ReadLineAsync(stream, ct, echo: true, maskChar: '*'))?.Trim();
+                    var confirm = (await ReadLineAsync(stream, ct))?.Trim();
                     if (password != confirm)
                     {
                         await WriteAnsiAsync(stream, "Passwords do not match.\r\n\r\n", isCp437);
@@ -517,7 +517,7 @@ public class MudServer
                 else
                 {
                     await WriteAnsiAsync(stream, "\r\n\u001b[1;32m  Choose a username: \u001b[0m", isCp437);
-                    username = (await ReadLineAsync(stream, ct, echo: true))?.Trim();
+                    username = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     if (username.Length < 2 || username.Length > 20)
                     {
@@ -525,7 +525,7 @@ public class MudServer
                         continue;
                     }
                     await WriteAnsiAsync(stream, "\u001b[1;32m  Choose a password: \u001b[0m", isCp437);
-                    password = (await ReadLineAsync(stream, ct, echo: true, maskChar: '*'))?.Trim();
+                    password = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                     if (password.Length < 4)
                     {
@@ -533,7 +533,7 @@ public class MudServer
                         continue;
                     }
                     await WriteAnsiAsync(stream, "\u001b[1;32m  Confirm password: \u001b[0m", isCp437);
-                    var confirm = (await ReadLineAsync(stream, ct, echo: true, maskChar: '*'))?.Trim();
+                    var confirm = (await ReadLineAsync(stream, ct))?.Trim();
                     if (password != confirm)
                     {
                         await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Passwords do not match.\u001b[0m\r\n\r\n", isCp437);
@@ -745,7 +745,6 @@ public class MudServer
     {
         var buffer = new byte[1];
         var line = new System.Text.StringBuilder();
-        bool prevWasCR = false;
 
         while (!ct.IsCancellationRequested)
         {
@@ -780,25 +779,24 @@ public class MudServer
 
             char c = (char)b;
 
-            // Handle \r\n — SyncTerm and other terminals send \r\n for Enter;
-            // treat \n after \r as redundant
+            // Handle line endings: \r, \n, or \r\n
+            // MUD clients (Mudlet, MUSHclient) typically send \r\n as a single packet.
+            // After reading \r, we consume a trailing \n if immediately available so it
+            // doesn't leak into the NEXT ReadLineAsync call as an empty-string return.
             if (c == '\n')
             {
-                if (prevWasCR)
-                {
-                    prevWasCR = false;
-                    continue; // skip \n that follows \r
-                }
-                if (echo) await stream.WriteAsync(new byte[] { (byte)'\r', (byte)'\n' }, 0, 2, ct);
                 return line.ToString();
             }
             if (c == '\r')
             {
-                prevWasCR = true;
-                if (echo) await stream.WriteAsync(new byte[] { (byte)'\r', (byte)'\n' }, 0, 2, ct);
+                // Drain trailing \n if it's already in the buffer (sent as \r\n packet)
+                if (stream.DataAvailable)
+                {
+                    int peek = await stream.ReadAsync(buffer, 0, 1, ct);
+                    // If it wasn't \n, we lost a byte — but \r without \n is extremely rare
+                }
                 return line.ToString();
             }
-            prevWasCR = false;
 
             // Handle backspace (BS 0x08 or DEL 0x7F)
             if (c == '\b' || c == 0x7F)

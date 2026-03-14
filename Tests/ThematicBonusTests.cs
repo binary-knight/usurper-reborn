@@ -278,7 +278,8 @@ public class ThematicBonusTests
     [InlineData("Splint Mail")]
     [InlineData("Studded Armguards")]
     [InlineData("Studded Legguards")]
-    [InlineData("Reinforced Gi")]
+    [InlineData("Wooden Buckler")]
+    [InlineData("Wooden Shield")]
     public void MetalArmorTemplates_GrantDefAndCon(string templateName)
     {
         var item = CreateTestItem();
@@ -439,15 +440,59 @@ public class ThematicBonusTests
 
     #endregion
 
-    #region Unmatched Templates Get No Thematic Bonus
+    #region Martial/Agile Templates
 
     [Theory]
     [InlineData("Training Gi")]
+    [InlineData("Reinforced Gi")]
     [InlineData("Master's Gi")]
-    [InlineData("Tattered Cloak")]
-    [InlineData("Rope Belt")]
+    public void MartialArmorTemplates_GrantDexAndAgi(string templateName)
+    {
+        var item = CreateTestItem();
+        LootGenerator.ApplyThematicBonuses(item, templateName, 50);
+
+        item.Dexterity.Should().BeGreaterThan(0, $"'{templateName}' should grant Dexterity");
+        item.Agility.Should().BeGreaterThan(0, $"'{templateName}' should grant Agility");
+    }
+
+    [Fact]
+    public void GiKeyword_DoesNotMatchSubstrings()
+    {
+        // "gi" should NOT match inside "leggings", "girdle", "magic", etc.
+        var leggings = CreateTestItem();
+        var girdle = CreateTestItem();
+
+        LootGenerator.ApplyThematicBonuses(leggings, "Chain Leggings", 50);
+        LootGenerator.ApplyThematicBonuses(girdle, "Steel Girdle", 50);
+
+        // These should match "chain"/"steel" (metal group → Con+Def), NOT "gi" (martial → Dex+Agi)
+        leggings.Agility.Should().Be(0, "'Chain Leggings' should not match martial 'gi' group");
+        girdle.Agility.Should().Be(0, "'Steel Girdle' should not match martial 'gi' group");
+    }
+
+    #endregion
+
+    #region Metal/Crafted Templates (wooden, bone, copper, etc.)
+
+    [Theory]
     [InlineData("Wooden Buckler")]
     [InlineData("Wooden Shield")]
+    public void WoodenTemplates_GrantConAndDef(string templateName)
+    {
+        var item = CreateTestItem();
+        LootGenerator.ApplyThematicBonuses(item, templateName, 50);
+
+        HasConstitutionEffect(item).Should().BeTrue($"'{templateName}' should grant Constitution");
+        item.Defence.Should().BeGreaterThan(0, $"'{templateName}' should grant Defence");
+    }
+
+    #endregion
+
+    #region Unmatched Templates Get No Thematic Bonus
+
+    [Theory]
+    [InlineData("Tattered Cloak")]
+    [InlineData("Rope Belt")]
     public void UnmatchedTemplates_GetNoThematicBonus(string templateName)
     {
         var item = CreateTestItem();

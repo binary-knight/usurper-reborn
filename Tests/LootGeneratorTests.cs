@@ -315,4 +315,106 @@ public class LootGeneratorTests
     }
 
     #endregion
+
+    #region Loot Rarity Distribution Tests (v0.52.5)
+
+    [Fact]
+    public void RollRarity_Level25_FewerCommonsThanBefore()
+    {
+        int commonCount = 0;
+        int trials = 1000;
+
+        for (int i = 0; i < trials; i++)
+        {
+            var rarity = LootGenerator.RollRarity(25);
+            if (rarity == LootGenerator.ItemRarity.Common) commonCount++;
+        }
+
+        double commonRate = (double)commonCount / trials;
+        commonRate.Should().BeLessThan(0.50,
+            "At level 25, Common drops should be under 50% (was ~55% before v0.52.5 rework)");
+    }
+
+    [Fact]
+    public void RollRarity_Level50_HasMeaningfulRareChance()
+    {
+        int rareOrBetter = 0;
+        int trials = 1000;
+
+        for (int i = 0; i < trials; i++)
+        {
+            var rarity = LootGenerator.RollRarity(50);
+            if (rarity >= LootGenerator.ItemRarity.Rare) rareOrBetter++;
+        }
+
+        double rareRate = (double)rareOrBetter / trials;
+        rareRate.Should().BeGreaterThan(0.15,
+            "At level 50, Rare+ drops should be above 15%");
+    }
+
+    [Fact]
+    public void RollRarity_Level100_HasArtifactChance()
+    {
+        int artifactCount = 0;
+        int trials = 5000;
+
+        for (int i = 0; i < trials; i++)
+        {
+            var rarity = LootGenerator.RollRarity(100);
+            if (rarity == LootGenerator.ItemRarity.Artifact) artifactCount++;
+        }
+
+        artifactCount.Should().BeGreaterThan(0,
+            "At level 100, should have a non-zero chance of Artifact drops");
+    }
+
+    [Fact]
+    public void RollRarity_HigherLevel_ProducesFewerCommons()
+    {
+        int lowLevelCommons = 0;
+        int highLevelCommons = 0;
+        int trials = 1000;
+
+        for (int i = 0; i < trials; i++)
+        {
+            if (LootGenerator.RollRarity(10) == LootGenerator.ItemRarity.Common) lowLevelCommons++;
+            if (LootGenerator.RollRarity(60) == LootGenerator.ItemRarity.Common) highLevelCommons++;
+        }
+
+        highLevelCommons.Should().BeLessThan(lowLevelCommons,
+            "Higher level should produce fewer Common drops");
+    }
+
+    #endregion
+
+    #region Loot Config Tests (v0.52.5)
+
+    [Fact]
+    public void LootBaseDropChance_IsReasonable()
+    {
+        GameConfig.LootBaseDropChance.Should().BeGreaterThanOrEqualTo(0.15,
+            "Base drop chance should be at least 15%");
+        GameConfig.LootBaseDropChance.Should().BeLessThanOrEqualTo(0.30,
+            "Base drop chance should not exceed 30%");
+    }
+
+    [Fact]
+    public void LootMaxDropChance_IsReasonable()
+    {
+        GameConfig.LootMaxDropChance.Should().BeGreaterThan(GameConfig.LootBaseDropChance,
+            "Max drop chance should exceed base drop chance");
+        GameConfig.LootMaxDropChance.Should().BeLessThanOrEqualTo(0.60,
+            "Max drop chance should not exceed 60%");
+    }
+
+    [Fact]
+    public void LootPartyBonus_IsPositive()
+    {
+        GameConfig.LootPartyBonusPerMember.Should().BeGreaterThan(0,
+            "Party loot bonus should be positive");
+        GameConfig.LootPartyBonusPerMember.Should().BeLessThanOrEqualTo(0.10,
+            "Party loot bonus per member should not exceed 10%");
+    }
+
+    #endregion
 }

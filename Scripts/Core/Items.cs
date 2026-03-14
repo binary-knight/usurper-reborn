@@ -1022,9 +1022,15 @@ public class Equipment
 
         if (StrengthBonus != 0) stats.Add($"{Loc.Get("ui.stat_str")}: {StrengthBonus:+#;-#;0}");
         if (DexterityBonus != 0) stats.Add($"{Loc.Get("ui.stat_dex")}: {DexterityBonus:+#;-#;0}");
+        if (AgilityBonus != 0) stats.Add($"{Loc.Get("ui.stat_agi")}: {AgilityBonus:+#;-#;0}");
+        if (ConstitutionBonus != 0) stats.Add($"{Loc.Get("ui.stat_con")}: {ConstitutionBonus:+#;-#;0}");
+        if (IntelligenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_int")}: {IntelligenceBonus:+#;-#;0}");
         if (WisdomBonus != 0) stats.Add($"{Loc.Get("ui.stat_wis")}: {WisdomBonus:+#;-#;0}");
+        if (CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}: {CharismaBonus:+#;-#;0}");
         if (MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}: {MaxHPBonus:+#;-#;0}");
         if (MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mana")}: {MaxManaBonus:+#;-#;0}");
+        if (DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}: {DefenceBonus:+#;-#;0}");
+        if (StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}: {StaminaBonus:+#;-#;0}");
 
         return stats.Count > 0 ? string.Join(", ", stats) : Loc.Get("ui.no_bonuses");
     }

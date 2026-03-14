@@ -1340,11 +1340,15 @@ public partial class MagicShopLocation : BaseLocation
                 if (equip.ArmorClass > 0) stats.Add($"{Loc.Get("ui.stat_ac")}:{equip.ArmorClass}");
                 if (equip.StrengthBonus != 0) stats.Add($"{Loc.Get("ui.stat_str")}{(equip.StrengthBonus > 0 ? "+" : "")}{equip.StrengthBonus}");
                 if (equip.DexterityBonus != 0) stats.Add($"{Loc.Get("ui.stat_dex")}{(equip.DexterityBonus > 0 ? "+" : "")}{equip.DexterityBonus}");
-                if (equip.DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}{(equip.DefenceBonus > 0 ? "+" : "")}{equip.DefenceBonus}");
-                if (equip.WisdomBonus != 0) stats.Add($"{Loc.Get("ui.stat_wis")}{(equip.WisdomBonus > 0 ? "+" : "")}{equip.WisdomBonus}");
+                if (equip.AgilityBonus != 0) stats.Add($"{Loc.Get("ui.stat_agi")}{(equip.AgilityBonus > 0 ? "+" : "")}{equip.AgilityBonus}");
                 if (equip.ConstitutionBonus != 0) stats.Add($"{Loc.Get("ui.stat_con")}{(equip.ConstitutionBonus > 0 ? "+" : "")}{equip.ConstitutionBonus}");
                 if (equip.IntelligenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_int")}{(equip.IntelligenceBonus > 0 ? "+" : "")}{equip.IntelligenceBonus}");
+                if (equip.WisdomBonus != 0) stats.Add($"{Loc.Get("ui.stat_wis")}{(equip.WisdomBonus > 0 ? "+" : "")}{equip.WisdomBonus}");
+                if (equip.CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}{(equip.CharismaBonus > 0 ? "+" : "")}{equip.CharismaBonus}");
+                if (equip.DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}{(equip.DefenceBonus > 0 ? "+" : "")}{equip.DefenceBonus}");
+                if (equip.MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}{(equip.MaxHPBonus > 0 ? "+" : "")}{equip.MaxHPBonus}");
                 if (equip.MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mana")}{(equip.MaxManaBonus > 0 ? "+" : "")}{equip.MaxManaBonus}");
+                if (equip.StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}{(equip.StaminaBonus > 0 ? "+" : "")}{equip.StaminaBonus}");
                 terminal.SetColor("green");
                 terminal.Write(string.Join(" ", stats));
 
@@ -2479,12 +2483,15 @@ public partial class MagicShopLocation : BaseLocation
         var bonuses = new List<string>();
         if (item.StrengthBonus != 0) bonuses.Add($"Str{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
         if (item.DexterityBonus != 0) bonuses.Add($"Dex{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
+        if (item.AgilityBonus != 0) bonuses.Add($"Agi{(item.AgilityBonus > 0 ? "+" : "")}{item.AgilityBonus}");
         if (item.ConstitutionBonus != 0) bonuses.Add($"Con{(item.ConstitutionBonus > 0 ? "+" : "")}{item.ConstitutionBonus}");
         if (item.IntelligenceBonus != 0) bonuses.Add($"Int{(item.IntelligenceBonus > 0 ? "+" : "")}{item.IntelligenceBonus}");
         if (item.WisdomBonus != 0) bonuses.Add($"Wis{(item.WisdomBonus > 0 ? "+" : "")}{item.WisdomBonus}");
+        if (item.CharismaBonus != 0) bonuses.Add($"Cha{(item.CharismaBonus > 0 ? "+" : "")}{item.CharismaBonus}");
         if (item.DefenceBonus != 0) bonuses.Add($"Def{(item.DefenceBonus > 0 ? "+" : "")}{item.DefenceBonus}");
         if (item.MaxHPBonus != 0) bonuses.Add($"HP+{item.MaxHPBonus}");
         if (item.MaxManaBonus != 0) bonuses.Add($"MP+{item.MaxManaBonus}");
+        if (item.StaminaBonus != 0) bonuses.Add($"Sta+{item.StaminaBonus}");
         if (item.MagicResistance != 0) bonuses.Add($"MR+{item.MagicResistance}");
         if (item.CriticalChanceBonus != 0) bonuses.Add($"Crit+{item.CriticalChanceBonus}%");
         if (item.CriticalDamageBonus != 0) bonuses.Add($"CritD+{item.CriticalDamageBonus}%");
@@ -2508,6 +2515,7 @@ public partial class MagicShopLocation : BaseLocation
         if (item.CharismaBonus != 0) bonuses.Add($"Cha{(item.CharismaBonus > 0 ? "+" : "")}{item.CharismaBonus}");
         if (item.MaxHPBonus != 0) bonuses.Add($"HP+{item.MaxHPBonus}");
         if (item.MaxManaBonus != 0) bonuses.Add($"MP+{item.MaxManaBonus}");
+        if (item.StaminaBonus != 0) bonuses.Add($"Sta{(item.StaminaBonus > 0 ? "+" : "")}{item.StaminaBonus}");
         if (item.MagicResistance != 0) bonuses.Add($"MR+{item.MagicResistance}");
         if (item.CriticalChanceBonus != 0) bonuses.Add($"Crit+{item.CriticalChanceBonus}%");
         if (item.CriticalDamageBonus != 0) bonuses.Add($"CritDmg+{item.CriticalDamageBonus}%");
@@ -2522,7 +2530,7 @@ public partial class MagicShopLocation : BaseLocation
     {
         return item.StrengthBonus * 3 + item.DexterityBonus * 3 + item.ConstitutionBonus * 3
              + item.IntelligenceBonus * 3 + item.WisdomBonus * 3 + item.DefenceBonus * 3
-             + item.AgilityBonus * 3 + item.CharismaBonus * 3
+             + item.AgilityBonus * 3 + item.CharismaBonus * 3 + item.StaminaBonus * 3
              + item.MaxHPBonus / 5 + item.MaxManaBonus / 5
              + item.MagicResistance + item.CriticalChanceBonus * 2
              + item.CriticalDamageBonus + item.LifeSteal * 3;

@@ -3042,6 +3042,12 @@ public abstract class BaseLocation
         var ambushed = await CheckFactionAmbush();
         if (ambushed)
         {
+            // If player died in the ambush, go to Inn (death already handled)
+            if (!currentPlayer.IsAlive)
+            {
+                throw new LocationExitException(GameLocation.TheInn);
+            }
+
             // After surviving ambush, continue to destination
             terminal.WriteLine("");
             terminal.SetColor("yellow");
@@ -3273,7 +3279,12 @@ public abstract class BaseLocation
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("base.ambush_disengaged"));
         }
-        // If player lost, the death handling is done by the combat engine
+        else if (result.Outcome == CombatOutcome.PlayerDied)
+        {
+            // PvP combat doesn't call HandlePlayerDeath — apply death penalties here
+            var deathEngine = new CombatEngine(terminal);
+            await deathEngine.HandlePlayerDeathPublic(result);
+        }
 
         await terminal.PressAnyKey();
     }
@@ -4820,6 +4831,11 @@ public abstract class BaseLocation
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("base.buff_arcane_mastery", (int)((GameConfig.MagicianArcaneSpellBonus - 1.0f) * 100)));
             }
+            if (currentPlayer.Class == CharacterClass.Bard)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  - Bardic Inspiration: {GameConfig.BardInspirationChance}% chance per ability to inspire a teammate (+{GameConfig.BardInspirationAttackBonus} ATK)");
+            }
             if (currentPlayer.Class == CharacterClass.Jester)
             {
                 terminal.SetColor("bright_magenta");
@@ -5816,12 +5832,17 @@ public abstract class BaseLocation
         if (item.WeaponPower > 0) stats.Add($"{Loc.Get("ui.stat_wp")}:{item.WeaponPower}");
         if (item.ArmorClass > 0) stats.Add($"{Loc.Get("ui.stat_ac")}:{item.ArmorClass}");
         if (item.ShieldBonus > 0) stats.Add($"{Loc.Get("ui.stat_block")}:{item.ShieldBonus}");
+        if (item.DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}:{item.DefenceBonus:+#;-#;0}");
         if (item.StrengthBonus != 0) stats.Add($"{Loc.Get("ui.stat_str")}:{item.StrengthBonus:+#;-#;0}");
         if (item.DexterityBonus != 0) stats.Add($"{Loc.Get("ui.stat_dex")}:{item.DexterityBonus:+#;-#;0}");
+        if (item.AgilityBonus != 0) stats.Add($"Agi:{item.AgilityBonus:+#;-#;0}");
         if (item.ConstitutionBonus != 0) stats.Add($"{Loc.Get("ui.stat_con")}:{item.ConstitutionBonus:+#;-#;0}");
         if (item.IntelligenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_int")}:{item.IntelligenceBonus:+#;-#;0}");
+        if (item.WisdomBonus != 0) stats.Add($"Wis:{item.WisdomBonus:+#;-#;0}");
+        if (item.CharismaBonus != 0) stats.Add($"Cha:{item.CharismaBonus:+#;-#;0}");
         if (item.MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}:{item.MaxHPBonus:+#;-#;0}");
         if (item.MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mp")}:{item.MaxManaBonus:+#;-#;0}");
+        if (item.StaminaBonus != 0) stats.Add($"Sta:{item.StaminaBonus:+#;-#;0}");
 
         // Limit to 4 stats for concise display
         return string.Join(", ", stats.Take(4));
@@ -5833,8 +5854,8 @@ public abstract class BaseLocation
     private void DisplayEquipmentTotals()
     {
         int totalWeapPow = 0, totalArmPow = 0;
-        int totalStr = 0, totalDex = 0, totalCon = 0, totalInt = 0, totalWis = 0;
-        int totalMaxHP = 0, totalMaxMana = 0;
+        int totalStr = 0, totalDex = 0, totalAgi = 0, totalCon = 0, totalInt = 0, totalWis = 0, totalCha = 0;
+        int totalMaxHP = 0, totalMaxMana = 0, totalDef = 0, totalSta = 0;
 
         foreach (var slot in Enum.GetValues<EquipmentSlot>())
         {
@@ -5845,11 +5866,15 @@ public abstract class BaseLocation
                 totalArmPow += item.ArmorClass + item.ShieldBonus;
                 totalStr += item.StrengthBonus;
                 totalDex += item.DexterityBonus;
+                totalAgi += item.AgilityBonus;
                 totalCon += item.ConstitutionBonus;
                 totalInt += item.IntelligenceBonus;
                 totalWis += item.WisdomBonus;
+                totalCha += item.CharismaBonus;
                 totalMaxHP += item.MaxHPBonus;
                 totalMaxMana += item.MaxManaBonus;
+                totalDef += item.DefenceBonus;
+                totalSta += item.StaminaBonus;
             }
         }
 
@@ -5865,19 +5890,24 @@ public abstract class BaseLocation
         terminal.WriteLine($"{totalArmPow}");
 
         // Only show stat bonuses if there are any
-        bool hasStatBonuses = totalStr != 0 || totalDex != 0 || totalCon != 0 ||
-                              totalInt != 0 || totalWis != 0 || totalMaxHP != 0 || totalMaxMana != 0;
+        bool hasStatBonuses = totalStr != 0 || totalDex != 0 || totalAgi != 0 || totalCon != 0 ||
+                              totalInt != 0 || totalWis != 0 || totalCha != 0 ||
+                              totalMaxHP != 0 || totalMaxMana != 0 || totalDef != 0 || totalSta != 0;
         if (hasStatBonuses)
         {
             terminal.SetColor("white");
             terminal.Write("  " + Loc.Get("base.bonuses") + " ");
             if (totalStr != 0) { terminal.SetColor("green"); terminal.Write($"Str {totalStr:+#;-#;0}  "); }
             if (totalDex != 0) { terminal.SetColor("green"); terminal.Write($"Dex {totalDex:+#;-#;0}  "); }
+            if (totalAgi != 0) { terminal.SetColor("green"); terminal.Write($"Agi {totalAgi:+#;-#;0}  "); }
             if (totalCon != 0) { terminal.SetColor("green"); terminal.Write($"Con {totalCon:+#;-#;0}  "); }
             if (totalInt != 0) { terminal.SetColor("cyan"); terminal.Write($"Int {totalInt:+#;-#;0}  "); }
             if (totalWis != 0) { terminal.SetColor("cyan"); terminal.Write($"Wis {totalWis:+#;-#;0}  "); }
+            if (totalCha != 0) { terminal.SetColor("cyan"); terminal.Write($"Cha {totalCha:+#;-#;0}  "); }
             if (totalMaxHP != 0) { terminal.SetColor("red"); terminal.Write($"MaxHP {totalMaxHP:+#;-#;0}  "); }
             if (totalMaxMana != 0) { terminal.SetColor("blue"); terminal.Write($"MaxMP {totalMaxMana:+#;-#;0}  "); }
+            if (totalDef != 0) { terminal.SetColor("bright_cyan"); terminal.Write($"Def {totalDef:+#;-#;0}  "); }
+            if (totalSta != 0) { terminal.SetColor("yellow"); terminal.Write($"Sta {totalSta:+#;-#;0}  "); }
             terminal.WriteLine("");
         }
     }

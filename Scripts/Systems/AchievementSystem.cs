@@ -1116,6 +1116,20 @@ public static class AchievementSystem
             if (!player.DevMenuUsed)
             {
                 SteamIntegration.UnlockAchievement(achievementId);
+
+                // v0.52.5: In online mode, send an invisible OSC marker through the player's
+                // terminal stream so the client-side relay (OnlinePlaySystem.PipeIO) can
+                // intercept it and sync to the local Steam client.
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    try
+                    {
+                        var term = player.RemoteTerminal
+                            ?? UsurperRemake.Server.SessionContext.Current?.Terminal;
+                        term?.WriteRawAnsi($"\x1B]99;ACH:{achievementId}\x07");
+                    }
+                    catch { /* Best-effort — don't break achievement flow */ }
+                }
             }
 
             // Online news: achievement unlocked

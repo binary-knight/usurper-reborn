@@ -961,6 +961,74 @@ public static class ClassAbilitySystem
             Duration = 3,
             AvailableToClasses = new[] { CharacterClass.Jester, CharacterClass.Bard }
         },
+        ["cutting_words"] = new ClassAbility
+        {
+            Id = "cutting_words",
+            Name = "Cutting Words",
+            Description = "A barbed insult that deals CHA-scaled damage and strips 25% of the target's defense for the fight.",
+            LevelRequired = 14,
+            StaminaCost = 15,
+            Cooldown = 2,
+            Type = AbilityType.Attack,
+            BaseDamage = 40,
+            SpecialEffect = "weaken",
+            AvailableToClasses = new[] { CharacterClass.Bard }
+        },
+        ["ballad_of_blades"] = new ClassAbility
+        {
+            Id = "ballad_of_blades",
+            Name = "Ballad of Blades",
+            Description = "A rhythmic battle-song that guides your weapon with deadly precision.",
+            LevelRequired = 34,
+            StaminaCost = 30,
+            Cooldown = 2,
+            Type = AbilityType.Attack,
+            BaseDamage = 75,
+            AvailableToClasses = new[] { CharacterClass.Bard }
+        },
+        ["countercharm"] = new ClassAbility
+        {
+            Id = "countercharm",
+            Name = "Countercharm",
+            Description = "A cleansing melody that purges afflictions from your party.",
+            LevelRequired = 42,
+            StaminaCost = 35,
+            Cooldown = 5,
+            Type = AbilityType.Buff,
+            SpecialEffect = "party_cleanse",
+            RequiredWeaponTypes = new[] { WeaponType.Instrument },
+            AvailableToClasses = new[] { CharacterClass.Bard }
+        },
+        ["dissonant_whispers"] = new ClassAbility
+        {
+            Id = "dissonant_whispers",
+            Name = "Dissonant Whispers",
+            Description = "Discordant notes that assault the mind, causing pain and terror.",
+            LevelRequired = 50,
+            StaminaCost = 40,
+            Cooldown = 3,
+            Type = AbilityType.Attack,
+            BaseDamage = 65,
+            SpecialEffect = "fear",
+            Duration = 2,
+            AvailableToClasses = new[] { CharacterClass.Bard }
+        },
+        ["war_drummers_cadence"] = new ClassAbility
+        {
+            Id = "war_drummers_cadence",
+            Name = "War Drummer's Cadence",
+            Description = "A thunderous war-beat that drives your allies to fight harder.",
+            LevelRequired = 65,
+            StaminaCost = 55,
+            Cooldown = 5,
+            Type = AbilityType.Buff,
+            AttackBonus = 45,
+            DefenseBonus = 30,
+            Duration = 5,
+            SpecialEffect = "party_song",
+            RequiredWeaponTypes = new[] { WeaponType.Instrument },
+            AvailableToClasses = new[] { CharacterClass.Bard }
+        },
         ["disappearing_act"] = new ClassAbility
         {
             Id = "disappearing_act",

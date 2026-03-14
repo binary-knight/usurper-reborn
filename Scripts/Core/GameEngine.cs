@@ -2396,6 +2396,12 @@ public partial class GameEngine
             // NOTE: Player quests are already merged in RestorePlayerFromSaveData via MergePlayerQuests.
             // A second merge here would create duplicate Quest objects, orphaning the ones in player.ActiveQuests.
 
+            // Check for quests targeting permadead NPCs — auto-complete with rewards
+            if (currentPlayer.ActiveQuests.Count > 0 && NPCSpawnSystem.Instance?.ActiveNPCs.Count > 0)
+            {
+                await CleanupDeadNPCQuests(currentPlayer);
+            }
+
             // Restore story systems (companions, children, seals, etc.)
             // In online mode, only restore this player's god entry — other players' stale
             // snapshots would overwrite their current worship choices in the shared GodSystem.
@@ -2678,6 +2684,76 @@ public partial class GameEngine
             UsurperRemake.Systems.DebugLogger.Instance.Flush();
             await Task.Delay(3000);
         }
+    }
+
+    /// <summary>
+    /// Check active quests for NPC targets that are permadead. Auto-complete with rewards
+    /// so the player isn't stuck with an impossible quest.
+    /// </summary>
+    private async Task CleanupDeadNPCQuests(Character player)
+    {
+        var questsToRemove = new List<Quest>();
+
+        foreach (var quest in player.ActiveQuests)
+        {
+            // Check quest-level TargetNPCName
+            string targetName = quest.TargetNPCName;
+
+            // Also check objective-level targets for TalkToNPC / DefeatNPC
+            if (string.IsNullOrEmpty(targetName))
+            {
+                var npcObjective = quest.Objectives.FirstOrDefault(o =>
+                    (o.ObjectiveType == QuestObjectiveType.TalkToNPC ||
+                     o.ObjectiveType == QuestObjectiveType.DefeatNPC) &&
+                    !string.IsNullOrEmpty(o.TargetId));
+                if (npcObjective != null)
+                    targetName = npcObjective.TargetId;
+            }
+
+            if (string.IsNullOrEmpty(targetName))
+                continue;
+
+            // Look up the NPC including dead ones
+            var npc = NPCSpawnSystem.Instance.GetNPCByName(targetName, includeDead: true);
+            if (npc != null && npc.IsDead)
+            {
+                questsToRemove.Add(quest);
+            }
+        }
+
+        if (questsToRemove.Count == 0)
+            return;
+
+        terminal.WriteLine("");
+        foreach (var quest in questsToRemove)
+        {
+            string targetDisplay = !string.IsNullOrEmpty(quest.TargetNPCName)
+                ? quest.TargetNPCName
+                : quest.Objectives.FirstOrDefault(o =>
+                    !string.IsNullOrEmpty(o.TargetName))?.TargetName ?? "Unknown";
+
+            // Give the reward
+            var rewardAmount = quest.CalculateReward(player.Level);
+            if (rewardAmount <= 0) rewardAmount = player.Level * 100;
+
+            player.Gold += rewardAmount;
+            player.Statistics?.RecordQuestGoldReward(rewardAmount);
+            player.RoyQuests++;
+            player.Fame += 5;
+
+            // Clean up the quest
+            quest.Deleted = true;
+            quest.Occupier = "";
+            player.ActiveQuests.Remove(quest);
+
+            terminal.WriteLine($"  Quest Update: {targetDisplay} has perished.", "yellow");
+            terminal.WriteLine($"  \"{quest.Title ?? "Quest"}\" auto-completed. Reward: {rewardAmount:N0} gold.", "bright_green");
+            terminal.WriteLine("");
+
+            DebugLogger.Instance.LogInfo("QUEST", $"Auto-completed quest '{quest.Title}' for {player.DisplayName} — target NPC '{targetDisplay}' is permadead. Reward: {rewardAmount:N0}g");
+        }
+
+        await terminal.PressAnyKey();
     }
 
     /// <summary>

@@ -862,12 +862,16 @@ namespace UsurperRemake.Systems
                         {
                             // Telnet BBS: write raw bytes directly to BBS socket.
                             // Bypasses all terminal/encoding processing — ANSI colors preserved.
-                            bbsRawStream.Write(buffer, 0, bytesRead);
+                            var rawText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                            rawText = InterceptAchievementMarkers(rawText);
+                            var rawBytes = Encoding.UTF8.GetBytes(rawText);
+                            bbsRawStream.Write(rawBytes, 0, rawBytes.Length);
                             bbsRawStream.Flush();
                         }
                         else
                         {
                             var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                            text = InterceptAchievementMarkers(text);
                             if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
                             {
                                 terminal.WriteRawAnsi(text);
@@ -1042,6 +1046,53 @@ namespace UsurperRemake.Systems
         /// Console.BackgroundColor calls. Handles SGR (colors), clear screen,
         /// and cursor positioning.
         /// </summary>
+        /// <summary>
+        /// Scan text for hidden OSC achievement markers sent by the server.
+        /// Format: ESC]99;ACH:achievement_id BEL — strip them from output and sync to Steam.
+        /// v0.52.5: Enables Steam achievements for players using [O]nline Play from Steam client.
+        /// </summary>
+        private static string InterceptAchievementMarkers(string text)
+        {
+            const string prefix = "\x1B]99;ACH:";
+            const char terminator = '\x07';
+
+            int idx = text.IndexOf(prefix, StringComparison.Ordinal);
+            if (idx < 0) return text; // Fast path: no markers
+
+            var sb = new System.Text.StringBuilder(text.Length);
+            int pos = 0;
+
+            while (idx >= 0)
+            {
+                // Append everything before the marker
+                sb.Append(text, pos, idx - pos);
+
+                int idStart = idx + prefix.Length;
+                int idEnd = text.IndexOf(terminator, idStart);
+                if (idEnd < 0)
+                {
+                    // Incomplete marker — keep it (might span buffer boundary)
+                    sb.Append(text, idx, text.Length - idx);
+                    return sb.ToString();
+                }
+
+                string achievementId = text.Substring(idStart, idEnd - idStart);
+                if (!string.IsNullOrEmpty(achievementId))
+                {
+                    SteamIntegration.UnlockAchievement(achievementId);
+                }
+
+                pos = idEnd + 1; // Skip past the BEL terminator
+                idx = text.IndexOf(prefix, pos, StringComparison.Ordinal);
+            }
+
+            // Append remainder after last marker
+            if (pos < text.Length)
+                sb.Append(text, pos, text.Length - pos);
+
+            return sb.ToString();
+        }
+
         private void WriteAnsiToConsole(string text)
         {
             ansiBuffer += text;

@@ -264,8 +264,12 @@ namespace UsurperRemake.Systems
             if (item.ConstitutionBonus != 0) stats.Add($"{Loc.Get("ui.stat_con")}:{item.ConstitutionBonus:+#;-#;0}");
             if (item.IntelligenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_int")}:{item.IntelligenceBonus:+#;-#;0}");
             if (item.WisdomBonus != 0) stats.Add($"{Loc.Get("ui.stat_wis")}:{item.WisdomBonus:+#;-#;0}");
+            if (item.CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}:{item.CharismaBonus:+#;-#;0}");
+            if (item.AgilityBonus != 0) stats.Add($"{Loc.Get("ui.stat_agi")}:{item.AgilityBonus:+#;-#;0}");
             if (item.MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}:{item.MaxHPBonus:+#;-#;0}");
             if (item.MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mp")}:{item.MaxManaBonus:+#;-#;0}");
+            if (item.DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}:{item.DefenceBonus:+#;-#;0}");
+            if (item.StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}:{item.StaminaBonus:+#;-#;0}");
             if (item.MagicResistance != 0) stats.Add($"{Loc.Get("ui.stat_mr")}:{item.MagicResistance:+#;-#;0}");
             if (item.CriticalChanceBonus != 0) stats.Add($"{Loc.Get("ui.stat_crit")}:{item.CriticalChanceBonus}%");
             if (item.LifeSteal != 0) stats.Add($"{Loc.Get("ui.stat_ls")}:{item.LifeSteal}%");
@@ -283,8 +287,8 @@ namespace UsurperRemake.Systems
 
             // Calculate total bonuses from equipment
             int totalWeapPow = 0, totalArmPow = 0;
-            int totalStr = 0, totalDex = 0, totalCon = 0, totalInt = 0, totalWis = 0, totalCha = 0;
-            int totalMaxHP = 0, totalMaxMana = 0, totalMR = 0, totalDef = 0;
+            int totalStr = 0, totalDex = 0, totalAgi = 0, totalCon = 0, totalInt = 0, totalWis = 0, totalCha = 0;
+            int totalMaxHP = 0, totalMaxMana = 0, totalMR = 0, totalDef = 0, totalSta = 0;
 
             foreach (var slot in Enum.GetValues<EquipmentSlot>())
             {
@@ -295,6 +299,7 @@ namespace UsurperRemake.Systems
                     totalArmPow += item.ArmorClass + item.ShieldBonus;
                     totalStr += item.StrengthBonus;
                     totalDex += item.DexterityBonus;
+                    totalAgi += item.AgilityBonus;
                     totalCon += item.ConstitutionBonus;
                     totalInt += item.IntelligenceBonus;
                     totalWis += item.WisdomBonus;
@@ -303,6 +308,7 @@ namespace UsurperRemake.Systems
                     totalMaxMana += item.MaxManaBonus;
                     totalMR += item.MagicResistance;
                     totalDef += item.DefenceBonus;
+                    totalSta += item.StaminaBonus;
                 }
             }
 
@@ -316,12 +322,14 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"{totalArmPow}");
 
             // Stat bonuses
-            if (totalStr != 0 || totalDex != 0 || totalCon != 0)
+            if (totalStr != 0 || totalDex != 0 || totalAgi != 0 || totalCon != 0 ||
+                totalInt != 0 || totalWis != 0 || totalCha != 0)
             {
                 terminal.SetColor("white");
                 terminal.Write($"{Loc.Get("inventory.stats")}: ");
                 if (totalStr != 0) { terminal.SetColor("green"); terminal.Write($"Str {totalStr:+#;-#;0}  "); }
                 if (totalDex != 0) { terminal.SetColor("green"); terminal.Write($"Dex {totalDex:+#;-#;0}  "); }
+                if (totalAgi != 0) { terminal.SetColor("green"); terminal.Write($"Agi {totalAgi:+#;-#;0}  "); }
                 if (totalCon != 0) { terminal.SetColor("green"); terminal.Write($"Con {totalCon:+#;-#;0}  "); }
                 if (totalInt != 0) { terminal.SetColor("cyan"); terminal.Write($"Int {totalInt:+#;-#;0}  "); }
                 if (totalWis != 0) { terminal.SetColor("cyan"); terminal.Write($"Wis {totalWis:+#;-#;0}  "); }
@@ -329,7 +337,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
             }
 
-            if (totalMaxHP != 0 || totalMaxMana != 0 || totalMR != 0 || totalDef != 0)
+            if (totalMaxHP != 0 || totalMaxMana != 0 || totalMR != 0 || totalDef != 0 || totalSta != 0)
             {
                 terminal.SetColor("white");
                 terminal.Write($"{Loc.Get("inventory.other")}: ");
@@ -337,6 +345,7 @@ namespace UsurperRemake.Systems
                 if (totalMaxMana != 0) { terminal.SetColor("blue"); terminal.Write($"MaxMP {totalMaxMana:+#;-#;0}  "); }
                 if (totalMR != 0) { terminal.SetColor("magenta"); terminal.Write($"MagicRes {totalMR:+#;-#;0}  "); }
                 if (totalDef != 0) { terminal.SetColor("cyan"); terminal.Write($"Def {totalDef:+#;-#;0}  "); }
+                if (totalSta != 0) { terminal.SetColor("yellow"); terminal.Write($"Sta {totalSta:+#;-#;0}  "); }
                 terminal.WriteLine("");
             }
 
@@ -791,13 +800,21 @@ namespace UsurperRemake.Systems
                 var newBonuses = new List<string>();
                 if (currentEquip.StrengthBonus != 0) currentBonuses.Add($"Str {currentEquip.StrengthBonus:+#;-#;0}");
                 if (currentEquip.DexterityBonus != 0) currentBonuses.Add($"Dex {currentEquip.DexterityBonus:+#;-#;0}");
+                if (currentEquip.AgilityBonus != 0) currentBonuses.Add($"Agi {currentEquip.AgilityBonus:+#;-#;0}");
+                if (currentEquip.ConstitutionBonus != 0) currentBonuses.Add($"Con {currentEquip.ConstitutionBonus:+#;-#;0}");
+                if (currentEquip.IntelligenceBonus != 0) currentBonuses.Add($"Int {currentEquip.IntelligenceBonus:+#;-#;0}");
                 if (currentEquip.WisdomBonus != 0) currentBonuses.Add($"Wis {currentEquip.WisdomBonus:+#;-#;0}");
+                if (currentEquip.CharismaBonus != 0) currentBonuses.Add($"Cha {currentEquip.CharismaBonus:+#;-#;0}");
                 if (currentEquip.MaxHPBonus != 0) currentBonuses.Add($"HP {currentEquip.MaxHPBonus:+#;-#;0}");
                 if (currentEquip.MaxManaBonus != 0) currentBonuses.Add($"Mana {currentEquip.MaxManaBonus:+#;-#;0}");
                 if (currentEquip.DefenceBonus != 0) currentBonuses.Add($"Def {currentEquip.DefenceBonus:+#;-#;0}");
                 if (equipment.StrengthBonus != 0) newBonuses.Add($"Str {equipment.StrengthBonus:+#;-#;0}");
                 if (equipment.DexterityBonus != 0) newBonuses.Add($"Dex {equipment.DexterityBonus:+#;-#;0}");
+                if (equipment.AgilityBonus != 0) newBonuses.Add($"Agi {equipment.AgilityBonus:+#;-#;0}");
+                if (equipment.ConstitutionBonus != 0) newBonuses.Add($"Con {equipment.ConstitutionBonus:+#;-#;0}");
+                if (equipment.IntelligenceBonus != 0) newBonuses.Add($"Int {equipment.IntelligenceBonus:+#;-#;0}");
                 if (equipment.WisdomBonus != 0) newBonuses.Add($"Wis {equipment.WisdomBonus:+#;-#;0}");
+                if (equipment.CharismaBonus != 0) newBonuses.Add($"Cha {equipment.CharismaBonus:+#;-#;0}");
                 if (equipment.MaxHPBonus != 0) newBonuses.Add($"HP {equipment.MaxHPBonus:+#;-#;0}");
                 if (equipment.MaxManaBonus != 0) newBonuses.Add($"Mana {equipment.MaxManaBonus:+#;-#;0}");
                 if (equipment.DefenceBonus != 0) newBonuses.Add($"Def {equipment.DefenceBonus:+#;-#;0}");

@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.52.4";
+    public const string Version = "0.52.5";
     public const string VersionName = "The Hook";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -694,9 +694,16 @@ public static partial class GameConfig
     public const int InformantCost = 100;                    // Gold cost for Shadows informant
     public const float CrownTaxExemptionRate = 0.20f;        // 20% gold loss reduction on death for Crown
 
-    // Shop Item Generation (v0.49.0)
+    // Shop Item Generation (v0.49.0, updated v0.52.5)
     public const float ShopPowerMultiplier = 0.85f;      // Shop items are 15% weaker than Common dungeon loot
     public const float ShopPriceMultiplier = 300f;        // Base price = level^1.5 * 300
+
+    // Loot Progression (v0.52.5)
+    public const double LootBaseDropChance = 0.20;        // 20% base drop chance (was 12%)
+    public const double LootLevelDropScale = 0.005;       // +0.5% per monster level
+    public const double LootMaxDropChance = 0.50;         // 50% cap (was 45%)
+    public const double LootPartyBonusPerMember = 0.05;   // +5% drop chance per party member
+    public const double LootTeammateTargetChance = 0.30;  // 30% chance to generate loot for a teammate's class
 
     // Dark Alley Overhaul (v0.41.0)
     // Shop Caps
@@ -837,6 +844,10 @@ public static partial class GameConfig
     public const float VoidreaverVoidHungerPercent = 0.10f;       // Voidreaver: Heal 10% max HP on every kill
     public const float VoidreaverPainThresholdBonus = 0.20f;      // Voidreaver: +20% ability damage when below 50% HP
     public const float VoidreaverSoulEaterManaPercent = 0.15f;    // Voidreaver: Restore 15% max mana on killing blow
+    // Bard Bardic Inspiration passive
+    public const int BardInspirationChance = 15;             // Bard: 15% chance per ability use to inspire a teammate
+    public const int BardInspirationAttackBonus = 20;        // +20 ATK buff to inspired teammate
+    public const int BardInspirationDuration = 2;            // Inspiration lasts 2 rounds
     // Jester Trickster's Luck
     public const int JesterTrickstersLuckChance = 20;        // Jester: 20% chance per attack to proc random bonus
     public const float JesterLuckBonusDamage = 0.50f;        // +50% bonus damage on lucky proc

@@ -703,15 +703,8 @@ public class HealerLocation : BaseLocation
     {
         var player = GetCurrentPlayer();
 
-        if (player.MaxMana <= 0)
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("healer.no_mana_use", player.Class, Manager));
-            terminal.SetColor("gray");
-            await terminal.PressAnyKey();
-            return;
-        }
+        // v0.52.5: Non-casters can buy mana potions to give to teammates via Aid Ally
+        // (restriction removed — was blocking non-mana classes entirely)
 
         int potionPrice = Math.Max(75, player.Level * 3);
         int manaRestored = 30 + player.Level * 5;

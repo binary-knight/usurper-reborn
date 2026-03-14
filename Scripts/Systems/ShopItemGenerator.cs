@@ -30,8 +30,8 @@ public static class ShopItemGenerator
     public const int ShopGeneratedMin = 50000;
     public const int ShopGeneratedMax = 99999;
 
-    private const int LevelInterval = 10;
-    private const int MaxItemsPerTemplate = 4;
+    private const int LevelInterval = 5;       // v0.52.5: was 10 — shops now refresh every 5 levels
+    private const int MaxItemsPerTemplate = 8;  // v0.52.5: was 4 — more level tiers per template
 
     public static bool IsShopGenerated(int id) => id >= ShopGeneratedMin && id <= ShopGeneratedMax;
 
@@ -566,13 +566,14 @@ public static class ShopItemGenerator
         _ => 0.5f,
     };
 
+    // v0.52.5: Tightened rarity bands so shops stay relevant longer
     private static EquipmentRarity GetRarityForLevel(int level) => level switch
     {
-        <= 15 => EquipmentRarity.Common,
-        <= 30 => EquipmentRarity.Uncommon,
-        <= 50 => EquipmentRarity.Rare,
-        <= 70 => EquipmentRarity.Epic,
-        <= 85 => EquipmentRarity.Legendary,
+        <= 10 => EquipmentRarity.Common,
+        <= 20 => EquipmentRarity.Uncommon,
+        <= 35 => EquipmentRarity.Rare,
+        <= 55 => EquipmentRarity.Epic,
+        <= 75 => EquipmentRarity.Legendary,
         _ => EquipmentRarity.Artifact,
     };
 

@@ -3193,7 +3193,7 @@ public partial class CombatEngine
     /// Apply poison effects from an active blade coating after a successful attack on a monster.
     /// Called after damage is dealt to the target.
     /// </summary>
-    private void ApplyPoisonEffectsOnHit(Character attacker, Monster target)
+    private void ApplyPoisonEffectsOnHit(Character attacker, Monster target, bool isPlayer = true)
     {
         if (attacker.PoisonCoatingCombats <= 0 || attacker.ActivePoisonType == PoisonType.None)
             return;
@@ -3229,7 +3229,9 @@ public partial class CombatEngine
                 {
                     attacker.ApplyStatus(StatusEffect.Lifesteal, 3);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine("  Siphoning venom activates — your attacks drain life!");
+                    terminal.WriteLine(isPlayer
+                        ? "  Siphoning venom activates — your attacks drain life!"
+                        : $"  Siphoning venom activates — {attacker.DisplayName}'s attacks drain life!");
                 }
                 break;
 
@@ -5584,7 +5586,7 @@ public partial class CombatEngine
     public async Task OfferMonkPotionPurchase(Character player)
     {
         bool canBuyHealing = player.Healing < player.MaxPotions;
-        bool canBuyMana = SpellSystem.HasSpells(player) && player.ManaPotions < player.MaxManaPotions;
+        bool canBuyMana = player.ManaPotions < player.MaxManaPotions; // v0.52.5: non-casters can buy for teammates
 
         // Don't bother the player if they're already at max for everything
         if (!canBuyHealing && !canBuyMana)
@@ -5718,13 +5720,15 @@ public partial class CombatEngine
     /// Apply Bard song effects to all party members (teammates and companions).
     /// Called when a Bard uses a song ability with "party_song" or "party_legend" effect.
     /// </summary>
-    private void ApplyBardSongToParty(Character bard, ClassAbilityResult abilityResult, CombatResult result)
+    private void ApplyBardSongToParty(Character bard, ClassAbilityResult abilityResult, CombatResult result, bool isPlayer = true)
     {
         var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
         if (teammates == null || teammates.Count == 0) return;
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine(Loc.Get("combat.song_resonates"));
+        terminal.WriteLine(isPlayer
+            ? Loc.Get("combat.song_resonates")
+            : $"{bard.DisplayName}'s song resonates through the party!");
 
         foreach (var teammate in teammates)
         {
@@ -5777,9 +5781,80 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// Bard passive: Bardic Inspiration. 15% chance after using any ability to grant
+    /// a random alive teammate +20 ATK for 2 rounds.
+    /// </summary>
+    private void ApplyBardicInspiration(Character bard, CombatResult result)
+    {
+        if (random.Next(100) >= GameConfig.BardInspirationChance) return;
+
+        var teammates = result.Teammates?.Where(t => t.IsAlive && !t.IsGroupedPlayer).ToList();
+        if (teammates == null || teammates.Count == 0) return;
+
+        var target = teammates[random.Next(teammates.Count)];
+        target.TempAttackBonus += GameConfig.BardInspirationAttackBonus;
+        target.TempAttackBonusDuration = Math.Max(target.TempAttackBonusDuration, GameConfig.BardInspirationDuration);
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  Bardic Inspiration! {target.DisplayName} is inspired! (+{GameConfig.BardInspirationAttackBonus} ATK for {GameConfig.BardInspirationDuration} rounds)");
+    }
+
+    /// <summary>
+    /// Bard Countercharm: cleanse negative status effects from self and all living teammates.
+    /// </summary>
+    private void ApplyBardCountercharm(Character bard, CombatResult result)
+    {
+        int cleansed = 0;
+
+        // Cleanse self
+        cleansed += CleanseCombatStatuses(bard);
+
+        // Cleanse teammates
+        var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
+        if (teammates != null)
+        {
+            foreach (var tm in teammates)
+            {
+                int tmCleansed = CleanseCombatStatuses(tm);
+                if (tmCleansed > 0)
+                    terminal.WriteLine($"  {tm.DisplayName} is purified! ({tmCleansed} affliction{(tmCleansed > 1 ? "s" : "")} removed)", "bright_cyan");
+            }
+        }
+
+        terminal.SetColor("bright_cyan");
+        if (cleansed > 0)
+            terminal.WriteLine($"  A cleansing melody washes over the party! ({cleansed} affliction{(cleansed > 1 ? "s" : "")} purged from you)");
+        else
+            terminal.WriteLine("  A cleansing melody washes over the party!");
+    }
+
+    /// <summary>
+    /// Remove common negative combat statuses from a character. Returns count of statuses removed.
+    /// </summary>
+    private int CleanseCombatStatuses(Character target)
+    {
+        int removed = 0;
+        if (target.Poisoned || target.PoisonTurns > 0)
+        {
+            target.Poison = 0; target.PoisonTurns = 0;
+            target.RemoveStatus(StatusEffect.Poisoned); removed++;
+        }
+        if (target.HasStatus(StatusEffect.Bleeding)) { target.RemoveStatus(StatusEffect.Bleeding); removed++; }
+        if (target.HasStatus(StatusEffect.Burning)) { target.RemoveStatus(StatusEffect.Burning); removed++; }
+        if (target.HasStatus(StatusEffect.Weakened)) { target.RemoveStatus(StatusEffect.Weakened); removed++; }
+        if (target.HasStatus(StatusEffect.Cursed)) { target.RemoveStatus(StatusEffect.Cursed); removed++; }
+        if (target.HasStatus(StatusEffect.Feared)) { target.RemoveStatus(StatusEffect.Feared); removed++; }
+        if (target.HasStatus(StatusEffect.Silenced)) { target.RemoveStatus(StatusEffect.Silenced); removed++; }
+        if (target.HasStatus(StatusEffect.Frozen)) { target.RemoveStatus(StatusEffect.Frozen); removed++; }
+        if (target.HasStatus(StatusEffect.Stunned)) { target.RemoveStatus(StatusEffect.Stunned); removed++; }
+        // Clear disease flags
+        target.Plague = false; target.Smallpox = false; target.Measles = false; target.Leprosy = false;
+        return removed;
+    }
+
+    /// <summary>
     /// Apply Alchemist party effects (heals, buffs, cleanses) to all living teammates.
     /// </summary>
-    private void ApplyAlchemistPartyEffect(Character alchemist, ClassAbilityResult abilityResult, CombatResult result, string effectType)
+    private void ApplyAlchemistPartyEffect(Character alchemist, ClassAbilityResult abilityResult, CombatResult result, string effectType, bool isPlayer = true)
     {
         var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
 
@@ -5793,7 +5868,9 @@ public partial class CombatEngine
                 if (selfHeal > 0)
                 {
                     alchemist.HP += selfHeal;
-                    terminal.WriteLine($"  You recover {selfHeal} HP from the mist!", "bright_green");
+                    terminal.WriteLine(isPlayer
+                        ? $"  You recover {selfHeal} HP from the mist!"
+                        : $"  {alchemist.DisplayName} recovers {selfHeal} HP from the mist!", "bright_green");
                 }
                 // Teammates get 75%
                 if (teammates != null)
@@ -5815,7 +5892,9 @@ public partial class CombatEngine
                 // Self buff
                 alchemist.TempAttackBonus += abilityResult.AttackBonus;
                 alchemist.TempAttackBonusDuration = Math.Max(alchemist.TempAttackBonusDuration, abilityResult.Duration);
-                terminal.WriteLine($"  You feel the stimulant surge through you! (+{abilityResult.AttackBonus} ATK)", "bright_yellow");
+                terminal.WriteLine(isPlayer
+                    ? $"  You feel the stimulant surge through you! (+{abilityResult.AttackBonus} ATK)"
+                    : $"  {alchemist.DisplayName} is surging with stimulant! (+{abilityResult.AttackBonus} ATK)", "bright_yellow");
                 // Teammates get 75%
                 if (teammates != null)
                 {
@@ -5834,7 +5913,9 @@ public partial class CombatEngine
                 // Self defense buff
                 alchemist.TempDefenseBonus += abilityResult.DefenseBonus;
                 alchemist.TempDefenseBonusDuration = Math.Max(alchemist.TempDefenseBonusDuration, abilityResult.Duration);
-                terminal.WriteLine($"  You vanish into the smoke! (+{abilityResult.DefenseBonus} DEF)", "gray");
+                terminal.WriteLine(isPlayer
+                    ? $"  You vanish into the smoke! (+{abilityResult.DefenseBonus} DEF)"
+                    : $"  {alchemist.DisplayName} vanishes into the smoke! (+{abilityResult.DefenseBonus} DEF)", "gray");
                 // Teammates get full value
                 if (teammates != null)
                 {
@@ -5854,7 +5935,9 @@ public partial class CombatEngine
                 alchemist.TempAttackBonusDuration = Math.Max(alchemist.TempAttackBonusDuration, abilityResult.Duration);
                 alchemist.TempDefenseBonus += abilityResult.DefenseBonus;
                 alchemist.TempDefenseBonusDuration = Math.Max(alchemist.TempDefenseBonusDuration, abilityResult.Duration);
-                terminal.WriteLine($"  You feel invincible! (+{abilityResult.AttackBonus} ATK, +{abilityResult.DefenseBonus} DEF)", "bright_cyan");
+                terminal.WriteLine(isPlayer
+                    ? $"  You feel invincible! (+{abilityResult.AttackBonus} ATK, +{abilityResult.DefenseBonus} DEF)"
+                    : $"  {alchemist.DisplayName} is empowered! (+{abilityResult.AttackBonus} ATK, +{abilityResult.DefenseBonus} DEF)", "bright_cyan");
                 // Teammates get 75%
                 if (teammates != null)
                 {
@@ -5881,7 +5964,9 @@ public partial class CombatEngine
                 alchemist.Smallpox = false;
                 alchemist.Measles = false;
                 alchemist.Leprosy = false;
-                terminal.WriteLine("  Your ailments are neutralized!", "bright_green");
+                terminal.WriteLine(isPlayer
+                    ? "  Your ailments are neutralized!"
+                    : $"  {alchemist.DisplayName}'s ailments are neutralized!", "bright_green");
                 // Cleanse teammates
                 if (teammates != null)
                 {
@@ -5900,7 +5985,9 @@ public partial class CombatEngine
             {
                 // Full heal self + cleanse
                 int selfHeal = (int)Math.Min(abilityResult.Healing, alchemist.MaxHP - alchemist.HP);
-                if (selfHeal > 0) { alchemist.HP += selfHeal; terminal.WriteLine($"  You are fully restored! (+{selfHeal} HP)", "bright_green"); }
+                if (selfHeal > 0) { alchemist.HP += selfHeal; terminal.WriteLine(isPlayer
+                    ? $"  You are fully restored! (+{selfHeal} HP)"
+                    : $"  {alchemist.DisplayName} is fully restored! (+{selfHeal} HP)", "bright_green"); }
                 alchemist.Poison = 0; alchemist.PoisonTurns = 0; alchemist.RemoveStatus(StatusEffect.Poisoned);
                 alchemist.RemoveStatus(StatusEffect.Bleeding); alchemist.RemoveStatus(StatusEffect.Burning);
                 alchemist.RemoveStatus(StatusEffect.Cursed); alchemist.RemoveStatus(StatusEffect.Weakened);
@@ -5927,7 +6014,7 @@ public partial class CombatEngine
     /// <summary>
     /// Apply Cleric party effects (heals, buffs, cleanses) to all living teammates.
     /// </summary>
-    private void ApplyClericPartyEffect(Character cleric, ClassAbilityResult abilityResult, CombatResult result, string effectType)
+    private void ApplyClericPartyEffect(Character cleric, ClassAbilityResult abilityResult, CombatResult result, string effectType, bool isPlayer = true)
     {
         var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
 
@@ -5940,7 +6027,9 @@ public partial class CombatEngine
                 if (selfHeal > 0)
                 {
                     cleric.HP += selfHeal;
-                    terminal.WriteLine($"  You are bathed in divine light! (+{selfHeal} HP)", "bright_green");
+                    terminal.WriteLine(isPlayer
+                        ? $"  You are bathed in divine light! (+{selfHeal} HP)"
+                        : $"  {cleric.DisplayName} is bathed in divine light! (+{selfHeal} HP)", "bright_green");
                 }
                 // Teammates get 75%
                 if (teammates != null)
@@ -5967,7 +6056,9 @@ public partial class CombatEngine
                 }
                 cleric.TempDefenseBonus += abilityResult.DefenseBonus;
                 cleric.TempDefenseBonusDuration = Math.Max(cleric.TempDefenseBonusDuration, abilityResult.Duration);
-                terminal.WriteLine($"  You radiate divine light! (+{selfHeal} HP, +{abilityResult.DefenseBonus} DEF for {abilityResult.Duration} rounds)", "bright_yellow");
+                terminal.WriteLine(isPlayer
+                    ? $"  You radiate divine light! (+{selfHeal} HP, +{abilityResult.DefenseBonus} DEF for {abilityResult.Duration} rounds)"
+                    : $"  {cleric.DisplayName} radiates divine light! (+{selfHeal} HP, +{abilityResult.DefenseBonus} DEF for {abilityResult.Duration} rounds)", "bright_yellow");
                 // Teammates get full defense buff + 75% heal
                 if (teammates != null)
                 {
@@ -5989,14 +6080,18 @@ public partial class CombatEngine
                 if (selfHeal > 0)
                 {
                     cleric.HP += selfHeal;
-                    terminal.WriteLine($"  The holy covenant restores you! (+{selfHeal} HP)", "bright_green");
+                    terminal.WriteLine(isPlayer
+                        ? $"  The holy covenant restores you! (+{selfHeal} HP)"
+                        : $"  The holy covenant restores {cleric.DisplayName}! (+{selfHeal} HP)", "bright_green");
                 }
                 cleric.Poison = 0; cleric.PoisonTurns = 0; cleric.RemoveStatus(StatusEffect.Poisoned);
                 cleric.RemoveStatus(StatusEffect.Bleeding); cleric.RemoveStatus(StatusEffect.Burning);
                 cleric.RemoveStatus(StatusEffect.Cursed); cleric.RemoveStatus(StatusEffect.Weakened);
                 cleric.RemoveStatus(StatusEffect.Stunned); cleric.RemoveStatus(StatusEffect.Frozen);
                 cleric.Plague = false; cleric.Smallpox = false; cleric.Measles = false; cleric.Leprosy = false;
-                terminal.WriteLine("  All your afflictions are cleansed!", "bright_cyan");
+                terminal.WriteLine(isPlayer
+                    ? "  All your afflictions are cleansed!"
+                    : $"  All of {cleric.DisplayName}'s afflictions are cleansed!", "bright_cyan");
                 // Teammates get 75% heal + full cleanse
                 if (teammates != null)
                 {
@@ -6024,12 +6119,18 @@ public partial class CombatEngine
     {
         if (damage <= 0 || target == null) return;
 
+        bool isPlayer = attacker == currentPlayer;
+        string attackerName = attacker.DisplayName;
+
         // Divine lifesteal
         int lifesteal = DivineBlessingSystem.Instance.CalculateLifesteal(attacker, (int)damage);
         if (lifesteal > 0)
         {
             attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + lifesteal);
-            terminal.WriteLine(Loc.Get("combat.dark_power_drain", lifesteal), "dark_magenta");
+            if (isPlayer)
+                terminal.WriteLine(Loc.Get("combat.dark_power_drain", lifesteal), "dark_magenta");
+            else
+                terminal.WriteLine($"{attackerName}'s dark power drains {lifesteal} life!", "dark_magenta");
         }
 
         // Equipment lifesteal (Lifedrinker enchant)
@@ -6038,7 +6139,10 @@ public partial class CombatEngine
         {
             long stolen = Math.Max(1, damage * equipLifeSteal / 100);
             attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + stolen);
-            terminal.WriteLine(Loc.Get("combat.lifedrinker", stolen), "dark_green");
+            if (isPlayer)
+                terminal.WriteLine(Loc.Get("combat.lifedrinker", stolen), "dark_green");
+            else
+                terminal.WriteLine($"{attackerName}'s weapon drains {stolen} life! (Lifedrinker)", "dark_green");
         }
 
         // Divine Boon lifesteal (from worshipped player-god)
@@ -6046,7 +6150,10 @@ public partial class CombatEngine
         {
             long boonSteal = Math.Max(1, (long)(damage * attacker.CachedBoonEffects.LifestealPercent));
             attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + boonSteal);
-            terminal.WriteLine(Loc.Get("combat.boon_drain", boonSteal), "dark_cyan");
+            if (isPlayer)
+                terminal.WriteLine(Loc.Get("combat.boon_drain", boonSteal), "dark_cyan");
+            else
+                terminal.WriteLine($"{attackerName}'s divine power drains {boonSteal} life! (Boon)", "dark_cyan");
         }
 
         // Abysswarden Abyssal Siphon passive: 10% lifesteal on all attacks
@@ -6054,7 +6161,10 @@ public partial class CombatEngine
         {
             long siphon = Math.Max(1, (long)(damage * GameConfig.AbysswardenAbyssalSiphonPercent));
             attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + siphon);
-            terminal.WriteLine($"Abyssal Siphon drains {siphon} HP!", "dark_red");
+            if (isPlayer)
+                terminal.WriteLine($"Abyssal Siphon drains {siphon} HP!", "dark_red");
+            else
+                terminal.WriteLine($"{attackerName}'s Abyssal Siphon drains {siphon} HP!", "dark_red");
         }
 
         // Ability-granted lifesteal (StatusEffect.Lifesteal from Abysswarden/Voidreaver/Assassin abilities)
@@ -6062,7 +6172,10 @@ public partial class CombatEngine
         {
             long statusSteal = Math.Max(1, damage * attacker.StatusLifestealPercent / 100);
             attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + statusSteal);
-            terminal.WriteLine($"Dark energy siphons {statusSteal} HP!", "dark_red");
+            if (isPlayer)
+                terminal.WriteLine($"Dark energy siphons {statusSteal} HP!", "dark_red");
+            else
+                terminal.WriteLine($"{attackerName}'s dark energy siphons {statusSteal} HP!", "dark_red");
         }
 
         // Elemental enchant procs
@@ -6090,7 +6203,7 @@ public partial class CombatEngine
 
         // Apply poison coating effects on hit
         if (target.IsAlive)
-            ApplyPoisonEffectsOnHit(attacker, target);
+            ApplyPoisonEffectsOnHit(attacker, target, isPlayer);
 
         // Gnoll racial: Poisonous Bite — 15% chance to poison on hit
         if (attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
@@ -6102,19 +6215,24 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Check for elemental enchant procs on player's equipped weapon (single-monster combat).
+    /// Check for elemental enchant procs on equipped weapon (single-monster combat).
     /// </summary>
     private void CheckElementalEnchantProcs(Character attacker, Monster target, long damage, CombatResult result)
     {
         var weapon = attacker.GetEquipment(EquipmentSlot.MainHand);
         if (weapon == null) return;
 
+        bool isPlayer = attacker == currentPlayer;
+        string name = attacker.DisplayName;
+
         if (weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
         {
             long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
             target.HP = Math.Max(0, target.HP - fireDamage);
             terminal.SetColor("bright_red");
-            terminal.WriteLine(Loc.Get("combat.enchant_fire", fireDamage));
+            terminal.WriteLine(isPlayer
+                ? Loc.Get("combat.enchant_fire", fireDamage)
+                : $"Flames erupt from {name}'s weapon! {fireDamage} fire damage! (Phoenix Fire)");
             result.TotalDamageDealt += fireDamage;
             attacker.Statistics?.RecordDamageDealt(fireDamage, false);
         }
@@ -6133,13 +6251,17 @@ public partial class CombatEngine
             if (target.StunImmunityRounds > 0)
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("combat.enchant_lightning_resist", lightningDamage, target.Name));
+                terminal.WriteLine(isPlayer
+                    ? Loc.Get("combat.enchant_lightning_resist", lightningDamage, target.Name)
+                    : $"Lightning arcs from {name}'s strike! {lightningDamage} shock damage! {target.Name} resists the stun! (Thunderstrike)");
             }
             else
             {
                 target.StunRounds = Math.Max(target.StunRounds, 1);
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("combat.enchant_lightning_stun", lightningDamage, target.Name));
+                terminal.WriteLine(isPlayer
+                    ? Loc.Get("combat.enchant_lightning_stun", lightningDamage, target.Name)
+                    : $"Lightning arcs from {name}'s strike! {lightningDamage} shock damage! {target.Name} is stunned! (Thunderstrike)");
             }
             result.TotalDamageDealt += lightningDamage;
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
@@ -6190,7 +6312,9 @@ public partial class CombatEngine
             long manaRestored = Math.Max(1, damage * manaStealPct / 100);
             attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
             terminal.SetColor("blue");
-            terminal.WriteLine(Loc.Get("combat.enchant_siphon", manaRestored));
+            terminal.WriteLine(isPlayer
+                ? Loc.Get("combat.enchant_siphon", manaRestored)
+                : $"{name}'s weapon siphons {manaRestored} mana! (Siphon)");
         }
     }
 
@@ -6456,15 +6580,19 @@ public partial class CombatEngine
                 continue; // Skip normal drop logic for bosses
             }
 
-            // Regular monsters - drop chance scales with level
-            // Drop chance: 12% base + 0.5% per monster level, capped at 30%
-            double dropChance = 0.12 + (monster.Level * 0.005);
+            // Regular monsters - drop chance scales with level (v0.52.5: buffed from 12% to 20% base)
+            double dropChance = GameConfig.LootBaseDropChance + (monster.Level * GameConfig.LootLevelDropScale);
+
+            // Party loot bonus: +5% per teammate in party (v0.52.5)
+            int teammateCount = currentTeammates?.Count(t => t.IsAlive && !t.IsGroupedPlayer) ?? 0;
+            if (teammateCount > 0)
+                dropChance += teammateCount * GameConfig.LootPartyBonusPerMember;
 
             // Divine boon luck bonus increases drop chance
             if (result.Player.CachedBoonEffects?.LuckPercent > 0)
                 dropChance += result.Player.CachedBoonEffects.LuckPercent;
 
-            dropChance = Math.Min(0.45, dropChance);
+            dropChance = Math.Min(GameConfig.LootMaxDropChance, dropChance);
 
             // Named monsters (Lords, Chiefs, Kings) have better drop chance (v0.41.4: 60% → 35%)
             if (monster.Name.Contains("Boss") || monster.Name.Contains("Chief") ||
@@ -6475,8 +6603,18 @@ public partial class CombatEngine
 
             if (random.NextDouble() < dropChance)
             {
-                // Generate loot using the new LootGenerator system
-                loot = LootGenerator.GenerateDungeonLoot(monster.Level, result.Player.Class);
+                // Teammate-targeted drops: 30% chance to generate for a random teammate's class (v0.52.5)
+                CharacterClass lootClass = result.Player.Class;
+                if (teammateCount > 0 && random.NextDouble() < GameConfig.LootTeammateTargetChance)
+                {
+                    var aliveTeammates = currentTeammates!.Where(t => t.IsAlive && !t.IsGroupedPlayer).ToList();
+                    if (aliveTeammates.Count > 0)
+                    {
+                        var targetMate = aliveTeammates[random.Next(aliveTeammates.Count)];
+                        lootClass = targetMate.Class;
+                    }
+                }
+                loot = LootGenerator.GenerateDungeonLoot(monster.Level, lootClass);
 
                 if (loot != null)
                 {
@@ -6576,7 +6714,9 @@ public partial class CombatEngine
             var bonuses = new List<string>();
             if (lootItem.Strength != 0) bonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
             if (lootItem.Dexterity != 0) bonuses.Add($"Dex {lootItem.Dexterity:+#;-#;0}");
+            if (lootItem.Agility != 0) bonuses.Add($"Agi {lootItem.Agility:+#;-#;0}");
             if (lootItem.Wisdom != 0) bonuses.Add($"Wis {lootItem.Wisdom:+#;-#;0}");
+            if (lootItem.Charisma != 0) bonuses.Add($"Cha {lootItem.Charisma:+#;-#;0}");
             if (lootItem.Defence != 0) bonuses.Add($"Def {lootItem.Defence:+#;-#;0}");
             int conFromEffects = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Item2) ?? 0;
             int intFromEffects = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Item2) ?? 0;
@@ -6584,6 +6724,7 @@ public partial class CombatEngine
             if (intFromEffects != 0) bonuses.Add($"Int {intFromEffects:+#;-#;0}");
             if (lootItem.HP != 0) bonuses.Add($"HP {lootItem.HP:+#;-#;0}");
             if (lootItem.Mana != 0) bonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
+            if (lootItem.Stamina != 0) bonuses.Add($"Sta {lootItem.Stamina:+#;-#;0}");
 
             if (bonuses.Count > 0)
             {
@@ -7945,13 +8086,16 @@ public partial class CombatEngine
             {
                 // Accessories: compare total stat value instead of armor
                 int currentStatTotal = currentEquip.StrengthBonus + currentEquip.DexterityBonus +
-                    currentEquip.WisdomBonus + currentEquip.MaxHPBonus + currentEquip.MaxManaBonus +
-                    currentEquip.DefenceBonus + currentEquip.AgilityBonus + currentEquip.ConstitutionBonus +
-                    currentEquip.IntelligenceBonus + currentEquip.CharismaBonus;
+                    currentEquip.AgilityBonus + currentEquip.ConstitutionBonus +
+                    currentEquip.IntelligenceBonus + currentEquip.WisdomBonus + currentEquip.CharismaBonus +
+                    currentEquip.DefenceBonus + currentEquip.MaxHPBonus + currentEquip.MaxManaBonus +
+                    currentEquip.StaminaBonus;
                 int newConTotal2 = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Item2) ?? 0;
                 int newIntTotal2 = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Item2) ?? 0;
-                int newStatTotal = lootItem.Strength + lootItem.Dexterity + lootItem.Wisdom +
-                    lootItem.Defence + newConTotal2 + newIntTotal2;
+                int newStatTotal = lootItem.Strength + lootItem.Dexterity + lootItem.Agility +
+                    lootItem.Wisdom + lootItem.Charisma + lootItem.Defence +
+                    newConTotal2 + newIntTotal2 +
+                    lootItem.HP + lootItem.Mana + lootItem.Stamina;
                 int diff = newStatTotal - currentStatTotal;
 
                 terminal.SetColor("white");
@@ -8010,9 +8154,11 @@ public partial class CombatEngine
             // Current item bonuses
             if (currentEquip.StrengthBonus != 0) currentBonuses.Add($"Str {currentEquip.StrengthBonus:+#;-#;0}");
             if (currentEquip.DexterityBonus != 0) currentBonuses.Add($"Dex {currentEquip.DexterityBonus:+#;-#;0}");
-            if (currentEquip.WisdomBonus != 0) currentBonuses.Add($"Wis {currentEquip.WisdomBonus:+#;-#;0}");
+            if (currentEquip.AgilityBonus != 0) currentBonuses.Add($"Agi {currentEquip.AgilityBonus:+#;-#;0}");
             if (currentEquip.ConstitutionBonus != 0) currentBonuses.Add($"Con {currentEquip.ConstitutionBonus:+#;-#;0}");
             if (currentEquip.IntelligenceBonus != 0) currentBonuses.Add($"Int {currentEquip.IntelligenceBonus:+#;-#;0}");
+            if (currentEquip.WisdomBonus != 0) currentBonuses.Add($"Wis {currentEquip.WisdomBonus:+#;-#;0}");
+            if (currentEquip.CharismaBonus != 0) currentBonuses.Add($"Cha {currentEquip.CharismaBonus:+#;-#;0}");
             if (currentEquip.MaxHPBonus != 0) currentBonuses.Add($"HP {currentEquip.MaxHPBonus:+#;-#;0}");
             if (currentEquip.MaxManaBonus != 0) currentBonuses.Add($"Mana {currentEquip.MaxManaBonus:+#;-#;0}");
             if (currentEquip.DefenceBonus != 0) currentBonuses.Add($"Def {currentEquip.DefenceBonus:+#;-#;0}");
@@ -8020,7 +8166,9 @@ public partial class CombatEngine
             // New item bonuses
             if (lootItem.Strength != 0) newBonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
             if (lootItem.Dexterity != 0) newBonuses.Add($"Dex {lootItem.Dexterity:+#;-#;0}");
+            if (lootItem.Agility != 0) newBonuses.Add($"Agi {lootItem.Agility:+#;-#;0}");
             if (lootItem.Wisdom != 0) newBonuses.Add($"Wis {lootItem.Wisdom:+#;-#;0}");
+            if (lootItem.Charisma != 0) newBonuses.Add($"Cha {lootItem.Charisma:+#;-#;0}");
             if (lootItem.Defence != 0) newBonuses.Add($"Def {lootItem.Defence:+#;-#;0}");
             int lootConBonus = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Item2) ?? 0;
             int lootIntBonus = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Item2) ?? 0;
@@ -10060,6 +10208,10 @@ public partial class CombatEngine
             // Apply ability effects
             await ApplyAbilityEffectsMultiMonster(player, target, monsters, abilityResult, result);
 
+            // Bard passive: Bardic Inspiration — 15% chance to buff a random teammate after any ability
+            if (player.Class == CharacterClass.Bard)
+                ApplyBardicInspiration(player, result);
+
             // Set cooldown
             if (abilityResult.CooldownApplied > 0)
             {
@@ -10297,6 +10449,16 @@ public partial class CombatEngine
                     target.Distracted = true;
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"{target.Name} is distracted and will have reduced accuracy!");
+                }
+                break;
+
+            case "weaken":
+                if (target != null && target.IsAlive)
+                {
+                    int defReduction = Math.Max(1, (int)(target.Defence * 0.25));
+                    target.Defence = Math.Max(0, target.Defence - defReduction);
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"{target.Name}'s resolve crumbles! (-{defReduction} DEF for the fight)");
                 }
                 break;
 
@@ -10774,56 +10936,56 @@ public partial class CombatEngine
 
             case "party_stimulant":
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("You distribute stimulant vials to the party!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_stimulant");
+                terminal.WriteLine(isPlayer ? "You distribute stimulant vials to the party!" : $"{actorName} distributes stimulant vials to the party!");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_stimulant", isPlayer);
                 break;
 
             case "party_heal_mist":
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("A healing mist washes over the party!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_heal_mist");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_heal_mist", isPlayer);
                 break;
 
             case "party_antidote":
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("The antidote bomb neutralizes all toxins!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_antidote");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_antidote", isPlayer);
                 break;
 
             case "party_smoke_screen":
                 terminal.SetColor("gray");
                 terminal.WriteLine("A dense smoke screen blankets the party!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_smoke_screen");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_smoke_screen", isPlayer);
                 break;
 
             case "party_battle_brew":
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine("You hand out battle tinctures — the party surges with power!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_battle_brew");
+                terminal.WriteLine(isPlayer ? "You hand out battle tinctures — the party surges with power!" : $"{actorName} hands out battle tinctures — the party surges with power!");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_battle_brew", isPlayer);
                 break;
 
             case "party_remedy":
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("The Grand Remedy flows through the party — all wounds close!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_remedy");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_remedy", isPlayer);
                 break;
 
             case "party_heal_divine":
                 terminal.SetColor("bright_green");
-                terminal.WriteLine("A circle of divine light radiates from your prayer!");
-                ApplyClericPartyEffect(player, abilityResult, result, "party_heal_divine");
+                terminal.WriteLine(isPlayer ? "A circle of divine light radiates from your prayer!" : $"A circle of divine light radiates from {actorName}'s prayer!");
+                ApplyClericPartyEffect(player, abilityResult, result, "party_heal_divine", isPlayer);
                 break;
 
             case "party_beacon":
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("You become a beacon of holy light, shielding all allies!");
-                ApplyClericPartyEffect(player, abilityResult, result, "party_beacon");
+                terminal.WriteLine(isPlayer ? "You become a beacon of holy light, shielding all allies!" : $"{actorName} becomes a beacon of holy light, shielding all allies!");
+                ApplyClericPartyEffect(player, abilityResult, result, "party_beacon", isPlayer);
                 break;
 
             case "party_heal_cleanse":
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("A sacred covenant purifies and heals the entire party!");
-                ApplyClericPartyEffect(player, abilityResult, result, "party_heal_cleanse");
+                ApplyClericPartyEffect(player, abilityResult, result, "party_heal_cleanse", isPlayer);
                 break;
 
             case "aoe_corrode":
@@ -10839,7 +11001,7 @@ public partial class CombatEngine
 
             case "party_song":
                 // Bard songs affect the entire party
-                ApplyBardSongToParty(player, abilityResult, result);
+                ApplyBardSongToParty(player, abilityResult, result, isPlayer);
                 break;
 
             case "party_legend":
@@ -10848,7 +11010,12 @@ public partial class CombatEngine
                     player.ActiveStatuses[StatusEffect.Regenerating] = abilityResult.Duration > 0 ? abilityResult.Duration : 6;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_legend_incarnate" : "combat.ability_legend_incarnate_npc", actorName));
-                ApplyBardSongToParty(player, abilityResult, result);
+                ApplyBardSongToParty(player, abilityResult, result, isPlayer);
+                break;
+
+            case "party_cleanse":
+                // Countercharm: cleanse status effects from self and party
+                ApplyBardCountercharm(player, result);
                 break;
 
             case "legendary":
@@ -14188,6 +14355,20 @@ public partial class CombatEngine
         // Skip normal attack if companion already died from special ability above
         if (!companion.IsAlive) goto CompanionDeathCheck;
 
+        // Distraction penalty: distracted monsters have a 25% chance to miss companions entirely
+        // (equivalent to the -5 to hit roll applied on the player attack path)
+        if (monster.Distracted)
+        {
+            monster.Distracted = false;
+            if (random.Next(100) < 25)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"{monster.TheNameOrName} is distracted and misses {companion.DisplayName}!");
+                await Task.Delay(GetCombatDelay(500));
+                return;
+            }
+        }
+
         // Calculate monster damage
         long monsterAttack = monster.GetAttackPower();
         monsterAttack += random.Next(0, 10);
@@ -15299,6 +15480,15 @@ public partial class CombatEngine
     /// <summary>
     /// Handle player death with resurrection options
     /// </summary>
+    /// <summary>
+    /// Public wrapper for HandlePlayerDeath — used by faction ambush and other
+    /// PvP paths where the combat engine doesn't handle death internally.
+    /// </summary>
+    public async Task HandlePlayerDeathPublic(CombatResult result)
+    {
+        await HandlePlayerDeath(result);
+    }
+
     private async Task HandlePlayerDeath(CombatResult result)
     {
         terminal.ClearScreen();
@@ -16128,6 +16318,10 @@ public partial class CombatEngine
         // Apply ability effects
         await ApplyAbilityEffects(player, monster, abilityResult, result);
 
+        // Bard passive: Bardic Inspiration — 15% chance to buff a random teammate after any ability
+        if (player.Class == CharacterClass.Bard)
+            ApplyBardicInspiration(player, result);
+
         // Set cooldown
         if (abilityResult.CooldownApplied > 0)
         {
@@ -16324,6 +16518,16 @@ public partial class CombatEngine
                 {
                     monster.Distracted = true;
                     terminal.WriteLine($"{monster.Name} is distracted and will have reduced accuracy!", "yellow");
+                }
+                break;
+
+            case "weaken":
+                if (monster != null && monster.IsAlive)
+                {
+                    int defReduction = Math.Max(1, (int)(monster.Defence * 0.25));
+                    monster.Defence = Math.Max(0, monster.Defence - defReduction);
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"{monster.Name}'s resolve crumbles! (-{defReduction} DEF for the fight)");
                 }
                 break;
 
@@ -16697,55 +16901,55 @@ public partial class CombatEngine
             case "party_stimulant":
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("You distribute stimulant vials to the party!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_stimulant");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_stimulant", true);
                 break;
 
             case "party_heal_mist":
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("A healing mist washes over the party!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_heal_mist");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_heal_mist", true);
                 break;
 
             case "party_antidote":
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("The antidote bomb neutralizes all toxins!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_antidote");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_antidote", true);
                 break;
 
             case "party_smoke_screen":
                 terminal.SetColor("gray");
                 terminal.WriteLine("A dense smoke screen blankets the party!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_smoke_screen");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_smoke_screen", true);
                 break;
 
             case "party_battle_brew":
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("You hand out battle tinctures — the party surges with power!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_battle_brew");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_battle_brew", true);
                 break;
 
             case "party_remedy":
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("The Grand Remedy flows through the party — all wounds close!");
-                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_remedy");
+                ApplyAlchemistPartyEffect(player, abilityResult, result, "party_remedy", true);
                 break;
 
             case "party_heal_divine":
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("A circle of divine light radiates from your prayer!");
-                ApplyClericPartyEffect(player, abilityResult, result, "party_heal_divine");
+                ApplyClericPartyEffect(player, abilityResult, result, "party_heal_divine", true);
                 break;
 
             case "party_beacon":
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("You become a beacon of holy light, shielding all allies!");
-                ApplyClericPartyEffect(player, abilityResult, result, "party_beacon");
+                ApplyClericPartyEffect(player, abilityResult, result, "party_beacon", true);
                 break;
 
             case "party_heal_cleanse":
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("A sacred covenant purifies and heals the entire party!");
-                ApplyClericPartyEffect(player, abilityResult, result, "party_heal_cleanse");
+                ApplyClericPartyEffect(player, abilityResult, result, "party_heal_cleanse", true);
                 break;
 
             case "aoe_corrode":
@@ -16771,6 +16975,11 @@ public partial class CombatEngine
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("combat.become_legend"));
                 ApplyBardSongToParty(player, abilityResult, result);
+                break;
+
+            case "party_cleanse":
+                // Countercharm: cleanse status effects from self and party
+                ApplyBardCountercharm(player, result);
                 break;
 
             case "legendary":

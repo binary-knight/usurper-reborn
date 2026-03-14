@@ -761,7 +761,7 @@ public class DailySystemManager
         // Process Quest System daily maintenance
         QuestSystem.ProcessDailyQuestMaintenance();
         if (player != null)
-            QuestSystem.RefreshBountyBoard(player.Level);
+            QuestSystem.RefreshBountyBoard(player.Level, player.Statistics?.DeepestDungeonLevel ?? 0);
 
         // Blood Price — natural murder weight decay
         if (player != null && player.MurderWeight > 0)
@@ -1008,7 +1008,7 @@ public class DailySystemManager
         var player = GameEngine.Instance?.CurrentPlayer;
         if (player != null)
         {
-            QuestSystem.RefreshBountyBoard(player.Level);
+            QuestSystem.RefreshBountyBoard(player.Level, player.Statistics?.DeepestDungeonLevel ?? 0);
         }
 
         // Blood Price — natural murder weight decay over real time

@@ -2248,7 +2248,7 @@ public class CharacterCreationSystem
             CharacterClass.Paladin => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
             CharacterClass.Barbarian => ("Crude Axe", WeaponType.Axe, WeaponHandedness.OneHanded, 5),
             CharacterClass.Cleric => ("Wooden Staff", WeaponType.Staff, WeaponHandedness.TwoHanded, 3),
-            CharacterClass.Bard => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 4),
+            CharacterClass.Bard => ("Old Lute", WeaponType.Instrument, WeaponHandedness.OneHanded, 4),
             CharacterClass.Jester => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
             CharacterClass.Alchemist => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
             _ => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
