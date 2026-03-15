@@ -15,6 +15,8 @@ namespace UsurperRemake.Systems
     {
         private TerminalEmulator terminal;
         private Character player;
+        private int _backpackPage = 0;
+        private const int BackpackPageSize = 15;
 
         public InventorySystem(TerminalEmulator term, Character character)
         {
@@ -108,30 +110,42 @@ namespace UsurperRemake.Systems
 
         private void DisplayBackpack()
         {
-            terminal.SetColor("yellow");
-            if (!GameConfig.ScreenReaderMode)
-                terminal.WriteLine($"═══ {Loc.Get("inventory.backpack")} ═══");
-            else
-                terminal.WriteLine(Loc.Get("inventory.backpack"));
-
             if (player.Inventory == null || player.Inventory.Count == 0)
             {
+                terminal.SetColor("yellow");
+                if (!GameConfig.ScreenReaderMode)
+                    terminal.WriteLine($"═══ {Loc.Get("inventory.backpack")} ═══");
+                else
+                    terminal.WriteLine(Loc.Get("inventory.backpack"));
                 terminal.SetColor("darkgray");
                 terminal.WriteLine($"  ({Loc.Get("inventory.backpack_empty")})");
                 terminal.WriteLine("");
                 return;
             }
 
+            int totalItems = player.Inventory.Count;
+            int totalPages = (totalItems + BackpackPageSize - 1) / BackpackPageSize;
+            _backpackPage = Math.Clamp(_backpackPage, 0, totalPages - 1);
+            int startIndex = _backpackPage * BackpackPageSize;
+            int endIndex = Math.Min(startIndex + BackpackPageSize, totalItems);
+
+            terminal.SetColor("yellow");
+            string pageInfo = totalPages > 1 ? $" ({_backpackPage + 1}/{totalPages})" : "";
+            if (!GameConfig.ScreenReaderMode)
+                terminal.WriteLine($"═══ {Loc.Get("inventory.backpack")}{pageInfo} ═══");
+            else
+                terminal.WriteLine($"{Loc.Get("inventory.backpack")}{pageInfo}");
+
             terminal.WriteLine("");
-            int index = 1;
-            foreach (var item in player.Inventory.Take(20)) // Limit display to 20 items
+            for (int i = startIndex; i < endIndex; i++)
             {
+                var item = player.Inventory[i];
+                int displayNum = i + 1;
                 terminal.SetColor("gray");
-                terminal.Write($"  [B{index}] ");
+                terminal.Write($"  [B{displayNum}] ");
 
                 if (item.IsIdentified)
                 {
-                    // Identified - show full name and stats
                     string itemColor = item.Type switch
                     {
                         ObjType.Weapon => "bright_red",
@@ -155,7 +169,6 @@ namespace UsurperRemake.Systems
                     if (item.Wisdom != 0) stats.Add($"{Loc.Get("ui.stat_wis")}:{item.Wisdom:+#;-#;0}");
                     if (item.Agility != 0) stats.Add($"{Loc.Get("ui.stat_agi")}:{item.Agility:+#;-#;0}");
                     if (item.Charisma != 0) stats.Add($"{Loc.Get("ui.stat_cha")}:{item.Charisma:+#;-#;0}");
-                    // CON and INT are stored in LootEffects, not as direct Item properties
                     int conFromLoot = item.LootEffects?.Where(e => e.EffectType == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Value) ?? 0;
                     int intFromLoot = item.LootEffects?.Where(e => e.EffectType == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Value) ?? 0;
                     if (conFromLoot != 0) stats.Add($"{Loc.Get("ui.stat_con")}:{conFromLoot:+#;-#;0}");
@@ -169,7 +182,6 @@ namespace UsurperRemake.Systems
                 }
                 else
                 {
-                    // Unidentified - show mystery name, no stats
                     terminal.SetColor("magenta");
                     terminal.Write(LootGenerator.GetUnidentifiedName(item));
                     terminal.SetColor("darkgray");
@@ -177,13 +189,18 @@ namespace UsurperRemake.Systems
                 }
 
                 terminal.WriteLine("");
-                index++;
             }
 
-            if (player.Inventory.Count > 20)
+            if (totalPages > 1)
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine($"  ... {Loc.Get("inventory.and_more", player.Inventory.Count - 20)}");
+                terminal.WriteLine("");
+                terminal.Write("  ");
+                if (_backpackPage > 0)
+                    terminal.Write($"[<] {Loc.Get("inventory.prev_page")}  ");
+                if (_backpackPage < totalPages - 1)
+                    terminal.Write($"[>] {Loc.Get("inventory.next_page")}");
+                terminal.WriteLine("");
             }
 
             terminal.WriteLine("");
@@ -420,6 +437,19 @@ namespace UsurperRemake.Systems
                     break;
                 case "D":
                     await DropItem();
+                    break;
+                case "<":
+                case ",":
+                    if (_backpackPage > 0) _backpackPage--;
+                    break;
+                case ">":
+                case ".":
+                    {
+                        int totalPages = player.Inventory != null
+                            ? (player.Inventory.Count + BackpackPageSize - 1) / BackpackPageSize
+                            : 1;
+                        if (_backpackPage < totalPages - 1) _backpackPage++;
+                    }
                     break;
                 default:
                     // Check for B# format (backpack item)
