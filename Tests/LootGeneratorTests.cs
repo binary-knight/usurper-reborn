@@ -5,7 +5,7 @@ namespace UsurperReborn.Tests;
 
 /// <summary>
 /// Unit tests for LootGenerator
-/// Tests equipment generation including rings, necklaces, and boss loot
+/// Tests equipment generation including rings, necklaces, shields, and boss loot
 /// </summary>
 public class LootGeneratorTests
 {
@@ -109,6 +109,34 @@ public class LootGeneratorTests
         hasStats.Should().BeTrue("Necklaces should have stat bonuses");
     }
 
+    #endregion
+
+    #region Shield Generation Tests
+    [Fact]
+    public void GenerateShield()
+    {
+        var shield = LootGenerator.GenerateShield(1);
+        shield.Should().NotBeNull();
+        shield.Type.Should().Be(ObjType.Shield);
+        shield.ShieldBonus.Should().BeGreaterThan(0);
+        shield.BlockChance.Should().BeGreaterThan(0);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(25)]
+    [InlineData(50)]
+    [InlineData(75)]
+    [InlineData(100)]
+    public void GenerateShield_WorksAtAllLevels(int level)
+    {
+        var shield = LootGenerator.GenerateShield(level);
+        shield.Should().NotBeNull();
+        shield.Type.Should().Be(ObjType.Shield);
+        shield.ShieldBonus.Should().BeGreaterThan(0);
+        shield.BlockChance.Should().BeGreaterThan(0);
+    }
+    
     #endregion
 
     #region Mini-Boss Loot Tests
