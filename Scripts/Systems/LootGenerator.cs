@@ -1856,15 +1856,15 @@ public static class LootGenerator
                 _ => Loc.Get("item.slot.armor")
             };
 
-                    return new Item
-                    {
-                        Name = $"{GetRarityPrefix(rarity)}{slotName}",
-                        Type = armorType,
-                        Value = power * 20,
-                        Armor = power,
-                        MinLevel = Math.Max(1, level - 10),
-                        Dungeon = true
-                    };
+            return new Item
+            {
+                Name = $"{GetRarityPrefix(rarity)}{slotName}",
+                Type = armorType,
+                Value = power * 20,
+                Armor = power,
+                MinLevel = Math.Max(1, level - 10),
+                Dungeon = true
+            };
         }
 
         private static string BuildItemName(string baseName, ItemRarity rarity,
