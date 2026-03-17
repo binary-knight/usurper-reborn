@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
 using UsurperRemake.Data;
@@ -27,6 +28,9 @@ namespace UsurperRemake.Systems
 
         // Combat modifiers based on dialogue choices
         private CombatModifiers activeCombatModifiers = new();
+
+        // Prevents concurrent boss encounters from corrupting shared state in MUD mode
+        private readonly SemaphoreSlim _bossEncounterLock = new(1, 1);
 
         /// <summary>
         /// Combat modifiers applied based on dialogue choices before boss fight
@@ -115,6 +119,13 @@ namespace UsurperRemake.Systems
                 // (they were spared via dialogue and player found the artifact to complete the save)
                 if (state.Status == GodStatus.Awakened)
                 {
+                    // Only gods with save quests can be in Awakened state
+                    // If a non-saveable god is somehow Awakened, treat as defeated to unblock progression
+                    if (!state.CanBeSaved)
+                    {
+                        state.Status = GodStatus.Defeated;
+                        return false;
+                    }
                     var requiredArtifact = GetArtifactForSave(type);
                     if (requiredArtifact != null && ArtifactSystem.Instance.HasArtifact(requiredArtifact.Value))
                         return true; // Allow re-encounter to complete the save
@@ -294,68 +305,71 @@ namespace UsurperRemake.Systems
                 return new BossEncounterResult { Success = false };
             }
 
-            currentBoss = boss;
-            bossDefeated = false;
-            dungeonTeammates = teammates;
-
-            // GD.Print($"[BossSystem] Starting encounter with {boss.Name}");
-
-            // Play introduction
-            await PlayBossIntroduction(boss, player, terminal);
-
-            // Run dialogue
-            var dialogueResult = await DialogueSystem.Instance.StartDialogue(
-                player, $"{type.ToString().ToLower()}_encounter", terminal);
-
-            // Check if dialogue led to non-combat resolution
-            var story = StoryProgressionSystem.Instance;
-            if (story.HasStoryFlag($"{type.ToString().ToLower()}_ally"))
+            // Serialize boss encounters to prevent concurrent MUD players from corrupting
+            // shared singleton state (currentBoss, activeCombatModifiers, etc.)
+            await _bossEncounterLock.WaitAsync();
+            try
             {
-                // Allied with the god — mark as Allied so floor is cleared
-                story.UpdateGodState(type, GodStatus.Allied);
-                return new BossEncounterResult
+                currentBoss = boss;
+                bossDefeated = false;
+                dungeonTeammates = teammates;
+
+                // Play introduction
+                await PlayBossIntroduction(boss, player, terminal);
+
+                // Run dialogue
+                var dialogueResult = await DialogueSystem.Instance.StartDialogue(
+                    player, $"{type.ToString().ToLower()}_encounter", terminal);
+
+                // Check if dialogue led to non-combat resolution
+                var story = StoryProgressionSystem.Instance;
+                if (story.HasStoryFlag($"{type.ToString().ToLower()}_ally"))
                 {
-                    Success = true,
-                    Outcome = BossOutcome.Allied,
-                    God = type,
-                    ApproachType = "allied"
-                };
-            }
+                    story.UpdateGodState(type, GodStatus.Allied);
+                    return new BossEncounterResult
+                    {
+                        Success = true,
+                        Outcome = BossOutcome.Allied,
+                        God = type,
+                        ApproachType = "allied"
+                    };
+                }
 
-            if (story.HasStoryFlag($"{type.ToString().ToLower()}_spared"))
-            {
-                // Spared the god - mark as Awakened (quest in progress, not fully saved yet)
-                // Player must find the required artifact and return to complete the save
-                story.UpdateGodState(type, GodStatus.Awakened);
-                story.SetStoryFlag($"{type.ToString().ToLower()}_save_quest", true);
-
-                return new BossEncounterResult
+                if (story.HasStoryFlag($"{type.ToString().ToLower()}_spared"))
                 {
-                    Success = true,
-                    Outcome = BossOutcome.Spared,
-                    God = type,
-                    ApproachType = "merciful"
-                };
-            }
+                    story.UpdateGodState(type, GodStatus.Awakened);
+                    story.SetStoryFlag($"{type.ToString().ToLower()}_save_quest", true);
 
-            // Combat time! Either the player chose a combat path, or said nothing
-            // (an Old God won't just let you walk away in silence)
-            if (!story.HasStoryFlag($"{type.ToString().ToLower()}_combat_start"))
+                    return new BossEncounterResult
+                    {
+                        Success = true,
+                        Outcome = BossOutcome.Spared,
+                        God = type,
+                        ApproachType = "merciful"
+                    };
+                }
+
+                // Combat time! Either the player chose a combat path, or said nothing
+                if (!story.HasStoryFlag($"{type.ToString().ToLower()}_combat_start"))
+                {
+                    terminal.WriteLine("");
+                    terminal.WriteLine(Loc.Get("old_god.say_nothing"), "gray");
+                    terminal.WriteLine("");
+                    terminal.WriteLine(Loc.Get("old_god.god_stares", boss.Name), boss.ThemeColor);
+                    terminal.WriteLine("");
+                    terminal.WriteLine($"\"{(type == OldGodType.Maelketh ? Loc.Get("old_god.maelketh_silence_rage") : Loc.Get("old_god.god_have_it_your_way"))}\"", boss.ThemeColor);
+                    terminal.WriteLine("");
+                    terminal.WriteLine(Loc.Get("old_god.god_attacks"), "bright_red");
+                    await Task.Delay(2000);
+                }
+
+                var combatResult = await RunBossCombat(player, boss, terminal);
+                return combatResult;
+            }
+            finally
             {
-                // Player said nothing — the god forces combat
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("old_god.say_nothing"), "gray");
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("old_god.god_stares", boss.Name), boss.ThemeColor);
-                terminal.WriteLine("");
-                terminal.WriteLine($"\"{(type == OldGodType.Maelketh ? Loc.Get("old_god.maelketh_silence_rage") : Loc.Get("old_god.god_have_it_your_way"))}\"", boss.ThemeColor);
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("old_god.god_attacks"), "bright_red");
-                await Task.Delay(2000);
+                _bossEncounterLock.Release();
             }
-
-            var combatResult = await RunBossCombat(player, boss, terminal);
-            return combatResult;
         }
 
         /// <summary>
@@ -905,11 +919,12 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void ClearPlayerModifiers(Character player)
         {
-            // Only clear the bonuses we added — TempAttackBonus/TempDefenseBonus
-            // are reset at the start of each PlayerVsMonsters call anyway,
-            // but clear HasBloodlust and DodgeNextAttack which persist
             player.HasBloodlust = false;
             player.DodgeNextAttack = false;
+            player.TempAttackBonus = 0;
+            player.TempDefenseBonus = 0;
+            player.TempAttackBonusDuration = 0;
+            player.TempDefenseBonusDuration = 0;
         }
 
         /// <summary>
@@ -1173,73 +1188,73 @@ namespace UsurperRemake.Systems
             switch (godType)
             {
                 case OldGodType.Maelketh: // Floor 25 — Tutorial boss: enrage only
-                    ctx.EnrageRound = 30;
+                    ctx.EnrageRound = 25;
                     break;
 
                 case OldGodType.Veloura: // Floor 40 — Introduces AoE (party damage spread)
-                    ctx.EnrageRound = 28;
-                    ctx.AoEFrequency = 5;
-                    ctx.AoEDamage = 150;
+                    ctx.EnrageRound = 22;
+                    ctx.AoEFrequency = 4;
+                    ctx.AoEDamage = 300;
                     ctx.AoEAbilityName = "Heartbreak Shatter";
                     break;
 
                 case OldGodType.Thorgrim: // Floor 55 — Introduces channeling (needs interrupter)
-                    ctx.EnrageRound = 25;
+                    ctx.EnrageRound = 20;
                     ctx.AoEFrequency = 4;
-                    ctx.AoEDamage = 250;
+                    ctx.AoEDamage = 500;
                     ctx.AoEAbilityName = "Gavel of Judgment";
-                    ctx.ChannelFrequency = 6;
+                    ctx.ChannelFrequency = 5;
                     ctx.ChannelAbilityName = "Final Verdict";
-                    ctx.ChannelDamage = 600;
+                    ctx.ChannelDamage = 1200;
                     break;
 
                 case OldGodType.Noctura: // Floor 70 — Introduces corruption (needs healer cleanse)
-                    ctx.EnrageRound = 22;
-                    ctx.AoEFrequency = 4;
-                    ctx.AoEDamage = 350;
+                    ctx.EnrageRound = 18;
+                    ctx.AoEFrequency = 3;
+                    ctx.AoEDamage = 700;
                     ctx.AoEAbilityName = "Shadow Tempest";
-                    ctx.ChannelFrequency = 5;
+                    ctx.ChannelFrequency = 4;
                     ctx.ChannelAbilityName = "Manifest Oblivion";
-                    ctx.ChannelDamage = 800;
-                    ctx.CorruptionDamagePerStack = 20;
+                    ctx.ChannelDamage = 1800;
+                    ctx.CorruptionDamagePerStack = 35;
                     ctx.HasPhysicalImmunityPhase = true; // Phase 2: physical immunity
                     break;
 
                 case OldGodType.Aurelion: // Floor 85 — Introduces doom (needs healer dispel)
-                    ctx.EnrageRound = 20;
+                    ctx.EnrageRound = 16;
                     ctx.AoEFrequency = 3;
-                    ctx.AoEDamage = 450;
+                    ctx.AoEDamage = 900;
                     ctx.AoEAbilityName = "Solar Cataclysm";
-                    ctx.ChannelFrequency = 5;
+                    ctx.ChannelFrequency = 4;
                     ctx.ChannelAbilityName = "Purifying Annihilation";
-                    ctx.ChannelDamage = 1000;
-                    ctx.CorruptionDamagePerStack = 25;
+                    ctx.ChannelDamage = 2500;
+                    ctx.CorruptionDamagePerStack = 45;
                     ctx.DoomRounds = 3;
                     ctx.HasMagicalImmunityPhase = true; // Phase 2: magical immunity
                     break;
 
                 case OldGodType.Terravok: // Floor 95 — Full mechanics, tighter timers
-                    ctx.EnrageRound = 18;
+                    ctx.EnrageRound = 14;
                     ctx.AoEFrequency = 3;
-                    ctx.AoEDamage = 550;
+                    ctx.AoEDamage = 1200;
                     ctx.AoEAbilityName = "World Breaker";
                     ctx.ChannelFrequency = 4;
                     ctx.ChannelAbilityName = "Tectonic Annihilation";
-                    ctx.ChannelDamage = 1200;
-                    ctx.CorruptionDamagePerStack = 30;
+                    ctx.ChannelDamage = 3000;
+                    ctx.CorruptionDamagePerStack = 55;
                     ctx.DoomRounds = 3;
                     ctx.HasPhysicalImmunityPhase = true; // Phase 2: physical immunity
                     break;
 
                 case OldGodType.Manwe: // Floor 100 — Everything at maximum, tightest timers
-                    ctx.EnrageRound = 15;
+                    ctx.EnrageRound = 12;
                     ctx.AoEFrequency = 2;
-                    ctx.AoEDamage = 700;
+                    ctx.AoEDamage = 1500;
                     ctx.AoEAbilityName = "Creation's End";
                     ctx.ChannelFrequency = 3;
                     ctx.ChannelAbilityName = "Unmake Reality";
-                    ctx.ChannelDamage = 1500;
-                    ctx.CorruptionDamagePerStack = 40;
+                    ctx.ChannelDamage = 4000;
+                    ctx.CorruptionDamagePerStack = 70;
                     ctx.DoomRounds = 2; // Only 2 rounds! Must dispel fast
                     ctx.HasPhysicalImmunityPhase = true;
                     ctx.HasMagicalImmunityPhase = true; // Both immunities across phases
@@ -1265,12 +1280,12 @@ namespace UsurperRemake.Systems
 
             // Check weapon for divine armor bypass
             var weapon = player.GetEquipment(EquipmentSlot.MainHand);
-            if (weapon == null) return baseReduction;
+            if (weapon?.Name == null) return baseReduction;
 
             // Artifact weapons (from Old God drops) fully bypass divine armor
             // Must be currently equipped — collecting the artifact isn't enough
-            if (weapon.Name != null && (weapon.Name.Contains("Artifact") || weapon.Name.Contains("Godforged") ||
-                 weapon.Name.Contains("Sunforged") || weapon.Name.Contains("Voidtouched")))
+            if (weapon.Name.Contains("Artifact") || weapon.Name.Contains("Godforged") ||
+                 weapon.Name.Contains("Sunforged") || weapon.Name.Contains("Voidtouched"))
             {
                 return 0; // Full bypass
             }

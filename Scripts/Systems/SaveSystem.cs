@@ -2045,11 +2045,19 @@ namespace UsurperRemake.Systems
                         var godType = (OldGodType)kvp.Key;
                         var godStatus = (GodStatus)kvp.Value;
 
-                        // Only update if the saved state is "resolved" (defeated, saved, allied, etc.)
-                        // This prevents overwriting the initial state with default values
+                        // Skip Unknown (0) — don't overwrite meaningful initial states
+                        // (e.g., Maelketh starts as Corrupted, Veloura as Dying)
+                        if (godStatus == GodStatus.Unknown)
+                            continue;
+
                         if (story.OldGodStates.TryGetValue(godType, out var existingState))
                         {
                             existingState.Status = godStatus;
+                        }
+                        else
+                        {
+                            DebugLogger.Instance?.LogWarning("SAVE",
+                                $"Saved OldGodState for unknown god type {(int)godType}, skipping");
                         }
                     }
                 }

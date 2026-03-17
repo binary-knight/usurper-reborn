@@ -51,9 +51,9 @@ public static partial class GameConfig
 
     // Boss fight party balance constants (v0.52.1)
     public const int BossPotionCooldownRounds = 2;          // Rounds between potion uses in boss fights
-    public const double BossEnrageDamageMultiplier = 2.0;   // Damage multiplier when boss enrages
+    public const double BossEnrageDamageMultiplier = 2.5;   // Damage multiplier when boss enrages
     public const double BossEnrageDefenseMultiplier = 1.5;  // Defense multiplier when boss enrages
-    public const int BossEnrageExtraAttacks = 2;            // Extra attacks per round when enraged
+    public const int BossEnrageExtraAttacks = 3;            // Extra attacks per round when enraged
     public const int BossCorruptionDamageBase = 15;         // Base damage per corruption stack per round
     public const int BossCorruptionMaxStacks = 10;          // Max corruption stacks
     public const int BossDoomDefaultRounds = 3;             // Rounds before Doom kills target

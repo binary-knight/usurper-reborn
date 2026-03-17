@@ -59,9 +59,58 @@ Group dungeon followers were missing several XP multipliers that the leader rece
 
 ---
 
+## Old God Boss Rebalance
+
+All seven Old God boss fights rebalanced to be genuinely challenging endgame encounters. Player damage scales multiplicatively through levels (STR growth + weapon power + abilities + crits), but boss HP/STR were scaling linearly — by level 85+, bosses melted in under 10 rounds with no real threat to survival.
+
+**HP increases** (matched to player DPS at each tier):
+- Maelketh (Fl.25): 15,000 → 25,000
+- Veloura (Fl.40): 25,000 → 50,000
+- Thorgrim (Fl.55): 40,000 → 100,000
+- Noctura (Fl.70): 50,000 → 150,000
+- Aurelion (Fl.85): 75,000 → 250,000
+- Terravok (Fl.95): 100,000 → 350,000
+- Manwe (Fl.100): 150,000 → 500,000
+
+**STR increases** (boss attacks should threaten player HP pools):
+- Maelketh: 120→150, Veloura: 90→140, Thorgrim: 140→200, Noctura: 130→220, Aurelion: 160→280, Terravok: 200→350, Manwe: 220→400
+
+**Attacks/round**: Aurelion 2→3, Terravok 1→2
+
+**Enrage timers tightened** 15-20% across all bosses (Maelketh 30→25, Veloura 28→22, Thorgrim 25→20, Noctura 22→18, Aurelion 20→16, Terravok 18→14, Manwe 15→12). Enrage damage multiplier increased 2.0x→2.5x with +3 extra attacks (was +2).
+
+**AoE/Channel damage doubled** to match player HP pools at each tier — Veloura AoE 150→300, Thorgrim channel 600→1200, Noctura channel 800→1800, Aurelion channel 1000→2500, Terravok channel 1200→3000, Manwe channel 1500→4000.
+
+**Corruption damage per stack** increased: Noctura 20→35, Aurelion 25→45, Terravok 30→55, Manwe 40→70.
+
+---
+
+## Old God Boss System Hardening
+
+Four fixes to the Old God boss encounter system addressing crash risks, state corruption, and story progression edge cases.
+
+**Divine armor null reference fix** — `GetDivineArmorReduction()` checked if the player's weapon was null but not if `weapon.Name` was null before calling `.Contains()`. Now uses `weapon?.Name == null` guard to prevent crash with unnamed weapons.
+
+**Combat modifier cleanup fix** — `ClearPlayerModifiers()` only cleared `HasBloodlust` and `DodgeNextAttack` after boss fights but left `TempAttackBonus`/`TempDefenseBonus` (set with duration 999) intact. If a player fought multiple bosses in one session, dialogue-granted bonuses from the first boss would carry over. Now clears all four temp bonus fields.
+
+**MUD mode concurrent boss encounter fix** — `OldGodBossSystem` is a singleton with class-level `currentBoss`, `bossDefeated`, `dungeonTeammates`, and `activeCombatModifiers` fields. If two MUD players fought Old God bosses simultaneously, they would overwrite each other's state. `StartBossEncounter()` now serialized with `SemaphoreSlim` to prevent concurrent corruption.
+
+**Awakened state recovery for non-saveable gods** — If a non-saveable god (Maelketh, Thorgrim) somehow reached `Awakened` status (no artifact exists to complete the save quest), `CanEncounterBoss()` would return false permanently, blocking floor progression. Now auto-recovers by setting status to `Defeated` when a non-saveable god is found in `Awakened` state.
+
+---
+
+## Old God State Deserialization Safety
+
+`SaveSystem` deserialization of `OldGodStates` had two issues: it would overwrite meaningful initial god states (Maelketh starts as `Corrupted`, Veloura as `Dying`) with `Unknown` (0) if the save data contained default values, and it silently discarded states for god types not found in the initialized dictionary. Now skips `Unknown` status during restore and logs a warning for unrecognized god types.
+
+---
+
 ## Files Changed
 
-- `Scripts/Core/GameConfig.cs` — Version 0.52.12
+- `Scripts/Core/GameConfig.cs` — Version 0.52.12; boss enrage damage 2.0x→2.5x; enrage extra attacks 2→3
+- `Scripts/Data/OldGodsData.cs` — All 7 Old God boss stats rebalanced (HP, STR, DEF, AGI, WIS, AttacksPerRound)
+- `Scripts/Systems/OldGodBossSystem.cs` — All boss party mechanics retuned (enrage timers, AoE damage, channel damage, corruption per stack); `SemaphoreSlim` lock on `StartBossEncounter()`; `ClearPlayerModifiers()` clears all temp bonuses; `GetDivineArmorReduction()` null-safe weapon name check; `CanEncounterBoss()` auto-recovers non-saveable gods stuck in Awakened state
+- `Scripts/Systems/SaveSystem.cs` — OldGodStates deserialization skips `Unknown` status; logs warning for unrecognized god types
 - `Scripts/Systems/DailySystemManager.cs` — Online mode daily reset skips display banner and mode-specific processing; single-player path unchanged
 - `Scripts/Systems/CompanionSystem.cs` — `GetCompanionMaxHP()` helper; fixed 7 `BaseStats.HP` references in `GetCompanionsAsCharacters()`, `DamageCompanion()`, `HealCompanion()`, `GetCompanionHP()`, `RestoreCompanionHP()`, and level-up
 - `Scripts/Systems/CombatEngine.cs` — Multi-target spell skip target prompt; monster ability display fix; group loot NPC-first priority; cascade timeout 30s→10s; group follower XP multiplier parity (Blood Moon, Child, Study, Settlement, Guild, HQ Training); gold distribution uses post-multiplier amount
