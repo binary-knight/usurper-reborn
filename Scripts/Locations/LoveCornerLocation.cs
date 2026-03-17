@@ -328,9 +328,12 @@ public class LoveCornerLocation : BaseLocation
             player.MarriedTimes++;
             player.IntimacyActs--;
 
+            // Try to register with RomanceTracker using the target name as ID
+            // (no NPC object available, so RelationshipSystem can't be used)
+            RomanceTracker.Instance?.AddSpouse(targetName);
+
             var ceremonyMessages = GameConfig.WeddingCeremonyMessages;
-            var random = new Random();
-            string ceremonyMessage = ceremonyMessages[random.Next(ceremonyMessages.Length)];
+            string ceremonyMessage = ceremonyMessages[Random.Shared.Next(ceremonyMessages.Length)];
 
             terminal.WriteLine();
             terminal.WriteLine(Loc.Get("love_corner.wedding_ceremony"), TerminalEmulator.ColorYellow);
@@ -440,6 +443,23 @@ public class LoveCornerLocation : BaseLocation
         // Process divorce
         player.Gold -= GameConfig.DivorceCostBase;
         string exSpouse = player.SpouseName;
+
+        // Sync divorce across all tracking systems
+        var exSpouseNPC = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n =>
+            (n.Name2 ?? n.Name1)?.Equals(exSpouse, StringComparison.OrdinalIgnoreCase) == true ||
+            n.Name1?.Equals(exSpouse, StringComparison.OrdinalIgnoreCase) == true);
+
+        if (exSpouseNPC != null)
+        {
+            RelationshipSystem.ProcessDivorce(player, exSpouseNPC, out _);
+            RomanceTracker.Instance?.Divorce(exSpouseNPC.ID, "Love Corner divorce", playerInitiated: true);
+
+            // Clear spouse NPC's marriage state
+            exSpouseNPC.Married = false;
+            exSpouseNPC.IsMarried = false;
+            exSpouseNPC.SpouseName = "";
+        }
+
         player.IsMarried = false;
         player.Married = false;
         player.SpouseName = "";

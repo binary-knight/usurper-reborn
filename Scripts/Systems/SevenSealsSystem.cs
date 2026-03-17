@@ -35,6 +35,19 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Get localized lore text for a seal
+        /// </summary>
+        private string[] GetLocalizedLore(string sealId, int totalLines)
+        {
+            var lines = new string[totalLines];
+            for (int i = 0; i < totalLines; i++)
+            {
+                lines[i] = Loc.Get($"seals.{sealId}.lore.{i}");
+            }
+            return lines;
+        }
+
+        /// <summary>
         /// Initialize all seal data
         /// </summary>
         private void InitializeSeals()
@@ -43,31 +56,13 @@ namespace UsurperRemake.Systems
             seals[SealType.Creation] = new SealData
             {
                 Type = SealType.Creation,
-                Name = "Seal of Creation",
-                Title = "The Beginning",
+                Name = Loc.Get("seals.creation.name"),
+                Title = Loc.Get("seals.creation.title"),
                 Number = 1,
-                Location = "Temple of Light - Hidden Altar",
-                LocationHint = "Where prayers echo in golden halls, seek the stone that predates the temple itself.",
+                Location = Loc.Get("seals.creation.location"),
+                LocationHint = Loc.Get("seals.creation.hint"),
                 DungeonFloor = 0, // Found in town
-                LoreText = new[]
-                {
-                    "In the beginning, there was only Manwe.",
-                    "",
-                    "Not a god as mortals understand - but the first thought,",
-                    "the first will to BE in an endless void of nothing.",
-                    "",
-                    "From his loneliness, he dreamed the Old Gods into existence.",
-                    "Six aspects of himself, given form and purpose.",
-                    "War. Passion. Law. Shadow. Light. Earth.",
-                    "",
-                    "They were his children. His companions.",
-                    "His greatest joy... and his ultimate tragedy.",
-                    "",
-                    "For a time, there was harmony.",
-                    "For a time, there was peace.",
-                    "",
-                    "That time is long past."
-                },
+                LoreText = GetLocalizedLore("creation", 16),
                 RewardXP = 1000,
                 IconColor = "bright_yellow"
             };
@@ -76,31 +71,13 @@ namespace UsurperRemake.Systems
             seals[SealType.FirstWar] = new SealData
             {
                 Type = SealType.FirstWar,
-                Name = "Seal of Conflict",
-                Title = "The First War",
+                Name = Loc.Get("seals.first_war.name"),
+                Title = Loc.Get("seals.first_war.title"),
                 Number = 2,
-                Location = "Dungeon Level 15 - Ancient Battlefield",
-                LocationHint = "In the depths where blood first stained stone, the seal waits among forgotten weapons.",
+                Location = Loc.Get("seals.first_war.location"),
+                LocationHint = Loc.Get("seals.first_war.hint"),
                 DungeonFloor = 15,
-                LoreText = new[]
-                {
-                    "Maelketh was the first to change.",
-                    "",
-                    "War, by its nature, requires opposition.",
-                    "But in paradise, there was nothing to fight.",
-                    "And so Maelketh grew restless. Hungry.",
-                    "",
-                    "He whispered to his siblings.",
-                    "'Why should Manwe rule alone?'",
-                    "'We are gods too. We deserve more.'",
-                    "",
-                    "Some listened. Some refused.",
-                    "The first war was not between mortals.",
-                    "It was between gods.",
-                    "",
-                    "And Manwe wept to see his children",
-                    "turn against each other... and against him."
-                },
+                LoreText = GetLocalizedLore("first_war", 16),
                 RewardXP = 2000,
                 IconColor = "dark_red"
             };
@@ -109,31 +86,13 @@ namespace UsurperRemake.Systems
             seals[SealType.Corruption] = new SealData
             {
                 Type = SealType.Corruption,
-                Name = "Seal of Corruption",
-                Title = "The Twisting",
+                Name = Loc.Get("seals.corruption.name"),
+                Title = Loc.Get("seals.corruption.title"),
                 Number = 3,
-                Location = "Dungeon Level 30 - Corrupted Shrine",
-                LocationHint = "Where holy becomes unholy, where light turns to shadow, the truth lies buried.",
+                Location = Loc.Get("seals.corruption.location"),
+                LocationHint = Loc.Get("seals.corruption.hint"),
                 DungeonFloor = 30,
-                LoreText = new[]
-                {
-                    "Manwe could not destroy his children.",
-                    "Even as they warred, he loved them still.",
-                    "",
-                    "But he could not allow their rebellion to continue.",
-                    "And so he chose a path between mercy and justice.",
-                    "",
-                    "He reached into their essence.",
-                    "He twisted what they were into shadows of themselves.",
-                    "Maelketh's righteous anger became bloodlust.",
-                    "Veloura's pure love became corrupting obsession.",
-                    "Thorgrim's fair law became tyrannical absolutes.",
-                    "",
-                    "He broke them to save them.",
-                    "Or perhaps... to punish them.",
-                    "",
-                    "Even gods can lie to themselves."
-                },
+                LoreText = GetLocalizedLore("corruption", 16),
                 RewardXP = 3000,
                 IconColor = "dark_magenta"
             };
@@ -142,32 +101,13 @@ namespace UsurperRemake.Systems
             seals[SealType.Imprisonment] = new SealData
             {
                 Type = SealType.Imprisonment,
-                Name = "Seal of Binding",
-                Title = "The Eternal Chains",
+                Name = Loc.Get("seals.imprisonment.name"),
+                Title = Loc.Get("seals.imprisonment.title"),
                 Number = 4,
-                Location = "Dungeon Level 45 - Prison of Ages",
-                LocationHint = "Where gods became prisoners, where eternity became torture, seek the warden's shame.",
+                Location = Loc.Get("seals.imprisonment.location"),
+                LocationHint = Loc.Get("seals.imprisonment.hint"),
                 DungeonFloor = 45,
-                LoreText = new[]
-                {
-                    "One by one, Manwe imprisoned his corrupted children.",
-                    "",
-                    "Maelketh, chained in blood and iron.",
-                    "Veloura, bound in mirrors of false love.",
-                    "Thorgrim, locked in laws he cannot break.",
-                    "Noctura, buried in shadows too deep to escape.",
-                    "Aurelion, blinded by his own stolen light.",
-                    "Terravok, sleeping in earth that will not release him.",
-                    "",
-                    "Ten thousand years they have waited.",
-                    "Ten thousand years they have suffered.",
-                    "",
-                    "And in their prisons, they have changed again.",
-                    "Some grew mad. Some grew wise.",
-                    "Some remember what they were before the twisting.",
-                    "",
-                    "The chains are weakening."
-                },
+                LoreText = GetLocalizedLore("imprisonment", 17),
                 RewardXP = 4000,
                 IconColor = "gray"
             };
@@ -176,31 +116,13 @@ namespace UsurperRemake.Systems
             seals[SealType.Prophecy] = new SealData
             {
                 Type = SealType.Prophecy,
-                Name = "Seal of Fate",
-                Title = "The Foretelling",
+                Name = Loc.Get("seals.prophecy.name"),
+                Title = Loc.Get("seals.prophecy.title"),
                 Number = 5,
-                Location = "Dungeon Level 60 - Oracle's Tomb",
-                LocationHint = "Where the future was first spoken, where destiny took shape, the words remain.",
+                Location = Loc.Get("seals.prophecy.location"),
+                LocationHint = Loc.Get("seals.prophecy.hint"),
                 DungeonFloor = 60,
-                LoreText = new[]
-                {
-                    "Before the seals were forged,",
-                    "Manwe saw a vision of the future.",
-                    "",
-                    "'One will come from beyond the veil.'",
-                    "'Neither god nor common mortal.'",
-                    "'They will hold the key to freedom or destruction.'",
-                    "",
-                    "'If they choose vengeance, gods will fall.'",
-                    "'If they choose mercy, gods will rise.'",
-                    "'If they choose wisdom, gods will change.'",
-                    "",
-                    "'And at the end of all things,'",
-                    "'they will stand before the Creator himself'",
-                    "'and answer the only question that matters:'",
-                    "",
-                    "'What have you become?'"
-                },
+                LoreText = GetLocalizedLore("prophecy", 16),
                 RewardXP = 5000,
                 IconColor = "bright_cyan"
             };
@@ -209,35 +131,13 @@ namespace UsurperRemake.Systems
             seals[SealType.Regret] = new SealData
             {
                 Type = SealType.Regret,
-                Name = "Seal of Sorrow",
-                Title = "The Creator's Tears",
+                Name = Loc.Get("seals.regret.name"),
+                Title = Loc.Get("seals.regret.title"),
                 Number = 6,
-                Location = "Dungeon Level 80 - Chamber of Mourning",
-                LocationHint = "Where even gods weep, where regret crystallizes into stone, seek understanding.",
+                Location = Loc.Get("seals.regret.location"),
+                LocationHint = Loc.Get("seals.regret.hint"),
                 DungeonFloor = 80,
-                LoreText = new[]
-                {
-                    "Do not think Manwe felt nothing.",
-                    "",
-                    "Every chain he forged, he felt as if upon himself.",
-                    "Every corruption he wrought, he witnessed in horror.",
-                    "He did not want to hurt his children.",
-                    "",
-                    "But what choice did he have?",
-                    "",
-                    "They would have destroyed everything.",
-                    "The world he made. The mortals he loved.",
-                    "Each other.",
-                    "",
-                    "Sometimes, love requires cruelty.",
-                    "Sometimes, mercy wears the mask of punishment.",
-                    "",
-                    "Manwe has not spoken in ten thousand years.",
-                    "Not because he chooses silence.",
-                    "But because he has nothing left to say.",
-                    "",
-                    "Only tears. Only regret. Only waiting."
-                },
+                LoreText = GetLocalizedLore("regret", 20),
                 RewardXP = 6000,
                 IconColor = "bright_blue"
             };
@@ -246,53 +146,13 @@ namespace UsurperRemake.Systems
             seals[SealType.Truth] = new SealData
             {
                 Type = SealType.Truth,
-                Name = "Seal of Revelation",
-                Title = "The Final Truth",
+                Name = Loc.Get("seals.truth.name"),
+                Title = Loc.Get("seals.truth.title"),
                 Number = 7,
-                Location = "Dungeon Level 99 - Threshold of the Divine",
-                LocationHint = "At the edge of the final confrontation, before the last door, truth awaits those who sought it.",
+                Location = Loc.Get("seals.truth.location"),
+                LocationHint = Loc.Get("seals.truth.hint"),
                 DungeonFloor = 99,
-                LoreText = new[]
-                {
-                    "You have found all seven seals.",
-                    "You have learned the history of the gods.",
-                    "But history is not truth. Events are not meaning.",
-                    "",
-                    "Now hear the final secret:",
-                    "",
-                    "Before Manwe, before the gods, before anything...",
-                    "there was only the Ocean.",
-                    "",
-                    "Vast. Eternal. Undivided.",
-                    "Complete in itself, yet utterly alone.",
-                    "",
-                    "And so the Ocean dreamed of waves.",
-                    "Each wave rose, believing itself separate.",
-                    "Each wave fell, returning to what it always was.",
-                    "",
-                    "Manwe is a wave. The Old Gods are waves.",
-                    "The mortals, the monsters, the dungeons, the stars...",
-                    "All waves. All temporary.",
-                    "All returning to the source.",
-                    "",
-                    "And you?",
-                    "",
-                    "You are not a wave fighting the ocean.",
-                    "You ARE the ocean, dreaming of being a wave.",
-                    "",
-                    "Death is not an ending.",
-                    "It is the wave remembering it was always water.",
-                    "",
-                    "The Creator does not wait to judge you.",
-                    "He waits to remember himself through you.",
-                    "",
-                    "When you face him, you will not face a god.",
-                    "You will face a mirror.",
-                    "",
-                    "And the question is not 'Can you do better?'",
-                    "The question is:",
-                    "'Are you ready to wake up?'"
-                },
+                LoreText = GetLocalizedLore("truth", 38),
                 RewardXP = 10000,
                 IconColor = "white",
                 UnlocksSecret = true,
@@ -433,9 +293,9 @@ namespace UsurperRemake.Systems
                 string displayLine = line;
 
                 // Seal 7 lore starts with "You have found all seven seals" — fix when not all collected
-                if (seal.Type == SealType.Truth && line == "You have found all seven seals." && collected < 7)
+                if (seal.Type == SealType.Truth && line == Loc.Get("seals.truth.lore.0") && collected < 7)
                 {
-                    displayLine = $"You have found the final seal — but {7 - collected} still elude you.";
+                    displayLine = Loc.Get("seals.lore_alt_final", 7 - collected);
                 }
 
                 if (string.IsNullOrEmpty(displayLine))
@@ -526,7 +386,7 @@ namespace UsurperRemake.Systems
             {
                 if (!story.CollectedSeals.Contains(seal.Type))
                 {
-                    hints.Add($"Seal {seal.Number}: {seal.LocationHint}");
+                    hints.Add(Loc.Get("seals.hint_prefix", seal.Number, seal.LocationHint));
                 }
             }
 

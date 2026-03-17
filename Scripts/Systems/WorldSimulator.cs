@@ -539,6 +539,8 @@ public class WorldSimulator
 
         npc.IsDead = true;
         npc.HP = 0;
+        npc.PregnancyDueDate = null;
+        npc.PregnancyFatherName = null;
         CheckKingDeath(npc);
 
         bool permadeath = RollPermadeath(npc, basePermadeathChance);
@@ -879,6 +881,8 @@ public class WorldSimulator
                     npc.IsDead = true;
                     npc.IsAgedDeath = true;
                     npc.HP = 0;
+                    npc.PregnancyDueDate = null;
+                    npc.PregnancyFatherName = null;
                     CheckKingDeath(npc);
 
                     // Remove from respawn queue if somehow queued
@@ -1410,9 +1414,6 @@ public class WorldSimulator
     /// Process NPC pregnancies - handle births for pregnant NPCs and
     /// give married female NPCs a chance to become pregnant each tick.
     /// </summary>
-    // Track which NPC is the father of a current pregnancy (for affairs where father != spouse)
-    private readonly Dictionary<string, string> _pregnancyFathers = new();
-
     private void ProcessNPCPregnancies()
     {
         // Process existing pregnancies - check for births
@@ -1422,10 +1423,10 @@ public class WorldSimulator
             {
                 // Baby is due! Find the father (could be affair partner, not spouse)
                 string fatherName = npc.SpouseName;
-                if (_pregnancyFathers.TryGetValue(npc.Name2 ?? npc.Name, out var affairFather))
+                if (!string.IsNullOrEmpty(npc.PregnancyFatherName))
                 {
-                    fatherName = affairFather;
-                    _pregnancyFathers.Remove(npc.Name2 ?? npc.Name);
+                    fatherName = npc.PregnancyFatherName;
+                    npc.PregnancyFatherName = null; // Clear after birth
                 }
 
                 // Try to find the father - first alive, then even dead (for the child record)
@@ -1522,8 +1523,8 @@ public class WorldSimulator
 
             if (isAffair)
             {
-                // Track the affair father so the child gets the right parentage
-                _pregnancyFathers[npc.Name2 ?? npc.Name] = father.Name2;
+                // Track the affair father on the NPC so the child gets the right parentage
+                npc.PregnancyFatherName = father.Name2;
 
                 NewsSystem.Instance?.WriteAffairNews(npc.Name2, father.Name2);
             }
@@ -1637,9 +1638,15 @@ public class WorldSimulator
             spouse.IsMarried = false;
             spouse.SpouseName = "";
 
-            // Clear pregnancy if pregnant by this spouse
-            if (npc.PregnancyDueDate.HasValue) npc.PregnancyDueDate = null;
-            if (spouse.PregnancyDueDate.HasValue) spouse.PregnancyDueDate = null;
+            // Clear pregnancy only if the father is the divorcing spouse (preserve affair pregnancies)
+            if (npc.PregnancyDueDate.HasValue && string.IsNullOrEmpty(npc.PregnancyFatherName))
+            {
+                npc.PregnancyDueDate = null;
+            }
+            if (spouse.PregnancyDueDate.HasValue && string.IsNullOrEmpty(spouse.PregnancyFatherName))
+            {
+                spouse.PregnancyDueDate = null;
+            }
 
             // End marriage in registry
             NPCMarriageRegistry.Instance.EndMarriage(npc.ID);

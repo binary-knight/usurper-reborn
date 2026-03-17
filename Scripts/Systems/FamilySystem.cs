@@ -218,12 +218,12 @@ namespace UsurperRemake.Systems
                 Level = 1,
                 HP = 100,
                 MaxHP = 100,
-                Strength = 10 + new Random().Next(5),
-                Defence = 10 + new Random().Next(5),
-                Stamina = 10 + new Random().Next(5),
-                Agility = 10 + new Random().Next(5),
-                Intelligence = 10 + new Random().Next(5),
-                Charisma = 10 + new Random().Next(5),
+                Strength = 10 + Random.Shared.Next(5),
+                Defence = 10 + Random.Shared.Next(5),
+                Stamina = 10 + Random.Shared.Next(5),
+                Agility = 10 + Random.Shared.Next(5),
+                Intelligence = 10 + Random.Shared.Next(5),
+                Charisma = 10 + Random.Shared.Next(5),
                 Gold = 100,
                 Experience = 0,
                 CurrentLocation = "Main Street",
@@ -237,13 +237,13 @@ namespace UsurperRemake.Systems
             // Inherit some traits based on soul
             if (child.Soul > 200)
             {
-                npc.Chivalry = 50 + new Random().Next(50);
+                npc.Chivalry = 50 + Random.Shared.Next(50);
                 npc.Darkness = 0;
             }
             else if (child.Soul < -200)
             {
                 npc.Chivalry = 0;
-                npc.Darkness = 50 + new Random().Next(50);
+                npc.Darkness = 50 + Random.Shared.Next(50);
             }
             else
             {
@@ -304,7 +304,7 @@ namespace UsurperRemake.Systems
             if (mother != null && father != null)
             {
                 // 50/50 chance of inheriting either parent's race
-                return new Random().Next(2) == 0 ? mother.Race : father.Race;
+                return Random.Shared.Next(2) == 0 ? mother.Race : father.Race;
             }
             else if (mother != null)
             {
@@ -323,7 +323,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         private CharacterClass DetermineChildClass(Child child)
         {
-            var random = new Random();
+            var random = Random.Shared;
             var race = DetermineChildRace(child);
             GameConfig.InvalidCombinations.TryGetValue(race, out var invalid);
 
@@ -455,7 +455,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void CreateNPCChild(Character mother, Character father)
         {
-            var rng = new Random();
+            var rng = Random.Shared;
             var sex = rng.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
 
             var firstName = GenerateNPCChildFirstName(sex);
@@ -498,7 +498,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         private string GenerateNPCChildFirstName(CharacterSex sex)
         {
-            var rng = new Random();
+            var rng = Random.Shared;
             var names = sex == CharacterSex.Female ? FemaleNames : MaleNames;
             return names[rng.Next(names.Length)];
         }
@@ -596,7 +596,8 @@ namespace UsurperRemake.Systems
                 KidnapperName = c.KidnapperName,
                 RansomDemanded = c.RansomDemanded,
                 CursedByGod = c.CursedByGod,
-                Royal = c.Royal
+                Royal = c.Royal,
+                LastParentingDay = c.LastParentingDay
             }).ToList();
         }
 
@@ -633,7 +634,8 @@ namespace UsurperRemake.Systems
                     KidnapperName = data.KidnapperName,
                     RansomDemanded = data.RansomDemanded,
                     CursedByGod = data.CursedByGod,
-                    Royal = data.Royal
+                    Royal = data.Royal,
+                    LastParentingDay = data.LastParentingDay
                 };
 
                 _children.Add(child);
@@ -704,4 +706,360 @@ namespace UsurperRemake.Systems
             return summary;
         }
     }
+
+    #region Parenting Scenario System
+
+    public enum ChildAgeGroup { Toddler, Child, Teen }
+
+    public class ParentingChoice
+    {
+        public string LabelKey { get; init; } = "";
+        public int SoulChange { get; init; }
+        public string ResultKey { get; init; } = "";
+        public bool IsVirtuous { get; init; }
+        public bool IsNeutral { get; init; }
+    }
+
+    public class ParentingScenario
+    {
+        public string Id { get; init; } = "";
+        public ChildAgeGroup AgeGroup { get; init; }
+        public string DescriptionKey { get; init; } = "";
+        public ParentingChoice[] Choices { get; init; } = Array.Empty<ParentingChoice>();
+    }
+
+    /// <summary>
+    /// Static pool of 24 CK-style parenting scenarios (8 per age group).
+    /// Each presents a moral dilemma with 3 choices that affect child soul.
+    /// </summary>
+    public static class ParentingScenarios
+    {
+        public static ChildAgeGroup GetAgeGroup(int age)
+        {
+            if (age <= GameConfig.ParentingToddlerMaxAge) return ChildAgeGroup.Toddler;
+            if (age <= GameConfig.ParentingChildMaxAge) return ChildAgeGroup.Child;
+            return ChildAgeGroup.Teen;
+        }
+
+        public static ParentingScenario GetRandomScenario(Child child)
+        {
+            var group = GetAgeGroup(child.Age);
+            var candidates = AllScenarios.Where(s => s.AgeGroup == group).ToArray();
+            return candidates[Random.Shared.Next(candidates.Length)];
+        }
+
+        /// <summary>
+        /// Calculate how parent alignment modifies the soul change.
+        /// Virtuous parents amplify virtuous lessons; dark parents amplify cruel ones.
+        /// Mismatched alignment reduces effectiveness.
+        /// </summary>
+        public static int CalculateAlignmentModifier(Character parent, ParentingChoice choice)
+        {
+            if (choice.IsNeutral) return 0;
+
+            int alignmentBalance = (int)Math.Clamp(parent.Chivalry - parent.Darkness, -1000, 1000);
+
+            if (choice.IsVirtuous)
+            {
+                if (alignmentBalance > 0)
+                    return Math.Min(GameConfig.ParentingAlignmentBonusMax, alignmentBalance / 20);
+                else
+                    return -Math.Min(GameConfig.ParentingAlignmentPenaltyMax, Math.Abs(alignmentBalance) / 30);
+            }
+            else // cruel choice
+            {
+                if (alignmentBalance < 0)
+                    return -Math.Min(GameConfig.ParentingAlignmentBonusMax, Math.Abs(alignmentBalance) / 20); // amplify negative
+                else
+                    return Math.Min(GameConfig.ParentingAlignmentPenaltyMax, alignmentBalance / 30); // reduce negative
+            }
+        }
+
+        // ──────────── TODDLER SCENARIOS (ages 0-4) ────────────
+
+        private static readonly ParentingScenario[] ToddlerScenarios = new[]
+        {
+            new ParentingScenario
+            {
+                Id = "toddler_toy_stolen", AgeGroup = ChildAgeGroup.Toddler,
+                DescriptionKey = "home.parenting.toddler_toy_stolen.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_toy_stolen.c1", SoulChange = 20, ResultKey = "home.parenting.toddler_toy_stolen.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_toy_stolen.c2", SoulChange = -15, ResultKey = "home.parenting.toddler_toy_stolen.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_toy_stolen.c3", SoulChange = -10, ResultKey = "home.parenting.toddler_toy_stolen.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "toddler_crying_night", AgeGroup = ChildAgeGroup.Toddler,
+                DescriptionKey = "home.parenting.toddler_crying_night.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_crying_night.c1", SoulChange = 20, ResultKey = "home.parenting.toddler_crying_night.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_crying_night.c2", SoulChange = -15, ResultKey = "home.parenting.toddler_crying_night.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_crying_night.c3", SoulChange = 5, ResultKey = "home.parenting.toddler_crying_night.r3", IsNeutral = true },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "toddler_sharing", AgeGroup = ChildAgeGroup.Toddler,
+                DescriptionKey = "home.parenting.toddler_sharing.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_sharing.c1", SoulChange = 20, ResultKey = "home.parenting.toddler_sharing.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_sharing.c2", SoulChange = -10, ResultKey = "home.parenting.toddler_sharing.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_sharing.c3", SoulChange = -20, ResultKey = "home.parenting.toddler_sharing.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "toddler_animal", AgeGroup = ChildAgeGroup.Toddler,
+                DescriptionKey = "home.parenting.toddler_animal.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_animal.c1", SoulChange = 25, ResultKey = "home.parenting.toddler_animal.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_animal.c2", SoulChange = -20, ResultKey = "home.parenting.toddler_animal.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_animal.c3", SoulChange = 0, ResultKey = "home.parenting.toddler_animal.r3", IsNeutral = true },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "toddler_tantrum", AgeGroup = ChildAgeGroup.Toddler,
+                DescriptionKey = "home.parenting.toddler_tantrum.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_tantrum.c1", SoulChange = 15, ResultKey = "home.parenting.toddler_tantrum.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_tantrum.c2", SoulChange = -15, ResultKey = "home.parenting.toddler_tantrum.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_tantrum.c3", SoulChange = -5, ResultKey = "home.parenting.toddler_tantrum.r3", IsNeutral = true },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "toddler_stranger", AgeGroup = ChildAgeGroup.Toddler,
+                DescriptionKey = "home.parenting.toddler_stranger.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_stranger.c1", SoulChange = 15, ResultKey = "home.parenting.toddler_stranger.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_stranger.c2", SoulChange = -20, ResultKey = "home.parenting.toddler_stranger.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_stranger.c3", SoulChange = 5, ResultKey = "home.parenting.toddler_stranger.r3", IsNeutral = true },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "toddler_drawing", AgeGroup = ChildAgeGroup.Toddler,
+                DescriptionKey = "home.parenting.toddler_drawing.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_drawing.c1", SoulChange = 20, ResultKey = "home.parenting.toddler_drawing.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_drawing.c2", SoulChange = -20, ResultKey = "home.parenting.toddler_drawing.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_drawing.c3", SoulChange = 0, ResultKey = "home.parenting.toddler_drawing.r3", IsNeutral = true },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "toddler_curse_word", AgeGroup = ChildAgeGroup.Toddler,
+                DescriptionKey = "home.parenting.toddler_curse_word.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_curse_word.c1", SoulChange = 15, ResultKey = "home.parenting.toddler_curse_word.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_curse_word.c2", SoulChange = -10, ResultKey = "home.parenting.toddler_curse_word.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.toddler_curse_word.c3", SoulChange = -20, ResultKey = "home.parenting.toddler_curse_word.r3" },
+                }
+            },
+        };
+
+        // ──────────── CHILD SCENARIOS (ages 5-12) ────────────
+
+        private static readonly ParentingScenario[] ChildScenarios = new[]
+        {
+            new ParentingScenario
+            {
+                Id = "child_stealing", AgeGroup = ChildAgeGroup.Child,
+                DescriptionKey = "home.parenting.child_stealing.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.child_stealing.c1", SoulChange = 20, ResultKey = "home.parenting.child_stealing.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_stealing.c2", SoulChange = -15, ResultKey = "home.parenting.child_stealing.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.child_stealing.c3", SoulChange = -20, ResultKey = "home.parenting.child_stealing.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "child_bully", AgeGroup = ChildAgeGroup.Child,
+                DescriptionKey = "home.parenting.child_bully.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.child_bully.c1", SoulChange = 20, ResultKey = "home.parenting.child_bully.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_bully.c2", SoulChange = -10, ResultKey = "home.parenting.child_bully.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.child_bully.c3", SoulChange = 5, ResultKey = "home.parenting.child_bully.r3", IsNeutral = true },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "child_lie", AgeGroup = ChildAgeGroup.Child,
+                DescriptionKey = "home.parenting.child_lie.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.child_lie.c1", SoulChange = 20, ResultKey = "home.parenting.child_lie.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_lie.c2", SoulChange = -15, ResultKey = "home.parenting.child_lie.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.child_lie.c3", SoulChange = -25, ResultKey = "home.parenting.child_lie.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "child_stray", AgeGroup = ChildAgeGroup.Child,
+                DescriptionKey = "home.parenting.child_stray.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.child_stray.c1", SoulChange = 20, ResultKey = "home.parenting.child_stray.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_stray.c2", SoulChange = 0, ResultKey = "home.parenting.child_stray.r2", IsNeutral = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_stray.c3", SoulChange = -25, ResultKey = "home.parenting.child_stray.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "child_fight", AgeGroup = ChildAgeGroup.Child,
+                DescriptionKey = "home.parenting.child_fight.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.child_fight.c1", SoulChange = 15, ResultKey = "home.parenting.child_fight.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_fight.c2", SoulChange = -10, ResultKey = "home.parenting.child_fight.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.child_fight.c3", SoulChange = -15, ResultKey = "home.parenting.child_fight.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "child_beggar", AgeGroup = ChildAgeGroup.Child,
+                DescriptionKey = "home.parenting.child_beggar.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.child_beggar.c1", SoulChange = 25, ResultKey = "home.parenting.child_beggar.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_beggar.c2", SoulChange = -20, ResultKey = "home.parenting.child_beggar.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.child_beggar.c3", SoulChange = 15, ResultKey = "home.parenting.child_beggar.r3", IsVirtuous = true },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "child_broken", AgeGroup = ChildAgeGroup.Child,
+                DescriptionKey = "home.parenting.child_broken.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.child_broken.c1", SoulChange = 20, ResultKey = "home.parenting.child_broken.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_broken.c2", SoulChange = -20, ResultKey = "home.parenting.child_broken.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.child_broken.c3", SoulChange = -15, ResultKey = "home.parenting.child_broken.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "child_death_question", AgeGroup = ChildAgeGroup.Child,
+                DescriptionKey = "home.parenting.child_death_question.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.child_death_question.c1", SoulChange = 20, ResultKey = "home.parenting.child_death_question.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_death_question.c2", SoulChange = 5, ResultKey = "home.parenting.child_death_question.r2", IsNeutral = true },
+                    new ParentingChoice { LabelKey = "home.parenting.child_death_question.c3", SoulChange = -20, ResultKey = "home.parenting.child_death_question.r3" },
+                }
+            },
+        };
+
+        // ──────────── TEEN SCENARIOS (ages 13-17) ────────────
+
+        private static readonly ParentingScenario[] TeenScenarios = new[]
+        {
+            new ParentingScenario
+            {
+                Id = "teen_guard", AgeGroup = ChildAgeGroup.Teen,
+                DescriptionKey = "home.parenting.teen_guard.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.teen_guard.c1", SoulChange = 20, ResultKey = "home.parenting.teen_guard.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_guard.c2", SoulChange = 5, ResultKey = "home.parenting.teen_guard.r2", IsNeutral = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_guard.c3", SoulChange = -15, ResultKey = "home.parenting.teen_guard.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "teen_romance", AgeGroup = ChildAgeGroup.Teen,
+                DescriptionKey = "home.parenting.teen_romance.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.teen_romance.c1", SoulChange = 20, ResultKey = "home.parenting.teen_romance.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_romance.c2", SoulChange = -15, ResultKey = "home.parenting.teen_romance.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_romance.c3", SoulChange = -20, ResultKey = "home.parenting.teen_romance.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "teen_faith", AgeGroup = ChildAgeGroup.Teen,
+                DescriptionKey = "home.parenting.teen_faith.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.teen_faith.c1", SoulChange = 20, ResultKey = "home.parenting.teen_faith.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_faith.c2", SoulChange = -15, ResultKey = "home.parenting.teen_faith.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_faith.c3", SoulChange = 10, ResultKey = "home.parenting.teen_faith.r3", IsNeutral = true },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "teen_drinking", AgeGroup = ChildAgeGroup.Teen,
+                DescriptionKey = "home.parenting.teen_drinking.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.teen_drinking.c1", SoulChange = 15, ResultKey = "home.parenting.teen_drinking.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_drinking.c2", SoulChange = -20, ResultKey = "home.parenting.teen_drinking.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_drinking.c3", SoulChange = -15, ResultKey = "home.parenting.teen_drinking.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "teen_runaway", AgeGroup = ChildAgeGroup.Teen,
+                DescriptionKey = "home.parenting.teen_runaway.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.teen_runaway.c1", SoulChange = 25, ResultKey = "home.parenting.teen_runaway.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_runaway.c2", SoulChange = -20, ResultKey = "home.parenting.teen_runaway.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_runaway.c3", SoulChange = -10, ResultKey = "home.parenting.teen_runaway.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "teen_dark_alley", AgeGroup = ChildAgeGroup.Teen,
+                DescriptionKey = "home.parenting.teen_dark_alley.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.teen_dark_alley.c1", SoulChange = 20, ResultKey = "home.parenting.teen_dark_alley.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_dark_alley.c2", SoulChange = 5, ResultKey = "home.parenting.teen_dark_alley.r2", IsNeutral = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_dark_alley.c3", SoulChange = -25, ResultKey = "home.parenting.teen_dark_alley.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "teen_injustice", AgeGroup = ChildAgeGroup.Teen,
+                DescriptionKey = "home.parenting.teen_injustice.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.teen_injustice.c1", SoulChange = 25, ResultKey = "home.parenting.teen_injustice.r1", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_injustice.c2", SoulChange = -10, ResultKey = "home.parenting.teen_injustice.r2" },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_injustice.c3", SoulChange = -25, ResultKey = "home.parenting.teen_injustice.r3" },
+                }
+            },
+            new ParentingScenario
+            {
+                Id = "teen_inheritance", AgeGroup = ChildAgeGroup.Teen,
+                DescriptionKey = "home.parenting.teen_inheritance.desc",
+                Choices = new[]
+                {
+                    new ParentingChoice { LabelKey = "home.parenting.teen_inheritance.c1", SoulChange = -10, ResultKey = "home.parenting.teen_inheritance.r1" },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_inheritance.c2", SoulChange = 20, ResultKey = "home.parenting.teen_inheritance.r2", IsVirtuous = true },
+                    new ParentingChoice { LabelKey = "home.parenting.teen_inheritance.c3", SoulChange = -20, ResultKey = "home.parenting.teen_inheritance.r3" },
+                }
+            },
+        };
+
+        public static ParentingScenario[] AllScenarios { get; } =
+            ToddlerScenarios.Concat(ChildScenarios).Concat(TeenScenarios).ToArray();
+    }
+
+    #endregion
 }

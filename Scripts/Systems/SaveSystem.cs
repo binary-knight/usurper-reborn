@@ -1070,6 +1070,7 @@ namespace UsurperRemake.Systems
                     IsAgedDeath = npc.IsAgedDeath,
                     IsPermaDead = npc.IsPermaDead,
                     PregnancyDueDate = npc.PregnancyDueDate,
+                    PregnancyFatherName = npc.PregnancyFatherName,
 
                     // Dialogue tracking
                     RecentDialogueIds = NPCDialogueDatabase.GetRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? ""),

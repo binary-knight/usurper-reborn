@@ -1247,6 +1247,7 @@ namespace UsurperRemake.Systems
                     IsAgedDeath = npc.IsAgedDeath,
                     IsPermaDead = npc.IsPermaDead,
                     PregnancyDueDate = npc.PregnancyDueDate,
+                    PregnancyFatherName = npc.PregnancyFatherName,
                 });
             }
 

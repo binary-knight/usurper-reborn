@@ -4826,6 +4826,7 @@ public partial class GameEngine
                 IsAgedDeath = data.IsAgedDeath,
                 IsPermaDead = data.IsPermaDead,
                 PregnancyDueDate = data.PregnancyDueDate,
+                PregnancyFatherName = data.PregnancyFatherName,
 
                 // Marriage status
                 IsMarried = data.IsMarried,

@@ -454,39 +454,25 @@ public class DailySystemManager
                 return;
             }
 
-            // In online mode, use a score-based estimated rank
-            // Higher level = lower rank number (rank 1 is best)
-            player.WeeklyRank = Math.Max(1, 101 - player.Level);
-
-            // Assign a rival from online players closest in level
-            var server = MudServer.Instance;
-            if (server != null)
+            // In online mode, query actual rank and rival from database
+            string playerKey = (player.Name1 ?? player.Name2 ?? "").ToLowerInvariant();
+            if (SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend)
             {
-                string? bestRival = null;
-                int bestRivalLevel = 0;
-                int smallestGap = int.MaxValue;
-                string playerKey = (player.Name1 ?? player.Name2 ?? "").ToLowerInvariant();
+                // Real rank based on level among all players
+                player.WeeklyRank = sqlBackend.GetPlayerRank(playerKey);
 
-                foreach (var kvp in server.ActiveSessions)
+                // Rival: closest player by level from ALL players
+                var (rivalName, rivalLevel) = sqlBackend.GetClosestPlayerByLevel(playerKey, player.Level);
+                if (rivalName != null)
                 {
-                    if (string.Equals(kvp.Key, playerKey, StringComparison.OrdinalIgnoreCase)) continue;
-                    var otherPlayer = kvp.Value?.Context?.Engine?.CurrentPlayer;
-                    if (otherPlayer == null) continue;
-
-                    int gap = Math.Abs(otherPlayer.Level - player.Level);
-                    if (gap < smallestGap)
-                    {
-                        smallestGap = gap;
-                        bestRival = otherPlayer.Name2 ?? otherPlayer.Name1 ?? kvp.Key;
-                        bestRivalLevel = otherPlayer.Level;
-                    }
+                    player.RivalName = rivalName;
+                    player.RivalLevel = rivalLevel;
                 }
-
-                if (bestRival != null)
-                {
-                    player.RivalName = bestRival;
-                    player.RivalLevel = bestRivalLevel;
-                }
+            }
+            else
+            {
+                // Fallback estimate if DB unavailable
+                player.WeeklyRank = Math.Max(1, 101 - player.Level);
             }
         }
         catch

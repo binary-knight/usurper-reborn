@@ -1180,6 +1180,10 @@ namespace UsurperRemake.Systems
 
         private async Task HandlePersonalOption(NPC npc, int relationLevel)
         {
+            var state = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
+            state.PersonalQuestionsAsked++;
+            npcConversationStates[npc.ID] = state;
+
             terminal!.SetColor("gray");
             terminal.WriteLine($"  You ask {npc.Name2} to tell you about themselves...");
             terminal.WriteLine("");
@@ -1256,7 +1260,7 @@ namespace UsurperRemake.Systems
             {
                 state.LastFlirtWasPositive = true;
                 state.FlirtSuccessCount++;
-                flirtCountThisSession++;
+                // Note: flirtCountThisSession is incremented by the caller (ProcessConversationChoice)
 
                 terminal!.SetColor("bright_magenta");
                 string their = npc.Sex == CharacterSex.Female ? "her" : "his";
@@ -1315,8 +1319,7 @@ namespace UsurperRemake.Systems
             flirtReceptiveness -= playerStatusPenalty;
 
             // Apply charisma modifier - high charisma makes flirting more effective
-            // Charisma matters more now (scaled up)
-            float charismaModifier = GetCharismaModifier() * 1.5f;
+            float charismaModifier = GetCharismaModifier();
             flirtReceptiveness += charismaModifier;
 
             // Adjust receptiveness based on how the conversation's been going
@@ -1681,9 +1684,9 @@ namespace UsurperRemake.Systems
                 successChance += profile.Romanticism * 0.2f;
             }
 
-            // Apply charisma modifier - confessions are heavily influenced by charm
+            // Apply charisma modifier - confessions are influenced by charm
             float charismaModifier = GetCharismaModifier();
-            successChance += charismaModifier * 1.5f; // Charisma matters more for confessions
+            successChance += charismaModifier;
             successChance = Math.Clamp(successChance, 0.05f, 0.90f);
 
             float roll = (float)random.NextDouble();
@@ -1700,6 +1703,12 @@ namespace UsurperRemake.Systems
                 // Becoming lovers is a major relationship boost - use override to break friendship cap
                 RelationshipSystem.UpdateRelationship(player!, npc, 1, 8, false, true);
                 RomanceTracker.Instance.AddLover(npc.ID, 30);
+
+                // Mark confession state
+                var confState = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
+                confState.HasConfessed = true;
+                confState.ConfessionAccepted = true;
+                npcConversationStates[npc.ID] = confState;
 
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine($"  {Loc.Get("dialogue.new_romance")}");
@@ -1724,6 +1733,12 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
+
+            // Mark that confession happened (even on rejection) so it doesn't repeat
+            var postState = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
+            postState.HasConfessed = true;
+            npcConversationStates[npc.ID] = postState;
+
             await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
         }
 

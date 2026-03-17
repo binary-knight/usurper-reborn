@@ -148,7 +148,7 @@ namespace UsurperRemake.Systems
                 {
                     string itemColor = item.Type switch
                     {
-                        ObjType.Weapon => "bright_red",
+                        ObjType.Weapon => "bright_yellow",
                         ObjType.Body or ObjType.Head or ObjType.Arms or ObjType.Legs => "bright_cyan",
                         ObjType.Shield => "cyan",
                         ObjType.Fingers or ObjType.Neck => "bright_magenta",
@@ -261,10 +261,10 @@ namespace UsurperRemake.Systems
             {
                 EquipmentRarity.Common => "white",
                 EquipmentRarity.Uncommon => "green",
-                EquipmentRarity.Rare => "blue",
+                EquipmentRarity.Rare => "cyan",
                 EquipmentRarity.Epic => "magenta",
                 EquipmentRarity.Legendary => "yellow",
-                EquipmentRarity.Artifact => "bright_red",
+                EquipmentRarity.Artifact => "bright_yellow",
                 _ => "white"
             };
         }

@@ -1430,32 +1430,33 @@ public class Character
                     break;
 
                 case StatusEffect.Bleeding:
-                    dmg = rnd.Next(1, 7); // 1d6
+                    dmg = rnd.Next(1, 7) + (int)(Level / 5); // 1d6 + level scaling
                     HP = Math.Max(0, HP - dmg);
                     messages.Add(($"{DisplayName} bleeds for {dmg} damage!", "red"));
                     break;
 
                 case StatusEffect.Burning:
-                    dmg = rnd.Next(2, 9); // 2d4
+                    dmg = rnd.Next(2, 9) + (int)(Level / 4); // 2d4 + level scaling
                     HP = Math.Max(0, HP - dmg);
                     messages.Add(($"{DisplayName} burns for {dmg} fire damage!", "bright_red"));
                     break;
 
                 case StatusEffect.Frozen:
-                    dmg = rnd.Next(1, 4); // 1d3
+                    dmg = rnd.Next(1, 4) + (int)(Level / 8); // 1d3 + level scaling
                     HP = Math.Max(0, HP - dmg);
                     messages.Add(($"{DisplayName} takes {dmg} cold damage from the frost!", "bright_cyan"));
                     break;
 
                 case StatusEffect.Cursed:
-                    dmg = rnd.Next(1, 3); // 1d2
+                    dmg = rnd.Next(1, 3) + (int)(Level / 10); // 1d2 + level scaling
                     HP = Math.Max(0, HP - dmg);
                     messages.Add(($"{DisplayName} suffers {dmg} curse damage!", "magenta"));
                     break;
 
                 case StatusEffect.Diseased:
-                    HP = Math.Max(0, HP - 1);
-                    messages.Add(($"{DisplayName} suffers from disease! (-1 HP)", "yellow"));
+                    dmg = 1 + (int)(Level / 15); // scales slightly with level
+                    HP = Math.Max(0, HP - dmg);
+                    messages.Add(($"{DisplayName} suffers from disease! (-{dmg} HP)", "yellow"));
                     break;
 
                 case StatusEffect.Regenerating:

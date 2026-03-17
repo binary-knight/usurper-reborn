@@ -2735,6 +2735,13 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.sunforged_blazes"), "bright_yellow");
         }
 
+        // Paladin Divine Resolve: +10% damage vs undead/demons
+        if (attacker.Class == CharacterClass.Paladin &&
+            (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
+        {
+            attackPower = (long)(attackPower * (1.0 + GameConfig.PaladinDivineResolveDamageBonus));
+        }
+
         // Apply grief effects - grief stage can modify damage dealt
         var griefEffects = GriefSystem.Instance.GetCurrentEffects();
         if (griefEffects.DamageModifier != 0 || griefEffects.CombatModifier != 0 || griefEffects.AllStatModifier != 0)
@@ -2963,8 +2970,10 @@ public partial class CombatEngine
         {
             // Apply soft cap to armor power (prevents extreme armor stacking)
             long effectiveArm = GetEffectiveArmPow(target.ArmPow);
-            int armPowMax = (int)Math.Min(effectiveArm, int.MaxValue - 1);
-            defense += random.Next(0, armPowMax + 1);
+            // Armor provides 75-100% of its value (was 0-100%, too volatile)
+            long armBase = effectiveArm * 3 / 4;
+            int armVariance = (int)Math.Max(1, effectiveArm / 4);
+            defense += armBase + random.Next(0, armVariance + 1);
         }
 
         // Armor piercing enchantment reduces effective defense
@@ -4351,6 +4360,11 @@ public partial class CombatEngine
             {
                 terminal.WriteLine($"Probability Manipulation negates {abilityResult.InflictStatus}!", "bright_magenta");
                 result.CombatLog.Add($"Cyclebreaker resists {abilityResult.InflictStatus} (Probability Manipulation)");
+            }
+            else if (player.Class == CharacterClass.Paladin && random.Next(100) < (int)(GameConfig.PaladinDivineResolveStatusResist * 100))
+            {
+                terminal.WriteLine($"Divine Resolve! Your faith shields you from {abilityResult.InflictStatus}!", "bright_white");
+                result.CombatLog.Add($"Paladin resists {abilityResult.InflictStatus} (Divine Resolve)");
             }
             else if (random.Next(100) < abilityResult.StatusChance)
             {
@@ -9864,6 +9878,13 @@ public partial class CombatEngine
                             terminal.WriteLine(Loc.Get("combat.sunforged_blazes"), "bright_yellow");
                         }
 
+                        // Paladin Divine Resolve: +10% damage vs undead/demons
+                        if (player.Class == CharacterClass.Paladin && target is Monster multiTargetPal &&
+                            (multiTargetPal.MonsterClass == MonsterClass.Undead || multiTargetPal.MonsterClass == MonsterClass.Demon || multiTargetPal.Undead > 0))
+                        {
+                            attackPower = (long)(attackPower * (1.0 + GameConfig.PaladinDivineResolveDamageBonus));
+                        }
+
                         // Jester Trickster's Luck: random beneficial proc on basic attacks
                         if (player.Class == CharacterClass.Jester && random.Next(100) < GameConfig.JesterTrickstersLuckChance)
                         {
@@ -10127,8 +10148,9 @@ public partial class CombatEngine
         if (target.ArmPow > 0)
         {
             long effectiveArm = GetEffectiveArmPow(target.ArmPow);
-            int armPowMax = (int)Math.Min(effectiveArm, int.MaxValue - 1);
-            defense += random.Next(0, armPowMax + 1);
+            long armBase = effectiveArm * 3 / 4;
+            int armVariance = (int)Math.Max(1, effectiveArm / 4);
+            defense += armBase + random.Next(0, armVariance + 1);
         }
         powerDamage = Math.Max(1, powerDamage - defense);
         powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage);
@@ -19977,8 +19999,9 @@ public partial class CombatEngine
         if (target.ArmPow > 0)
         {
             long effectiveArm = GetEffectiveArmPow(target.ArmPow);
-            int armPowMax = (int)Math.Min(effectiveArm, int.MaxValue - 1);
-            defense += random.Next(0, armPowMax + 1);
+            long armBase = effectiveArm * 3 / 4;
+            int armVariance = (int)Math.Max(1, effectiveArm / 4);
+            defense += armBase + random.Next(0, armVariance + 1);
         }
 
         long damage = Math.Max(1, attackPower - defense);
@@ -20028,8 +20051,9 @@ public partial class CombatEngine
         if (target.ArmPow > 0)
         {
             long effectiveArm = GetEffectiveArmPow(target.ArmPow);
-            int armPowMax = (int)Math.Min(effectiveArm, int.MaxValue - 1);
-            defense += random.Next(0, armPowMax + 1);
+            long armBase = effectiveArm * 3 / 4;
+            int armVariance = (int)Math.Max(1, effectiveArm / 4);
+            defense += armBase + random.Next(0, armVariance + 1);
         }
 
         long damage = Math.Max(1, attackPower - defense);

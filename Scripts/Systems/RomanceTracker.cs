@@ -100,9 +100,14 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void AddSpouse(string npcId, bool isPolyMarriage = false)
         {
-            if (Spouses.Any(s => s.NPCId == npcId))
+            var existing = Spouses.FirstOrDefault(s => s.NPCId == npcId);
+            if (existing != null)
             {
-                // GD.Print($"[Romance] Already married to {npcId}");
+                // Update metadata on re-marriage (e.g., when RelationshipSystem.PerformMarriage calls us)
+                existing.MarriedDate = DateTime.Now;
+                existing.MarriedGameDay = DailySystemManager.Instance.CurrentDay;
+                existing.NPCName = GetNPCName(npcId);
+                DebugLogger.Instance.LogInfo("ROMANCE", $"Updated existing spouse record for {existing.NPCName} (ID: {npcId})");
                 return;
             }
 
@@ -312,6 +317,8 @@ namespace UsurperRemake.Systems
                 return RomanceRelationType.Lover;
             if (FriendsWithBenefits.Contains(npcId))
                 return RomanceRelationType.FWB;
+            if (ExSpouses.Any(e => e.NPCId == npcId))
+                return RomanceRelationType.Ex;
             if (Exes.Contains(npcId))
                 return RomanceRelationType.Ex;
             return RomanceRelationType.None;
@@ -359,7 +366,7 @@ namespace UsurperRemake.Systems
                 return messages;
             }
 
-            var random = new Random();
+            var random = Random.Shared;
 
             // Process each jealous partner
             foreach (var kvp in JealousyLevels.ToList())
@@ -385,14 +392,19 @@ namespace UsurperRemake.Systems
                         messages.Add($"{npcName} has had enough of your infidelity!");
                         messages.Add($"{npcName} demands a divorce!");
 
-                        // Remove spouse
-                        Spouses.Remove(spouse);
-                        Exes.Add(npcId);
-
-                        // Severe relationship damage
+                        // Use proper divorce flow through both systems
                         if (npc != null && player != null)
                         {
-                            RelationshipSystem.UpdateRelationship(player, npc, -1, 30, true);
+                            RelationshipSystem.ProcessDivorce(player, npc, out _);
+                        }
+                        Divorce(npcId, "Infidelity — jealousy", playerInitiated: false);
+
+                        // Clear marriage state on player in case ProcessDivorce missed it
+                        if (player != null)
+                        {
+                            player.Married = false;
+                            player.IsMarried = false;
+                            player.SpouseName = "";
                         }
 
                         NewsSystem.Instance.Newsy(true, $"{npcName} has divorced their partner due to infidelity!");
@@ -446,7 +458,7 @@ namespace UsurperRemake.Systems
 
                 // Jealousy slowly fades over time (if no new triggers)
                 // Decay rate affected by difficulty: Easy = faster decay, Hard/Nightmare = slower
-                if (jealousy > 0 && jealousy < 90)
+                if (jealousy > 0)
                 {
                     int baseDecay = 2;
                     int adjustedDecay = DifficultySystem.ApplyJealousyDecayMultiplier(baseDecay);

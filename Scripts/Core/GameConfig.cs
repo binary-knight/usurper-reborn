@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.52.10";
+    public const string Version = "0.52.11";
     public const string VersionName = "The Hook";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -850,6 +850,9 @@ public static partial class GameConfig
     public const float VoidreaverVoidHungerPercent = 0.10f;       // Voidreaver: Heal 10% max HP on every kill
     public const float VoidreaverPainThresholdBonus = 0.20f;      // Voidreaver: +20% ability damage when below 50% HP
     public const float VoidreaverSoulEaterManaPercent = 0.15f;    // Voidreaver: Restore 15% max mana on killing blow
+    // Paladin Divine Resolve passive
+    public const float PaladinDivineResolveDamageBonus = 0.10f;  // Paladin: +10% damage vs undead/demons
+    public const float PaladinDivineResolveStatusResist = 0.15f; // Paladin: 15% chance to resist negative status effects
     // Bard Bardic Inspiration passive
     public const int BardInspirationChance = 15;             // Bard: 15% chance per ability use to inspire a teammate
     public const int BardInspirationAttackBonus = 20;        // +20 ATK buff to inspired teammate
@@ -1250,6 +1253,13 @@ public static partial class GameConfig
     public const int ChildHealthDepressed = 4;
     
     public const int ChildAgeUpDays = 30;     // Days per age increment
+
+    // Parenting system (v0.52.12)
+    public const int ParentingToddlerMaxAge = 4;         // Ages 0-4: toddler scenarios
+    public const int ParentingChildMaxAge = 12;          // Ages 5-12: child scenarios
+    public const int ParentingTeenMaxAge = 17;           // Ages 13-17: teen scenarios
+    public const int ParentingAlignmentBonusMax = 10;    // Max bonus soul from parent alignment match
+    public const int ParentingAlignmentPenaltyMax = 5;   // Max penalty from parent alignment mismatch
     
     // Wedding Ceremony Messages (Pascal authentic)
     public static readonly string[] WeddingCeremonyMessages = 

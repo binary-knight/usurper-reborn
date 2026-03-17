@@ -39,6 +39,9 @@ public class Child
     public string CursedByGodID { get; set; } = "";     // god's unique ID
     public int Royal { get; set; }                      // royal blood (0=no, 1=half, 2=full)
     
+    // Parenting interaction tracking
+    public int LastParentingDay { get; set; }           // game day of last parent interaction (cooldown)
+
     // System tracking
     public int RecordNumber { get; set; }               // file position
     public DateTime LastUpdated { get; set; }           // last update time
@@ -63,7 +66,8 @@ public class Child
         Deleted = false;
         Location = GameConfig.ChildLocationHome;
         Health = GameConfig.ChildHealthNormal;
-        Soul = 0; // neutral soul
+        Soul = 0;
+        LastParentingDay = 0;
         MotherAccess = true;
         FatherAccess = true;
         Kidnapped = false;
@@ -83,6 +87,11 @@ public class Child
     /// </summary>
     public static Child CreateChild(Character mother, Character father, bool bastard = false)
     {
+        // Inherit parent alignment tendency (scaled to +-100 range)
+        int parentInfluence = (int)Math.Clamp((mother.Chivalry - mother.Darkness + father.Chivalry - father.Darkness) / 2L, -100, 100);
+        parentInfluence = Math.Clamp(parentInfluence, -100, 100);
+        int initialSoul = parentInfluence + Random.Shared.Next(-20, 21);
+
         var child = new Child
         {
             Mother = mother.Name,
@@ -91,27 +100,28 @@ public class Child
             FatherID = father.ID,
             OriginalMother = mother.Name,
             OriginalFather = father.Name,
-            Sex = (CharacterSex)(new Random().Next(1, 3)), // Random sex (1=male, 2=female)
+            Sex = (CharacterSex)Random.Shared.Next(1, 3),
             Age = 0,
             BirthDate = DateTime.Now,
             Named = false,
             Location = GameConfig.ChildLocationHome,
             Health = GameConfig.ChildHealthNormal,
-            Soul = 0
+            Soul = Math.Clamp(initialSoul, -500, 500)
         };
-        
+
         // Inherit some traits from parents
         if (mother.King || father.King)
         {
-            child.Royal = mother.King && father.King ? 2 : 1; // Full or half royal
+            child.Royal = mother.King && father.King ? 2 : 1;
         }
-        
-        // If bastard child, different handling might apply
+
+        // Bastard children start with soul penalty
         if (bastard)
         {
-            child.Soul -= 50; // Bastard children start with lower soul
+            child.Soul -= 50;
+            child.Soul = Math.Max(-500, child.Soul);
         }
-        
+
         return child;
     }
     
@@ -164,13 +174,13 @@ public class Child
     {
         return Soul switch
         {
-            >= -500 and <= -250 => "evil",
-            >= -249 and <= -100 => "naughty",
-            >= -99 and <= 0 => "bad kid",
-            >= 1 and <= 100 => "normal",
-            >= 101 and <= 250 => "well-behaved",
-            >= 251 and <= 500 => "angel-heart",
-            _ => "unknown temperament"
+            <= -250 => "evil",
+            <= -100 => "naughty",
+            <= -25 => "mischievous",
+            <= 24 => "normal",
+            <= 100 => "well-behaved",
+            <= 250 => "virtuous",
+            _ => "angel-heart"
         };
     }
     
@@ -221,18 +231,17 @@ public class Child
     public string GenerateNewbornName()
     {
         if (Named) return Name;
-        
-        var random = new Random();
+
         string[] maleNames = { "Alexander", "Benjamin", "Christopher", "Daniel", "Edward", "Frederick", "Gabriel", "Henry", "Isaac", "James" };
         string[] femaleNames = { "Alice", "Beatrice", "Catherine", "Diana", "Elizabeth", "Florence", "Grace", "Helena", "Isabella", "Jane" };
-        
+
         if (Sex == CharacterSex.Male)
         {
-            Name = maleNames[random.Next(maleNames.Length)];
+            Name = maleNames[Random.Shared.Next(maleNames.Length)];
         }
         else
         {
-            Name = femaleNames[random.Next(femaleNames.Length)];
+            Name = femaleNames[Random.Shared.Next(femaleNames.Length)];
         }
         
         Named = true;
@@ -285,10 +294,9 @@ public class Child
             LastUpdated = DateTime.Now;
             
             // Random soul changes as child grows
-            var random = new Random();
-            if (random.Next(10) == 0) // 10% chance
+            if (Random.Shared.Next(10) == 0) // 10% chance
             {
-                var soulChange = random.Next(-5, 6); // -5 to +5
+                var soulChange = Random.Shared.Next(-5, 6); // -5 to +5
                 Soul += soulChange;
                 Soul = Math.Max(-500, Math.Min(500, Soul)); // Clamp to valid range
             }

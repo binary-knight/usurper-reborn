@@ -701,6 +701,7 @@ namespace UsurperRemake.Systems
         public bool IsAgedDeath { get; set; }
         public bool IsPermaDead { get; set; }  // Permanent combat death (v0.42.0)
         public DateTime? PregnancyDueDate { get; set; }
+        public string? PregnancyFatherName { get; set; }
 
         // Dialogue tracking - prevents repetition across sessions
         public List<string>? RecentDialogueIds { get; set; }
@@ -1357,6 +1358,7 @@ namespace UsurperRemake.Systems
         public long RansomDemanded { get; set; }
         public string CursedByGod { get; set; } = "";
         public int Royal { get; set; }
+        public int LastParentingDay { get; set; }
     }
 
     /// <summary>

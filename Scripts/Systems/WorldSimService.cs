@@ -278,14 +278,14 @@ namespace UsurperRemake.Systems
                     // Capture world-sim-managed state BEFORE reloading from DB.
                     // Player sessions write stale NPC data that may overwrite active pregnancies,
                     // marriage state changes, equipment changes, or other world-sim-driven mutations.
-                    var activePregnancies = new Dictionary<string, DateTime>();
+                    var activePregnancies = new Dictionary<string, (DateTime DueDate, string? FatherName)>();
                     var activeEquipment = new Dictionary<string, Dictionary<EquipmentSlot, int>>();
                     foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
                     {
                         var key = npc.Name2 ?? npc.Name1;
                         if (npc.PregnancyDueDate.HasValue)
                         {
-                            activePregnancies[key] = npc.PregnancyDueDate.Value;
+                            activePregnancies[key] = (npc.PregnancyDueDate.Value, npc.PregnancyFatherName);
                         }
                         // Capture equipment — player may have given NPCs new gear between saves
                         if (npc.EquippedItems != null && npc.EquippedItems.Count > 0)
@@ -304,11 +304,12 @@ namespace UsurperRemake.Systems
                         foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
                         {
                             var key = npc.Name2 ?? npc.Name1;
-                            if (!npc.PregnancyDueDate.HasValue && activePregnancies.TryGetValue(key, out var dueDate))
+                            if (!npc.PregnancyDueDate.HasValue && activePregnancies.TryGetValue(key, out var pregData))
                             {
                                 // Only restore if the due date hasn't already passed
                                 // (if it passed, the pregnancy should have been processed before the reload)
-                                npc.PregnancyDueDate = dueDate;
+                                npc.PregnancyDueDate = pregData.DueDate;
+                                npc.PregnancyFatherName = pregData.FatherName;
                                 restored++;
                             }
                         }
@@ -1276,6 +1277,7 @@ namespace UsurperRemake.Systems
                     IsAgedDeath = data.IsAgedDeath,
                     IsPermaDead = data.IsPermaDead,
                     PregnancyDueDate = data.PregnancyDueDate,
+                    PregnancyFatherName = data.PregnancyFatherName,
 
                     IsMarried = data.IsMarried,
                     Married = data.Married,

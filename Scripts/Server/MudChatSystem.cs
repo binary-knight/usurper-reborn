@@ -479,6 +479,16 @@ public static class MudChatSystem
                 // Extra tags
                 string invisTag = (session.IsWizInvisible && myWizLevel >= wizLevel) ? " \u001b[1;31m[INVIS]\u001b[0m" : "";
 
+                // Guild tag
+                string guildTag = "";
+                var guildSystem = Systems.GuildSystem.Instance;
+                if (guildSystem != null)
+                {
+                    var guildName = guildSystem.GetPlayerGuildDisplayName(session.Username);
+                    if (!string.IsNullOrEmpty(guildName))
+                        guildTag = $" <{guildName}>";
+                }
+
                 // Render line
                 terminal.SetColor(color);
                 terminal.Write($" [{tag}] ");
@@ -487,6 +497,8 @@ public static class MudChatSystem
                 terminal.Write(name, color);
                 if (!string.IsNullOrEmpty(title))
                     terminal.WriteRawAnsi(title);
+                if (!string.IsNullOrEmpty(guildTag))
+                    terminal.Write(guildTag, "dark_cyan");
                 if (invisTag.Length > 0)
                 {
                     terminal.Write(" ");

@@ -278,7 +278,10 @@ public class HomeLocation : BaseLocation
         WriteMenuCol("", "J", Loc.Get("home.use_herb"), currentPlayer.TotalHerbCount > 0);
         WriteMenuNL("", "T", Loc.Get("home.trophies"), hasTrophies);
 
+        var hasChildrenAtHome = FamilySystem.Instance.GetChildrenOf(currentPlayer)
+            .Any(c => c.Age < FamilySystem.ADULT_AGE && c.Location == GameConfig.ChildLocationHome && !c.Deleted);
         WriteMenuCol(" ", "F", Loc.Get("home.family"), true);
+        WriteMenuNL("", "C", Loc.Get("home.children_interact"), hasChildrenAtHome);
 
         // Row 4: Romance
         WriteMenuCol(" ", "P", Loc.Get("home.partner"), true);
@@ -466,8 +469,9 @@ public class HomeLocation : BaseLocation
         ShowBBSMenuRow(("E", "bright_yellow", Loc.Get("home.rest")), ("U", "bright_yellow", Loc.Get("home.upgrades")), ("S", "bright_yellow", Loc.Get("dungeon.status")));
         ShowBBSMenuRow(("D", "bright_yellow", Loc.Get("home.deposit")), ("W", "bright_yellow", Loc.Get("home.withdraw")), ("L", "bright_yellow", Loc.Get("home.list_chest")));
         ShowBBSMenuRow(("A", "bright_yellow", Loc.Get("home.gather_herbs")), ("T", "bright_yellow", Loc.Get("home.trophies")), ("F", "bright_yellow", Loc.Get("home.family")));
-        ShowBBSMenuRow(("P", "bright_yellow", Loc.Get("home.partner")), ("B", "bright_yellow", Loc.Get("home.bedroom")), ("!", "bright_yellow", Loc.Get("home.resurrect")));
-        ShowBBSMenuRow(("I", "bright_yellow", Loc.Get("dungeon.inventory")), ("G", "bright_yellow", Loc.Get("home.gear_partner")), ("H", "bright_yellow", Loc.Get("home.heal_potion")));
+        ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("home.children_interact")), ("P", "bright_yellow", Loc.Get("home.partner")), ("B", "bright_yellow", Loc.Get("home.bedroom")));
+        ShowBBSMenuRow(("!", "bright_yellow", Loc.Get("home.resurrect")), ("I", "bright_yellow", Loc.Get("dungeon.inventory")), ("G", "bright_yellow", Loc.Get("home.gear_partner")));
+        ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("home.heal_potion")));
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
         {
             string zLabel = DailySystemManager.CanRestForNight(currentPlayer) ? Loc.Get("home.sleep") : Loc.Get("home.wait_night");
@@ -558,6 +562,9 @@ public class HomeLocation : BaseLocation
                 return false;
             case "F":
                 await ShowFamily();
+                return false;
+            case "C":
+                await InteractWithChild();
                 return false;
             case "P":
                 await SpendTimeWithSpouse();
@@ -1838,6 +1845,135 @@ public class HomeLocation : BaseLocation
         await terminal.WaitForKey();
     }
 
+    private async Task InteractWithChild()
+    {
+        var children = FamilySystem.Instance.GetChildrenOf(currentPlayer)
+            .Where(c => c.Age < FamilySystem.ADULT_AGE && c.Location == GameConfig.ChildLocationHome && !c.Deleted && !c.Kidnapped)
+            .ToList();
+
+        if (children.Count == 0)
+        {
+            terminal.WriteLine();
+            terminal.WriteLine(Loc.Get("home.parenting_no_children"), "gray");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        // Select child
+        Child selectedChild;
+        if (children.Count == 1)
+        {
+            selectedChild = children[0];
+        }
+        else
+        {
+            terminal.WriteLine();
+            WriteBoxHeader(Loc.Get("home.children_interact"), "bright_cyan", 38);
+            terminal.WriteLine();
+            terminal.WriteLine(Loc.Get("home.parenting_select"), "bright_white");
+            terminal.WriteLine();
+
+            for (int i = 0; i < children.Count; i++)
+            {
+                var c = children[i];
+                string soulColor = c.Soul > 100 ? "bright_cyan" : (c.Soul < -100 ? "red" : "white");
+                terminal.Write($"  ");
+                terminal.Write($"[{i + 1}] ", "bright_yellow");
+                terminal.Write($"{c.Name}", "bright_white");
+                terminal.Write($" (age {c.Age}, ", "gray");
+                terminal.Write(c.GetSoulDescription(), soulColor);
+                terminal.WriteLine(")", "gray");
+            }
+
+            terminal.WriteLine();
+            string input = await GetChoice();
+            if (!int.TryParse(input, out int idx) || idx < 1 || idx > children.Count)
+                return;
+            selectedChild = children[idx - 1];
+        }
+
+        // Check cooldown
+        int currentDay = DailySystemManager.Instance?.CurrentDay ?? 0;
+        if (selectedChild.LastParentingDay >= currentDay && currentDay > 0)
+        {
+            terminal.WriteLine();
+            terminal.WriteLine(Loc.Get("home.parenting_cooldown", selectedChild.Name), "yellow");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        // Get a random scenario for this child's age group
+        var scenario = ParentingScenarios.GetRandomScenario(selectedChild);
+
+        // Display scenario
+        terminal.WriteLine();
+        WriteBoxHeader(Loc.Get("home.children_interact"), "bright_cyan", 38);
+        terminal.WriteLine();
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get(scenario.DescriptionKey, selectedChild.Name));
+        terminal.WriteLine();
+
+        // Display choices
+        for (int i = 0; i < scenario.Choices.Length; i++)
+        {
+            terminal.Write($"  [{i + 1}] ", "bright_yellow");
+            terminal.WriteLine(Loc.Get(scenario.Choices[i].LabelKey), "white");
+        }
+
+        terminal.WriteLine();
+        string choiceInput = await GetChoice();
+        if (!int.TryParse(choiceInput, out int choiceIdx) || choiceIdx < 1 || choiceIdx > scenario.Choices.Length)
+            return;
+
+        var chosen = scenario.Choices[choiceIdx - 1];
+
+        // Calculate final soul change with alignment modifier
+        int alignmentMod = ParentingScenarios.CalculateAlignmentModifier(currentPlayer, chosen);
+        int finalChange = chosen.SoulChange + alignmentMod;
+
+        // Apply soul change
+        if (finalChange > 0)
+            selectedChild.ImproveSoul(finalChange);
+        else if (finalChange < 0)
+            selectedChild.WorsenSoul(Math.Abs(finalChange));
+
+        // Display result
+        terminal.WriteLine();
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get(chosen.ResultKey, selectedChild.Name));
+        terminal.WriteLine();
+
+        // Show soul change
+        if (finalChange > 0)
+        {
+            terminal.WriteLine(Loc.Get("home.parenting_soul_gain", selectedChild.Name, finalChange), "bright_green");
+        }
+        else if (finalChange < 0)
+        {
+            terminal.WriteLine(Loc.Get("home.parenting_soul_loss", selectedChild.Name, finalChange), "red");
+        }
+
+        // Show alignment influence message
+        if (alignmentMod > 0 && chosen.IsVirtuous)
+            terminal.WriteLine(Loc.Get("home.parenting_alignment_virtue"), "bright_cyan");
+        else if (alignmentMod < 0 && !chosen.IsVirtuous && !chosen.IsNeutral)
+            terminal.WriteLine(Loc.Get("home.parenting_alignment_dark"), "dark_red");
+        else if (alignmentMod < 0 && chosen.IsVirtuous)
+            terminal.WriteLine(Loc.Get("home.parenting_alignment_mismatch_virtue"), "yellow");
+        else if (alignmentMod > 0 && !chosen.IsVirtuous && !chosen.IsNeutral)
+            terminal.WriteLine(Loc.Get("home.parenting_alignment_mismatch_dark"), "yellow");
+
+        // Show current soul status
+        string soulDescColor = selectedChild.Soul > 100 ? "bright_cyan" : (selectedChild.Soul < -100 ? "red" : "white");
+        terminal.Write(Loc.Get("home.parenting_soul_status", selectedChild.Name), "gray");
+        terminal.WriteLine($" {selectedChild.GetSoulDescription()}", soulDescColor);
+
+        // Set cooldown
+        selectedChild.LastParentingDay = currentDay;
+
+        await terminal.WaitForKey();
+    }
+
     private async Task SpendTimeWithSpouse()
     {
         var romance = RomanceTracker.Instance;
@@ -1860,15 +1996,15 @@ public class HomeLocation : BaseLocation
         foreach (var spouse in romance.Spouses)
         {
             var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
-            var name = npc?.Name ?? spouse.NPCId;
-            options.Add((spouse.NPCId, name, "spouse"));
+            if (npc == null || npc.IsDead) continue;
+            options.Add((spouse.NPCId, npc.Name ?? spouse.NPCId, "spouse"));
         }
 
         foreach (var lover in romance.CurrentLovers)
         {
             var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
-            var name = npc?.Name ?? lover.NPCId;
-            options.Add((lover.NPCId, name, "lover"));
+            if (npc == null || npc.IsDead) continue;
+            options.Add((lover.NPCId, npc.Name ?? lover.NPCId, "lover"));
         }
 
         terminal.SetColor("white");

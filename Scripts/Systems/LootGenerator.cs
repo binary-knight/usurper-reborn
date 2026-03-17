@@ -126,9 +126,12 @@ public static class LootGenerator
         /// </summary>
         private static string GetEffectKey(SpecialEffect effect)
         {
-            // Convert PascalCase enum to snake_case: FireDamage → fire_damage
+            // Convert PascalCase enum to snake_case: FireDamage → fire_damage, MaxHP → max_hp
+            // Two-pass regex handles acronyms: first insert _ between lower→upper or upper→upper+lower
             string name = effect.ToString();
-            return Regex.Replace(name, @"(?<!^)([A-Z])", "_$1").ToLowerInvariant();
+            string result = Regex.Replace(name, @"([a-z])([A-Z])", "$1_$2");        // fire|Damage
+            result = Regex.Replace(result, @"([A-Z]+)([A-Z][a-z])", "$1_$2");       // Max|HP stays, but HTTP|Server → HTTP_Server
+            return result.ToLowerInvariant();
         }
 
         private static string GetLocalizedEffectPrefix(SpecialEffect effect)
@@ -234,7 +237,7 @@ public static class LootGenerator
         /// <summary>
         /// Roll random effects for an item based on rarity
         /// </summary>
-        private static List<(SpecialEffect effect, int value)> RollEffects(ItemRarity rarity, int level, bool isWeapon)
+        private static List<(SpecialEffect effect, int value)> RollEffects(ItemRarity rarity, int level, bool isWeapon, string[]? classes = null)
         {
             var effects = new List<(SpecialEffect, int)>();
             var stats = RarityStats[rarity];
@@ -247,9 +250,21 @@ public static class LootGenerator
                 .Where(e => isWeapon ? EffectInfo[e].IsOffensive : !EffectInfo[e].IsOffensive || e == SpecialEffect.Thorns)
                 .ToList();
 
+            // Build class-thematic weights for weapon elemental effects
+            var thematicWeights = isWeapon && classes != null ? GetThematicWeights(classes) : null;
+
             for (int i = 0; i < numEffects && possibleEffects.Count > 0; i++)
             {
-                var effect = possibleEffects[random.Next(possibleEffects.Count)];
+                SpecialEffect effect;
+                if (thematicWeights != null && thematicWeights.Count > 0)
+                {
+                    // Weighted selection: thematic effects get 3x weight
+                    effect = WeightedSelect(possibleEffects, thematicWeights);
+                }
+                else
+                {
+                    effect = possibleEffects[random.Next(possibleEffects.Count)];
+                }
                 possibleEffects.Remove(effect); // No duplicate effects
 
                 // Calculate effect value based on level and rarity
@@ -258,6 +273,73 @@ public static class LootGenerator
             }
 
             return effects;
+        }
+
+        /// <summary>
+        /// Get thematically appropriate elemental effects for weapon classes.
+        /// Returns a set of effects that should be weighted more heavily.
+        /// </summary>
+        private static HashSet<SpecialEffect>? GetThematicWeights(string[] classes)
+        {
+            if (classes.Contains("All")) return null; // Universal weapons get no weighting
+
+            var favored = new HashSet<SpecialEffect>();
+            foreach (var cls in classes)
+            {
+                switch (cls)
+                {
+                    case "Alchemist":
+                        favored.Add(SpecialEffect.PoisonDamage);
+                        favored.Add(SpecialEffect.FireDamage);
+                        break;
+                    case "Paladin":
+                    case "Cleric":
+                        favored.Add(SpecialEffect.HolyDamage);
+                        favored.Add(SpecialEffect.FireDamage);
+                        break;
+                    case "Assassin":
+                        favored.Add(SpecialEffect.PoisonDamage);
+                        favored.Add(SpecialEffect.ShadowDamage);
+                        break;
+                    case "Magician":
+                    case "Sage":
+                        favored.Add(SpecialEffect.FireDamage);
+                        favored.Add(SpecialEffect.IceDamage);
+                        favored.Add(SpecialEffect.LightningDamage);
+                        break;
+                    case "Ranger":
+                        favored.Add(SpecialEffect.PoisonDamage);
+                        favored.Add(SpecialEffect.IceDamage);
+                        break;
+                    case "Bard":
+                    case "Jester":
+                        favored.Add(SpecialEffect.ShadowDamage);
+                        favored.Add(SpecialEffect.LightningDamage);
+                        break;
+                    // Warrior, Barbarian — no preference, all elements equally likely
+                }
+            }
+            return favored.Count > 0 ? favored : null;
+        }
+
+        /// <summary>
+        /// Weighted random selection — favored effects get 3x the chance of non-favored ones.
+        /// </summary>
+        private static SpecialEffect WeightedSelect(List<SpecialEffect> pool, HashSet<SpecialEffect> favored)
+        {
+            // Build weighted pool: favored effects get weight 3, others get weight 1
+            int totalWeight = 0;
+            foreach (var e in pool)
+                totalWeight += favored.Contains(e) ? 3 : 1;
+
+            int roll = random.Next(totalWeight);
+            int cumulative = 0;
+            foreach (var e in pool)
+            {
+                cumulative += favored.Contains(e) ? 3 : 1;
+                if (roll < cumulative) return e;
+            }
+            return pool[^1]; // Fallback
         }
 
         private static int CalculateEffectValue(SpecialEffect effect, int level, ItemRarity rarity)
@@ -503,7 +585,7 @@ public static class LootGenerator
             ("Night Stalker Armor", new[] { "Assassin" }, 75, 100, 85),
 
             // Ranger specific
-            ("Ranger's Cloak", new[] { "Ranger" }, 20, 60, 25),
+            ("Ranger's Leather", new[] { "Ranger" }, 20, 60, 25),
             ("Forest Guardian Armor", new[] { "Ranger" }, 45, 85, 50),
             ("Elven Chainweave", new[] { "Ranger" }, 70, 100, 80),
 
@@ -1116,8 +1198,8 @@ public static class LootGenerator
             // Calculate value
             long value = (long)(finalPower * 15 * stats.ValueMult);
 
-            // Roll for effects
-            var effects = RollEffects(rarity, level, isWeapon: true);
+            // Roll for effects (class-weighted: Alchemist favors Poison/Fire, Paladin favors Holy, etc.)
+            var effects = RollEffects(rarity, level, isWeapon: true, classes: template.Classes);
 
             // Roll for curse
             bool isCursed = random.NextDouble() < stats.CurseChance;

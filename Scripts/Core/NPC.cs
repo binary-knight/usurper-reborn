@@ -94,6 +94,12 @@ public partial class NPC : Character
     public DateTime? PregnancyDueDate { get; set; } = null;
 
     /// <summary>
+    /// If pregnant via affair, the name of the actual father (not the spouse).
+    /// Null/empty means the spouse is the father. Serialized with NPC data.
+    /// </summary>
+    public string? PregnancyFatherName { get; set; } = null;
+
+    /// <summary>
     /// What this NPC is currently doing (set by WorldSimulator each tick).
     /// Used for location presence flavor text. Examples: "nursing a drink", "examining a blade"
     /// </summary>

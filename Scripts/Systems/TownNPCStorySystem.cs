@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace UsurperRemake.Systems
-{
-    /// <summary>
+{    /// <summary>
     /// Town NPC Story System - Manages memorable NPCs with mini-arcs
     /// that unfold over time, giving the town a sense of living narrative.
     ///
@@ -511,6 +510,91 @@ namespace UsurperRemake.Systems
             }
         };
 
+        /// <summary>
+        /// Maps NPC dictionary keys to short localization key prefixes.
+        /// </summary>
+        private static readonly Dictionary<string, string> NPCLocKeyMap = new()
+        {
+            ["Marcus_WoundedSoldier"] = "marcus",
+            ["Elena_GrievingMother"] = "elena",
+            ["Bartholomew_Drunk"] = "bartholomew",
+            ["Greta_FormerAdventurer"] = "greta",
+            ["Pip_OrphanThief"] = "pip",
+            ["Ezra_DyingProphet"] = "ezra"
+        };
+
+        /// <summary>
+        /// Get the localized name for an NPC, falling back to the static English data.
+        /// </summary>
+        public static string GetLocalizedName(string npcKey, MemorableNPCData npc)
+        {
+            if (NPCLocKeyMap.TryGetValue(npcKey, out var locId))
+                return Loc.Get($"npc_story.{locId}.name");
+            return npc.Name;
+        }
+
+        /// <summary>
+        /// Get the localized title for an NPC, falling back to the static English data.
+        /// </summary>
+        public static string GetLocalizedTitle(string npcKey, MemorableNPCData npc)
+        {
+            if (NPCLocKeyMap.TryGetValue(npcKey, out var locId))
+                return Loc.Get($"npc_story.{locId}.title");
+            return npc.Title;
+        }
+
+        /// <summary>
+        /// Get the localized description for an NPC, falling back to the static English data.
+        /// </summary>
+        public static string GetLocalizedDescription(string npcKey, MemorableNPCData npc)
+        {
+            if (NPCLocKeyMap.TryGetValue(npcKey, out var locId))
+                return Loc.Get($"npc_story.{locId}.description");
+            return npc.Description;
+        }
+
+        /// <summary>
+        /// Get localized dialogue lines for a stage, falling back to the static English data.
+        /// </summary>
+        public static string[] GetLocalizedDialogue(string npcKey, NPCStoryStage stage)
+        {
+            if (!NPCLocKeyMap.TryGetValue(npcKey, out var locId))
+                return stage.Dialogue;
+
+            string stageKey = stage.StageId < 0 ? $"stage_neg{Math.Abs(stage.StageId)}" : $"stage{stage.StageId}";
+            var localized = new string[stage.Dialogue.Length];
+            for (int i = 0; i < stage.Dialogue.Length; i++)
+            {
+                localized[i] = Loc.Get($"npc_story.{locId}.{stageKey}.dialogue.{i}");
+            }
+            return localized;
+        }
+
+        /// <summary>
+        /// Get the localized choice prompt for a stage, falling back to the static English data.
+        /// </summary>
+        public static string GetLocalizedChoicePrompt(string npcKey, NPCStoryStage stage)
+        {
+            if (stage.Choice == null) return "";
+            if (!NPCLocKeyMap.TryGetValue(npcKey, out var locId))
+                return stage.Choice.Prompt;
+
+            string stageKey = stage.StageId < 0 ? $"stage_neg{Math.Abs(stage.StageId)}" : $"stage{stage.StageId}";
+            return Loc.Get($"npc_story.{locId}.{stageKey}.choice.prompt");
+        }
+
+        /// <summary>
+        /// Get the localized choice option text, falling back to the static English data.
+        /// </summary>
+        public static string GetLocalizedChoiceText(string npcKey, NPCStoryStage stage, NPCChoiceOption option)
+        {
+            if (!NPCLocKeyMap.TryGetValue(npcKey, out var locId))
+                return option.Text;
+
+            string stageKey = stage.StageId < 0 ? $"stage_neg{Math.Abs(stage.StageId)}" : $"stage{stage.StageId}";
+            return Loc.Get($"npc_story.{locId}.{stageKey}.choice.{option.Key}.text");
+        }
+
         public TownNPCStorySystem()
         {
             _fallbackInstance = this;
@@ -571,21 +655,19 @@ namespace UsurperRemake.Systems
 
             string friendlyLocation = npcData.Location switch
             {
-                "WeaponShop" => "Weapon Shop",
-                "MainStreet" => "Main Street",
+                "WeaponShop" => Loc.Get("npc_story.location.weapon_shop"),
+                "MainStreet" => Loc.Get("npc_story.location.main_street"),
                 _ => npcData.Location
             };
 
-            return npcData.Name switch
+            string locId = NPCLocKeyMap.TryGetValue(npcKey, out var id) ? id : "";
+            if (!string.IsNullOrEmpty(locId))
             {
-                "Marcus" => $"Word around town: Marcus at the {friendlyLocation} has been asking about you.",
-                "Elena" => $"The innkeeper mentions that Elena at the {friendlyLocation} seems troubled lately.",
-                "Bartholomew" => $"Old Bartholomew at the {friendlyLocation} has a tale he's been dying to tell.",
-                "Greta" => $"Greta the adventurer has been spotted pacing near the {friendlyLocation}.",
-                "Pip" => $"That scruffy kid Pip was seen lurking around {friendlyLocation}.",
-                "Ezra" => $"The dying prophet Ezra whispers your name from the {friendlyLocation}.",
-                _ => $"{npcData.Name} at the {friendlyLocation} has something to tell you."
-            };
+                return Loc.Get($"npc_story.notification.{locId}", friendlyLocation);
+            }
+
+            string localizedName = GetLocalizedName(npcKey, npcData);
+            return Loc.Get("npc_story.notification.default", localizedName, friendlyLocation);
         }
 
         /// <summary>

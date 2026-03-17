@@ -512,8 +512,6 @@ public class QuestHallLocation : BaseLocation
             terminal.WriteLine($"  {Loc.Get("quest_hall.hint_dungeon")}");
         else if (quest.QuestTarget == QuestTarget.ReachFloor)
             terminal.WriteLine($"  {Loc.Get("quest_hall.hint_floor")}");
-        else if (quest.QuestTarget == QuestTarget.FindArtifact)
-            terminal.WriteLine($"  {Loc.Get("quest_hall.hint_artifact")}");
         else if (quest.QuestTarget == QuestTarget.BuyWeapon || quest.QuestTarget == QuestTarget.BuyShield)
             terminal.WriteLine($"  {Loc.Get("quest_hall.hint_weapon_shop")}");
         else if (quest.QuestTarget == QuestTarget.BuyArmor)

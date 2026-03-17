@@ -3463,10 +3463,13 @@ public class CastleLocation : BaseLocation
                 spouseNPC.SpouseName = "";
             }
 
-            // Clean up registries
+            // Clean up registries — sync both RelationshipSystem and RomanceTracker
             NPCMarriageRegistry.Instance.EndMarriage(currentPlayer.ID);
             if (spouseNPC != null)
+            {
+                RelationshipSystem.ProcessDivorce(currentPlayer, spouseNPC, out _);
                 RomanceTracker.Instance?.Divorce(spouseNPC.ID, "Royal divorce", playerInitiated: true);
+            }
 
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("castle.divorced", spouseName));

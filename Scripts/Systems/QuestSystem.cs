@@ -144,7 +144,7 @@ public partial class QuestSystem
 
         // Display completion banner
         terminal.WriteLine("");
-        UIHelper.WriteBoxHeader(terminal, "QUEST COMPLETED!", "bright_yellow", 40);
+        UIHelper.WriteBoxHeader(terminal, Loc.Get("quest.completed_banner"), "bright_yellow", 40);
         terminal.WriteLine("");
 
         // For equipment purchase quests, remove the purchased item from the player
@@ -392,30 +392,13 @@ public partial class QuestSystem
                 // Kill a specific boss - use level-appropriate monster
                 var (family, tier) = MonsterFamilies.GetMonsterForLevel(
                     Math.Min(playerLevel + quest.Difficulty * 3, maxAccessibleFloor), random);
-                var bossName = $"{tier.Name} Champion";
+                var bossName = Loc.Get("quest.title.champion", tier.Name);
                 var bossId = tier.Name.ToLower().Replace(" ", "_") + "_champion";
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillBoss,
-                    $"Defeat the {bossName}",
+                    Loc.Get("quest.objective.defeat_boss", bossName),
                     1, bossId, bossName));
-                quest.Title = $"Slay the {bossName}";
-                break;
-
-            case QuestTarget.FindArtifact:
-                // Find an artifact on a specific floor - capped to accessible range
-                var artifactFloor = CapFloor(playerLevel + quest.Difficulty * 2 + random.Next(-2, 3));
-                var artifactId = $"artifact_{random.Next(1, 100)}";
-                var artifactNames = new[] { "Ancient Amulet", "Crystal Orb", "Mystic Tome", "Golden Chalice", "Obsidian Blade" };
-                var artifactName = artifactNames[random.Next(artifactNames.Length)];
-                quest.Objectives.Add(new QuestObjective(
-                    QuestObjectiveType.ReachDungeonFloor,
-                    $"Descend to floor {artifactFloor}",
-                    artifactFloor, "", $"Floor {artifactFloor}"));
-                quest.Objectives.Add(new QuestObjective(
-                    QuestObjectiveType.FindArtifact,
-                    $"Retrieve the {artifactName}",
-                    1, artifactId, artifactName));
-                quest.Title = $"Recover the {artifactName}";
+                quest.Title = Loc.Get("quest.title.defeat_boss", bossName);
                 break;
 
             case QuestTarget.ReachFloor:
@@ -429,15 +412,15 @@ public partial class QuestSystem
                     expeditionFloor = maxAccessibleFloor; // At cap, just use max — kill req still adds challenge
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ReachDungeonFloor,
-                    $"Reach dungeon floor {expeditionFloor}",
+                    Loc.Get("quest.objective.reach_floor", expeditionFloor),
                     expeditionFloor, "", $"Floor {expeditionFloor}"));
                 // Required: kill monsters on the target floor to prove you fought there
                 int killCount = 3 + quest.Difficulty * 2;
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillMonsters,
-                    $"Defeat {killCount} monsters on the expedition",
+                    Loc.Get("quest.objective.defeat_monsters_expedition", killCount),
                     killCount, "", "Monsters"));
-                quest.Title = $"Expedition to Floor {expeditionFloor}";
+                quest.Title = Loc.Get("quest.title.expedition", expeditionFloor);
                 break;
 
             case QuestTarget.ClearFloor:
@@ -445,29 +428,13 @@ public partial class QuestSystem
                 var clearFloor = CapFloor(playerLevel + quest.Difficulty + random.Next(-1, 3));
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ReachDungeonFloor,
-                    $"Descend to floor {clearFloor}",
+                    Loc.Get("quest.objective.descend_floor", clearFloor),
                     clearFloor, "", $"Floor {clearFloor}"));
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ClearDungeonFloor,
-                    $"Clear all monsters on floor {clearFloor}",
+                    Loc.Get("quest.objective.clear_monsters", clearFloor),
                     1, clearFloor.ToString(), $"Floor {clearFloor}"));
-                quest.Title = $"Clear Floor {clearFloor}";
-                break;
-
-            case QuestTarget.RescueNPC:
-                // Rescue an NPC from a dungeon floor - capped to accessible range
-                var rescueFloor = CapFloor(playerLevel + quest.Difficulty * 2 + random.Next(-1, 2));
-                var npcNames = new[] { "Lady Elara", "Sir Marcus", "Priest Aldric", "Merchant Tobias", "Scholar Helena" };
-                var npcName = npcNames[random.Next(npcNames.Length)];
-                quest.Objectives.Add(new QuestObjective(
-                    QuestObjectiveType.ReachDungeonFloor,
-                    $"Reach floor {rescueFloor} where {npcName} is trapped",
-                    rescueFloor, "", $"Floor {rescueFloor}"));
-                quest.Objectives.Add(new QuestObjective(
-                    QuestObjectiveType.TalkToNPC,
-                    $"Find and rescue {npcName}",
-                    1, npcName.ToLower().Replace(" ", "_"), npcName));
-                quest.Title = $"Rescue {npcName}";
+                quest.Title = Loc.Get("quest.title.clear_floor", clearFloor);
                 break;
 
             case QuestTarget.SurviveDungeon:
@@ -475,13 +442,13 @@ public partial class QuestSystem
                 var surviveFloors = Math.Min(quest.Difficulty * 3 + random.Next(2, 5), 15);
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ReachDungeonFloor,
-                    $"Survive {surviveFloors} consecutive floors",
+                    Loc.Get("quest.objective.survive_floors", surviveFloors),
                     surviveFloors, "", "Floors"));
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillMonsters,
-                    "Defeat at least 10 monsters",
+                    Loc.Get("quest.objective.defeat_minimum"),
                     10, "", "Monsters") { IsOptional = false });
-                quest.Title = $"Survive {surviveFloors} Floors";
+                quest.Title = Loc.Get("quest.title.survive_floors", surviveFloors);
                 break;
         }
     }
@@ -498,7 +465,7 @@ public partial class QuestSystem
 
         var quest = new Quest
         {
-            Initiator = "Bounty Board",
+            Initiator = Loc.Get("quest.initiator.bounty_board"),
             QuestType = QuestType.SingleQuest,
             QuestTarget = target,
             Difficulty = difficulty,
@@ -531,7 +498,7 @@ public partial class QuestSystem
         return questDatabase.Where(q =>
             !q.Deleted &&
             string.IsNullOrEmpty(q.Occupier) &&
-            q.Initiator == "Bounty Board" &&
+            q.Initiator == Loc.Get("quest.initiator.bounty_board") &&
             player.Level >= q.MinLevel &&
             player.Level <= q.MaxLevel
         ).ToList();
@@ -543,10 +510,10 @@ public partial class QuestSystem
     public static void RefreshBountyBoard(int playerLevel, int deepestFloor = 0)
     {
         // Remove old unclaimed bounty board quests
-        questDatabase.RemoveAll(q => q.Initiator == "Bounty Board" && string.IsNullOrEmpty(q.Occupier) && q.Date < DateTime.Now.AddDays(-3));
+        questDatabase.RemoveAll(q => q.Initiator == Loc.Get("quest.initiator.bounty_board") && string.IsNullOrEmpty(q.Occupier) && q.Date < DateTime.Now.AddDays(-3));
 
         // Count existing bounty board quests
-        var existingCount = questDatabase.Count(q => q.Initiator == "Bounty Board" && !q.Deleted && string.IsNullOrEmpty(q.Occupier));
+        var existingCount = questDatabase.Count(q => q.Initiator == Loc.Get("quest.initiator.bounty_board") && !q.Deleted && string.IsNullOrEmpty(q.Occupier));
 
         // Add quests until we have 5 available
         var targetCount = 5;
@@ -556,7 +523,7 @@ public partial class QuestSystem
             var difficulty = (byte)Math.Min(4, Math.Max(1, (playerLevel / 5) + random.Next(-1, 2)));
 
             // Random dungeon quest type
-            var questTypes = new[] { QuestTarget.ClearBoss, QuestTarget.FindArtifact, QuestTarget.ReachFloor, QuestTarget.ClearFloor, QuestTarget.SurviveDungeon };
+            var questTypes = new[] { QuestTarget.ClearBoss, QuestTarget.ReachFloor, QuestTarget.ClearFloor, QuestTarget.SurviveDungeon };
             var questType = questTypes[random.Next(questTypes.Length)];
 
             CreateDungeonQuest(questType, difficulty, "The Dungeon", playerLevel, deepestFloor);
@@ -1160,14 +1127,12 @@ public partial class QuestSystem
         foreach (var quest in playerQuests)
         {
             // Update floor objectives - set progress to floor number reached
-            bool floorObjectiveJustCompleted = false;
             foreach (var objective in quest.Objectives.Where(o =>
                 o.ObjectiveType == QuestObjectiveType.ReachDungeonFloor && !o.IsComplete))
             {
                 if (floorNumber >= objective.RequiredProgress)
                 {
                     objective.CurrentProgress = objective.RequiredProgress;
-                    floorObjectiveJustCompleted = true;
                 }
                 else if (floorNumber > objective.CurrentProgress)
                 {
@@ -1175,17 +1140,6 @@ public partial class QuestSystem
                 }
             }
 
-            // For RescueNPC quests: when reaching the target floor, auto-complete
-            // the TalkToNPC objective if the target NPC is dead (you "learned their fate")
-            if (floorObjectiveJustCompleted && quest.QuestTarget == QuestTarget.RescueNPC
-                && !string.IsNullOrEmpty(quest.TargetNPCName))
-            {
-                var targetNPC = NPCSpawnSystem.Instance?.GetNPCByName(quest.TargetNPCName);
-                if (targetNPC == null || targetNPC.IsDead || !targetNPC.IsAlive)
-                {
-                    quest.UpdateObjectiveProgress(QuestObjectiveType.TalkToNPC, 1, quest.TargetNPCName);
-                }
-            }
         }
     }
 
@@ -1200,34 +1154,6 @@ public partial class QuestSystem
         foreach (var quest in playerQuests)
         {
             quest.UpdateObjectiveProgress(QuestObjectiveType.ClearDungeonFloor, 1, floorNumber.ToString());
-        }
-    }
-
-    /// <summary>
-    /// Update quest progress when player finds an artifact
-    /// Call this from DungeonLocation or treasure system
-    /// </summary>
-    public static void OnArtifactFound(Character player, string artifactId)
-    {
-        var playerQuests = GetPlayerQuests(player.Name2);
-
-        foreach (var quest in playerQuests)
-        {
-            quest.UpdateObjectiveProgress(QuestObjectiveType.FindArtifact, 1, artifactId);
-        }
-    }
-
-    /// <summary>
-    /// Update quest progress when player talks to an NPC
-    /// Call this from InnLocation or other NPC interaction points
-    /// </summary>
-    public static void OnNPCInteraction(Character player, string npcId)
-    {
-        var playerQuests = GetPlayerQuests(player.Name2);
-
-        foreach (var quest in playerQuests)
-        {
-            quest.UpdateObjectiveProgress(QuestObjectiveType.TalkToNPC, 1, npcId);
         }
     }
 
@@ -1370,20 +1296,6 @@ public partial class QuestSystem
     }
 
     /// <summary>
-    /// Update quest progress when player visits a location
-    /// Call this from BaseLocation.EnterLocation
-    /// </summary>
-    public static void OnLocationVisited(Character player, string locationId)
-    {
-        var playerQuests = GetPlayerQuests(player.Name2);
-
-        foreach (var quest in playerQuests)
-        {
-            quest.UpdateObjectiveProgress(QuestObjectiveType.VisitLocation, 1, locationId);
-        }
-    }
-
-    /// <summary>
     /// Update quest progress when gold is collected
     /// </summary>
     public static void OnGoldCollected(Character player, long amount)
@@ -1412,7 +1324,7 @@ public partial class QuestSystem
     {
         if (quest.Objectives.Count == 0)
         {
-            return "No tracked objectives";
+            return Loc.Get("quest.no_tracked_objectives");
         }
 
         var completed = quest.Objectives.Count(o => o.IsComplete && !o.IsOptional);
@@ -1420,10 +1332,10 @@ public partial class QuestSystem
         var optional = quest.Objectives.Count(o => o.IsOptional && o.IsComplete);
         var totalOptional = quest.Objectives.Count(o => o.IsOptional);
 
-        var summary = $"Progress: {completed}/{required} objectives complete";
+        var summary = Loc.Get("quest.progress_summary", completed, required);
         if (totalOptional > 0)
         {
-            summary += $" (+{optional}/{totalOptional} bonus)";
+            summary += Loc.Get("quest.progress_summary_bonus", optional, totalOptional);
         }
 
         return summary;
@@ -1444,60 +1356,60 @@ public partial class QuestSystem
         // each time they were regenerated, invalidating cached quest references.
 
         // Beginner quests (levels 1-15)
-        CreateStarterQuest("Wolf Pack",
+        CreateStarterQuest(Loc.Get("quest.title.wolf_pack"),
             "Wolves have been menacing travelers near the dungeon. Hunt them down.",
             QuestTarget.Monster, 1, 1, 15,
             new[] { ("Wolf", 5), ("Dire Wolf", 2) });
 
-        CreateStarterQuest("Goblin Menace",
+        CreateStarterQuest(Loc.Get("quest.title.goblin_menace"),
             "Goblins from the dungeon have been raiding merchant caravans. Thin their numbers.",
             QuestTarget.Monster, 1, 1, 15,
             new[] { ("Goblin", 4), ("Hobgoblin", 2) });
 
-        CreateStarterQuest("Undead Rising",
+        CreateStarterQuest(Loc.Get("quest.title.undead_rising"),
             "The undead are stirring in the dungeon depths. Destroy them before they spread.",
             QuestTarget.Monster, 2, 5, 20,
             new[] { ("Zombie", 5), ("Ghoul", 2) });
 
         // Intermediate quests (levels 10-35)
-        CreateStarterQuest("The Orc Warlord",
+        CreateStarterQuest(Loc.Get("quest.title.orc_warlord"),
             "An orc warband grows in strength deep in the dungeon. Cull their forces.",
             QuestTarget.Monster, 2, 10, 35,
             new[] { ("Orc", 6), ("Orc Warrior", 3), ("Orc Berserker", 1) });
 
-        CreateStarterQuest("Troll Hunt",
+        CreateStarterQuest(Loc.Get("quest.title.troll_hunt"),
             "Ogres and trolls lurk in the dungeon's middle levels. Clear them out.",
             QuestTarget.Monster, 2, 15, 40,
             new[] { ("Ogre", 3), ("Troll", 2) });
 
-        CreateStarterQuest("Dungeon Delve",
+        CreateStarterQuest(Loc.Get("quest.title.dungeon_delve"),
             "Explore the dungeon depths and report back what you find.",
             QuestTarget.ReachFloor, 2, 10, 40,
             floorTarget: 10);
 
         // Advanced quests (levels 20-55)
-        CreateStarterQuest("Dragon Hunt",
+        CreateStarterQuest(Loc.Get("quest.title.dragon_hunt"),
             "Draconic creatures infest the deeper dungeon levels. Slay them.",
             QuestTarget.Monster, 3, 20, 55,
             new[] { ("Drake", 3), ("Wyvern", 1) });
 
-        CreateStarterQuest("The Deep Descent",
+        CreateStarterQuest(Loc.Get("quest.title.deep_descent"),
             "Reach the 25th floor of the dungeon.",
             QuestTarget.ReachFloor, 3, 20, 60,
             floorTarget: 25);
 
-        CreateStarterQuest("Deep Exploration",
+        CreateStarterQuest(Loc.Get("quest.title.deep_exploration"),
             "Scouts report strange activity on the 15th floor. Investigate the depths.",
             QuestTarget.ReachFloor, 3, 10, 40,
             floorTarget: 15);
 
         // Expert quests (levels 50+)
-        CreateStarterQuest("The Lich King",
+        CreateStarterQuest(Loc.Get("quest.title.lich_king"),
             "An ancient lich commands undead legions in the deep dungeon. Destroy them all.",
             QuestTarget.Monster, 4, 50, 100,
             new[] { ("Lich", 1), ("Wraith", 4), ("Shade", 3) });
 
-        CreateStarterQuest("Abyssal Expedition",
+        CreateStarterQuest(Loc.Get("quest.title.abyssal_expedition"),
             "Reach the 50th floor of the dungeon.",
             QuestTarget.ReachFloor, 4, 35, 100,
             floorTarget: 50);
@@ -1523,7 +1435,7 @@ public partial class QuestSystem
         var quest = new Quest
         {
             Title = title,
-            Initiator = "Royal Council",
+            Initiator = Loc.Get("quest.initiator.royal_council"),
             QuestType = QuestType.SingleQuest,
             QuestTarget = target,
             Difficulty = difficulty,
@@ -1553,7 +1465,7 @@ public partial class QuestSystem
             {
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillSpecificMonster,
-                    $"Kill {count} {(count > 1 ? GetPluralName(name) : name)}",
+                    Loc.Get("quest.objective.kill_count", count, (count > 1 ? GetPluralName(name) : name)),
                     count,
                     name.ToLower().Replace(" ", "_"),
                     name
@@ -1564,7 +1476,7 @@ public partial class QuestSystem
         {
             quest.Objectives.Add(new QuestObjective(
                 QuestObjectiveType.ReachDungeonFloor,
-                $"Reach floor {floorTarget}",
+                Loc.Get("quest.objective.reach_floor_short", floorTarget),
                 floorTarget,
                 "",
                 $"Floor {floorTarget}"
@@ -1575,7 +1487,7 @@ public partial class QuestSystem
             var bossName = monsters?.FirstOrDefault().name ?? "Boss";
             quest.Objectives.Add(new QuestObjective(
                 QuestObjectiveType.KillBoss,
-                $"Defeat the {bossName}",
+                Loc.Get("quest.objective.defeat_boss", bossName),
                 1,
                 "",
                 bossName
@@ -1634,7 +1546,7 @@ public partial class QuestSystem
 
     #region King Bounty System
 
-    private const string KING_BOUNTY_INITIATOR = "The Crown";
+    private static string KING_BOUNTY_INITIATOR => Loc.Get("quest.initiator.the_crown");
 
     /// <summary>
     /// Get all bounties posted by the King
@@ -1744,7 +1656,7 @@ public partial class QuestSystem
 
         var bounty = new Quest
         {
-            Title = $"WANTED: {target.Name}",
+            Title = Loc.Get("quest.bounty.wanted", target.Name),
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Assassin,
@@ -1761,7 +1673,7 @@ public partial class QuestSystem
 
         bounty.Objectives.Add(new QuestObjective(
             QuestObjectiveType.DefeatNPC,
-            $"Defeat {target.Name}",
+            Loc.Get("quest.objective.defeat_npc", target.Name),
             1,
             target.Name,
             target.Name
@@ -1790,7 +1702,7 @@ public partial class QuestSystem
 
         var bounty = new Quest
         {
-            Title = $"WANTED: {title}",
+            Title = Loc.Get("quest.bounty.wanted", title),
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Monster,
@@ -1804,7 +1716,7 @@ public partial class QuestSystem
 
         bounty.Objectives.Add(new QuestObjective(
             QuestObjectiveType.KillMonsters,
-            $"Slay {killCount} monsters in the dungeon",
+            Loc.Get("quest.objective.slay_monsters", killCount),
             killCount
         ));
 
@@ -1839,7 +1751,7 @@ public partial class QuestSystem
 
         var bounty = new Quest
         {
-            Title = $"WANTED: {playerName}",
+            Title = Loc.Get("quest.bounty.wanted", playerName),
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Assassin,
@@ -1856,7 +1768,7 @@ public partial class QuestSystem
 
         bounty.Objectives.Add(new QuestObjective(
             QuestObjectiveType.DefeatNPC,
-            $"Defeat {playerName}",
+            Loc.Get("quest.objective.defeat_npc", playerName),
             1,
             playerName,
             playerName
@@ -2059,7 +1971,7 @@ public partial class QuestSystem
 
     #region Equipment Purchase Quests
 
-    private const string MERCHANT_GUILD_INITIATOR = "Merchant Guild";
+    private static string MERCHANT_GUILD_INITIATOR => Loc.Get("quest.initiator.merchant_guild");
 
     /// <summary>
     /// Get all equipment purchase quests
@@ -2227,7 +2139,7 @@ public partial class QuestSystem
         // Add objective for equipment purchase
         quest.Objectives.Add(new QuestObjective(
             QuestObjectiveType.PurchaseEquipment,
-            $"Purchase a {targetEquipment.Name}",
+            Loc.Get("quest.objective.purchase_equipment", targetEquipment.Name),
             1,
             targetEquipment.Id.ToString(),
             targetEquipment.Name

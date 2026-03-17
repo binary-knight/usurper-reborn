@@ -362,12 +362,12 @@ public static class ClassAbilitySystem
         {
             Id = "aura_of_protection",
             Name = "Aura of Protection",
-            Description = "Project a protective aura that increases defense.",
+            Description = "Project a protective aura that increases defense. Scales with Wisdom.",
             LevelRequired = 20,
             StaminaCost = 40,
-            Cooldown = 5,
+            Cooldown = 4,
             Type = AbilityType.Defense,
-            DefenseBonus = 40,  // Scales with CON
+            DefenseBonus = 40,  // Scales with CON + WIS (Paladin)
             Duration = 4,
             AvailableToClasses = new[] { CharacterClass.Paladin }
         },
@@ -435,7 +435,7 @@ public static class ClassAbilitySystem
             StaminaCost = 80,
             Cooldown = 6,
             Type = AbilityType.Attack,
-            BaseDamage = 60,  // AoE holy — full damage to each target
+            BaseDamage = 75,  // AoE holy — full damage to each target
             SpecialEffect = "aoe_holy",
             AvailableToClasses = new[] { CharacterClass.Paladin }
         },
@@ -2240,56 +2240,60 @@ public static class ClassAbilitySystem
         double levelScale = 1.0 + (user.Level * 0.03); // 3% per level
 
         // Stat scaling based on ability type - stats are major contributors up to the cap
+        // Attack abilities scale at 4% per primary stat point (comparable to spell INT scaling at 5%)
         double statScale = 1.0;
         if (ability.Type == AbilityType.Attack)
         {
             if (user.Class == CharacterClass.Alchemist)
             {
                 // Alchemist bombs scale with Intelligence (science, not brawn)
-                statScale += Math.Max(0, (user.Intelligence - 10) * 0.03);
+                statScale += Math.Max(0, (user.Intelligence - 10) * 0.04);
                 // Dexterity adds accuracy bonus for throwing
-                statScale += Math.Max(0, (user.Dexterity - 10) * 0.015);
+                statScale += Math.Max(0, (user.Dexterity - 10) * 0.02);
             }
             else if (user.Class == CharacterClass.Bard || user.Class == CharacterClass.Jester)
             {
                 // Bard/Jester attacks scale with Charisma (performance-based combat)
-                statScale += Math.Max(0, (user.Charisma - 10) * 0.03);
+                statScale += Math.Max(0, (user.Charisma - 10) * 0.04);
                 // Dexterity adds finesse bonus
-                statScale += Math.Max(0, (user.Dexterity - 10) * 0.015);
+                statScale += Math.Max(0, (user.Dexterity - 10) * 0.02);
             }
             else
             {
-                // Strength contributes 3% per point above 10 (20 STR = 1.30x, 30 STR = 1.60x)
-                statScale += Math.Max(0, (user.Strength - 10) * 0.03);
+                // Strength contributes 4% per point above 10 (20 STR = 1.40x, 30 STR = 1.80x)
+                statScale += Math.Max(0, (user.Strength - 10) * 0.04);
                 // Dexterity adds a smaller bonus for accuracy/precision
-                statScale += Math.Max(0, (user.Dexterity - 10) * 0.01);
+                statScale += Math.Max(0, (user.Dexterity - 10) * 0.015);
             }
         }
         else if (ability.Type == AbilityType.Heal)
         {
-            // Constitution contributes 2.5% per point above 10 for healing
-            statScale += Math.Max(0, (user.Constitution - 10) * 0.025);
-            // Wisdom adds smaller healing bonus
-            statScale += Math.Max(0, (user.Wisdom - 10) * 0.015);
+            // Constitution contributes 3% per point above 10 for healing
+            statScale += Math.Max(0, (user.Constitution - 10) * 0.03);
+            // Wisdom adds healing bonus
+            statScale += Math.Max(0, (user.Wisdom - 10) * 0.02);
         }
         else if (ability.Type == AbilityType.Defense)
         {
-            // Constitution contributes 2% per point above 10 for defense
-            statScale += Math.Max(0, (user.Constitution - 10) * 0.02);
+            // Constitution contributes 2.5% per point above 10 for defense
+            statScale += Math.Max(0, (user.Constitution - 10) * 0.025);
+            // Paladin: Wisdom also contributes to defense abilities (holy warrior's faith)
+            if (user.Class == CharacterClass.Paladin)
+                statScale += Math.Max(0, (user.Wisdom - 10) * 0.02);
         }
         else if (ability.Type == AbilityType.Buff)
         {
             // Charisma affects buff potency
-            statScale += Math.Max(0, (user.Charisma - 10) * 0.02);
+            statScale += Math.Max(0, (user.Charisma - 10) * 0.025);
         }
         else if (ability.Type == AbilityType.Debuff)
         {
             // Intelligence affects debuff potency
-            statScale += Math.Max(0, (user.Intelligence - 10) * 0.025);
+            statScale += Math.Max(0, (user.Intelligence - 10) * 0.03);
         }
 
-        // Cap stat scaling to prevent exponential damage at endgame stat levels
-        statScale = Math.Min(statScale, 5.0);
+        // Cap stat scaling — abilities cap at 6.0x (spells cap at 8.0x but cost mana)
+        statScale = Math.Min(statScale, 6.0);
 
         double totalScale = levelScale * statScale;
 

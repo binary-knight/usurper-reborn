@@ -41,6 +41,9 @@ public class GuildSystem
     // Cache of guild membership: username -> guild name (lowercased)
     private readonly ConcurrentDictionary<string, string> membershipCache = new(StringComparer.OrdinalIgnoreCase);
 
+    // Cache of guild display names: lowercased guild name -> display name
+    private readonly ConcurrentDictionary<string, string> guildDisplayNameCache = new(StringComparer.OrdinalIgnoreCase);
+
     // Pending guild invites: target username -> (guild name, inviter name, expiry)
     private readonly ConcurrentDictionary<string, GuildInvite> pendingInvites = new(StringComparer.OrdinalIgnoreCase);
 
@@ -132,6 +135,15 @@ public class GuildSystem
             {
                 membershipCache[reader.GetString(0)] = reader.GetString(1);
             }
+
+            // Load guild display names
+            using var dnCmd = conn.CreateCommand();
+            dnCmd.CommandText = "SELECT name, display_name FROM guilds";
+            using var dnReader = dnCmd.ExecuteReader();
+            while (dnReader.Read())
+            {
+                guildDisplayNameCache[dnReader.GetString(0)] = dnReader.GetString(1);
+            }
         }
         catch (Exception ex)
         {
@@ -145,6 +157,16 @@ public class GuildSystem
     public string? GetPlayerGuild(string username)
     {
         return membershipCache.TryGetValue(username, out var guild) ? guild : null;
+    }
+
+    /// <summary>
+    /// Get the display name of a player's guild, or null if not in a guild.
+    /// </summary>
+    public string? GetPlayerGuildDisplayName(string username)
+    {
+        var guildKey = GetPlayerGuild(username);
+        if (guildKey == null) return null;
+        return guildDisplayNameCache.TryGetValue(guildKey, out var displayName) ? displayName : guildKey;
     }
 
     /// <summary>
@@ -210,6 +232,7 @@ public class GuildSystem
             }
 
             membershipCache[leaderUsername] = guildName.ToLowerInvariant();
+            guildDisplayNameCache[guildName.ToLowerInvariant()] = displayName;
             return null; // success
         }
         catch (Exception ex)

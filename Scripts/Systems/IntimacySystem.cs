@@ -40,6 +40,8 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task StartIntimateScene(Character player, NPC partner, TerminalEmulator term)
         {
+            if (partner.IsDead) return;
+
             this.player = player;
             this.terminal = term;
 
@@ -52,6 +54,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task InitiateIntimateScene(Character player, NPC partner, TerminalEmulator term)
         {
+            if (partner.IsDead) return;
             await StartIntimateScene(player, partner, term);
         }
 
@@ -60,6 +63,9 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task StartGroupScene(Character player, List<NPC> partners, TerminalEmulator term)
         {
+            partners.RemoveAll(p => p.IsDead);
+            if (partners.Count == 0) return;
+
             this.player = player;
             this.terminal = term;
 
@@ -72,6 +78,8 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task ApplyIntimacyBenefitsOnly(Character player, NPC partner, TerminalEmulator term)
         {
+            if (partner.IsDead) return;
+
             this.player = player;
             this.terminal = term;
 
@@ -90,14 +98,12 @@ namespace UsurperRemake.Systems
             };
             RomanceTracker.Instance.RecordEncounter(encounter);
 
-            // Relationship boost from intimacy
-            int baseSteps = 3;
-            int adjustedSteps = DifficultySystem.ApplyRelationshipMultiplier(baseSteps);
+            // Relationship boost from intimacy (fade-to-black gets fewer steps than full scene)
+            int baseSteps = 2;
             foreach (var p in partners)
             {
-                RelationshipSystem.UpdateRelationship(player, p, 1, adjustedSteps, false, false);
-                // NPC's feeling toward player can deepen past Friendship through intimacy
-                RelationshipSystem.UpdateRelationship(p, player, 1, adjustedSteps, false, true);
+                RelationshipSystem.UpdateRelationship(player, p, 1, baseSteps, false, true);
+                RelationshipSystem.UpdateRelationship(p, player, 1, baseSteps, false, true);
             }
 
             // Check for pregnancy
@@ -170,7 +176,8 @@ namespace UsurperRemake.Systems
                 3 => 7,
                 _ => 3
             };
-            int adjustedSteps = DifficultySystem.ApplyRelationshipMultiplier(baseSteps);
+            // Note: don't apply difficulty multiplier to steps — daily cap in RelationshipSystem
+            // handles progression rate. Multiplying steps before the cap bypasses it.
 
             // Show connection quality summary (only for full scenes, not fade-to-black)
             if (player?.SkipIntimateScenes != true && _matchCount >= 0)
@@ -215,10 +222,9 @@ namespace UsurperRemake.Systems
 
             foreach (var partner in partners)
             {
-                // Update player's feeling toward partner
-                RelationshipSystem.UpdateRelationship(player!, partner, 1, adjustedSteps, false, false);
-                // NPC's feeling toward player can deepen past Friendship through intimacy
-                RelationshipSystem.UpdateRelationship(partner, player!, 1, adjustedSteps, false, true);
+                // Both directions can deepen past Friendship through intimacy
+                RelationshipSystem.UpdateRelationship(player!, partner, 1, baseSteps, false, true);
+                RelationshipSystem.UpdateRelationship(partner, player!, 1, baseSteps, false, true);
             }
 
             // Check for pregnancy (only for opposite-sex spouse encounters)

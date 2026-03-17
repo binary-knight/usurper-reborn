@@ -1030,18 +1030,20 @@ public abstract class BaseLocation
     private async Task DisplayTownNPCEncounter(MemorableNPCData npc, NPCStoryStage stage, string npcKey)
     {
         terminal.ClearScreen();
-        WriteBoxHeader($"{npc.Name.ToUpper()} - {npc.Title.ToUpper()}", "bright_cyan");
+        string localName = TownNPCStorySystem.GetLocalizedName(npcKey, npc);
+        string localTitle = TownNPCStorySystem.GetLocalizedTitle(npcKey, npc);
+        WriteBoxHeader($"{localName.ToUpper()} - {localTitle.ToUpper()}", "bright_cyan");
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
-        terminal.WriteLine($"  {npc.Description}");
+        terminal.WriteLine($"  {TownNPCStorySystem.GetLocalizedDescription(npcKey, npc)}");
         terminal.WriteLine("");
 
         await Task.Delay(1500);
 
         // Display dialogue
         terminal.SetColor("white");
-        foreach (var line in stage.Dialogue)
+        foreach (var line in TownNPCStorySystem.GetLocalizedDialogue(npcKey, stage))
         {
             terminal.WriteLine($"  {line}");
             await Task.Delay(1500);
@@ -1054,7 +1056,7 @@ public abstract class BaseLocation
         if (stage.Choice != null)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"  {stage.Choice.Prompt}");
+            terminal.WriteLine($"  {TownNPCStorySystem.GetLocalizedChoicePrompt(npcKey, stage)}");
             terminal.WriteLine("");
 
             foreach (var option in stage.Choice.Options)
@@ -1066,7 +1068,7 @@ public abstract class BaseLocation
                 terminal.SetColor("white");
                 terminal.Write("] ");
                 terminal.SetColor("white");
-                terminal.WriteLine(option.Text);
+                terminal.WriteLine(TownNPCStorySystem.GetLocalizedChoiceText(npcKey, stage, option));
             }
             terminal.WriteLine("");
 
@@ -3689,6 +3691,8 @@ public abstract class BaseLocation
                 case "0":
                 case "":
                     exitPrefs = true;
+                    // Force location redraw so theme/compact/language changes are visible immediately
+                    _locationEntryDisplayed = false;
                     break;
 
                 default:
@@ -4840,6 +4844,7 @@ public abstract class BaseLocation
             || currentPlayer.HasActiveSongBuff || currentPlayer.HasActiveHerbBuff
             || currentPlayer.LoversBlissCombats > 0 || currentPlayer.DivineBlessingCombats > 0
             || currentPlayer.Class == CharacterClass.Alchemist
+            || currentPlayer.Class == CharacterClass.Paladin
             || currentPlayer.Class == CharacterClass.Magician
             || currentPlayer.Class == CharacterClass.Jester
             || currentPlayer.Class == CharacterClass.Cleric
@@ -4876,6 +4881,11 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("base.buff_tricksters_luck", GameConfig.JesterTrickstersLuckChance));
+            }
+            if (currentPlayer.Class == CharacterClass.Paladin)
+            {
+                terminal.SetColor("bright_white");
+                terminal.WriteLine($"  - Divine Resolve: +{(int)(GameConfig.PaladinDivineResolveDamageBonus * 100)}% damage vs undead/demons, {(int)(GameConfig.PaladinDivineResolveStatusResist * 100)}% status resist");
             }
             if (currentPlayer.Class == CharacterClass.Cleric)
             {

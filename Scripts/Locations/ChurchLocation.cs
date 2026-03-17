@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
@@ -776,13 +777,32 @@ namespace UsurperRemake.Locations
 
                 // Show the player's closest romantic relationships so they know how far they are
                 var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>();
+                var romance = RomanceTracker.Instance;
+                var loverIds = new HashSet<string>(romance.CurrentLovers.Select(l => l.NPCId));
+                var addedIds = new HashSet<string>();
                 var prospects = new List<(NPC npc, int playerFeeling, int npcFeeling)>();
+
+                // Always include current lovers from RomanceTracker
                 foreach (var npc in allNPCs)
                 {
                     if (!npc.IsAlive || npc.IsDead || npc.IsMarried) continue;
+                    if (loverIds.Contains(npc.ID))
+                    {
+                        var pf = RelationshipSystem.GetRelationshipLevel(currentPlayer, npc);
+                        var nf = RelationshipSystem.GetRelationshipLevel(npc, currentPlayer);
+                        // Use Love level for lovers whose RelationshipSystem hasn't caught up
+                        prospects.Add((npc, Math.Min(pf, GameConfig.RelationLove), Math.Min(nf, GameConfig.RelationLove)));
+                        addedIds.Add(npc.ID);
+                    }
+                }
+
+                // Also include NPCs with better-than-Normal relationship levels
+                foreach (var npc in allNPCs)
+                {
+                    if (!npc.IsAlive || npc.IsDead || npc.IsMarried) continue;
+                    if (addedIds.Contains(npc.ID)) continue;
                     var pf = RelationshipSystem.GetRelationshipLevel(currentPlayer, npc);
                     var nf = RelationshipSystem.GetRelationshipLevel(npc, currentPlayer);
-                    // Only show NPCs the player has some relationship with (better than Normal)
                     if (pf < GameConfig.RelationNormal || nf < GameConfig.RelationNormal)
                         prospects.Add((npc, pf, nf));
                 }
@@ -902,6 +922,17 @@ namespace UsurperRemake.Locations
                 return;
             }
 
+            // Sync RelationshipSystem for lovers from RomanceTracker
+            var romanceCheck = RomanceTracker.Instance;
+            if (romanceCheck.CurrentLovers.Any(l => l.NPCId == targetNPC.ID))
+            {
+                var rel = RelationshipSystem.GetOrCreateRelationship(currentPlayer, targetNPC);
+                if (rel.Relation1 > GameConfig.RelationLove)
+                    rel.Relation1 = GameConfig.RelationLove;
+                if (rel.Relation2 > GameConfig.RelationLove)
+                    rel.Relation2 = GameConfig.RelationLove;
+            }
+
             // Use the proper RelationshipSystem to validate and perform marriage
             currentPlayer.Gold -= ceremonyCost;
 
@@ -963,17 +994,25 @@ namespace UsurperRemake.Locations
         {
             var eligible = new List<NPC>();
             var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>();
+            var romance = RomanceTracker.Instance;
+            var loverIds = new HashSet<string>(romance.CurrentLovers.Select(l => l.NPCId));
 
             foreach (var npc in allNPCs)
             {
                 if (!npc.IsAlive) continue;
                 if (npc.IsMarried) continue;
 
-                // Check if both player and NPC are in love with each other
+                // Current lovers in RomanceTracker are eligible for marriage
+                if (loverIds.Contains(npc.ID))
+                {
+                    eligible.Add(npc);
+                    continue;
+                }
+
+                // Also check RelationshipSystem — both must be at Love or better
                 var relation = RelationshipSystem.GetRelationshipLevel(currentPlayer, npc);
                 var reverseRelation = RelationshipSystem.GetRelationshipLevel(npc, currentPlayer);
 
-                // Both must be at RelationLove (20) or better (lower number = better)
                 if (relation <= GameConfig.RelationLove && reverseRelation <= GameConfig.RelationLove)
                 {
                     eligible.Add(npc);

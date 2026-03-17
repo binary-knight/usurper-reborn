@@ -1659,6 +1659,80 @@ namespace UsurperRemake.Systems
             return summaries;
         }
 
+        /// <summary>
+        /// Get a player's rank among all players, ordered by level descending.
+        /// Returns 1-based rank, or 1 if query fails.
+        /// </summary>
+        public int GetPlayerRank(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT COUNT(*) + 1 FROM players
+                    WHERE is_banned = 0
+                        AND player_data != '{}'
+                        AND LENGTH(player_data) > 2
+                        AND json_extract(player_data, '$.player.level') IS NOT NULL
+                        AND username NOT LIKE 'emergency_%'
+                        AND json_extract(player_data, '$.player.level') > (
+                            SELECT COALESCE(json_extract(player_data, '$.player.level'), 0)
+                            FROM players WHERE LOWER(username) = LOWER(@username)
+                        );
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                var result = cmd.ExecuteScalar();
+                return result != null ? Convert.ToInt32(result) : 1;
+            }
+            catch
+            {
+                return 1;
+            }
+        }
+
+        /// <summary>
+        /// Find the closest player by level from ALL players in the database (not just online).
+        /// Used for rival assignment in weekly rankings.
+        /// </summary>
+        public (string? displayName, int level) GetClosestPlayerByLevel(string excludeUsername, int playerLevel)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT
+                        display_name,
+                        json_extract(player_data, '$.player.level') as level
+                    FROM players
+                    WHERE LOWER(username) != LOWER(@excludeUser)
+                        AND is_banned = 0
+                        AND player_data != '{}'
+                        AND LENGTH(player_data) > 2
+                        AND json_extract(player_data, '$.player.level') IS NOT NULL
+                        AND username NOT LIKE 'emergency_%'
+                    ORDER BY ABS(json_extract(player_data, '$.player.level') - @playerLevel)
+                    LIMIT 1;
+                ";
+                cmd.Parameters.AddWithValue("@excludeUser", excludeUsername);
+                cmd.Parameters.AddWithValue("@playerLevel", playerLevel);
+
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    string displayName = reader.GetString(0);
+                    int level = reader.IsDBNull(1) ? 1 : Convert.ToInt32(reader.GetValue(1));
+                    return (displayName, level);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to get closest player by level: {ex.Message}");
+            }
+            return (null, 0);
+        }
+
         // --- Divine System (God-Mortal Interactions) ---
 
         public async Task<List<ImmortalPlayerInfo>> GetImmortalPlayers()

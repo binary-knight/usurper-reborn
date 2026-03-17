@@ -186,7 +186,10 @@ public partial class RelationshipSystem
             _lastDailyReset = DateTime.Now;
         }
 
-        string key = $"{name1}_{name2}_{DateTime.Now:yyyyMMdd}";
+        // Normalize key order so A→B and B→A share the same cap
+        string normalizedName1 = string.Compare(name1, name2, StringComparison.OrdinalIgnoreCase) <= 0 ? name1 : name2;
+        string normalizedName2 = string.Compare(name1, name2, StringComparison.OrdinalIgnoreCase) <= 0 ? name2 : name1;
+        string key = $"{normalizedName1}_{normalizedName2}_{DateTime.Now:yyyyMMdd}";
         int alreadyGained = _dailyRelationshipGains.GetValueOrDefault(key, 0);
         int remaining = GameConfig.MaxDailyRelationshipGain - alreadyGained;
 
@@ -441,9 +444,9 @@ public partial class RelationshipSystem
             durationMessage = $"Their marriage lasted {relation.MarriedDays} days.";
         }
         
-        // Update relationship status
-        relation.Relation1 = GameConfig.RelationNormal;
-        relation.Relation2 = GameConfig.RelationHate; // Divorced partner becomes hateful
+        // Update relationship status — both parties are hurt by divorce
+        relation.Relation1 = GameConfig.RelationAnger;
+        relation.Relation2 = GameConfig.RelationHate;
         relation.MarriedDays = 0;
         
         // Update character marriage status

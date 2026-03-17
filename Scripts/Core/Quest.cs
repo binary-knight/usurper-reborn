@@ -1,4 +1,5 @@
 using UsurperRemake.Utils;
+using UsurperRemake.Systems;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -73,11 +74,11 @@ public partial class Quest
     {
         return Difficulty switch
         {
-            1 => "Easy",
-            2 => "Medium", 
-            3 => "Hard",
-            4 => "Extreme",
-            _ => "Unknown"
+            1 => Loc.Get("quest.difficulty.easy"),
+            2 => Loc.Get("quest.difficulty.medium"),
+            3 => Loc.Get("quest.difficulty.hard"),
+            4 => Loc.Get("quest.difficulty.extreme"),
+            _ => Loc.Get("quest.difficulty.unknown")
         };
     }
     
@@ -88,22 +89,20 @@ public partial class Quest
     {
         return QuestTarget switch
         {
-            QuestTarget.Monster => "Slay Monsters",
-            QuestTarget.Assassin => "Assassination Mission",
-            QuestTarget.Seduce => "Seduction Mission",
-            QuestTarget.ClaimTown => "Claim Territory",
-            QuestTarget.GangWar => "Gang War Participation",
-            QuestTarget.ClearBoss => "Dungeon Boss Hunt",
-            QuestTarget.FindArtifact => "Artifact Recovery",
-            QuestTarget.ReachFloor => "Dungeon Expedition",
-            QuestTarget.ClearFloor => "Dungeon Sweep",
-            QuestTarget.RescueNPC => "Rescue Mission",
-            QuestTarget.SurviveDungeon => "Survival Challenge",
-            QuestTarget.BuyWeapon => "Weapon Procurement",
-            QuestTarget.BuyArmor => "Armor Procurement",
-            QuestTarget.BuyAccessory => "Accessory Procurement",
-            QuestTarget.BuyShield => "Shield Procurement",
-            _ => "Unknown Mission"
+            QuestTarget.Monster => Loc.Get("quest.target.monster"),
+            QuestTarget.Assassin => Loc.Get("quest.target.assassin"),
+            QuestTarget.Seduce => Loc.Get("quest.target.seduce"),
+            QuestTarget.ClaimTown => Loc.Get("quest.target.claim_town"),
+            QuestTarget.GangWar => Loc.Get("quest.target.gang_war"),
+            QuestTarget.ClearBoss => Loc.Get("quest.target.clear_boss"),
+            QuestTarget.ReachFloor => Loc.Get("quest.target.reach_floor"),
+            QuestTarget.ClearFloor => Loc.Get("quest.target.clear_floor"),
+            QuestTarget.SurviveDungeon => Loc.Get("quest.target.survive_dungeon"),
+            QuestTarget.BuyWeapon => Loc.Get("quest.target.buy_weapon"),
+            QuestTarget.BuyArmor => Loc.Get("quest.target.buy_armor"),
+            QuestTarget.BuyAccessory => Loc.Get("quest.target.buy_accessory"),
+            QuestTarget.BuyShield => Loc.Get("quest.target.buy_shield"),
+            _ => Loc.Get("quest.target.unknown")
         };
     }
     
@@ -153,8 +152,8 @@ public partial class Quest
     /// </summary>
     public string GetDisplayInfo()
     {
-        var status = IsActive ? $"Claimed by {Occupier}" : "Available";
-        var timeInfo = IsActive ? $"{DaysRemaining} days left" : $"{DaysToComplete} days to complete";
+        var status = IsActive ? Loc.Get("quest.status.claimed_by", Occupier) : Loc.Get("quest.status.available");
+        var timeInfo = IsActive ? Loc.Get("quest.status.days_left", DaysRemaining) : Loc.Get("quest.status.days_to_complete", DaysToComplete);
 
         return $"{GetTargetDescription()} | {GetDifficultyString()} | {GetRewardDescription()} | {status} | {timeInfo}";
     }
@@ -212,9 +211,6 @@ public partial class Quest
         if (Objectives == null || Objectives.Count == 0) return true;
         // All required (non-optional) objectives must be complete
         // Optional objectives are tracked but don't block completion
-        // Note: RescueNPC quests no longer need an alternative path — dead NPCs
-        // have their TalkToNPC objective auto-completed when the player reaches
-        // the target dungeon floor (handled in QuestSystem.OnDungeonFloorReached)
         return Objectives.Where(o => !o.IsOptional).All(o => o.IsComplete);
     }
 
@@ -253,14 +249,14 @@ public partial class Quest
     public string GetRewardDescription()
     {
         if (Reward == 0 || RewardType == QuestRewardType.Nothing)
-            return "No reward";
+            return Loc.Get("quest.reward.none");
 
         string level = Reward switch
         {
-            1 => "Low",
-            2 => "Medium",
-            3 => "High",
-            _ => "Unknown"
+            1 => Loc.Get("quest.reward.low"),
+            2 => Loc.Get("quest.reward.medium"),
+            3 => Loc.Get("quest.reward.high"),
+            _ => Loc.Get("quest.reward.unknown")
         };
 
         return $"{level} {RewardType}";
@@ -407,12 +403,12 @@ public class QuestObjective
 
     public QuestObjective()
     {
-        Id = $"OBJ{DateTime.Now:HHmmss}{new Random().Next(100, 999)}";
+        Id = $"OBJ{DateTime.Now:HHmmss}{Random.Shared.Next(100, 999)}";
     }
 
     public QuestObjective(QuestObjectiveType type, string description, int required, string targetId = "", string targetName = "")
     {
-        Id = $"OBJ{DateTime.Now:HHmmss}{new Random().Next(100, 999)}";
+        Id = $"OBJ{DateTime.Now:HHmmss}{Random.Shared.Next(100, 999)}";
         ObjectiveType = type;
         Description = description;
         RequiredProgress = required;
@@ -425,8 +421,8 @@ public class QuestObjective
     /// </summary>
     public string GetDisplayString()
     {
-        var status = IsComplete ? "[COMPLETE]" : $"[{CurrentProgress}/{RequiredProgress}]";
-        var optional = IsOptional ? " (Optional)" : "";
+        var status = IsComplete ? Loc.Get("quest.objective.complete") : Loc.Get("quest.objective.progress", CurrentProgress, RequiredProgress);
+        var optional = IsOptional ? " " + Loc.Get("quest.objective.optional") : "";
         return $"{status} {Description}{optional}";
     }
 } 

@@ -399,26 +399,26 @@ namespace UsurperRemake.Systems
             }
 
             string troubleDescription = spouseHasAffair
-                ? $"I think {spouseName} is seeing someone else behind my back."
-                : $"{spouseName} has grown cold and cruel. I don't know what to do.";
+                ? Loc.Get("petition.betrayal.trouble_affair", spouseName)
+                : Loc.Get("petition.betrayal.trouble_cold", spouseName);
 
             terminal.ClearScreen();
-            UIHelper.DrawBoxTop(terminal, "A TROUBLED SOUL", "bright_magenta");
+            UIHelper.DrawBoxTop(terminal, Loc.Get("petition.betrayal.header"), "bright_magenta");
             UIHelper.DrawBoxEmpty(terminal, "bright_magenta");
-            UIHelper.DrawBoxLine(terminal, $"  {petitioner.Name2} approaches you with tears in their eyes.", "bright_magenta", "white");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.betrayal.approaches", petitioner.Name2)}", "bright_magenta", "white");
             UIHelper.DrawBoxEmpty(terminal, "bright_magenta");
-            UIHelper.DrawBoxLine(terminal, $"  \"{player.Name2}, I need your help. Please.\"", "bright_magenta", "bright_cyan");
-            UIHelper.DrawBoxLine(terminal, $"  \"{troubleDescription}\"", "bright_magenta", "cyan");
-            UIHelper.DrawBoxLine(terminal, $"  \"You're the only one I can trust with this.\"", "bright_magenta", "cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.betrayal.need_help", player.Name2)}", "bright_magenta", "bright_cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {troubleDescription}", "bright_magenta", "cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.betrayal.only_trust")}", "bright_magenta", "cyan");
             UIHelper.DrawBoxEmpty(terminal, "bright_magenta");
             UIHelper.DrawBoxSeparator(terminal, "bright_magenta");
-            UIHelper.DrawMenuOption(terminal, "C", "Counsel them — offer advice", "bright_magenta", "bright_yellow", "white");
-            UIHelper.DrawMenuOption(terminal, "F", $"Confront {spouseName} directly", "bright_magenta", "bright_yellow", "white");
-            UIHelper.DrawMenuOption(terminal, "E", "Exploit their vulnerability", "bright_magenta", "bright_yellow", "red");
-            UIHelper.DrawMenuOption(terminal, "R", "Refuse to get involved", "bright_magenta", "bright_yellow", "gray");
+            UIHelper.DrawMenuOption(terminal, "C", Loc.Get("petition.betrayal.option_counsel"), "bright_magenta", "bright_yellow", "white");
+            UIHelper.DrawMenuOption(terminal, "F", Loc.Get("petition.betrayal.option_confront", spouseName), "bright_magenta", "bright_yellow", "white");
+            UIHelper.DrawMenuOption(terminal, "E", Loc.Get("petition.betrayal.option_exploit"), "bright_magenta", "bright_yellow", "red");
+            UIHelper.DrawMenuOption(terminal, "R", Loc.Get("petition.betrayal.option_refuse"), "bright_magenta", "bright_yellow", "gray");
             UIHelper.DrawBoxBottom(terminal, "bright_magenta");
 
-            var choice = await terminal.GetInput("\n  What do you do? ");
+            var choice = await terminal.GetInput($"\n  {Loc.Get("petition.betrayal.prompt")}");
 
             switch (choice.ToUpper())
             {
@@ -433,9 +433,9 @@ namespace UsurperRemake.Systems
                     break;
                 default: // Refuse
                     terminal.SetColor("gray");
-                    terminal.WriteLine("\n  \"I'm sorry, this isn't my business.\"");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.betrayal.refuse_line")}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {petitioner.Name2} nods sadly and walks away.");
+                    terminal.WriteLine($"  {Loc.Get("petition.betrayal.refuse_walks_away", petitioner.Name2)}");
                     petitioner.Memory?.RecordEvent(new MemoryEvent
                     {
                         Type = MemoryType.SocialInteraction,
@@ -458,10 +458,10 @@ namespace UsurperRemake.Systems
             if (success)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"\n  {petitioner.Name2} thinks about what you said.");
-                terminal.WriteLine($"  \"Youre right. I gotta talk to {spouse.Name2}. For real this time.\"");
+                terminal.WriteLine($"\n  {Loc.Get("petition.counsel.success_thinks", petitioner.Name2)}");
+                terminal.WriteLine($"  {Loc.Get("petition.counsel.success_talk", spouse.Name2)}");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {petitioner.Name2} looks a little better. Not great, but better.");
+                terminal.WriteLine($"  {Loc.Get("petition.counsel.success_looks_better", petitioner.Name2)}");
 
                 // Improve petitioner-spouse relationship
                 RelationshipSystem.UpdateRelationship(petitioner, spouse, 1, 3, overrideMaxFeeling: true);
@@ -481,9 +481,9 @@ namespace UsurperRemake.Systems
             else
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"\n  Your advice falls flat. {petitioner.Name2} looks unconvinced.");
+                terminal.WriteLine($"\n  {Loc.Get("petition.counsel.fail_flat", petitioner.Name2)}");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  \"That's... not helpful at all. Maybe I was wrong to ask you.\"");
+                terminal.WriteLine($"  {Loc.Get("petition.counsel.fail_not_helpful")}");
 
                 petitioner.Memory?.RecordEvent(new MemoryEvent
                 {
@@ -502,12 +502,12 @@ namespace UsurperRemake.Systems
             TerminalEmulator terminal, bool spouseHasAffair)
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"\n  You find {spouse.Name2} and confront them.");
+            terminal.WriteLine($"\n  {Loc.Get("petition.confront.find_confront", spouse.Name2)}");
 
             if (spouseHasAffair)
-                terminal.WriteLine($"  \"I know what you're doing to {petitioner.Name2}. It ends now.\"");
+                terminal.WriteLine($"  {Loc.Get("petition.confront.affair_accusation", petitioner.Name2)}");
             else
-                terminal.WriteLine($"  \"{petitioner.Name2} tells me you've changed. What's going on?\"");
+                terminal.WriteLine($"  {Loc.Get("petition.confront.changed_accusation", petitioner.Name2)}");
 
             // CHA check for peaceful resolution
             int peaceChance = Math.Min(70, 25 + (int)(player.Charisma * 2));
@@ -516,8 +516,8 @@ namespace UsurperRemake.Systems
             if (peaceful)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"\n  {spouse.Name2} is taken aback by your directness.");
-                terminal.WriteLine($"  \"You're right. I've been a fool. I'll make things right.\"");
+                terminal.WriteLine($"\n  {Loc.Get("petition.confront.peaceful_taken_aback", spouse.Name2)}");
+                terminal.WriteLine($"  {Loc.Get("petition.confront.peaceful_right")}");
 
                 // Improve their marriage
                 RelationshipSystem.UpdateRelationship(petitioner, spouse, 1, 5, overrideMaxFeeling: true);
@@ -547,8 +547,8 @@ namespace UsurperRemake.Systems
             else
             {
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"\n  {spouse.Name2}'s eyes narrow. \"Mind your own business!\"");
-                terminal.WriteLine($"  {spouse.Name2} shoves you and storms off.");
+                terminal.WriteLine($"\n  {Loc.Get("petition.confront.hostile_narrow", spouse.Name2)}");
+                terminal.WriteLine($"  {Loc.Get("petition.confront.hostile_shoves", spouse.Name2)}");
 
                 // Spouse hostile to player
                 spouse.Memory?.RecordEvent(new MemoryEvent
@@ -579,11 +579,11 @@ namespace UsurperRemake.Systems
         private async Task ExploitTroubledSpouse(NPC petitioner, NPC spouse, Character player, TerminalEmulator terminal)
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"\n  You see an opportunity in {petitioner.Name2}'s vulnerability.");
+            terminal.WriteLine($"\n  {Loc.Get("petition.exploit.opportunity", petitioner.Name2)}");
             terminal.SetColor("white");
-            terminal.WriteLine($"  \"Forget about {spouse.Name2}. You deserve someone who appreciates you...\"");
+            terminal.WriteLine($"  {Loc.Get("petition.exploit.forget", spouse.Name2)}");
             terminal.SetColor("yellow");
-            terminal.WriteLine($"  \"Someone like me.\"");
+            terminal.WriteLine($"  {Loc.Get("petition.exploit.someone_like_me")}");
 
             // CHA check for seduction
             int seduceChance = Math.Min(70, 20 + (int)(player.Charisma * 2));
@@ -592,8 +592,8 @@ namespace UsurperRemake.Systems
             if (success)
             {
                 terminal.SetColor("magenta");
-                terminal.WriteLine($"\n  {petitioner.Name2}'s eyes widen... then soften.");
-                terminal.WriteLine($"  \"Maybe you're right. Maybe I've been looking for comfort in the wrong place.\"");
+                terminal.WriteLine($"\n  {Loc.Get("petition.exploit.success_eyes_widen", petitioner.Name2)}");
+                terminal.WriteLine($"  {Loc.Get("petition.exploit.success_maybe_right")}");
 
                 // Start affair pathway — boost relationship significantly
                 RelationshipSystem.UpdateRelationship(player, petitioner, 1, 8, overrideMaxFeeling: true);
@@ -624,10 +624,10 @@ namespace UsurperRemake.Systems
             else
             {
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"\n  {petitioner.Name2} recoils in disgust.");
-                terminal.WriteLine($"  \"Is THAT what this was about? I thought you were my friend!\"");
+                terminal.WriteLine($"\n  {Loc.Get("petition.exploit.fail_recoils", petitioner.Name2)}");
+                terminal.WriteLine($"  {Loc.Get("petition.exploit.fail_that_what")}");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {petitioner.Name2} storms off, furious.");
+                terminal.WriteLine($"  {Loc.Get("petition.exploit.fail_storms_off", petitioner.Name2)}");
 
                 petitioner.Memory?.RecordEvent(new MemoryEvent
                 {
@@ -671,22 +671,22 @@ namespace UsurperRemake.Systems
             if (crushName == null) return;
 
             terminal.ClearScreen();
-            UIHelper.DrawBoxTop(terminal, "MATTERS OF THE HEART", "bright_magenta");
+            UIHelper.DrawBoxTop(terminal, Loc.Get("petition.romance.header"), "bright_magenta");
             UIHelper.DrawBoxEmpty(terminal, "bright_magenta");
-            UIHelper.DrawBoxLine(terminal, $"  {suitor.Name2} pulls you aside, looking nervous.", "bright_magenta", "white");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.romance.pulls_aside", suitor.Name2)}", "bright_magenta", "white");
             UIHelper.DrawBoxEmpty(terminal, "bright_magenta");
-            UIHelper.DrawBoxLine(terminal, $"  \"{player.Name2}, can I tell you something in confidence?\"", "bright_magenta", "bright_cyan");
-            UIHelper.DrawBoxLine(terminal, $"  \"I... I have feelings for {crushName}. But they barely notice me.\"", "bright_magenta", "cyan");
-            UIHelper.DrawBoxLine(terminal, $"  \"Could you put in a good word for me? Maybe help us meet?\"", "bright_magenta", "cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.romance.confidence", player.Name2)}", "bright_magenta", "bright_cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.romance.feelings", crushName)}", "bright_magenta", "cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.romance.good_word")}", "bright_magenta", "cyan");
             UIHelper.DrawBoxEmpty(terminal, "bright_magenta");
             UIHelper.DrawBoxSeparator(terminal, "bright_magenta");
-            UIHelper.DrawMenuOption(terminal, "W", $"Play wingman for {suitor.Name2}", "bright_magenta", "bright_yellow", "white");
-            UIHelper.DrawMenuOption(terminal, "S", $"Sabotage — warn {crushName} away", "bright_magenta", "bright_yellow", "red");
-            UIHelper.DrawMenuOption(terminal, "H", "Give honest advice about their chances", "bright_magenta", "bright_yellow", "white");
-            UIHelper.DrawMenuOption(terminal, "R", "Refuse to get involved", "bright_magenta", "bright_yellow", "gray");
+            UIHelper.DrawMenuOption(terminal, "W", Loc.Get("petition.romance.option_wingman", suitor.Name2), "bright_magenta", "bright_yellow", "white");
+            UIHelper.DrawMenuOption(terminal, "S", Loc.Get("petition.romance.option_sabotage", crushName), "bright_magenta", "bright_yellow", "red");
+            UIHelper.DrawMenuOption(terminal, "H", Loc.Get("petition.romance.option_honest"), "bright_magenta", "bright_yellow", "white");
+            UIHelper.DrawMenuOption(terminal, "R", Loc.Get("petition.romance.option_refuse"), "bright_magenta", "bright_yellow", "gray");
             UIHelper.DrawBoxBottom(terminal, "bright_magenta");
 
-            var choice = await terminal.GetInput("\n  What do you do? ");
+            var choice = await terminal.GetInput($"\n  {Loc.Get("petition.romance.prompt")}");
             var crushNpc = NPCSpawnSystem.Instance?.GetNPCByName(crushName);
 
             switch (choice.ToUpper())
@@ -698,8 +698,8 @@ namespace UsurperRemake.Systems
                     if (wingmanSuccess && crushNpc != null)
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"\n  You speak to {crushName} about {suitor.Name2}'s qualities.");
-                        terminal.WriteLine($"  \"Really? I never noticed before... Tell {suitor.Name2} I'd love to talk.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.wingman.success_speak", crushName, suitor.Name2)}");
+                        terminal.WriteLine($"  {Loc.Get("petition.wingman.success_noticed", suitor.Name2)}");
 
                         crushNpc.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -732,7 +732,7 @@ namespace UsurperRemake.Systems
                         long reward = 100 + suitor.Level * 20;
                         player.Gold += reward;
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"\n  {suitor.Name2} is overjoyed! They give you {reward} gold as thanks.");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.wingman.success_overjoyed", suitor.Name2, reward)}");
 
                         player.Chivalry += 3;
                         NewsSystem.Instance?.Newsy($"{player.Name2} played matchmaker for {suitor.Name2} and {crushName}.");
@@ -740,9 +740,9 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"\n  You try to talk up {suitor.Name2}, but {crushName} isn't interested.");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.wingman.fail_not_interested", suitor.Name2, crushName)}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  \"Sorry, but they're just not my type.\"");
+                        terminal.WriteLine($"  {Loc.Get("petition.wingman.fail_not_type")}");
 
                         suitor.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -759,9 +759,9 @@ namespace UsurperRemake.Systems
                     if (crushNpc != null)
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine($"\n  You tell {crushName} that {suitor.Name2} is trouble.");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.sabotage.tell_trouble", crushName, suitor.Name2)}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  \"Thanks for the warning. I'll steer clear of them.\"");
+                        terminal.WriteLine($"  {Loc.Get("petition.sabotage.thanks_warning")}");
 
                         // Crush now avoids suitor
                         if (crushNpc.Brain?.Memory != null)
@@ -777,8 +777,8 @@ namespace UsurperRemake.Systems
                         if (_random.Next(100) < 30)
                         {
                             terminal.SetColor("bright_red");
-                            terminal.WriteLine($"\n  Word gets back to {suitor.Name2} about what you did...");
-                            terminal.WriteLine($"  \"You SABOTAGED me?! I thought we were friends!\"");
+                            terminal.WriteLine($"\n  {Loc.Get("petition.sabotage.discovered", suitor.Name2)}");
+                            terminal.WriteLine($"  {Loc.Get("petition.sabotage.discovered_reaction")}");
 
                             suitor.Memory?.RecordEvent(new MemoryEvent
                             {
@@ -796,10 +796,10 @@ namespace UsurperRemake.Systems
 
                 case "H": // Honest advice
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"\n  \"Look, I'll be honest with you. {crushName} might not feel the same way.\"");
-                    terminal.WriteLine($"  \"But you should tell them yourself. That takes real courage.\"");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.honest.advice", crushName)}");
+                    terminal.WriteLine($"  {Loc.Get("petition.honest.courage")}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"\n  {suitor.Name2} nods thoughtfully. \"You're right. Thank you for being straight with me.\"");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.honest.thanks", suitor.Name2)}");
 
                     suitor.Memory?.RecordEvent(new MemoryEvent
                     {
@@ -813,9 +813,9 @@ namespace UsurperRemake.Systems
 
                 default: // Refuse
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"\n  \"Sorry, I'm not really the matchmaker type.\"");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.romance.refuse_line")}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {suitor.Name2} looks disappointed but understands.");
+                    terminal.WriteLine($"  {Loc.Get("petition.romance.refuse_disappointed", suitor.Name2)}");
                     break;
             }
 
@@ -850,30 +850,30 @@ namespace UsurperRemake.Systems
 
             if (exName == null)
             {
-                exName = "their former spouse";
+                exName = Loc.Get("petition.custody.their_former_spouse");
             }
 
             var children = FamilySystem.Instance?.GetChildrenOf(petitioner) ?? new List<Child>();
             int childCount = children.Count;
 
             terminal.ClearScreen();
-            UIHelper.DrawBoxTop(terminal, "CUSTODY DISPUTE", "bright_yellow");
+            UIHelper.DrawBoxTop(terminal, Loc.Get("petition.custody.header"), "bright_yellow");
             UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
-            UIHelper.DrawBoxLine(terminal, $"  {petitioner.Name2} approaches, visibly distressed.", "bright_yellow", "white");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.custody.approaches", petitioner.Name2)}", "bright_yellow", "white");
             UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
-            UIHelper.DrawBoxLine(terminal, $"  \"{player.Name2}, I need someone with authority to help me.\"", "bright_yellow", "bright_cyan");
-            UIHelper.DrawBoxLine(terminal, $"  \"Since the divorce, {exName} won't let me see my {(childCount == 1 ? "child" : "children")}.\"", "bright_yellow", "cyan");
-            UIHelper.DrawBoxLine(terminal, $"  \"I just want to be part of their {(childCount == 1 ? "life" : "lives")}. Please help.\"", "bright_yellow", "cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.custody.need_authority", player.Name2)}", "bright_yellow", "bright_cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get(childCount == 1 ? "petition.custody.wont_let_see_child" : "petition.custody.wont_let_see_children", exName)}", "bright_yellow", "cyan");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get(childCount == 1 ? "petition.custody.want_part_life" : "petition.custody.want_part_lives")}", "bright_yellow", "cyan");
             UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
             UIHelper.DrawBoxSeparator(terminal, "bright_yellow");
-            UIHelper.DrawMenuOption(terminal, "M", "Mediate between both parents", "bright_yellow", "bright_cyan", "white");
-            UIHelper.DrawMenuOption(terminal, "P", $"Side with {petitioner.Name2}", "bright_yellow", "bright_cyan", "white");
+            UIHelper.DrawMenuOption(terminal, "M", Loc.Get("petition.custody.option_mediate"), "bright_yellow", "bright_cyan", "white");
+            UIHelper.DrawMenuOption(terminal, "P", Loc.Get("petition.custody.option_side_petitioner", petitioner.Name2), "bright_yellow", "bright_cyan", "white");
             if (exSpouse != null)
-                UIHelper.DrawMenuOption(terminal, "X", $"Side with {exName}", "bright_yellow", "bright_cyan", "white");
-            UIHelper.DrawMenuOption(terminal, "I", "Stay out of it", "bright_yellow", "bright_cyan", "gray");
+                UIHelper.DrawMenuOption(terminal, "X", Loc.Get("petition.custody.option_side_ex", exName), "bright_yellow", "bright_cyan", "white");
+            UIHelper.DrawMenuOption(terminal, "I", Loc.Get("petition.custody.option_stay_out"), "bright_yellow", "bright_cyan", "gray");
             UIHelper.DrawBoxBottom(terminal, "bright_yellow");
 
-            var choice = await terminal.GetInput("\n  What do you do? ");
+            var choice = await terminal.GetInput($"\n  {Loc.Get("petition.custody.prompt")}");
 
             switch (choice.ToUpper())
             {
@@ -884,8 +884,8 @@ namespace UsurperRemake.Systems
                     if (mediateSuccess)
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"\n  You bring both parties together and work out an arrangement.");
-                        terminal.WriteLine($"  Both parents agree to shared custody. The {(childCount == 1 ? "child is" : "children are")} relieved.");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.mediate.success_arrangement")}");
+                        terminal.WriteLine($"  {Loc.Get(childCount == 1 ? "petition.mediate.success_shared_child" : "petition.mediate.success_shared_children")}");
 
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -907,15 +907,15 @@ namespace UsurperRemake.Systems
                         long reward = 200 + petitioner.Level * 30;
                         player.Gold += reward;
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"\n  Both parents thank you. You receive {reward} gold.");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.mediate.success_thanks", reward)}");
                         NewsSystem.Instance?.Newsy($"{player.Name2} successfully mediated a custody dispute between {petitioner.Name2} and {exName}.");
                     }
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"\n  Despite your best efforts, both parents refuse to compromise.");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.mediate.fail_refuse")}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  \"You don't understand!\" they both shout. The meeting ends in tears.");
+                        terminal.WriteLine($"  {Loc.Get("petition.mediate.fail_shout")}");
 
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -928,7 +928,7 @@ namespace UsurperRemake.Systems
 
                 case "P": // Side with petitioner
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine($"\n  You advocate strongly for {petitioner.Name2}'s parental rights.");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.side.advocate", petitioner.Name2)}");
 
                     petitioner.Memory?.RecordEvent(new MemoryEvent
                     {
@@ -940,7 +940,7 @@ namespace UsurperRemake.Systems
                     if (exSpouse != null)
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  {exName} glares at you. \"You'll regret taking sides.\"");
+                        terminal.WriteLine($"  {Loc.Get("petition.side.ex_glares", exName)}");
                         exSpouse.Memory?.RecordEvent(new MemoryEvent
                         {
                             Type = MemoryType.Betrayed,
@@ -954,9 +954,9 @@ namespace UsurperRemake.Systems
 
                 case "X" when exSpouse != null: // Side with ex
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"\n  After hearing both sides, you believe {exName} has the right of it.");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.side.believe_ex", exName)}");
                     terminal.SetColor("red");
-                    terminal.WriteLine($"  {petitioner.Name2} is devastated. \"I thought you'd understand...\"");
+                    terminal.WriteLine($"  {Loc.Get("petition.side.devastated", petitioner.Name2)}");
 
                     petitioner.Memory?.RecordEvent(new MemoryEvent
                     {
@@ -976,9 +976,9 @@ namespace UsurperRemake.Systems
 
                 default: // Ignore
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"\n  \"I'm sorry, but this is a family matter. I can't intervene.\"");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.custody.ignore_line")}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {petitioner.Name2} walks away, looking defeated.");
+                    terminal.WriteLine($"  {Loc.Get("petition.custody.ignore_walks_away", petitioner.Name2)}");
                     break;
             }
 
@@ -1003,34 +1003,34 @@ namespace UsurperRemake.Systems
             {
                 case 0: // Tax relief
                     petitionType = "tax";
-                    petitionText = $"Your Majesty, the tax of {king.TaxRate} gold per day is crushing us. My family can barely eat.";
+                    petitionText = Loc.Get("petition.royal.tax_text", king.TaxRate);
                     break;
                 case 1: // Justice
                     var aggressor = NPCSpawnSystem.Instance?.ActiveNPCs?
                         .FirstOrDefault(n => !n.IsDead && n != petitioner &&
                             (n.Memory?.GetCharacterImpression(petitioner.Name2) ?? 0f) < -0.3f);
-                    string aggressorName = aggressor?.Name2 ?? "a scoundrel";
+                    string aggressorName = aggressor?.Name2 ?? Loc.Get("petition.royal.justice_scoundrel");
                     petitionType = "justice";
-                    petitionText = $"Your Majesty, {aggressorName} attacked me and stole my belongings. I demand justice!";
+                    petitionText = Loc.Get("petition.royal.justice_text", aggressorName);
                     break;
                 case 2: // Monster threat
                     petitionType = "monster";
-                    petitionText = "Your Majesty, creatures from the dungeon have been spotted near the outskirts. We need protection!";
+                    petitionText = Loc.Get("petition.royal.monster_text");
                     break;
                 default: // Marriage blessing
                     var partner = NPCSpawnSystem.Instance?.ActiveNPCs?
                         .FirstOrDefault(n => !n.IsDead && !n.Married && n != petitioner &&
                             (n.Memory?.GetCharacterImpression(petitioner.Name2) ?? 0f) > 0.3f);
-                    string partnerName = partner?.Name2 ?? "my beloved";
+                    string partnerName = partner?.Name2 ?? Loc.Get("petition.royal.marriage_beloved");
                     petitionType = "marriage";
-                    petitionText = $"Your Majesty, {partnerName} and I wish to marry. We seek the King's blessing.";
+                    petitionText = Loc.Get("petition.royal.marriage_text", partnerName);
                     break;
             }
 
             terminal.ClearScreen();
-            UIHelper.DrawBoxTop(terminal, "ROYAL PETITION", "bright_yellow");
+            UIHelper.DrawBoxTop(terminal, Loc.Get("petition.royal.header"), "bright_yellow");
             UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
-            UIHelper.DrawBoxLine(terminal, $"  {petitioner.Name2} kneels before you.", "bright_yellow", "white");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.royal.kneels", petitioner.Name2)}", "bright_yellow", "white");
             UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
             UIHelper.DrawBoxLine(terminal, $"  \"{petitionText}\"", "bright_yellow", "bright_cyan");
             UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
@@ -1040,29 +1040,29 @@ namespace UsurperRemake.Systems
             {
                 case "tax":
                     long relief = king.TaxRate * 5; // 5 days of tax relief cost
-                    UIHelper.DrawMenuOption(terminal, "G", $"Grant relief (-{relief}g from treasury)", "bright_yellow", "bright_cyan", "bright_green");
-                    UIHelper.DrawMenuOption(terminal, "D", "Deny the request", "bright_yellow", "bright_cyan", "red");
-                    UIHelper.DrawMenuOption(terminal, "H", "Halve their tax temporarily", "bright_yellow", "bright_cyan", "white");
+                    UIHelper.DrawMenuOption(terminal, "G", Loc.Get("petition.royal.tax_grant", relief), "bright_yellow", "bright_cyan", "bright_green");
+                    UIHelper.DrawMenuOption(terminal, "D", Loc.Get("petition.royal.tax_deny"), "bright_yellow", "bright_cyan", "red");
+                    UIHelper.DrawMenuOption(terminal, "H", Loc.Get("petition.royal.tax_halve"), "bright_yellow", "bright_cyan", "white");
                     break;
                 case "justice":
-                    UIHelper.DrawMenuOption(terminal, "J", "Order an investigation", "bright_yellow", "bright_cyan", "bright_green");
-                    UIHelper.DrawMenuOption(terminal, "D", "Dismiss the complaint", "bright_yellow", "bright_cyan", "red");
-                    UIHelper.DrawMenuOption(terminal, "C", "Offer compensation from treasury", "bright_yellow", "bright_cyan", "white");
+                    UIHelper.DrawMenuOption(terminal, "J", Loc.Get("petition.royal.justice_investigate"), "bright_yellow", "bright_cyan", "bright_green");
+                    UIHelper.DrawMenuOption(terminal, "D", Loc.Get("petition.royal.justice_dismiss"), "bright_yellow", "bright_cyan", "red");
+                    UIHelper.DrawMenuOption(terminal, "C", Loc.Get("petition.royal.justice_compensate"), "bright_yellow", "bright_cyan", "white");
                     break;
                 case "monster":
                     long guardCost = 500;
-                    UIHelper.DrawMenuOption(terminal, "S", $"Send guards (-{guardCost}g)", "bright_yellow", "bright_cyan", "bright_green");
-                    UIHelper.DrawMenuOption(terminal, "P", "Promise to investigate personally", "bright_yellow", "bright_cyan", "white");
-                    UIHelper.DrawMenuOption(terminal, "D", "Dismiss — the walls will hold", "bright_yellow", "bright_cyan", "red");
+                    UIHelper.DrawMenuOption(terminal, "S", Loc.Get("petition.royal.monster_send", guardCost), "bright_yellow", "bright_cyan", "bright_green");
+                    UIHelper.DrawMenuOption(terminal, "P", Loc.Get("petition.royal.monster_promise"), "bright_yellow", "bright_cyan", "white");
+                    UIHelper.DrawMenuOption(terminal, "D", Loc.Get("petition.royal.monster_dismiss"), "bright_yellow", "bright_cyan", "red");
                     break;
                 case "marriage":
-                    UIHelper.DrawMenuOption(terminal, "B", "Grant the royal blessing", "bright_yellow", "bright_cyan", "bright_green");
-                    UIHelper.DrawMenuOption(terminal, "D", "Deny the blessing", "bright_yellow", "bright_cyan", "red");
+                    UIHelper.DrawMenuOption(terminal, "B", Loc.Get("petition.royal.marriage_bless"), "bright_yellow", "bright_cyan", "bright_green");
+                    UIHelper.DrawMenuOption(terminal, "D", Loc.Get("petition.royal.marriage_deny"), "bright_yellow", "bright_cyan", "red");
                     break;
             }
 
             UIHelper.DrawBoxBottom(terminal, "bright_yellow");
-            var choice = await terminal.GetInput("\n  Your ruling, Majesty? ");
+            var choice = await terminal.GetInput($"\n  {Loc.Get("petition.royal.prompt")}");
 
             // Process ruling
             switch (petitionType)
@@ -1073,7 +1073,7 @@ namespace UsurperRemake.Systems
                         long cost = king.TaxRate * 5;
                         king.Treasury -= cost;
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"\n  You grant tax relief. The people cheer! (-{cost}g from treasury)");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.tax_grant_result", cost)}");
                         player.Chivalry += 5;
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1087,16 +1087,16 @@ namespace UsurperRemake.Systems
                         long cost = king.TaxRate * 2;
                         king.Treasury -= cost;
                         terminal.SetColor("cyan");
-                        terminal.WriteLine($"\n  A fair compromise. (-{cost}g from treasury)");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.tax_halve_result", cost)}");
                         player.Chivalry += 2;
                         NewsSystem.Instance?.Newsy($"King {player.Name2} offered partial tax relief to {petitioner.Name2}.");
                     }
                     else
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine($"\n  \"The tax stands. The kingdom needs every coin.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.tax_deny_result")}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  {petitioner.Name2} leaves, muttering under their breath.");
+                        terminal.WriteLine($"  {Loc.Get("petition.royal.tax_deny_muttering", petitioner.Name2)}");
                         player.Darkness += 3;
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1111,7 +1111,7 @@ namespace UsurperRemake.Systems
                     if (choice.ToUpper() == "J")
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"\n  \"Justice shall be done. Guards, investigate this matter!\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.justice_investigate_result")}");
                         player.Chivalry += 5;
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1126,7 +1126,7 @@ namespace UsurperRemake.Systems
                         king.Treasury -= comp;
                         player.Gold -= Math.Min(comp / 2, player.Gold);
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"\n  You offer {comp}g from the treasury as compensation.");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.justice_compensate_result", comp)}");
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
                             Type = MemoryType.Helped, Description = $"King {player.Name2} compensated me for my losses",
@@ -1136,7 +1136,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"\n  \"I cannot act on hearsay alone. Bring evidence.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.justice_dismiss_result")}");
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
                             Type = MemoryType.Insulted, Description = $"King {player.Name2} dismissed my complaint",
@@ -1150,7 +1150,7 @@ namespace UsurperRemake.Systems
                     {
                         king.Treasury -= 500;
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"\n  You dispatch guards to secure the outskirts. (-500g from treasury)");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.monster_send_result")}");
                         player.Chivalry += 5;
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1162,9 +1162,9 @@ namespace UsurperRemake.Systems
                     else if (choice.ToUpper() == "P")
                     {
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine($"\n  \"I will look into this personally. The realm is under my protection.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.monster_promise_result")}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  The people are inspired by your courage!");
+                        terminal.WriteLine($"  {Loc.Get("petition.royal.monster_promise_inspired")}");
                         player.Chivalry += 8;
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1176,7 +1176,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"\n  \"The walls of the city are strong enough.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.monster_dismiss_result")}");
                         player.Darkness += 3;
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1191,9 +1191,9 @@ namespace UsurperRemake.Systems
                     if (choice.ToUpper() == "B")
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"\n  \"I grant the royal blessing upon this union! May it be long and prosperous.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.marriage_bless_result")}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  {petitioner.Name2} beams with joy.");
+                        terminal.WriteLine($"  {Loc.Get("petition.royal.marriage_bless_joy", petitioner.Name2)}");
                         player.Chivalry += 3;
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1205,9 +1205,9 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine($"\n  \"No. The crown says no.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.royal.marriage_deny_result")}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  {petitioner.Name2} looks crushed.");
+                        terminal.WriteLine($"  {Loc.Get("petition.royal.marriage_deny_crushed", petitioner.Name2)}");
                         player.Darkness += 3;
                         petitioner.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1236,10 +1236,10 @@ namespace UsurperRemake.Systems
             int wishRoll = _random.Next(4);
 
             terminal.ClearScreen();
-            UIHelper.DrawBoxTop(terminal, "A FINAL REQUEST", "magenta");
+            UIHelper.DrawBoxTop(terminal, Loc.Get("petition.dying.header"), "magenta");
             UIHelper.DrawBoxEmpty(terminal, "magenta");
-            UIHelper.DrawBoxLine(terminal, $"  {elder.Name2}, aged {elder.Age}, approaches slowly.", "magenta", "white");
-            UIHelper.DrawBoxLine(terminal, $"  They look old. Really old. And tired.", "magenta", "gray");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.approaches", elder.Name2, elder.Age)}", "magenta", "white");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.old_tired")}", "magenta", "gray");
             UIHelper.DrawBoxEmpty(terminal, "magenta");
 
             switch (wishRoll)
@@ -1247,28 +1247,28 @@ namespace UsurperRemake.Systems
                 case 0: // Legacy — deliver message
                     var recipient = NPCSpawnSystem.Instance?.ActiveNPCs?
                         .FirstOrDefault(n => !n.IsDead && n != elder && n.Name2 != player.Name2);
-                    string recipientName = recipient?.Name2 ?? "someone special";
+                    string recipientName = recipient?.Name2 ?? Loc.Get("petition.dying.someone_special");
 
-                    UIHelper.DrawBoxLine(terminal, $"  \"Im not gonna be around much longer, {player.Name2}.\"", "magenta", "bright_cyan");
-                    UIHelper.DrawBoxLine(terminal, $"  \"When Im gone, tell {recipientName} I forgave them.\"", "magenta", "cyan");
-                    UIHelper.DrawBoxLine(terminal, $"  \"Theyll know what its about.\"", "magenta", "cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.legacy_not_long", player.Name2)}", "magenta", "bright_cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.legacy_tell", recipientName)}", "magenta", "cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.legacy_know")}", "magenta", "cyan");
                     UIHelper.DrawBoxEmpty(terminal, "magenta");
                     UIHelper.DrawBoxSeparator(terminal, "magenta");
-                    UIHelper.DrawMenuOption(terminal, "P", "Promise to deliver the message", "magenta", "bright_yellow", "bright_green");
-                    UIHelper.DrawMenuOption(terminal, "D", "Decline gently", "magenta", "bright_yellow", "gray");
+                    UIHelper.DrawMenuOption(terminal, "P", Loc.Get("petition.dying.legacy_option_promise"), "magenta", "bright_yellow", "bright_green");
+                    UIHelper.DrawMenuOption(terminal, "D", Loc.Get("petition.dying.legacy_option_decline"), "magenta", "bright_yellow", "gray");
                     UIHelper.DrawBoxBottom(terminal, "magenta");
 
-                    var legacyChoice = await terminal.GetInput("\n  Your answer? ");
+                    var legacyChoice = await terminal.GetInput($"\n  {Loc.Get("petition.dying.legacy_prompt")}");
                     if (legacyChoice.ToUpper() == "P")
                     {
                         long inheritance = 500 + elder.Level * 50;
                         player.Gold += inheritance;
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"\n  \"Thank you, {player.Name2}. You've given an old {race} peace.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.dying.legacy_thanks", player.Name2, race)}");
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"  {elder.Name2} presses {inheritance} gold into your hands.");
+                        terminal.WriteLine($"  {Loc.Get("petition.dying.legacy_gold", elder.Name2, inheritance)}");
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"  \"My savings. Take em. I wont need em where Im going.\"");
+                        terminal.WriteLine($"  {Loc.Get("petition.dying.legacy_savings")}");
 
                         elder.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1293,31 +1293,31 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"\n  {elder.Name2} nods slowly. \"Fair enough. Cant blame you.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.dying.legacy_decline", elder.Name2)}");
                     }
                     break;
 
                 case 1: // Confession
-                    UIHelper.DrawBoxLine(terminal, $"  \"Before I go, I must confess something.\"", "magenta", "bright_cyan");
-                    UIHelper.DrawBoxLine(terminal, $"  \"I've kept a secret for years...\"", "magenta", "cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.confession_intro")}", "magenta", "bright_cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.confession_secret")}", "magenta", "cyan");
 
                     // Generate a random confession
                     int confessionType = _random.Next(3);
                     string confession = confessionType switch
                     {
-                        0 => $"\"I buried a stash of gold beneath the old oak near the inn. Take it.\"",
-                        1 => $"\"I had an affair years ago. The child... they never knew who their real parent was.\"",
-                        _ => $"\"I overheard something in the castle. There are those who plot against the throne.\""
+                        0 => Loc.Get("petition.dying.confession_gold"),
+                        1 => Loc.Get("petition.dying.confession_affair"),
+                        _ => Loc.Get("petition.dying.confession_plot")
                     };
 
                     UIHelper.DrawBoxLine(terminal, $"  {confession}", "magenta", "bright_yellow");
                     UIHelper.DrawBoxEmpty(terminal, "magenta");
                     UIHelper.DrawBoxSeparator(terminal, "magenta");
-                    UIHelper.DrawMenuOption(terminal, "L", "Listen carefully", "magenta", "bright_yellow", "bright_green");
-                    UIHelper.DrawMenuOption(terminal, "D", "\"Take your secrets to the grave.\"", "magenta", "bright_yellow", "gray");
+                    UIHelper.DrawMenuOption(terminal, "L", Loc.Get("petition.dying.confession_option_listen"), "magenta", "bright_yellow", "bright_green");
+                    UIHelper.DrawMenuOption(terminal, "D", Loc.Get("petition.dying.confession_option_grave"), "magenta", "bright_yellow", "gray");
                     UIHelper.DrawBoxBottom(terminal, "magenta");
 
-                    var confChoice = await terminal.GetInput("\n  Your response? ");
+                    var confChoice = await terminal.GetInput($"\n  {Loc.Get("petition.dying.confession_prompt")}");
                     if (confChoice.ToUpper() == "L")
                     {
                         if (confessionType == 0)
@@ -1325,14 +1325,14 @@ namespace UsurperRemake.Systems
                             long stash = 1000 + elder.Level * 100;
                             player.Gold += stash;
                             terminal.SetColor("yellow");
-                            terminal.WriteLine($"\n  Following the elder's directions, you find {stash} gold buried in a cache!");
+                            terminal.WriteLine($"\n  {Loc.Get("petition.dying.confession_gold_found", stash)}");
                         }
                         else
                         {
                             terminal.SetColor("bright_cyan");
-                            terminal.WriteLine($"\n  You listen intently, committing every detail to memory.");
+                            terminal.WriteLine($"\n  {Loc.Get("petition.dying.confession_listen")}");
                             terminal.SetColor("white");
-                            terminal.WriteLine($"  This information could be valuable...");
+                            terminal.WriteLine($"  {Loc.Get("petition.dying.confession_valuable")}");
                             player.Experience += 100 + elder.Level * 10;
                         }
 
@@ -1347,7 +1347,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"\n  {elder.Name2} sighs. \"Perhaps that's for the best.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.dying.confession_decline", elder.Name2)}");
                     }
                     break;
 
@@ -1369,25 +1369,25 @@ namespace UsurperRemake.Systems
                     }
                     else
                     {
-                        protectedName = "my friends";
+                        protectedName = Loc.Get("petition.dying.protect_friends");
                         protectedType = "friends";
                     }
 
-                    UIHelper.DrawBoxLine(terminal, $"  \"When I'm gone, please watch over {protectedName} for me.\"", "magenta", "bright_cyan");
-                    UIHelper.DrawBoxLine(terminal, $"  \"I dont want them to be alone.\"", "magenta", "cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.protect_watch_over", protectedName)}", "magenta", "bright_cyan");
+                    UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.protect_alone")}", "magenta", "cyan");
                     UIHelper.DrawBoxEmpty(terminal, "magenta");
                     UIHelper.DrawBoxSeparator(terminal, "magenta");
-                    UIHelper.DrawMenuOption(terminal, "P", $"\"I'll watch over {protectedName}. You have my word.\"", "magenta", "bright_yellow", "bright_green");
-                    UIHelper.DrawMenuOption(terminal, "D", "\"I can't make that promise.\"", "magenta", "bright_yellow", "gray");
+                    UIHelper.DrawMenuOption(terminal, "P", Loc.Get("petition.dying.protect_option_promise", protectedName), "magenta", "bright_yellow", "bright_green");
+                    UIHelper.DrawMenuOption(terminal, "D", Loc.Get("petition.dying.protect_option_cant"), "magenta", "bright_yellow", "gray");
                     UIHelper.DrawBoxBottom(terminal, "magenta");
 
-                    var protChoice = await terminal.GetInput("\n  Your answer? ");
+                    var protChoice = await terminal.GetInput($"\n  {Loc.Get("petition.dying.protect_prompt")}");
                     if (protChoice.ToUpper() == "P")
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"\n  {elder.Name2}'s face lights up with gratitude.");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.dying.protect_grateful", elder.Name2)}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  \"Thank you. Knowing {protectedName} won't be alone... that's all I needed.\"");
+                        terminal.WriteLine($"  {Loc.Get("petition.dying.protect_knowing", protectedName)}");
 
                         // Boost impression with protected person
                         if (protectedType == "spouse" && elderSpouse != null)
@@ -1403,7 +1403,7 @@ namespace UsurperRemake.Systems
                         long gift = 300 + elder.Level * 30;
                         player.Gold += gift;
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"  {elder.Name2} gives you {gift} gold. \"For your trouble.\"");
+                        terminal.WriteLine($"  {Loc.Get("petition.dying.protect_gold", elder.Name2, gift)}");
 
                         player.Chivalry += 8;
                         elder.Memory?.RecordEvent(new MemoryEvent
@@ -1417,9 +1417,9 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"\n  \"Yeah. I figured youd say that.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.dying.protect_decline")}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  {elder.Name2} shuffles away, looking smaller than before.");
+                        terminal.WriteLine($"  {Loc.Get("petition.dying.protect_shuffles", elder.Name2)}");
                     }
                     break;
             }
@@ -1440,11 +1440,11 @@ namespace UsurperRemake.Systems
         private async Task ExecuteRivalryReport(NPC warner, Character player, TerminalEmulator terminal)
         {
             terminal.ClearScreen();
-            UIHelper.DrawBoxTop(terminal, "A FRIENDLY WARNING", "bright_cyan");
+            UIHelper.DrawBoxTop(terminal, Loc.Get("petition.warning.header"), "bright_cyan");
             UIHelper.DrawBoxEmpty(terminal, "bright_cyan");
-            UIHelper.DrawBoxLine(terminal, $"  {warner.Name2} pulls you into a quiet corner.", "bright_cyan", "white");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.warning.pulls_corner", warner.Name2)}", "bright_cyan", "white");
             UIHelper.DrawBoxEmpty(terminal, "bright_cyan");
-            UIHelper.DrawBoxLine(terminal, $"  \"{player.Name2}, I like you. So I'm telling you this as a friend.\"", "bright_cyan", "bright_yellow");
+            UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.warning.like_you", player.Name2)}", "bright_cyan", "bright_yellow");
 
             // Determine what to warn about
             bool isCourtPlot = false;
@@ -1458,13 +1458,13 @@ namespace UsurperRemake.Systems
                 {
                     isCourtPlot = true;
                     var plot = king.ActivePlots[0];
-                    warningText = "\"There are whispers in the court. Someone is plotting against you.\"";
-                    threatDetail = $"Plot type: {plot.PlotType}, Progress: {plot.Progress}%";
+                    warningText = Loc.Get("petition.warning.court_plot");
+                    threatDetail = Loc.Get("petition.warning.court_plot_detail", plot.PlotType, plot.Progress);
                 }
                 else
                 {
-                    warningText = "\"I've heard rumblings. Some NPCs are unhappy with your reign.\"";
-                    threatDetail = "General dissent detected among court members.";
+                    warningText = Loc.Get("petition.warning.court_rumblings");
+                    threatDetail = Loc.Get("petition.warning.court_dissent");
                 }
             }
             else
@@ -1482,43 +1482,43 @@ namespace UsurperRemake.Systems
                     string teamName = rivalTeam.Key;
                     int teamSize = rivalTeam.Count();
                     int maxLevel = rivalTeam.Max(n => n.Level);
-                    warningText = $"\"A group called '{teamName}' has been growing in power. {teamSize} members, led by someone level {maxLevel}.\"";
-                    threatDetail = $"Team '{teamName}': {teamSize} members, highest level {maxLevel}";
+                    warningText = Loc.Get("petition.warning.rival_team", teamName, teamSize, maxLevel);
+                    threatDetail = Loc.Get("petition.warning.rival_team_detail", teamName, teamSize, maxLevel);
                 }
                 else
                 {
-                    warningText = "\"Watch your back. Not everyone in this town is friendly.\"";
-                    threatDetail = "General warning about hostile NPCs.";
+                    warningText = Loc.Get("petition.warning.general");
+                    threatDetail = Loc.Get("petition.warning.general_detail");
                 }
             }
 
             UIHelper.DrawBoxLine(terminal, $"  {warningText}", "bright_cyan", "cyan");
             UIHelper.DrawBoxEmpty(terminal, "bright_cyan");
             UIHelper.DrawBoxSeparator(terminal, "bright_cyan");
-            UIHelper.DrawMenuOption(terminal, "T", "\"Tell me everything you know.\"", "bright_cyan", "bright_yellow", "bright_green");
-            UIHelper.DrawMenuOption(terminal, "A", "\"I'll handle it. Thank you.\"", "bright_cyan", "bright_yellow", "white");
-            UIHelper.DrawMenuOption(terminal, "D", "\"I'm not worried.\"", "bright_cyan", "bright_yellow", "gray");
+            UIHelper.DrawMenuOption(terminal, "T", Loc.Get("petition.warning.option_tell_more"), "bright_cyan", "bright_yellow", "bright_green");
+            UIHelper.DrawMenuOption(terminal, "A", Loc.Get("petition.warning.option_handle"), "bright_cyan", "bright_yellow", "white");
+            UIHelper.DrawMenuOption(terminal, "D", Loc.Get("petition.warning.option_dismiss"), "bright_cyan", "bright_yellow", "gray");
             UIHelper.DrawBoxBottom(terminal, "bright_cyan");
 
-            var choice = await terminal.GetInput("\n  Your response? ");
+            var choice = await terminal.GetInput($"\n  {Loc.Get("petition.warning.prompt")}");
 
             switch (choice.ToUpper())
             {
                 case "T": // Get details
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine($"\n  {warner.Name2} leans in close and shares everything they know.");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.warning.shares_everything", warner.Name2)}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  Intel: {threatDetail}");
+                    terminal.WriteLine($"  {Loc.Get("petition.warning.intel", threatDetail)}");
 
                     if (isCourtPlot)
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"\n  \"Check the Court Politics menu in the Castle for more details.\"");
+                        terminal.WriteLine($"\n  {Loc.Get("petition.warning.court_hint")}");
                     }
 
                     player.Experience += 50 + player.Level * 5;
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"\n  You learned something useful. (+{50 + player.Level * 5} XP)");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.warning.xp_gained", 50 + player.Level * 5)}");
 
                     warner.Memory?.RecordEvent(new MemoryEvent
                     {
@@ -1532,9 +1532,9 @@ namespace UsurperRemake.Systems
 
                 case "A": // Acknowledge
                     terminal.SetColor("white");
-                    terminal.WriteLine($"\n  \"Good. Be careful out there, {player.Name2}.\"");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.warning.acknowledge", player.Name2)}");
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"  {warner.Name2} nods and slips back into the crowd.");
+                    terminal.WriteLine($"  {Loc.Get("petition.warning.acknowledge_slips", warner.Name2)}");
 
                     warner.Memory?.RecordEvent(new MemoryEvent
                     {
@@ -1546,7 +1546,7 @@ namespace UsurperRemake.Systems
 
                 default: // Dismiss
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"\n  {warner.Name2} shrugs. \"Suit yourself. Don't say I didn't warn you.\"");
+                    terminal.WriteLine($"\n  {Loc.Get("petition.warning.dismiss_shrug", warner.Name2)}");
                     break;
             }
 
