@@ -832,6 +832,8 @@
   "combat.loot_added_inventory": "Added {0} to your inventory.",
   "combat.loot_ally_picks_up": "{0} picks up {1} — a {2}% upgrade!",
   "combat.loot_armor_power": "  Armor Power: +{0}",
+  "combat.loot_shield_bonus": "  Shield Bonus: +{0}",
+  "combat.loot_block_chance": "  Block Chance: +{0}",
   "combat.loot_attack_power": "  Attack Power: +{0}",
   "combat.loot_boss_drop": "The Boss drops powerful equipment!",
   "combat.loot_cannot_equip": "  You cannot equip this item. {0}",

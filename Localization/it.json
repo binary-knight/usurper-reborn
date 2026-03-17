@@ -831,6 +831,8 @@
   "combat.loot_added_inventory": "{0} aggiunto all'inventario.",
   "combat.loot_ally_picks_up": "{0} raccoglie {1} — un miglioramento del {2}%!",
   "combat.loot_armor_power": "  Potenza Armatura: +{0}",
+  "combat.loot_shield_bonus": "  Bonus Scudo: +{0}",
+  "combat.loot_block_chance": "  Possibilità di blocco: +{0}",
   "combat.loot_attack_power": "  Potenza Attacco: +{0}",
   "combat.loot_boss_drop": "Il Boss lascia cadere equipaggiamento potente!",
   "combat.loot_cannot_equip": "  Non puoi equipaggiare questo oggetto. {0}",

@@ -832,6 +832,8 @@
     "combat.loot_added_inventory":  "Hátizsákba rakod: {0}.",
     "combat.loot_ally_picks_up":  "{0} felveszi a(z) {1}-t — ez {2}%-os javulás!",
     "combat.loot_armor_power":  "  Páncél ereje: +{0}",
+    "combat.loot_shield_bonus": "  Pajzs bónusz: +{0}",
+  "combat.loot_block_chance": "  Blokk esély: +{0}",
     "combat.loot_attack_power":  "  Támadóerő: +{0}",
     "combat.loot_boss_drop":  "A Főnök nagy erejű felszerelést hagyott hátra!",
     "combat.loot_cannot_equip":  "  Nem tudod felszerelni ezt a tárgyat. {0}",

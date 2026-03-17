@@ -827,6 +827,8 @@
   "combat.loot_added_inventory": "{0} añadido a tu inventario.",
   "combat.loot_ally_picks_up": "¡{0} recoge {1} — una mejora del {2}%!",
   "combat.loot_armor_power": "  Poder de Armadura: +{0}",
+  "combat.loot_shield_bonus": "  Bonificación de escudo: +{0}",
+  "combat.loot_block_chance": "  Bloquear probabilidad: +{0}",
   "combat.loot_attack_power": "  Poder de Ataque: +{0}",
   "combat.loot_boss_drop": "¡El Jefe deja caer equipo poderoso!",
   "combat.loot_cannot_equip": "  No puedes equipar este objeto. {0}",
