@@ -703,11 +703,11 @@ public static class LootGenerator
             ("Wooden Buckler", new[] { "All" }, 1, 20, 3),
             ("Iron Buckler", new[] { "All" }, 8, 35, 8),
             ("Steel Buckler", new[] { "All" }, 15, 50, 14),
-            ("Reinforced Shield", new[] { "All" }, 25, 60, 18),
+            ("Reinforced Buckler", new[] { "All" }, 25, 60, 18),
             ("Duelist's Buckler", new[] { "Warrior", "Paladin", "Ranger", "Assassin" }, 30, 70, 22),
-            ("Forged Shield", new[] { "All" }, 35, 70, 28),
+            ("Forged Buckler", new[] { "All" }, 35, 70, 28),
             ("Elven Buckler", new[] { "All" }, 50, 85, 38),
-            ("Runed Shield", new[] { "All" }, 65, 100, 50),
+            ("Runed Buckler", new[] { "All" }, 65, 100, 50),
             ("Phantom Buckler", new[] { "Assassin", "Ranger" }, 70, 100, 55),
 
             // Standard Shields (balanced protection)
@@ -935,20 +935,8 @@ public static class LootGenerator
                 // Fallback to any necklace
                 candidates = ShieldTemplates.ToList();
             }
-            int templateIndex = random.Next(candidates.Count);
-            var template = candidates[templateIndex];
-            WeaponType shieldType = 0;
-            if (templateIndex < 9)
-            {
-                shieldType = WeaponType.Buckler;
-            } else if (templateIndex < 18)
-            {
-                shieldType = WeaponType.Shield;
-            } else
-            {
-                shieldType = WeaponType.TowerShield;
-            }
-            return CreateShieldFromTemplate(template, shieldType, dungeonLevel, rarity);
+            var template = candidates[random.Next(candidates.Count)];
+            return CreateShieldFromTemplate(template, dungeonLevel, rarity);
         }
 
         /// <summary>
@@ -1643,7 +1631,6 @@ public static class LootGenerator
 
         private static Item CreateShieldFromTemplate(
             (string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower) template,
-            WeaponType shieldType,
             int level,
             ItemRarity rarity)
         {
@@ -1656,6 +1643,7 @@ public static class LootGenerator
             int finalPower = basePower + random.Next(-variance, variance + 1);
             finalPower = Math.Max(2, finalPower);
 
+            WeaponType shieldType = ShopItemGenerator.InferShieldType(template.Name);
             var (shieldBonus, blockChance) = RollShieldStats(shieldType, finalPower, rarity);
 
             // Shields are worth about as much as weapons
