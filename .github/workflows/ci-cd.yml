@@ -1001,47 +1001,10 @@ jobs:
 
           echo "✅ WezTerm bundled into Steam depots"
 
-      - name: Patch WezTerm icon for Steam (macOS)
-        run: |
-          WEZAPP="steam-build/depot-macos/wezterm/WezTerm.app"
-          if [ -d "$WEZAPP" ]; then
-            # Convert app.ico to .icns using sips (not available on Linux CI)
-            # Instead, use png2icns or iconutil approach:
-            # 1. Extract a 256x256 PNG from the ICO using ImageMagick
-            # 2. Build .icns from the PNG
-            sudo apt-get install -y -qq icnsutils imagemagick > /dev/null 2>&1
-
-            # Extract largest icon from ICO as PNG
-            convert "app.ico[0]" -resize 256x256 /tmp/icon_256.png 2>/dev/null || true
-
-            if [ -f "/tmp/icon_256.png" ]; then
-              # Generate multiple sizes for .icns
-              for size in 16 32 64 128 256 512; do
-                convert /tmp/icon_256.png -resize ${size}x${size} /tmp/icon_${size}x${size}.png 2>/dev/null || true
-              done
-
-              # Build .icns from PNGs
-              png2icns /tmp/usurper.icns /tmp/icon_16x16.png /tmp/icon_32x32.png /tmp/icon_128x128.png /tmp/icon_256x256.png 2>/dev/null || true
-
-              if [ -f "/tmp/usurper.icns" ]; then
-                # Replace WezTerm's icon in the app bundle
-                ICNS_PATH=$(find "$WEZAPP/Contents/Resources" -name "*.icns" -type f 2>/dev/null | head -1)
-                if [ -n "$ICNS_PATH" ]; then
-                  cp /tmp/usurper.icns "$ICNS_PATH"
-                  echo "✅ Steam macOS WezTerm icon patched (replaced $(basename $ICNS_PATH))"
-                else
-                  cp /tmp/usurper.icns "$WEZAPP/Contents/Resources/WezTerm.icns"
-                  echo "✅ Steam macOS WezTerm icon added as WezTerm.icns"
-                fi
-              else
-                echo "⚠️ icns generation failed (non-critical)"
-              fi
-            else
-              echo "⚠️ ICO to PNG conversion failed (non-critical)"
-            fi
-          else
-            echo "⚠️ WezTerm.app not found, skipping icon patch"
-          fi
+      # NOTE: macOS WezTerm icon patching REMOVED in v0.53.1
+      # Modifying any file inside a .app bundle invalidates its code signature,
+      # causing macOS Gatekeeper to block it with "WezTerm is damaged" error.
+      # Windows icon patching (rcedit) is fine — PE modification doesn't have this issue.
 
       - name: Patch WezTerm icon for Steam (Windows)
         run: |
