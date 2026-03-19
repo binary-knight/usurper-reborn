@@ -517,6 +517,7 @@ public class ArmorShopLocation : BaseLocation
             CharacterClass.Bard => "Brd",
             CharacterClass.Alchemist => "Alc",
             CharacterClass.Jester => "Jst",
+            CharacterClass.MysticShaman => "Sha",
             _ => c.ToString().Substring(0, 3),
         });
         return string.Join("/", abbrevs);

@@ -799,6 +799,16 @@ public class LevelMasterLocation : BaseLocation
                 player.BaseMaxMana += 12;
                 break;
 
+            case CharacterClass.MysticShaman:
+                player.BaseStrength += 3;
+                player.BaseDefence += 2;
+                player.BaseIntelligence += 3;
+                player.BaseConstitution += 2;
+                player.BaseStamina += 2;
+                player.BaseAgility += 1;
+                player.BaseMaxMana += 8;
+                break;
+
             default:
                 // Fallback for any undefined class
                 player.BaseStrength += 2;
@@ -965,6 +975,15 @@ public class LevelMasterLocation : BaseLocation
                 expSta  += levelsGained * 2;
                 expHP   += levelsGained * 6;
                 expMana += levelsGained * 12;
+                break;
+            case CharacterClass.MysticShaman:
+                expStr  += levelsGained * 3;
+                expDef  += levelsGained * 2;
+                expInt  += levelsGained * 3;
+                expCon  += levelsGained * 2;
+                expSta  += levelsGained * 2;
+                expAgi  += levelsGained;
+                expMana += levelsGained * 8;
                 break;
             default:
                 expStr  += levelsGained * 2;

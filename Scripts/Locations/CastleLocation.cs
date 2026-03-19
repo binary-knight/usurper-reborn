@@ -1314,6 +1314,10 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.executed_confirm", name));
             terminal.WriteLine(Loc.Get("castle.darkness_increases"));
             NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} executed {name}!");
+
+            // Prevent save cheesing — persist negative outcomes immediately
+            if (DoorMode.IsOnlineMode)
+                _ = GameEngine.Instance.SaveCurrentGame();
         }
         else
         {

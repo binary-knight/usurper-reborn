@@ -9737,6 +9737,7 @@
   "street_encounter.murder.faction_drop": "  Tu reputación con {0} ha caido drasticamente!",
   "_comment_opening_story": "=== Sistema de Historia Inicial ===",
   "opening_story.skip_hint": "Presiona ESPACIO para avanzar en cualquier momento",
+  "opening_story.skip_hint_enter": "Presiona ENTER para avanzar en cualquier momento",
   "opening_story.the_awakening": "EL DESPERTAR",
   "opening_story.letter_title": "Una Carta para Ti Mismo",
   "opening_story.parchment_crumbles": "El pergamino se desmorona en tus manos.",

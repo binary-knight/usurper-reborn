@@ -1227,15 +1227,27 @@ namespace UsurperRemake.Systems
         /// </summary>
         private CharacterClass PickWeightedClass(CharacterRace race)
         {
-            int classCount = 11; // Alchemist(0) through Warrior(10)
+            int baseClassCount = 11; // Alchemist(0) through Warrior(10)
+
+            // MysticShaman (enum 16) is eligible for Troll, Orc, Gnoll
+            bool shamanEligible = race == CharacterRace.Troll || race == CharacterRace.Orc || race == CharacterRace.Gnoll;
+
+            // Build the list of class indices to consider
+            var classIndices = new List<int>();
+            for (int i = 0; i < baseClassCount; i++)
+                classIndices.Add(i);
+            if (shamanEligible)
+                classIndices.Add((int)CharacterClass.MysticShaman);
 
             // Count alive NPCs per class
             var aliveNPCs = spawnedNPCs.Where(n => n.IsAlive && !n.IsDead && !n.IsPermaDead).ToList();
-            var classCounts = new int[classCount];
+            var classCounts = new Dictionary<int, int>();
+            foreach (var idx in classIndices)
+                classCounts[idx] = 0;
             foreach (var npc in aliveNPCs)
             {
                 int idx = (int)npc.Class;
-                if (idx >= 0 && idx < classCount)
+                if (classCounts.ContainsKey(idx))
                     classCounts[idx]++;
             }
 
@@ -1244,11 +1256,11 @@ namespace UsurperRemake.Systems
 
             // Build weighted list: weight = max(1, targetPerClass - currentCount)
             // Target is equal share of the population
-            int targetPerClass = Math.Max(3, aliveNPCs.Count / classCount);
-            var weights = new double[classCount];
+            int targetPerClass = Math.Max(3, aliveNPCs.Count / classIndices.Count);
+            var weights = new Dictionary<int, double>();
             double totalWeight = 0;
 
-            for (int i = 0; i < classCount; i++)
+            foreach (var i in classIndices)
             {
                 var cls = (CharacterClass)i;
                 if (invalidClasses != null && invalidClasses.Contains(cls))
@@ -1263,21 +1275,21 @@ namespace UsurperRemake.Systems
                 totalWeight += weights[i];
             }
 
-            // Fallback: if no valid classes (shouldn't happen), pure random
+            // Fallback: if no valid classes (shouldn't happen), pure random from base classes
             if (totalWeight <= 0)
-                return (CharacterClass)random.Next(classCount);
+                return (CharacterClass)random.Next(baseClassCount);
 
             // Weighted random selection
             double roll = random.NextDouble() * totalWeight;
             double cumulative = 0;
-            for (int i = 0; i < classCount; i++)
+            foreach (var i in classIndices)
             {
-                cumulative += weights[i];
+                cumulative += weights.GetValueOrDefault(i, 0);
                 if (roll < cumulative)
                     return (CharacterClass)i;
             }
 
-            return (CharacterClass)random.Next(classCount);
+            return (CharacterClass)random.Next(baseClassCount);
         }
 
         private static string ToRomanNumeral(int number)

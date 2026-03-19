@@ -695,9 +695,15 @@ public class DormitoryLocation : BaseLocation
             }
 
             // Steal 1 random item
-            string stolenItemName = await StealRandomItem(backend, target.Username, victimSave);
-            if (stolenItemName != null)
+            var (stolenItemName, stolenEquipment) = await StealRandomItem(backend, target.Username, victimSave);
+            if (stolenItemName != null && stolenEquipment != null)
+            {
+                // Add the stolen equipment to the attacker's inventory
+                EquipmentDatabase.RegisterDynamic(stolenEquipment);
+                var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(stolenEquipment);
+                currentPlayer.Inventory.Add(legacyItem);
                 terminal.WriteLine(Loc.Get("dormitory.also_take_item", stolenItemName), "yellow");
+            }
 
             // Apply XP loss to victim
             long xpLoss = (long)(victimSave.Player.Experience * GameConfig.SleeperXPLossPercent / 100.0);
@@ -736,12 +742,12 @@ public class DormitoryLocation : BaseLocation
         await terminal.WaitForKeyPress();
     }
 
-    private async Task<string?> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
+    private async Task<(string? name, Equipment? equipment)> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
     {
         try
         {
             var playerData = saveData.Player;
-            if (playerData == null) return null;
+            if (playerData == null) return (null, null);
 
             // Collect stealable dynamic equipment (these have names)
             var stealable = new List<(int index, string name)>();
@@ -755,11 +761,38 @@ public class DormitoryLocation : BaseLocation
                 }
             }
 
-            if (stealable.Count == 0) return null;
+            if (stealable.Count == 0) return (null, null);
 
             // Pick a random item
             var (index, name) = stealable[rng.Next(stealable.Count)];
             var stolenEquip = playerData.DynamicEquipment![index];
+
+            // Build an Equipment object from the save data before removing it
+            var equipment = new Equipment
+            {
+                Id = stolenEquip.Id,
+                Name = stolenEquip.Name ?? name,
+                Slot = (EquipmentSlot)(stolenEquip.Slot),
+                Handedness = (WeaponHandedness)(stolenEquip.Handedness),
+                WeaponType = (WeaponType)(stolenEquip.WeaponType),
+                WeaponPower = stolenEquip.WeaponPower,
+                ArmorClass = stolenEquip.ArmorClass,
+                ShieldBonus = stolenEquip.ShieldBonus,
+                BlockChance = stolenEquip.BlockChance,
+                DefenceBonus = stolenEquip.DefenceBonus,
+                StrengthBonus = stolenEquip.StrengthBonus,
+                DexterityBonus = stolenEquip.DexterityBonus,
+                AgilityBonus = stolenEquip.AgilityBonus,
+                ConstitutionBonus = stolenEquip.ConstitutionBonus,
+                IntelligenceBonus = stolenEquip.IntelligenceBonus,
+                WisdomBonus = stolenEquip.WisdomBonus,
+                CharismaBonus = stolenEquip.CharismaBonus,
+                MaxHPBonus = stolenEquip.MaxHPBonus,
+                MaxManaBonus = stolenEquip.MaxManaBonus,
+                Value = stolenEquip.Value,
+                IsIdentified = true,
+                MinLevel = stolenEquip.MinLevel
+            };
 
             // Also remove from equipped slots if this item is equipped
             if (playerData.EquippedItems != null)
@@ -777,12 +810,12 @@ public class DormitoryLocation : BaseLocation
             // Write modified save back
             await backend.WriteGameData(username, saveData);
 
-            return name;
+            return (name, equipment);
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("DORMITORY", $"Failed to steal item from {username}: {ex.Message}");
-            return null;
+            return (null, null);
         }
     }
 

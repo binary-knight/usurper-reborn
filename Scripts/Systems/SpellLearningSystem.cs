@@ -35,7 +35,7 @@ public static class SpellLearningSystem
         {
             terminal.ClearScreen();
             UIHelper.WriteSectionHeader(terminal, Loc.Get("spell_learning.header"), "bright_magenta");
-            terminal.WriteLine($"{Loc.Get("status.class")}: {player.Class} | {Loc.Get("ui.level")}: {player.Level} | {Loc.Get("ui.stat_mana")}: {player.Mana}/{player.MaxMana}", "cyan");
+            terminal.WriteLine($"{Loc.Get("status.class")}: {player.ClassName} | {Loc.Get("ui.level")}: {player.Level} | {Loc.Get("ui.stat_mana")}: {player.Mana}/{player.MaxMana}", "cyan");
             terminal.WriteLine("");
 
             // Show current quickbar

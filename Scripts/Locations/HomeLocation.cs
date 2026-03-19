@@ -4058,6 +4058,9 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.upgrade_craftsmen"));
             await Task.Delay(1500);
             terminal.WriteLine(Loc.Get("home.upgrade_home_done"));
+
+            // Save immediately after upgrade to prevent data loss on disconnect
+            _ = GameEngine.Instance.SaveCurrentGame();
         }
         else
         {

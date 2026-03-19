@@ -9132,14 +9132,14 @@ public class DungeonLocation : BaseLocation
         // Show current dungeon party
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.current_dungeon_party"));
-        terminal.WriteLine($"  1. {player.DisplayName} (You) - Level {player.Level} {player.Class}");
+        terminal.WriteLine($"  1. {player.DisplayName} (You) - Level {player.Level} {player.ClassName}");
         for (int i = 0; i < teammates.Count; i++)
         {
             var tm = teammates[i];
             string status = tm.IsAlive ? $"{Loc.Get("combat.bar_hp")}: {tm.HP}/{tm.MaxHP}" : Loc.Get("combat.injured");
             string tag = tm.IsGroupedPlayer ? " [Player]" : "";
             if (tm.IsGroupedPlayer) terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {i + 2}. {tm.DisplayName}{tag} - Level {tm.Level} {tm.Class} - {status}");
+            terminal.WriteLine($"  {i + 2}. {tm.DisplayName}{tag} - Level {tm.Level} {tm.ClassName} - {status}");
             if (tm.IsGroupedPlayer) terminal.SetColor("cyan");
         }
         terminal.WriteLine("");
@@ -9219,7 +9219,7 @@ public class DungeonLocation : BaseLocation
                 if (isSpouse)
                 {
                     terminal.SetColor("bright_magenta");
-                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} (Spouse) - Level {npc.Level} {npc.Class} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} (Spouse) - Level {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
@@ -9227,14 +9227,14 @@ public class DungeonLocation : BaseLocation
                 else if (isLover)
                 {
                     terminal.SetColor("magenta");
-                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} (Lover) - Level {npc.Level} {npc.Class} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} (Lover) - Level {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
                 }
                 else
                 {
-                    terminal.Write($"  [{i + 1}] {npc.DisplayName} - Level {npc.Level} {npc.Class} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.Write($"  [{i + 1}] {npc.DisplayName} - Level {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
@@ -9418,7 +9418,7 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.Write($"{tm.DisplayName} ");
                 terminal.SetColor("gray");
-                terminal.Write($"Lv{tm.Level} {tm.Class}  ");
+                terminal.Write($"Lv{tm.Level} {tm.ClassName}  ");
                 terminal.SetColor(hpColor);
                 terminal.Write($"HP:{tm.HP}/{tm.MaxHP}");
                 if (tm.IsManaClass)
@@ -9501,7 +9501,7 @@ public class DungeonLocation : BaseLocation
 
             // Show target's stats
             terminal.SetColor("white");
-            terminal.WriteLine($"  Level: {target.Level}  Class: {target.Class}  Race: {target.Race}");
+            terminal.WriteLine($"  Level: {target.Level}  Class: {target.ClassName}  Race: {target.Race}");
             string hpColor = target.HP < target.MaxHP * 0.3 ? "red" : target.HP < target.MaxHP * 0.7 ? "yellow" : "bright_green";
             terminal.SetColor(hpColor);
             terminal.Write($"  HP: {target.HP}/{target.MaxHP}");
@@ -9688,6 +9688,19 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {message}");
             }
+
+            // Sync equipment and save — prevents item loss on disconnect
+            if (target.IsCompanion)
+                CompanionSystem.Instance?.SyncCompanionEquipment(target);
+            _ = GameEngine.Instance.SaveCurrentGame();
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+                    catch { /* best-effort */ }
+                });
+            }
         }
         else
         {
@@ -9762,6 +9775,19 @@ public class DungeonLocation : BaseLocation
 
         var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(selectedItem);
         currentPlayer.Inventory.Add(legacyItem);
+
+        // Sync equipment and save — prevents item loss on disconnect
+        if (target.IsCompanion)
+            CompanionSystem.Instance?.SyncCompanionEquipment(target);
+        _ = GameEngine.Instance.SaveCurrentGame();
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+                catch { /* best-effort */ }
+            });
+        }
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
@@ -9866,7 +9892,7 @@ public class DungeonLocation : BaseLocation
         {
             var tm = teammates[i];
             string tag = tm.IsGroupedPlayer ? " [Player]" : "";
-            terminal.WriteLine($"  {i + 2}. {tm.DisplayName}{tag} - Level {tm.Level} {tm.Class}");
+            terminal.WriteLine($"  {i + 2}. {tm.DisplayName}{tag} - Level {tm.Level} {tm.ClassName}");
         }
         terminal.SetColor("white");
         var input = await terminal.GetInput(Loc.Get("dungeon.enter_party_remove", teammates.Count + 1));
@@ -9951,7 +9977,7 @@ public class DungeonLocation : BaseLocation
 
             // Slot 0 — Player
             terminal.SetColor("bright_white");
-            string youLabel = $"  [0] You ({player.Class} Lv.{player.Level})";
+            string youLabel = $"  [0] You ({player.ClassName} Lv.{player.Level})";
             terminal.Write(youLabel.PadRight(40));
             terminal.SetColor("bright_green");
             terminal.WriteLine($": {player.TeamXPPercent[0],3}%");
@@ -9967,7 +9993,7 @@ public class DungeonLocation : BaseLocation
                     var tm = xpTeammates[i];
                     string tmLabel = tm.IsCompanion
                         ? $"  [{slotIndex}] {tm.DisplayName} (Companion Lv.{tm.Level})"
-                        : $"  [{slotIndex}] {tm.DisplayName} (Lv.{tm.Level} {tm.Class})";
+                        : $"  [{slotIndex}] {tm.DisplayName} (Lv.{tm.Level} {tm.ClassName})";
                     terminal.SetColor("cyan");
                     terminal.Write(tmLabel.PadRight(40));
                     terminal.SetColor("bright_green");
@@ -15736,7 +15762,7 @@ public class DungeonLocation : BaseLocation
             case "stats":
             case "status":
                 term.SetColor("bright_cyan");
-                term.WriteLine($"  {player.DisplayName} — Level {player.Level} {player.Race} {player.Class}");
+                term.WriteLine($"  {player.DisplayName} — Level {player.Level} {player.Race} {player.ClassName}");
                 term.SetColor("white");
                 term.WriteLine($"  HP: {player.HP}/{player.MaxHP}  Mana: {player.Mana}/{player.MaxMana}  Sta: {player.CurrentCombatStamina}/{player.Stamina}");
                 term.SetColor("gray");
@@ -15800,7 +15826,7 @@ public class DungeonLocation : BaseLocation
                             ? (GameConfig.ScreenReaderMode ? "*" : "\u001b[1;33m★\u001b[0m")
                             : (GameConfig.ScreenReaderMode ? "-" : "·");
                         string suffix = isMe ? " \u001b[36m(you)\u001b[0m" : "";
-                        term.WriteLine($"  {prefix} \u001b[{mhpColor}m{memberPlayer.DisplayName}\u001b[0m Lv{memberPlayer.Level} {memberPlayer.Class} — HP:{memberPlayer.HP}/{memberPlayer.MaxHP} ({mhpPct}%) MP:{memberPlayer.Mana}/{memberPlayer.MaxMana}{suffix}");
+                        term.WriteLine($"  {prefix} \u001b[{mhpColor}m{memberPlayer.DisplayName}\u001b[0m Lv{memberPlayer.Level} {memberPlayer.ClassName} — HP:{memberPlayer.HP}/{memberPlayer.MaxHP} ({mhpPct}%) MP:{memberPlayer.Mana}/{memberPlayer.MaxMana}{suffix}");
                     }
                 }
                 return true;
@@ -16123,7 +16149,7 @@ public class DungeonLocation : BaseLocation
         term.SetColor("white");
         term.WriteLine($"  {player.DisplayName}");
         term.SetColor("gray");
-        term.WriteLine($"  Level {player.Level} {player.Race} {player.Class}");
+        term.WriteLine($"  Level {player.Level} {player.Race} {player.ClassName}");
         term.WriteLine("");
 
         // HP bar

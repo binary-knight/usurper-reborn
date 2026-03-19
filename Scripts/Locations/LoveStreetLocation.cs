@@ -984,7 +984,7 @@ public class LoveStreetLocation : BaseLocation
                 };
                 var profile = npc.Brain?.Personality;
                 string hint = profile != null ? $", {GetPersonalityHint(profile)}" : "";
-                WriteSRMenuOption($"{i + 1}", $"{npc.Name}, Lv{npc.Level} {npc.Race} {npc.Class}{tag}{hint}");
+                WriteSRMenuOption($"{i + 1}", $"{npc.Name}, Lv{npc.Level} {npc.Race} {npc.ClassName}{tag}{hint}");
             }
             else
             {
@@ -993,7 +993,7 @@ public class LoveStreetLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.Write($"{npc.Name}");
                 terminal.SetColor("gray");
-                terminal.Write($" (Lv{npc.Level} {npc.Race} {npc.Class})");
+                terminal.Write($" (Lv{npc.Level} {npc.Race} {npc.ClassName})");
 
                 // Relationship tag
                 string tag = romanceType switch
@@ -1956,7 +1956,7 @@ public class LoveStreetLocation : BaseLocation
             terminal.SetColor("white");
             terminal.Write($"{npc.Name}");
             terminal.SetColor("gray");
-            terminal.Write($" (Lv{npc.Level} {npc.Race} {npc.Class})");
+            terminal.Write($" (Lv{npc.Level} {npc.Race} {npc.ClassName})");
 
             if (profile != null)
             {

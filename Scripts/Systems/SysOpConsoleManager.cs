@@ -425,7 +425,8 @@ namespace UsurperRemake.Systems
         private static readonly string[] ClassNames = {
             "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",
             "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior",
-            "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver"
+            "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver",
+            "Mystic Shaman"
         };
 
         private async Task ListAndEditPlayers(OnlineAdminConsole admin)

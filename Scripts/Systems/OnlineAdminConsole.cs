@@ -25,7 +25,8 @@ namespace UsurperRemake.Systems
         private static readonly string[] ClassNames = {
             "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",
             "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior",
-            "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver"
+            "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver",
+            "Mystic Shaman"
         };
 
         public OnlineAdminConsole(TerminalEmulator term, SqlSaveBackend sqlBackend)
@@ -292,6 +293,10 @@ namespace UsurperRemake.Systems
                     case CharacterClass.Voidreaver:
                         player.BaseStrength += 5; player.BaseIntelligence += 5; player.BaseDexterity += 4;
                         player.BaseAgility += 3; player.BaseStamina += 2; player.BaseMaxHP += 6; player.BaseMaxMana += 12;
+                        break;
+                    case CharacterClass.MysticShaman:
+                        player.BaseStrength += 3; player.BaseDefence += 2; player.BaseIntelligence += 3;
+                        player.BaseConstitution += 2; player.BaseStamina += 2; player.BaseAgility += 1; player.BaseMaxMana += 8;
                         break;
                     default:
                         player.BaseStrength += 2; player.BaseConstitution += 2; player.BaseMaxHP += 8;

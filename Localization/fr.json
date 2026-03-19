@@ -9737,6 +9737,7 @@
   "street_encounter.murder.faction_drop": "  Votre réputation auprès de {0} a chuté drastiquement!",
   "_comment_opening_story": "=== Système d'histoire d'ouverture ===",
   "opening_story.skip_hint": "Appuyez sur ESPACE pour sauter à tout moment",
+  "opening_story.skip_hint_enter": "Appuyez sur ENTRER pour passer à tout moment",
   "opening_story.the_awakening": "LE RÉVEIL",
   "opening_story.letter_title": "Une lettre à vous-même",
   "opening_story.parchment_crumbles": "Le parchemin se désagrège en poussière entre vos doigts.",

@@ -251,7 +251,7 @@ namespace UsurperRemake.Data
             if (text == null) return "";
             var result = text;
             result = result.Replace("{player_name}", player?.Name2 ?? player?.Name1 ?? "stranger");
-            result = result.Replace("{player_class}", player?.Class.ToString() ?? "adventurer");
+            result = result.Replace("{player_class}", player?.ClassName ?? "adventurer");
             result = result.Replace("{npc_name}", npc?.Name2 ?? npc?.Name1 ?? "someone");
 
             // Player title

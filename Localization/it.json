@@ -9737,6 +9737,7 @@
   "street_encounter.murder.faction_drop": "  La tua reputazione con {0} è crollata drasticamente!",
   "_comment_opening_story": "=== Sistema Storia d'Apertura ===",
   "opening_story.skip_hint": "Premi SPAZIO per saltare avanti in qualsiasi momento",
+  "opening_story.skip_hint_enter": "Premi INVIO per saltare avanti in qualsiasi momento",
   "opening_story.the_awakening": "IL RISVEGLIO",
   "opening_story.letter_title": "Una Lettera a Te Stesso",
   "opening_story.parchment_crumbles": "La pergamena si sgretola in polvere tra le tue mani.",

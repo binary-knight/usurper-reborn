@@ -1643,7 +1643,7 @@ public partial class QuestSystem
 
         var bounty = new Quest
         {
-            Title = Loc.Get("quest.bounty.wanted", target.Name),
+            Title = $"WANTED: {target.Name}",
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Assassin,
@@ -1689,7 +1689,7 @@ public partial class QuestSystem
 
         var bounty = new Quest
         {
-            Title = Loc.Get("quest.bounty.wanted", title),
+            Title = $"WANTED: {title}",
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Monster,
@@ -1738,7 +1738,7 @@ public partial class QuestSystem
 
         var bounty = new Quest
         {
-            Title = Loc.Get("quest.bounty.wanted", playerName),
+            Title = $"WANTED: {playerName}",
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Assassin,
@@ -2168,18 +2168,14 @@ public partial class QuestSystem
     }
 
     /// <summary>
-    /// Ensure equipment quests exist alongside regular quests
+    /// Equipment purchase quests removed — fundamentally broken with procedural shop inventory.
+    /// Items referenced by quest don't match shop-generated items, and turn-in checks fail.
     /// </summary>
     public static void EnsureEquipmentQuestsExist(int playerLevel)
     {
-        var existingCount = questDatabase.Count(q =>
-            q.Initiator == MERCHANT_GUILD_INITIATOR &&
-            !q.Deleted);
-
-        if (existingCount == 0)
-        {
-            RefreshEquipmentQuests(playerLevel);
-        }
+        // Disabled: equipment purchase quests removed in v0.53.0
+        // The quest system referenced static equipment IDs/names but shops generate
+        // procedural inventory each session, so the items never match.
     }
 
     #endregion

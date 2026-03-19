@@ -341,12 +341,16 @@ namespace UsurperRemake.Systems
             else
             {
                 // Neutral children - any base class
-                candidates = new[] {
+                var baseClasses = new List<CharacterClass> {
                     CharacterClass.Warrior, CharacterClass.Magician, CharacterClass.Assassin,
                     CharacterClass.Ranger, CharacterClass.Bard, CharacterClass.Sage,
                     CharacterClass.Cleric, CharacterClass.Alchemist, CharacterClass.Jester,
                     CharacterClass.Barbarian, CharacterClass.Paladin
                 };
+                // MysticShaman available for Troll, Orc, Gnoll children
+                if (race == CharacterRace.Troll || race == CharacterRace.Orc || race == CharacterRace.Gnoll)
+                    baseClasses.Add(CharacterClass.MysticShaman);
+                candidates = baseClasses.ToArray();
             }
 
             // Filter out invalid race/class combos

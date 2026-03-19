@@ -207,7 +207,7 @@ namespace UsurperRemake.Systems
 
             // NPC description
             terminal.SetColor("gray");
-            terminal.WriteLine($"  Level {npc.Level} {npc.Race} {npc.Class}");
+            terminal.WriteLine($"  Level {npc.Level} {npc.Race} {npc.ClassName}");
 
             // Physical description based on gender and traits
             string physicalDesc = GeneratePhysicalDescription(npc);
@@ -1228,7 +1228,7 @@ namespace UsurperRemake.Systems
             {
                 var stories = new[]
                 {
-                    $"I became a {npc.Class} because I had no other choice. My family... it's a long story.",
+                    $"I became a {npc.ClassName} because I had no other choice. My family... it's a long story.",
                     $"Sometimes I wonder if there's more to life than fighting and surviving.",
                     $"I trust you, so I'll tell you - I'm looking for someone I lost long ago.",
                     $"Between you and me? I'm not as tough as I seem. Everyone has their vulnerabilities."
@@ -1239,7 +1239,7 @@ namespace UsurperRemake.Systems
             {
                 var stories = new[]
                 {
-                    $"I've been a {npc.Class} for many years now. It's a living.",
+                    $"I've been a {npc.ClassName} for many years now. It's a living.",
                     $"Not much to tell, really. I do my job and try to stay alive.",
                     $"I came to Dorashire looking for opportunity. Still looking.",
                     $"The usual story - trying to make gold and not die."

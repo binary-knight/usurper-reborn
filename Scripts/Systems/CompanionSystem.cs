@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UsurperRemake.BBS;
 using UsurperRemake.UI;
 using UsurperRemake.Utils;
 
@@ -1073,6 +1074,10 @@ namespace UsurperRemake.Systems
             // Queue Stranger encounter for companion death
             StrangerEncounterSystem.Instance.QueueScriptedEncounter(ScriptedEncounterType.AfterCompanionDeath);
             StrangerEncounterSystem.Instance.RecordGameEvent(StrangerContextEvent.CompanionDied);
+
+            // Prevent save cheesing — persist negative outcomes immediately
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                _ = GameEngine.Instance.SaveCurrentGame();
         }
 
         private string GetLastWords(Companion companion, DeathType type)
@@ -1265,6 +1270,10 @@ namespace UsurperRemake.Systems
             OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.CompanionSacrifice);
 
             OnCompanionDeath?.Invoke(companion.Id, DeathType.ChoiceBased);
+
+            // Prevent save cheesing — persist negative outcomes immediately
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                _ = GameEngine.Instance.SaveCurrentGame();
         }
 
         #endregion

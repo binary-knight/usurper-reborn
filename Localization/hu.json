@@ -9737,6 +9737,7 @@
   "street_encounter.murder.faction_drop": "  A {0} frakcióval való viszonyod jelentősen romlott!",
   "_comment_opening_story": "=== Kezdő Történet Rendszer ===",
   "opening_story.skip_hint": "Nyomd meg a SZÓKÖZT az átugráshoz bármikor",
+  "opening_story.skip_hint_enter": "Nyomd meg az ENTER-t a továbblépéshez bármikor",
   "opening_story.the_awakening": "AZ ÉBREDÉS",
   "opening_story.letter_title": "Levél önmagadnak",
   "opening_story.parchment_crumbles": "A pergamen porrá omlik kezeid között.",

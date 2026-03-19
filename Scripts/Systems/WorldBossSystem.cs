@@ -547,13 +547,16 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_white");
                 terminal.WriteLine($"  {Loc.Get("world_boss.choose_action")}");
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  [A] {Loc.Get("world_boss.action_attack")}  [C] {Loc.Get("world_boss.action_cast")}  [D] {Loc.Get("world_boss.action_defend")}");
-                terminal.WriteLine($"  [I] {Loc.Get("world_boss.action_item")}  [P] {Loc.Get("world_boss.action_power")}  [E] {Loc.Get("world_boss.action_precise")}");
+                terminal.WriteLine($"  A. {Loc.Get("world_boss.action_attack")}");
+                terminal.WriteLine($"  C. {Loc.Get("world_boss.action_cast")}");
+                terminal.WriteLine($"  D. {Loc.Get("world_boss.action_defend")}");
+                terminal.WriteLine($"  I. {Loc.Get("world_boss.action_item")}");
+                terminal.WriteLine($"  P. {Loc.Get("world_boss.action_power")}");
+                terminal.WriteLine($"  E. {Loc.Get("world_boss.action_precise")}");
                 var abilities = ClassAbilitySystem.GetAvailableAbilities(player);
                 if (abilities.Count > 0)
-                    terminal.WriteLine($"  [L] {Loc.Get("world_boss.action_ability")}  [R] {Loc.Get("world_boss.action_retreat")}");
-                else
-                    terminal.WriteLine($"  [R] {Loc.Get("world_boss.action_retreat")}");
+                    terminal.WriteLine($"  L. {Loc.Get("world_boss.action_ability")}  (or 1-9 for quickbar)");
+                terminal.WriteLine($"  R. {Loc.Get("world_boss.action_retreat")}");
             }
             else
             {
@@ -649,6 +652,12 @@ namespace UsurperRemake.Systems
                     break;
 
                 case "L": // Class ability
+                    damage = await ProcessClassAbility(player, terminal, bossDef, bossData, rng, state.AbilityCooldowns);
+                    break;
+
+                // Quickbar shortcuts (1-9) — treat as class ability selection
+                case "1": case "2": case "3": case "4": case "5":
+                case "6": case "7": case "8": case "9":
                     damage = await ProcessClassAbility(player, terminal, bossDef, bossData, rng, state.AbilityCooldowns);
                     break;
 

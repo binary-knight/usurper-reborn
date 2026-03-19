@@ -126,6 +126,13 @@ public class Character
     public bool AutoEquipDisabled { get; set; }      // when true, shop purchases go straight to inventory
     public int[] TeamXPPercent { get; set; } = new int[] { 100, 0, 0, 0, 0 };  // per-slot XP percentage (player + 4 teammates, aggregate <= 100)
     public CharacterClass Class { get; set; }       // class
+
+    /// <summary>Display-friendly class name (handles multi-word names like "Mystic Shaman")</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string ClassName => (int)Class < GameConfig.ClassNames.Length
+        ? GameConfig.ClassNames[(int)Class]
+        : Class.ToString();
+
     public int Loyalty { get; set; }                // loyalty% (0-100)
     public int Haunt { get; set; }                  // how many demons haunt player
     public char Master { get; set; }                // level master player uses
@@ -291,7 +298,8 @@ public class Character
     public bool IsManaClass => Class == CharacterClass.Cleric || Class == CharacterClass.Magician ||
         Class == CharacterClass.Sage || Class == CharacterClass.Tidesworn ||
         Class == CharacterClass.Wavecaller || Class == CharacterClass.Cyclebreaker ||
-        Class == CharacterClass.Abysswarden || Class == CharacterClass.Voidreaver;
+        Class == CharacterClass.Abysswarden || Class == CharacterClass.Voidreaver ||
+        Class == CharacterClass.MysticShaman;
 
     // Combat Stamina System - resource for special abilities
     // Formula: MaxCombatStamina = 50 + (Stamina stat * 2) + (Level * 3) + armor weight bonus
@@ -547,6 +555,16 @@ public class Character
 
     // Calm Waters debuff shield (Wavecaller ability, v0.52.13)
     public int CalmWatersRounds { get; set; } = 0;             // Rounds remaining with debuff resistance shield
+
+    // Mystic Shaman totem state (transient, per-combat)
+    public int ActiveTotemType { get; set; }        // 0 = none, 1-5 = totem type
+    public int ActiveTotemRounds { get; set; }       // Rounds remaining
+    public int ActiveTotemPower { get; set; }         // Totem strength (scales with INT)
+
+    // Mystic Shaman weapon enchantment state (transient, per-combat)
+    public int ShamanEnchantType { get; set; }       // 0 = none, 1=fire, 2=frost, 3=earth, 4=storm
+    public int ShamanEnchantRounds { get; set; }     // Rounds remaining
+    public int ShamanEnchantPower { get; set; }       // Enchant strength (scales with INT)
 
     // Dark Pact buff (Evil Deeds ritual, v0.49.4)
     public int DarkPactCombats { get; set; }
@@ -840,7 +858,13 @@ public class Character
             message += $"Moved {oldEquipment.Name} to inventory. ";
         }
 
-        // Equip the new item
+        // Equip the new item — first remove this item's ID from any other slot
+        // to prevent the same item appearing in multiple slots (corruption guard)
+        foreach (var existingSlot in EquippedItems.Keys.ToList())
+        {
+            if (existingSlot != slot && EquippedItems[existingSlot] == item.Id)
+                EquippedItems.Remove(existingSlot);
+        }
         EquippedItems[slot] = item.Id;
 
         // Apply stats
@@ -1013,6 +1037,20 @@ public class Character
         Agility = BaseAgility;
         WeapPow = 0;
         ArmPow = 0;
+
+        // Guard: detect and fix equipment corruption (same ID in multiple slots)
+        var seenIds = new HashSet<int>();
+        foreach (var slot in EquippedItems.Keys.ToList())
+        {
+            int id = EquippedItems[slot];
+            if (id <= 0) continue;
+            if (!seenIds.Add(id))
+            {
+                // Duplicate ID — remove from this slot
+                EquippedItems.Remove(slot);
+                DebugLogger.Instance?.LogWarning("EQUIP", $"Removed duplicate equipment ID {id} from slot {slot} on {DisplayName}");
+            }
+        }
 
         // Add bonuses from all equipped items
         foreach (var kvp in EquippedItems)
@@ -1879,7 +1917,8 @@ public enum CharacterClass
     Wavecaller,   // Good alignment — support/buffer
     Cyclebreaker, // Neutral alignment — reality manipulator
     Abysswarden,  // Dark alignment — drain/debuff striker
-    Voidreaver    // Evil alignment — glass cannon / self-sacrifice
+    Voidreaver,   // Evil alignment — glass cannon / self-sacrifice
+    MysticShaman  // Tribal caster — totem summoner / weapon enchanter (Troll/Orc/Gnoll only)
 }
 
 /// <summary>

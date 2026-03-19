@@ -949,7 +949,7 @@ public class AdvancedCombatEngine
             case CombatActionType.Status:
                 terminal.WriteLine($"\n{GameConfig.PlayerColor}{Loc.Get("combat.your_status")}{GameConfig.TextColor}");
                 terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP:N0}/{player.MaxHP:N0}  {Loc.Get("combat.bar_mp")}: {player.Mana:N0}/{player.MaxMana:N0}");
-                terminal.WriteLine($"{Loc.Get("ui.level")}: {player.Level}  {Loc.Get("status.class")}: {player.Class}");
+                terminal.WriteLine($"{Loc.Get("ui.level")}: {player.Level}  {Loc.Get("status.class")}: {player.ClassName}");
                 break;
 
             default:

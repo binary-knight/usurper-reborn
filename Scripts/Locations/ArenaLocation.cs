@@ -17,7 +17,9 @@ public class ArenaLocation : BaseLocation
 {
     private static readonly string[] ClassNames = {
         "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",
-        "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior"
+        "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior",
+        "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver",
+        "Mystic Shaman"
     };
 
     public ArenaLocation() : base(GameLocation.Arena,

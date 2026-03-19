@@ -69,10 +69,11 @@ namespace UsurperRemake.Systems
             _skipMode = false;
             _terminal = terminal;
 
-            // Show skip hint
+            // Show skip hint — MUD/BBS uses line input so ENTER is needed, not SPACE
             terminal.Clear();
             terminal.WriteLine("");
-            terminal.WriteLine($"  ({Loc.Get("opening_story.skip_hint")})", "dark_gray");
+            bool isLineInput = UsurperRemake.BBS.DoorMode.IsOnlineMode || UsurperRemake.BBS.DoorMode.IsInDoorMode;
+            terminal.WriteLine($"  ({Loc.Get(isLineInput ? "opening_story.skip_hint_enter" : "opening_story.skip_hint")})", "dark_gray");
             await SkippableDelay(2000);
 
             // Phase 1: The Awakening (mysterious dream-like intro)
@@ -450,7 +451,8 @@ namespace UsurperRemake.Systems
 
             terminal.Clear();
             terminal.WriteLine("");
-            terminal.WriteLine($"  ({Loc.Get("opening_story.skip_hint")})", "dark_gray");
+            bool isLineInput2 = UsurperRemake.BBS.DoorMode.IsOnlineMode || UsurperRemake.BBS.DoorMode.IsInDoorMode;
+            terminal.WriteLine($"  ({Loc.Get(isLineInput2 ? "opening_story.skip_hint_enter" : "opening_story.skip_hint")})", "dark_gray");
             await SkippableDelay(2000);
 
             terminal.Clear();

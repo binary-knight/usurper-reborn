@@ -3557,7 +3557,7 @@ public partial class GameEngine
         if (UsurperRemake.Systems.OnlineStateManager.IsActive)
         {
             var displayName = currentPlayer.Name2 ?? currentPlayer.Name1;
-            var className = currentPlayer.Class.ToString();
+            var className = currentPlayer.ClassName;
             _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
                 $"A new adventurer arrives! {displayName} the {className} begins their journey.", "quest");
             // Update online_players display_name from BBS username to character name
@@ -5292,7 +5292,7 @@ public partial class GameEngine
         if (needsFix)
         {
             UsurperRemake.Systems.DebugLogger.Instance.LogWarning("NPC",
-                $"Fixed corrupted base stats for {npc.Name} (Level {level} {npc.Class}): " +
+                $"Fixed corrupted base stats for {npc.Name} (Level {level} {npc.ClassName}): " +
                 $"STR={npc.BaseStrength}, DEF={npc.BaseDefence}, AGI={npc.BaseAgility}");
         }
     }

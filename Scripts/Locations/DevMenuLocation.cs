@@ -150,7 +150,7 @@ public class DevMenuLocation : BaseLocation
             terminal.WriteLine("  ═══════════════════════════════════════════════════════════════");
         }
         terminal.SetColor("gray");
-        terminal.WriteLine($"  {currentPlayer.DisplayName} | Lvl {currentPlayer.Level} {currentPlayer.Race} {currentPlayer.Class} | HP {currentPlayer.HP}/{currentPlayer.MaxHP} | Mana {currentPlayer.Mana}/{currentPlayer.MaxMana}");
+        terminal.WriteLine($"  {currentPlayer.DisplayName} | Lvl {currentPlayer.Level} {currentPlayer.Race} {currentPlayer.ClassName} | HP {currentPlayer.HP}/{currentPlayer.MaxHP} | Mana {currentPlayer.Mana}/{currentPlayer.MaxMana}");
         terminal.WriteLine($"  Str:{currentPlayer.Strength} Dex:{currentPlayer.Dexterity} Con:{currentPlayer.Constitution} Int:{currentPlayer.Intelligence} Wis:{currentPlayer.Wisdom} Cha:{currentPlayer.Charisma}");
         terminal.WriteLine($"  Sta:{currentPlayer.Stamina} Agi:{currentPlayer.Agility} | WeapPow:{currentPlayer.WeapPow} ArmPow:{currentPlayer.ArmPow} Def:{currentPlayer.Defence}");
         terminal.WriteLine($"  Gold:{currentPlayer.Gold:N0} Bank:{currentPlayer.BankGold:N0} | XP:{currentPlayer.Experience:N0}");
@@ -767,7 +767,7 @@ public class DevMenuLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine($"  Current Class: {currentPlayer.Class}");
+        terminal.WriteLine($"  Current Class: {currentPlayer.ClassName}");
         terminal.WriteLine($"  Current Race:  {currentPlayer.Race}");
         terminal.WriteLine("");
         terminal.WriteLine("  [1] Change Class");
@@ -790,7 +790,7 @@ public class DevMenuLocation : BaseLocation
             if (int.TryParse(classInput, out int classIndex) && classIndex >= 0 && classIndex < classes.Length)
             {
                 currentPlayer.Class = classes[classIndex];
-                terminal.WriteLine($"Class changed to {currentPlayer.Class}", "green");
+                terminal.WriteLine($"Class changed to {currentPlayer.ClassName}", "green");
             }
         }
         else if (choice == "2")
@@ -1794,7 +1794,7 @@ public class DevMenuLocation : BaseLocation
                     foreach (var npc in npcs.Take(30))
                     {
                         string status = npc.IsAlive ? "ALIVE" : "DEAD";
-                        terminal.WriteLine($"  [{idx}] {npc.Name} - Lvl {npc.Level} {npc.Class} @ {npc.CurrentLocation} ({status})");
+                        terminal.WriteLine($"  [{idx}] {npc.Name} - Lvl {npc.Level} {npc.ClassName} @ {npc.CurrentLocation} ({status})");
                         idx++;
                     }
                     if (npcs.Count > 30)

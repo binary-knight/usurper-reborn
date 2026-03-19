@@ -3170,7 +3170,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.SetColor("white");
         terminal.Write($"  {Loc.Get("magic_shop.dark_target")}   ");
         terminal.SetColor("bright_red");
-        terminal.WriteLine($"{targetNPC.Name1} ({targetNPC.Class}, {Loc.Get("magic_shop.dark_level")} {targetNPC.Level})");
+        terminal.WriteLine($"{targetNPC.Name1} ({targetNPC.ClassName}, {Loc.Get("magic_shop.dark_level")} {targetNPC.Level})");
 
         terminal.SetColor("white");
         terminal.Write($"  {Loc.Get("magic_shop.dark_success")}  ");
@@ -3254,6 +3254,10 @@ public partial class MagicShopLocation : BaseLocation
             AchievementSystem.TryUnlock(player, "dark_magician");
             if ((player.Statistics?.TotalDeathSpellsCast ?? 0) >= 5)
                 AchievementSystem.TryUnlock(player, "angel_of_death");
+
+            // Prevent save cheesing — persist negative outcomes immediately
+            if (DoorMode.IsOnlineMode)
+                _ = GameEngine.Instance.SaveCurrentGame();
         }
         else
         {
@@ -3388,7 +3392,7 @@ public partial class MagicShopLocation : BaseLocation
         await Task.Delay(500);
         DisplayMessage("");
         WriteSectionHeader(target.Name1, "cyan");
-        DisplayMessage($"  {Loc.Get("magic_shop.scry_class")} {target.Class}    {Loc.Get("magic_shop.dark_level")}: {target.Level}", "white");
+        DisplayMessage($"  {Loc.Get("magic_shop.scry_class")} {target.ClassName}    {Loc.Get("magic_shop.dark_level")}: {target.Level}", "white");
         DisplayMessage($"  {Loc.Get("magic_shop.scry_status")} {(target.IsDead ? Loc.Get("magic_shop.scry_dead") : Loc.Get("magic_shop.scry_alive"))}", target.IsDead ? "red" : "green");
 
         int rel = RelationshipSystem.GetRelationshipLevel(player, target);

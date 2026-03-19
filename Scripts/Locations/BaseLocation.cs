@@ -3612,7 +3612,7 @@ public abstract class BaseLocation
 
             // Show class/level
             terminal.SetColor("gray");
-            terminal.Write($" - {Loc.Get("base.guard_level")} {npc.Level} {npc.Class}");
+            terminal.Write($" - {Loc.Get("base.guard_level")} {npc.Level} {npc.ClassName}");
 
             // Show relationship status in brackets with color
             terminal.Write(" [");
@@ -3679,7 +3679,7 @@ public abstract class BaseLocation
             // Show NPC info
             terminal.SetColor("gray");
             string sexDisplay = npc.Sex == CharacterSex.Female ? Loc.Get("base.female") : Loc.Get("base.male");
-            terminal.WriteLine($"  {Loc.Get("base.guard_level")} {npc.Level} {npc.Race} {sexDisplay} {npc.Class}");
+            terminal.WriteLine($"  {Loc.Get("base.guard_level")} {npc.Level} {npc.Race} {sexDisplay} {npc.ClassName}");
             terminal.WriteLine($"  {GetAlignmentDisplay(npc)}");
             terminal.WriteLine("");
 
@@ -4324,7 +4324,7 @@ public abstract class BaseLocation
         terminal.SetColor("white");
         terminal.Write(Loc.Get("base.stat_class") + " ");
         terminal.SetColor("bright_green");
-        terminal.Write($"{currentPlayer.Class}");
+        terminal.Write($"{currentPlayer.ClassName}");
         terminal.SetColor("white");
         terminal.Write("  |  " + Loc.Get("base.stat_race") + " ");
         terminal.SetColor("bright_green");
@@ -4580,6 +4580,27 @@ public abstract class BaseLocation
         {
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("base.stat_active_buffs"));
+
+            // Blood Price debuffs (murder weight consequences)
+            if (currentPlayer.MurderWeight >= GameConfig.MurderWeightTier3Threshold)
+            {
+                terminal.SetColor("dark_red");
+                terminal.WriteLine($"  - Blood Price (Mass Murderer): -{(int)(GameConfig.MurderWeightTier3CombatPenalty * 100)}% damage, +{(int)(GameConfig.MurderWeightTier3ShopMarkup * 100)}% shop prices, +{(int)(GameConfig.MurderWeightTier3HealPenalty * 100)}% healer costs");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+            }
+            else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightTier2Threshold)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  - Blood Price (Notorious Killer): -{(int)(GameConfig.MurderWeightTier2CombatPenalty * 100)}% damage, +{(int)(GameConfig.MurderWeightTier2ShopMarkup * 100)}% shop prices");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+            }
+            else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightShopMarkupThreshold)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  - Blood Price (Known Killer): +{(int)(GameConfig.MurderWeightShopMarkupPercent * 100)}% shop prices");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+            }
+
             if (currentPlayer.IsKnighted)
             {
                 terminal.SetColor("bright_yellow");
@@ -4609,6 +4630,17 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  - Lethal Precision: +{(int)(GameConfig.AssassinLethalPrecisionCritBonus * 100)}% crit damage with dagger, +{(int)(GameConfig.AssassinLethalPrecisionPoisonBonus * 100)}% damage vs poisoned targets");
+            }
+            if (currentPlayer.Class == CharacterClass.MysticShaman)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  - Elemental Mastery: +{(int)(GameConfig.ShamanElementalMastery * 100)}% elemental damage per INT point");
+                terminal.WriteLine($"  - Totem Duration: {GameConfig.ShamanTotemBaseDuration} rounds | Enchant Duration: {GameConfig.ShamanEnchantDuration} rounds");
+                if (currentPlayer.ShamanEnchantRounds > 0)
+                {
+                    string enchantName = currentPlayer.ShamanEnchantType switch { 1 => "Flametongue", 2 => "Frostbrand", 3 => "Rockbiter", 4 => "Stormstrike", _ => "Unknown" };
+                    terminal.WriteLine($"  - Active Enchant: {enchantName} ({currentPlayer.ShamanEnchantRounds} rounds remaining)");
+                }
             }
             if (currentPlayer.Class == CharacterClass.Paladin)
             {
@@ -7161,7 +7193,7 @@ public abstract class BaseLocation
             terminal.SetColor(relationColor);
             terminal.Write($"{npc.Name2}");
             terminal.SetColor("gray");
-            terminal.Write($" - Level {npc.Level} {npc.Class}");
+            terminal.Write($" - Level {npc.Level} {npc.ClassName}");
             terminal.Write(" [");
             terminal.SetColor(relationColor);
             terminal.Write(relationText);

@@ -9,8 +9,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.52.14";
-    public const string VersionName = "The Hook";
+    public const string Version = "0.53.0";
+    public const string VersionName = "Ancestral Spirits";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // From Pascal global_maxXX constants
@@ -24,7 +24,7 @@ public static partial class GameConfig
     public const int MaxHittas = 450;            // global_maxhittas (dungeon objects)
     public const int MaxSpells = 25;             // global_maxspells - Expanded from 12 to 25 spells per class
     public const int MaxCombat = 14;             // global_maxcombat
-    public const int MaxClasses = 16;            // global_maxclasses (11 base + 5 NG+ prestige)
+    public const int MaxClasses = 17;            // global_maxclasses (11 base + 5 NG+ prestige + 1 race-locked)
     public const int MaxRaces = 10;              // global_maxraces
     public const int MaxBarrelMasters = 15;      // global_maxbarrelmasters
     public const int MaxInput = 2000000000;      // global_maxinput
@@ -634,6 +634,17 @@ public static partial class GameConfig
     public const int MurderWeightShopMarkupThreshold = 5;       // Shop +20% markup at this weight
     public const float MurderWeightShopMarkupPercent = 0.20f;   // 20% markup
     public const int MurderWeightTeamRefuseThreshold = 4;       // NPCs refuse team at this weight
+
+    // Escalating blood price tiers (v0.53.0)
+    public const float MurderWeightTier2Threshold = 8.0f;       // Tier 2: notorious killer
+    public const float MurderWeightTier2ShopMarkup = 0.50f;     // 50% shop markup
+    public const float MurderWeightTier2CombatPenalty = 0.10f;  // -10% damage (guilt weighs on you)
+    public const float MurderWeightTier3Threshold = 15.0f;      // Tier 3: mass murderer
+    public const float MurderWeightTier3ShopMarkup = 1.00f;     // 100% shop markup (double prices)
+    public const float MurderWeightTier3CombatPenalty = 0.20f;  // -20% damage
+    public const float MurderWeightTier3HealPenalty = 0.50f;    // Healers charge 50% more
+    public const float MurderWeightBountyHunterThreshold = 10.0f; // Bounty hunters start appearing
+    public const int MurderWeightBountyHunterChance = 15;       // 15% chance per dungeon room at tier 3+
     public const int CompanionLossPerMurder = 15;               // Companion loyalty loss per deliberate murder
     public const long BloodConfessionBaseCost = 500;            // Base gold cost for blood absolution
     public const long BloodConfessionCostPerWeight = 200;       // Extra gold per weight point
@@ -864,6 +875,13 @@ public static partial class GameConfig
     // Assassin Lethal Precision passive
     public const float AssassinLethalPrecisionCritBonus = 0.25f;  // Assassin: +25% crit damage when wielding dagger
     public const float AssassinLethalPrecisionPoisonBonus = 0.10f; // Assassin: +10% damage vs poisoned targets
+    // Mystic Shaman constants
+    public const int ShamanTotemBaseDuration = 4;          // Base totem duration in rounds
+    public const float ShamanEnchantBaseDamage = 0.20f;    // Base 20% bonus elemental damage from weapon enchants
+    public const int ShamanEnchantDuration = 5;            // Weapon enchant lasts 5 rounds
+    public const float ShamanTotemHealPercent = 0.10f;     // Healing totem: 10% MaxHP per round
+    public const float ShamanSpiritLinkPercent = 0.15f;    // Spirit Link redistributes 15% HP
+    public const float ShamanElementalMastery = 0.03f;     // +3% elemental damage per INT point
     // Jester Trickster's Luck
     public const int JesterTrickstersLuckChance = 20;        // Jester: 20% chance per attack to proc random bonus
     public const float JesterLuckBonusDamage = 0.50f;        // +50% bonus damage on lucky proc
@@ -966,6 +984,7 @@ public static partial class GameConfig
             CharacterClass.Jester => ArmorWeightClass.Medium,
             CharacterClass.Alchemist => ArmorWeightClass.Medium,
             CharacterClass.Ranger => ArmorWeightClass.Medium,
+            CharacterClass.MysticShaman => ArmorWeightClass.Medium,
             // Tanks & Prestige: All armor types
             _ => ArmorWeightClass.Heavy,
         };
@@ -1417,7 +1436,10 @@ public static partial class GameConfig
         [CharacterClass.Wavecaller] = new() { HP = 4, Strength = 3, Defence = 3, Stamina = 3, Agility = 3, Charisma = 6, Dexterity = 3, Wisdom = 5, Intelligence = 5, Constitution = 3, Mana = 45, MaxMana = 45 },
         [CharacterClass.Cyclebreaker] = new() { HP = 4, Strength = 4, Defence = 4, Stamina = 4, Agility = 4, Charisma = 4, Dexterity = 4, Wisdom = 4, Intelligence = 4, Constitution = 4, Mana = 35, MaxMana = 35 },
         [CharacterClass.Abysswarden] = new() { HP = 4, Strength = 5, Defence = 3, Stamina = 4, Agility = 5, Charisma = 3, Dexterity = 6, Wisdom = 3, Intelligence = 5, Constitution = 4, Mana = 35, MaxMana = 35 },
-        [CharacterClass.Voidreaver] = new() { HP = 3, Strength = 6, Defence = 2, Stamina = 4, Agility = 4, Charisma = 2, Dexterity = 5, Wisdom = 2, Intelligence = 6, Constitution = 3, Mana = 40, MaxMana = 40 }
+        [CharacterClass.Voidreaver] = new() { HP = 3, Strength = 6, Defence = 2, Stamina = 4, Agility = 4, Charisma = 2, Dexterity = 5, Wisdom = 2, Intelligence = 6, Constitution = 3, Mana = 40, MaxMana = 40 },
+
+        // Race-locked class (Troll/Orc/Gnoll only)
+        [CharacterClass.MysticShaman] = new() { HP = 3, Strength = 4, Defence = 3, Stamina = 3, Agility = 3, Charisma = 2, Dexterity = 3, Wisdom = 3, Intelligence = 4, Constitution = 3, Mana = 25, MaxMana = 25 }
     };
 
     // Character Race Bonuses (Pascal USERHUNC.PAS race case statements)
@@ -1465,9 +1487,12 @@ public static partial class GameConfig
         "Human", "Hobbit", "Elf", "Half-Elf", "Dwarf", "Troll", "Orc", "Gnome", "Gnoll", "Mutant"
     };
 
+    // Indexed by CharacterClass enum value (alphabetical: Alchemist=0 ... Warrior=10, then prestige, then Shaman)
     public static readonly string[] ClassNames = {
-        "Warrior", "Paladin", "Ranger", "Assassin", "Bard", "Jester", "Alchemist", "Magician", "Cleric", "Sage", "Barbarian",
-        "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver"
+        "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",      // 0-4
+        "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior", // 5-10
+        "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver", // 11-15
+        "Mystic Shaman"                                                // 16
     };
 
     // Race Descriptions for Character Creation
@@ -1545,26 +1570,29 @@ Wavecaller   - Ocean's harmonics. Support/buffer specialist. Requires Savior end
 Cyclebreaker - Reality manipulator. Balanced versatility. Requires Defiant ending.
 Abysswarden  - Old God prison warden. Drain/debuff striker. Requires Usurper ending.
 Voidreaver   - Void consumer. Extreme glass cannon. Requires Usurper ending.
+
+=== RACE-LOCKED CLASSES ===
+Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc/Gnoll only.
 ";
 
     // Invalid Race/Class Combinations (Pascal validation + expanded restrictions)
     // Based on racial attributes and common-sense fantasy archetypes
     public static readonly Dictionary<CharacterRace, CharacterClass[]> InvalidCombinations = new()
     {
-        // Humans can be anything - jack of all trades
-        // [CharacterRace.Human] = no restrictions
+        // Humans can be anything except race-locked classes
+        [CharacterRace.Human] = new[] { CharacterClass.MysticShaman },
 
-        // Hobbits: Small folk - too small for berserker rage
-        [CharacterRace.Hobbit] = new[] { CharacterClass.Barbarian },
+        // Hobbits: Small folk - too small for berserker rage; no tribal shamanism
+        [CharacterRace.Hobbit] = new[] { CharacterClass.Barbarian, CharacterClass.MysticShaman },
 
-        // Elves: Graceful and magical - poor at brute force classes
-        [CharacterRace.Elf] = new[] { CharacterClass.Barbarian },
+        // Elves: Graceful and magical - poor at brute force classes; no tribal shamanism
+        [CharacterRace.Elf] = new[] { CharacterClass.Barbarian, CharacterClass.MysticShaman },
 
-        // Half-Elves: Versatile like humans - no restrictions
-        // [CharacterRace.HalfElf] = no restrictions
+        // Half-Elves: Versatile like humans except race-locked classes
+        [CharacterRace.HalfElf] = new[] { CharacterClass.MysticShaman },
 
-        // Dwarves: Strong but stubborn, distrust magic - no pure casters
-        [CharacterRace.Dwarf] = new[] { CharacterClass.Magician, CharacterClass.Sage },
+        // Dwarves: Strong but stubborn, distrust magic - no pure casters; no tribal shamanism
+        [CharacterRace.Dwarf] = new[] { CharacterClass.Magician, CharacterClass.Sage, CharacterClass.MysticShaman },
 
         // Trolls: Massive brutes, too stupid for magic or finesse
         [CharacterRace.Troll] = new[] {
@@ -1579,8 +1607,8 @@ Voidreaver   - Void consumer. Extreme glass cannon. Requires Usurper ending.
             CharacterClass.Bard
         },
 
-        // Gnomes: Small and clever - too small for berserker rage
-        [CharacterRace.Gnome] = new[] { CharacterClass.Barbarian },
+        // Gnomes: Small and clever - too small for berserker rage; no tribal shamanism
+        [CharacterRace.Gnome] = new[] { CharacterClass.Barbarian, CharacterClass.MysticShaman },
 
         // Gnolls: Pack hunters, limited intellect
         [CharacterRace.Gnoll] = new[] {
@@ -1588,20 +1616,23 @@ Voidreaver   - Void consumer. Extreme glass cannon. Requires Usurper ending.
             CharacterClass.Cleric, CharacterClass.Alchemist
         },
 
-        // Mutants: Unpredictable - can be anything (chaos incarnate)
-        // [CharacterRace.Mutant] = no restrictions
+        // Mutants: Unpredictable - can be anything except race-locked tribal classes
+        [CharacterRace.Mutant] = new[] { CharacterClass.MysticShaman }
     };
 
     // Restriction reasons for player feedback
     public static readonly Dictionary<CharacterRace, string> RaceRestrictionReasons = new()
     {
-        [CharacterRace.Hobbit] = "Hobbits are too small for the berserker's brutal raging combat style.",
-        [CharacterRace.Elf] = "Elves find brute-force fighting distasteful and beneath them.",
-        [CharacterRace.Dwarf] = "Dwarves distrust arcane magic, preferring steel to spells.",
+        [CharacterRace.Human] = "Humans lack the primal connection to the spirit world needed for tribal shamanism.",
+        [CharacterRace.Hobbit] = "Hobbits are too small for the berserker's brutal raging combat style, and lack the primal connection for shamanism.",
+        [CharacterRace.Elf] = "Elves find brute-force fighting distasteful, and their refined magic traditions are incompatible with primal shamanism.",
+        [CharacterRace.HalfElf] = "Half-Elves lack the primal connection to the spirit world needed for tribal shamanism.",
+        [CharacterRace.Dwarf] = "Dwarves distrust arcane magic, preferring steel to spells, and lack the primal connection for shamanism.",
         [CharacterRace.Troll] = "Trolls lack the intelligence and discipline for most classes.",
         [CharacterRace.Orc] = "Orcs lack the discipline for knightly codes, arcane study, or artistic performance.",
-        [CharacterRace.Gnome] = "Gnomes are too small for the berserker's brutal raging combat style.",
-        [CharacterRace.Gnoll] = "Gnolls lack the intellect for complex magic or holy devotion."
+        [CharacterRace.Gnome] = "Gnomes are too small for the berserker's brutal raging combat style, and lack the primal connection for shamanism.",
+        [CharacterRace.Gnoll] = "Gnolls lack the intellect for complex magic or holy devotion.",
+        [CharacterRace.Mutant] = "Mutants' chaotic nature is incompatible with the ancestral traditions of tribal shamanism."
     };
 
     // NG+ Prestige Classes — set for quick lookup

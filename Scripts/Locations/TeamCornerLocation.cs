@@ -659,7 +659,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 string status = member.IsAlive ? "" : Loc.Get("team.member_dead_tag");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {member.DisplayName} - Level {member.Level} {member.Class}{status}");
+                terminal.WriteLine($"  {member.DisplayName} - Level {member.Level} {member.ClassName}{status}");
             }
         }
     }
@@ -1192,7 +1192,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("status.class")}: {member.Class}");
+        terminal.WriteLine($"{Loc.Get("status.class")}: {member.ClassName}");
         terminal.WriteLine($"{Loc.Get("status.race")}: {member.Race}");
         terminal.WriteLine($"{Loc.Get("ui.level")}: {member.Level}");
 
@@ -1667,7 +1667,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("white");
             terminal.Write($"{member.DisplayName} ");
             terminal.SetColor("gray");
-            terminal.WriteLine($"(Lv {member.Level} {member.Class})");
+            terminal.WriteLine($"(Lv {member.Level} {member.ClassName})");
         }
 
         terminal.WriteLine("");

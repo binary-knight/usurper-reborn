@@ -860,7 +860,7 @@ namespace UsurperRemake.Locations
             for (int i = 0; i < eligibleNPCs.Count; i++)
             {
                 var npc = eligibleNPCs[i];
-                terminal.WriteLine($"  {i + 1}. {npc.Name2} ({npc.Class}, {Loc.Get("ui.level")} {npc.Level})", "bright_cyan");
+                terminal.WriteLine($"  {i + 1}. {npc.Name2} ({npc.ClassName}, {Loc.Get("ui.level")} {npc.Level})", "bright_cyan");
             }
             terminal.WriteLine("");
 

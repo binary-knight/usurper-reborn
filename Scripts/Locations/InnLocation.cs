@@ -1108,18 +1108,19 @@ public class InnLocation : BaseLocation
         }
 
         // Show NPCs with interaction options
+        int displayCount = Math.Min(npcsHere.Count, 8);
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("inn.patrons_following"));
+        terminal.WriteLine($"{Loc.Get("inn.patrons_following")} ({displayCount})");
         terminal.WriteLine("");
 
-        for (int i = 0; i < Math.Min(npcsHere.Count, 8); i++)
+        for (int i = 0; i < displayCount; i++)
         {
             var npc = npcsHere[i];
             var alignColor = npc.Darkness > npc.Chivalry ? "red" : (npc.Chivalry > 500 ? "bright_green" : "cyan");
             terminal.SetColor(alignColor);
             terminal.WriteLine(IsScreenReader
-                ? $"  {i + 1}. {npc.Name2} - {Loc.Get("inn.npc_level_class", npc.Level, npc.Class)} ({GetAlignmentDisplay(npc)})"
-                : $"  [{i + 1}] {npc.Name2} - {Loc.Get("inn.npc_level_class", npc.Level, npc.Class)} ({GetAlignmentDisplay(npc)})");
+                ? $"  {i + 1}. {npc.Name2} - {Loc.Get("inn.npc_level_class", npc.Level, npc.ClassName)} ({GetAlignmentDisplay(npc)})"
+                : $"  [{i + 1}] {npc.Name2} - {Loc.Get("inn.npc_level_class", npc.Level, npc.ClassName)} ({GetAlignmentDisplay(npc)})");
         }
 
         terminal.WriteLine("");
@@ -1127,9 +1128,9 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(IsScreenReader ? $"0. {Loc.Get("inn.return_to_menu")}" : $"[0] {Loc.Get("inn.return_to_menu")}");
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInput(Loc.Get("inn.choose_patron"));
+        var choice = await terminal.GetInput($"Choose (0-{displayCount}): ");
 
-        if (int.TryParse(choice, out int npcIndex) && npcIndex > 0 && npcIndex <= Math.Min(npcsHere.Count, 8))
+        if (int.TryParse(choice, out int npcIndex) && npcIndex > 0 && npcIndex <= displayCount)
         {
             await InteractWithNPC(npcsHere[npcIndex - 1]);
         }
@@ -2720,55 +2721,60 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.options"));
         terminal.SetColor("white");
 
+        bool sr = GameConfig.ScreenReaderMode;
+
         // Show personal quest option if available
         if (!companion.PersonalQuestStarted && companion.LoyaltyLevel >= 50)
         {
-            terminal.SetColor("bright_yellow");
-            terminal.Write("  [Q]");
-            terminal.SetColor("bright_magenta");
-            terminal.WriteLine($" {Loc.Get("inn.begin_quest", companion.PersonalQuestName)}");
+            if (sr)
+                terminal.WriteLine($"  Q. {Loc.Get("inn.begin_quest", companion.PersonalQuestName)}", "bright_magenta");
+            else
+            {
+                terminal.SetColor("bright_yellow"); terminal.Write("  [Q]");
+                terminal.SetColor("bright_magenta"); terminal.WriteLine($" {Loc.Get("inn.begin_quest", companion.PersonalQuestName)}");
+            }
         }
         else if (companion.PersonalQuestStarted && !companion.PersonalQuestCompleted)
         {
-            terminal.SetColor("bright_yellow");
-            terminal.Write("  [Q]");
-            terminal.SetColor("magenta");
-            terminal.WriteLine($" {Loc.Get("inn.discuss_progress")}");
+            if (sr)
+                terminal.WriteLine($"  Q. {Loc.Get("inn.discuss_progress")}", "magenta");
+            else
+            {
+                terminal.SetColor("bright_yellow"); terminal.Write("  [Q]");
+                terminal.SetColor("magenta"); terminal.WriteLine($" {Loc.Get("inn.discuss_progress")}");
+            }
         }
 
         if (companion.RomanceAvailable)
         {
-            terminal.SetColor("bright_yellow");
-            terminal.Write("  [R]");
-            if (companion.RomancedToday)
-            {
-                terminal.SetColor("dark_gray");
-                terminal.WriteLine($" {Loc.Get("inn.deepen_bond_today")}");
-            }
-            else if (companion.RomanceLevel >= 10)
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine($" {Loc.Get("inn.spend_time_max")}");
-            }
+            string bondLabel = companion.RomancedToday ? Loc.Get("inn.deepen_bond_today")
+                : companion.RomanceLevel >= 10 ? Loc.Get("inn.spend_time_max")
+                : Loc.Get("inn.deepen_bond");
+            string bondColor = companion.RomancedToday ? "dark_gray" : companion.RomanceLevel >= 10 ? "gray" : "bright_magenta";
+            if (sr)
+                terminal.WriteLine($"  R. {bondLabel}", bondColor);
             else
             {
-                terminal.SetColor("bright_magenta");
-                terminal.WriteLine($" {Loc.Get("inn.deepen_bond")}");
+                terminal.SetColor("bright_yellow"); terminal.Write("  [R]");
+                terminal.SetColor(bondColor); terminal.WriteLine($" {bondLabel}");
             }
         }
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write("  [G]");
-        terminal.SetColor("white");
-        terminal.WriteLine($" {Loc.Get("inn.give_a_gift")}");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("  [H]");
-        terminal.SetColor("white");
-        terminal.WriteLine($" {Loc.Get("inn.view_history")}");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("  [E]");
-        terminal.SetColor("white");
-        terminal.WriteLine($" {Loc.Get("inn.manage_equipment")}");
+        if (sr)
+        {
+            terminal.WriteLine($"  G. {Loc.Get("inn.give_a_gift")}", "white");
+            terminal.WriteLine($"  H. {Loc.Get("inn.view_history")}", "white");
+            terminal.WriteLine($"  E. {Loc.Get("inn.manage_equipment")}", "white");
+        }
+        else
+        {
+            terminal.SetColor("bright_yellow"); terminal.Write("  [G]");
+            terminal.SetColor("white"); terminal.WriteLine($" {Loc.Get("inn.give_a_gift")}");
+            terminal.SetColor("bright_yellow"); terminal.Write("  [H]");
+            terminal.SetColor("white"); terminal.WriteLine($" {Loc.Get("inn.view_history")}");
+            terminal.SetColor("bright_yellow"); terminal.Write("  [E]");
+            terminal.SetColor("white"); terminal.WriteLine($" {Loc.Get("inn.manage_equipment")}");
+        }
         terminal.SetColor("bright_yellow");
         terminal.Write("  [A]");
         terminal.SetColor("white");
@@ -3201,7 +3207,7 @@ public class InnLocation : BaseLocation
 
             // Show target's stats
             terminal.SetColor("white");
-            terminal.WriteLine($"  Level: {target.Level}  Class: {target.Class}  Race: {target.Race}");
+            terminal.WriteLine($"  Level: {target.Level}  Class: {target.ClassName}  Race: {target.Race}");
             terminal.WriteLine($"  HP: {target.HP}/{target.MaxHP}  Mana: {target.Mana}/{target.MaxMana}");
             terminal.WriteLine($"  STR: {target.Strength}  DEX: {target.Dexterity}  AGI: {target.Agility}  CON: {target.Constitution}");
             terminal.WriteLine($"  INT: {target.Intelligence}  WIS: {target.Wisdom}  CHA: {target.Charisma}  DEF: {target.Defence}");

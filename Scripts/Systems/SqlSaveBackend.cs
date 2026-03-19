@@ -1349,7 +1349,7 @@ namespace UsurperRemake.Systems
                 cmd.CommandText = @"
                     SELECT COUNT(*) FROM online_players
                     WHERE LOWER(username) = LOWER(@username)
-                      AND last_heartbeat >= datetime('now', '-120 seconds');
+                      AND last_heartbeat >= datetime('now', '-300 seconds');
                 ";
                 cmd.Parameters.AddWithValue("@username", username);
                 var result = await cmd.ExecuteScalarAsync();
@@ -1467,7 +1467,7 @@ namespace UsurperRemake.Systems
                 cmd.CommandText = @"
                     SELECT username, display_name, location, connected_at, last_heartbeat, connection_type
                     FROM online_players
-                    WHERE last_heartbeat >= datetime('now', '-120 seconds')
+                    WHERE last_heartbeat >= datetime('now', '-300 seconds')
                     ORDER BY display_name;
                 ";
 
@@ -1498,7 +1498,7 @@ namespace UsurperRemake.Systems
             {
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM online_players WHERE last_heartbeat < datetime('now', '-120 seconds');";
+                cmd.CommandText = "DELETE FROM online_players WHERE last_heartbeat < datetime('now', '-300 seconds');";
                 var removed = await cmd.ExecuteNonQueryAsync();
                 if (removed > 0)
                 {
@@ -1630,7 +1630,7 @@ namespace UsurperRemake.Systems
                         json_extract(p.player_data, '$.player.nobleTitle') as noble_title
                     FROM players p
                     LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
-                        AND op.last_heartbeat >= datetime('now', '-120 seconds')
+                        AND op.last_heartbeat >= datetime('now', '-300 seconds')
                     WHERE p.is_banned = 0
                         AND p.player_data != '{}'
                         AND LENGTH(p.player_data) > 2
@@ -1754,7 +1754,7 @@ namespace UsurperRemake.Systems
                         json_extract(p.player_data, '$.player.divineBoonConfig') as boon_config
                     FROM players p
                     LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
-                        AND op.last_heartbeat >= datetime('now', '-120 seconds')
+                        AND op.last_heartbeat >= datetime('now', '-300 seconds')
                     WHERE p.is_banned = 0
                         AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
                         AND json_extract(p.player_data, '$.player.isImmortal') = 1
@@ -1804,7 +1804,7 @@ namespace UsurperRemake.Systems
                         CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online
                     FROM players p
                     LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
-                        AND op.last_heartbeat >= datetime('now', '-120 seconds')
+                        AND op.last_heartbeat >= datetime('now', '-300 seconds')
                     WHERE p.is_banned = 0
                         AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
                         AND (json_extract(p.player_data, '$.player.isImmortal') IS NULL
@@ -2113,7 +2113,7 @@ namespace UsurperRemake.Systems
                         CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online
                     FROM players p
                     LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
-                        AND op.last_heartbeat >= datetime('now', '-120 seconds')
+                        AND op.last_heartbeat >= datetime('now', '-300 seconds')
                     ORDER BY p.display_name;
                 ";
                 using var reader = await cmd.ExecuteReaderAsync();
@@ -2247,7 +2247,7 @@ namespace UsurperRemake.Systems
                             SUM(p.total_playtime_minutes) as total_playtime
                         FROM players p
                         LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
-                            AND op.last_heartbeat >= datetime('now', '-120 seconds');
+                            AND op.last_heartbeat >= datetime('now', '-300 seconds');
                     ";
                     using var reader = await cmd.ExecuteReaderAsync();
                     if (await reader.ReadAsync())

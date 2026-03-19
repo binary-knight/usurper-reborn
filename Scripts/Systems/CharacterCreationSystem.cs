@@ -556,12 +556,12 @@ public class CharacterCreationSystem
     /// </summary>
     private void DisplayRaceOption(int number, string raceName, CharacterRace race, string suffix = "")
     {
-        // Get all classes
+        // Get all base classes (including race-locked classes)
         var allClasses = new[] {
             CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Ranger,
             CharacterClass.Assassin, CharacterClass.Bard, CharacterClass.Jester,
             CharacterClass.Alchemist, CharacterClass.Magician, CharacterClass.Cleric,
-            CharacterClass.Sage, CharacterClass.Barbarian
+            CharacterClass.Sage, CharacterClass.Barbarian, CharacterClass.MysticShaman
         };
 
         // Get restricted classes for this race
@@ -609,7 +609,8 @@ public class CharacterCreationSystem
             { CharacterClass.Magician, "Mag" },
             { CharacterClass.Cleric, "Clr" },
             { CharacterClass.Sage, "Sge" },
-            { CharacterClass.Barbarian, "Bar" }
+            { CharacterClass.Barbarian, "Bar" },
+            { CharacterClass.MysticShaman, "Sha" }
         };
 
         return string.Join("/", classes.Select(c => abbreviations[c]));
@@ -812,7 +813,7 @@ public class CharacterCreationSystem
             CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Ranger,
             CharacterClass.Assassin, CharacterClass.Bard, CharacterClass.Jester,
             CharacterClass.Alchemist, CharacterClass.Magician, CharacterClass.Cleric,
-            CharacterClass.Sage, CharacterClass.Barbarian
+            CharacterClass.Sage, CharacterClass.Barbarian, CharacterClass.MysticShaman
         };
         var restricted = GameConfig.InvalidCombinations.ContainsKey(race)
             ? GameConfig.InvalidCombinations[race]
@@ -935,7 +936,7 @@ public class CharacterCreationSystem
             CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Ranger,
             CharacterClass.Assassin, CharacterClass.Bard, CharacterClass.Jester,
             CharacterClass.Alchemist, CharacterClass.Magician, CharacterClass.Cleric,
-            CharacterClass.Sage, CharacterClass.Barbarian
+            CharacterClass.Sage, CharacterClass.Barbarian, CharacterClass.MysticShaman
         };
         var restricted = GameConfig.InvalidCombinations.ContainsKey(race)
             ? GameConfig.InvalidCombinations[race]
@@ -948,8 +949,9 @@ public class CharacterCreationSystem
         }
         else
         {
-            var classNames = available.Select(c => c.ToString());
-            string classList = string.Join(", ", classNames);
+            string GetClassDisplayName(CharacterClass c) => (int)c < GameConfig.ClassNames.Length ? GameConfig.ClassNames[(int)c] : c.ToString();
+            var classNamesList = available.Select(GetClassDisplayName);
+            string classList = string.Join(", ", classNamesList);
             if (($"  {Loc.Get("creation.preview.classes")}  " + classList).Length <= W - 4)
             {
                 CardLine(pad, W, $"  [cyan]{Loc.Get("creation.preview.classes")}  [white]{classList}");
@@ -957,8 +959,8 @@ public class CharacterCreationSystem
             else
             {
                 CardLine(pad, W, $"  [cyan]{Loc.Get("creation.preview.classes")}");
-                var row1 = string.Join(", ", available.Take(available.Count / 2 + 1).Select(c => c.ToString()));
-                var row2 = string.Join(", ", available.Skip(available.Count / 2 + 1).Select(c => c.ToString()));
+                var row1 = string.Join(", ", available.Take(available.Count / 2 + 1).Select(GetClassDisplayName));
+                var row2 = string.Join(", ", available.Skip(available.Count / 2 + 1).Select(GetClassDisplayName));
                 CardLine(pad, W, $"  [white]{row1}");
                 CardLine(pad, W, $"  [white]{row2}");
             }
@@ -1189,7 +1191,9 @@ public class CharacterCreationSystem
         const int RIGHT_W = 38;
         const int CONTENT_ROWS = 18;
 
-        string className = characterClass.ToString();
+        string className = (int)characterClass < GameConfig.ClassNames.Length
+            ? GameConfig.ClassNames[(int)characterClass]
+            : characterClass.ToString();
 
         // ── Row 1: Top border with class name ──
         string title = $" {className.ToUpper()} ";
@@ -1328,7 +1332,7 @@ public class CharacterCreationSystem
         string category = characterClass switch
         {
             CharacterClass.Warrior or CharacterClass.Barbarian or CharacterClass.Paladin => Loc.Get("creation.preview.category.melee"),
-            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester => Loc.Get("creation.preview.category.hybrid"),
+            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester or CharacterClass.MysticShaman => Loc.Get("creation.preview.category.hybrid"),
             CharacterClass.Magician or CharacterClass.Sage or CharacterClass.Cleric or CharacterClass.Alchemist => Loc.Get("creation.preview.category.magic"),
             _ => Loc.Get("creation.preview.category.adventurer")
         };
@@ -1435,13 +1439,15 @@ public class CharacterCreationSystem
         string pad = new string(' ', (80 - W) / 2);
 
         var attrs = GameConfig.ClassStartingAttributes[characterClass];
-        string className = characterClass.ToString();
+        string className = (int)characterClass < GameConfig.ClassNames.Length
+            ? GameConfig.ClassNames[(int)characterClass]
+            : characterClass.ToString();
 
         // Determine class category
         string category = characterClass switch
         {
             CharacterClass.Warrior or CharacterClass.Barbarian or CharacterClass.Paladin => Loc.Get("creation.preview.category.melee"),
-            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester => Loc.Get("creation.preview.category.hybrid"),
+            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester or CharacterClass.MysticShaman => Loc.Get("creation.preview.category.hybrid"),
             CharacterClass.Magician or CharacterClass.Sage or CharacterClass.Cleric or CharacterClass.Alchemist => Loc.Get("creation.preview.category.magic"),
             _ => Loc.Get("creation.preview.category.adventurer")
         };
@@ -1518,7 +1524,7 @@ public class CharacterCreationSystem
             CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Ranger,
             CharacterClass.Assassin, CharacterClass.Bard, CharacterClass.Jester,
             CharacterClass.Alchemist, CharacterClass.Magician, CharacterClass.Cleric,
-            CharacterClass.Sage, CharacterClass.Barbarian
+            CharacterClass.Sage, CharacterClass.Barbarian, CharacterClass.MysticShaman
         };
         var restricted = GameConfig.InvalidCombinations.ContainsKey(race)
             ? GameConfig.InvalidCombinations[race]
@@ -1531,7 +1537,7 @@ public class CharacterCreationSystem
         }
         else
         {
-            terminal.WriteLine($"{Loc.Get("creation.preview.classes")} {string.Join(", ", available.Select(c => c.ToString()))}");
+            terminal.WriteLine($"{Loc.Get("creation.preview.classes")} {string.Join(", ", available.Select(c => (int)c < GameConfig.ClassNames.Length ? GameConfig.ClassNames[(int)c] : c.ToString()))}");
         }
 
         if (restricted.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
@@ -1564,12 +1570,14 @@ public class CharacterCreationSystem
         terminal.Clear();
 
         var attrs = GameConfig.ClassStartingAttributes[characterClass];
-        string className = characterClass.ToString();
+        string className = (int)characterClass < GameConfig.ClassNames.Length
+            ? GameConfig.ClassNames[(int)characterClass]
+            : characterClass.ToString();
 
         string category = characterClass switch
         {
             CharacterClass.Warrior or CharacterClass.Barbarian or CharacterClass.Paladin => Loc.Get("creation.preview.category.melee"),
-            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester => Loc.Get("creation.preview.category.hybrid"),
+            CharacterClass.Ranger or CharacterClass.Assassin or CharacterClass.Bard or CharacterClass.Jester or CharacterClass.MysticShaman => Loc.Get("creation.preview.category.hybrid"),
             CharacterClass.Magician or CharacterClass.Sage or CharacterClass.Cleric or CharacterClass.Alchemist => Loc.Get("creation.preview.category.magic"),
             _ => Loc.Get("creation.preview.category.adventurer")
         };
@@ -1615,6 +1623,7 @@ public class CharacterCreationSystem
         CharacterClass.Sage => Loc.Get("character_creation.class_desc.sage"),
         CharacterClass.Cleric => Loc.Get("character_creation.class_desc.cleric"),
         CharacterClass.Alchemist => Loc.Get("character_creation.class_desc.alchemist"),
+        CharacterClass.MysticShaman => Loc.Get("character_creation.class_desc.mystic_shaman"),
         _ => Loc.Get("character_creation.class_desc.unknown")
     };
 
@@ -1631,6 +1640,7 @@ public class CharacterCreationSystem
         CharacterClass.Sage => Loc.Get("character_creation.class_str.sage"),
         CharacterClass.Cleric => Loc.Get("character_creation.class_str.cleric"),
         CharacterClass.Alchemist => Loc.Get("character_creation.class_str.alchemist"),
+        CharacterClass.MysticShaman => Loc.Get("character_creation.class_str.mystic_shaman"),
         _ => Loc.Get("character_creation.class_str.unknown")
     };
 
@@ -1646,6 +1656,7 @@ public class CharacterCreationSystem
         CharacterClass.Alchemist => 0,
         CharacterClass.Paladin => 0,
         CharacterClass.Bard => 0,
+        CharacterClass.MysticShaman => 10,
         _ => 0
     };
 
@@ -1671,12 +1682,13 @@ public class CharacterCreationSystem
             { 7, CharacterClass.Magician },
             { 8, CharacterClass.Cleric },
             { 9, CharacterClass.Sage },
-            { 10, CharacterClass.Barbarian }
+            { 10, CharacterClass.Barbarian },
+            { 11, CharacterClass.MysticShaman }
         };
 
         // Check for unlocked NG+ prestige classes
         var unlockedPrestige = GetUnlockedPrestigeClasses();
-        int prestigeStartIndex = 11;
+        int prestigeStartIndex = 12;
         // Always map unlocked prestige classes to menu indices
         {
             int idx = prestigeStartIndex;
@@ -1713,6 +1725,7 @@ public class CharacterCreationSystem
                 DisplayClassOption(8, Loc.Get("class.cleric"), CharacterClass.Cleric, restrictedClasses);
                 DisplayClassOption(9, Loc.Get("class.sage"), CharacterClass.Sage, restrictedClasses);
                 DisplayClassOption(10, Loc.Get("class.barbarian"), CharacterClass.Barbarian, restrictedClasses);
+                DisplayClassOption(11, Loc.Get("class.mystic_shaman"), CharacterClass.MysticShaman, restrictedClasses);
 
                 // Always show prestige classes — unlocked ones selectable, locked ones grayed out
                 terminal.WriteLine("");
@@ -1907,7 +1920,7 @@ public class CharacterCreationSystem
             else
                 terminal.WriteLine(Loc.Get("character_creation.stat_roll"), "bright_cyan");
             terminal.WriteLine("");
-            terminal.WriteLine($"{Loc.Get("status.class")}: {character.Class}", "yellow");
+            terminal.WriteLine($"{Loc.Get("status.class")}: {character.ClassName}", "yellow");
             terminal.WriteLine($"{Loc.Get("status.race")}: {GameConfig.RaceNames[(int)character.Race]}", "yellow");
             terminal.WriteLine("");
 
@@ -2251,12 +2264,12 @@ public class CharacterCreationSystem
             CharacterClass.Bard => ("Old Lute", WeaponType.Instrument, WeaponHandedness.OneHanded, 4),
             CharacterClass.Jester => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
             CharacterClass.Alchemist => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
+            CharacterClass.MysticShaman => ("Tribal Mace", WeaponType.Mace, WeaponHandedness.OneHanded, 5),
             _ => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
         };
 
         var weapon = new Equipment
         {
-            Id = 1, // Starting weapon ID
             Name = name,
             Description = $"A basic {name.ToLower()} for new adventurers.",
             Slot = EquipmentSlot.MainHand,
@@ -2268,6 +2281,7 @@ public class CharacterCreationSystem
             Rarity = EquipmentRarity.Common,
         };
 
+        EquipmentDatabase.RegisterDynamic(weapon);
         character.EquipItem(weapon, EquipmentSlot.MainHand, out _);
     }
 
@@ -2283,7 +2297,7 @@ public class CharacterCreationSystem
 
         terminal.WriteLine($"{Loc.Get("ui.name_label")}: {character.Name2}", "cyan");
         terminal.WriteLine($"{Loc.Get("status.race")}: {GameConfig.RaceNames[(int)character.Race]}", "yellow");
-        terminal.WriteLine($"{Loc.Get("status.class")}: {character.Class}", "yellow");
+        terminal.WriteLine($"{Loc.Get("status.class")}: {character.ClassName}", "yellow");
         terminal.WriteLine($"{Loc.Get("character_creation.sex")}: {(character.Sex == CharacterSex.Male ? Loc.Get("character_creation.male") : Loc.Get("character_creation.female"))}", "white");
         terminal.WriteLine($"{Loc.Get("character_creation.age")}: {character.Age}", "white");
         terminal.WriteLine("");

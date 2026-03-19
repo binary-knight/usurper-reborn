@@ -203,8 +203,20 @@ public partial class CombatEngine
         attacker.StatusImmunityDuration = 0;
         attacker.DeathsEmbraceActive = false;
         attacker.StatusLifestealPercent = 0;
+        attacker.ActiveTotemType = 0;
+        attacker.ActiveTotemRounds = 0;
+        attacker.ActiveTotemPower = 0;
+        attacker.ShamanEnchantType = 0;
+        attacker.ShamanEnchantRounds = 0;
+        attacker.ShamanEnchantPower = 0;
         defender.DeathsEmbraceActive = false;
         defender.StatusLifestealPercent = 0;
+        defender.ActiveTotemType = 0;
+        defender.ActiveTotemRounds = 0;
+        defender.ActiveTotemPower = 0;
+        defender.ShamanEnchantType = 0;
+        defender.ShamanEnchantRounds = 0;
+        defender.ShamanEnchantPower = 0;
         abilityCooldowns.Clear();
         pvpDefenderCooldowns.Clear();
         teammateCooldowns.Clear();
@@ -383,6 +395,12 @@ public partial class CombatEngine
         player.StatusImmunityDuration = 0;
         player.DeathsEmbraceActive = false;
         player.StatusLifestealPercent = 0;
+        player.ActiveTotemType = 0;
+        player.ActiveTotemRounds = 0;
+        player.ActiveTotemPower = 0;
+        player.ShamanEnchantType = 0;
+        player.ShamanEnchantRounds = 0;
+        player.ShamanEnchantPower = 0;
         abilityCooldowns.Clear();
         teammateCooldowns.Clear();
 
@@ -1196,7 +1214,10 @@ public partial class CombatEngine
 
             // Process end-of-round effects: decrement ability cooldowns and buff durations
             if (player.IsAlive)
+            {
                 ProcessEndOfRoundAbilityEffects(player);
+                ProcessShamanTotemEffects(player, monsters, result);
+            }
 
             // Short pause between rounds
             await Task.Delay(GetCombatDelay(1000));
@@ -2832,6 +2853,12 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * fatigueDmgPenalty);
         }
 
+        // Blood Price combat penalty — guilt weighs on killers (v0.53.0)
+        if (attacker.MurderWeight >= GameConfig.MurderWeightTier3Threshold)
+            attackPower -= (long)(attackPower * GameConfig.MurderWeightTier3CombatPenalty);
+        else if (attacker.MurderWeight >= GameConfig.MurderWeightTier2Threshold)
+            attackPower -= (long)(attackPower * GameConfig.MurderWeightTier2CombatPenalty);
+
         // Lover's Bliss bonus damage (perfect intimacy match)
         if (attacker.LoversBlissCombats > 0 && attacker.LoversBlissBonus > 0f)
         {
@@ -3046,6 +3073,67 @@ public partial class CombatEngine
 
         // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
         ApplyPostHitEnchantments(attacker, target, actualDamage, result);
+
+        // Mystic Shaman weapon enchantment bonus damage
+        if (attacker.ShamanEnchantType > 0 && attacker.ShamanEnchantRounds > 0)
+        {
+            long enchantDamage = (long)(actualDamage * attacker.ShamanEnchantPower / 100.0);
+            enchantDamage = Math.Max(1, enchantDamage);
+            target.HP = Math.Max(0, target.HP - enchantDamage);
+            result.TotalDamageDealt += enchantDamage;
+
+            string enchantMsg = attacker.ShamanEnchantType switch
+            {
+                1 => Loc.Get("combat.shaman_enchant_fire_hit", enchantDamage),
+                2 => Loc.Get("combat.shaman_enchant_frost_hit", enchantDamage),
+                3 => Loc.Get("combat.shaman_enchant_earth_hit", enchantDamage),
+                4 => Loc.Get("combat.shaman_enchant_storm_hit", enchantDamage),
+                _ => ""
+            };
+            if (!string.IsNullOrEmpty(enchantMsg))
+                terminal.WriteLine($"  {enchantMsg}", attacker.ShamanEnchantType == 1 ? "bright_red" : attacker.ShamanEnchantType == 2 ? "bright_cyan" : attacker.ShamanEnchantType == 3 ? "bright_green" : "bright_yellow");
+
+            // Stormstrike: restore mana on hit
+            if (attacker.ShamanEnchantType == 4)
+            {
+                long manaRestore = Math.Min(5 + attacker.Intelligence / 10, attacker.MaxMana - attacker.Mana);
+                if (manaRestore > 0)
+                {
+                    attacker.Mana += manaRestore;
+                    terminal.WriteLine(Loc.Get("combat.shaman_enchant_storm_mana", manaRestore), "cyan");
+                }
+            }
+
+            // Frostbrand: slow the enemy (reduce defense, matching regular frost enchant)
+            if (attacker.ShamanEnchantType == 2 && target.IsAlive)
+            {
+                target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
+            }
+
+            // Ancestral Guidance: 25% of enchant damage dealt heals the party
+            if (attacker.ActiveTotemType == 6 && attacker.ActiveTotemRounds > 0)
+            {
+                long ancestralHeal = (long)(enchantDamage * attacker.ActiveTotemPower / 100.0);
+                long actualHealAG = Math.Min(ancestralHeal, attacker.MaxHP - attacker.HP);
+                if (actualHealAG > 0)
+                {
+                    attacker.HP += actualHealAG;
+                    terminal.WriteLine(Loc.Get("combat.shaman_ancestral_heal", actualHealAG), "bright_magenta");
+                }
+            }
+        }
+
+        // Ancestral Guidance: 25% of base damage dealt heals the party
+        if (attacker.ActiveTotemType == 6 && attacker.ActiveTotemRounds > 0 && attacker.ShamanEnchantType == 0 && actualDamage > 0)
+        {
+            long ancestralHeal = (long)(actualDamage * attacker.ActiveTotemPower / 100.0);
+            long actualHealAG = Math.Min(ancestralHeal, attacker.MaxHP - attacker.HP);
+            if (actualHealAG > 0)
+            {
+                attacker.HP += actualHealAG;
+                terminal.WriteLine(Loc.Get("combat.shaman_ancestral_heal", actualHealAG), "bright_magenta");
+            }
+        }
 
         // Chance to improve basic attack skill from successful use
         if (TrainingSystem.TryImproveFromUse(attacker, "basic_attack", random))
@@ -3935,6 +4023,12 @@ public partial class CombatEngine
         if (player.IsBloodMoon)
         {
             monsterAttack = (long)(monsterAttack * GameConfig.BloodMoonMonsterBuff);
+        }
+
+        // Earthbind Totem: -20% monster attack
+        if (player.ActiveTotemType == 2 && player.ActiveTotemRounds > 0)
+        {
+            monsterAttack = (long)(monsterAttack * 0.80);
         }
 
         // Show critical hit message
@@ -6619,6 +6713,7 @@ public partial class CombatEngine
 
     private void AutoHealWithPotions(Character player)
     {
+        if (!player.AutoHeal) return;
         if (player.Healing <= 0 || player.HP >= player.MaxHP)
             return;
 
@@ -6660,6 +6755,7 @@ public partial class CombatEngine
     /// </summary>
     private void AutoRestoreManaWithPotions(Character player)
     {
+        if (!player.AutoHeal) return;
         if (player.ManaPotions <= 0 || player.Mana >= player.MaxMana)
             return;
 
@@ -7065,30 +7161,64 @@ public partial class CombatEngine
             followerTerm.WriteLine(Loc.Get("combat.loot_pass_option"));
             followerTerm.WriteLine("");
 
-            // Read input with a 30-second timeout
+            // Read input with a 30-second timeout via CombatInputChannel
+            // (GroupFollowerLoop forwards input here when IsAwaitingCombatInput is set)
             string followerChoice = "P";
             try
             {
                 followerTerm.Write(Loc.Get("ui.your_choice"));
-                var inputTask = followerTerm.GetKeyInput();
-                var completed = await Task.WhenAny(inputTask, Task.Delay(30000));
-                if (completed == inputTask)
+
+                // Use the combat input channel so GroupFollowerLoop forwards input to us
+                if (player.CombatInputChannel != null)
                 {
-                    followerChoice = inputTask.Result.ToUpper();
-                    if (followerChoice == "L") followerChoice = "P";
-                    bool validChoice = followerChoice == "T" || followerChoice == "P"
-                        || (followerChoice == "E" && lootItem.IsIdentified && followerCanUse);
-                    if (!validChoice)
+                    player.IsAwaitingCombatInput = true;
+                    using var cts = new System.Threading.CancellationTokenSource(30000);
+                    try
+                    {
+                        followerChoice = (await player.CombatInputChannel.Reader.ReadAsync(cts.Token)).ToUpper();
+                        if (followerChoice == "L") followerChoice = "P";
+                        bool validChoice = followerChoice == "T" || followerChoice == "P"
+                            || (followerChoice == "E" && lootItem.IsIdentified && followerCanUse);
+                        if (!validChoice)
+                        {
+                            followerTerm.SetColor("yellow");
+                            followerTerm.WriteLine(Loc.Get("combat.loot_invalid_passing"));
+                            followerChoice = "P";
+                        }
+                    }
+                    catch (OperationCanceledException)
                     {
                         followerTerm.SetColor("yellow");
-                        followerTerm.WriteLine(Loc.Get("combat.loot_invalid_passing"));
-                        followerChoice = "P";
+                        followerTerm.WriteLine(Loc.Get("combat.loot_timed_out"));
+                    }
+                    finally
+                    {
+                        player.IsAwaitingCombatInput = false;
                     }
                 }
                 else
                 {
-                    followerTerm.SetColor("yellow");
-                    followerTerm.WriteLine(Loc.Get("combat.loot_timed_out"));
+                    // Fallback for non-grouped or missing channel
+                    var inputTask = followerTerm.GetKeyInput();
+                    var completed = await Task.WhenAny(inputTask, Task.Delay(30000));
+                    if (completed == inputTask)
+                    {
+                        followerChoice = inputTask.Result.ToUpper();
+                        if (followerChoice == "L") followerChoice = "P";
+                        bool validChoice = followerChoice == "T" || followerChoice == "P"
+                            || (followerChoice == "E" && lootItem.IsIdentified && followerCanUse);
+                        if (!validChoice)
+                        {
+                            followerTerm.SetColor("yellow");
+                            followerTerm.WriteLine(Loc.Get("combat.loot_invalid_passing"));
+                            followerChoice = "P";
+                        }
+                    }
+                    else
+                    {
+                        followerTerm.SetColor("yellow");
+                        followerTerm.WriteLine(Loc.Get("combat.loot_timed_out"));
+                    }
                 }
             }
             catch { followerChoice = "P"; }
@@ -10047,6 +10177,74 @@ public partial class CombatEngine
 
                         // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
                         ApplyPostHitEnchantments(player, target, damage, result);
+
+                        // Mystic Shaman weapon enchantment bonus damage
+                        if (player.ShamanEnchantType > 0 && player.ShamanEnchantRounds > 0)
+                        {
+                            long enchantDamage = (long)(damage * player.ShamanEnchantPower / 100.0);
+                            enchantDamage = Math.Max(1, enchantDamage);
+                            target.HP -= (int)enchantDamage;
+                            result.TotalDamageDealt += enchantDamage;
+
+                            string enchantMsg = player.ShamanEnchantType switch
+                            {
+                                1 => Loc.Get("combat.shaman_enchant_fire_hit", enchantDamage),
+                                2 => Loc.Get("combat.shaman_enchant_frost_hit", enchantDamage),
+                                3 => Loc.Get("combat.shaman_enchant_earth_hit", enchantDamage),
+                                4 => Loc.Get("combat.shaman_enchant_storm_hit", enchantDamage),
+                                _ => ""
+                            };
+                            if (!string.IsNullOrEmpty(enchantMsg))
+                                terminal.WriteLine($"  {enchantMsg}", player.ShamanEnchantType == 1 ? "bright_red" : player.ShamanEnchantType == 2 ? "bright_cyan" : player.ShamanEnchantType == 3 ? "bright_green" : "bright_yellow");
+
+                            // Stormstrike: restore mana on hit
+                            if (player.ShamanEnchantType == 4)
+                            {
+                                long manaRestore = Math.Min(5 + player.Intelligence / 10, player.MaxMana - player.Mana);
+                                if (manaRestore > 0)
+                                {
+                                    player.Mana += manaRestore;
+                                    terminal.WriteLine(Loc.Get("combat.shaman_enchant_storm_mana", manaRestore), "cyan");
+                                }
+                            }
+
+                            // Frostbrand: slow the enemy (reduce defense, matching regular frost enchant)
+                            if (player.ShamanEnchantType == 2 && target.IsAlive)
+                            {
+                                target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
+                            }
+
+                            // Ancestral Guidance: 25% of damage dealt heals the party
+                            if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0)
+                            {
+                                long ancestralHeal = (long)(enchantDamage * player.ActiveTotemPower / 100.0);
+                                long actualHeal = Math.Min(ancestralHeal, player.MaxHP - player.HP);
+                                if (actualHeal > 0)
+                                {
+                                    player.HP += actualHeal;
+                                    terminal.WriteLine(Loc.Get("combat.shaman_ancestral_heal", actualHeal), "bright_magenta");
+                                }
+                            }
+
+                            if (target.HP <= 0)
+                            {
+                                target.HP = 0;
+                                if (!result.DefeatedMonsters.Contains(target))
+                                    result.DefeatedMonsters.Add(target);
+                            }
+                        }
+
+                        // Ancestral Guidance: 25% of base damage dealt heals the party
+                        if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0 && player.ShamanEnchantType == 0 && damage > 0)
+                        {
+                            long ancestralHeal = (long)(damage * player.ActiveTotemPower / 100.0);
+                            long actualHeal = Math.Min(ancestralHeal, player.MaxHP - player.HP);
+                            if (actualHeal > 0)
+                            {
+                                player.HP += actualHeal;
+                                terminal.WriteLine(Loc.Get("combat.shaman_ancestral_heal", actualHeal), "bright_magenta");
+                            }
+                        }
                     }
                 }
                 break;
@@ -10523,6 +10721,14 @@ public partial class CombatEngine
                 return;
             }
 
+            // Check mana cost (Mystic Shaman abilities)
+            if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
+            {
+                terminal.WriteLine(Loc.Get("combat.shaman_not_enough_mana", ability.ManaCost, player.Mana), "red");
+                await Task.Delay(GetCombatDelay(1000));
+                return;
+            }
+
             // Check cooldown
             if (abilityCooldowns.TryGetValue(action.AbilityId, out int cd) && cd > 0)
             {
@@ -10533,6 +10739,13 @@ public partial class CombatEngine
 
             // Spend stamina
             player.SpendStamina(ability.StaminaCost);
+
+            // Deduct mana cost if the ability has one (Mystic Shaman abilities)
+            if (ability.ManaCost > 0)
+            {
+                player.Mana -= ability.ManaCost;
+                terminal.WriteLine(Loc.Get("combat.shaman_mana_cost", ability.ManaCost, player.Mana, player.MaxMana), "dark_gray");
+            }
 
             // Execute the ability
             var abilityResult = ClassAbilitySystem.UseAbility(player, action.AbilityId, random);
@@ -10546,9 +10759,18 @@ public partial class CombatEngine
             // Display ability use
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.ability_use", player.Name2, ability.Name, ability.StaminaCost));
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("combat.ability_stamina", player.CurrentCombatStamina, player.MaxCombatStamina));
+            if (ability.ManaCost > 0)
+            {
+                terminal.WriteLine($"\u00bb {player.Name2} uses {ability.Name}! (-{ability.ManaCost} mana)");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  (Mana: {player.Mana}/{player.MaxMana})");
+            }
+            else
+            {
+                terminal.WriteLine(Loc.Get("combat.ability_use", player.Name2, ability.Name, ability.StaminaCost));
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("combat.ability_stamina", player.CurrentCombatStamina, player.MaxCombatStamina));
+            }
             await Task.Delay(GetCombatDelay(500));
 
             // Get target for damage abilities
@@ -12533,6 +12755,118 @@ public partial class CombatEngine
                 }
                 break;
             }
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // MYSTIC SHAMAN ABILITIES (multi-monster)
+            // ═══════════════════════════════════════════════════════════════════════
+
+            case "shaman_enchant_fire":
+                player.ShamanEnchantType = 1;
+                player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
+                player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_fire", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_red");
+                break;
+
+            case "shaman_enchant_frost":
+                player.ShamanEnchantType = 2;
+                player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
+                player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_frost", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_cyan");
+                break;
+
+            case "shaman_enchant_earth":
+                player.ShamanEnchantType = 3;
+                player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
+                player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
+                player.TempDefenseBonus += abilityResult.DefenseBonus;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, GameConfig.ShamanEnchantDuration);
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_earth", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration), "bright_green");
+                break;
+
+            case "shaman_enchant_storm":
+                player.ShamanEnchantType = 4;
+                player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
+                player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_storm", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_yellow");
+                break;
+
+            case "shaman_totem_healing":
+                player.ActiveTotemType = 1;
+                player.ActiveTotemRounds = GameConfig.ShamanTotemBaseDuration;
+                player.ActiveTotemPower = (int)(player.MaxHP * GameConfig.ShamanTotemHealPercent);
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_healing_summon", GameConfig.ShamanTotemBaseDuration), "bright_green");
+                break;
+
+            case "shaman_totem_earthbind":
+                player.ActiveTotemType = 2;
+                player.ActiveTotemRounds = GameConfig.ShamanTotemBaseDuration;
+                player.ActiveTotemPower = 20; // 20% ATK reduction
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_earthbind_summon", GameConfig.ShamanTotemBaseDuration), "yellow");
+                break;
+
+            case "shaman_totem_searing":
+                player.ActiveTotemType = 3;
+                player.ActiveTotemRounds = GameConfig.ShamanTotemBaseDuration;
+                player.ActiveTotemPower = abilityResult.Damage > 0 ? (int)abilityResult.Damage : 60 + (int)(player.Intelligence * 2);
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_searing_summon", GameConfig.ShamanTotemBaseDuration), "bright_red");
+                break;
+
+            case "shaman_totem_windfury":
+                player.ActiveTotemType = 4;
+                player.ActiveTotemRounds = GameConfig.ShamanTotemBaseDuration;
+                player.ActiveTotemPower = 30; // 30% chance for extra attack
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_windfury_summon", GameConfig.ShamanTotemBaseDuration), "bright_cyan");
+                break;
+
+            case "shaman_totem_spirit_link":
+                player.ActiveTotemType = 5;
+                player.ActiveTotemRounds = 3;
+                player.ActiveTotemPower = (int)(GameConfig.ShamanSpiritLinkPercent * 100);
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_spirit_link_summon", 3), "bright_magenta");
+                break;
+
+            case "shaman_lightning_bolt":
+            {
+                long boltDamage = abilityResult.Damage > 0 ? abilityResult.Damage : 80 + player.Intelligence * 3;
+                if (target != null && target.IsAlive)
+                {
+                    target.HP -= (int)boltDamage;
+                    result.TotalDamageDealt += boltDamage;
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", target.Name, boltDamage), "bright_yellow");
+                }
+                break;
+            }
+
+            case "shaman_chain_lightning":
+            {
+                long chainDamage = abilityResult.Damage > 0 ? abilityResult.Damage : 100 + player.Intelligence * 3;
+                // Hit primary target
+                if (target != null && target.IsAlive)
+                {
+                    target.HP -= (int)chainDamage;
+                    result.TotalDamageDealt += chainDamage;
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", target.Name, chainDamage), "bright_yellow");
+                }
+                // Chain to other living monsters at reduced damage
+                if (monsters != null)
+                {
+                    long chainReduced = (long)(chainDamage * 0.5);
+                    foreach (var m in monsters.Where(m => m.IsAlive && m != target))
+                    {
+                        m.HP -= (int)chainReduced;
+                        result.TotalDamageDealt += chainReduced;
+                        terminal.WriteLine($"  Lightning chains to {m.Name} for {chainReduced} damage!", "yellow");
+                    }
+                }
+                break;
+            }
+
+            case "shaman_ancestral_guidance":
+                player.ActiveTotemType = 6; // Reuse totem slot for ancestral (only one active at a time)
+                player.ActiveTotemRounds = 4;
+                player.ActiveTotemPower = 25; // 25% of damage dealt heals party
+                terminal.WriteLine(Loc.Get("combat.shaman_ancestral_summon", 4), "bright_magenta");
+                break;
         }
 
         // Sweep all monsters for deaths caused by special-effect cases that bypass the generic
@@ -12606,9 +12940,17 @@ public partial class CombatEngine
                 statusText = $" [Need {ability.StaminaCost} stamina]";
                 color = "dark_gray";
             }
+            else if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
+            {
+                statusText = $" [Need {ability.ManaCost} mana]";
+                color = "dark_gray";
+            }
 
+            string costDisplay = ability.ManaCost > 0
+                ? $"{ability.StaminaCost} stamina, {ability.ManaCost} mana"
+                : $"{ability.StaminaCost} stamina";
             terminal.SetColor(color);
-            terminal.WriteLine($"  {displayIndex}. {ability.Name} - {ability.StaminaCost} stamina{statusText}");
+            terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplay}{statusText}");
             terminal.SetColor("gray");
             terminal.WriteLine($"     {ability.Description}");
 
@@ -14488,7 +14830,10 @@ public partial class CombatEngine
         // Display ability usage
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"» {teammate.DisplayName} uses {chosenAbility.Name}! (-{chosenAbility.StaminaCost} stamina)");
+        if (chosenAbility.ManaCost > 0)
+            terminal.WriteLine($"\u00bb {teammate.DisplayName} uses {chosenAbility.Name}! (-{chosenAbility.ManaCost} mana)");
+        else
+            terminal.WriteLine($"\u00bb {teammate.DisplayName} uses {chosenAbility.Name}! (-{chosenAbility.StaminaCost} stamina)");
         await Task.Delay(GetCombatDelay(500));
 
         // Get target for the ability
@@ -14764,6 +15109,9 @@ public partial class CombatEngine
             case CharacterClass.Abysswarden:
                 baseWeight = 75; // Shadow striker lurks in darkness
                 break;
+            case CharacterClass.MysticShaman:
+                baseWeight = 120; // Melee hybrid — fights in front but has utility
+                break;
 
             default:
                 baseWeight = 100;
@@ -14955,6 +15303,12 @@ public partial class CombatEngine
 
         // Apply difficulty modifier
         monsterAttack = DifficultySystem.ApplyMonsterDamageMultiplier(monsterAttack);
+
+        // Earthbind Totem: -20% monster attack (player's totem affects all monster attacks)
+        if (result.Player != null && result.Player.ActiveTotemType == 2 && result.Player.ActiveTotemRounds > 0)
+        {
+            monsterAttack = (long)(monsterAttack * 0.80);
+        }
 
         // Calculate companion defense — use same diminishing returns as player defense (v0.41.4)
         // Without sqrt scaling, high-level bodyguards become untouchable (damage always = 1)
@@ -15235,6 +15589,10 @@ public partial class CombatEngine
         {
             OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.FirstCompanionDeath);
         }
+
+        // Prevent save cheesing — persist negative outcomes immediately
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            _ = GameEngine.Instance.SaveCurrentGame();
     }
 
     /// <summary>
@@ -16215,6 +16573,10 @@ public partial class CombatEngine
             await ApplyDeathPenalties(result);
             result.ShouldReturnToTemple = true; // Player resurrects at temple after death
         }
+
+        // Prevent save cheesing — persist negative outcomes immediately
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            _ = GameEngine.Instance.SaveCurrentGame();
     }
 
     /// <summary>
@@ -16849,9 +17211,17 @@ public partial class CombatEngine
                 statusText = $" [Need {ability.StaminaCost} stamina, have {player.CurrentCombatStamina}]";
                 color = "dark_gray";
             }
+            else if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
+            {
+                statusText = $" [Need {ability.ManaCost} mana, have {player.Mana}]";
+                color = "dark_gray";
+            }
 
+            string costDisplaySM = ability.ManaCost > 0
+                ? $"{ability.StaminaCost} stamina, {ability.ManaCost} mana"
+                : $"{ability.StaminaCost} stamina";
             terminal.SetColor(color);
-            terminal.WriteLine($"  {displayIndex}. {ability.Name} - {ability.StaminaCost} stamina{statusText}");
+            terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplaySM}{statusText}");
             terminal.SetColor("gray");
             terminal.WriteLine($"     {ability.Description}");
 
@@ -16892,10 +17262,25 @@ public partial class CombatEngine
             return;
         }
 
+        // Check mana cost (Mystic Shaman abilities)
+        if (selectedAbility.ManaCost > 0 && player.Mana < selectedAbility.ManaCost)
+        {
+            terminal.WriteLine(Loc.Get("combat.shaman_not_enough_mana", selectedAbility.ManaCost, player.Mana), "red");
+            await Task.Delay(GetCombatDelay(1500));
+            return;
+        }
+
         // Deduct stamina cost
         player.SpendStamina(selectedAbility.StaminaCost);
         terminal.SetColor("cyan");
         terminal.WriteLine($"(-{selectedAbility.StaminaCost} stamina, {player.CurrentCombatStamina}/{player.MaxCombatStamina} remaining)");
+
+        // Deduct mana cost if the ability has one (Mystic Shaman abilities)
+        if (selectedAbility.ManaCost > 0)
+        {
+            player.Mana -= selectedAbility.ManaCost;
+            terminal.WriteLine(Loc.Get("combat.shaman_mana_cost", selectedAbility.ManaCost, player.Mana, player.MaxMana), "dark_gray");
+        }
 
         // Execute the ability
         var abilityResult = ClassAbilitySystem.UseAbility(player, selectedAbility.Id, random);
@@ -18671,6 +19056,106 @@ public partial class CombatEngine
                 }
                 break;
             }
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // MYSTIC SHAMAN ABILITIES (single-monster)
+            // ═══════════════════════════════════════════════════════════════════════
+
+            case "shaman_enchant_fire":
+                player.ShamanEnchantType = 1;
+                player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
+                player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_fire", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_red");
+                break;
+
+            case "shaman_enchant_frost":
+                player.ShamanEnchantType = 2;
+                player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
+                player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_frost", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_cyan");
+                break;
+
+            case "shaman_enchant_earth":
+                player.ShamanEnchantType = 3;
+                player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
+                player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
+                player.TempDefenseBonus += abilityResult.DefenseBonus;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, GameConfig.ShamanEnchantDuration);
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_earth", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration), "bright_green");
+                break;
+
+            case "shaman_enchant_storm":
+                player.ShamanEnchantType = 4;
+                player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
+                player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_storm", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_yellow");
+                break;
+
+            case "shaman_totem_healing":
+                player.ActiveTotemType = 1;
+                player.ActiveTotemRounds = GameConfig.ShamanTotemBaseDuration;
+                player.ActiveTotemPower = (int)(player.MaxHP * GameConfig.ShamanTotemHealPercent);
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_healing_summon", GameConfig.ShamanTotemBaseDuration), "bright_green");
+                break;
+
+            case "shaman_totem_earthbind":
+                player.ActiveTotemType = 2;
+                player.ActiveTotemRounds = GameConfig.ShamanTotemBaseDuration;
+                player.ActiveTotemPower = 20; // 20% ATK reduction
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_earthbind_summon", GameConfig.ShamanTotemBaseDuration), "yellow");
+                break;
+
+            case "shaman_totem_searing":
+                player.ActiveTotemType = 3;
+                player.ActiveTotemRounds = GameConfig.ShamanTotemBaseDuration;
+                player.ActiveTotemPower = abilityResult.Damage > 0 ? (int)abilityResult.Damage : 60 + (int)(player.Intelligence * 2);
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_searing_summon", GameConfig.ShamanTotemBaseDuration), "bright_red");
+                break;
+
+            case "shaman_totem_windfury":
+                player.ActiveTotemType = 4;
+                player.ActiveTotemRounds = GameConfig.ShamanTotemBaseDuration;
+                player.ActiveTotemPower = 30; // 30% chance for extra attack
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_windfury_summon", GameConfig.ShamanTotemBaseDuration), "bright_cyan");
+                break;
+
+            case "shaman_totem_spirit_link":
+                player.ActiveTotemType = 5;
+                player.ActiveTotemRounds = 3;
+                player.ActiveTotemPower = (int)(GameConfig.ShamanSpiritLinkPercent * 100);
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_spirit_link_summon", 3), "bright_magenta");
+                break;
+
+            case "shaman_lightning_bolt":
+            {
+                long boltDamage = abilityResult.Damage > 0 ? abilityResult.Damage : 80 + player.Intelligence * 3;
+                if (monster != null)
+                {
+                    monster.HP -= (int)boltDamage;
+                    result.TotalDamageDealt += boltDamage;
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", monster.Name, boltDamage), "bright_yellow");
+                }
+                break;
+            }
+
+            case "shaman_chain_lightning":
+            {
+                long chainDamage = abilityResult.Damage > 0 ? abilityResult.Damage : 100 + player.Intelligence * 3;
+                if (monster != null)
+                {
+                    monster.HP -= (int)chainDamage;
+                    result.TotalDamageDealt += chainDamage;
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", monster.Name, chainDamage), "bright_yellow");
+                }
+                break;
+            }
+
+            case "shaman_ancestral_guidance":
+                player.ActiveTotemType = 6; // Reuse totem slot for ancestral (only one active at a time)
+                player.ActiveTotemRounds = 4;
+                player.ActiveTotemPower = 25; // 25% of damage dealt heals party
+                terminal.WriteLine(Loc.Get("combat.shaman_ancestral_summon", 4), "bright_magenta");
+                break;
         }
 
         await Task.CompletedTask;
@@ -18817,6 +19302,130 @@ public partial class CombatEngine
             player.IsDefending = false;
             if (player.HasStatus(StatusEffect.Defending))
                 player.ActiveStatuses.Remove(StatusEffect.Defending);
+        }
+
+        // Process Mystic Shaman weapon enchantment expiry
+        if (player.ShamanEnchantRounds > 0)
+        {
+            player.ShamanEnchantRounds--;
+            if (player.ShamanEnchantRounds <= 0)
+            {
+                terminal.WriteLine(Loc.Get("combat.shaman_enchant_expires"), "gray");
+                player.ShamanEnchantType = 0;
+                player.ShamanEnchantPower = 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Process Mystic Shaman totem effects at end of each combat round.
+    /// Separate from ProcessEndOfRoundAbilityEffects because totems need access to monsters and result.
+    /// </summary>
+    private void ProcessShamanTotemEffects(Character player, List<Monster> monsters, CombatResult result)
+    {
+        if (player.ActiveTotemRounds <= 0) return;
+
+        var livingMonster = monsters?.FirstOrDefault(m => m.IsAlive);
+
+        switch (player.ActiveTotemType)
+        {
+            case 1: // Healing Totem — heals player AND all alive companions/teammates
+            {
+                long totalHealed = 0;
+                // Heal player
+                long playerHeal = Math.Min(player.ActiveTotemPower, player.MaxHP - player.HP);
+                if (playerHeal > 0)
+                {
+                    player.HP += playerHeal;
+                    totalHealed += playerHeal;
+                }
+                // Heal teammates/companions
+                if (result.Teammates != null)
+                {
+                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        long tmPower = (long)(tm.MaxHP * GameConfig.ShamanTotemHealPercent);
+                        long tmHeal = Math.Min(tmPower, tm.MaxHP - tm.HP);
+                        if (tmHeal > 0)
+                        {
+                            tm.HP += tmHeal;
+                            totalHealed += tmHeal;
+                        }
+                    }
+                }
+                if (totalHealed > 0)
+                    terminal.WriteLine(Loc.Get("combat.shaman_totem_healing_pulse", totalHealed), "bright_green");
+                break;
+            }
+            case 2: // Earthbind Totem — ATK reduction applied in monster damage calc
+                terminal.WriteLine(Loc.Get("combat.shaman_totem_earthbind_pulse"), "yellow");
+                break;
+            case 3: // Searing Totem
+                if (livingMonster != null)
+                {
+                    long searingDmg = player.ActiveTotemPower + random.Next(20);
+                    livingMonster.HP -= (int)searingDmg;
+                    result.TotalDamageDealt += searingDmg;
+                    terminal.WriteLine(Loc.Get("combat.shaman_totem_searing_pulse", searingDmg), "bright_red");
+                    if (livingMonster.HP <= 0)
+                    {
+                        livingMonster.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(livingMonster))
+                            result.DefeatedMonsters.Add(livingMonster);
+                    }
+                }
+                break;
+            case 4: // Windfury — handled in GetAttackCount
+                break;
+            case 5: // Spirit Link — redistribute HP among party (solo: self-heal 15% MaxHP)
+            {
+                if (result.Teammates != null && result.Teammates.Count > 0)
+                {
+                    var alive = result.Teammates.Where(t => t.IsAlive).Concat(new[] { player }).ToList();
+                    long totalHP = alive.Sum(a => a.HP);
+                    long totalMaxHP = alive.Sum(a => a.MaxHP);
+                    if (totalMaxHP > 0)
+                    {
+                        foreach (var member in alive)
+                        {
+                            member.HP = (long)(totalHP * ((double)member.MaxHP / totalMaxHP));
+                            member.HP = Math.Min(member.HP, member.MaxHP);
+                        }
+                        terminal.WriteLine(Loc.Get("combat.shaman_totem_spirit_link_pulse"), "bright_magenta");
+                    }
+                }
+                else
+                {
+                    // Solo: heal player for 15% MaxHP instead of redistributing
+                    long soloHeal = Math.Min((long)(player.MaxHP * GameConfig.ShamanSpiritLinkPercent), player.MaxHP - player.HP);
+                    if (soloHeal > 0)
+                    {
+                        player.HP += soloHeal;
+                        terminal.WriteLine(Loc.Get("combat.shaman_totem_healing_pulse", soloHeal), "bright_magenta");
+                    }
+                }
+                break;
+            }
+            case 6: // Ancestral Guidance — healing handled after damage dealt
+                break;
+        }
+
+        player.ActiveTotemRounds--;
+        if (player.ActiveTotemRounds <= 0)
+        {
+            string totemName = player.ActiveTotemType switch
+            {
+                1 => "Healing Totem",
+                2 => "Earthbind Totem",
+                3 => "Searing Totem",
+                4 => "Windfury Totem",
+                5 => "Spirit Link Totem",
+                6 => "Ancestral Guidance",
+                _ => "totem"
+            };
+            terminal.WriteLine(Loc.Get("combat.shaman_totem_expires", totemName), "gray");
+            player.ActiveTotemType = 0;
+            player.ActiveTotemPower = 0;
         }
     }
 
@@ -19191,9 +19800,17 @@ public partial class CombatEngine
                     statusText = $" [Need {ability.StaminaCost} stamina, have {attacker.CurrentCombatStamina}]";
                     color = "dark_gray";
                 }
+                else if (ability.ManaCost > 0 && attacker.Mana < ability.ManaCost)
+                {
+                    statusText = $" [Need {ability.ManaCost} mana, have {attacker.Mana}]";
+                    color = "dark_gray";
+                }
 
+                string costDisplayPvP = ability.ManaCost > 0
+                    ? $"{ability.StaminaCost} stamina, {ability.ManaCost} mana"
+                    : $"{ability.StaminaCost} stamina";
                 terminal.SetColor(color);
-                terminal.WriteLine($"  {displayIndex}. {ability.Name} - {ability.StaminaCost} stamina{statusText}");
+                terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplayPvP}{statusText}");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"     {ability.Description}");
 
@@ -19233,10 +19850,25 @@ public partial class CombatEngine
             return;
         }
 
+        // Check mana cost (Mystic Shaman abilities)
+        if (selectedAbility.ManaCost > 0 && attacker.Mana < selectedAbility.ManaCost)
+        {
+            terminal.WriteLine(Loc.Get("combat.shaman_not_enough_mana", selectedAbility.ManaCost, attacker.Mana), "red");
+            await Task.Delay(GetCombatDelay(1000));
+            return;
+        }
+
         // Deduct stamina and execute
         attacker.SpendStamina(selectedAbility.StaminaCost);
         terminal.SetColor("cyan");
         terminal.WriteLine($"(-{selectedAbility.StaminaCost} stamina, {attacker.CurrentCombatStamina}/{attacker.MaxCombatStamina} remaining)");
+
+        // Deduct mana cost if the ability has one (Mystic Shaman abilities)
+        if (selectedAbility.ManaCost > 0)
+        {
+            attacker.Mana -= selectedAbility.ManaCost;
+            terminal.WriteLine(Loc.Get("combat.shaman_mana_cost", selectedAbility.ManaCost, attacker.Mana, attacker.MaxMana), "dark_gray");
+        }
 
         var abilityResult = ClassAbilitySystem.UseAbility(attacker, selectedAbility.Id, random);
 
@@ -20912,6 +21544,13 @@ public partial class CombatEngine
         if (attacker.HerbBuffType == (int)HerbType.Swiftthistle && attacker.HerbBuffCombats > 0)
             attacks += attacker.HerbExtraAttacks;
 
+        // Mystic Shaman Windfury Totem: chance for extra attack
+        if (attacker.ActiveTotemType == 4 && attacker.ActiveTotemRounds > 0)
+        {
+            if (Random.Shared.Next(100) < attacker.ActiveTotemPower)
+                attacks++;
+        }
+
         // Speed penalty from drugs
         if (drugEffects.SpeedPenalty > 15)
             attacks = Math.Max(1, attacks - 1);
@@ -21232,8 +21871,13 @@ public partial class CombatEngine
                     displayName = $"{ability.Name} ({weaponReason})";
                 else if (abilityCooldowns.TryGetValue(slotId, out int cd) && cd > 0)
                     displayName = $"{ability.Name} (CD:{cd})";
+                else if (ability.ManaCost > 0)
+                    displayName = $"{ability.Name} ({ability.StaminaCost} ST, {ability.ManaCost} MP)";
                 else
                     displayName = $"{ability.Name} ({ability.StaminaCost} ST)";
+                // Check mana availability for shaman abilities
+                if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
+                    canUse = false;
                 actions.Add(((i + 1).ToString(), slotId, displayName, canUse));
             }
         }

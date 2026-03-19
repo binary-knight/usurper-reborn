@@ -3073,6 +3073,10 @@ public class StreetEncounterSystem
             {
                 p.Statistics?.RecordMonsterKill(expGain, stolenGold, false, false);
             }
+
+            // Prevent save cheesing — persist negative outcomes immediately
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                _ = GameEngine.Instance.SaveCurrentGame();
         }
         else
         {

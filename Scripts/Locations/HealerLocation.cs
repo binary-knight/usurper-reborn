@@ -1189,7 +1189,7 @@ public class HealerLocation : BaseLocation
 
         terminal.SetColor("white");
         terminal.WriteLine($"{Loc.Get("ui.name_label")}:  {player.Name2}");
-        terminal.WriteLine($"{Loc.Get("status.class")}: {player.Class}  {Loc.Get("status.race")}: {player.Race}");
+        terminal.WriteLine($"{Loc.Get("status.class")}: {player.ClassName}  {Loc.Get("status.race")}: {player.Race}");
         terminal.WriteLine($"{Loc.Get("ui.level")}: {player.Level}");
         terminal.WriteLine("");
 

@@ -485,9 +485,12 @@ namespace UsurperRemake.Systems
                     break;
 
                 default:
+                    long listenXP = level * 10;
+                    player.Experience += listenXP;
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("encounter.minstrel.listen_leave"));
-                    player.Experience += level * 10;
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"  (+{listenXP} XP)");
                     break;
             }
 

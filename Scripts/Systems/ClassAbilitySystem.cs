@@ -23,6 +23,7 @@ public static class ClassAbilitySystem
         public string Description { get; set; } = "";
         public int LevelRequired { get; set; }
         public int StaminaCost { get; set; }
+        public int ManaCost { get; set; }  // Mana cost (for mana-using ability classes like Mystic Shaman)
         public int Cooldown { get; set; } // Combat rounds before can use again
         public AbilityType Type { get; set; }
         public CharacterClass[] AvailableToClasses { get; set; } = Array.Empty<CharacterClass>();
@@ -1431,6 +1432,174 @@ public static class ClassAbilitySystem
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
+        // MYSTIC SHAMAN ABILITIES - Tribal caster, totem summoner & weapon enchanter
+        // ═══════════════════════════════════════════════════════════════════════════════
+        ["flametongue"] = new ClassAbility
+        {
+            Id = "flametongue",
+            Name = "Flametongue",
+            Description = "Enchant your weapon with fire for 5 rounds. Melee attacks deal bonus fire damage.",
+            LevelRequired = 1,
+            ManaCost = 15,
+            Cooldown = 0,
+            Type = AbilityType.Buff,
+            Duration = 5,
+            SpecialEffect = "shaman_enchant_fire",
+            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Maul, WeaponType.Polearm },
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["healing_totem"] = new ClassAbility
+        {
+            Id = "healing_totem",
+            Name = "Healing Totem",
+            Description = "Summon a healing totem that restores 10% MaxHP to all allies each round for 4 rounds.",
+            LevelRequired = 5,
+            ManaCost = 30,
+            Cooldown = 5,
+            Type = AbilityType.Heal,
+            Duration = 4,
+            SpecialEffect = "shaman_totem_healing",
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["rockbiter"] = new ClassAbility
+        {
+            Id = "rockbiter",
+            Name = "Rockbiter",
+            Description = "Enchant your weapon with earth for 5 rounds. Attacks deal bonus earth damage and grant +15% armor.",
+            LevelRequired = 10,
+            ManaCost = 20,
+            Cooldown = 0,
+            Type = AbilityType.Buff,
+            DefenseBonus = 50,
+            Duration = 5,
+            SpecialEffect = "shaman_enchant_earth",
+            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Maul, WeaponType.Polearm },
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["earthbind_totem"] = new ClassAbility
+        {
+            Id = "earthbind_totem",
+            Name = "Earthbind Totem",
+            Description = "Summon an earthbind totem that slows enemies, reducing their attack by 20% for 4 rounds.",
+            LevelRequired = 15,
+            ManaCost = 25,
+            Cooldown = 5,
+            Type = AbilityType.Debuff,
+            Duration = 4,
+            SpecialEffect = "shaman_totem_earthbind",
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["lightning_bolt"] = new ClassAbility
+        {
+            Id = "lightning_bolt",
+            Name = "Lightning Bolt",
+            Description = "Hurl a bolt of lightning at the enemy. Damage scales with INT.",
+            LevelRequired = 20,
+            ManaCost = 20,
+            StaminaCost = 10,
+            Cooldown = 2,
+            Type = AbilityType.Attack,
+            BaseDamage = 80,
+            SpecialEffect = "shaman_lightning_bolt",
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["frostbrand"] = new ClassAbility
+        {
+            Id = "frostbrand",
+            Name = "Frostbrand",
+            Description = "Enchant your weapon with frost for 5 rounds. Attacks deal bonus ice damage and slow the enemy.",
+            LevelRequired = 25,
+            ManaCost = 25,
+            Cooldown = 0,
+            Type = AbilityType.Buff,
+            Duration = 5,
+            SpecialEffect = "shaman_enchant_frost",
+            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Maul, WeaponType.Polearm },
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["searing_totem"] = new ClassAbility
+        {
+            Id = "searing_totem",
+            Name = "Searing Totem",
+            Description = "Summon a fire totem that blasts enemies for fire damage each round for 4 rounds.",
+            LevelRequired = 30,
+            ManaCost = 35,
+            Cooldown = 5,
+            Type = AbilityType.Attack,
+            BaseDamage = 60,
+            Duration = 4,
+            SpecialEffect = "shaman_totem_searing",
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["stormstrike"] = new ClassAbility
+        {
+            Id = "stormstrike",
+            Name = "Stormstrike",
+            Description = "Enchant your weapon with lightning for 5 rounds. Attacks deal bonus storm damage and restore mana on hit.",
+            LevelRequired = 40,
+            ManaCost = 30,
+            Cooldown = 0,
+            Type = AbilityType.Buff,
+            Duration = 5,
+            SpecialEffect = "shaman_enchant_storm",
+            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Maul, WeaponType.Polearm },
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["windfury_totem"] = new ClassAbility
+        {
+            Id = "windfury_totem",
+            Name = "Windfury Totem",
+            Description = "Summon a wind totem that grants all allies a chance for an extra attack each round for 4 rounds.",
+            LevelRequired = 50,
+            ManaCost = 40,
+            Cooldown = 6,
+            Type = AbilityType.Buff,
+            Duration = 4,
+            SpecialEffect = "shaman_totem_windfury",
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["chain_lightning"] = new ClassAbility
+        {
+            Id = "chain_lightning",
+            Name = "Chain Lightning",
+            Description = "Unleash lightning that chains between enemies. Hits all targets in multi-monster combat.",
+            LevelRequired = 60,
+            ManaCost = 45,
+            StaminaCost = 15,
+            Cooldown = 3,
+            Type = AbilityType.Attack,
+            BaseDamage = 100,
+            SpecialEffect = "shaman_chain_lightning",
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["spirit_link_totem"] = new ClassAbility
+        {
+            Id = "spirit_link_totem",
+            Name = "Spirit Link Totem",
+            Description = "Summon a spirit totem that redistributes HP among all party members, equalizing health for 3 rounds.",
+            LevelRequired = 75,
+            ManaCost = 50,
+            Cooldown = 7,
+            Type = AbilityType.Heal,
+            Duration = 3,
+            SpecialEffect = "shaman_totem_spirit_link",
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+        ["ancestral_guidance"] = new ClassAbility
+        {
+            Id = "ancestral_guidance",
+            Name = "Ancestral Guidance",
+            Description = "Channel the power of your ancestors. For 4 rounds, 25% of damage dealt is converted to healing for the party.",
+            LevelRequired = 90,
+            ManaCost = 60,
+            Cooldown = 8,
+            Type = AbilityType.Buff,
+            Duration = 4,
+            SpecialEffect = "shaman_ancestral_guidance",
+            AvailableToClasses = new[] { CharacterClass.MysticShaman }
+        },
+
+        // ═══════════════════════════════════════════════════════════════════════════════
         // UNIVERSAL ABILITIES - Available to ALL classes (including spellcasters)
         // BALANCE: Basic utility abilities available to every class.
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -1450,7 +1619,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
-                CharacterClass.Abysswarden, CharacterClass.Voidreaver
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver, CharacterClass.MysticShaman
             }
         },
         ["focus"] = new ClassAbility
@@ -1470,7 +1639,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
-                CharacterClass.Abysswarden, CharacterClass.Voidreaver
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver, CharacterClass.MysticShaman
             }
         },
         ["rally"] = new ClassAbility
@@ -1489,7 +1658,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
-                CharacterClass.Abysswarden, CharacterClass.Voidreaver
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver, CharacterClass.MysticShaman
             }
         },
         ["desperate_strike"] = new ClassAbility
@@ -1509,7 +1678,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
-                CharacterClass.Abysswarden, CharacterClass.Voidreaver
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver, CharacterClass.MysticShaman
             }
         },
         ["iron_will"] = new ClassAbility
@@ -1530,7 +1699,7 @@ public static class ClassAbilitySystem
                 CharacterClass.Bard, CharacterClass.Alchemist, CharacterClass.Cleric,
                 CharacterClass.Magician, CharacterClass.Sage,
                 CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker,
-                CharacterClass.Abysswarden, CharacterClass.Voidreaver
+                CharacterClass.Abysswarden, CharacterClass.Voidreaver, CharacterClass.MysticShaman
             }
         },
 
@@ -2403,7 +2572,7 @@ public static class ClassAbilitySystem
         {
             terminal.ClearScreen();
             UIHelper.WriteSectionHeader(terminal, Loc.Get("ability.header"), "bright_yellow");
-            terminal.WriteLine($"{Loc.Get("status.class")}: {player.Class} | {Loc.Get("ui.level")}: {player.Level} | {Loc.Get("ui.stat_stamina")}: {player.MaxCombatStamina}", "cyan");
+            terminal.WriteLine($"{Loc.Get("status.class")}: {player.ClassName} | {Loc.Get("ui.level")}: {player.Level} | {Loc.Get("ui.stat_stamina")}: {player.MaxCombatStamina}", "cyan");
             terminal.WriteLine("");
 
             // Show current quickbar
@@ -2434,7 +2603,8 @@ public static class ClassAbilitySystem
                             terminal.SetColor("bright_yellow");
                             terminal.Write($"  [{i + 1}] ");
                             terminal.SetColor("yellow");
-                            terminal.Write($"{ability.Name,-24} ({ability.StaminaCost} ST)");
+                            string costDisplay = ability.ManaCost > 0 ? $"({ability.ManaCost} MP)" : $"({ability.StaminaCost} ST)";
+                            terminal.Write($"{ability.Name,-24} {costDisplay}");
                             if (!string.IsNullOrEmpty(ability.Description))
                             {
                                 terminal.SetColor("gray");
@@ -2497,7 +2667,8 @@ public static class ClassAbilitySystem
                 foreach (var ability in locked)
                 {
                     terminal.SetColor("darkgray");
-                    terminal.Write($"      {ability.Name,-24} ({ability.StaminaCost} ST) {Loc.Get("ability.requires_lv", ability.LevelRequired)}");
+                    string lCostDisplay = ability.ManaCost > 0 ? $"({ability.ManaCost} MP)" : $"({ability.StaminaCost} ST)";
+                    terminal.Write($"      {ability.Name,-24} {lCostDisplay} {Loc.Get("ability.requires_lv", ability.LevelRequired)}");
                     if (!string.IsNullOrEmpty(ability.Description))
                         terminal.Write($"  {ability.Description}");
                     terminal.WriteLine("");
@@ -2575,7 +2746,8 @@ public static class ClassAbilitySystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.WriteLine($"{unequipped[i].Name,-24} ({unequipped[i].StaminaCost} ST)");
+                    string uCostDisplay = unequipped[i].ManaCost > 0 ? $"({unequipped[i].ManaCost} MP)" : $"({unequipped[i].StaminaCost} ST)";
+                    terminal.WriteLine($"{unequipped[i].Name,-24} {uCostDisplay}");
                 }
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");

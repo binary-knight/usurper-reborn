@@ -272,7 +272,8 @@ const CLASS_NAMES = {
   4: 'Cleric', 5: 'Jester', 6: 'Magician', 7: 'Paladin',
   8: 'Ranger', 9: 'Sage', 10: 'Warrior',
   11: 'Tidesworn', 12: 'Wavecaller', 13: 'Cyclebreaker',
-  14: 'Abysswarden', 15: 'Voidreaver'
+  14: 'Abysswarden', 15: 'Voidreaver',
+  16: 'Mystic Shaman'
 };
 
 const RACE_NAMES = {

@@ -1199,10 +1199,17 @@ public partial class NPC : Character
         if (mood > 0.7f) modifier -= 0.05f;
         else if (mood < 0.3f) modifier += 0.10f;
 
-        // Blood Price markup — merchants charge more for known killers (v0.42.0)
-        if (player != null && player.MurderWeight >= GameConfig.MurderWeightShopMarkupThreshold)
-            modifier += GameConfig.MurderWeightShopMarkupPercent;
+        // Blood Price markup — merchants charge more for known killers (v0.42.0, escalated v0.53.0)
+        if (player != null)
+        {
+            if (player.MurderWeight >= GameConfig.MurderWeightTier3Threshold)
+                modifier += GameConfig.MurderWeightTier3ShopMarkup;    // 100% markup (double prices)
+            else if (player.MurderWeight >= GameConfig.MurderWeightTier2Threshold)
+                modifier += GameConfig.MurderWeightTier2ShopMarkup;    // 50% markup
+            else if (player.MurderWeight >= GameConfig.MurderWeightShopMarkupThreshold)
+                modifier += GameConfig.MurderWeightShopMarkupPercent;  // 20% markup
+        }
 
-        return Math.Clamp(modifier, 0.80f, 1.30f);
+        return Math.Clamp(modifier, 0.80f, 2.00f);
     }
 } 

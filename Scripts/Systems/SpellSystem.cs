@@ -627,6 +627,9 @@ public static class SpellSystem
             case CharacterClass.Voidreaver:
                 ExecuteVoidreaverSpell(caster, spellLevel, target, allTargets, result, random, profMult);
                 break;
+            default:
+                // Classes without spells (MysticShaman, etc.) should not reach here — HasSpells() gates entry
+                break;
         }
     }
 

@@ -274,7 +274,7 @@ public static class BugReportSystem
         if (player != null)
         {
             info.PlayerLevel = player.Level;
-            info.PlayerClass = player.Class.ToString();
+            info.PlayerClass = player.ClassName;
             info.PlayerRace = player.Race.ToString();
             info.CurrentHP = player.HP;
             info.MaxHP = player.MaxHP;
