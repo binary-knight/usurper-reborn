@@ -2695,9 +2695,24 @@ public static class ClassAbilitySystem
 
             if (cmd == "A")
             {
-                // Auto-fill: populate quickbar with available abilities in level order
-                GameEngine.AutoPopulateQuickbar(player);
-                terminal.WriteLine(Loc.Get("ability.auto_filled"), "bright_green");
+                // Auto-fill: add abilities to empty quickbar slots (preserve existing spell entries)
+                var abilities = GetAvailableAbilities(player).OrderBy(a => a.LevelRequired).ToList();
+                int filled = 0;
+                foreach (var ability in abilities)
+                {
+                    // Skip if this ability is already on the quickbar
+                    if (player.Quickbar.Contains(ability.Id)) continue;
+
+                    // Find first empty slot
+                    int emptySlot = player.Quickbar.FindIndex(s => s == null);
+                    if (emptySlot < 0) break; // All slots full
+
+                    player.Quickbar[emptySlot] = ability.Id;
+                    filled++;
+                }
+                terminal.WriteLine(filled > 0
+                    ? Loc.Get("ability.auto_filled")
+                    : Loc.Get("ability.no_abilities_to_add"), "bright_green");
                 await SaveSystem.Instance.AutoSave(player);
                 await Task.Delay(800);
                 continue;

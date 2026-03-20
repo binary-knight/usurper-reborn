@@ -487,6 +487,14 @@ public class HealerLocation : BaseLocation
 
         if (player.HP >= player.MaxHP)
         {
+            // HP is full, but check if mana needs restoring
+            if (player.MaxMana > 0 && player.Mana < player.MaxMana)
+            {
+                player.Mana = player.MaxMana;
+                terminal.WriteLine(Loc.Get("healer.mana_restored_to", player.Mana, player.MaxMana), "blue");
+                await terminal.PressAnyKey();
+                return;
+            }
             terminal.WriteLine(Loc.Get("healer.already_full", player.Name2, Manager), "cyan");
             await terminal.PressAnyKey();
             return;
@@ -541,11 +549,21 @@ public class HealerLocation : BaseLocation
         player.HP += (int)hpToHeal;
         if (player.HP > player.MaxHP) player.HP = player.MaxHP;
 
+        // Also restore mana to full (healing magic restores the spirit too)
+        long manaRestored = 0;
+        if (player.MaxMana > 0 && player.Mana < player.MaxMana)
+        {
+            manaRestored = player.MaxMana - player.Mana;
+            player.Mana = player.MaxMana;
+        }
+
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("healer.hands_on_wounds", Manager), "gray");
         await Task.Delay(1000);
         terminal.WriteLine(Loc.Get("healer.warm_light"), "bright_green");
         terminal.WriteLine(Loc.Get("healer.healed_hp", hpToHeal), "green");
+        if (manaRestored > 0)
+            terminal.WriteLine(Loc.Get("healer.mana_restored_to", player.Mana, player.MaxMana), "blue");
         terminal.WriteLine(Loc.Get("healer.cost_line", $"{healTotalWithTax:N0}"), "yellow");
 
         await terminal.PressAnyKey();

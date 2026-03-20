@@ -123,7 +123,7 @@ public partial class GameEngine
             // MUD mode: per-session engine
             var ctx = UsurperRemake.Server.SessionContext.Current;
             if (ctx?.Engine != null) return ctx.Engine;
-            // If a specific instance was set (e.g., in Godot), use it
+            // If a specific instance was set explicitly, use it
             if (_fallbackInstance != null) return _fallbackInstance;
             // Otherwise use lazy initialization for thread safety
             return lazyInstance.Value;
@@ -131,7 +131,7 @@ public partial class GameEngine
     }
 
     /// <summary>
-    /// Set the instance explicitly (used when created by Godot scene tree)
+    /// Set the instance explicitly
     /// </summary>
     public static void SetInstance(GameEngine engine)
     {
@@ -889,6 +889,7 @@ public partial class GameEngine
             PendingNewGamePlus = false;
             // Preserve player preferences before deleting old save
             bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
+            var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
             // Use the active character key (could be main or alt)
             var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
             var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
@@ -897,7 +898,10 @@ public partial class GameEngine
             await CreateNewGame(activeKey);
             // Restore preferences that CreateNewGame defaults from CLI flags
             if (currentPlayer != null)
+            {
                 currentPlayer.ScreenReaderMode = preserveScreenReader;
+                currentPlayer.Orientation = preserveOrientation;
+            }
         }
     }
 
@@ -930,11 +934,9 @@ public partial class GameEngine
     /// </summary>
     private void InitializeGame()
     {
-        // Ensure we have a working terminal instance when running outside of Godot
+        // Ensure we have a working terminal instance
         if (terminal == null)
         {
-            // If we were truly running inside Godot, the Terminal node would
-            // already exist and TerminalEmulator.Instance would have been set.
             terminal = TerminalEmulator.Instance ?? new TerminalEmulator();
         }
 
@@ -3807,6 +3809,7 @@ public partial class GameEngine
             Race = playerData.Race,
             Class = playerData.Class,
             Sex = (CharacterSex)playerData.Sex,
+            Orientation = (SexualOrientation)playerData.Orientation,
             Age = playerData.Age,
             Difficulty = playerData.Difficulty,
             
@@ -5976,7 +5979,6 @@ public partial class GameEngine
         // Mark as intentional exit so bootstrap doesn't show warning
         IsIntentionalExit = true;
 
-        // GetTree().Quit(); // Godot API not available, use alternative
         Environment.Exit(0);
     }
     

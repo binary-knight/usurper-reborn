@@ -197,12 +197,16 @@ public partial class CombatEngine
         attacker.TempAttackBonusDuration = 0;
         attacker.TempDefenseBonus = 0;
         attacker.TempDefenseBonusDuration = 0;
+        attacker.MagicACBonus = 0;
         attacker.DodgeNextAttack = false;
         attacker.HasBloodlust = false;
         attacker.HasStatusImmunity = false;
         attacker.StatusImmunityDuration = 0;
         attacker.DeathsEmbraceActive = false;
         attacker.StatusLifestealPercent = 0;
+        attacker.RemoveStatus(StatusEffect.Protected);
+        attacker.RemoveStatus(StatusEffect.Blessed);
+        attacker.RemoveStatus(StatusEffect.Haste);
         attacker.ActiveTotemType = 0;
         attacker.ActiveTotemRounds = 0;
         attacker.ActiveTotemPower = 0;
@@ -389,12 +393,17 @@ public partial class CombatEngine
         player.TempAttackBonusDuration = 0;
         player.TempDefenseBonus = 0;
         player.TempDefenseBonusDuration = 0;
+        player.MagicACBonus = 0; // Clear spell protection buffs from previous fight
         player.DodgeNextAttack = false;
         player.HasBloodlust = false;
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
         player.DeathsEmbraceActive = false;
         player.StatusLifestealPercent = 0;
+        // Clear spell status effects that shouldn't persist between fights
+        player.RemoveStatus(StatusEffect.Protected);
+        player.RemoveStatus(StatusEffect.Blessed);
+        player.RemoveStatus(StatusEffect.Haste);
         player.ActiveTotemType = 0;
         player.ActiveTotemRounds = 0;
         player.ActiveTotemPower = 0;

@@ -107,7 +107,7 @@ public class MaintenanceSystem
                 await DisplayMaintenanceCompletion();
             else
             {
-                // Log silently to Godot console
+                // Log silently to debug log
             }
         }
         finally

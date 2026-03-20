@@ -382,7 +382,7 @@ public class DormitoryLocation : BaseLocation
         }
 
         terminal.WriteLine(Loc.Get("dormitory.awaken_refreshed"), "green");
-        await Task.Delay(1500);
+        await terminal.PressAnyKey();
 
         await NavigateToLocation(GameLocation.MainStreet);
     }

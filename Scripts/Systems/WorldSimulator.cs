@@ -246,8 +246,7 @@ public class WorldSimulator
 
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"WorldSimulator starting - NPCs available: {npcs?.Count ?? 0}");
 
-        // Start a background task to periodically run simulation steps. This works even when
-        // running head-less outside the Godot scene tree.
+        // Start a background task to periodically run simulation steps.
         _ = System.Threading.Tasks.Task.Run(async () =>
         {
             UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", "Background simulation task started");

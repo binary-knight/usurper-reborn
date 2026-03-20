@@ -2068,9 +2068,8 @@ public class InnLocation : BaseLocation
         else
         {
             await Task.Delay(2000);
+            await terminal.PressAnyKey();
         }
-
-        await terminal.WaitForKey();
     }
 
     /// <summary>

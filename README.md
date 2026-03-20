@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.53.0** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.53.3** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -261,6 +261,9 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### v0.53.3 - Ancestral Spirits (Orientation, UX & Bug Fixes)
+Romantic orientation system in character creation (Straight/Gay/Bisexual/Asexual) with NPC diversity guarantees. Spell buffs no longer persist between fights. Healer restores mana. Dungeon mana potion menu. Quickbar auto-fill preserves existing entries. Monster attack message clarity. 10+ UX and bug fixes.
+
 ### v0.53.0 - Ancestral Spirits (New Class: Mystic Shaman)
 New race-locked base class for Trolls, Orcs, and Gnolls. Summon persistent totems (healing, earthbind, searing, windfury, spirit link) and enchant weapons with elemental power (fire, frost, earth, storm). 12 abilities, STR/INT scaling, mana-powered. Plus 19 bug fixes including shield stat doubling, companion loot item loss, MUD input freeze, menu alignment, NPC population control, and equipment corruption guard.
 
@@ -375,4 +378,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.53.0 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.53.3 — The world is running. [Watch it live.](https://usurper-reborn.net)

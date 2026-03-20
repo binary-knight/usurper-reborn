@@ -100,7 +100,11 @@ public partial class TempleLocation : BaseLocation
                 refreshMenu = false;
                 
                 var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
-                
+
+                // Handle global quick commands (/health, /bug, etc.)
+                var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
+                if (handled) { refreshMenu = true; continue; }
+
                 switch (choice.ToUpper())
                 {
                     case "?":

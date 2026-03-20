@@ -92,6 +92,15 @@ public abstract class BaseLocation
     /// <summary>
     /// Localized Loc.Get("ui.your_choice") prompt. Use instead of terminal.GetInput(Loc.Get("ui.your_choice")).
     /// </summary>
+    protected static string GetOrientationLabel(SexualOrientation orientation) => orientation switch
+    {
+        SexualOrientation.Straight => "Straight",
+        SexualOrientation.Gay => "Gay / Lesbian",
+        SexualOrientation.Bisexual => "Bisexual",
+        SexualOrientation.Asexual => "Asexual",
+        _ => "Straight"
+    };
+
     protected async Task<string> GetChoice()
     {
         return await terminal.GetInput(Loc.Get("ui.your_choice"));
@@ -3245,6 +3254,11 @@ public abstract class BaseLocation
                 terminal.WriteLine($"] Title ({currentPlayer.NobleTitle ?? "None"})");
                 terminal.Write("[");
                 terminal.SetColor("bright_yellow");
+                terminal.Write("O");
+                terminal.SetColor("white");
+                terminal.WriteLine($"] {Loc.Get("prefs.orientation")} ({GetOrientationLabel(currentPlayer.Orientation)})");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
                 terminal.Write("0");
                 terminal.SetColor("white");
                 terminal.WriteLine($"] {Loc.Get("prefs.back")}");
@@ -3469,6 +3483,39 @@ public abstract class BaseLocation
                             await Task.Delay(1000);
                         }
                     }
+                    break;
+
+                case "O":
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"  {Loc.Get("creation.orientation")}");
+                    terminal.WriteLine("");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"  {Loc.Get("creation.orientation_1")}");
+                    terminal.WriteLine($"  {Loc.Get("creation.orientation_2")}");
+                    terminal.WriteLine($"  {Loc.Get("creation.orientation_3")}");
+                    terminal.WriteLine($"  {Loc.Get("creation.orientation_4")}");
+                    terminal.WriteLine("");
+                    var oriChoice = await terminal.GetInput(Loc.Get("ui.your_choice"));
+                    switch (oriChoice.Trim())
+                    {
+                        case "1":
+                            currentPlayer.Orientation = SexualOrientation.Straight;
+                            break;
+                        case "2":
+                            currentPlayer.Orientation = SexualOrientation.Gay;
+                            break;
+                        case "3":
+                            currentPlayer.Orientation = SexualOrientation.Bisexual;
+                            break;
+                        case "4":
+                            currentPlayer.Orientation = SexualOrientation.Asexual;
+                            break;
+                    }
+                    terminal.SetColor("green");
+                    terminal.WriteLine($"  Orientation set to: {GetOrientationLabel(currentPlayer.Orientation)}");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(1000);
                     break;
 
                 case "0":

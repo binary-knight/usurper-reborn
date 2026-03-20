@@ -398,6 +398,7 @@ namespace UsurperRemake.Systems
                 Race = player.Race,
                 Class = player.Class,
                 Sex = (char)((int)player.Sex),
+                Orientation = (int)player.Orientation,
                 Age = player.Age,
                 Difficulty = player.Difficulty,
                 

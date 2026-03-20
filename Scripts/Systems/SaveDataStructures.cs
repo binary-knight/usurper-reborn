@@ -236,6 +236,7 @@ namespace UsurperRemake.Systems
         public CharacterRace Race { get; set; }
         public CharacterClass Class { get; set; }
         public char Sex { get; set; }
+        public int Orientation { get; set; } // SexualOrientation enum
         public int Age { get; set; }
         public DifficultyMode Difficulty { get; set; } = DifficultyMode.Normal;
         

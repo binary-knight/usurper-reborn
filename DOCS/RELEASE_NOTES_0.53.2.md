@@ -138,3 +138,5 @@ Removed macOS WezTerm icon patching from the CI/CD pipeline. Modifying any file 
 - `.github/workflows/ci-cd.yml` — Removed macOS WezTerm icon patch step (v0.53.1); macOS Steam depot
 - `launchers/play-mac.sh` — macOS launcher
 - `launchers/play-mac-accessible.sh` — macOS accessible launcher
+- `launchers/play-mac.sh` — macOS launcher
+- `launchers/play-mac-accessible.sh` — macOS accessible launcher

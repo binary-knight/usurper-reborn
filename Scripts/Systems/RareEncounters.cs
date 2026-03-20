@@ -1816,92 +1816,103 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.option_leave"));
             terminal.WriteLine("");
 
-            var choice = await terminal.GetInput(Loc.Get("ui.your_choice"));
-
-            switch (choice.ToUpper())
+            bool validChoice = false;
+            while (!validChoice)
             {
-                case "T":
-                    if (player.Gold >= 100)
-                    {
-                        player.Gold -= 100;
-                        terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("encounter.well.throw_coin"));
-                        await Task.Delay(1500);
+                var choice = await terminal.GetInput(Loc.Get("ui.your_choice"));
 
-                        var wish = random.Next(6);
-                        switch (wish)
+                switch (choice.ToUpper())
+                {
+                    case "T":
+                        validChoice = true;
+                        if (player.Gold >= 100)
                         {
-                            case 0:
-                                terminal.SetColor("bright_green");
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_granted"));
-                                player.HP = player.MaxHP;
-                                player.Mana = player.MaxMana;
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_restore"));
-                                break;
-                            case 1:
-                                terminal.SetColor("bright_yellow");
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_gold"));
-                                player.Gold += 500;
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_gold_amount"));
-                                break;
-                            case 2:
-                                terminal.SetColor("green");
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_strength"));
-                                player.Strength += 3;
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_str_amount"));
-                                break;
-                            case 3:
-                                terminal.SetColor("gray");
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_nothing"));
-                                break;
-                            case 4:
-                                terminal.SetColor("bright_magenta");
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_wisdom"));
-                                player.Experience += level * 250;
-                                terminal.WriteLine(Loc.Get("encounter.reward_exp", level * 250));
-                                break;
-                            case 5:
-                                terminal.SetColor("red");
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_reject"));
-                                terminal.WriteLine(Loc.Get("encounter.well.wish_returned"));
-                                player.Gold += 150;
-                                break;
+                            player.Gold -= 100;
+                            terminal.SetColor("cyan");
+                            terminal.WriteLine(Loc.Get("encounter.well.throw_coin"));
+                            await Task.Delay(1500);
+
+                            var wish = random.Next(6);
+                            switch (wish)
+                            {
+                                case 0:
+                                    terminal.SetColor("bright_green");
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_granted"));
+                                    player.HP = player.MaxHP;
+                                    player.Mana = player.MaxMana;
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_restore"));
+                                    break;
+                                case 1:
+                                    terminal.SetColor("bright_yellow");
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_gold"));
+                                    player.Gold += 500;
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_gold_amount"));
+                                    break;
+                                case 2:
+                                    terminal.SetColor("green");
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_strength"));
+                                    player.Strength += 3;
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_str_amount"));
+                                    break;
+                                case 3:
+                                    terminal.SetColor("gray");
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_nothing"));
+                                    break;
+                                case 4:
+                                    terminal.SetColor("bright_magenta");
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_wisdom"));
+                                    player.Experience += level * 250;
+                                    terminal.WriteLine(Loc.Get("encounter.reward_exp", level * 250));
+                                    break;
+                                case 5:
+                                    terminal.SetColor("red");
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_reject"));
+                                    terminal.WriteLine(Loc.Get("encounter.well.wish_returned"));
+                                    player.Gold += 150;
+                                    break;
+                            }
                         }
-                    }
-                    else
-                    {
-                        terminal.WriteLine(Loc.Get("ui.not_enough_gold_plain"), "gray");
-                    }
-                    break;
+                        else
+                        {
+                            terminal.WriteLine(Loc.Get("ui.not_enough_gold_plain"), "gray");
+                        }
+                        break;
 
-                case "D":
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("encounter.well.dive"));
-                    await Task.Delay(1000);
+                    case "D":
+                        validChoice = true;
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine(Loc.Get("encounter.well.dive"));
+                        await Task.Delay(1000);
 
-                    if (random.NextDouble() < 0.4)
-                    {
-                        long coins = level * 200 + random.Next(500);
-                        player.Gold += coins;
-                        terminal.SetColor("bright_yellow");
-                        terminal.WriteLine(Loc.Get("encounter.well.dive_success", coins));
-                        terminal.WriteLine(Loc.Get("encounter.well.dive_rich"));
-                    }
-                    else
-                    {
-                        terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("encounter.well.dive_angry"));
-                        int damage = (int)(player.MaxHP / 3);
-                        player.HP -= damage;
-                        terminal.WriteLine(Loc.Get("encounter.well.dive_damage", damage));
-                        terminal.WriteLine(Loc.Get("encounter.well.dive_escape"));
-                    }
-                    break;
+                        if (random.NextDouble() < 0.4)
+                        {
+                            long coins = level * 200 + random.Next(500);
+                            player.Gold += coins;
+                            terminal.SetColor("bright_yellow");
+                            terminal.WriteLine(Loc.Get("encounter.well.dive_success", coins));
+                            terminal.WriteLine(Loc.Get("encounter.well.dive_rich"));
+                        }
+                        else
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine(Loc.Get("encounter.well.dive_angry"));
+                            int damage = (int)(player.MaxHP / 3);
+                            player.HP -= damage;
+                            terminal.WriteLine(Loc.Get("encounter.well.dive_damage", damage));
+                            terminal.WriteLine(Loc.Get("encounter.well.dive_escape"));
+                        }
+                        break;
 
-                default:
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("encounter.well.leave_msg"));
-                    break;
+                    case "L":
+                        validChoice = true;
+                        terminal.SetColor("gray");
+                        terminal.WriteLine(Loc.Get("encounter.well.leave_msg"));
+                        break;
+
+                    default:
+                        terminal.WriteLine(Loc.Get("ui.invalid_choice"), "red");
+                        break;
+                }
             }
 
             await terminal.PressAnyKey();

@@ -13,8 +13,8 @@ public partial class TerminalEmulator
     private const int COLUMNS = 80;
     private const int ROWS = 25;
 
-    private readonly object? display = null;   // Godot RichTextLabel - always null in console mode
-    private readonly object? inputLine = null; // Godot LineEdit - always null in console mode
+    private readonly object? display = null;   // Legacy UI display - always null in console mode
+    private readonly object? inputLine = null; // Legacy UI input - always null in console mode
 
     private Queue<string> outputBuffer = new Queue<string>();
     private int cursorX = 0, cursorY = 0;
@@ -243,7 +243,7 @@ public partial class TerminalEmulator
     public Func<string?>? MessageSource { get; set; }
 
     /// <summary>
-    /// Default constructor for Godot/Console mode (single-player, BBS door).
+    /// Default constructor for console mode (single-player, BBS door).
     /// </summary>
     public TerminalEmulator() { }
 
@@ -280,7 +280,7 @@ public partial class TerminalEmulator
         }
     }
     
-    // ANSI color mappings - hex strings (was Godot Color, now plain strings)
+    // ANSI color mappings - hex strings for terminal output
     private readonly Dictionary<string, string> ansiColors = new Dictionary<string, string>
     {
         { "black", "000000" },
@@ -336,12 +336,12 @@ public partial class TerminalEmulator
 
     private void SetupDisplay()
     {
-        // No-op in console mode — Godot UI not used
+        // No-op in console mode
     }
 
     private void SetupInput()
     {
-        // No-op in console mode — Godot UI not used
+        // No-op in console mode
     }
     
     public void WriteLine(string text, string color = "white")
@@ -361,7 +361,7 @@ public partial class TerminalEmulator
             }
         }
 
-        // BBS 80x25 pagination — pause before overflow (only in BBS door mode, not MUD stream or Godot)
+        // BBS 80x25 pagination — pause before overflow (only in BBS door mode, not MUD stream)
         if (_streamWriter == null && display == null && DoorMode.IsInDoorMode && _bbsLineCount >= BBS_PAGE_LIMIT)
         {
             ShowBBSMorePrompt();
@@ -372,7 +372,7 @@ public partial class TerminalEmulator
             // MUD stream mode — write ANSI-colored output to TCP stream
             WriteLineToStream(text, color);
         }
-        // display is always null in console mode — Godot branch removed
+        // display is always null in console mode
         else if (ShouldUseBBSAdapter())
         {
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
@@ -515,8 +515,7 @@ public partial class TerminalEmulator
     }
 
     /// <summary>
-    /// Convert simplified [colorname]text[/] format to Godot BBCode [color=#hex]text[/color]
-    /// This allows combat messages to use simple color codes that work in both Godot and console modes
+    /// Convert simplified [colorname]text[/] markup to ANSI color codes for terminal output
     /// </summary>
     private string ConvertSimplifiedColorToBBCode(string text)
     {
@@ -580,7 +579,7 @@ public partial class TerminalEmulator
             // MUD stream mode — write ANSI-colored output to TCP stream
             WriteToStream(text, effectiveColor);
         }
-        // display is always null in console mode — Godot branch removed
+        // display is always null in console mode
         else if (ShouldUseBBSAdapter())
         {
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
@@ -633,7 +632,7 @@ public partial class TerminalEmulator
         }
         else if (display != null)
         {
-            // Godot mode removed — display is always null in console mode
+            // display is always null in console mode
         }
         else if (ShouldUseBBSAdapter())
         {
@@ -886,7 +885,7 @@ public partial class TerminalEmulator
             }
             ForwardToSpectators(clearAnsi);
         }
-        // display is always null in console mode — Godot branch removed
+        // display is always null in console mode
         else if (ShouldUseBBSAdapter())
         {
             // BBS socket mode - route through BBSTerminalAdapter → SocketTerminal
@@ -1474,7 +1473,7 @@ public partial class TerminalEmulator
             var input = await GetInput("");
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }
-        // If running inside Godot, use line input and take first char
+        // If display/inputLine are set, use line input and take first char
         else if (inputLine != null && display != null)
         {
             var input = await GetInput("");
@@ -1912,7 +1911,7 @@ public partial class TerminalEmulator
 
     public async Task WaitForKey()
     {
-        await GetKeyInput();
+        await PressAnyKey();
     }
     
     public async Task WaitForKey(string message)

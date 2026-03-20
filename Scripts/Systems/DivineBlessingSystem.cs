@@ -30,6 +30,7 @@ namespace UsurperRemake.Systems
 
         // Track daily prayer status
         private Dictionary<string, DateTime> lastPrayerTime = new();
+        private Dictionary<string, int> lastPrayerDay = new(); // Single-player: in-game day number
 
         private Random random = new();
 
@@ -283,6 +284,7 @@ namespace UsurperRemake.Systems
                 return null;
 
             lastPrayerTime[character.Name2] = DateTime.Now;
+            lastPrayerDay[character.Name2] = DailySystemManager.Instance.CurrentDay;
 
             // In online mode, persist to player's LastPrayerRealDate so it survives logout/login
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
@@ -334,9 +336,11 @@ namespace UsurperRemake.Systems
                 return player.LastPrayerRealDate < boundary;
             }
 
-            if (lastPrayerTime.TryGetValue(playerName, out var lastPrayer))
+            // Single-player: compare against in-game day (not real-world date)
+            // because multiple in-game days can pass in one real session
+            if (lastPrayerDay.TryGetValue(playerName, out var lastDay))
             {
-                return lastPrayer.Date != DateTime.Now.Date;
+                return DailySystemManager.Instance.CurrentDay > lastDay;
             }
             return true;
         }

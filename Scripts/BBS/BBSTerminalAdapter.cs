@@ -8,9 +8,8 @@ namespace UsurperRemake.BBS
     /// Terminal implementation for BBS door mode that can work with socket or console I/O.
     /// This class provides the same interface as TerminalEmulator but routes through SocketTerminal.
     ///
-    /// Note: Since TerminalEmulator extends Godot.Control, we can't directly inherit from it.
-    /// Instead, this class provides the same public API and sets itself as TerminalEmulator.Instance
-    /// using duck typing through the static instance pattern.
+    /// This class provides the same public API as TerminalEmulator and sets itself as the Instance
+    /// using the static instance pattern.
     /// </summary>
     public class BBSTerminalAdapter
     {

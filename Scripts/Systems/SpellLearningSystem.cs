@@ -177,11 +177,25 @@ public static class SpellLearningSystem
 
             if (cmd == "X") break;
 
-            // Auto-fill quickbar
+            // Auto-fill quickbar with spells (preserve existing ability entries)
             if (cmd == "A")
             {
-                GameEngine.AutoPopulateQuickbar(player);
-                terminal.WriteLine(Loc.Get("spell_learning.auto_filled"), "bright_green");
+                var knownSpells = SpellSystem.GetAvailableSpells(player);
+                int filled = 0;
+                foreach (var spell in knownSpells.OrderBy(s => s.Level))
+                {
+                    string spellKey = $"spell:{spell.Level}";
+                    if (player.Quickbar.Contains(spellKey)) continue;
+
+                    int emptySlot = player.Quickbar.FindIndex(s => s == null);
+                    if (emptySlot < 0) break;
+
+                    player.Quickbar[emptySlot] = spellKey;
+                    filled++;
+                }
+                terminal.WriteLine(filled > 0
+                    ? Loc.Get("spell_learning.auto_filled")
+                    : Loc.Get("spell_learning.no_spells_to_add"), "bright_green");
                 await SaveSystem.Instance.AutoSave(player);
                 await Task.Delay(800);
                 continue;

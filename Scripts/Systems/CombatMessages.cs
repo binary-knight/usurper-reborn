@@ -156,9 +156,10 @@ public static class CombatMessages
         }
 
         var attackVerb = MonsterAttackVerbs[tier][random.Next(MonsterAttackVerbs[tier].Count)];
-        var color = DamageColors[tier];
 
-        return $"[{monsterColor}]{monsterName}[/] {attackVerb} for [{color}]{damage}[/] damage!";
+        // Don't show raw damage here — the actual damage (after armor) is shown separately
+        // Showing both confused players into thinking they were hit twice
+        return $"[{monsterColor}]{monsterName}[/] {attackVerb}!";
     }
 
     /// <summary>

@@ -286,7 +286,7 @@ public class HomeLocation : BaseLocation
         // Row 4: Romance
         WriteMenuCol(" ", "P", Loc.Get("home.partner"), true);
         WriteMenuCol("", "B", Loc.Get("home.bedroom"), true);
-        WriteMenuNL("", "!", Loc.Get("home.resurrect"), true);
+        WriteMenuNL("", "X", Loc.Get("home.resurrect"), true);
 
         // Row 5: Items
         WriteMenuCol(" ", "I", Loc.Get("dungeon.inventory"), true);
@@ -470,7 +470,7 @@ public class HomeLocation : BaseLocation
         ShowBBSMenuRow(("D", "bright_yellow", Loc.Get("home.deposit")), ("W", "bright_yellow", Loc.Get("home.withdraw")), ("L", "bright_yellow", Loc.Get("home.list_chest")));
         ShowBBSMenuRow(("A", "bright_yellow", Loc.Get("home.gather_herbs")), ("T", "bright_yellow", Loc.Get("home.trophies")), ("F", "bright_yellow", Loc.Get("home.family")));
         ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("home.children_interact")), ("P", "bright_yellow", Loc.Get("home.partner")), ("B", "bright_yellow", Loc.Get("home.bedroom")));
-        ShowBBSMenuRow(("!", "bright_yellow", Loc.Get("home.resurrect")), ("I", "bright_yellow", Loc.Get("dungeon.inventory")), ("G", "bright_yellow", Loc.Get("home.gear_partner")));
+        ShowBBSMenuRow(("X", "bright_yellow", Loc.Get("home.resurrect")), ("I", "bright_yellow", Loc.Get("dungeon.inventory")), ("G", "bright_yellow", Loc.Get("home.gear_partner")));
         ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("home.heal_potion")));
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
         {
@@ -495,13 +495,6 @@ public class HomeLocation : BaseLocation
             return false;
 
         var c = choice.Trim().ToUpperInvariant();
-
-        // Handle ! locally first (Resurrect) before global handler claims it for bug report
-        if (c == "!")
-        {
-            await ResurrectAlly();
-            return false;
-        }
 
         // Handle global quick commands
         var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
@@ -603,6 +596,9 @@ public class HomeLocation : BaseLocation
                     else
                         await DailySystemManager.Instance.WaitUntilEvening(currentPlayer, terminal);
                 }
+                return false;
+            case "X":
+                await ResurrectAlly();
                 return false;
             case "R":
             case "Q":

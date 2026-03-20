@@ -392,14 +392,14 @@ public class PersonalityProfile
                 break;
         }
 
-        // Randomly assign orientation — heterosexual is the vast majority,
-        // non-hetero relationships are rare flavor (~1-2% of the population)
+        // Randomly assign orientation — enough non-straight NPCs to ensure
+        // viable romance options for all player orientations
         float orientationRoll = (float)Random.Shared.NextDouble();
-        if (orientationRoll < 0.96f)
+        if (orientationRoll < 0.85f)
             profile.Orientation = SexualOrientation.Straight;
-        else if (orientationRoll < 0.975f)
+        else if (orientationRoll < 0.93f)
             profile.Orientation = profile.Gender == GenderIdentity.Female ? SexualOrientation.Lesbian : SexualOrientation.Gay;
-        else if (orientationRoll < 0.99f)
+        else if (orientationRoll < 0.98f)
             profile.Orientation = SexualOrientation.Bisexual;
         else
             profile.Orientation = SexualOrientation.Asexual;
@@ -526,12 +526,12 @@ public class PersonalityProfile
         };
     }
 
-    private static bool IsMalePresenting(GenderIdentity gender)
+    public static bool IsMalePresenting(GenderIdentity gender)
     {
         return gender == GenderIdentity.Male || gender == GenderIdentity.TransMale;
     }
 
-    private static bool IsFemalePresenting(GenderIdentity gender)
+    public static bool IsFemalePresenting(GenderIdentity gender)
     {
         return gender == GenderIdentity.Female || gender == GenderIdentity.TransFemale;
     }

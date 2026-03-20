@@ -5505,18 +5505,22 @@ public class DungeonLocation : BaseLocation
 
         // Check if floor is now fully cleared
         bool isNowCleared = IsFloorCleared();
-        if (isNowCleared && !floorState.EverCleared)
+        if (isNowCleared)
         {
-            floorState.EverCleared = true;
-            floorState.LastClearedAt = DateTime.Now;
-
-            // Special floors stay permanently cleared
-            if (SealFloors.Contains(floorLevel) || SecretBossFloors.Contains(floorLevel))
+            if (!floorState.EverCleared)
             {
-                floorState.IsPermanentlyClear = true;
+                floorState.EverCleared = true;
+
+                // Special floors stay permanently cleared
+                if (SealFloors.Contains(floorLevel) || SecretBossFloors.Contains(floorLevel))
+                {
+                    floorState.IsPermanentlyClear = true;
+                }
             }
 
-            // Notify quest system that floor is cleared
+            floorState.LastClearedAt = DateTime.Now;
+
+            // Always notify quest system — player may have taken the quest after first clear
             var questPlayer = GetCurrentPlayer();
             if (questPlayer != null)
             {
@@ -10309,6 +10313,16 @@ public class DungeonLocation : BaseLocation
                 bool anyTeammateInjured = allPartyMembers.Any(c => c.HP < c.MaxHP);
                 if (allPartyMembers.Count > 0 && player.Healing > 0 && (player.HP < player.MaxHP || anyTeammateInjured))
                     WriteSRMenuOption("A", Loc.Get("dungeon.heal_all"));
+                if (player.IsManaClass && player.MaxMana > 0)
+                {
+                    long srManaPerPotion = 30 + player.Level * 5;
+                    if (player.ManaPotions > 0 && player.Mana < player.MaxMana)
+                        WriteSRMenuOption("M", Loc.Get("dungeon.use_mana_potion_self", srManaPerPotion, player.ManaPotions));
+                    else if (player.ManaPotions > 0)
+                        WriteSRMenuOption("M", Loc.Get("dungeon.mana_full"));
+                    else
+                        WriteSRMenuOption("M", Loc.Get("dungeon.no_mana_potions"));
+                }
                 if (player.Antidotes > 0 && player.Poison > 0)
                     WriteSRMenuOption("D", Loc.Get("dungeon.use_antidote", player.Antidotes));
                 else if (player.Antidotes > 0)
@@ -10386,6 +10400,33 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.heal_all"));
                 }
 
+                // Mana potion option (mana classes only)
+                if (player.IsManaClass && player.MaxMana > 0)
+                {
+                    long manaPerPotion = 30 + player.Level * 5;
+                    if (player.ManaPotions > 0 && player.Mana < player.MaxMana)
+                    {
+                        terminal.SetColor("darkgray");
+                        terminal.Write("  [");
+                        terminal.SetColor("bright_cyan");
+                        terminal.Write("M");
+                        terminal.SetColor("darkgray");
+                        terminal.Write("] ");
+                        terminal.SetColor("white");
+                        terminal.WriteLine(Loc.Get("dungeon.use_mana_potion_self", manaPerPotion, player.ManaPotions));
+                    }
+                    else if (player.ManaPotions > 0)
+                    {
+                        terminal.SetColor("darkgray");
+                        terminal.WriteLine($"  [M] {Loc.Get("dungeon.mana_full")}");
+                    }
+                    else
+                    {
+                        terminal.SetColor("darkgray");
+                        terminal.WriteLine($"  [M] {Loc.Get("dungeon.no_mana_potions")}");
+                    }
+                }
+
                 // Antidote option
                 if (player.Antidotes > 0 && player.Poison > 0)
                 {
@@ -10459,6 +10500,32 @@ public class DungeonLocation : BaseLocation
                     if (allPartyMembers.Count > 0 && player.Healing > 0)
                     {
                         await HealEntireParty(player, allPartyMembers);
+                    }
+                    break;
+
+                case "M":
+                    if (player.IsManaClass && player.MaxMana > 0 && player.ManaPotions > 0 && player.Mana < player.MaxMana)
+                    {
+                        long manaPerPotion = 30 + player.Level * 5;
+                        long manaRestored = Math.Min(manaPerPotion, player.MaxMana - player.Mana);
+                        player.Mana += manaRestored;
+                        player.ManaPotions--;
+                        player.Statistics?.RecordManaPotionUsed(manaRestored);
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine(Loc.Get("dungeon.mana_potion_used", manaRestored, player.Mana, player.MaxMana, player.ManaPotions));
+                        await Task.Delay(1500);
+                    }
+                    else if (player.IsManaClass && player.ManaPotions > 0)
+                    {
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine(Loc.Get("dungeon.mana_full"));
+                        await Task.Delay(1000);
+                    }
+                    else if (player.IsManaClass && player.ManaPotions <= 0)
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine(Loc.Get("dungeon.no_mana_potions"));
+                        await Task.Delay(1000);
                     }
                     break;
 

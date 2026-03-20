@@ -88,6 +88,9 @@ namespace UsurperRemake.Systems
                     spawnedNPCs.Add(npc);
                 }
 
+                // Ensure minimum orientation diversity for viable romance options
+                EnsureOrientationDiversity();
+
                 // Distribute NPCs across locations
                 DistributeNPCsAcrossWorld();
 
@@ -747,6 +750,52 @@ namespace UsurperRemake.Systems
             };
 
             return locations[random.Next(locations.Length)];
+        }
+
+        /// <summary>
+        /// Ensure at least 3 gay/lesbian and 3 bisexual NPCs exist for romance viability
+        /// </summary>
+        private void EnsureOrientationDiversity()
+        {
+            const int minGayMale = 2;
+            const int minLesbianFemale = 2;
+            const int minBisexual = 2;
+
+            int gayMaleCount = spawnedNPCs.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Gay);
+            int lesbianCount = spawnedNPCs.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Lesbian);
+            int bisexualCount = spawnedNPCs.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Bisexual);
+
+            // Convert some straight NPCs to fill minimums
+            var straightNPCs = spawnedNPCs
+                .Where(n => n.Brain?.Personality?.Orientation == SexualOrientation.Straight)
+                .OrderBy(_ => Random.Shared.Next())
+                .ToList();
+
+            int idx = 0;
+            while (gayMaleCount < minGayMale && idx < straightNPCs.Count)
+            {
+                var npc = straightNPCs[idx++];
+                if (npc.Brain?.Personality?.Gender == GenderIdentity.Male)
+                {
+                    npc.Brain!.Personality!.Orientation = SexualOrientation.Gay;
+                    gayMaleCount++;
+                }
+            }
+            while (lesbianCount < minLesbianFemale && idx < straightNPCs.Count)
+            {
+                var npc = straightNPCs[idx++];
+                if (npc.Brain?.Personality?.Gender == GenderIdentity.Female)
+                {
+                    npc.Brain!.Personality!.Orientation = SexualOrientation.Lesbian;
+                    lesbianCount++;
+                }
+            }
+            while (bisexualCount < minBisexual && idx < straightNPCs.Count)
+            {
+                var npc = straightNPCs[idx++];
+                npc.Brain!.Personality!.Orientation = SexualOrientation.Bisexual;
+                bisexualCount++;
+            }
         }
 
         /// <summary>

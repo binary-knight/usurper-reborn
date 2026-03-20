@@ -116,7 +116,10 @@ public class CharacterCreationSystem
             
             // Step 2: Select gender (Pascal gender selection)
             character.Sex = await SelectGender();
-            
+
+            // Step 2b: Select orientation
+            character.Orientation = await SelectOrientation();
+
             // Step 3: Select race (Pascal race selection with help + portrait preview)
             character.Race = await SelectRace(character.Name2, character.Sex);
             
@@ -398,6 +401,42 @@ public class CharacterCreationSystem
                     
                 default:
                     terminal.WriteLine(Loc.Get("creation.gender_invalid"), "red");
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Select character orientation (affects NPC romance availability)
+    /// </summary>
+    private async Task<SexualOrientation> SelectOrientation()
+    {
+        while (true)
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("creation.orientation"), "cyan");
+            terminal.WriteLine(Loc.Get("creation.orientation_1"), "white");
+            terminal.WriteLine(Loc.Get("creation.orientation_2"), "white");
+            terminal.WriteLine(Loc.Get("creation.orientation_3"), "white");
+            terminal.WriteLine(Loc.Get("creation.orientation_4"), "white");
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("creation.orientation_hint"));
+
+            var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
+
+            switch (choice.Trim())
+            {
+                case "1":
+                    return SexualOrientation.Straight;
+                case "2":
+                    return SexualOrientation.Gay; // Gay or Lesbian based on sex, but stored as Gay for simplicity
+                case "3":
+                    return SexualOrientation.Bisexual;
+                case "4":
+                    return SexualOrientation.Asexual;
+                default:
+                    terminal.WriteLine(Loc.Get("ui.invalid_choice"), "red");
                     break;
             }
         }

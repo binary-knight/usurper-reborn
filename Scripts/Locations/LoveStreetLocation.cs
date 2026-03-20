@@ -932,6 +932,7 @@ public class LoveStreetLocation : BaseLocation
 
             var extras = (NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>())
                 .Where(n => n.IsAlive && !n.IsDead && !hereIds.Contains(n.ID))
+                .Where(n => IsPlayerAttractedTo(n)) // Filter by player orientation
                 .Where(n => n.Brain?.Personality?.IsAttractedTo(playerGender) == true ||
                             RelationshipSystem.GetRelationshipStatus(currentPlayer, n) <= 40)
                 .OrderBy(n => RelationshipSystem.GetRelationshipStatus(currentPlayer, n))
@@ -1929,11 +1930,20 @@ public class LoveStreetLocation : BaseLocation
 
         var playerGender = currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
 
+        // Asexual players get a message instead of singles list
+        if (currentPlayer.Orientation == SexualOrientation.Asexual)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("love_street.gossip_asexual"));
+            return;
+        }
+
         var singles = (NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>())
             .Where(n => n.IsAlive && !n.IsDead)
             .Where(n => NPCMarriageRegistry.Instance?.IsMarriedToNPC(n.ID) != true)
             .Where(n => RomanceTracker.Instance.GetRelationType(n.ID) == RomanceRelationType.None)
             .Where(n => n.Brain?.Personality?.IsAttractedTo(playerGender) == true)
+            .Where(n => IsPlayerAttractedTo(n)) // Also filter by player's orientation
             .OrderBy(n => RelationshipSystem.GetRelationshipStatus(currentPlayer, n))
             .Take(10)
             .ToList();
@@ -2082,7 +2092,9 @@ public class LoveStreetLocation : BaseLocation
         if (profile != null)
         {
             var playerGender = currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
-            bool attracted = profile.IsAttractedTo(playerGender);
+            bool npcAttracted = profile.IsAttractedTo(playerGender);
+            bool playerAttracted = IsPlayerAttractedTo(npc);
+            bool attracted = npcAttracted && playerAttracted;
             terminal.SetColor("white");
             terminal.Write($" {Loc.Get("love_street.label_compatibility")}: ");
             if (!attracted)
@@ -2373,6 +2385,27 @@ public class LoveStreetLocation : BaseLocation
     private void GiveDarkness(Character player, int amount)
     {
         player.Darkness += amount;
+    }
+
+    /// <summary>
+    /// Check if the player is attracted to an NPC based on player orientation
+    /// </summary>
+    private bool IsPlayerAttractedTo(NPC npc)
+    {
+        var npcGender = npc.Brain?.Personality?.Gender ?? (npc.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male);
+        var playerGender = currentPlayer.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+
+        return currentPlayer.Orientation switch
+        {
+            SexualOrientation.Straight => (playerGender == GenderIdentity.Male && PersonalityProfile.IsFemalePresenting(npcGender)) ||
+                                          (playerGender == GenderIdentity.Female && PersonalityProfile.IsMalePresenting(npcGender)),
+            SexualOrientation.Gay or SexualOrientation.Lesbian =>
+                                     (playerGender == GenderIdentity.Male && PersonalityProfile.IsMalePresenting(npcGender)) ||
+                                     (playerGender == GenderIdentity.Female && PersonalityProfile.IsFemalePresenting(npcGender)),
+            SexualOrientation.Bisexual or SexualOrientation.Pansexual or SexualOrientation.Demisexual => true,
+            SexualOrientation.Asexual => false,
+            _ => true
+        };
     }
 
     private string GetRelationDescription(int level)

@@ -927,7 +927,7 @@ namespace UsurperRemake.Systems
                 !companion.PersonalQuestStarted && !companion.PersonalQuestCompleted)
             {
                 companion.PersonalQuestAvailable = true;
-                // Godot.GD.Print($"[Companion] {companion.Name}'s personal quest unlocked: {companion.PersonalQuestName}");
+                // DebugLogger: {companion.Name}'s personal quest unlocked: {companion.PersonalQuestName}
 
                 // Queue a notification for the player
                 QueueQuestUnlockNotification(companion);
@@ -1617,7 +1617,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         companion.Experience = GetExperienceForLevel(companion.Level);
-                        // Godot.GD.Print($"[Companion] Initialized {companion.Name}'s XP to {companion.Experience} for level {companion.Level}");
+                        // DebugLogger: Initialized {companion.Name}'s XP to {companion.Experience} for level {companion.Level}
                     }
 
                     // Restore base stats if saved (otherwise scale from defaults)

@@ -78,6 +78,7 @@ public class Character
     public int Hair { get; set; }                   // hair color
     public int Skin { get; set; }                   // skin color
     public CharacterSex Sex { get; set; }           // sex, male=1 female=2
+    public SexualOrientation Orientation { get; set; } = SexualOrientation.Straight; // player sexual orientation
     public long Mana { get; set; }                  // mana, spellcasters only
     public long MaxMana { get; set; }               // maxmana
     public long Stamina { get; set; }               // stamina
