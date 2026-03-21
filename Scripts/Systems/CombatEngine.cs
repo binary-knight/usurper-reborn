@@ -207,12 +207,14 @@ public partial class CombatEngine
         attacker.RemoveStatus(StatusEffect.Protected);
         attacker.RemoveStatus(StatusEffect.Blessed);
         attacker.RemoveStatus(StatusEffect.Haste);
+        attacker.RemoveStatus(StatusEffect.Reflecting);
         attacker.ActiveTotemType = 0;
         attacker.ActiveTotemRounds = 0;
         attacker.ActiveTotemPower = 0;
         attacker.ShamanEnchantType = 0;
         attacker.ShamanEnchantRounds = 0;
         attacker.ShamanEnchantPower = 0;
+        attacker.UnmakingCooldown = 0;
         defender.DeathsEmbraceActive = false;
         defender.StatusLifestealPercent = 0;
         defender.ActiveTotemType = 0;
@@ -404,12 +406,14 @@ public partial class CombatEngine
         player.RemoveStatus(StatusEffect.Protected);
         player.RemoveStatus(StatusEffect.Blessed);
         player.RemoveStatus(StatusEffect.Haste);
+        player.RemoveStatus(StatusEffect.Reflecting);
         player.ActiveTotemType = 0;
         player.ActiveTotemRounds = 0;
         player.ActiveTotemPower = 0;
         player.ShamanEnchantType = 0;
         player.ShamanEnchantRounds = 0;
         player.ShamanEnchantPower = 0;
+        player.UnmakingCooldown = 0;
         abilityCooldowns.Clear();
         teammateCooldowns.Clear();
 
@@ -8022,9 +8026,21 @@ public partial class CombatEngine
                     : currentEquip.ArmorClass;
             }
 
-            // Only pick up if it's strictly better (accessories with all-zero stats: always upgrade if slot empty)
-            if (isAccessory && itemPower == 0 && currentPower == 0) continue;
-            if (itemPower <= currentPower) continue;
+            // Empty slot is always an upgrade (any gear > nothing)
+            bool slotIsEmpty = currentEquip == null;
+            if (slotIsEmpty && itemPower == 0)
+            {
+                // Item has no raw power but may have stat bonuses — count those
+                int statBonus = lootItem.Strength + lootItem.Dexterity + lootItem.Agility +
+                    lootItem.Wisdom + lootItem.Charisma + lootItem.HP + lootItem.Mana +
+                    lootItem.Defence + lootItem.Attack + lootItem.Armor;
+                if (lootItem.LootEffects != null)
+                    statBonus += lootItem.LootEffects.Sum(e => e.Item2);
+                if (statBonus <= 0) continue; // Truly empty item, skip
+                itemPower = Math.Max(1, statBonus); // Treat stat bonuses as power
+            }
+            // Only pick up if it's strictly better
+            if (!slotIsEmpty && itemPower <= currentPower) continue;
 
             int upgradePercent;
             if (currentPower == 0)
@@ -8430,8 +8446,18 @@ public partial class CombatEngine
 
         if (currentEquip == null)
         {
-            terminal.SetColor("green");
-            terminal.WriteLine($"  Slot is empty - this would be an upgrade!");
+            // Warn if equipping a shield/off-hand item would conflict with two-handed weapon
+            if (targetSlot == EquipmentSlot.OffHand && player.IsTwoHanding)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  WARNING: You are using a two-handed weapon.");
+                terminal.WriteLine($"  Equipping this would unequip your main weapon!");
+            }
+            else
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine($"  Slot is empty - this would be an upgrade!");
+            }
         }
         else
         {
@@ -10969,8 +10995,13 @@ public partial class CombatEngine
 
         // Off-hand follow-up for melee attack abilities when dual-wielding
         // Power Strike etc. empower the main hand — the off-hand still gets its normal swing
+        // Non-melee abilities (distract, psychic, magic) don't trigger off-hand physical strikes
+        bool isNonMeleeAbility = abilityResult.SpecialEffect.Contains("aoe") ||
+            abilityResult.SpecialEffect.Contains("distract") || abilityResult.SpecialEffect.Contains("psychic") ||
+            abilityResult.SpecialEffect.Contains("magic") || abilityResult.SpecialEffect.Contains("charm") ||
+            abilityResult.SpecialEffect.Contains("fear") || abilityResult.SpecialEffect.Contains("confus");
         if (ability.Type == ClassAbilitySystem.AbilityType.Attack && abilityResult.Damage > 0 && player.IsDualWielding
-            && !abilityResult.SpecialEffect.Contains("aoe"))
+            && !isNonMeleeAbility)
         {
             var offHandTarget = (target != null && target.IsAlive) ? target : GetRandomLivingMonster(monsters);
             if (offHandTarget != null && offHandTarget.IsAlive)
@@ -11779,12 +11810,24 @@ public partial class CombatEngine
             // TIDESWORN PRESTIGE ABILITIES
             // ═══════════════════════════════════════════════════════════════════════
             case "undertow":
-                // -20% enemy damage for duration (apply Weakened + reduce strength)
+                // -20% enemy damage for duration (apply Weakened) + taunt (force target to attack you)
                 if (target != null && target.IsAlive)
                 {
                     target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration);
+                    target.TauntedBy = player.DisplayName;
+                    target.TauntRoundsLeft = Math.Max(target.TauntRoundsLeft, abilityResult.Duration);
                     terminal.SetColor("cyan");
                     terminal.WriteLine(Loc.Get("combat.ability_undertow", target.Name));
+                }
+                // In multi-monster: taunt ALL living monsters
+                if (monsters != null)
+                {
+                    foreach (var m in monsters.Where(m => m.IsAlive && m != target))
+                    {
+                        m.TauntedBy = player.DisplayName;
+                        m.TauntRoundsLeft = Math.Max(m.TauntRoundsLeft, abilityResult.Duration);
+                        m.WeakenRounds = Math.Max(m.WeakenRounds, abilityResult.Duration);
+                    }
                 }
                 break;
 
@@ -12590,14 +12633,16 @@ public partial class CombatEngine
             // ═══════════════════════════════════════════════════════════════════════
             // VOIDREAVER PRESTIGE ABILITIES
             // ═══════════════════════════════════════════════════════════════════════
+            case "lifesteal_20":
             case "lifesteal_30":
             {
-                // 60 damage + 30% lifesteal
+                // Damage + lifesteal (20% for Hungering Strike, 30% for legacy)
+                float lifestealPct = abilityResult.SpecialEffect == "lifesteal_20" ? 0.20f : 0.30f;
                 if (target != null && target.IsAlive)
                 {
                     int dmg = abilityResult.Damage;
                     target.HP -= dmg;
-                    int heal = (int)(dmg * 0.30);
+                    int heal = (int)(dmg * lifestealPct);
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("combat.ability_lifesteal_30", target.Name, dmg, heal));
@@ -12669,12 +12714,12 @@ public partial class CombatEngine
 
             case "apotheosis":
             {
-                // Burn 40% HP. 4 rounds: +100 ATK (handled), hit all, 20% lifesteal
+                // Burn 40% HP. 3 rounds: +60 ATK (handled), hit all, 10% lifesteal (rebalanced)
                 int sacrifice = (int)(player.MaxHP * 0.40);
                 player.HP = Math.Max(1, player.HP - sacrifice);
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
-                    player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
-                player.StatusLifestealPercent = Math.Max(player.StatusLifestealPercent, 20);
+                    player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                player.StatusLifestealPercent = Math.Max(player.StatusLifestealPercent, 10); // Reduced from 20%
                 player.IsRaging = true;
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
                     player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
@@ -12686,13 +12731,13 @@ public partial class CombatEngine
 
             case "devour":
             {
-                // 160 damage, 50% lifesteal, double if player <30% HP
+                // 120 damage, 30% lifesteal, 1.5x if player <30% HP (rebalanced)
                 if (target != null && target.IsAlive)
                 {
                     int dmg = abilityResult.Damage;
-                    if (player.HP < (int)(player.MaxHP * 0.30)) dmg *= 2;
+                    if (player.HP < (int)(player.MaxHP * 0.30)) dmg = (int)(dmg * 1.5);
                     target.HP -= dmg;
-                    int heal = (int)(dmg * 0.50);
+                    int heal = (int)(dmg * 0.30);
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("combat.ability_devour", target.Name, dmg, heal));
@@ -12743,8 +12788,8 @@ public partial class CombatEngine
 
             case "void_rupture":
             {
-                // 220 AoE, killed enemies explode for 100
-                int killExplosionDmg = 100;
+                // 160 AoE, killed enemies explode for 60 (rebalanced)
+                int killExplosionDmg = 60;
                 int kills = 0;
                 if (monsters != null)
                 {
@@ -13118,8 +13163,12 @@ public partial class CombatEngine
         // Only apply effects if spell succeeded (not fumbled/failed)
         if (!spellResult.Success)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  ** The spell had no effect! Train at the Level Master to improve your casting. **");
+            // Don't show training advice for cooldown blocks — the player knows why it failed
+            if (spellResult.SpecialEffect != "fail" || !spellResult.Message.Contains("recovered"))
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  ** The spell had no effect! Train at the Level Master to improve your casting. **");
+            }
             result.CombatLog.Add($"{player.DisplayName}'s spell fizzles.");
             return;
         }
@@ -15430,6 +15479,23 @@ public partial class CombatEngine
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("combat.monster_hits_companion", monster.TheNameOrName, companion.DisplayName, actualDamage) + $" ({companion.HP}/{companion.MaxHP} HP)");
 
+        // Reflecting status: reflect damage back at attacker (same as player path)
+        if (actualDamage > 0 && monster.IsAlive && companion.HasStatus(StatusEffect.Reflecting))
+        {
+            float reflectPercent = GameConfig.WavecallerReflectionPercent;
+            long reflectDamage = Math.Max(1, (long)(actualDamage * reflectPercent));
+            monster.HP = Math.Max(0, monster.HP - reflectDamage);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  {companion.DisplayName}'s tidal barrier reflects {reflectDamage} damage back at {monster.Name}!");
+            if (monster.HP <= 0)
+            {
+                terminal.SetColor("bright_white");
+                terminal.WriteLine($"  {monster.Name} is destroyed by the reflected damage!");
+                if (!result.DefeatedMonsters.Contains(monster))
+                    result.DefeatedMonsters.Add(monster);
+            }
+        }
+
         // Broadcast to grouped players: tell the target they got hit, tell others what happened
         if (companion.IsGroupedPlayer && companion.GroupPlayerUsername != null)
         {
@@ -17471,8 +17537,13 @@ public partial class CombatEngine
         }
 
         // Off-hand follow-up for melee attack abilities when dual-wielding
+        // Non-melee abilities (distract, psychic, magic) don't trigger off-hand physical strikes
+        bool isNonMelee = abilityResult.SpecialEffect.Contains("aoe") ||
+            abilityResult.SpecialEffect.Contains("distract") || abilityResult.SpecialEffect.Contains("psychic") ||
+            abilityResult.SpecialEffect.Contains("magic") || abilityResult.SpecialEffect.Contains("charm") ||
+            abilityResult.SpecialEffect.Contains("fear") || abilityResult.SpecialEffect.Contains("confus");
         if (ability.Type == ClassAbilitySystem.AbilityType.Attack && abilityResult.Damage > 0 && player.IsDualWielding
-            && monster != null && monster.IsAlive)
+            && !isNonMelee && monster != null && monster.IsAlive)
         {
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
@@ -18172,10 +18243,12 @@ public partial class CombatEngine
             // ═══════════════════════════════════════════════════════════════════════
 
             case "undertow":
-                // -20% enemy damage for duration (apply Weakened)
+                // -20% enemy damage for duration (apply Weakened) + taunt
                 if (monster != null && monster.IsAlive)
                 {
                     monster.WeakenRounds = Math.Max(monster.WeakenRounds, abilityResult.Duration);
+                    monster.TauntedBy = player.DisplayName;
+                    monster.TauntRoundsLeft = Math.Max(monster.TauntRoundsLeft, abilityResult.Duration);
                     terminal.SetColor("cyan");
                     terminal.WriteLine(Loc.Get("combat.ability_undertow", monster.Name));
                 }
@@ -18926,14 +18999,16 @@ public partial class CombatEngine
             // VOIDREAVER PRESTIGE ABILITIES (single-monster)
             // ═══════════════════════════════════════════════════════════════════════
 
+            case "lifesteal_20":
             case "lifesteal_30":
             {
-                // 60 damage + 30% lifesteal
+                // Damage + lifesteal (20% for Hungering Strike, 30% for legacy)
+                float lsPct = abilityResult.SpecialEffect == "lifesteal_20" ? 0.20f : 0.30f;
                 if (monster != null && monster.IsAlive)
                 {
                     int dmg = abilityResult.Damage;
                     monster.HP -= dmg;
-                    int lsHeal = (int)(dmg * 0.30);
+                    int lsHeal = (int)(dmg * lsPct);
                     player.HP = Math.Min(player.MaxHP, player.HP + lsHeal);
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("combat.ability_lifesteal_30", monster.Name, dmg, lsHeal));
@@ -19005,12 +19080,12 @@ public partial class CombatEngine
 
             case "apotheosis":
             {
-                // Burn 40% HP. 4 rounds: +100 ATK (handled), hit all, 20% lifesteal
+                // Burn 40% HP. 3 rounds: +60 ATK (handled), hit all, 10% lifesteal (rebalanced)
                 int apoSacrifice = (int)(player.MaxHP * 0.40);
                 player.HP = Math.Max(1, player.HP - apoSacrifice);
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
-                    player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
-                player.StatusLifestealPercent = Math.Max(player.StatusLifestealPercent, 20);
+                    player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                player.StatusLifestealPercent = Math.Max(player.StatusLifestealPercent, 10);
                 player.IsRaging = true;
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
                     player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
@@ -19311,6 +19386,10 @@ public partial class CombatEngine
                 abilityCooldowns.Remove(key);
             }
         }
+
+        // Decrement Unmaking spell cooldown
+        if (player.UnmakingCooldown > 0)
+            player.UnmakingCooldown--;
 
         // Decrement teammate ability cooldowns
         foreach (var tcEntry in teammateCooldowns.Values)
@@ -21927,9 +22006,13 @@ public partial class CombatEngine
                 var spell = SpellSystem.GetSpellInfo(player.Class, spellLevel.Value);
                 if (spell == null) continue;
                 int manaCost = SpellSystem.CalculateManaCost(spell, player);
-                bool canCast = player.CanCastSpells() && player.Mana >= manaCost && SpellSystem.HasRequiredSpellWeapon(player);
+                // Check for Unmaking cooldown (Voidreaver spell 5)
+                bool onCooldown = player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0;
+                bool canCast = player.CanCastSpells() && player.Mana >= manaCost && SpellSystem.HasRequiredSpellWeapon(player) && !onCooldown;
                 string displayName;
-                if (!SpellSystem.HasRequiredSpellWeapon(player))
+                if (onCooldown)
+                    displayName = $"{spell.Name} (CD:{player.UnmakingCooldown})";
+                else if (!SpellSystem.HasRequiredSpellWeapon(player))
                 {
                     var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
                     displayName = $"{spell.Name} (Need {reqType})";
@@ -22000,7 +22083,9 @@ public partial class CombatEngine
                 if (spell != null)
                 {
                     int manaCost = SpellSystem.CalculateManaCost(spell, player);
-                    if (!SpellSystem.HasRequiredSpellWeapon(player))
+                    if (player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0)
+                        terminal.WriteLine($"{spell.Name} is on cooldown! ({player.UnmakingCooldown} round{(player.UnmakingCooldown > 1 ? "s" : "")} remaining)", "red");
+                    else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
                         var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
                         terminal.WriteLine(Loc.Get("combat.need_weapon_spell", reqType), "red");
@@ -22056,21 +22141,13 @@ public partial class CombatEngine
             }
             else if (spellInfo.IsMultiTarget)
             {
-                terminal.WriteLine("");
-                terminal.Write(Loc.Get("combat.target_all_yn"));
-                var targetAllResponse = await terminal.GetInput("");
-                bool targetAll = targetAllResponse.Trim().ToUpper() == "Y";
-                int? targetIdx = null;
-                if (!targetAll)
-                {
-                    targetIdx = await GetTargetSelection(monsters, allowRandom: false);
-                }
-                return (CombatActionType.CastSpell, targetIdx, "", spLevel.Value, null, targetAll);
+                // AoE spells always target all monsters — no prompt needed
+                return (CombatActionType.CastSpell, null, "", spLevel.Value, null, true);
             }
             else
             {
                 // Single target attack/debuff spell
-                var targetIdx = await GetTargetSelection(monsters, allowRandom: false);
+                var targetIdx = await GetTargetSelection(monsters, allowRandom: true);
                 return (CombatActionType.CastSpell, targetIdx, "", spLevel.Value, null, false);
             }
         }
@@ -22120,7 +22197,9 @@ public partial class CombatEngine
                 if (spell != null)
                 {
                     int manaCost = SpellSystem.CalculateManaCost(spell, player);
-                    if (!SpellSystem.HasRequiredSpellWeapon(player))
+                    if (player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0)
+                        terminal.WriteLine($"{spell.Name} is on cooldown! ({player.UnmakingCooldown} round{(player.UnmakingCooldown > 1 ? "s" : "")} remaining)", "red");
+                    else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
                         var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
                         terminal.WriteLine(Loc.Get("combat.need_weapon_spell", reqType), "red");

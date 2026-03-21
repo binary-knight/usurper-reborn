@@ -785,6 +785,8 @@ namespace UsurperRemake.Systems
         public int HP { get; set; }
         public int Mana { get; set; }
         public int Charisma { get; set; }
+        public int Agility { get; set; }
+        public int Stamina { get; set; }
         public int MinLevel { get; set; }
         public bool IsCursed { get; set; }
         // Cursed is now an alias for IsCursed for backwards compatibility

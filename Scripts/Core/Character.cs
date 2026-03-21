@@ -567,6 +567,9 @@ public class Character
     public int ShamanEnchantRounds { get; set; }     // Rounds remaining
     public int ShamanEnchantPower { get; set; }       // Enchant strength (scales with INT)
 
+    // Voidreaver Unmaking cooldown (transient, per-combat)
+    public int UnmakingCooldown { get; set; }
+
     // Dark Pact buff (Evil Deeds ritual, v0.49.4)
     public int DarkPactCombats { get; set; }
     public float DarkPactDamageBonus { get; set; }
@@ -802,18 +805,18 @@ public class Character
             else if (item.Handedness == WeaponHandedness.OffHandOnly)
                 slot = EquipmentSlot.OffHand;
 
-            // Smart ring slot selection: prefer empty slot over replacing
+            // Smart ring slot selection: if the chosen slot is occupied, try the other
+            // But respect the player's explicit choice when both are empty
             if (slot == EquipmentSlot.LFinger || slot == EquipmentSlot.RFinger)
             {
-                var leftRing = GetEquipment(EquipmentSlot.LFinger);
-                var rightRing = GetEquipment(EquipmentSlot.RFinger);
+                var chosenRing = GetEquipment(slot);
+                var otherSlot = slot == EquipmentSlot.LFinger ? EquipmentSlot.RFinger : EquipmentSlot.LFinger;
+                var otherRing = GetEquipment(otherSlot);
 
-                if (leftRing == null && rightRing == null)
-                    slot = EquipmentSlot.LFinger; // Both empty, use left
-                else if (leftRing == null)
-                    slot = EquipmentSlot.LFinger; // Left empty, use it
-                else if (rightRing == null)
-                    slot = EquipmentSlot.RFinger; // Right empty, use it
+                if (chosenRing == null)
+                { } // Chosen slot is empty — use it as-is
+                else if (otherRing == null)
+                    slot = otherSlot; // Chosen slot full, other is empty — use other
                 // else both full — keep original slot (caller should prompt)
             }
         }

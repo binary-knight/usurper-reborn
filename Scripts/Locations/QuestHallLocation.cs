@@ -111,6 +111,10 @@ public class QuestHallLocation : BaseLocation
 
         var choice = await GetChoice();
 
+        // Handle global quick commands (/health, /bug, etc.)
+        var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
+        if (handled) return false;
+
         switch (choice.ToUpper().Trim())
         {
             case "V":

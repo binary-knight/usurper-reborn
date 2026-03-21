@@ -247,7 +247,7 @@ public static class SpellSystem
             [2] = new SpellInfo(2, "Blood Pact", "Sacrifice 20% of max HP. Gain +50 attack for the fight and guaranteed critical strike on next hit. Cannot be dispelled.", 30, 5, "Bloodpactarie", false, "Buff"),
             [3] = new SpellInfo(3, "Void Bolt", "Fire a bolt of annihilating nothingness. Damage: 90-120. Ignores all defense. Duration: 1 turn.", 55, 10, "Voidboltarie", false, "Attack"),
             [4] = new SpellInfo(4, "Consume the Fallen", "Devour residual energy from the fallen. Heals 25% of max HP (min 100). Duration: 1 turn.", 80, 16, "Consumfallarie", false, "Heal"),
-            [5] = new SpellInfo(5, "Unmaking", "Erase the target from reality. Damage: 350-450. Costs 25% current HP. If kills: restore all HP and mana. Duration: 1 turn.", 250, 24, "Unmakingarie", false, "Attack")
+            [5] = new SpellInfo(5, "Unmaking", "Erase the target from reality. Damage: 200-280. Costs 25% current HP. If kills: restore all HP and mana. Duration: 1 turn.", 250, 24, "Unmakingarie", false, "Attack")
         }
     };
     
@@ -525,13 +525,19 @@ public static class SpellSystem
         caster.Mana -= manaCost;
 
         // Check for spell failure
-        if (rollResult.IsCriticalFailure || !rollResult.Success)
+        // Spells don't auto-fail on natural 1 (unlike melee attacks) — only the flat fumble
+        // chance from inexperience and failing to beat the DC cause failure. This follows
+        // D&D 5e rules where nat 1/20 only apply to attack rolls, not ability checks.
+        bool spellFailed = (rollResult.IsCriticalFailure && rollResult.NaturalRoll == 0) || // Flat fumble from inexperience
+                           (!rollResult.Success && !rollResult.IsCriticalSuccess);           // Didn't beat DC (nat 1 with high mod can still succeed)
+        if (spellFailed)
         {
             result.Success = false;
-            if (rollResult.IsCriticalFailure)
+            if (rollResult.NaturalRoll == 0)
             {
+                // Flat fumble from inexperience
                 result.Message = $"{caster.Name2} fumbles the spell! The magic fizzles harmlessly.";
-                result.Message += $"\n  {result.RollInfo}";
+                result.Message += $"\n  [Miscast! Train at the Level Master to reduce fumble chance.]";
                 result.SpecialEffect = "fizzle";
             }
             else
@@ -1419,11 +1425,16 @@ public static class SpellSystem
                 result.IsMultiTarget = true;
                 result.Message += $" Shimmering wave-light protects all allies! (+{result.ProtectionBonus} defense)";
                 break;
-            case 3: // Siren's Lament - All enemies debuffed
+            case 3: // Siren's Lament - All enemies debuffed (crit = double duration + damage)
                 result.SpecialEffect = "weaken";
-                result.Duration = 4;
+                bool sirenCrit = result.Message.Contains("CRITICAL CAST");
+                result.Duration = sirenCrit ? 8 : 4;
+                result.Damage = sirenCrit ? ScaleSpellEffect(40 + random.Next(20), caster, random, profMult) : 0;
                 result.IsMultiTarget = true;
-                result.Message += $" The Ocean's grief saps enemy will! (-30% attack, -20% defense)";
+                if (sirenCrit)
+                    result.Message += $" The Ocean's grief OVERWHELMS enemy will! (-30% ATK, -20% DEF for {result.Duration} rounds + {result.Damage} psychic damage!)";
+                else
+                    result.Message += $" The Ocean's grief saps enemy will! (-30% attack, -20% defense)";
                 break;
             case 4: // Restorative Tide - 80-120 heal to all allies
                 int waveHeal4 = 80 + random.Next(41);
@@ -1549,13 +1560,24 @@ public static class SpellSystem
                 result.Healing = ScaleHealingEffect(consumeHeal, caster, random, profMult);
                 result.Message += $" {caster.Name2} consumes fallen energy, restoring {result.Healing} HP!";
                 break;
-            case 5: // Unmaking - 350-450 damage, costs 25% current HP
+            case 5: // Unmaking - 200-280 damage, costs 25% current HP (reduced from 350-450)
+                // 1-round cooldown — can't spam the most powerful spell every round
+                if (caster.UnmakingCooldown > 0)
+                {
+                    result.Success = false;
+                    result.Message += $" The void hasn't recovered — Unmaking needs 1 more round!";
+                    result.SpecialEffect = "fail";
+                    // Refund mana since we blocked the cast
+                    caster.Mana += result.ManaCost;
+                    break;
+                }
                 int unmakeCost = (int)(caster.HP * 0.25);
                 caster.HP = Math.Max(1, caster.HP - unmakeCost);
-                int vrDmg5 = 350 + random.Next(101);
+                int vrDmg5 = 200 + random.Next(81);
                 result.Damage = ScaleSpellEffect(vrDmg5, caster, random, profMult);
                 result.SpecialEffect = "unmaking";
                 result.Message += $" {caster.Name2} erases reality for {result.Damage} damage! (-{unmakeCost} HP)";
+                caster.UnmakingCooldown = 2; // Ticks down each round, castable again after 1 round
                 break;
         }
     }

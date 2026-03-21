@@ -145,7 +145,7 @@ public class BankLocation : BaseLocation
         // Menu rows
         ShowBBSMenuRow(("D", "bright_yellow", Loc.Get("bank.deposit")), ("W", "bright_yellow", Loc.Get("bank.withdraw")), ("T", "bright_yellow", Loc.Get("bank.transfer")));
         ShowBBSMenuRow(("L", "bright_yellow", Loc.Get("bank.loan")), ("I", "bright_yellow", Loc.Get("bank.interest")), ("A", "bright_yellow", Loc.Get("bank.history")));
-        ShowBBSMenuRow(("G", "bright_yellow", Loc.Get("bank.guard")), ("*", "bright_yellow", Loc.Get("bank.resign_guard")), ("O", "bright_yellow", Loc.Get("bank.robbery")));
+        ShowBBSMenuRow(("G", "bright_yellow", Loc.Get("bank.guard")), ("X", "bright_yellow", Loc.Get("bank.resign_guard")), ("O", "bright_yellow", Loc.Get("bank.robbery")));
         ShowBBSMenuRow(("R", "bright_yellow", Loc.Get("bank.return")), ("Q", "bright_yellow", Loc.Get("bank.return")));
         ShowBBSFooter();
     }
@@ -321,7 +321,7 @@ public class BankLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
-        terminal.Write("*");
+        terminal.Write("X");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
@@ -382,7 +382,7 @@ public class BankLocation : BaseLocation
         WriteSRMenuOption("I", Loc.Get("bank.interest"));
         WriteSRMenuOption("A", Loc.Get("bank.history"));
         WriteSRMenuOption("G", Loc.Get("bank.guard"));
-        WriteSRMenuOption("*", Loc.Get("bank.resign_guard"));
+        WriteSRMenuOption("X", Loc.Get("bank.resign_guard"));
         WriteSRMenuOption("O", Loc.Get("bank.robbery"));
         WriteSRMenuOption("R", Loc.Get("bank.return"));
         terminal.WriteLine("");
@@ -431,7 +431,7 @@ public class BankLocation : BaseLocation
                 await ApplyForGuardDuty();
                 return false;
 
-            case "*":
+            case "X":
                 await ResignGuardDuty();
                 return false;
 
@@ -1260,57 +1260,61 @@ public class BankLocation : BaseLocation
         var monsters = new List<Monster>();
         int level = currentPlayer.Level;
 
-        // Captain — roughly 1.5x a same-level dungeon monster
-        long captainHP = (long)(75 * level + Math.Pow(level, 1.2) * 20);
+        // Captain — elite combatant, should be a serious challenge (3x dungeon monster)
+        long captainHP = (long)(150 * level + Math.Pow(level, 1.3) * 40);
         var captain = new Monster
         {
             Name = "Captain of the Guard",
+            Level = level + 5, // Loot quality scales with monster level
             HP = captainHP,
             MaxHP = captainHP,
-            Strength = 15 + (int)(level * 2.5),
-            Defence = 10 + (int)(level * 1.5),
-            WeapPow = 10 + level,
-            ArmPow = 8 + level / 2,
-            WeaponName = "Broadsword",
-            ArmorName = "Chainmail"
+            Strength = 25 + (int)(level * 4.0),
+            Defence = 20 + (int)(level * 3.0),
+            WeapPow = 20 + level * 2,
+            ArmPow = 15 + level,
+            WeaponName = "Enchanted Broadsword",
+            ArmorName = "Reinforced Plate"
         };
         monsters.Add(captain);
 
-        // Regular guards — roughly equal to same-level dungeon monsters
+        // Regular guards — trained professionals (2x dungeon monster)
         for (int i = 1; i < guardCount; i++)
         {
-            long guardHP = (long)(50 * level + Math.Pow(level, 1.2) * 12);
+            long guardHP = (long)(100 * level + Math.Pow(level, 1.2) * 25);
             var guard = new Monster
             {
                 Name = "Bank Guard",
+                Level = level,
                 HP = guardHP,
                 MaxHP = guardHP,
-                Strength = 10 + level * 2,
-                Defence = 8 + level,
-                WeapPow = 8 + level * 3 / 4,
-                ArmPow = 5 + level / 3,
+                Strength = 18 + level * 3,
+                Defence = 15 + level * 2,
+                WeapPow = 15 + level,
+                ArmPow = 10 + level * 2 / 3,
                 WeaponName = "Halberd",
-                ArmorName = "Ringmail"
+                ArmorName = "Half-Plate"
             };
             monsters.Add(guard);
         }
 
-        // Possible pitbull — scales with player level
+        // War hounds — always present, fast and vicious
         var random = new Random();
-        if (random.Next(2) == 0)
+        int houndCount = 1 + random.Next(3); // 1-3 war hounds
+        for (int h = 0; h < houndCount; h++)
         {
-            long dogHP = (long)(30 * level + Math.Pow(level, 1.1) * 10);
+            long dogHP = (long)(60 * level + Math.Pow(level, 1.2) * 15);
             var dog = new Monster
             {
-                Name = "Guard Pitbull",
+                Name = "War Hound",
+                Level = level - 5,
                 HP = dogHP,
                 MaxHP = dogHP,
-                Strength = 10 + (int)(level * 1.8),
-                Defence = 3 + level / 2,
-                WeapPow = 12 + level,
-                ArmPow = 3 + level / 4,
-                WeaponName = "Savage Jaws",
-                ArmorName = "Thick Hide"
+                Strength = 15 + (int)(level * 2.5),
+                Defence = 8 + level,
+                WeapPow = 15 + level,
+                ArmPow = 5 + level / 3,
+                WeaponName = "Iron-Tipped Jaws",
+                ArmorName = "Studded Barding"
             };
             monsters.Add(dog);
         }
@@ -1327,23 +1331,39 @@ public class BankLocation : BaseLocation
 
         if (result.Outcome == CombatOutcome.Victory)
         {
-            // Calculate loot (25% of safe) with overflow protection
-            long stolenGold = _safeContents / 4;
-            long goldBeforeRob = currentPlayer.Gold;
-            currentPlayer.Gold = SafeAddGold(currentPlayer.Gold, stolenGold);
-            _safeContents = Math.Max(0, _safeContents - stolenGold);
-            DebugLogger.Instance.LogInfo("GOLD", $"BANK ROBBERY: {currentPlayer.DisplayName} stole {stolenGold:N0}g (gold {goldBeforeRob:N0}->{currentPlayer.Gold:N0})");
+            // Calculate loot (25% of safe) — exclude the robber's own deposits to prevent
+            // deposit-rob-redeposit exploit (player was stealing their own money back endlessly)
+            long otherPeoplesGold = Math.Max(0, _safeContents - currentPlayer.BankGold);
+            long stolenGold = otherPeoplesGold / 4;
 
-            terminal.WriteLine("");
-            WriteBoxHeader(Loc.Get("bank.rob_success", stolenGold.ToString("N0")), "bright_green");
-            terminal.WriteLine("");
+            if (stolenGold <= 0)
+            {
+                // Nothing to steal — vault only contains the robber's own gold
+                terminal.WriteLine("");
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("bank.rob_vault_empty"));
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("bank.rob_only_your_gold"));
+            }
+            else
+            {
+                long goldBeforeRob = currentPlayer.Gold;
+                currentPlayer.Gold = SafeAddGold(currentPlayer.Gold, stolenGold);
+                _safeContents = Math.Max(0, _safeContents - stolenGold);
+                DebugLogger.Instance.LogInfo("GOLD", $"BANK ROBBERY: {currentPlayer.DisplayName} stole {stolenGold:N0}g (gold {goldBeforeRob:N0}->{currentPlayer.Gold:N0})");
 
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("bank.rob_flee"));
-            terminal.WriteLine(Loc.Get("bank.rob_authorities"));
-            terminal.WriteLine(Loc.Get("bank.rob_vault_remaining", _safeContents.ToString("N0")));
+                terminal.WriteLine("");
+                WriteBoxHeader(Loc.Get("bank.rob_success", stolenGold.ToString("N0")), "bright_green");
+                terminal.WriteLine("");
 
-            NewsSystem.Instance.Newsy(true, $"BANK ROBBERY! {currentPlayer.DisplayName} robbed the Ironvault Bank of {stolenGold:N0} gold!");
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("bank.rob_flee"));
+                terminal.WriteLine(Loc.Get("bank.rob_authorities"));
+                long vaultRemaining = Math.Max(0, _safeContents - currentPlayer.BankGold);
+                terminal.WriteLine(Loc.Get("bank.rob_vault_remaining", vaultRemaining.ToString("N0")));
+
+                NewsSystem.Instance.Newsy(true, $"BANK ROBBERY! {currentPlayer.DisplayName} robbed the Ironvault Bank of {stolenGold:N0} gold!");
+            }
         }
         else if (result.Outcome == CombatOutcome.PlayerDied)
         {
@@ -1388,18 +1408,18 @@ public class BankLocation : BaseLocation
 
     private int CalculateGuardCount()
     {
-        int guards = 2; // Base guards
+        int guards = 4; // Base guards (increased from 2)
 
         // More guards for richer banks
         if (_safeContents > 100000) guards++;
         if (_safeContents > 250000) guards++;
-        if (_safeContents > 500000) guards++;
-        if (_safeContents > 1000000) guards += 2;
+        if (_safeContents > 500000) guards += 2;
+        if (_safeContents > 1000000) guards += 3;
 
         // More guards after recent robbery attempts
-        guards += _robberyAttemptsToday;
+        guards += _robberyAttemptsToday * 2;
 
-        return Math.Min(guards, 10); // Cap at 10
+        return Math.Min(guards, 12); // Cap at 12
     }
 
     /// <summary>

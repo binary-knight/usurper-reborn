@@ -4696,18 +4696,18 @@ public class CastleLocation : BaseLocation
             }
             else
             {
-                // Create fallback Character from estimated stats
-                int guardLevel = Math.Max(10, estKingLevel - 5);
+                // Create fallback Character from estimated stats (buffed — royal guards are elite)
+                int guardLevel = Math.Max(15, estKingLevel - 3);
                 guardCharacter = new Character
                 {
                     Name2 = guard.Name,
                     Level = guardLevel,
-                    Strength = (long)((30 + estKingLevel * 5) * loyaltyMod),
-                    Defence = 10 + estKingLevel * 3,
-                    HP = 100 + estKingLevel * 30,
-                    MaxHP = 100 + estKingLevel * 30,
-                    WeapPow = 20 + estKingLevel * 2,
-                    ArmPow = 10 + estKingLevel,
+                    Strength = (long)((50 + estKingLevel * 8) * loyaltyMod),
+                    Defence = 15 + estKingLevel * 5,
+                    HP = 200 + estKingLevel * 50,
+                    MaxHP = 200 + estKingLevel * 50,
+                    WeapPow = 25 + estKingLevel * 3,
+                    ArmPow = 12 + estKingLevel * 2,
                     AI = CharacterAI.Computer,
                     Class = CharacterClass.Warrior
                 };
@@ -4837,18 +4837,18 @@ public class CastleLocation : BaseLocation
         }
         else
         {
-            // Fallback — scale with estimated king level
-            int kingLevel = Math.Max(20, currentKing.TotalReign > 0 ? 20 + (int)(currentKing.TotalReign / 5) : 20);
+            // Fallback — scale with estimated king level (buffed to be a serious challenge)
+            int kingLevel = Math.Max(30, currentKing.TotalReign > 0 ? 30 + (int)(currentKing.TotalReign / 3) : 30);
             kingCharacter = new Character
             {
                 Name2 = currentKing.Name,
                 Level = kingLevel,
-                Strength = 50 + kingLevel * 8,
-                Defence = (long)((10 + kingLevel * 4) * GameConfig.KingDefenderDefBonus),
-                WeapPow = 20 + kingLevel * 3,
-                ArmPow = 10 + kingLevel * 2,
-                HP = (long)((200 + kingLevel * 40) * GameConfig.KingDefenderHPBonus),
-                MaxHP = (long)((200 + kingLevel * 40) * GameConfig.KingDefenderHPBonus),
+                Strength = 80 + kingLevel * 12,
+                Defence = (long)((20 + kingLevel * 6) * GameConfig.KingDefenderDefBonus),
+                WeapPow = 30 + kingLevel * 4,
+                ArmPow = 15 + kingLevel * 3,
+                HP = (long)((400 + kingLevel * 60) * GameConfig.KingDefenderHPBonus),
+                MaxHP = (long)((400 + kingLevel * 60) * GameConfig.KingDefenderHPBonus),
                 AI = CharacterAI.Computer,
                 Class = CharacterClass.Warrior
             };

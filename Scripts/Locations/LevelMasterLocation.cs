@@ -790,13 +790,13 @@ public class LevelMasterLocation : BaseLocation
                 break;
 
             case CharacterClass.Voidreaver:
-                player.BaseStrength += 5;
-                player.BaseIntelligence += 5;
-                player.BaseDexterity += 4;
+                player.BaseStrength += 4;     // Reduced from 5 — still strong melee but not best-in-class
+                player.BaseIntelligence += 3;  // Reduced from 5 — spell damage was scaling too fast
+                player.BaseDexterity += 3;     // Reduced from 4
                 player.BaseAgility += 3;
                 player.BaseStamina += 2;
-                player.BaseMaxHP += 6;
-                player.BaseMaxMana += 12;
+                player.BaseMaxHP += 5;         // Reduced from 6 — glass cannon should be glassy
+                player.BaseMaxMana += 10;      // Reduced from 12
                 break;
 
             case CharacterClass.MysticShaman:

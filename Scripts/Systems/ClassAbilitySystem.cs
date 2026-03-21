@@ -1710,7 +1710,7 @@ public static class ClassAbilitySystem
         {
             Id = "undertow_stance",
             Name = "Undertow Stance",
-            Description = "Enemies attacking you are pulled off-balance: -20% damage for 3 rounds. Self defense +35.",
+            Description = "Tidal currents pull all enemies toward you: taunt + weaken (-20% damage) for 3 rounds. Self defense +35.",
             LevelRequired = 1, StaminaCost = 30, Cooldown = 4,
             Type = AbilityType.Defense, DefenseBonus = 35, Duration = 3,
             SpecialEffect = "undertow",
@@ -2166,10 +2166,10 @@ public static class ClassAbilitySystem
         {
             Id = "hungering_strike",
             Name = "Hungering Strike",
-            Description = "A ravenous blow. 90 base damage. Heals 30% of damage dealt.",
+            Description = "A ravenous blow. 60 base damage. Heals 20% of damage dealt.",
             LevelRequired = 1, StaminaCost = 20, Cooldown = 1,
-            Type = AbilityType.Attack, BaseDamage = 90,
-            SpecialEffect = "lifesteal_30",
+            Type = AbilityType.Attack, BaseDamage = 60, // Reduced from 90; lifesteal 30%→20%
+            SpecialEffect = "lifesteal_20",
             AvailableToClasses = new[] { CharacterClass.Voidreaver }
         },
         ["offer_flesh"] = new ClassAbility
@@ -2206,9 +2206,9 @@ public static class ClassAbilitySystem
         {
             Id = "apotheosis_of_ruin",
             Name = "Apotheosis of Ruin",
-            Description = "Burn 40% HP. 4 rounds: +100 ATK, hit all enemies, 20% lifesteal.",
+            Description = "Burn 40% HP. 3 rounds: +60 ATK, hit all enemies, 10% lifesteal.",
             LevelRequired = 40, StaminaCost = 120, Cooldown = 8,
-            Type = AbilityType.Buff, AttackBonus = 100, Duration = 4,
+            Type = AbilityType.Buff, AttackBonus = 60, Duration = 3, // Reduced: ATK 100→60, duration 4→3, lifesteal 20%→10%
             SpecialEffect = "apotheosis",
             AvailableToClasses = new[] { CharacterClass.Voidreaver }
         },
@@ -2216,9 +2216,9 @@ public static class ClassAbilitySystem
         {
             Id = "devour",
             Name = "Devour",
-            Description = "Consume the target. 160 damage. Heals 50% dealt. Below 30% HP: damage doubles.",
+            Description = "Consume the target. 120 damage. Heals 30% dealt. Below 30% HP: damage x1.5.",
             LevelRequired = 50, StaminaCost = 60, Cooldown = 4,
-            Type = AbilityType.Attack, BaseDamage = 160,
+            Type = AbilityType.Attack, BaseDamage = 120, // Reduced from 160; lifesteal 50%→30%, low HP 2x→1.5x
             SpecialEffect = "devour",
             AvailableToClasses = new[] { CharacterClass.Voidreaver }
         },
@@ -2226,9 +2226,9 @@ public static class ClassAbilitySystem
         {
             Id = "entropic_blade",
             Name = "Entropic Blade",
-            Description = "A cut through reality itself. 180 damage. Ignores all defense. Costs 10% current HP.",
+            Description = "A cut through reality itself. 140 damage. Ignores all defense. Costs 10% current HP.",
             LevelRequired = 60, StaminaCost = 65, Cooldown = 4,
-            Type = AbilityType.Attack, BaseDamage = 180,
+            Type = AbilityType.Attack, BaseDamage = 140, // Reduced from 180
             SpecialEffect = "entropic_blade",
             AvailableToClasses = new[] { CharacterClass.Voidreaver }
         },
@@ -2246,9 +2246,9 @@ public static class ClassAbilitySystem
         {
             Id = "void_rupture",
             Name = "Void Rupture",
-            Description = "Tear the void open. 220 AoE damage. Enemies killed explode for 100 bonus damage to others.",
+            Description = "Tear the void open. 160 AoE damage. Enemies killed explode for 60 bonus damage to others.",
             LevelRequired = 80, StaminaCost = 90, Cooldown = 6,
-            Type = AbilityType.Attack, BaseDamage = 220,
+            Type = AbilityType.Attack, BaseDamage = 160, // Reduced from 220; explosion 100→60
             SpecialEffect = "void_rupture",
             AvailableToClasses = new[] { CharacterClass.Voidreaver }
         },
@@ -2266,9 +2266,9 @@ public static class ClassAbilitySystem
         {
             Id = "annihilation",
             Name = "Annihilation",
-            Description = "Erase from existence. Costs 50% current HP. 500 damage. Below 50% HP: instant kill (non-boss).",
+            Description = "Erase from existence. Costs 50% current HP. 300 damage. Below 50% HP: instant kill (non-boss).",
             LevelRequired = 95, StaminaCost = 130, Cooldown = 9,
-            Type = AbilityType.Attack, BaseDamage = 500,
+            Type = AbilityType.Attack, BaseDamage = 300, // Reduced from 500
             SpecialEffect = "annihilation",
             AvailableToClasses = new[] { CharacterClass.Voidreaver }
         }
@@ -2558,7 +2558,12 @@ public static class ClassAbilitySystem
     {
         return characterClass == CharacterClass.Cleric ||
                characterClass == CharacterClass.Magician ||
-               characterClass == CharacterClass.Sage;
+               characterClass == CharacterClass.Sage ||
+               characterClass == CharacterClass.Tidesworn ||
+               characterClass == CharacterClass.Wavecaller ||
+               characterClass == CharacterClass.Cyclebreaker ||
+               characterClass == CharacterClass.Abysswarden ||
+               characterClass == CharacterClass.Voidreaver;
     }
 
     /// <summary>

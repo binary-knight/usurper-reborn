@@ -629,6 +629,12 @@ public static class LootGenerator
             ("Forged Brigandine", new[] { "All" }, 50, 85, 52),
             ("Runed Hauberk", new[] { "All" }, 65, 100, 70),
             ("Ancient Mail", new[] { "All" }, 80, 100, 90),
+
+            // Charisma-themed (Bard, Jester, Wavecaller, any CHA build)
+            ("Noble's Vestments", new[] { "All" }, 10, 45, 12),
+            ("Regal Coat", new[] { "All" }, 30, 65, 32),
+            ("Sovereign's Raiment", new[] { "All" }, 50, 85, 55),
+            ("Imperial Regalia Armor", new[] { "All" }, 75, 100, 85),
         };
 
         // Per-slot armor templates for dungeon loot drops
@@ -649,6 +655,9 @@ public static class LootGenerator
             ("Crown of the Archmage", new[] { "Magician", "Sage" }, 70, 100, 65),
             ("Titan's Greathelm", new[] { "Warrior", "Barbarian" }, 75, 100, 78),
             ("Holy Diadem", new[] { "Paladin", "Cleric", "MysticShaman" }, 65, 100, 60),
+            ("Noble Circlet", new[] { "All" }, 10, 50, 8),
+            ("Sovereign's Crown", new[] { "All" }, 45, 85, 42),
+            ("Imperial Diadem", new[] { "All" }, 70, 100, 68),
         };
 
         private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> ArmsArmorTemplates = new()
@@ -668,6 +677,8 @@ public static class LootGenerator
             ("Plate Vambraces", new[] { "Warrior", "Paladin" }, 55, 95, 55),
             ("Holy Armguards", new[] { "Paladin", "Cleric", "MysticShaman" }, 60, 100, 58),
             ("Dragonscale Bracers", new[] { "All" }, 80, 100, 75),
+            ("Herald's Armguards", new[] { "All" }, 20, 65, 15),
+            ("Regal Vambraces", new[] { "All" }, 50, 90, 45),
         };
 
         private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> HandsArmorTemplates = new()
@@ -687,6 +698,8 @@ public static class LootGenerator
             ("Shadow Handwraps", new[] { "Assassin" }, 45, 85, 38),
             ("Plate Gauntlets", new[] { "Warrior", "Paladin" }, 60, 95, 55),
             ("Dragon Grip", new[] { "All" }, 80, 100, 72),
+            ("Orator's Gloves", new[] { "All" }, 15, 55, 10),
+            ("Majestic Gauntlets", new[] { "All" }, 55, 95, 48),
         };
 
         private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> LegsArmorTemplates = new()
@@ -777,6 +790,9 @@ public static class LootGenerator
             ("Mithril Weave Cloak", new[] { "All" }, 55, 90, 45),
             ("Cloak of the Archmage", new[] { "Magician", "Sage" }, 65, 100, 55),
             ("Dragonwing Cape", new[] { "All" }, 80, 100, 68),
+            ("Noble's Mantle", new[] { "All" }, 10, 50, 8),
+            ("Glamour Cloak", new[] { "All" }, 30, 75, 28),
+            ("Sovereign's Cape", new[] { "All" }, 60, 100, 52),
         };
 
         private static readonly List<(string Name, string[] Classes, int MinLevel, int MaxLevel, float BasePower)> ShieldTemplates = new()
@@ -839,6 +855,11 @@ public static class LootGenerator
             ("Windstrike Ring", 55, 100, 35),
             ("Dragon's Eye Ring", 70, 100, 45),
             ("Archmage's Sigil", 85, 100, 55),
+            ("Ring of Charm", 5, 50, 10),
+            ("Siren's Band", 20, 70, 16),
+            ("Ring of the Sovereign", 40, 85, 25),
+            ("Crown Jewel Ring", 60, 100, 38),
+            ("Ring of Allure", 15, 65, 14),
         };
 
         private static readonly List<(string Name, int MinLevel, int MaxLevel, float BasePower)> NecklaceTemplates = new()
@@ -865,6 +886,11 @@ public static class LootGenerator
             ("Amulet of the Planes", 65, 100, 45),
             ("Heart of the Dragon", 75, 100, 52),
             ("Tear of the Gods", 90, 100, 65),
+            ("Pendant of Glamour", 10, 55, 12),
+            ("Orator's Medallion", 25, 70, 18),
+            ("Siren's Choker", 35, 80, 24),
+            ("Amulet of the Muse", 50, 90, 32),
+            ("Imperial Regalia", 70, 100, 45),
         };
 
         #endregion
@@ -1453,6 +1479,16 @@ public static class LootGenerator
                 item.Dexterity += secondaryStat;
                 item.Defence += Math.Max(1, finalPower / 12);
             }
+            // Charisma/Presence themed → Charisma + Wisdom
+            else if (name.Contains("charm") || name.Contains("glamour") || name.Contains("enchant") ||
+                     name.Contains("siren") || name.Contains("muse") || name.Contains("sovereign") ||
+                     name.Contains("orator") || name.Contains("herald") || name.Contains("eloquen") ||
+                     name.Contains("regal") || name.Contains("noble") || name.Contains("crown") ||
+                     name.Contains("majestic") || name.Contains("imperial"))
+            {
+                item.Charisma += primaryStat;
+                item.Wisdom += secondaryStat;
+            }
             // Alchemist themed → Intelligence + Constitution + Defence
             else if (name.Contains("alchemist") || name.Contains("elixir") || name.Contains("philosopher") ||
                      name.Contains("pestle"))
@@ -1552,6 +1588,17 @@ public static class LootGenerator
             {
                 item.Strength += finalPower / 3;
                 item.Dexterity += finalPower / 4;
+                item.LootEffects.Add(((int)SpecialEffect.Constitution, finalPower / 5));
+            }
+            // Charisma/Presence themed
+            else if (lowerName.Contains("charm") || lowerName.Contains("glamour") || lowerName.Contains("siren") ||
+                     lowerName.Contains("muse") || lowerName.Contains("sovereign") || lowerName.Contains("eloquen") ||
+                     lowerName.Contains("regal") || lowerName.Contains("noble") || lowerName.Contains("majestic") ||
+                     lowerName.Contains("herald") || lowerName.Contains("orator") || lowerName.Contains("imperial") ||
+                     lowerName.Contains("crown") || lowerName.Contains("allure") || lowerName.Contains("voice"))
+            {
+                item.Charisma += finalPower / 2;
+                item.Wisdom += finalPower / 4;
                 item.LootEffects.Add(((int)SpecialEffect.Constitution, finalPower / 5));
             }
             // Luck/Fortune themed
@@ -1787,6 +1834,17 @@ public static class LootGenerator
             {
                 item.Strength += finalPower / 3;
                 item.Dexterity += finalPower / 4;
+                item.LootEffects.Add(((int)SpecialEffect.Constitution, finalPower / 5));
+            }
+            // Charisma/Presence themed
+            else if (lowerName.Contains("charm") || lowerName.Contains("glamour") || lowerName.Contains("siren") ||
+                     lowerName.Contains("muse") || lowerName.Contains("sovereign") || lowerName.Contains("eloquen") ||
+                     lowerName.Contains("regal") || lowerName.Contains("noble") || lowerName.Contains("majestic") ||
+                     lowerName.Contains("herald") || lowerName.Contains("orator") || lowerName.Contains("imperial") ||
+                     lowerName.Contains("crown") || lowerName.Contains("allure") || lowerName.Contains("voice"))
+            {
+                item.Charisma += finalPower / 2;
+                item.Wisdom += finalPower / 4;
                 item.LootEffects.Add(((int)SpecialEffect.Constitution, finalPower / 5));
             }
             // Luck/Fortune themed

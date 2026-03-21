@@ -1447,7 +1447,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine(Loc.Get("magic_shop.enchant_tier_header"));
         WriteDivider(60);
 
-        for (int i = 4; i < EnchantTiers.Length; i++)
+        for (int i = 4; i < 9; i++)
         {
             var tier = EnchantTiers[i];
             long cost = ApplyAllPriceModifiers(tier.baseCost + (player.Level * tier.levelScale), player);

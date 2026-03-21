@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.53.3";
+    public const string Version = "0.53.4";
     public const string VersionName = "Ancestral Spirits";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -381,9 +381,9 @@ public static partial class GameConfig
     public const int GuardRecruitmentCost = 5000;    // Cost to recruit a guard
 
     // King Combat - Defender Bonus (kings fight harder when defending their throne)
-    public const float KingDefenderHPBonus = 1.35f;   // +35% HP for defending king
-    public const float KingDefenderDefBonus = 1.20f;   // +20% DEF for defending king
-    public const int KingChallengeLevelRange = 20;     // Challenger must be within this many levels of king
+    public const float KingDefenderHPBonus = 2.0f;    // +100% HP for defending king (increased from 35%)
+    public const float KingDefenderDefBonus = 1.50f;   // +50% DEF for defending king (increased from 20%)
+    public const int KingChallengeLevelRange = 10;     // Challenger must be within 10 levels of king (tightened from 20)
 
     // King Combat Buffs (Royal Authority - active while player is king)
     public const float KingCombatStrengthBonus = 1.10f;  // +10% attack damage
@@ -860,11 +860,11 @@ public static partial class GameConfig
     public const float AbysswardenAbyssalSiphonPercent = 0.10f;   // Abysswarden: 10% passive lifesteal on all attacks
     public const float AbysswardenPrisonWardResist = 0.10f;       // Abysswarden: Enemies deal 10% less damage
     public const float AbysswardenCorruptionHealPercent = 0.15f;  // Abysswarden: Heal 15% max HP on killing poisoned enemy
-    // Voidreaver Passives
-    public const float VoidreaverReflectionPercent = 0.25f;       // Voidreaver: 25% damage reflection from Void Shroud
-    public const float VoidreaverVoidHungerPercent = 0.10f;       // Voidreaver: Heal 10% max HP on every kill
-    public const float VoidreaverPainThresholdBonus = 0.20f;      // Voidreaver: +20% ability damage when below 50% HP
-    public const float VoidreaverSoulEaterManaPercent = 0.15f;    // Voidreaver: Restore 15% max mana on killing blow
+    // Voidreaver Passives (rebalanced v0.53.4)
+    public const float VoidreaverReflectionPercent = 0.15f;       // Voidreaver: 15% damage reflection (reduced from 25%)
+    public const float VoidreaverVoidHungerPercent = 0.05f;       // Voidreaver: Heal 5% max HP on every kill (reduced from 10%)
+    public const float VoidreaverPainThresholdBonus = 0.15f;      // Voidreaver: +15% ability damage when below 50% HP (reduced from 20%)
+    public const float VoidreaverSoulEaterManaPercent = 0.10f;    // Voidreaver: Restore 10% max mana on killing blow (reduced from 15%)
     // Paladin Divine Resolve passive
     public const float PaladinDivineResolveDamageBonus = 0.10f;  // Paladin: +10% damage vs undead/demons
     public const float PaladinDivineResolveStatusResist = 0.15f; // Paladin: 15% chance to resist negative status effects

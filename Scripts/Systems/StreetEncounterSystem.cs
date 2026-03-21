@@ -583,7 +583,8 @@ public class StreetEncounterSystem
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
-        if (choice == "F")
+        // Invalid input defaults to fight — you can't ignore thugs
+        if (choice != "S" && choice != "R")
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("street_encounter.mugging.draw_weapon"));
@@ -1410,12 +1411,10 @@ public class StreetEncounterSystem
 
         if (result.Victory)
         {
-            // Calculate rewards
-            long expGain = npc.Level * 100 + _random.Next(50, 150);
-            long goldGain = _random.Next(10, 50) * npc.Level;
-
-            player.Experience += expGain;
-            player.Gold += goldGain;
+            // XP and gold are handled by the combat engine's HandleVictory — no double reward
+            // Just track what the combat engine gave for display
+            long expGain = combatResult.ExperienceGained;
+            long goldGain = combatResult.GoldGained;
 
             if (isHonorDuel)
             {
@@ -2925,9 +2924,8 @@ public class StreetEncounterSystem
             }
             result.GoldGained = stolenGold;
 
-            // === XP REWARD ===
-            long expGain = npc.Level * 120 + _random.Next(50, 200);
-            player.Experience += expGain;
+            // === XP REWARD (combat engine already awarded XP — no double reward) ===
+            long expGain = combatResult.ExperienceGained;
             result.ExperienceGained = expGain;
             result.Message = $"Murdered {npc.Name2 ?? npc.Name}! (+{expGain} XP, +{stolenGold} gold)";
 

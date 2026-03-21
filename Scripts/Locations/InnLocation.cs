@@ -1159,7 +1159,7 @@ public class InnLocation : BaseLocation
             // Get relationship status
             var relationship = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
             terminal.SetColor(GetRelationshipColor(relationship));
-            terminal.WriteLine($"  {Loc.Get("inn.interact_relationship")}: {GetRelationshipText(relationship)}");
+            terminal.WriteLine($"  {Loc.Get("inn.interact_relationship", GetRelationshipText(relationship))}");
 
             // Show alignment compatibility
             var reactionMod = AlignmentSystem.Instance.GetNPCReactionModifier(currentPlayer, npc);
@@ -1250,6 +1250,16 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.challenging_npc", npc.Name2));
         terminal.WriteLine("");
 
+        // Daily duel limit — prevent XP farming by dueling the same NPCs repeatedly
+        const int maxDuelsPerDay = 3;
+        if (currentPlayer.SethFightsToday >= maxDuelsPerDay)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("inn.too_many_duels"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
         // Check if they'll accept
         bool accepts = npc.Darkness > 300 || new Random().Next(100) < 50;
 
@@ -1315,8 +1325,9 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.defeated_npc", npc.Name2));
             terminal.WriteLine(Loc.Get("inn.victory_spreads"));
 
-            currentPlayer.Experience += npc.Level * 100;
+            // XP already awarded by combat engine — no double reward
             currentPlayer.PKills++;
+            currentPlayer.SethFightsToday++; // Count toward daily duel limit
 
             // Update relationship negatively
             RelationshipSystem.UpdateRelationship(currentPlayer, npc, -1, 5, false, false);
