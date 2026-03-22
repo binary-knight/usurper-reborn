@@ -233,6 +233,11 @@ namespace UsurperRemake.Systems
         public long RoyTaxPaid { get; set; }
         public int KingVotePoll { get; set; }
         public int KingLastVote { get; set; }
+        public bool ThroneChallengedToday { get; set; }
+        public int TotalExecutions { get; set; }
+        public int ExecutionsToday { get; set; }
+        public bool PlayerImprisonedToday { get; set; }
+        public int NPCsImprisonedToday { get; set; }
 
         // Family & Misc
         public int Kids { get; set; }

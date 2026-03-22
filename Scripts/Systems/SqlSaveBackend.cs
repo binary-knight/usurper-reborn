@@ -1548,7 +1548,7 @@ namespace UsurperRemake.Systems
                 cmd.CommandText = @"
                     SELECT id, from_player, to_player, message_type, message, created_at
                     FROM messages
-                    WHERE ((LOWER(to_player) = LOWER(@username) AND is_read = 0)
+                    WHERE (((LOWER(to_player) = LOWER(@username) OR to_player IN (SELECT display_name FROM players WHERE LOWER(username) = LOWER(@username))) AND is_read = 0)
                            OR (to_player = '*' AND id > @afterId AND LOWER(from_player) != LOWER(@username)))
                     ORDER BY created_at ASC;
                 ";
@@ -1622,6 +1622,7 @@ namespace UsurperRemake.Systems
                 // Skip banned players and empty saves
                 cmd.CommandText = @"
                     SELECT
+                        p.username,
                         p.display_name,
                         json_extract(p.player_data, '$.player.level') as level,
                         json_extract(p.player_data, '$.player.class') as class_id,
@@ -1635,7 +1636,8 @@ namespace UsurperRemake.Systems
                         AND p.player_data != '{}'
                         AND LENGTH(p.player_data) > 2
                         AND json_extract(p.player_data, '$.player.level') IS NOT NULL
-                        AND p.username NOT LIKE 'emergency_%';
+                        AND p.username NOT LIKE 'emergency_%'
+                        AND COALESCE(json_extract(p.player_data, '$.player.isImmortal'), 0) != 1;
                 ";
 
                 using var reader = await cmd.ExecuteReaderAsync();
@@ -1643,12 +1645,13 @@ namespace UsurperRemake.Systems
                 {
                     summaries.Add(new PlayerSummary
                     {
-                        DisplayName = reader.GetString(0),
-                        Level = reader.IsDBNull(1) ? 1 : Convert.ToInt32(reader.GetValue(1)),
-                        ClassId = reader.IsDBNull(2) ? 0 : Convert.ToInt32(reader.GetValue(2)),
-                        Experience = reader.IsDBNull(3) ? 0 : Convert.ToInt64(reader.GetValue(3)),
-                        IsOnline = reader.GetInt32(4) == 1,
-                        NobleTitle = reader.IsDBNull(5) ? null : reader.GetString(5)
+                        Username = reader.GetString(0),
+                        DisplayName = reader.GetString(1),
+                        Level = reader.IsDBNull(2) ? 1 : Convert.ToInt32(reader.GetValue(2)),
+                        ClassId = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3)),
+                        Experience = reader.IsDBNull(4) ? 0 : Convert.ToInt64(reader.GetValue(4)),
+                        IsOnline = reader.GetInt32(5) == 1,
+                        NobleTitle = reader.IsDBNull(6) ? null : reader.GetString(6)
                     });
                 }
             }
@@ -2907,7 +2910,7 @@ namespace UsurperRemake.Systems
                         '$.player.gold',
                         MAX(0, CAST(json_extract(player_data, '$.player.gold') AS INTEGER) - @goldAmount)
                     )
-                    WHERE LOWER(username) = LOWER(@username)
+                    WHERE (LOWER(username) = LOWER(@username) OR LOWER(display_name) = LOWER(@username))
                     AND player_data != '{}' AND LENGTH(player_data) > 2;
                 ";
                 cmd.Parameters.AddWithValue("@username", username);
@@ -2917,6 +2920,36 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to deduct gold from {username}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Atomically deduct a percentage of a player's gold.
+        /// </summary>
+        public async Task DeductGoldByPercentage(string username, int percent)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE players
+                    SET player_data = json_set(
+                        player_data,
+                        '$.player.gold',
+                        MAX(0, CAST(json_extract(player_data, '$.player.gold') AS INTEGER) -
+                            CAST(json_extract(player_data, '$.player.gold') AS INTEGER) * @percent / 100)
+                    )
+                    WHERE (LOWER(username) = LOWER(@username) OR LOWER(display_name) = LOWER(@username))
+                    AND player_data != '{}' AND LENGTH(player_data) > 2;
+                ";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@percent", percent);
+                await Task.Run(() => cmd.ExecuteNonQuery());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to deduct {percent}% gold from {username}: {ex.Message}");
             }
         }
 
@@ -2937,7 +2970,7 @@ namespace UsurperRemake.Systems
                         '$.player.gold',
                         CAST(json_extract(player_data, '$.player.gold') AS INTEGER) + @goldAmount
                     )
-                    WHERE LOWER(username) = LOWER(@username)
+                    WHERE (LOWER(username) = LOWER(@username) OR LOWER(display_name) = LOWER(@username))
                     AND player_data != '{}' AND LENGTH(player_data) > 2;
                 ";
                 cmd.Parameters.AddWithValue("@username", username);
@@ -2993,7 +3026,7 @@ namespace UsurperRemake.Systems
                         '$.player.daysInPrison',
                         @days
                     )
-                    WHERE LOWER(username) = LOWER(@username)
+                    WHERE (LOWER(username) = LOWER(@username) OR LOWER(display_name) = LOWER(@username))
                     AND player_data != '{}' AND LENGTH(player_data) > 2;
                 ";
                 cmd.Parameters.AddWithValue("@username", username);

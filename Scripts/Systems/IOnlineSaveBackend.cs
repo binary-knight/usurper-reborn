@@ -188,6 +188,7 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class PlayerSummary
     {
+        public string Username { get; set; } = "";
         public string DisplayName { get; set; } = "";
         public int Level { get; set; }
         public int ClassId { get; set; }

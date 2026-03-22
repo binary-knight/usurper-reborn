@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.53.5";
+    public const string Version = "0.53.6";
     public const string VersionName = "Ancestral Spirits";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -40,7 +40,7 @@ public static partial class GameConfig
     public const int MaxDrugs = 100;             // maxdrugs
     
     // Game limits
-    public const int MaxLevel = 200;             // maxlevel
+    public const int MaxLevel = 100;             // maxlevel
     public const int TurnsPerDay = 325;          // turns_per_day
     public const int MaxChildren = 8;            // maxchildren
     public const int MaxKingEdicts = 5;          // max_kingedicts

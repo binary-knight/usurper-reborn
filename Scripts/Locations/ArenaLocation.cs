@@ -189,12 +189,12 @@ public class ArenaLocation : BaseLocation
         // Determine this account's base username (strip __alt suffix if present)
         string myAccount = SqlSaveBackend.GetAccountUsername(myUsername);
         var eligible = allPlayers
-            .Where(p => !string.Equals(p.DisplayName, myName, StringComparison.OrdinalIgnoreCase))
+            .Where(p => !string.Equals(p.Username, myUsername, StringComparison.OrdinalIgnoreCase))
             // Block same-account PvP (main vs alt)
-            .Where(p => !string.Equals(SqlSaveBackend.GetAccountUsername(p.DisplayName.ToLower()), myAccount, StringComparison.OrdinalIgnoreCase))
+            .Where(p => !string.Equals(SqlSaveBackend.GetAccountUsername(p.Username), myAccount, StringComparison.OrdinalIgnoreCase))
             .Where(p => Math.Abs(p.Level - currentPlayer.Level) <= GameConfig.PvPLevelRangeLimit)
             .Where(p => p.Level >= GameConfig.MinPvPLevel)
-            .Where(p => !backend.HasAttackedPlayerToday(myUsername, p.DisplayName.ToLower()))
+            .Where(p => !backend.HasAttackedPlayerToday(myUsername, p.Username))
             .OrderByDescending(p => p.Level)
             .ToList();
 
@@ -272,8 +272,8 @@ public class ArenaLocation : BaseLocation
             return;
         }
 
-        // Load opponent's save data
-        var opponentSave = await backend.ReadGameData(target.DisplayName);
+        // Load opponent's save data (use username, not display name)
+        var opponentSave = await backend.ReadGameData(target.Username);
         if (opponentSave?.Player == null)
         {
             terminal.SetColor("red");

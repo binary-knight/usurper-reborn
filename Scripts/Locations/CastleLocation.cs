@@ -982,6 +982,14 @@ public class CastleLocation : BaseLocation
 
     private async Task ManagePrisonCells()
     {
+        if (currentKing == null)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  The throne is vacant. No one has authority over the prison.");
+            await Task.Delay(2000);
+            return;
+        }
+
         bool done = false;
         while (!done)
         {
@@ -997,24 +1005,36 @@ public class CastleLocation : BaseLocation
             }
             else
             {
-                terminal.SetColor("cyan");
-                terminal.WriteLine($"{Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_name"),-18} {Loc.Get("castle.header_crime"),-18} {Loc.Get("castle.header_sentence"),-10} {Loc.Get("castle.header_served"),-8} {Loc.Get("castle.header_bail"),-10}");
-                WriteDivider(75);
-
                 int i = 1;
-                foreach (var prisoner in currentKing.Prisoners)
+                if (IsScreenReader)
                 {
-                    var p = prisoner.Value;
-                    string bailStr = p.BailAmount > 0 ? $"{p.BailAmount:N0}g" : Loc.Get("ui.none");
-                    terminal.SetColor("white");
-                    terminal.WriteLine($"{i,-3} {p.CharacterName,-18} {p.Crime,-18} {p.Sentence,-10} {p.DaysServed,-8} {bailStr,-10}");
-                    i++;
+                    foreach (var prisoner in currentKing.Prisoners)
+                    {
+                        var p = prisoner.Value;
+                        string bailStr = p.BailAmount > 0 ? $"{p.BailAmount:N0}g" : Loc.Get("ui.none");
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"{i}. {p.CharacterName} - {Loc.Get("castle.header_crime")}: {p.Crime}, {Loc.Get("castle.header_sentence")}: {p.Sentence} days, {Loc.Get("castle.header_served")}: {p.DaysServed}, {Loc.Get("castle.header_bail")}: {bailStr}");
+                        i++;
+                    }
+                }
+                else
+                {
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($"  {Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_name"),-18} {Loc.Get("castle.header_crime"),-18} {Loc.Get("castle.header_sentence"),-10} {Loc.Get("castle.header_served"),-8} {Loc.Get("castle.header_bail"),-10}");
+                    WriteDivider(75);
+
+                    foreach (var prisoner in currentKing.Prisoners)
+                    {
+                        var p = prisoner.Value;
+                        string bailStr = p.BailAmount > 0 ? $"{p.BailAmount:N0}g" : Loc.Get("ui.none");
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"  {i,-3} {p.CharacterName,-18} {p.Crime,-18} {p.Sentence,-10} {p.DaysServed,-8} {bailStr,-10}");
+                        i++;
+                    }
                 }
                 terminal.WriteLine("");
             }
 
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("castle.prison_commands"));
             if (IsScreenReader)
             {
                 WriteSRMenuOption("I", Loc.Get("castle.imprison"));
@@ -1023,18 +1043,53 @@ public class CastleLocation : BaseLocation
                 WriteSRMenuOption("S", Loc.Get("castle.set_bail"));
                 WriteSRMenuOption("R", Loc.Get("castle.return"));
             }
+            else if (IsBBSSession)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write(" [I]");
+                terminal.SetColor("white");
+                terminal.Write($"{Loc.Get("castle.imprison")}  ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[P]");
+                terminal.SetColor("white");
+                terminal.Write($"{Loc.Get("castle.pardon")}  ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[E]");
+                terminal.SetColor("white");
+                terminal.WriteLine($"{Loc.Get("castle.execute")}");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(" [S]");
+                terminal.SetColor("white");
+                terminal.Write($"{Loc.Get("castle.set_bail")}  ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[R]");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"{Loc.Get("castle.return")}");
+            }
             else
             {
-                terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("castle.prison_menu_text_1"));
-                terminal.WriteLine(Loc.Get("castle.prison_menu_text_2"));
+                terminal.WriteLine("");
+                terminal.Write("  [", "white");
+                terminal.Write("I", "bright_yellow");
+                terminal.Write($"] {Loc.Get("castle.imprison")}   ", "white");
+                terminal.Write("[", "white");
+                terminal.Write("P", "bright_yellow");
+                terminal.Write($"] {Loc.Get("castle.pardon")}   ", "white");
+                terminal.Write("[", "white");
+                terminal.Write("E", "bright_yellow");
+                terminal.WriteLine($"] {Loc.Get("castle.execute")}", "white");
+
+                terminal.Write("  [", "white");
+                terminal.Write("S", "bright_yellow");
+                terminal.Write($"] {Loc.Get("castle.set_bail")}   ", "white");
+                terminal.Write("[", "white");
+                terminal.Write("R", "bright_yellow");
+                terminal.WriteLine($"] {Loc.Get("castle.return")}", "gray");
             }
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
-            terminal.Write(Loc.Get("castle.your_decree"));
-            terminal.SetColor("white");
-            string input = await terminal.ReadLineAsync();
+            string input = await terminal.GetInput(Loc.Get("castle.your_decree"));
 
             if (string.IsNullOrEmpty(input)) continue;
 
@@ -1066,9 +1121,10 @@ public class CastleLocation : BaseLocation
         // Build a list of potential targets (NPCs + online players)
         var targets = new List<(string Name, string Type, bool IsNPC)>();
 
-        // Add living NPCs (not already imprisoned, not the king)
+        // Add living NPCs (not already imprisoned, not the king, not dead)
+        string kingName = currentKing?.Name ?? "";
         var npcs = NPCSpawnSystem.Instance?.ActiveNPCs?
-            .Where(n => !n.IsDead && n.DaysInPrison <= 0 && n.Name2 != currentKing.Name)
+            .Where(n => n.IsAlive && !n.IsDead && !n.IsPermaDead && n.DaysInPrison <= 0 && n.Name2 != kingName)
             .OrderBy(n => n.Name2)
             .ToList() ?? new List<NPC>();
         foreach (var npc in npcs)
@@ -1120,6 +1176,32 @@ public class CastleLocation : BaseLocation
 
         var target = targets[idx - 1];
 
+        // Check if already imprisoned (prevent double-imprisonment)
+        if (currentKing.Prisoners.ContainsKey(target.Name))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {target.Name} is already imprisoned!");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Limit: 1 player imprisonment per day, 5 NPCs per day
+        if (!target.IsNPC && currentPlayer.PlayerImprisonedToday)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  You have already imprisoned a player today.");
+            terminal.WriteLine("  The guards need time to process new prisoners.");
+            await Task.Delay(2000);
+            return;
+        }
+        if (target.IsNPC && currentPlayer.NPCsImprisonedToday >= 5)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  The dungeons are overwhelmed. No more NPC arrests today.");
+            await Task.Delay(2000);
+            return;
+        }
+
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.crime_committed"));
         terminal.SetColor("white");
@@ -1133,7 +1215,7 @@ public class CastleLocation : BaseLocation
 
         int sentence = 7;
         if (int.TryParse(sentenceStr, out int s) && s > 0)
-            sentence = Math.Min(s, 365);
+            sentence = target.IsNPC ? Math.Min(s, 30) : Math.Min(s, 1); // Players: max 1 day; NPCs: max 30
 
         // Add to king's prison records
         currentKing.ImprisonCharacter(target.Name, sentence, crime);
@@ -1164,6 +1246,41 @@ public class CastleLocation : BaseLocation
                 }
                 catch { /* notification failed */ }
             }
+
+            // If the player is currently online, immediately send guards to arrest them
+            var mudServer = UsurperRemake.Server.MudServer.Instance;
+            if (mudServer != null)
+            {
+                // Find their session by display name or username
+                UsurperRemake.Server.PlayerSession? targetSession = null;
+                foreach (var kvp in mudServer.ActiveSessions)
+                {
+                    var sessPlayer = kvp.Value.Context?.Engine?.CurrentPlayer;
+                    if (sessPlayer != null &&
+                        (sessPlayer.DisplayName.Equals(target.Name, StringComparison.OrdinalIgnoreCase) ||
+                         sessPlayer.Name2?.Equals(target.Name, StringComparison.OrdinalIgnoreCase) == true))
+                    {
+                        targetSession = kvp.Value;
+                        break;
+                    }
+                }
+
+                if (targetSession != null)
+                {
+                    var sessPlayer = targetSession!.Context?.Engine?.CurrentPlayer;
+                    if (sessPlayer != null)
+                    {
+                        sessPlayer.DaysInPrison = (byte)sentence;
+                        // Send them a dramatic arrest message
+                        targetSession!.IncomingMessages.Enqueue(
+                            $"\u001b[1;31m\n  *** ROYAL GUARDS SEIZE YOU! ***\n" +
+                            $"  By order of {currentKing.GetTitle()} {currentKing.Name}, you are under arrest!\n" +
+                            $"  Crime: {crime}\n" +
+                            $"  Sentence: {sentence} day{(sentence == 1 ? "" : "s")}\n" +
+                            $"  You will be sent to prison on your next action.\u001b[0m");
+                    }
+                }
+            }
         }
 
         // Persist royal court changes in online mode
@@ -1173,6 +1290,12 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("castle.imprisoned_confirm", target.Name, sentence));
         NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} imprisoned {target.Name} for {crime}!");
+
+        // Track daily imprisonment limits
+        if (!target.IsNPC)
+            currentPlayer.PlayerImprisonedToday = true;
+        else
+            currentPlayer.NPCsImprisonedToday++;
 
         await Task.Delay(2000);
     }
@@ -1305,7 +1428,7 @@ public class CastleLocation : BaseLocation
                     }
                     catch { /* notification failed */ }
                     // Deduct 10% gold as execution penalty
-                    await backend.DeductGoldFromPlayer(name, 1000);
+                    await backend.DeductGoldByPercentage(name, 10);
                 }
                 PersistRoyalCourtToWorldState();
             }
@@ -1314,6 +1437,37 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.executed_confirm", name));
             terminal.WriteLine(Loc.Get("castle.darkness_increases"));
             NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} executed {name}!");
+
+            // Server-wide broadcast of execution
+            if (DoorMode.IsOnlineMode)
+            {
+                UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
+                    $"\u001b[1;31m  *** {currentKing.GetTitle()} {currentKing.Name} has executed {name}! ***\u001b[0m");
+            }
+
+            // Track executions
+            currentPlayer.ExecutionsToday++;
+            currentPlayer.TotalExecutions++;
+
+            // Rebellion trigger: 5+ total executions = the people rise up
+            if (currentPlayer.TotalExecutions >= 5)
+            {
+                await TriggerRebellion();
+                return;
+            }
+            else if (currentPlayer.TotalExecutions >= 4)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("");
+                terminal.WriteLine("  Whispers of rebellion spread through the streets...");
+                terminal.WriteLine("  The people will not tolerate this tyranny much longer.");
+            }
+            else if (currentPlayer.TotalExecutions >= 3)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("");
+                terminal.WriteLine("  The townspeople watch in fearful silence.");
+            }
 
             // Prevent save cheesing — persist negative outcomes immediately
             if (DoorMode.IsOnlineMode)
@@ -1326,6 +1480,498 @@ public class CastleLocation : BaseLocation
         }
 
         await Task.Delay(2000);
+    }
+
+    /// <summary>
+    /// Rebellion triggered by excessive executions. The king is overthrown,
+    /// imprisoned, and faces the executioner. A coin flip determines their fate:
+    /// Heads = character permanently deleted. Tails = stripped, beaten, humiliated, but alive.
+    /// </summary>
+    private async Task TriggerRebellion()
+    {
+        string kingName = currentPlayer.DisplayName;
+        string title = currentPlayer.Sex == CharacterSex.Female ? "Queen" : "King";
+
+        // === ACT 1: THE UPRISING ===
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("");
+        terminal.WriteLine("  ╔═══════════════════════════════════════════════════╗");
+        terminal.WriteLine("  ║              THE PEOPLE HAVE RISEN!              ║");
+        terminal.WriteLine("  ╚═══════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  You hear it before you see it.");
+        terminal.WriteLine("  A low rumble, like distant thunder.");
+        terminal.WriteLine("  But it's not thunder. It's voices. Hundreds of them.");
+        terminal.WriteLine("");
+        await Task.Delay(2500);
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine("  The castle doors EXPLODE inward.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  A tide of citizens floods the throne room — farmers,");
+        terminal.WriteLine("  merchants, mothers clutching children, old soldiers");
+        terminal.WriteLine("  with rusty swords. Their eyes burn with fury.");
+        terminal.WriteLine("");
+        await Task.Delay(2500);
+
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  A woman at the front points at you.");
+        terminal.WriteLine($"  \"THAT is the one! {currentPlayer.TotalExecutions} lives! {currentPlayer.TotalExecutions} of our");
+        terminal.WriteLine($"   people fed to the executioner's blade!\"");
+        terminal.WriteLine("");
+        await Task.Delay(2500);
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("  You look to your Royal Guard for protection.");
+        terminal.WriteLine("  They stand motionless. Then, one by one, they");
+        terminal.WriteLine("  lay down their weapons and step aside.");
+        terminal.WriteLine("");
+        await Task.Delay(2500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  The captain of the guard removes his helm.");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"  \"I swore an oath to the crown, not to a butcher.\"");
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+
+        // === ACT 2: THE CAPTURE ===
+        terminal.ClearScreen();
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("");
+        terminal.WriteLine("  ╔═══════════════════════════════════════════════════╗");
+        terminal.WriteLine("  ║                   OVERTHROWN                     ║");
+        terminal.WriteLine("  ╚═══════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  Rough hands seize you from the throne.");
+        terminal.WriteLine("  Your crown is torn from your head and thrown");
+        terminal.WriteLine("  to the marble floor, where it rings hollow.");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("  They drag you through the halls you once ruled.");
+        terminal.WriteLine("  Servants you ordered around avert their eyes.");
+        terminal.WriteLine("  Some spit as you pass.");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  Down the spiral stairs. Past the armory.");
+        terminal.WriteLine("  Into the cold, dripping darkness of the dungeon.");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("dark_red");
+        terminal.WriteLine("  The iron door slams shut behind you.");
+        terminal.WriteLine("  The lock turns with terrible finality.");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("  You sit in the dark.");
+        terminal.WriteLine("  Water drips somewhere.");
+        terminal.WriteLine("  Hours pass. Or days. You can't tell.");
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+
+        // === ACT 3: THE TRIAL ===
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine("  ╔═══════════════════════════════════════════════════╗");
+        terminal.WriteLine("  ║              THE PEOPLE'S COURT                  ║");
+        terminal.WriteLine("  ╚═══════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  They drag you into the town square.");
+        terminal.WriteLine("  The entire population has gathered.");
+        terminal.WriteLine("  A makeshift judge's bench. No defense. No mercy.");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("  The judge — an elderly woman whose son you executed —");
+        terminal.WriteLine("  reads the charges in a steady voice:");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_white");
+        terminal.WriteLine($"  \"{title} {kingName}, you stand accused of the murder");
+        terminal.WriteLine($"   of {currentPlayer.TotalExecutions} citizens under color of royal authority.\"");
+        terminal.WriteLine("");
+        terminal.WriteLine("  \"The law of this land is clear: a tyrant who rules");
+        terminal.WriteLine("   through execution forfeits their right to rule —\"");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("  \"— and perhaps their right to LIVE.\"");
+        terminal.WriteLine("");
+        await Task.Delay(2500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  The crowd roars.");
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+
+        // === ACT 4: THE COIN ===
+        terminal.ClearScreen();
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine("  ╔═══════════════════════════════════════════════════╗");
+        terminal.WriteLine("  ║              THE COIN OF FATE                    ║");
+        terminal.WriteLine("  ╚═══════════════════════════════════════════════════╝");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  The judge reaches into her robe and produces");
+        terminal.WriteLine("  an ancient coin — tarnished, heavy, inscribed");
+        terminal.WriteLine("  with symbols older than the kingdom itself.");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine("  \"The gods will decide your fate.\"");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine("  \"Heads — the executioner takes your life.\"");
+        terminal.SetColor("gray");
+        terminal.WriteLine("  \"Tails — you walk. Stripped of everything, but alive.\"");
+        terminal.WriteLine("");
+        await Task.Delay(2500);
+
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine("  She flips the coin.");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        terminal.SetColor("white");
+        terminal.WriteLine("  It spins in the air...");
+        await Task.Delay(1000);
+        terminal.WriteLine("  catching the sunlight...");
+        await Task.Delay(1000);
+        terminal.WriteLine("  tumbling end over end...");
+        await Task.Delay(1000);
+        terminal.WriteLine("  the crowd holds its breath...");
+        await Task.Delay(1500);
+        terminal.WriteLine("");
+
+        // THE COIN FLIP
+        bool heads = Random.Shared.Next(2) == 0;
+
+        // Release all prisoners before removing king (prevents orphaned prisoners)
+        if (currentKing?.Prisoners != null)
+        {
+            foreach (var prisonerName in currentKing.Prisoners.Keys.ToList())
+            {
+                var npc = NPCSpawnSystem.Instance?.GetNPCByName(prisonerName, includeDead: true);
+                if (npc != null)
+                {
+                    npc.DaysInPrison = 0;
+                    npc.CurrentLocation = "MainStreet";
+                }
+                // Release online players too
+                if (DoorMode.IsOnlineMode)
+                {
+                    var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                    if (backend != null)
+                        _ = backend.ImprisonPlayer(prisonerName, 0);
+                }
+            }
+            currentKing.Prisoners.Clear();
+        }
+
+        // Remove from throne (regardless of outcome)
+        currentPlayer.King = false;
+        if (currentPlayer.NobleTitle == "King" || currentPlayer.NobleTitle == "Queen")
+            currentPlayer.NobleTitle = null;
+        currentKing = null;
+
+        if (heads)
+        {
+            // === HEADS: EXECUTION ===
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("  ╔═══════════════════════════════╗");
+            terminal.WriteLine("  ║           H E A D S           ║");
+            terminal.WriteLine("  ╚═══════════════════════════════╝");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  The crowd erupts. Not in celebration.");
+            terminal.WriteLine("  In grim satisfaction.");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("  They lead you to the executioner's block.");
+            terminal.WriteLine("  The hooded figure tests the blade's edge");
+            terminal.WriteLine("  with his thumb. A thin line of red appears.");
+            terminal.WriteLine("  He nods.");
+            terminal.WriteLine("");
+            await Task.Delay(2500);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  You kneel.");
+            terminal.WriteLine("  The wood is stained dark from years of use.");
+            terminal.WriteLine("  You wonder how many of these stains are");
+            terminal.WriteLine("  from the people YOU sent here.");
+            terminal.WriteLine("");
+            await Task.Delay(2500);
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  The judge speaks one final time:");
+            terminal.WriteLine($"  \"{kingName}, may the gods have more mercy");
+            terminal.WriteLine("   on your soul than you had on theirs.\"");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("  The executioner raises the axe.");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("  ...");
+            await Task.Delay(2000);
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("  ╔═══════════════════════════════════════════════════╗");
+            terminal.WriteLine("  ║          YOUR STORY ENDS HERE.                   ║");
+            terminal.WriteLine("  ║                                                  ║");
+            terminal.WriteLine("  ║   Your character has been permanently deleted.    ║");
+            terminal.WriteLine("  ║   The kingdom remembers you as a cautionary       ║");
+            terminal.WriteLine("  ║   tale about the price of tyranny.               ║");
+            terminal.WriteLine("  ╚═══════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+
+            NewsSystem.Instance.Newsy(true, $"REBELLION! The tyrant {kingName} was overthrown and EXECUTED by the people's court!");
+
+            // Server-wide broadcast
+            if (DoorMode.IsOnlineMode)
+            {
+                UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
+                    $"\u001b[1;31m  *** REBELLION! The tyrant {kingName} has been EXECUTED by the people! The kingdom is free! ***\u001b[0m");
+            }
+
+            // Delete the character and suppress disconnect save
+            if (DoorMode.IsOnlineMode)
+            {
+                // Suppress the emergency save on disconnect so it doesn't overwrite the deletion
+                string sessionUser = currentPlayer.Name2?.ToLowerInvariant() ?? "";
+                if (UsurperRemake.Server.MudServer.Instance?.ActiveSessions.TryGetValue(sessionUser, out var session) == true)
+                    session.SuppressDisconnectSave = true;
+
+                var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                if (backend != null)
+                {
+                    string username = currentPlayer.Name2?.ToLowerInvariant() ?? currentPlayer.Name1?.ToLowerInvariant() ?? "";
+                    if (!string.IsNullOrEmpty(username))
+                    {
+                        try
+                        {
+                            backend.DeleteGameData(username);
+                            DebugLogger.Instance.LogInfo("REBELLION", $"Character '{kingName}' permanently deleted — coin was HEADS");
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "REBELLION", $"Failed to delete: {ex.Message}");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                SaveSystem.Instance.DeleteSave(currentPlayer.Name2 ?? currentPlayer.Name1 ?? "");
+            }
+
+            // Clear king from world state before disconnecting
+            PersistRoyalCourtToWorldState();
+
+            await terminal.PressAnyKey();
+            throw new Exception("CHARACTER_DELETED_REBELLION");
+        }
+        else
+        {
+            // === TAILS: THE WALK OF SHAME ===
+            terminal.SetColor("bright_green");
+            terminal.WriteLine("  ╔═══════════════════════════════╗");
+            terminal.WriteLine("  ║           T A I L S           ║");
+            terminal.WriteLine("  ╚═══════════════════════════════╝");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  A murmur ripples through the crowd.");
+            terminal.WriteLine("  Some cry out in protest. The judge raises her hand.");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  \"The gods have spoken. We are not the tyrant.\"");
+            terminal.WriteLine("  \"We will not become what we sought to destroy.\"");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  \"But mercy is not forgiveness.\"");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+
+            // THE WALK OF SHAME
+            terminal.ClearScreen();
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("");
+            terminal.WriteLine("  ╔═══════════════════════════════════════════════════╗");
+            terminal.WriteLine("  ║              THE WALK OF SHAME                   ║");
+            terminal.WriteLine("  ╚═══════════════════════════════════════════════════╝");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  They strip you of your royal garments.");
+            terminal.WriteLine("  Your armor. Your weapons. Your rings.");
+            terminal.WriteLine("  Everything you own, taken piece by piece");
+            terminal.WriteLine("  and thrown to the crowd as trophies.");
+            terminal.WriteLine("");
+            await Task.Delay(2500);
+
+            // Strip all equipment
+            var allSlots = new[] {
+                EquipmentSlot.MainHand, EquipmentSlot.OffHand, EquipmentSlot.Head,
+                EquipmentSlot.Body, EquipmentSlot.Arms, EquipmentSlot.Hands,
+                EquipmentSlot.Legs, EquipmentSlot.Feet, EquipmentSlot.Waist,
+                EquipmentSlot.Face, EquipmentSlot.Cloak, EquipmentSlot.Neck,
+                EquipmentSlot.LFinger, EquipmentSlot.RFinger
+            };
+            foreach (var slot in allSlots)
+            {
+                if (currentPlayer.GetEquipment(slot) != null)
+                    currentPlayer.UnequipSlot(slot);
+            }
+            currentPlayer.Inventory.Clear(); // Everything confiscated
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("  Dressed in nothing but rags, barefoot,");
+            terminal.WriteLine("  they tie your hands behind your back");
+            terminal.WriteLine("  and push you into the street.");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  A bell rings. Once. Twice. Three times.");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  A woman walks behind you, calling out:");
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("  \"SHAME!\"");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  You walk the length of Main Street.");
+            terminal.WriteLine("  Every face you pass is someone who");
+            terminal.WriteLine("  lived under your rule.");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  Rotten vegetables hit your face.");
+            terminal.WriteLine("  Someone throws a boot. It connects.");
+            terminal.WriteLine("  Children point and laugh.");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("  \"SHAME!\"");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("  The walk takes an eternity.");
+            terminal.WriteLine("  Past the weapon shop where you once browsed");
+            terminal.WriteLine("  for the finest blades. Past the inn where");
+            terminal.WriteLine("  companions once raised their cups to you.");
+            terminal.WriteLine("  Past the healer who patched your wounds");
+            terminal.WriteLine("  after battles you actually earned.");
+            terminal.WriteLine("");
+            await Task.Delay(3000);
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("  \"SHAME!\"");
+            terminal.WriteLine("");
+            await Task.Delay(1500);
+
+            terminal.SetColor("white");
+            terminal.WriteLine("  At the town gates, they cut your bonds.");
+            terminal.WriteLine("  The judge stands before you one last time.");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  \"{kingName}. You leave this city with nothing.");
+            terminal.WriteLine("   No gold. No gear. No title. No dignity.\"");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_white");
+            terminal.WriteLine("  \"But you leave with your life.\"");
+            terminal.WriteLine("  \"Do not waste the gods' mercy.\"");
+            terminal.WriteLine("");
+            await Task.Delay(2500);
+
+            // Apply penalties
+            long goldLost = currentPlayer.Gold;
+            currentPlayer.Gold = 0;
+            currentPlayer.BankGold = 0; // Bank accounts seized
+            currentPlayer.Fame = 0;
+            currentPlayer.Chivalry = Math.Max(0, currentPlayer.Chivalry - 5000);
+            currentPlayer.Darkness += 500;
+            currentPlayer.TotalExecutions = 0; // Reset counter
+            currentPlayer.RecalculateStats();
+
+            terminal.SetColor("red");
+            terminal.WriteLine("  ═══ Penalties ═══");
+            terminal.WriteLine("  All equipment: CONFISCATED");
+            terminal.WriteLine("  All inventory: CONFISCATED");
+            terminal.WriteLine($"  All gold: SEIZED ({goldLost:N0}g on hand, bank accounts frozen)");
+            terminal.WriteLine("  Fame: RESET to 0");
+            terminal.WriteLine("  Chivalry: -5,000");
+            terminal.WriteLine("  Darkness: +500");
+            terminal.WriteLine("  Title: STRIPPED");
+            terminal.WriteLine("");
+
+            NewsSystem.Instance.Newsy(true, $"REBELLION! The tyrant {kingName} was overthrown! Stripped and paraded through the streets in shame!");
+            if (DoorMode.IsOnlineMode)
+            {
+                UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
+                    $"\u001b[1;31m  *** REBELLION! The tyrant {kingName} was paraded through the streets in shame! The kingdom is free! ***\u001b[0m");
+            }
+
+            // Save immediately
+            _ = GameEngine.Instance.SaveCurrentGame();
+
+            await terminal.PressAnyKey();
+
+            // Force exit — the tyrant is banished from the castle
+            PersistRoyalCourtToWorldState();
+            await NavigateToLocation(GameLocation.MainStreet);
+            return;
+        }
+
+        PersistRoyalCourtToWorldState();
     }
 
     private async Task SetBailAmount()
@@ -1364,9 +2010,47 @@ public class CastleLocation : BaseLocation
             currentKing.Prisoners[name].BailAmount = amount;
             terminal.SetColor("bright_green");
             if (amount > 0)
+            {
                 terminal.WriteLine(Loc.Get("castle.bail_set", amount.ToString("N0"), name));
+
+                // Notify the prisoner that bail has been set
+                if (DoorMode.IsOnlineMode)
+                {
+                    var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                    if (backend != null)
+                    {
+                        try
+                        {
+                            await backend.SendMessage("System", name, "system",
+                                $"Bail has been set at {amount:N0} gold by {currentKing.GetTitle()} {currentKing.Name}. Use [B] Pay Bail in prison to purchase your freedom.");
+                        }
+                        catch { }
+                    }
+
+                    // Notify online player immediately
+                    var mudServer = UsurperRemake.Server.MudServer.Instance;
+                    if (mudServer != null)
+                    {
+                        foreach (var kvp in mudServer.ActiveSessions)
+                        {
+                            var sessPlayer = kvp.Value.Context?.Engine?.CurrentPlayer;
+                            if (sessPlayer != null &&
+                                (sessPlayer.DisplayName.Equals(name, StringComparison.OrdinalIgnoreCase) ||
+                                 sessPlayer.Name2?.Equals(name, StringComparison.OrdinalIgnoreCase) == true))
+                            {
+                                kvp.Value.IncomingMessages.Enqueue(
+                                    $"\u001b[1;33m  *** Bail has been set at {amount:N0} gold! Use [B] to pay and walk free. ***\u001b[0m");
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
             else
                 terminal.WriteLine(Loc.Get("castle.no_bail", name));
+
+            if (DoorMode.IsOnlineMode)
+                PersistRoyalCourtToWorldState();
         }
 
         await Task.Delay(2000);
@@ -2507,8 +3191,6 @@ public class CastleLocation : BaseLocation
                 terminal.WriteLine("");
             }
 
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("castle.commands"));
             if (IsScreenReader)
             {
                 WriteSRMenuOption("E", Loc.Get("castle.establishments"));
@@ -2516,18 +3198,46 @@ public class CastleLocation : BaseLocation
                 WriteSRMenuOption("B", Loc.Get("castle.bounty"));
                 WriteSRMenuOption("R", Loc.Get("castle.return"));
             }
+            else if (IsBBSSession)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write(" [E]");
+                terminal.SetColor("white");
+                terminal.Write($"{Loc.Get("castle.establishments")}  ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[P]");
+                terminal.SetColor("white");
+                terminal.Write($"{Loc.Get("castle.proclamation")}  ");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("[B]");
+                terminal.SetColor("white");
+                terminal.WriteLine($"{Loc.Get("castle.bounty")}");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(" [R]");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"{Loc.Get("castle.return")}");
+            }
             else
             {
-                terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("castle.orders_menu_line1"));
-                terminal.WriteLine(Loc.Get("castle.orders_menu_line2"));
+                terminal.WriteLine("");
+                terminal.Write("  [", "white");
+                terminal.Write("E", "bright_yellow");
+                terminal.Write($"] {Loc.Get("castle.establishments")}   ", "white");
+                terminal.Write("[", "white");
+                terminal.Write("P", "bright_yellow");
+                terminal.Write($"] {Loc.Get("castle.proclamation")}   ", "white");
+                terminal.Write("[", "white");
+                terminal.Write("B", "bright_yellow");
+                terminal.WriteLine($"] {Loc.Get("castle.bounty")}", "white");
+
+                terminal.Write("  [", "white");
+                terminal.Write("R", "bright_yellow");
+                terminal.WriteLine($"] {Loc.Get("castle.return")}", "gray");
             }
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
-            terminal.Write(Loc.Get("castle.orders_prompt"));
-            terminal.SetColor("white");
-            string input = await terminal.ReadLineAsync();
+            string input = await terminal.GetInput(Loc.Get("castle.orders_prompt"));
 
             if (string.IsNullOrEmpty(input)) continue;
 
@@ -2563,8 +3273,9 @@ public class CastleLocation : BaseLocation
             string status = est.Value ? Loc.Get("castle.open") : Loc.Get("castle.closed");
             string statusColor = est.Value ? "bright_green" : "red";
 
+            string displayName = Loc.Get($"castle.est_{est.Key.ToLowerInvariant()}");
             terminal.SetColor("white");
-            terminal.Write($"{i}. {est.Key,-20} ");
+            terminal.Write($"{i}. {displayName,-20} ");
             terminal.SetColor(statusColor);
             terminal.WriteLine(status);
             i++;
@@ -2579,13 +3290,49 @@ public class CastleLocation : BaseLocation
         if (int.TryParse(input, out int choice) && choice >= 1 && choice <= establishments.Count)
         {
             var key = establishments[choice - 1].Key;
+            bool currentlyOpen = currentKing.EstablishmentStatus[key];
+
             currentKing.EstablishmentStatus[key] = !currentKing.EstablishmentStatus[key];
 
-            string newStatus = currentKing.EstablishmentStatus[key] ? Loc.Get("castle.opened") : Loc.Get("castle.closed_past");
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("castle.establishment_toggled", key, newStatus));
+            // Check for rebellion from closing too many establishments
+            if (currentlyOpen) // We just closed one
+            {
+                int closedCount = currentKing.EstablishmentStatus.Count(e => !e.Value);
+                int totalCount = currentKing.EstablishmentStatus.Count;
+                double closedPercent = (double)closedCount / totalCount;
 
-            NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} has {newStatus} the {key}!");
+                if (closedPercent >= 0.75) // 75% closed = rebellion
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  The people have had enough! Too many shops closed!");
+                    await Task.Delay(2000);
+                    await TriggerRebellion();
+                    return;
+                }
+                else if (closedCount >= 2)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  The citizens grumble about the closures...");
+                    terminal.WriteLine("  Close too many more and the people may revolt.");
+                }
+            }
+
+            string newStatus = currentKing.EstablishmentStatus[key] ? Loc.Get("castle.opened") : Loc.Get("castle.closed_past");
+            string estDisplayName = Loc.Get($"castle.est_{key.ToLowerInvariant()}");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("castle.establishment_toggled", estDisplayName, newStatus));
+
+            NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} has {newStatus} the {estDisplayName}!");
+
+            if (DoorMode.IsOnlineMode)
+            {
+                string color = currentKing.EstablishmentStatus[key] ? "\u001b[1;32m" : "\u001b[1;31m";
+                UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
+                    $"{color}  *** {currentKing.GetTitle()} {currentKing.Name} has {newStatus} the {estDisplayName}! ***\u001b[0m");
+                PersistRoyalCourtToWorldState();
+            }
 
             await Task.Delay(2000);
         }
@@ -2602,6 +3349,11 @@ public class CastleLocation : BaseLocation
 
         if (!string.IsNullOrEmpty(proclamation))
         {
+            // Sanitize: strip ANSI escape codes and limit length
+            proclamation = System.Text.RegularExpressions.Regex.Replace(proclamation, @"\u001b\[[0-9;]*[a-zA-Z]", "");
+            if (proclamation.Length > 200)
+                proclamation = proclamation.Substring(0, 200);
+
             currentKing.LastProclamation = proclamation;
             currentKing.LastProclamationDate = DateTime.Now;
 
@@ -2613,6 +3365,14 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine($"\"{proclamation}\"");
 
             NewsSystem.Instance.Newsy(true, $"Royal Proclamation: \"{proclamation}\" - {currentKing.GetTitle()} {currentKing.Name}");
+
+            // Broadcast server-wide
+            if (DoorMode.IsOnlineMode)
+            {
+                UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
+                    $"\u001b[1;33m  *** Royal Proclamation by {currentKing.GetTitle()} {currentKing.Name}: \"{proclamation}\" ***\u001b[0m");
+                PersistRoyalCourtToWorldState();
+            }
 
             await Task.Delay(3000);
         }
@@ -2627,6 +3387,16 @@ public class CastleLocation : BaseLocation
         string name = await terminal.ReadLineAsync();
 
         if (string.IsNullOrEmpty(name)) return;
+
+        // Can't bounty yourself
+        if (name.Equals(currentKing.Name, StringComparison.OrdinalIgnoreCase) ||
+            name.Equals(currentPlayer.DisplayName, StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  You cannot place a bounty on yourself.");
+            await Task.Delay(2000);
+            return;
+        }
 
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.bounty_amount"));
@@ -2650,6 +3420,14 @@ public class CastleLocation : BaseLocation
 
                 // Wire into QuestSystem so the bounty is trackable
                 QuestSystem.PostBountyOnPlayer(name, "Royal decree", amount);
+
+                // Broadcast and persist
+                if (DoorMode.IsOnlineMode)
+                {
+                    UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
+                        $"\u001b[1;31m  *** BOUNTY: {amount:N0} gold on {name} by order of {currentKing.GetTitle()} {currentKing.Name}! ***\u001b[0m");
+                    PersistRoyalCourtToWorldState();
+                }
             }
         }
 
@@ -4502,6 +5280,14 @@ public class CastleLocation : BaseLocation
 
     private async Task<bool> ChallengeThrone()
     {
+        if (currentKing == null || !currentKing.IsActive)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  The throne is vacant. No one to challenge.");
+            await Task.Delay(2000);
+            return false;
+        }
+
         // Mark daily attempt — win or lose, you only get one shot per day
         currentPlayer.ThroneChallengedToday = true;
 
@@ -4897,6 +5683,7 @@ public class CastleLocation : BaseLocation
         // Crown new monarch — inherit the previous king's treasury and orphans
         long inheritedTreasury = currentKing.Treasury;
         var inheritedOrphans = currentKing?.Orphans?.ToList();
+        var inheritedPrisoners = currentKing?.Prisoners?.ToDictionary(p => p.Key, p => p.Value);
         string oldKingName = currentKing.Name;
         bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
         ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before replacing
@@ -4904,6 +5691,11 @@ public class CastleLocation : BaseLocation
         currentPlayer.NobleTitle = currentPlayer.Sex == CharacterSex.Female ? "Queen" : "King";
         currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
         currentKing.Treasury = inheritedTreasury;
+        if (inheritedPrisoners != null && inheritedPrisoners.Count > 0)
+        {
+            foreach (var p in inheritedPrisoners)
+                currentKing.Prisoners[p.Key] = p.Value;
+        }
         playerIsKing = true;
 
         currentPlayer.PKills++;
@@ -5001,11 +5793,17 @@ public class CastleLocation : BaseLocation
             return false;
         }
 
-        // Crown the new monarch — inherit any orphans from previous reign
+        // Crown the new monarch — inherit orphans and prisoners from previous reign
         var inheritedOrphans = currentKing?.Orphans?.ToList();
+        var inheritedPrisoners = currentKing?.Prisoners?.ToDictionary(p => p.Key, p => p.Value);
         ClearRoyalMarriage(currentKing); // Clear old king's royal spouse if any
         currentPlayer.King = true;
         currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
+        if (inheritedPrisoners != null && inheritedPrisoners.Count > 0)
+        {
+            foreach (var p in inheritedPrisoners)
+                currentKing.Prisoners[p.Key] = p.Value;
+        }
         playerIsKing = true;
 
         // Track archetype - Major Ruler moment
@@ -6417,6 +7215,24 @@ public class CastleLocation : BaseLocation
     /// tax policy changes, treasury deposits/withdrawals, etc.
     /// This ensures the world sim and other player sessions see the change immediately.
     /// </summary>
+    /// <summary>
+    /// Static version for use from other locations (e.g., PrisonLocation bail payment)
+    /// </summary>
+    public static void PersistRoyalCourtToWorldStateStatic()
+    {
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+        var osm = OnlineStateManager.Instance;
+        if (osm == null) return;
+        _ = Task.Run(async () =>
+        {
+            try { await osm.SaveRoyalCourtToWorldState(); }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("CASTLE", $"Failed to persist royal court (static): {ex.Message}");
+            }
+        });
+    }
+
     private void PersistRoyalCourtToWorldState()
     {
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
@@ -6524,17 +7340,24 @@ public class CastleLocation : BaseLocation
     /// </summary>
     private void CrownNPC(NPC npc)
     {
+        // Inherit prisoners and orphans from previous king
+        var inheritedPrisoners = currentKing?.Prisoners?.ToDictionary(p => p.Key, p => p.Value);
+        var inheritedOrphans = currentKing?.Orphans?.ToList();
+
         ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before crowning NPC
-        currentKing = new King
+        currentKing = King.CreateNewKing(npc.DisplayName, CharacterAI.Computer, npc.Sex, inheritedOrphans);
+        currentKing.Treasury = Math.Max(10000, npc.Gold / 2);
+        currentKing.TotalReign = 0;
+        currentKing.CoronationDate = DateTime.Now;
+
+        if (inheritedPrisoners != null && inheritedPrisoners.Count > 0)
         {
-            Name = npc.DisplayName,
-            AI = CharacterAI.Computer,
-            Sex = npc.Sex,
-            IsActive = true,
-            CoronationDate = DateTime.Now,
-            Treasury = Math.Max(10000, npc.Gold / 2), // NPC donates half their gold to treasury
-            TotalReign = 0
-        };
+            foreach (var p in inheritedPrisoners)
+                currentKing.Prisoners[p.Key] = p.Value;
+        }
+
+        // Deduct donated gold from NPC (prevents gold duplication)
+        npc.Gold = Math.Max(0, npc.Gold - npc.Gold / 2);
 
         // Record the coronation
         monarchHistory.Add(new MonarchRecord
@@ -7698,15 +8521,21 @@ public class CastleLocation : BaseLocation
         while (monarchHistory.Count > MaxMonarchHistory)
             monarchHistory.RemoveAt(0);
 
-        // Crown new monarch — inherit the previous king's treasury and orphans
+        // Crown new monarch — inherit the previous king's treasury, orphans, and prisoners
         long inheritedTreasury = currentKing.Treasury;
         var inheritedOrphans = currentKing?.Orphans?.ToList();
+        var inheritedPrisoners = currentKing?.Prisoners?.ToDictionary(p => p.Key, p => p.Value);
         bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
         ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before replacing
         currentPlayer.King = true;
         currentPlayer.NobleTitle = currentPlayer.Sex == CharacterSex.Female ? "Queen" : "King";
         currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
         currentKing.Treasury = inheritedTreasury;
+        if (inheritedPrisoners != null && inheritedPrisoners.Count > 0)
+        {
+            foreach (var p in inheritedPrisoners)
+                currentKing.Prisoners[p.Key] = p.Value;
+        }
         playerIsKing = true;
         currentPlayer.PKills++;
         UsurperRemake.Systems.ArchetypeTracker.Instance.RecordBecameKing();

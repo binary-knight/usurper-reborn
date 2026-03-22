@@ -257,6 +257,37 @@ namespace UsurperRemake.Systems
                 PhilosophicalHint = "How many times have you walked this road?"
             },
 
+            new NarrativeDreamData
+            {
+                Id = "dream_alethia_grace",
+                Title = "The Grace of Light",
+                MinLevel = 35, MaxLevel = 70,
+                MinAwakening = 3, MaxAwakening = 7,
+                Priority = 15,
+                Content = new[] {
+                    "You dream of a garden bathed in golden light.",
+                    "Two figures walk among the flowers — one blazing like the sun,",
+                    "the other gentle, luminous, her laughter like wind chimes.",
+                    "",
+                    "A third figure watches from the treeline. A woman cloaked in shadow.",
+                    "Her eyes burn with something that is not hatred.",
+                    "It is worse than hatred. It is love turned inward, eating itself alive.",
+                    "",
+                    "The gentle woman picks a flower and hands it to the blazing one.",
+                    "He smiles. The shadow in the trees trembles.",
+                    "",
+                    "That night, the garden fills with the scent of night-blooming flowers.",
+                    "By morning, the gentle woman is gone.",
+                    "The blazing one searches. Calls her name.",
+                    "",
+                    "Alethia.",
+                    "",
+                    "He never stops calling."
+                },
+                AwakeningGain = 1,
+                PhilosophicalHint = "The shadow loved the light. But the light loved the grace."
+            },
+
             // ====== LATE GAME DREAMS (Levels 50-80) ======
 
             new NarrativeDreamData

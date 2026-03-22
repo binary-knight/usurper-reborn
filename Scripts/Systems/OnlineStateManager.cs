@@ -351,7 +351,16 @@ namespace UsurperRemake.Systems
             try
             {
                 var king = global::CastleLocation.GetCurrentKing();
-                if (king == null) return;
+                if (king == null)
+                {
+                    // Throne is vacant — save empty state so other sessions see it
+                    var emptyData = new RoyalCourtSaveData { KingName = "", Treasury = 0, KingAI = 1 };
+                    var emptyJson = System.Text.Json.JsonSerializer.Serialize(emptyData,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                    var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                    if (backend != null) await backend.SaveWorldState("royal_court", emptyJson);
+                    return;
+                }
 
                 var data = new RoyalCourtSaveData
                 {

@@ -3751,13 +3751,6 @@ public partial class GameEngine
             return;
         }
 
-        // Check if player is in prison
-        if (currentPlayer.DaysInPrison > 0)
-        {
-            await HandlePrison();
-            return;
-        }
-
         // Check if player is dead - handle death and continue playing
         if (!currentPlayer.IsAlive)
         {
@@ -3789,6 +3782,10 @@ public partial class GameEngine
                 ? (GameLocation)currentPlayer.Location
                 : GameLocation.MainStreet;
         }
+        // Override start location if player is in prison
+        if (currentPlayer.DaysInPrison > 0)
+            startLocation = GameLocation.Prison;
+
         await locationManager.EnterLocation(startLocation, currentPlayer);
     }
     
@@ -3837,6 +3834,11 @@ public partial class GameEngine
             RoyTaxPaid = playerData.RoyTaxPaid,
             KingVotePoll = (byte)playerData.KingVotePoll,
             KingLastVote = (byte)playerData.KingLastVote,
+            ThroneChallengedToday = playerData.ThroneChallengedToday,
+            TotalExecutions = playerData.TotalExecutions,
+            ExecutionsToday = playerData.ExecutionsToday,
+            PlayerImprisonedToday = playerData.PlayerImprisonedToday,
+            NPCsImprisonedToday = playerData.NPCsImprisonedToday,
 
             // Family & Misc
             Kids = playerData.Kids,
@@ -5678,77 +5680,6 @@ public partial class GameEngine
     /// <summary>
     /// Handle prison - based on prison handling from Pascal
     /// </summary>
-    private async Task HandlePrison()
-    {
-        terminal.ClearScreen();
-        terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.in_prison"));
-        if (!GameConfig.ScreenReaderMode)
-            terminal.WriteLine("═══════════════════");
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("engine.days_remaining", currentPlayer.DaysInPrison));
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("engine.prison_wait"));
-        terminal.WriteLine(Loc.Get("engine.prison_escape"));
-        terminal.WriteLine(Loc.Get("engine.prison_quit"));
-        
-        var choice = await terminal.GetMenuChoice();
-        
-        switch (choice)
-        {
-            case 0: // Wait
-                currentPlayer.DaysInPrison--;
-                terminal.WriteLine(Loc.Get("engine.wait_patiently"), "gray");
-                await Task.Delay(2000);
-                break;
-                
-            case 1: // Escape
-                if (currentPlayer.PrisonEscapes > 0)
-                {
-                    await AttemptPrisonEscape();
-                }
-                else
-                {
-                    terminal.WriteLine(Loc.Get("ui.no_escape_attempts"), "red");
-                    await Task.Delay(2000);
-                }
-                break;
-                
-            case 2: // Quit
-                await QuitGame();
-                break;
-        }
-    }
-    
-    /// <summary>
-    /// Attempt prison escape
-    /// </summary>
-    private async Task AttemptPrisonEscape()
-    {
-        currentPlayer.PrisonEscapes--;
-        
-        terminal.WriteLine(Loc.Get("engine.attempt_escape"), "yellow");
-        await Task.Delay(1000);
-        
-        // Escape chance based on stats
-        var escapeChance = (currentPlayer.Dexterity + currentPlayer.Agility) / 4;
-        var roll = Random.Shared.Next(1, 101);
-        
-        if (roll <= escapeChance)
-        {
-            terminal.WriteLine(Loc.Get("engine.escape_success"), "green");
-            currentPlayer.DaysInPrison = 0;
-            currentPlayer.Location = 1; // Return to main street
-        }
-        else
-        {
-            terminal.WriteLine(Loc.Get("engine.escape_caught"), "red");
-            currentPlayer.DaysInPrison += 2; // Extra penalty
-        }
-        
-        await Task.Delay(2000);
-    }
-    
     /// <summary>
     /// Run world sim catch-up after loading a single-player save.
     /// Fast-forwards the world simulation based on how long the player was away,

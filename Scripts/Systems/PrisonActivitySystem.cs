@@ -56,10 +56,16 @@ public class PrisonActivitySystem
     /// <summary>
     /// Perform a prison activity for a character
     /// </summary>
+    private const int MaxActivitiesPerDay = 3;
+
     public async Task<string> PerformActivity(Character prisoner, PrisonActivity activity)
     {
         if (activity == PrisonActivity.None)
             return "You rest in your cell.";
+
+        // Daily activity limit to prevent stat farming
+        if (prisoner.PrisonActivitiesToday >= MaxActivitiesPerDay)
+            return "You're too exhausted for more exercise today. Rest until tomorrow.";
 
         string result = "";
 
@@ -98,13 +104,14 @@ public class PrisonActivitySystem
                 break;
         }
 
+        prisoner.PrisonActivitiesToday++;
         await Task.CompletedTask;
         return result;
     }
 
     private string PerformPushups(Character prisoner)
     {
-        int gain = random.Next(1, 3);
+        int gain = 1;
         prisoner.Strength += gain;
 
         return $"You do pushups until your arms burn. Strength +{gain}!";
@@ -112,7 +119,7 @@ public class PrisonActivitySystem
 
     private string PerformYoga(Character prisoner)
     {
-        int dexGain = random.Next(1, 3);
+        int dexGain = 1;
         int agiGain = random.Next(0, 2);
 
         prisoner.Dexterity += dexGain;
@@ -128,54 +135,48 @@ public class PrisonActivitySystem
 
     private string PerformReading(Character prisoner)
     {
-        int intGain = random.Next(1, 3);
-        int manaGain = random.Next(3, 8);
+        int intGain = 1;
 
         prisoner.Intelligence += intGain;
-        prisoner.Mana = Math.Min(prisoner.Mana + manaGain, prisoner.MaxMana);
-        prisoner.MaxMana += random.Next(0, 2);
+        prisoner.Mana = Math.Min(prisoner.Mana + 5, prisoner.MaxMana);
 
-        return $"You read whatever materials you can find. Intelligence +{intGain}, Mana +{manaGain}!";
+        return $"You read whatever materials you can find. Intelligence +{intGain}, Mana restored!";
     }
 
     private string PerformMeditation(Character prisoner)
     {
-        int wisGain = 1;
         long healAmount = prisoner.MaxHP / 10;
 
-        prisoner.Wisdom += wisGain;
+        prisoner.Wisdom += 1;
         prisoner.HP = Math.Min(prisoner.HP + healAmount, prisoner.MaxHP);
 
-        return $"You meditate peacefully. Wisdom +{wisGain}, HP +{healAmount}!";
+        return $"You meditate peacefully. Wisdom +1, HP +{healAmount}!";
     }
 
     private string PerformShadowBoxing(Character prisoner)
     {
-        prisoner.BonusWeapPow += 1;
-        prisoner.BaseDefence += 1;
-        prisoner.RecalculateStats();
+        // No permanent stat gain — just restores stamina
+        prisoner.CurrentCombatStamina = Math.Min(prisoner.CurrentCombatStamina + 10, 100);
 
-        return "You practice fighting an imaginary opponent. Attack +1, Defence +1!";
+        return "You practice fighting an imaginary opponent. You feel sharper.";
     }
 
     private string PerformStretching(Character prisoner)
     {
-        int stamGain = random.Next(1, 3);
-        int hpGain = random.Next(3, 8);
+        int stamGain = 1;
+        long healAmount = prisoner.MaxHP / 20;
 
         prisoner.Stamina += stamGain;
-        prisoner.MaxHP += hpGain;
-        prisoner.HP = Math.Min(prisoner.HP + hpGain, prisoner.MaxHP);
+        prisoner.HP = Math.Min(prisoner.HP + healAmount, prisoner.MaxHP);
 
-        return $"You stretch and build endurance. Stamina +{stamGain}, MaxHP +{hpGain}!";
+        return $"You stretch and build endurance. Stamina +{stamGain}, HP +{healAmount}!";
     }
 
     private string PerformPlanning(Character prisoner)
     {
-        int chaGain = random.Next(1, 3);
-        prisoner.Charisma += chaGain;
+        prisoner.Charisma += 1;
 
-        return $"You plan your future carefully. Charisma +{chaGain}!";
+        return "You plan your future carefully. Charisma +1!";
     }
 
     private string PerformPraying(Character prisoner)
@@ -297,6 +298,13 @@ public class PrisonActivitySystem
                 if (prisoner.DaysInPrison <= 0)
                 {
                     UsurperRemake.Systems.NPCSpawnSystem.Instance?.ReleaseNPC(prisoner);
+                    // Also remove from King's prisoner records to keep in sync
+                    var king = CastleLocation.GetCurrentKing();
+                    if (king?.Prisoners != null)
+                    {
+                        string prisonerName = prisoner.Name2 ?? prisoner.Name1;
+                        king.Prisoners.Remove(prisonerName);
+                    }
                     NewsSystem.Instance?.Newsy(true, $"{prisoner.Name} has been released from prison.");
                 }
             }

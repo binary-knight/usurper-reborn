@@ -2175,6 +2175,12 @@ namespace UsurperRemake.Systems
                 {
                     new()
                     {
+                        Text = "Who was Alethia?",
+                        NextNodeId = "aurelion_alethia",
+                        Tone = DialogueTone.Humble
+                    },
+                    new()
+                    {
                         Text = "Then I'll find a way to heal you. I swear it.",
                         NextNodeId = "aurelion_spare",
                         Tone = DialogueTone.Friendly
@@ -2188,6 +2194,63 @@ namespace UsurperRemake.Systems
                 }
             };
             tree.AllNodes[truth.Id] = truth;
+
+            var alethia = new DialogueNode
+            {
+                Id = "aurelion_alethia",
+                Speaker = "Aurelion",
+                Text = new[]
+                {
+                    "The light in the chamber falters. For one heartbeat,",
+                    "the God of Light is simply a man, broken by grief.",
+                    "",
+                    "\"Alethia...\"",
+                    "",
+                    "\"She was my grace. My warmth. The reason my light\"",
+                    "\"was gentle instead of blinding.\"",
+                    "",
+                    "\"Noctura... my sister... she loved me.\"",
+                    "\"Not as a sister should. She burned with it.\"",
+                    "\"And when I chose Alethia, when I gave my heart\"",
+                    "\"to the gentle one instead of the shadow...\"",
+                    "",
+                    "His voice breaks.",
+                    "",
+                    "\"Noctura came to her in the night.\"",
+                    "\"Wearing darkness. Wearing a smile.\"",
+                    "\"Alethia did not fear her. She was family.\"",
+                    "",
+                    "\"That was the last night the garden smelled of flowers.\"",
+                    "\"After that, it only smelled of night-blooming grief.\"",
+                    "",
+                    "\"My light has been going out ever since.\"",
+                    "\"Not because Manwe broke me.\"",
+                    "\"Because she was my light. And she is gone.\""
+                },
+                TextColor = "bright_yellow",
+                Choices = new List<DialogueChoice>
+                {
+                    new()
+                    {
+                        Text = "Her grace still lives. I've felt it. Let me help you carry this.",
+                        NextNodeId = "aurelion_spare",
+                        Tone = DialogueTone.Friendly
+                    },
+                    new()
+                    {
+                        Text = "I'm sorry. But the world still needs your light, even diminished.",
+                        NextNodeId = "aurelion_spare",
+                        Tone = DialogueTone.Humble
+                    },
+                    new()
+                    {
+                        Text = "Then let your light go out with honor.",
+                        NextNodeId = "aurelion_fight_reluctant",
+                        Tone = DialogueTone.Neutral
+                    }
+                }
+            };
+            tree.AllNodes[alethia.Id] = alethia;
 
             var spare = new DialogueNode
             {

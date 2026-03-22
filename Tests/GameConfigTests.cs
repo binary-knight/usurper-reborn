@@ -26,7 +26,7 @@ public class GameConfigTests
     {
         GameConfig.MaxPlayers.Should().BeGreaterThan(0);
         GameConfig.MaxTeamMembers.Should().BeGreaterThan(0);
-        GameConfig.MaxLevel.Should().BeGreaterThan(100);
+        GameConfig.MaxLevel.Should().BeGreaterThanOrEqualTo(100);
     }
 
     [Fact]

@@ -69,6 +69,16 @@ public class DungeonLocation : BaseLocation
         currentPlayer = player;
         terminal = term;
 
+        // Block entry if player is imprisoned
+        if (player.DaysInPrison > 0)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  You are a prisoner! The dungeon entrance is barred to you.");
+            await Task.Delay(2000);
+            await NavigateToLocation(GameLocation.Prison);
+            return;
+        }
+
         // GROUP FOLLOWER CHECK: If this player is in a group but not the leader,
         // and the leader is already in the dungeon, enter as a follower instead.
         var group = GroupSystem.Instance?.GetGroupFor(player?.Name2 ?? "");
@@ -11372,6 +11382,7 @@ public class DungeonLocation : BaseLocation
         string? bossRoomId = null;
         string? nearestUnexploredId = null;
         string? nearestUnclearedId = null;
+        string? nearestSafeHavenId = null;
 
         // BFS order guarantees nearest first, so iterate parentMap keys in insertion order
         foreach (var roomId in bfsVisited)
@@ -11388,10 +11399,14 @@ public class DungeonLocation : BaseLocation
                 nearestUnexploredId = roomId;
             if (nearestUnclearedId == null && room.IsExplored && !room.IsCleared && room.HasMonsters)
                 nearestUnclearedId = roomId;
+            if (nearestSafeHavenId == null && room.IsSafeRoom && room.IsExplored)
+                nearestSafeHavenId = roomId;
         }
 
         // Menu
         var options = new List<(string key, string label, string? targetId)>();
+        if (nearestSafeHavenId != null)
+            options.Add(("H", "Nearest safe haven", nearestSafeHavenId));
         if (nearestUnexploredId != null)
             options.Add(("U", "Nearest unexplored room", nearestUnexploredId));
         if (nearestUnclearedId != null)
@@ -13072,6 +13087,68 @@ public class DungeonLocation : BaseLocation
                     }
                     await Task.Delay(1500);
                 }
+            }
+
+            // Alethia's ghost appears at rest spots on floors 60-85 (near Noctura/Aurelion)
+            if (currentDungeonLevel >= 60 && currentDungeonLevel <= 85 && dungeonRandom.Next(100) < 25)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("  A gentle warmth fills the air...");
+                await Task.Delay(1500);
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  A luminous figure appears — a woman of surpassing grace,");
+                terminal.WriteLine("  her form woven from fading starlight.");
+                await Task.Delay(1500);
+
+                var alethiaLines = new[]
+                {
+                    new[] {
+                        "  \"He was my light, and I was his grace.\"",
+                        "  \"His sister... she loved him too. Not as a sister should.\"",
+                        "  \"When I close my eyes, I still smell night-blooming flowers.\""
+                    },
+                    new[] {
+                        "  \"Tell Aurelion... tell him his light is not gone.\"",
+                        "  \"It lives in everyone he ever healed.\"",
+                        "  \"Even in death, I am still his grace.\""
+                    },
+                    new[] {
+                        "  \"She came to me wearing shadows and smiling.\"",
+                        "  \"I did not fear her. She was his sister.\"",
+                        "  \"That was my mistake.\""
+                    },
+                    new[] {
+                        "  \"Do not hate her. She is consumed by something\"",
+                        "  \"older than hate. Older than love.\"",
+                        "  \"She could not have what she wanted. So she destroyed it.\""
+                    }
+                };
+
+                var lines = alethiaLines[dungeonRandom.Next(alethiaLines.Length)];
+                terminal.SetColor("bright_cyan");
+                foreach (var line in lines)
+                {
+                    terminal.WriteLine(line);
+                    await Task.Delay(1200);
+                }
+
+                // Grant healing and a small buff
+                long alethiaHeal = player.MaxHP / 3;
+                player.HP = Math.Min(player.MaxHP, player.HP + alethiaHeal);
+                if (player.MaxMana > 0)
+                    player.Mana = Math.Min(player.MaxMana, player.Mana + player.MaxMana / 3);
+
+                await Task.Delay(1000);
+                terminal.SetColor("bright_white");
+                terminal.WriteLine("  She touches your forehead. Warmth floods through you.");
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  (+{alethiaHeal} HP restored. Mana restored.)");
+                await Task.Delay(1500);
+
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("  The light fades. The warmth lingers.");
+                await terminal.PressAnyKey();
             }
 
             // In single-player, dungeon rest can advance the day if it's nighttime

@@ -518,6 +518,19 @@ public abstract class BaseLocation
             if (GameEngine.Instance.IsPermadeath)
                 return;
 
+            // Royal arrest — if guards seized you mid-game, redirect to prison
+            if (currentPlayer.DaysInPrison > 0 && !(this is PrisonLocation) && !(this is PrisonWalkLocation))
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("");
+                terminal.WriteLine("  Royal guards surround you!");
+                terminal.WriteLine("  \"By order of the crown, you are under arrest!\"");
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+                await NavigateToLocation(GameLocation.Prison);
+                return;
+            }
+
             // Auto-level-up check — catches ALL XP sources (combat, quests, seals, events, etc.)
             if (currentPlayer != null && currentPlayer.AI == CharacterAI.Human && currentPlayer.AutoLevelUp)
             {

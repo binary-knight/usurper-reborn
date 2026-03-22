@@ -1081,6 +1081,8 @@ function getStats() {
         ) pvp
         JOIN players p ON LOWER(pvp.player) = LOWER(p.username)
         WHERE p.is_banned = 0
+          AND (json_extract(p.player_data, '$.player.isImmortal') IS NULL
+               OR json_extract(p.player_data, '$.player.isImmortal') != 1)
         GROUP BY pvp.player
         HAVING wins > 0
         ORDER BY wins DESC, gold_stolen DESC

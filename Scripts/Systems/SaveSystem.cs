@@ -395,6 +395,11 @@ namespace UsurperRemake.Systems
                 RoyTaxPaid = player.RoyTaxPaid,
                 KingVotePoll = player.KingVotePoll,
                 KingLastVote = player.KingLastVote,
+                ThroneChallengedToday = player.ThroneChallengedToday,
+                TotalExecutions = player.TotalExecutions,
+                ExecutionsToday = player.ExecutionsToday,
+                PlayerImprisonedToday = player.PlayerImprisonedToday,
+                NPCsImprisonedToday = player.NPCsImprisonedToday,
 
                 // Family & Misc
                 Kids = player.Kids,

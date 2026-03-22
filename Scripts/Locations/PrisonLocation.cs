@@ -251,6 +251,8 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteLineAsync(Loc.Get("prison.sr_menu_escape"));
             await terminal.WriteLineAsync(Loc.Get("prison.sr_menu_status"));
             await terminal.WriteLineAsync(Loc.Get("prison.sr_menu_activities"));
+            await terminal.WriteLineAsync("B. Pay Bail (if bail is set)");
+            await terminal.WriteLineAsync("P. Petition the King for release");
 
             var currentPlayer = gameEngine?.CurrentPlayer;
             if (currentPlayer != null && CanMeetVex(currentPlayer))
@@ -265,6 +267,7 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteLineAsync(Loc.Get("prison.menu_row1"));
             await terminal.WriteLineAsync(Loc.Get("prison.menu_row2"));
             await terminal.WriteLineAsync(Loc.Get("prison.menu_row3"));
+            await terminal.WriteLineAsync("(B)ail Payment              (P)etition for Release");
 
             // Check for Vex companion availability - get player from game engine
             var currentPlayer = gameEngine?.CurrentPlayer;
@@ -325,12 +328,227 @@ public partial class PrisonLocation : BaseLocation
             case 'A':
                 await HandleActivities(player);
                 return false;
+            case 'B':
+                return await HandlePayBail(player);
+            case 'P':
+                await HandlePetitionKing(player);
+                return false;
             case 'V':
                 return await HandleVexEncounter(player);
             default:
                 // Invalid choice, do nothing
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Handle bail payment — player pays gold to get released immediately
+    /// </summary>
+    private async Task<bool> HandlePayBail(Character player)
+    {
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null)
+        {
+            await terminal.WriteColorLineAsync("  There is no king to accept bail.", TerminalEmulator.ColorYellow);
+            await Task.Delay(2000);
+            return false;
+        }
+
+        // Find this player's prison record
+        string playerName = player.DisplayName ?? player.Name2 ?? "";
+        if (!king.Prisoners.TryGetValue(playerName, out var record))
+        {
+            await terminal.WriteColorLineAsync("  No bail has been set for you.", TerminalEmulator.ColorYellow);
+            await Task.Delay(2000);
+            return false;
+        }
+
+        if (record.BailAmount <= 0)
+        {
+            await terminal.WriteColorLineAsync("  The king has not set bail for your release.", TerminalEmulator.ColorYellow);
+            await terminal.WriteColorLineAsync("  You must wait, escape, or petition for clemency.", TerminalEmulator.ColorDarkGray);
+            await Task.Delay(2000);
+            return false;
+        }
+
+        await terminal.WriteLineAsync();
+        await terminal.WriteColorLineAsync($"  Bail is set at {record.BailAmount:N0} gold.", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorLineAsync($"  You have {player.Gold:N0} gold.", TerminalEmulator.ColorWhite);
+        await terminal.WriteLineAsync();
+
+        if (player.Gold < record.BailAmount)
+        {
+            await terminal.WriteColorLineAsync("  You cannot afford bail.", TerminalEmulator.ColorRed);
+            await Task.Delay(2000);
+            return false;
+        }
+
+        await terminal.WriteColorAsync($"  Pay {record.BailAmount:N0} gold for your freedom? (Y/N): ", TerminalEmulator.ColorCyan);
+        string confirm = await terminal.ReadLineAsync();
+        if (confirm?.Trim().ToUpper() != "Y")
+        {
+            await terminal.WriteColorLineAsync("  You decide to keep your gold... for now.", TerminalEmulator.ColorDarkGray);
+            await Task.Delay(1500);
+            return false;
+        }
+
+        // Pay bail
+        player.Gold -= record.BailAmount;
+        long bailPaid = record.BailAmount;
+
+        // Add bail to king's treasury
+        king.Treasury += bailPaid;
+
+        // Release from prison
+        player.DaysInPrison = 0;
+        king.Prisoners.Remove(playerName);
+
+        // Persist changes
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            CastleLocation.PersistRoyalCourtToWorldStateStatic();
+
+        await terminal.WriteLineAsync();
+        await terminal.WriteColorLineAsync($"  You pay {bailPaid:N0} gold to the jailer.", TerminalEmulator.ColorYellow);
+        await terminal.WriteColorLineAsync("  The cell door swings open.", TerminalEmulator.ColorGreen);
+        await terminal.WriteColorLineAsync("  You are free!", TerminalEmulator.ColorGreen);
+        await terminal.WriteLineAsync();
+
+        NewsSystem.Instance?.Newsy(true, $"{playerName} paid {bailPaid:N0} gold bail and was released from prison.");
+
+        await terminal.WaitForKey();
+        return true; // Exit prison
+    }
+
+    /// <summary>
+    /// Handle petition to the king for release or bail setting
+    /// </summary>
+    private async Task HandlePetitionKing(Character player)
+    {
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null)
+        {
+            await terminal.WriteColorLineAsync("  There is no king to petition.", TerminalEmulator.ColorYellow);
+            await Task.Delay(2000);
+            return;
+        }
+
+        string playerName = player.DisplayName ?? player.Name2 ?? "";
+
+        await terminal.ClearScreenAsync();
+        await terminal.WriteColorLineAsync("  ═══ PETITION TO THE CROWN ═══", TerminalEmulator.ColorCyan);
+        await terminal.WriteLineAsync();
+        await terminal.WriteColorLineAsync("  You send a formal petition to the throne:", TerminalEmulator.ColorWhite);
+        await terminal.WriteLineAsync();
+        await terminal.WriteColorLineAsync("  1. Request bail be set (if none is set)", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorLineAsync("  2. Plead for clemency (request pardon)", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorLineAsync("  0. Cancel", TerminalEmulator.ColorDarkGray);
+        await terminal.WriteLineAsync();
+
+        string choice = await terminal.ReadLineAsync();
+
+        if (choice?.Trim() == "1")
+        {
+            // Request bail
+            bool hasBail = king.Prisoners.TryGetValue(playerName, out var record) && record?.BailAmount > 0;
+            if (hasBail)
+            {
+                await terminal.WriteColorLineAsync($"  Bail is already set at {record!.BailAmount:N0} gold.", TerminalEmulator.ColorYellow);
+            }
+            else
+            {
+                // NPC king auto-sets bail based on player level and crime
+                if (king.AI == CharacterAI.Computer)
+                {
+                    long bailAmount = 1000 + player.Level * 500;
+                    if (king.Prisoners.TryGetValue(playerName, out var rec) && rec != null)
+                    {
+                        rec.BailAmount = bailAmount;
+                        await terminal.WriteColorLineAsync($"  The king considers your petition...", TerminalEmulator.ColorWhite);
+                        await Task.Delay(1500);
+                        await terminal.WriteColorLineAsync($"  Bail has been set at {bailAmount:N0} gold.", TerminalEmulator.ColorGreen);
+                        await terminal.WriteColorLineAsync($"  Use [B] to pay bail.", TerminalEmulator.ColorCyan);
+                    }
+                    else
+                    {
+                        await terminal.WriteColorLineAsync("  The king cannot find your prison record.", TerminalEmulator.ColorRed);
+                    }
+                }
+                else
+                {
+                    // Human king — send a message
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    {
+                        var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                        if (backend != null)
+                        {
+                            try
+                            {
+                                string kingUsername = king.Name.ToLowerInvariant();
+                                await backend.SendMessage(playerName, kingUsername, "petition",
+                                    $"{playerName} petitions from prison: \"Please set bail for my release! I await your mercy, Your Majesty.\"");
+                            }
+                            catch { }
+                        }
+                    }
+                    await terminal.WriteColorLineAsync("  Your petition has been sent to the king.", TerminalEmulator.ColorCyan);
+                    await terminal.WriteColorLineAsync("  You must wait for a royal response.", TerminalEmulator.ColorDarkGray);
+                }
+            }
+        }
+        else if (choice?.Trim() == "2")
+        {
+            // Plead for clemency
+            if (king.AI == CharacterAI.Computer)
+            {
+                // NPC king: 20% chance of pardon based on chivalry
+                int pardonChance = 10 + (int)(player.Chivalry / 500);
+                pardonChance = Math.Clamp(pardonChance, 5, 40);
+
+                await terminal.WriteColorLineAsync("  The king considers your plea for mercy...", TerminalEmulator.ColorWhite);
+                await Task.Delay(2000);
+
+                if (Random.Shared.Next(100) < pardonChance)
+                {
+                    player.DaysInPrison = 0;
+                    king.Prisoners.Remove(playerName);
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                        CastleLocation.PersistRoyalCourtToWorldStateStatic();
+
+                    await terminal.WriteColorLineAsync("  \"Very well. I shall show mercy this once.\"", TerminalEmulator.ColorGreen);
+                    await terminal.WriteColorLineAsync("  The king pardons you! You are free!", TerminalEmulator.ColorGreen);
+                    NewsSystem.Instance?.Newsy(true, $"The king pardoned {playerName} after a plea for clemency.");
+                    await terminal.WaitForKey();
+                    return;
+                }
+                else
+                {
+                    await terminal.WriteColorLineAsync("  \"Your crimes have not been forgotten.\"", TerminalEmulator.ColorRed);
+                    await terminal.WriteColorLineAsync("  The king denies your petition.", TerminalEmulator.ColorRed);
+                }
+            }
+            else
+            {
+                // Human king — send message
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                    if (backend != null)
+                    {
+                        try
+                        {
+                            string kingUsername = king.Name.ToLowerInvariant();
+                            await backend.SendMessage(playerName, kingUsername, "petition",
+                                $"{playerName} pleads from prison: \"I beg for clemency! Please pardon my crimes, Your Majesty.\"");
+                        }
+                        catch { }
+                    }
+                }
+                await terminal.WriteColorLineAsync("  Your plea for clemency has been sent to the king.", TerminalEmulator.ColorCyan);
+                await terminal.WriteColorLineAsync("  You must wait for a royal response.", TerminalEmulator.ColorDarkGray);
+            }
+        }
+
+        await Task.Delay(2000);
     }
 
     /// <summary>
@@ -485,6 +703,27 @@ public partial class PrisonLocation : BaseLocation
         
         await terminal.WriteColorLineAsync(response, TerminalEmulator.ColorMagenta);
         await terminal.WriteLineAsync(Loc.Get("prison.released_probably"));
+
+        // Send demand message to the king
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            var king = CastleLocation.GetCurrentKing();
+            if (king != null)
+            {
+                var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                if (backend != null)
+                {
+                    string playerName = player.DisplayName ?? player.Name2 ?? "";
+                    try
+                    {
+                        await backend.SendMessage(playerName, king.Name, "petition",
+                            $"{playerName} demands release from prison: \"LET ME OUT! I demand to be freed at once!\"");
+                    }
+                    catch { }
+                }
+                await terminal.WriteColorLineAsync("  Your demands echo through the dungeon halls...", TerminalEmulator.ColorDarkGray);
+            }
+        }
     }
     
     private async Task<bool> HandleEscapeAttempt(Character player)
@@ -528,7 +767,7 @@ public partial class PrisonLocation : BaseLocation
 
             await terminal.WriteLineAsync(Loc.Get("prison.guards_heard"));
             await terminal.WriteLineAsync(Loc.Get("prison.sentence_extended"));
-            player.DaysInPrison++;
+            if (player.DaysInPrison < 255) player.DaysInPrison++;
             await Task.Delay(1500);
             return false;
         }

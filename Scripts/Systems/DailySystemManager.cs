@@ -359,6 +359,10 @@ public class DailySystemManager
         player.SettlementWorkshopUsedToday = false;
         player.ThroneChallengedToday = false;
         player.TavernStrangerTalkedToday = false;
+        player.ExecutionsToday = 0;
+        player.PlayerImprisonedToday = false;
+        player.NPCsImprisonedToday = 0;
+        player.PrisonActivitiesToday = 0;
 
         // Reset fatigue on full sleep (v0.49.1)
         player.Fatigue = 0;

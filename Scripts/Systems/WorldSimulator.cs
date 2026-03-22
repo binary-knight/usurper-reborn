@@ -918,7 +918,7 @@ public class WorldSimulator
         var aliveNPCs = npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead).ToList();
 
         // Skip diversity immigration when population is high — only extinction prevention
-        bool populationHigh = aliveNPCs.Count >= 80;
+        bool populationHigh = aliveNPCs.Count >= 200;
 
         // Calculate average level of alive NPCs for immigrant scaling
         int avgLevel = aliveNPCs.Count > 0 ? Math.Max(1, (int)aliveNPCs.Average(n => n.Level)) : 5;

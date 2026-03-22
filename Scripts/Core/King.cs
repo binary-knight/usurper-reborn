@@ -199,6 +199,13 @@ public class King
         foreach (var prisonerId in prisonersToRelease)
         {
             Prisoners.Remove(prisonerId);
+            // Also clear the NPC's prison state
+            var npc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.GetNPCByName(prisonerId, includeDead: true);
+            if (npc != null)
+            {
+                npc.DaysInPrison = 0;
+                npc.CurrentLocation = "MainStreet";
+            }
         }
 
         // Replenish magic budget from treasury (up to cap)
@@ -333,6 +340,9 @@ public class King
     /// </summary>
     public static King CreateNewKing(string name, CharacterAI ai, CharacterSex sex, List<RoyalOrphan>? inheritedOrphans = null)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            name = "Unknown Ruler";
+
         var king = new King
         {
             Name = name,

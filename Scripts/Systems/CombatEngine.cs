@@ -334,6 +334,12 @@ public partial class CombatEngine
             foreach (var (msg, color) in defender.ProcessStatusEffects())
                 terminal.WriteLine(msg, color);
 
+            // Process Shaman totem effects for both combatants
+            if (attacker.ActiveTotemRounds > 0)
+                ProcessShamanTotemEffects(attacker, null, result);
+            if (defender.ActiveTotemRounds > 0)
+                ProcessShamanTotemEffects(defender, null, result);
+
             // Tick down cooldowns for both sides
             foreach (var key in abilityCooldowns.Keys.ToList())
                 if (abilityCooldowns[key] > 0) abilityCooldowns[key]--;
@@ -7980,7 +7986,10 @@ public partial class CombatEngine
         int itemPower;
         if (isWeapon)
         {
-            itemPower = lootItem.Attack;
+            // Weight: WeaponPower * 3 + stat bonuses to match Equipment scoring
+            itemPower = lootItem.Attack * 3
+                + lootItem.Strength + lootItem.Dexterity + lootItem.Wisdom
+                + lootItem.Charisma + lootItem.Agility + lootItem.Defence;
         }
         else if (isAccessory)
         {
@@ -8030,10 +8039,15 @@ public partial class CombatEngine
             {
                 var mainEquip = teammate.GetEquipment(EquipmentSlot.MainHand);
                 var offEquip = teammate.GetEquipment(EquipmentSlot.OffHand);
-                int mainPower = mainEquip?.WeaponPower ?? 0;
-                int offPower = offEquip?.WeaponPower ?? 0;
+                // Use weighted scoring (WP*3 + stats) to pick the weaker slot
+                int mainScore = mainEquip != null ? (mainEquip.WeaponPower * 3 + mainEquip.StrengthBonus + mainEquip.DexterityBonus
+                    + mainEquip.IntelligenceBonus + mainEquip.WisdomBonus + mainEquip.ConstitutionBonus
+                    + mainEquip.CharismaBonus + mainEquip.AgilityBonus + mainEquip.DefenceBonus) : 0;
+                int offScore = offEquip != null ? (offEquip.WeaponPower * 3 + offEquip.StrengthBonus + offEquip.DexterityBonus
+                    + offEquip.IntelligenceBonus + offEquip.WisdomBonus + offEquip.ConstitutionBonus
+                    + offEquip.CharismaBonus + offEquip.AgilityBonus + offEquip.DefenceBonus) : 0;
                 // Pick the weaker slot to compare against
-                if (offPower < mainPower)
+                if (offScore < mainScore)
                     actualSlot = EquipmentSlot.OffHand;
             }
 
@@ -8041,7 +8055,10 @@ public partial class CombatEngine
             int currentPower = 0;
             if (currentEquip != null)
             {
-                currentPower = isWeapon ? currentEquip.WeaponPower
+                currentPower = isWeapon ? (currentEquip.WeaponPower * 3
+                        + currentEquip.StrengthBonus + currentEquip.DexterityBonus + currentEquip.IntelligenceBonus
+                        + currentEquip.WisdomBonus + currentEquip.ConstitutionBonus + currentEquip.CharismaBonus
+                        + currentEquip.AgilityBonus + currentEquip.DefenceBonus)
                     : isAccessory ? (currentEquip.StrengthBonus + currentEquip.DexterityBonus + currentEquip.IntelligenceBonus + currentEquip.WisdomBonus
                                    + currentEquip.ConstitutionBonus + currentEquip.CharismaBonus + currentEquip.AgilityBonus + currentEquip.ArmorClass + currentEquip.WeaponPower)
                     : currentEquip.ArmorClass;
@@ -12060,9 +12077,9 @@ public partial class CombatEngine
 
             case "crescendo_aoe":
             {
-                // 120 AoE + 30 per ally in party
+                // 180 AoE + 50 per ally in party + inspire buff
                 int allyCount = result?.Teammates?.Count(t => t.IsAlive) ?? 0;
-                int bonusDmg = allyCount * 30;
+                int bonusDmg = allyCount * 50;
                 if (monsters != null)
                 {
                     var crescLiving = monsters.Where(m => m.IsAlive).ToList();
@@ -12086,6 +12103,23 @@ public partial class CombatEngine
                     terminal.SetColor("cyan");
                     terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe_allies", allyCount, bonusDmg));
                 }
+                // Inspire buff: +25 ATK, +25 DEF for 3 rounds to all allies
+                player.TempAttackBonus += 25;
+                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
+                player.TempDefenseBonus += 25;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 3);
+                if (result?.Teammates != null)
+                {
+                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        tm.TempAttackBonus += 25;
+                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, 3);
+                        tm.TempDefenseBonus += 25;
+                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, 3);
+                    }
+                }
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("  The crescendo inspires your party! +25 ATK, +25 DEF for 3 rounds!");
                 break;
             }
 
@@ -12812,14 +12846,15 @@ public partial class CombatEngine
 
             case "void_rupture":
             {
-                // 160 AoE, killed enemies explode for 60 (rebalanced)
-                int killExplosionDmg = 60;
+                // 160 AoE with diminishing returns, killed enemies explode for 25% of hit damage
                 int kills = 0;
                 if (monsters != null)
                 {
-                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    var vrLiving = monsters.Where(m => m.IsAlive).ToList();
+                    for (int vi = 0; vi < vrLiving.Count; vi++)
                     {
-                        int dmg = abilityResult.Damage;
+                        var m = vrLiving[vi];
+                        int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(vi));
                         m.HP -= dmg;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.ability_void_rupture", m.Name, dmg));
@@ -12833,9 +12868,10 @@ public partial class CombatEngine
                     }
                     if (kills > 0)
                     {
+                        int explosionBase = Math.Max(60, (int)(abilityResult.Damage * 0.15)); // 15% of hit damage, min 60
                         foreach (var m in monsters.Where(m => m.IsAlive))
                         {
-                            int explosionDmg = killExplosionDmg * kills;
+                            int explosionDmg = explosionBase * kills;
                             m.HP -= explosionDmg;
                             terminal.SetColor("bright_red");
                             terminal.WriteLine(Loc.Get("combat.ability_void_rupture_explode", kills, m.Name, explosionDmg));
@@ -14934,12 +14970,20 @@ public partial class CombatEngine
                 chosenAbility = aoeAbility;
         }
 
-        if (chosenAbility == null && livingMonsters.Any(m => m.HP < m.MaxHP * 0.3))
+        // Re-check living monsters (some may have died this round from other actions)
+        var stillAlive = monsters.Where(m => m.IsAlive).ToList();
+        if (chosenAbility == null && stillAlive.Any(m => m.HP < m.MaxHP * 0.3))
         {
             var executeAbility = attackAbilities.FirstOrDefault(a =>
                 a.SpecialEffect == "execute" || a.SpecialEffect == "assassinate");
             if (executeAbility != null && random.Next(100) < 50)
                 chosenAbility = executeAbility;
+        }
+        // Don't use execute if no living monster is actually low HP
+        if (chosenAbility != null && (chosenAbility.SpecialEffect == "execute" || chosenAbility.SpecialEffect == "assassinate"))
+        {
+            if (!stillAlive.Any(m => m.HP < m.MaxHP * 0.3))
+                chosenAbility = null; // Cancel — no valid execute target
         }
 
         // No situational pick — weighted random from ALL ability types
@@ -18613,9 +18657,9 @@ public partial class CombatEngine
 
             case "crescendo_aoe":
             {
-                // 120 AoE + 30 per ally in party (single-monster: hits monster)
+                // 180 AoE + 50 per ally in party + inspire buff
                 int caAllyCount = result?.Teammates?.Count(t => t.IsAlive) ?? 0;
-                int caBonusDmg = caAllyCount * 30;
+                int caBonusDmg = caAllyCount * 50;
                 if (monster != null && monster.IsAlive)
                 {
                     int dmg = abilityResult.Damage + caBonusDmg;
@@ -18634,6 +18678,23 @@ public partial class CombatEngine
                     terminal.SetColor("cyan");
                     terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe_allies", caAllyCount, caBonusDmg));
                 }
+                // Inspire buff: +25 ATK, +25 DEF for 3 rounds to all allies
+                player.TempAttackBonus += 25;
+                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
+                player.TempDefenseBonus += 25;
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 3);
+                if (result?.Teammates != null)
+                {
+                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    {
+                        tm.TempAttackBonus += 25;
+                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, 3);
+                        tm.TempDefenseBonus += 25;
+                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, 3);
+                    }
+                }
+                terminal.SetColor("bright_green");
+                terminal.WriteLine("  The crescendo inspires your party! +25 ATK, +25 DEF for 3 rounds!");
                 break;
             }
 
@@ -21009,7 +21070,7 @@ public partial class CombatEngine
                 break;
 
             case "tidal_reflect":
-                // Tidal Ward: reflect 15% of melee damage back at attackers
+                // Alethia's Ward: reflect 15% of melee damage back at attackers
                 if (!caster.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
                     caster.ActiveStatuses[StatusEffect.Reflecting] = 999;
                 terminal.WriteLine($"The tidal barrier will reflect damage back at attackers!", "bright_cyan");
@@ -21879,7 +21940,7 @@ public partial class CombatEngine
         if (drugEffects.SpeedPenalty > 15)
             attacks = Math.Max(1, attacks - 1);
 
-        // Haste doubles attacks
+        // Haste doubles basic attacks (Blood Frenzy, Timeline Split, etc.)
         if (attacker.HasStatus(StatusEffect.Haste))
             attacks *= 2;
 
@@ -22296,7 +22357,7 @@ public partial class CombatEngine
             if (spellInfo.SpellType == "Buff" || spellInfo.SpellType == "Heal")
             {
                 int? allyTarget = null;
-                // Multi-target buff/heal (e.g. Restorative Tide, Tidecall Barrier) — skip target prompt
+                // Multi-target buff/heal (e.g. Alethia's Grace, Tidecall Barrier) — skip target prompt
                 if (!spellInfo.IsMultiTarget && currentTeammates?.Any(t => t.IsAlive) == true)
                 {
                     if (spellInfo.SpellType == "Heal" && currentTeammates.Any(t => t.IsAlive && t.HP < t.MaxHP))

@@ -22,7 +22,7 @@ public class ChallengeSystem
     private static ChallengeSystem? instance;
     public static ChallengeSystem Instance => instance ??= new ChallengeSystem();
 
-    private Random random = new();
+    private Random random = Random.Shared;
 
     /// <summary>
     /// SQL backend for loading player stats when challenging a player king offline
@@ -41,6 +41,9 @@ public class ChallengeSystem
     private int _npcChallengesThisDay = 0;
     private int _lastChallengeDay = -1;
     private PendingNPCChallenge? _pendingChallenge = null;
+    private string _lastKnownKingName = "";
+    private DateTime _lastDethronementTime = DateTime.MinValue;
+    private const int DethronementCooldownMinutes = 10;
 
     /// <summary>
     /// Pending NPC challenge against a player king (warning period before execution)
@@ -79,9 +82,23 @@ public class ChallengeSystem
         if (king == null)
         {
             // Empty throne - find someone to claim it
+            _pendingChallenge = null; // Clear any stale challenge
             ClaimEmptyThrone();
             return;
         }
+
+        // Detect king change — clear pending challenges from old reign
+        if (!string.IsNullOrEmpty(_lastKnownKingName) && king.Name != _lastKnownKingName)
+        {
+            _pendingChallenge = null;
+            _lastDethronementTime = DateTime.UtcNow;
+            DebugLogger.Instance.LogInfo("CHALLENGE", $"King changed from {_lastKnownKingName} to {king.Name} — cleared pending challenges, cooldown started");
+        }
+        _lastKnownKingName = king.Name;
+
+        // Cooldown after a dethronement — no new challenges for 10 minutes
+        if ((DateTime.UtcNow - _lastDethronementTime).TotalMinutes < DethronementCooldownMinutes)
+            return;
 
         // Remember designated heir in case king is dethroned
         _lastDesignatedHeir = king.DesignatedHeir;

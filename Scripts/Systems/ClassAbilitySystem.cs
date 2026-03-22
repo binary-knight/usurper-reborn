@@ -1864,9 +1864,9 @@ public static class ClassAbilitySystem
         {
             Id = "crescendo",
             Name = "Crescendo",
-            Description = "Devastating harmonic peak. 120 AoE damage + 30 bonus per ally in party.",
-            LevelRequired = 40, StaminaCost = 80, Cooldown = 6,
-            Type = AbilityType.Attack, BaseDamage = 120,
+            Description = "Devastating harmonic peak. 180 AoE damage + 50 per ally. Inspires all allies: +25 ATK, +25 DEF for 3 rounds.",
+            LevelRequired = 40, StaminaCost = 80, Cooldown = 5,
+            Type = AbilityType.Attack, BaseDamage = 180,
             SpecialEffect = "crescendo_aoe",
             AvailableToClasses = new[] { CharacterClass.Wavecaller }
         },
@@ -2236,7 +2236,7 @@ public static class ClassAbilitySystem
         {
             Id = "blood_frenzy",
             Name = "Blood Frenzy",
-            Description = "Sacrifice 25% HP. Attack twice per round and gain +50 ATK for 3 rounds.",
+            Description = "Sacrifice 25% HP. Basic attacks hit twice per round and gain +50 ATK for 3 rounds. Does not affect abilities or spells.",
             LevelRequired = 70, StaminaCost = 70, Cooldown = 7,
             Type = AbilityType.Buff, AttackBonus = 50, Duration = 3,
             SpecialEffect = "blood_frenzy",

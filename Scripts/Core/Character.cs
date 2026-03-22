@@ -1411,6 +1411,11 @@ public class Character
     }
     public int PrisonsLeft { get; set; } = 0; // Prison sentences remaining
     public int ExecuteLeft { get; set; } = 0; // Execution attempts remaining
+    public int ExecutionsToday { get; set; } = 0; // Daily execution counter
+    public bool PlayerImprisonedToday { get; set; } = false; // Max 1 player imprisonment per day
+    public int NPCsImprisonedToday { get; set; } = 0; // Max 5 NPC imprisonments per day
+    public int PrisonActivitiesToday { get; set; } = 0; // Max 3 prison activities per day
+    public int TotalExecutions { get; set; } = 0; // Total executions as king (rebellion at 10)
     public int MarryActions { get; set; } = 0; // Marriage actions remaining
     public int WolfFeed { get; set; } = 0; // Wolf feeding actions
     public int RoyalAdoptions { get; set; } = 0; // Royal adoption actions

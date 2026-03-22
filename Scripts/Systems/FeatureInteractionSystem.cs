@@ -339,6 +339,34 @@ public class FeatureInteractionSystem
                 RevealsOldGod = "Noctura",
                 AffectsAlignment = true,
                 AlignmentShift = -5
+            },
+            new()
+            {
+                Text = new[]
+                {
+                    "A chill wind carries a scent of night-blooming flowers.",
+                    "Scratched into the wall in desperate handwriting:",
+                    "\"The shadows that took her smelled of midnight gardens.\"",
+                    "\"She was grace itself. And then she was gone.\""
+                },
+                GrantsExperience = true,
+                RevealsOldGod = "Noctura",
+                AffectsAlignment = true,
+                AlignmentShift = -5
+            },
+            new()
+            {
+                Text = new[]
+                {
+                    "Dark petals are pressed between the pages of an old journal:",
+                    "\"She watched him from the shadows, her brother,",
+                    "  the Light — and felt something a sister should not.\"",
+                    "\"When he chose another, the shadows grew teeth.\""
+                },
+                GrantsExperience = true,
+                RevealsOldGod = "Noctura",
+                AffectsAlignment = true,
+                AlignmentShift = -10
             }
         };
         return fragments[random.Next(fragments.Count)];
@@ -361,6 +389,34 @@ public class FeatureInteractionSystem
                 RevealsOldGod = "Aurelion",
                 AffectsAlignment = true,
                 AlignmentShift = 15
+            },
+            new()
+            {
+                Text = new[]
+                {
+                    "A faded mural shows two figures — one radiant, one gentle.",
+                    "Beneath it, barely legible:",
+                    "\"Alethia was his light. His grace. His reason.\"",
+                    "\"When she was taken, his light began to dim.\""
+                },
+                GrantsExperience = true,
+                RevealsOldGod = "Aurelion",
+                AffectsAlignment = true,
+                AlignmentShift = 15
+            },
+            new()
+            {
+                Text = new[]
+                {
+                    "A prayer is carved into the stone, worn smooth by time:",
+                    "\"Alethia, beloved of the Light, whose grace healed",
+                    "  all wounds and whose laughter silenced all sorrow.\"",
+                    "\"She was murdered. And the Light has never recovered.\""
+                },
+                GrantsExperience = true,
+                RevealsOldGod = "Aurelion",
+                AffectsAlignment = true,
+                AlignmentShift = 20
             }
         };
         return fragments[random.Next(fragments.Count)];

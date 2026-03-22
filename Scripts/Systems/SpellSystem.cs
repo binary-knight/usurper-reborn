@@ -191,7 +191,7 @@ public static class SpellSystem
         // ═══════════════════════════════════════════════════════════════════════════════
         [CharacterClass.Tidesworn] = new Dictionary<int, SpellInfo>
         {
-            [1] = new SpellInfo(1, "Tidal Ward", "Conjure a barrier of living water. Protection: +20, reflects 10% melee damage. Duration: whole fight.", 20, 1, "Tidacovenarie", false, "Buff"),
+            [1] = new SpellInfo(1, "Alethia's Ward", "Invoke the grace of Aurelion's lost beloved. Protection: +20, reflects 10% melee damage. Duration: whole fight.", 20, 1, "Alethiavardarie", false, "Buff"),
             [2] = new SpellInfo(2, "Purifying Surge", "A wave of sacred water cleanses and mends. Effect: 40-60 hp + removes poison/disease. Duration: 1 turn.", 35, 5, "Surgiapurarie", false, "Heal"),
             [3] = new SpellInfo(3, "Ocean's Rebuke", "Call forth a crashing wave of consecrated water. Damage: 70-95. Extra vs undead/evil. Duration: 1 turn.", 60, 10, "Oceanrebuquarie", false, "Attack"),
             [4] = new SpellInfo(4, "Covenant of the Deep", "The Ocean itself shields the faithful. All allies: +40 protection, +20 attack. Duration: whole fight.", 100, 17, "Covendeepmarie", true, "Buff"),
@@ -207,7 +207,7 @@ public static class SpellSystem
             [1] = new SpellInfo(1, "Harmonic Resonance", "Attune to an ally's rhythm. Target ally: +15 attack, +10 defense. Duration: whole fight.", 15, 1, "Harmonresarie", false, "Buff"),
             [2] = new SpellInfo(2, "Tidecall Barrier", "Surround all allies with shimmering wave-light. All allies: +25 protection. Duration: whole fight.", 40, 6, "Tidabarriarie", true, "Buff"),
             [3] = new SpellInfo(3, "Siren's Lament", "Sing the Ocean's grief, sapping enemy will. All enemies: -30% attack, -20% defense. Duration: 4 rounds.", 55, 11, "Sirenlamentarie", true, "Debuff"),
-            [4] = new SpellInfo(4, "Restorative Tide", "A warm wave of healing energy. Effect: 80-120 hp to all allies. Duration: 1 turn.", 90, 16, "Restoratidarie", true, "Heal"),
+            [4] = new SpellInfo(4, "Alethia's Grace", "Channel the healing light of Aurelion's beloved. Effect: 80-120 hp to all allies. Duration: 1 turn.", 90, 16, "Alethiagratarie", true, "Heal"),
             [5] = new SpellInfo(5, "Symphony of the Depths", "Channel the Ocean's full harmonic spectrum. All allies: +60 attack, +40 defense, guaranteed crit on next hit. Self: -50% max HP. Duration: whole fight.", 160, 22, "Symphodeptarie", true, "Buff")
         },
 
@@ -1374,7 +1374,7 @@ public static class SpellSystem
     {
         switch (spellLevel)
         {
-            case 1: // Tidal Ward - Protection +20, reflects 10% melee damage
+            case 1: // Alethia's Ward - Protection +20, reflects 10% melee damage
                 result.ProtectionBonus = ScaleProtectionEffect(20 + (caster.Level / 8), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "tidal_reflect";
@@ -1440,7 +1440,7 @@ public static class SpellSystem
                 else
                     result.Message += $" The Ocean's grief saps enemy will! ({result.Damage} damage, -30% attack, -20% defense for {result.Duration} rounds)";
                 break;
-            case 4: // Restorative Tide - 80-120 heal to all allies
+            case 4: // Alethia's Grace - 80-120 heal to all allies
                 int waveHeal4 = 80 + random.Next(41);
                 result.Healing = ScaleHealingEffect(waveHeal4, caster, random, profMult);
                 result.IsMultiTarget = true;

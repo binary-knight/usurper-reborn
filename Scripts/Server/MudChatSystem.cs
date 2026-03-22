@@ -117,7 +117,6 @@ public static class MudChatSystem
                 return HandleKickAllSpectators(username, terminal);
 
             case "group":
-            case "g":
                 return await HandleGroup(username, args, terminal);
 
             case "leave":

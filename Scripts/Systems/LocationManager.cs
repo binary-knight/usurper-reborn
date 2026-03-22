@@ -323,6 +323,16 @@ public class LocationManager
                 }
             }
         }
+        catch (GameExitException)
+        {
+            // Player quit from prison or other special location
+            GameEngine.MarkIntentionalExit();
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                terminal.WriteLine(Loc.Get("location.returning_main_menu"), "yellow");
+                await Task.Delay(1000);
+            }
+        }
         catch (LocationChangeException ex)
         {
             // Handle legacy location change exception

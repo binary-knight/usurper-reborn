@@ -43,6 +43,9 @@ public class PlayerSession : IDisposable
     /// <summary>The SessionContext for this player (set during RunAsync).</summary>
     public SessionContext? Context { get; private set; }
 
+    /// <summary>Skip emergency save on disconnect (character was deleted by rebellion).</summary>
+    public bool SuppressDisconnectSave { get; set; } = false;
+
     /// <summary>Last time the player sent any input. Used for idle timeout detection.</summary>
     public DateTime LastActivityTime { get; set; } = DateTime.UtcNow;
 
@@ -250,15 +253,20 @@ public class PlayerSession : IDisposable
         finally
         {
             // Emergency save on disconnect — save to main player key so it persists
+            // Skip if character was deleted (e.g., rebellion execution)
             try
             {
                 var player = ctx.Engine?.CurrentPlayer;
-                if (player != null)
+                if (player != null && !SuppressDisconnectSave)
                 {
                     var saveKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
                     Console.Error.WriteLine($"[MUD] [{Username}] Performing emergency save (key: {saveKey})...");
                     await SaveSystem.Instance.SaveGame(saveKey, player);
                     Console.Error.WriteLine($"[MUD] [{Username}] Emergency save completed");
+                }
+                else if (SuppressDisconnectSave)
+                {
+                    Console.Error.WriteLine($"[MUD] [{Username}] Disconnect save suppressed (character deleted)");
                 }
             }
             catch (Exception ex)

@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.53.4** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.53.6** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -261,6 +261,12 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
+### v0.53.6 - Ancestral Spirits (King, Prison & Lore)
+King system overhaul with rebellion mechanic (coin-flip execution/humiliation), prison system rewrite with bail/activities/escape, Alethia lore (Aurelion's murdered wife) woven across dungeon fragments, dreams, ghost encounters, and dialogue. Comprehensive code health pass: serialization audit (20 properties), 4,777 lines dead code removed, 116 thread-safety fixes, localization audit (92 missing keys, 26 format fixes). Level cap 100. Arena immortal filter. 30+ bug fixes.
+
+### v0.53.5 - Ancestral Spirits (Death, Loot & Code Health)
+Death & resurrection overhaul (Temple 50% gold/3 uses, Dark Bargain 10k Darkness + stat loss, Accept Fate -5 levels/75% gold/item). Loot stat transfer fix (CHA/AGI/STA dropped on equip). Smart sell filters and companion auto-equip (by DJLunacy). Serialization audit (20 properties). Soulweaver's Loom narrative fix. Hostile NPC scaling. Single-player save OOM fix. 4 language translation pass.
+
 ### v0.53.4 - Ancestral Spirits (Balance, Exploits & Fixes)
 Voidreaver class rebalance (stat growth, ability damage, passives all reduced). XP exploit fixes (duel farming, NPC kill double XP). Bank robbery gold exploit fix and massive difficulty increase. Throne challenge near-impossible. Item serialization stat loss fix (Agility/Stamina/BlockChance). 25+ bug fixes.
 
@@ -381,4 +387,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.53.4 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.53.6 — The world is running. [Watch it live.](https://usurper-reborn.net)
