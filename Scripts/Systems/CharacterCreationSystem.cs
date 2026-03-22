@@ -20,7 +20,7 @@ public class CharacterCreationSystem
     public CharacterCreationSystem(TerminalEmulator terminal)
     {
         this.terminal = terminal;
-        this.random = new Random();
+        this.random = Random.Shared;
     }
     
     /// <summary>

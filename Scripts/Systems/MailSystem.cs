@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 public static partial class MailSystem
 {
     private static List<MailRecord> mailDatabase = new List<MailRecord>();
-    private static Random random = new Random();
+    private static Random random = Random.Shared;
     
     /// <summary>
     /// Send system mail to a player

@@ -3008,7 +3008,7 @@ public class HomeLocation : BaseLocation
         }
 
         // Select a random one
-        var random = new Random();
+        var random = Random.Shared;
         var thirdParty = potentialDates[random.Next(potentialDates.Count)];
         string thirdName = thirdParty.Name;
         string spouseGender = spouse.Sex == CharacterSex.Female ? "she" : "he";
@@ -3229,7 +3229,7 @@ public class HomeLocation : BaseLocation
         }
 
         // Select a random one
-        var random = new Random();
+        var random = Random.Shared;
         var thirdParty = potentialLovers[random.Next(potentialLovers.Count)];
         string thirdName = thirdParty.Name;
         string spouseGender = spouse.Sex == CharacterSex.Female ? "she" : "he";
@@ -3435,7 +3435,7 @@ public class HomeLocation : BaseLocation
         bool relationshipStrained = spouseData.LoveLevel > 60;
 
         // Roll for divorce chance (higher if relationship already strained)
-        var random = new Random();
+        var random = Random.Shared;
         float effectiveDivorceChance = divorceChance;
         if (relationshipStrained)
         {

@@ -178,7 +178,7 @@ namespace UsurperRemake.Systems
             {
                 UsurperRemake.GodSystemSingleton.Instance?.SetPlayerGod(playerName, "");
             }
-            catch { /* GodSystem not initialized */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"GodSystem not initialized: {ex.Message}"); }
 
             return backend.DeleteGameData(playerName);
         }
@@ -344,7 +344,7 @@ namespace UsurperRemake.Systems
                     }
                 }
             }
-            catch { /* CompanionSystem not initialized */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"CompanionSystem not initialized: {ex.Message}"); }
 
             return ids;
         }
@@ -373,6 +373,33 @@ namespace UsurperRemake.Systems
                 BankLoan = player.Loan,
                 BankInterest = player.Interest,
                 BankRobberyAttempts = player.BankRobberyAttempts,
+                TempleResurrectionsUsed = player.TempleResurrectionsUsed,
+
+                // Resurrection & Church
+                Resurrections = player.Resurrections,
+                ResurrectionsUsed = player.ResurrectionsUsed,
+                MaxResurrections = player.MaxResurrections,
+                BannedFromChurch = player.BannedFromChurch,
+                BlessingsReceived = player.BlessingsReceived,
+                ChurchDonations = player.ChurchDonations,
+                SacrificesMade = player.SacrificesMade,
+                HealingsReceived = player.HealingsReceived,
+                HasHolyWater = player.HasHolyWater,
+                BardSongsLeft = player.BardSongsLeft,
+
+                // Kingdom & Crime
+                DaysInPower = player.DaysInPower,
+                Thievery = player.Thievery,
+                WantedLvl = player.WantedLvl,
+                TaxRelief = player.TaxRelief,
+                RoyTaxPaid = player.RoyTaxPaid,
+                KingVotePoll = player.KingVotePoll,
+                KingLastVote = player.KingLastVote,
+
+                // Family & Misc
+                Kids = player.Kids,
+                DisRes = player.DisRes,
+                AgePlus = player.AgePlus,
 
                 // Attributes
                 Strength = player.Strength,
@@ -1572,7 +1599,7 @@ namespace UsurperRemake.Systems
                 data.CollectedFragments = ocean.CollectedFragments.Select(f => (int)f).ToList();
                 data.ExperiencedMoments = ocean.ExperiencedMoments.Select(m => (int)m).ToList();
             }
-            catch { /* System not initialized */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
             // Grief System - save full grief state (multiple griefs, memories)
             try
@@ -1611,7 +1638,7 @@ namespace UsurperRemake.Systems
                 {
                 }
             }
-            catch { /* System not initialized */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
             // Story Progression - save cycle count, seals, story flags, and Old God states
             try
@@ -1632,7 +1659,7 @@ namespace UsurperRemake.Systems
                 {
                 }
             }
-            catch { /* System not initialized */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
             // God System - save player worship data
             try
@@ -1644,7 +1671,7 @@ namespace UsurperRemake.Systems
                     data.PlayerGods = new Dictionary<string, string>(playerGodDict);
                 }
             }
-            catch { /* System not initialized */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
             // Companion System - save companion states
             try
@@ -1701,7 +1728,7 @@ namespace UsurperRemake.Systems
                     DeathDay = d.DeathDay
                 }).ToList();
             }
-            catch { /* Companion system not initialized */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Companion system not initialized: {ex.Message}"); }
 
             // Dungeon Party NPCs - save NPC teammates (spouses, team members, lovers)
             try
@@ -1712,7 +1739,7 @@ namespace UsurperRemake.Systems
                 {
                 }
             }
-            catch { /* GameEngine not initialized */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"GameEngine not initialized: {ex.Message}"); }
 
             // Family System - save children
             try
@@ -1724,6 +1751,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Archetype Tracker - save Jungian archetype scores
@@ -1733,6 +1761,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Royal Court Political Systems - save court members, heirs, spouse, plots
@@ -1871,6 +1900,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Relationship System - save all character relationships
@@ -1883,6 +1913,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // ===== NEW NARRATIVE SYSTEMS =====
@@ -1897,6 +1928,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Faction System
@@ -1909,6 +1941,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Town NPC Story System
@@ -1922,6 +1955,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Dream System
@@ -1934,6 +1968,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // NPC Marriage Registry — only save to individual player saves in single-player mode.
@@ -1967,8 +2002,9 @@ namespace UsurperRemake.Systems
                     }
                 }
                 catch (Exception ex)
-                {
-                }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
+            }
             }
 
             // Cultural Meme System (Social Emergence)
@@ -1981,6 +2017,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             return data;
@@ -2015,7 +2052,7 @@ namespace UsurperRemake.Systems
                     }
                 }
             }
-            catch { /* System not available */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 
             // Story Progression - restore seals, story flags, and Old God states
             try
@@ -2087,7 +2124,7 @@ namespace UsurperRemake.Systems
                 // This ensures backward compatibility with old saves
                 MigrateOldGodStatesFromStoryFlags(story, data.StoryFlags);
             }
-            catch { /* System not available */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 
             // God System - restore player worship data
             // In online mode, only restore this player's god entry — other players' entries
@@ -2103,7 +2140,7 @@ namespace UsurperRemake.Systems
                     godSystem.SetPlayerGod(kvp.Key, kvp.Value);
                 }
             }
-            catch { /* System not available */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 
             // Companion System - restore companion states
             try
@@ -2170,7 +2207,7 @@ namespace UsurperRemake.Systems
                     CompanionSystem.Instance.Deserialize(companionSystemData);
                 }
             }
-            catch { /* Companion system not available */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"Companion system not available: {ex.Message}"); }
 
             // Dungeon Party NPCs - restore NPC teammates
             try
@@ -2184,7 +2221,7 @@ namespace UsurperRemake.Systems
                     GameEngine.Instance?.SetDungeonPartyPlayers(data.DungeonPartyPlayerNames);
                 }
             }
-            catch { /* GameEngine not available */ }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"GameEngine not available: {ex.Message}"); }
 
             // Family System - restore children
             try
@@ -2196,6 +2233,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Archetype Tracker - restore Jungian archetype scores
@@ -2208,6 +2246,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Royal Court Political Systems - restore court members, heirs, spouse, plots
@@ -2395,6 +2434,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Grief System - restore full grief states and memories
@@ -2436,6 +2476,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Relationship System - restore all character relationships
@@ -2448,6 +2489,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // ===== NEW NARRATIVE SYSTEMS =====
@@ -2462,6 +2504,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Faction System
@@ -2477,6 +2520,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Town NPC Story System
@@ -2490,6 +2534,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // Dream System
@@ -2502,6 +2547,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
             // NPC Marriage Registry — only restore from individual saves in single-player mode.
@@ -2538,8 +2584,9 @@ namespace UsurperRemake.Systems
                     }
                 }
                 catch (Exception ex)
-                {
-                }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
+            }
             }
 
             // Cultural Meme System (Social Emergence)
@@ -2552,6 +2599,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
         }
 

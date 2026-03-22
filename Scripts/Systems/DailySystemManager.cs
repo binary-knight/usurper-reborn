@@ -1179,7 +1179,7 @@ public class DailySystemManager
     private void ProcessGuardLoyalty(King king, long treasuryBefore, TerminalUI? terminal)
     {
         var guardsToRemove = new List<RoyalGuard>();
-        var random = new Random();
+        var random = Random.Shared;
 
         foreach (var guard in king.Guards)
         {
@@ -1231,7 +1231,7 @@ public class DailySystemManager
     /// </summary>
     private void ProcessTreasuryCrisis(King king, TerminalUI? terminal)
     {
-        var random = new Random();
+        var random = Random.Shared;
 
         // All guards lose extra loyalty during crisis
         foreach (var guard in king.Guards)

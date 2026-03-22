@@ -967,7 +967,7 @@ namespace UsurperRemake.Systems
                     {
                         // New day - roll once and cache the result
                         state.LastRandomCheckDay = currentDay;
-                        state.RandomCheckPassedToday = new Random().Next(100) < 30; // 30% chance
+                        state.RandomCheckPassedToday = Random.Shared.Next(100) < 30; // 30% chance
                         if (!state.RandomCheckPassedToday)
                             allConditionsMet = false;
                     }

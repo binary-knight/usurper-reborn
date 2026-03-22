@@ -23,7 +23,7 @@ namespace UsurperRemake.Systems
             }
         }
 
-        private Random _random = new Random();
+        private Random _random = Random.Shared;
 
         /// <summary>
         /// Alignment categories based on Chivalry vs Darkness

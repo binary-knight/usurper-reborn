@@ -7,7 +7,7 @@ using System.Collections.Generic;
 /// </summary>
 public static class MonsterAbilities
 {
-    private static Random _rnd = new Random();
+    private static Random _rnd = Random.Shared;
 
     /// <summary>
     /// All available monster abilities

@@ -55,8 +55,9 @@ namespace UsurperRemake.Systems
             {
                 var fileName = GetSaveFileName(playerName);
                 var filePath = Path.Combine(SaveDirectory, fileName);
-                var json = JsonSerializer.Serialize(data, jsonOptions);
-                await File.WriteAllTextAsync(filePath, json);
+                // Use stream-based serialization to avoid OOM on large saves
+                using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+                await JsonSerializer.SerializeAsync(stream, data, jsonOptions);
                 return true;
             }
             catch (Exception ex)
@@ -191,12 +192,14 @@ namespace UsurperRemake.Systems
                         }
                     }
                     catch (Exception ex)
-                    {
-                    }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
                 }
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
             }
 
             return saves;
@@ -239,14 +242,16 @@ namespace UsurperRemake.Systems
                         }
                     }
                     catch (Exception ex)
-                    {
-                    }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
                 }
 
                 saves = saves.OrderByDescending(s => s.SaveTime).ToList();
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
             }
 
             return saves;
@@ -290,6 +295,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
             }
 
             return playerNames.OrderBy(n => n).ToList();
@@ -331,6 +337,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
             }
         }
 
@@ -361,6 +368,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
             }
         }
 

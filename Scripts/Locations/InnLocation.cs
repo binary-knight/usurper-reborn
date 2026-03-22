@@ -124,7 +124,7 @@ public class InnLocation : BaseLocation
         if (currentPlayer.Level < aldric.RecruitLevel) return;
 
         // 20% chance to trigger the event
-        var random = new Random();
+        var random = Random.Shared;
         if (random.NextDouble() > 0.20) return;
 
         aldricBanditEventTriggered = true;
@@ -1261,7 +1261,7 @@ public class InnLocation : BaseLocation
         }
 
         // Check if they'll accept
-        bool accepts = npc.Darkness > 300 || new Random().Next(100) < 50;
+        bool accepts = npc.Darkness > 300 || Random.Shared.Next(100) < 50;
 
         if (!accepts)
         {
@@ -1377,7 +1377,7 @@ public class InnLocation : BaseLocation
 
         currentPlayer.Gold -= 50;
 
-        var random = new Random();
+        var random = Random.Shared;
         var responses = new[] {
             $"{npc.Name2}'s eyes light up. \"For me? How thoughtful!\"",
             $"{npc.Name2} accepts the gift graciously. \"You're too kind.\"",
@@ -2984,7 +2984,7 @@ public class InnLocation : BaseLocation
             // CHA-based success chance: 30% base + 1% per CHA point, cap 80%
             int charisma = (int)(currentPlayer?.Charisma ?? 10);
             int successChance = Math.Min(80, 30 + charisma);
-            int roll = new Random().Next(100);
+            int roll = Random.Shared.Next(100);
 
             if (roll < successChance)
             {
@@ -3720,7 +3720,7 @@ public class InnLocation : BaseLocation
     private async Task CompanionEquipBestGear(Character target)
     {
         terminal.ClearScreen();
-        WriteBoxHeader($"BEST GEAR: {target.DisplayName.ToUpper()}", "bright_cyan");
+        WriteBoxHeader($"{Loc.Get("inn.equip_best")}: {target.DisplayName.ToUpper()}", "bright_cyan");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -3752,6 +3752,14 @@ public class InnLocation : BaseLocation
 
         foreach (var slot in slotsToCheck)
         {
+            // Skip off-hand if companion is using a two-handed weapon
+            if (slot == EquipmentSlot.OffHand && target.IsTwoHanding)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"  {slot.GetDisplayName()}: Using two-handed weapon");
+                continue;
+            }
+
             // Get all matching items from player inventory for this slot
             var candidates = GetItemsForSlot(slot)
                 .Where(x => !x.isEquipped && x.item.IsIdentified && !x.item.IsCursed)
@@ -4386,7 +4394,7 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        var rng = new Random();
+        var rng = Random.Shared;
         int doubleDownCount = 0;
 
         while (true)
@@ -4525,7 +4533,7 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        var rng = new Random();
+        var rng = Random.Shared;
         string[] faceTiles = { "Skull", "Crown", "Sword" };
 
         // Player's turn
@@ -4698,7 +4706,7 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        var rng = new Random();
+        var rng = Random.Shared;
         var candidates = allNPCs.Where(n => n.IsAlive && !n.IsDead).ToList();
         if (candidates.Count == 0)
         {
@@ -5182,7 +5190,7 @@ public class InnLocation : BaseLocation
 
     private async Task AttackInnSleepingPlayer(SqlSaveBackend backend, string targetUsername)
     {
-        var rng = new Random();
+        var rng = Random.Shared;
         var target = (await backend.GetSleepingPlayers())
             .FirstOrDefault(s => s.Username.Equals(targetUsername, StringComparison.OrdinalIgnoreCase));
         if (target == null) return;
@@ -5340,7 +5348,7 @@ public class InnLocation : BaseLocation
 
     private async Task<string?> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
     {
-        var rng = new Random();
+        var rng = Random.Shared;
         try
         {
             var playerData = saveData.Player;

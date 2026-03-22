@@ -147,7 +147,7 @@ namespace UsurperRemake.Data
             int topScore = scored[0].score;
             var topCandidates = scored.Where(s => s.score >= topScore - 2).ToList();
 
-            var random = new Random();
+            var random = Random.Shared;
             var chosen = topCandidates[random.Next(topCandidates.Count)].line;
 
             // Mark as recently used

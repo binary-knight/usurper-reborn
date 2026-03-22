@@ -320,7 +320,7 @@ namespace UsurperRemake.Systems
 
             // Combat state
             var state = new WorldBossCombatState();
-            var rng = new Random();
+            var rng = Random.Shared;
 
             terminal.ClearScreen();
             terminal.SetColor(bossDef.ThemeColor);

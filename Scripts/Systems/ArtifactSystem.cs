@@ -71,11 +71,13 @@ namespace UsurperRemake.Systems
                     "the very essence of being. With it, destinies were written",
                     "and rewritten, souls crafted and refined.",
                     "",
-                    "Manwe hid it when he realized its power could undo",
-                    "even his own divine corruption. Find it, and you may",
-                    "save those who seem beyond redemption."
+                    "Veloura found it in the ruins of a forgotten age and",
+                    "tried to use it to heal her own fractured heart. But the",
+                    "Loom's power is a double-edged thread — it bound her",
+                    "corruption even deeper, trapping her in an endless loop",
+                    "of longing. Only by freeing her could the Loom be claimed."
                 },
-                ObtainedFrom = "Hidden in the Shadow Realm (Noctura's Domain)",
+                ObtainedFrom = "Veloura's Domain (Floor 40)",
                 DungeonFloor = 40,
                 RequiredLevel = 45,
                 StatBonuses = new Dictionary<string, int>

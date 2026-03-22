@@ -567,8 +567,9 @@ public class Character
     public int ShamanEnchantRounds { get; set; }     // Rounds remaining
     public int ShamanEnchantPower { get; set; }       // Enchant strength (scales with INT)
 
-    // Voidreaver Unmaking cooldown (transient, per-combat)
+    // Spell cooldowns (transient, per-combat)
     public int UnmakingCooldown { get; set; }
+    public int DelugeCooldown { get; set; }
 
     // Dark Pact buff (Evil Deeds ritual, v0.49.4)
     public int DarkPactCombats { get; set; }
@@ -1329,6 +1330,7 @@ public class Character
     public DateTime LastResurrection { get; set; } = DateTime.MinValue; // Last time resurrected
     public int ResurrectionsUsed { get; set; } = 0;    // Total resurrections used
     public int MaxResurrections { get; set; } = 3;     // Maximum resurrections allowed
+    public int TempleResurrectionsUsed { get; set; } = 0; // Temple resurrections used (max 3 per life)
     
     // Divine favor and religious standing  
     public int DivineBlessing { get; set; } = 0;       // Divine blessing duration (days)
@@ -1469,7 +1471,7 @@ public class Character
         if (ActiveStatuses.Count == 0) return messages;
 
         var toRemove = new List<StatusEffect>();
-        var rnd = new Random();
+        var rnd = Random.Shared;
 
         foreach (var kvp in ActiveStatuses.ToList())
         {

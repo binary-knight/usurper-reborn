@@ -879,7 +879,7 @@ namespace UsurperRemake.Systems
                 if (companion.RomanceLevel > 5)
                     sacrificeChance += 30;
 
-                var random = new Random();
+                var random = Random.Shared;
                 if (random.Next(100) < sacrificeChance)
                 {
                     return companion;
@@ -1905,7 +1905,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void ApplyCompanionLevelUpStats(Companion companion)
         {
-            var random = new Random();
+            var random = Random.Shared;
 
             // Base HP gain: 12-24 per level, +1 for every 10 levels (tiered scaling)
             int hpGain = 12 + random.Next(0, 13) + (companion.Level / 10);

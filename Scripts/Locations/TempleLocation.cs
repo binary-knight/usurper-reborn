@@ -21,7 +21,7 @@ public partial class TempleLocation : BaseLocation
     private readonly LocationManager locationManager;
     private readonly GodSystem godSystem;
     private bool refreshMenu = true;
-    private Random random = new Random();
+    private Random random = Random.Shared;
 
     // Old Gods integration
     private static readonly string[] OldGodsProphecies = new[]
@@ -723,7 +723,7 @@ public partial class TempleLocation : BaseLocation
                         "farewell..",
                         "never again will I follow you!"
                     };
-                    note = randomNotes[new Random().Next(randomNotes.Length)];
+                    note = randomNotes[Random.Shared.Next(randomNotes.Length)];
                 }
 
                 // Remove from god system
@@ -1200,7 +1200,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine("");
         
-        var random = new Random();
+        var random = Random.Shared;
         switch (random.Next(2))
         {
             case 0:
@@ -2016,7 +2016,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine("");
 
-        var random = new Random();
+        var random = Random.Shared;
 
         // Desecration flavour text
         string[] desecrationKeys = new[]
@@ -2922,7 +2922,7 @@ public partial class TempleLocation : BaseLocation
         await Task.Delay(1500);
 
         // Grant +1 to a random stat
-        var rng = new Random();
+        var rng = Random.Shared;
         string statName;
         switch (rng.Next(9))
         {
@@ -3086,7 +3086,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.renounce_elder", oldNpcGod));
 
             // Divine retribution — the elder god may smite the apostate
-            var rng = new Random();
+            var rng = Random.Shared;
             if (rng.NextDouble() < 0.6) // 60% chance of punishment
             {
                 long smiteDamage = Math.Max(1, (long)(currentPlayer.MaxHP * (0.1 + rng.NextDouble() * 0.2)));

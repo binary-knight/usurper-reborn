@@ -307,7 +307,7 @@ public static class MonsterFamilies
     /// </summary>
     public static (MonsterFamily family, MonsterTier tier) GetMonsterForLevel(int level, Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
 
         // Get all families that have tiers for this level
         var suitableFamilies = AllFamilies

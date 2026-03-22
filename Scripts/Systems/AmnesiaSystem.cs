@@ -262,7 +262,7 @@ namespace UsurperRemake.Systems
             var ocean = OceanPhilosophySystem.Instance;
             float dreamChance = 0.30f + (ocean.AwakeningLevel * 0.05f);
 
-            if (new Random().NextDouble() < dreamChance)
+            if (Random.Shared.NextDouble() < dreamChance)
             {
                 await PlayDreamSequence(terminal, player);
             }
@@ -289,7 +289,7 @@ namespace UsurperRemake.Systems
 
             if (availableDreams.Count == 0) return;
 
-            var dream = availableDreams[new Random().Next(availableDreams.Count)];
+            var dream = availableDreams[Random.Shared.Next(availableDreams.Count)];
             var dreamData = dream.Value;
 
             ExperiencedDreams.Add(dream.Key);
@@ -360,7 +360,7 @@ namespace UsurperRemake.Systems
                 bool shouldTrigger = trigger switch
                 {
                     TriggerType.FirstRest => RestCount == 1,
-                    TriggerType.Dream => new Random().NextDouble() < 0.3,
+                    TriggerType.Dream => Random.Shared.NextDouble() < 0.3,
                     TriggerType.DungeonFloor10 => true,
                     TriggerType.DungeonFloor25 => true,
                     TriggerType.DungeonFloor50 => true,

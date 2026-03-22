@@ -110,7 +110,7 @@ namespace UsurperRemake.Systems
     {
         private static SettlementSystem _instance;
         private static readonly object _lock = new object();
-        private readonly Random random = new Random();
+        private readonly Random random = Random.Shared;
 
         public SettlementState State { get; set; } = new SettlementState();
 

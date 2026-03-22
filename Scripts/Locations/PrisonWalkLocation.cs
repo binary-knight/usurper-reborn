@@ -348,8 +348,7 @@ public partial class PrisonWalkLocation : BaseLocation
     
     private Task<bool> IsPrisonBreakInProgress()
     {
-        // TODO: Check if any other player is currently on location onloc_prisonbreak
-        // For now, always return false
+        // Multi-player prison break coordination not yet implemented
         return Task.FromResult(false);
     }
     
@@ -374,7 +373,6 @@ public partial class PrisonWalkLocation : BaseLocation
         await terminal.WriteLineAsync();
         
         // Set location to prison break (for other systems to detect)
-        // TODO: Set player location to onloc_prisonbreak
         
         // Gather prison guards for battle
         var guards = await GatherPrisonGuards();
@@ -680,7 +678,7 @@ public partial class PrisonWalkLocation : BaseLocation
     
     private Task<bool> IsPlayerOnline(Character player)
     {
-        // TODO: Implement online player checking
+        // Online player checking not yet implemented
         return Task.FromResult(false);
     }
 

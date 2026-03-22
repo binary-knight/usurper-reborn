@@ -211,6 +211,33 @@ namespace UsurperRemake.Systems
         public long BankLoan { get; set; }
         public long BankInterest { get; set; }
         public int BankRobberyAttempts { get; set; }
+        public int TempleResurrectionsUsed { get; set; }
+
+        // Resurrection & Church
+        public int Resurrections { get; set; }
+        public int ResurrectionsUsed { get; set; }
+        public int MaxResurrections { get; set; } = 3;
+        public bool BannedFromChurch { get; set; }
+        public int BlessingsReceived { get; set; }
+        public long ChurchDonations { get; set; }
+        public int SacrificesMade { get; set; }
+        public int HealingsReceived { get; set; }
+        public bool HasHolyWater { get; set; }
+        public int BardSongsLeft { get; set; }
+
+        // Kingdom & Crime
+        public int DaysInPower { get; set; }
+        public long Thievery { get; set; }
+        public int WantedLvl { get; set; }
+        public bool TaxRelief { get; set; }
+        public long RoyTaxPaid { get; set; }
+        public int KingVotePoll { get; set; }
+        public int KingLastVote { get; set; }
+
+        // Family & Misc
+        public int Kids { get; set; }
+        public int DisRes { get; set; }
+        public int AgePlus { get; set; }
 
         // Attributes
         public long Strength { get; set; }

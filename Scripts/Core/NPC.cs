@@ -438,7 +438,7 @@ public partial class NPC : Character
     /// </summary>
     private void ProcessEnhancedBehaviors(float deltaTime)
     {
-        var random = new Random();
+        var random = Random.Shared;
         
         // Inventory management (Pascal NPC_CHEC.PAS logic)
         if (random.Next(100) < 5) // 5% chance per update
@@ -509,7 +509,7 @@ public partial class NPC : Character
     /// </summary>
     private void ProcessGangBehavior()
     {
-        var random = new Random();
+        var random = Random.Shared;
 
         if (string.IsNullOrEmpty(Team) && string.IsNullOrEmpty(GangId))
         {
@@ -539,7 +539,7 @@ public partial class NPC : Character
     /// </summary>
     private void ProcessBelieverBehavior()
     {
-        var random = new Random();
+        var random = Random.Shared;
         
         if (string.IsNullOrEmpty(God))
         {

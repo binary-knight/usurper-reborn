@@ -822,6 +822,167 @@ public class LevelMasterLocation : BaseLocation
     }
 
     /// <summary>
+    /// Reverse one level of class stat increases (for death level loss).
+    /// Does NOT call RecalculateStats — caller must do that after all levels are reversed.
+    /// </summary>
+    public static void ReverseClassStatIncrease(Character player)
+    {
+        // Reverse base stats everyone gets
+        player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 5);
+        player.BaseDefence = Math.Max(1, player.BaseDefence - 1);
+        player.BaseStamina = Math.Max(1, player.BaseStamina - 1);
+
+        switch (player.Class)
+        {
+            case CharacterClass.Magician:
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 4);
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 3);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 15);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 6);
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 1);
+                player.BaseDefence = Math.Max(1, player.BaseDefence - 1);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                break;
+            case CharacterClass.Cleric:
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 4);
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 2);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 12);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 6);
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 2);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                break;
+            case CharacterClass.Sage:
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 5);
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 4);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 18);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 5);
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 1);
+                player.BaseDefence = Math.Max(1, player.BaseDefence - 1);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 1);
+                break;
+            case CharacterClass.Alchemist:
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 4);
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 2);
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 5);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                break;
+            case CharacterClass.Warrior:
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 3);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 3);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 12);
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 2);
+                player.BaseDefence = Math.Max(1, player.BaseDefence - 2);
+                break;
+            case CharacterClass.Barbarian:
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 4);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 4);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 12);
+                player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                break;
+            case CharacterClass.Paladin:
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 3);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 3);
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 2);
+                player.BaseCharisma = Math.Max(1, player.BaseCharisma - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 10);
+                player.BaseDefence = Math.Max(1, player.BaseDefence - 1);
+                break;
+            case CharacterClass.Assassin:
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 4);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 3);
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 6);
+                player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                break;
+            case CharacterClass.Ranger:
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 3);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 3);
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 2);
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 1);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 8);
+                player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                break;
+            case CharacterClass.Jester:
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 3);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 3);
+                player.BaseCharisma = Math.Max(1, player.BaseCharisma - 3);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 5);
+                player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                break;
+            case CharacterClass.Bard:
+                player.BaseCharisma = Math.Max(1, player.BaseCharisma - 4);
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 2);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 2);
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 5);
+                player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                break;
+            case CharacterClass.Tidesworn:
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 4);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 4);
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 3);
+                player.BaseCharisma = Math.Max(1, player.BaseCharisma - 2);
+                player.BaseDefence = Math.Max(1, player.BaseDefence - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 13);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 8);
+                break;
+            case CharacterClass.Wavecaller:
+                player.BaseCharisma = Math.Max(1, player.BaseCharisma - 5);
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 4);
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 3);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 7);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 14);
+                break;
+            case CharacterClass.Cyclebreaker:
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 3);
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 3);
+                player.BaseWisdom = Math.Max(1, player.BaseWisdom - 3);
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 3);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 3);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 9);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 10);
+                break;
+            case CharacterClass.Abysswarden:
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 5);
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 4);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 4);
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 3);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 8);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 10);
+                break;
+            case CharacterClass.Voidreaver:
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 4);
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 3);
+                player.BaseDexterity = Math.Max(1, player.BaseDexterity - 3);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 3);
+                player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 5);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 10);
+                break;
+            case CharacterClass.MysticShaman:
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 3);
+                player.BaseDefence = Math.Max(1, player.BaseDefence - 2);
+                player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 3);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                player.BaseAgility = Math.Max(1, player.BaseAgility - 1);
+                player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 8);
+                break;
+            default:
+                player.BaseStrength = Math.Max(1, player.BaseStrength - 2);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 8);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Ensures an NPC/companion Character has class-appropriate stats for their level.
     /// Computes the expected minimum stat values from level-up scaling and applies
     /// Math.Max(current, expected) — never a nerf, only a buff for under-scaled characters.
@@ -1428,7 +1589,7 @@ public class LevelMasterLocation : BaseLocation
 
         // Handle leveling up based on ally type
         int levelsGained = 0;
-        var random = new Random();
+        var random = Random.Shared;
 
         if (selectedAlly.IsCompanion)
         {

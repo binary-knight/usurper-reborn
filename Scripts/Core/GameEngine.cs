@@ -1028,7 +1028,7 @@ public partial class GameEngine
         var npcs = NPCSpawnSystem.Instance.ActiveNPCs;
         if (npcs == null || npcs.Count == 0) return;
 
-        var random = new Random();
+        var random = Random.Shared;
 
         // Process each living NPC
         foreach (var npc in npcs.Where(n => n.IsAlive).ToList())
@@ -2265,8 +2265,9 @@ public partial class GameEngine
                                 System.IO.File.Delete(filePath);
                             }
                             catch (Exception ex)
-                            {
-                            }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "ENGINE", $"Swallowed exception: {ex.Message}");
+            }
                         }
                         terminal.WriteLine(Loc.Get("engine.all_saves_deleted"), "green");
                         await Task.Delay(1500);
@@ -2679,7 +2680,37 @@ public partial class GameEngine
             {
                 startLocation = GameLocation.MainStreet;
             }
-            await locationManager.EnterLocation(startLocation, currentPlayer!);
+            // If player was saved dead (HP <= 0), they closed during the death screen — re-present Veil
+            if (currentPlayer!.HP <= 0)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("  You awaken at the threshold between life and death...");
+                terminal.WriteLine("");
+                // Apply Accept Your Fate penalties since they tried to dodge death
+                int levelsLost = Math.Min(5, currentPlayer.Level - 1);
+                if (levelsLost > 0)
+                {
+                    for (int i = 0; i < levelsLost; i++)
+                    {
+                        LevelMasterLocation.ReverseClassStatIncrease(currentPlayer);
+                        currentPlayer.Level--;
+                    }
+                    currentPlayer.Experience = LevelMasterLocation.GetExperienceForLevel(currentPlayer.Level);
+                    terminal.WriteLine($"  You lose {levelsLost} levels. (Now level {currentPlayer.Level})", "red");
+                }
+                long goldLost = (long)(currentPlayer.Gold * 0.75);
+                currentPlayer.Gold -= goldLost;
+                terminal.WriteLine($"  You lose {goldLost:N0} gold.", "red");
+                currentPlayer.RecalculateStats();
+                currentPlayer.HP = Math.Max(1, (int)(currentPlayer.MaxHP * 0.1));
+                terminal.WriteLine("  The void releases you, diminished.", "gray");
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+                startLocation = GameLocation.MainStreet;
+                _ = SaveCurrentGame();
+            }
+
+            await locationManager.EnterLocation(startLocation, currentPlayer);
         }
         catch (Exception ex)
         {
@@ -3784,6 +3815,33 @@ public partial class GameEngine
             Loan = playerData.BankLoan,
             Interest = playerData.BankInterest,
             BankRobberyAttempts = playerData.BankRobberyAttempts,
+            TempleResurrectionsUsed = playerData.TempleResurrectionsUsed,
+
+            // Resurrection & Church
+            Resurrections = playerData.Resurrections,
+            ResurrectionsUsed = playerData.ResurrectionsUsed,
+            MaxResurrections = playerData.MaxResurrections > 0 ? playerData.MaxResurrections : 3,
+            BannedFromChurch = playerData.BannedFromChurch,
+            BlessingsReceived = playerData.BlessingsReceived,
+            ChurchDonations = playerData.ChurchDonations,
+            SacrificesMade = playerData.SacrificesMade,
+            HealingsReceived = playerData.HealingsReceived,
+            HasHolyWater = playerData.HasHolyWater,
+            BardSongsLeft = playerData.BardSongsLeft,
+
+            // Kingdom & Crime
+            DaysInPower = playerData.DaysInPower,
+            Thievery = playerData.Thievery,
+            WantedLvl = playerData.WantedLvl,
+            TaxRelief = playerData.TaxRelief,
+            RoyTaxPaid = playerData.RoyTaxPaid,
+            KingVotePoll = (byte)playerData.KingVotePoll,
+            KingLastVote = (byte)playerData.KingLastVote,
+
+            // Family & Misc
+            Kids = playerData.Kids,
+            DisRes = (byte)playerData.DisRes,
+            AgePlus = playerData.AgePlus,
 
             // Attributes
             Strength = playerData.Strength,
@@ -4811,10 +4869,10 @@ public partial class GameEngine
                 IsDead = data.IsDead,
 
                 // Lifecycle - aging and natural death
-                Age = data.Age > 0 ? data.Age : new Random().Next(18, 50),
+                Age = data.Age > 0 ? data.Age : Random.Shared.Next(18, 50),
                 BirthDate = data.BirthDate > DateTime.MinValue
                     ? data.BirthDate
-                    : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : new Random().Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
+                    : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : Random.Shared.Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
                 IsAgedDeath = data.IsAgedDeath,
                 IsPermaDead = data.IsPermaDead,
                 PregnancyDueDate = data.PregnancyDueDate,
@@ -5329,7 +5387,7 @@ public partial class GameEngine
     /// </summary>
     private static UsurperRemake.Systems.Faction? DetermineFactionForNPC(NPC npc)
     {
-        var random = new Random();
+        var random = Random.Shared;
 
         // Clerics are strongly associated with The Faith
         if (npc.Class == CharacterClass.Cleric)
@@ -6303,6 +6361,7 @@ public partial class GameEngine
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("engine.credits_fastfinge"));
         terminal.WriteLine(Loc.Get("engine.credits_maxsond"));
+        terminal.WriteLine(Loc.Get("engine.credits_djlunacy"));
         terminal.WriteLine("");
 
         terminal.SetColor("bright_magenta");
@@ -6584,8 +6643,9 @@ public partial class GameEngine
 
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "ENGINE", $"Swallowed exception: {ex.Message}");
+            }
     }
     
     /// <summary>
@@ -6619,20 +6679,6 @@ public partial class GameEngine
     private void ApplyClassBonuses(Character character) { }
     private void SetInitialEquipment(Character character) { }
     private Task ShowCharacterSummary(Character character) => Task.CompletedTask;
-
-    /// <summary>
-    /// Run magic shop system validation tests
-    /// </summary>
-    public static void TestMagicShopSystem()
-    {
-        try
-        {
-            // MagicShopSystemValidation(); // TODO: Implement this validation method
-        }
-        catch (System.Exception ex)
-        {
-        }
-    }
 
 }
 

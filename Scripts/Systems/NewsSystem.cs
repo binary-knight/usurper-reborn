@@ -1,3 +1,4 @@
+using UsurperRemake.Systems;
 using UsurperRemake.Utils;
 using System;
 using System.Collections.Generic;
@@ -101,6 +102,7 @@ public partial class NewsSystem
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
             }
         }
     }
@@ -270,8 +272,9 @@ public partial class NewsSystem
             }
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
 
         return news;
     }
@@ -367,6 +370,7 @@ public partial class NewsSystem
             }
             catch (Exception ex)
             {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
             }
         }
     }
@@ -420,8 +424,9 @@ public partial class NewsSystem
             }
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
     }
 
     private int _writesSinceTrim = 0;
@@ -453,8 +458,9 @@ public partial class NewsSystem
             }
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
     }
 
     private void TrimNewsFile()

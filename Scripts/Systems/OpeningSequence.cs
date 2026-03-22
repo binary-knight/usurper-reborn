@@ -39,7 +39,7 @@ namespace UsurperRemake.Systems
                 // Higher chance on Main Street, Inn, or Dark Alley
                 var triggerChance = GetTriggerChance(locationId, player);
 
-                if (new Random().NextDouble() < triggerChance)
+                if (Random.Shared.NextDouble() < triggerChance)
                 {
                     strangerEncounterPending = true;
                 }

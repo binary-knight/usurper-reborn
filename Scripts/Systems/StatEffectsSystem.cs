@@ -7,7 +7,7 @@ using UsurperRemake.Systems;
 /// </summary>
 public static class StatEffectsSystem
 {
-    private static Random _random = new Random();
+    private static Random _random = Random.Shared;
 
     // =====================================================
     // STRENGTH - Physical power, melee damage

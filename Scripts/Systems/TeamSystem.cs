@@ -675,8 +675,6 @@ public partial class TeamSystem
             characters.AddRange(npcs);
         }
 
-        // TODO: Also load saved players from USERS.DAT if needed for multiplayer
-        // For now, single-player mode only uses NPCs for gang warfare
 
         return characters;
     }

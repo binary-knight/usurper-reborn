@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 public class EnhancedNPCBehaviorSystem
 {
     // MailSystem and RelationshipSystem are static - no need to instantiate
-    private Random random = new Random();
+    private Random random = Random.Shared;
     
     // Pascal constants from NPCMAINT.PAS
     private const int MaxNPCTeams = 60;          // Pascal maxnr

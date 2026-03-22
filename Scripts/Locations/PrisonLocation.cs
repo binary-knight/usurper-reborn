@@ -180,8 +180,7 @@ public partial class PrisonLocation : BaseLocation
     
     private Task ShowOthersHere(Character player)
     {
-        // TODO: Implement showing other players in prison
-        // This would list other online prisoners
+        // Online prisoner display not yet implemented
         return Task.CompletedTask;
     }
     
@@ -636,7 +635,7 @@ public partial class PrisonLocation : BaseLocation
     
     private Task<bool> IsPlayerOnline(Character player)
     {
-        // TODO: Implement online player checking
+        // Online player checking not yet implemented
         return Task.FromResult(false);
     }
 

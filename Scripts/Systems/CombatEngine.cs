@@ -18,7 +18,7 @@ using System.Linq;
 public partial class CombatEngine
 {
     private TerminalEmulator terminal;
-    private Random random = new Random();
+    private Random random = Random.Shared;
     private bool _lastMonsterTargetedGroupPlayer; // Set by ProcessMonsterAction when monster attacks a grouped player
     private int _lootRoundRobinIndex = 0; // Round-robin index for group loot distribution
 
@@ -61,9 +61,9 @@ public partial class CombatEngine
         "TIP: [E]xact Strike has higher accuracy - good against armored foes.",
         "TIP: [D]efend reduces incoming damage by 50% - useful against strong monsters.",
         "TIP: [T]aunt lowers enemy defense, making them easier to hit.",
-        "TIP: [I]disarm can remove a monster's weapon, reducing their damage.",
-        "TIP: Spellcasters can press [S] to cast spells using Mana.",
-        "TIP: Check [L]hide to attempt to escape or reposition.",
+        "TIP: [I] Disarm can remove a monster's weapon, reducing their damage.",
+        "TIP: Use [1]-[9] quickbar slots to cast spells and abilities.",
+        "TIP: [L] Hide gives a stealth bonus to your next attack.",
         "TIP: Use healing potions [H] mid-combat if your HP gets low."
     };
     // Class-specific tips shown only to the relevant class
@@ -215,6 +215,7 @@ public partial class CombatEngine
         attacker.ShamanEnchantRounds = 0;
         attacker.ShamanEnchantPower = 0;
         attacker.UnmakingCooldown = 0;
+        attacker.DelugeCooldown = 0;
         defender.DeathsEmbraceActive = false;
         defender.StatusLifestealPercent = 0;
         defender.ActiveTotemType = 0;
@@ -414,6 +415,7 @@ public partial class CombatEngine
         player.ShamanEnchantRounds = 0;
         player.ShamanEnchantPower = 0;
         player.UnmakingCooldown = 0;
+        player.DelugeCooldown = 0;
         abilityCooldowns.Clear();
         teammateCooldowns.Clear();
 
@@ -675,7 +677,7 @@ public partial class CombatEngine
         // Only monsters that win the roll get a free attack — partial ambushes are common.
         if (isAmbush && player.IsAlive && monsters.Any(m => m.IsAlive))
         {
-            var ambushRng = new Random();
+            var ambushRng = Random.Shared;
 
             // Party awareness: use the best AGI + DEX from anyone in the party (leader or teammates)
             long bestAgi = player.BaseAgility;
@@ -952,7 +954,7 @@ public partial class CombatEngine
             // Poison counter tick (player.Poison from traps/monster attacks — separate from StatusEffect.Poisoned)
             if (player.Poison > 0 && player.IsAlive)
             {
-                int poisonBase = 2 + new Random().Next(4); // 2-5
+                int poisonBase = 2 + Random.Shared.Next(4); // 2-5
                 int poisonLevel = (int)(player.Level / 10);
                 int poisonIntensity = player.Poison / 5;
                 int poisonDmg = Math.Min(poisonBase + poisonLevel + poisonIntensity,
@@ -4731,7 +4733,7 @@ public partial class CombatEngine
                     }
                     else
                     {
-                        player.ApplyStatus(StatusEffect.Stunned, 1);
+                        player.ApplyStatus(StatusEffect.Stunned, 2); // +1 for ProcessStatusEffects off-by-one
                         terminal.WriteLine($"  {monster.Name} uses {abilityName}!", "bright_yellow");
                         terminal.WriteLine($"  You are stunned!", "yellow");
                     }
@@ -4939,7 +4941,7 @@ public partial class CombatEngine
                     }
                     else
                     {
-                        player.ApplyStatus(StatusEffect.Stunned, 1);
+                        player.ApplyStatus(StatusEffect.Stunned, 2); // +1 for ProcessStatusEffects off-by-one
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_time_freeze")}", "bright_cyan");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_time_trapped")}", "yellow");
                     }
@@ -7499,6 +7501,9 @@ public partial class CombatEngine
                 if (lootItem.Dexterity != 0) equipment = equipment.WithDexterity(lootItem.Dexterity);
                 if (lootItem.Wisdom != 0) equipment = equipment.WithWisdom(lootItem.Wisdom);
                 if (lootItem.Defence != 0) equipment = equipment.WithDefence(lootItem.Defence);
+                if (lootItem.Charisma != 0) equipment = equipment.WithCharisma(lootItem.Charisma);
+                if (lootItem.Agility != 0) equipment.AgilityBonus += lootItem.Agility;
+                if (lootItem.Stamina != 0) equipment.StaminaBonus += lootItem.Stamina;
                 if (lootItem.IsCursed) equipment.IsCursed = true;
 
                 // Transfer loot enchantment effects to Equipment properties (v0.40.5)
@@ -7841,6 +7846,9 @@ public partial class CombatEngine
                 if (lootItem.Dexterity != 0) equipment = equipment.WithDexterity(lootItem.Dexterity);
                 if (lootItem.Wisdom != 0) equipment = equipment.WithWisdom(lootItem.Wisdom);
                 if (lootItem.Defence != 0) equipment = equipment.WithDefence(lootItem.Defence);
+                if (lootItem.Charisma != 0) equipment = equipment.WithCharisma(lootItem.Charisma);
+                if (lootItem.Agility != 0) equipment.AgilityBonus += lootItem.Agility;
+                if (lootItem.Stamina != 0) equipment.StaminaBonus += lootItem.Stamina;
                 if (lootItem.IsCursed) equipment.IsCursed = true;
 
                 if (lootItem.LootEffects != null)
@@ -8016,7 +8024,20 @@ public partial class CombatEngine
             // Check level requirement
             if (lootItem.MinLevel > 0 && teammate.Level < lootItem.MinLevel) continue;
 
-            var currentEquip = teammate.GetEquipment(targetSlot);
+            // For weapons, also check off-hand if teammate is dual-wielding
+            var actualSlot = targetSlot;
+            if (isWeapon && teammate.IsDualWielding)
+            {
+                var mainEquip = teammate.GetEquipment(EquipmentSlot.MainHand);
+                var offEquip = teammate.GetEquipment(EquipmentSlot.OffHand);
+                int mainPower = mainEquip?.WeaponPower ?? 0;
+                int offPower = offEquip?.WeaponPower ?? 0;
+                // Pick the weaker slot to compare against
+                if (offPower < mainPower)
+                    actualSlot = EquipmentSlot.OffHand;
+            }
+
+            var currentEquip = teammate.GetEquipment(actualSlot);
             int currentPower = 0;
             if (currentEquip != null)
             {
@@ -8350,6 +8371,9 @@ public partial class CombatEngine
         if (lootItem.Dexterity != 0) equipment = equipment.WithDexterity(lootItem.Dexterity);
         if (lootItem.Wisdom != 0) equipment = equipment.WithWisdom(lootItem.Wisdom);
         if (lootItem.Defence != 0) equipment = equipment.WithDefence(lootItem.Defence);
+        if (lootItem.Charisma != 0) equipment = equipment.WithCharisma(lootItem.Charisma);
+        if (lootItem.Agility != 0) equipment.AgilityBonus += lootItem.Agility;
+        if (lootItem.Stamina != 0) equipment.StaminaBonus += lootItem.Stamina;
         if (lootItem.IsCursed) equipment.IsCursed = true;
 
         // Transfer enchantment effects
@@ -13310,6 +13334,19 @@ public partial class CombatEngine
             totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
             await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.Name);
 
+            // Apply self-healing from attack spells (e.g. Deluge of Sanctity)
+            if (spellResult.Healing > 0)
+            {
+                long oldHP = player.HP;
+                player.HP = Math.Min(player.MaxHP, player.HP + spellResult.Healing);
+                long actualHeal = player.HP - oldHP;
+                if (actualHeal > 0)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"{player.DisplayName} is restored for {actualHeal} HP!");
+                }
+            }
+
             // Apply spell special effects to each surviving monster
             if (!string.IsNullOrEmpty(spellResult.SpecialEffect) && spellResult.SpecialEffect != "fizzle" && spellResult.SpecialEffect != "fail")
             {
@@ -15729,8 +15766,8 @@ public partial class CombatEngine
             OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.FirstCompanionDeath);
         }
 
-        // Prevent save cheesing — persist negative outcomes immediately
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        // Prevent save cheesing — persist death outcomes immediately (both online and offline)
+        if (GameEngine.Instance != null)
             _ = GameEngine.Instance.SaveCurrentGame();
     }
 
@@ -16590,6 +16627,10 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandlePlayerDeath(CombatResult result)
     {
+        // Save immediately with HP=0 to prevent save cheesing (close game to avoid death penalties)
+        if (GameEngine.Instance != null)
+            _ = GameEngine.Instance.SaveCurrentGame();
+
         terminal.ClearScreen();
 
         // Display dramatic death art
@@ -16713,8 +16754,8 @@ public partial class CombatEngine
             result.ShouldReturnToTemple = true; // Player resurrects at temple after death
         }
 
-        // Prevent save cheesing — persist negative outcomes immediately
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        // Prevent save cheesing — persist death outcomes immediately (both online and offline)
+        if (GameEngine.Instance != null)
             _ = GameEngine.Instance.SaveCurrentGame();
     }
 
@@ -16741,14 +16782,15 @@ public partial class CombatEngine
             });
         }
 
-        // Option 2: Temple Resurrection (costs gold, returns to temple)
-        long templeCost = 500 + (player.Level * 100);
-        if (player.Gold >= templeCost || player.BankGold >= templeCost)
+        // Option 2: Temple Resurrection (costs 50% gold, max 3 uses)
+        if (player.TempleResurrectionsUsed < 3)
         {
+            long templeCost = (long)(player.Gold * 0.5);
+            int remaining = 3 - player.TempleResurrectionsUsed;
             choices.Add(new ResurrectionChoice
             {
                 Name = Loc.Get("death.temple_resurrection"),
-                Description = Loc.Get("death.temple_desc", $"{templeCost:N0}"),
+                Description = $"Pay the temple 50% of your gold ({templeCost:N0}g) for resurrection ({remaining} remaining)",
                 Cost = templeCost,
                 HPRestored = (int)(player.MaxHP * 0.75), // 75% HP
                 Method = "Temple Resurrection",
@@ -16758,13 +16800,13 @@ public partial class CombatEngine
             });
         }
 
-        // Option 3: Deal with Death (if high enough level and has darkness)
-        if (player.Level >= 5 && player.Darkness >= 100)
+        // Option 3: Deal with Death (costs 10,000 darkness + permanent stat loss)
+        if (player.Level >= 5 && player.Darkness >= 10000)
         {
             choices.Add(new ResurrectionChoice
             {
                 Name = Loc.Get("death.deal_with_death"),
-                Description = Loc.Get("death.deal_desc"),
+                Description = "Bargain with the reaper (costs 10,000 Darkness, permanent stat loss)",
                 Cost = 0,
                 HPRestored = (int)(player.MaxHP * 0.25), // 25% HP
                 Method = "Dark Bargain",
@@ -16774,11 +16816,11 @@ public partial class CombatEngine
             });
         }
 
-        // Option 4: Accept Death
+        // Option 4: Accept Death (lose 5 levels, 75% gold, and an item)
         choices.Add(new ResurrectionChoice
         {
             Name = Loc.Get("death.accept_fate"),
-            Description = Loc.Get("death.accept_desc"),
+            Description = "WARNING: Lose 5 levels, 75% of your gold, and a random equipped item",
             Cost = 0,
             HPRestored = 0,
             Method = "Death Accepted",
@@ -16827,8 +16869,109 @@ public partial class CombatEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("combat.accept_fate"));
-            terminal.WriteLine(Loc.Get("combat.darkness_claims"));
-            return new ResurrectionResult { WasResurrected = false };
+            terminal.WriteLine("");
+
+            // Track stats before penalties
+            int levelBefore = player.Level;
+            long strBefore = player.Strength, defBefore = player.Defence;
+            long dexBefore = player.Dexterity, agiBefore = player.Agility;
+            long conBefore = player.Constitution, intBefore = player.Intelligence;
+            long wisBefore = player.Wisdom, chaBefore = player.Charisma;
+            long hpBefore = player.MaxHP, manaBefore = player.MaxMana;
+
+            // Lose 5 levels (minimum level 1) with stat decreases
+            int levelsLost = Math.Min(5, player.Level - 1);
+            if (levelsLost > 0)
+            {
+                for (int i = 0; i < levelsLost; i++)
+                {
+                    LevelMasterLocation.ReverseClassStatIncrease(player);
+                    player.Level--;
+                }
+                player.Experience = LevelMasterLocation.GetExperienceForLevel(player.Level);
+            }
+
+            // Lose 75% gold
+            long goldLost = (long)(player.Gold * 0.75);
+            player.Gold -= goldLost;
+
+            // Lose a random equipped item
+            string lostItemName = "none";
+            var equippedSlots = new[] {
+                EquipmentSlot.MainHand, EquipmentSlot.OffHand, EquipmentSlot.Head,
+                EquipmentSlot.Body, EquipmentSlot.Arms, EquipmentSlot.Hands,
+                EquipmentSlot.Legs, EquipmentSlot.Feet, EquipmentSlot.Waist,
+                EquipmentSlot.Face, EquipmentSlot.Cloak, EquipmentSlot.Neck,
+                EquipmentSlot.LFinger, EquipmentSlot.RFinger
+            };
+            var filledSlots = equippedSlots.Where(s => player.GetEquipment(s) != null).ToList();
+            if (filledSlots.Count > 0)
+            {
+                var rng = Random.Shared;
+                var lostSlot = filledSlots[rng.Next(filledSlots.Count)];
+                var lostItem = player.GetEquipment(lostSlot);
+                lostItemName = lostItem?.Name ?? "equipment";
+                player.UnequipSlot(lostSlot);
+            }
+
+            // Unequip gear that exceeds new level requirements
+            var demotedGear = new List<string>();
+            foreach (var slot in equippedSlots)
+            {
+                var equip = player.GetEquipment(slot);
+                if (equip != null && equip.MinLevel > player.Level)
+                {
+                    var item = player.ConvertEquipmentToLegacyItem(equip);
+                    player.UnequipSlot(slot);
+                    if (item != null) player.Inventory.Add(item);
+                    demotedGear.Add($"{equip.Name} (requires Lv.{equip.MinLevel})");
+                }
+            }
+
+            player.RecalculateStats();
+            player.HP = Math.Max(1, (int)(player.MaxHP * 0.1));
+
+            // Show summary
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  ═══ Death Penalty Summary ═══");
+            terminal.WriteLine($"  Levels lost: {levelsLost} (Lv.{levelBefore} -> Lv.{player.Level})", "red");
+            terminal.WriteLine($"  Gold lost: {goldLost:N0}g (remaining: {player.Gold:N0}g)", "red");
+            terminal.WriteLine($"  Item destroyed: {lostItemName}", "red");
+
+            // Show stat changes
+            terminal.SetColor("gray");
+            var statChanges = new List<string>();
+            if (player.Strength < strBefore) statChanges.Add($"STR -{strBefore - player.Strength}");
+            if (player.Defence < defBefore) statChanges.Add($"DEF -{defBefore - player.Defence}");
+            if (player.Dexterity < dexBefore) statChanges.Add($"DEX -{dexBefore - player.Dexterity}");
+            if (player.Agility < agiBefore) statChanges.Add($"AGI -{agiBefore - player.Agility}");
+            if (player.Constitution < conBefore) statChanges.Add($"CON -{conBefore - player.Constitution}");
+            if (player.Intelligence < intBefore) statChanges.Add($"INT -{intBefore - player.Intelligence}");
+            if (player.Wisdom < wisBefore) statChanges.Add($"WIS -{wisBefore - player.Wisdom}");
+            if (player.Charisma < chaBefore) statChanges.Add($"CHA -{chaBefore - player.Charisma}");
+            if (player.MaxHP < hpBefore) statChanges.Add($"HP -{hpBefore - player.MaxHP}");
+            if (player.MaxMana < manaBefore) statChanges.Add($"MP -{manaBefore - player.MaxMana}");
+            if (statChanges.Count > 0)
+                terminal.WriteLine($"  Stats lost: {string.Join(", ", statChanges)}", "red");
+
+            if (demotedGear.Count > 0)
+            {
+                terminal.SetColor("yellow");
+                foreach (var g in demotedGear)
+                    terminal.WriteLine($"  Unequipped (over-leveled): {g}");
+            }
+
+            terminal.WriteLine("");
+            terminal.WriteLine("  You claw your way back from the abyss, diminished but alive.", "gray");
+            await terminal.PressAnyKey();
+
+            return new ResurrectionResult
+            {
+                WasResurrected = true,
+                RestoredHP = (int)player.HP,
+                Method = "Accepted Fate",
+                ShouldReturnToTemple = true
+            };
         }
 
         if (selectedChoice.UsesResurrection)
@@ -16843,42 +16986,58 @@ public partial class CombatEngine
         }
         else if (selectedChoice.RequiresGold)
         {
-            // Deduct gold from bank first, then cash
-            if (player.BankGold >= selectedChoice.Cost)
-            {
-                player.BankGold -= selectedChoice.Cost;
-            }
-            else
-            {
-                player.Gold -= selectedChoice.Cost;
-            }
+            // Deduct 50% of gold on hand
+            player.Gold -= selectedChoice.Cost;
+            player.TempleResurrectionsUsed++;
+            int remaining = 3 - player.TempleResurrectionsUsed;
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("combat.temple_priests_chant"));
             terminal.WriteLine(Loc.Get("combat.magic_pulls_soul"));
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  ═══ Resurrection Summary ═══");
+            terminal.WriteLine($"  Gold paid: {selectedChoice.Cost:N0}g (50% of gold on hand)", "red");
+            terminal.WriteLine($"  Gold remaining: {player.Gold:N0}g", "white");
+            terminal.WriteLine($"  HP restored: {selectedChoice.HPRestored}/{player.MaxHP}", "green");
+            if (remaining > 0)
+                terminal.WriteLine($"  Temple resurrections remaining: {remaining}", "yellow");
+            else
+                terminal.WriteLine($"  Temple resurrections remaining: 0 (no more temple aid available)", "bright_red");
+            terminal.WriteLine("");
         }
         else if (selectedChoice.IsDarkBargain)
         {
-            // Dark bargain - costs darkness and a permanent stat reduction
-            player.Darkness -= 50;
-            var random = new Random();
-            int statLoss = 1 + random.Next(3);
+            // Dark bargain - costs 10,000 darkness and a permanent stat reduction
+            long darknessBefore = player.Darkness;
+            player.Darkness -= 10000;
+            var random = Random.Shared;
+            int statLoss = 2 + random.Next(4);
 
             // Reduce a random stat permanently
+            string lostStatName;
             switch (random.Next(6))
             {
-                case 0: player.Strength = Math.Max(1, player.Strength - statLoss); break;
-                case 1: player.Defence = Math.Max(1, player.Defence - statLoss); break;
-                case 2: player.Stamina = Math.Max(1, player.Stamina - statLoss); break;
-                case 3: player.Agility = Math.Max(1, player.Agility - statLoss); break;
-                case 4: player.Charisma = Math.Max(1, player.Charisma - statLoss); break;
-                case 5: player.MaxHP = Math.Max(10, player.MaxHP - (statLoss * 5)); break;
+                case 0: player.Strength = Math.Max(1, player.Strength - statLoss); lostStatName = "Strength"; break;
+                case 1: player.Defence = Math.Max(1, player.Defence - statLoss); lostStatName = "Defence"; break;
+                case 2: player.Stamina = Math.Max(1, player.Stamina - statLoss); lostStatName = "Stamina"; break;
+                case 3: player.Agility = Math.Max(1, player.Agility - statLoss); lostStatName = "Agility"; break;
+                case 4: player.Charisma = Math.Max(1, player.Charisma - statLoss); lostStatName = "Charisma"; break;
+                default: player.MaxHP = Math.Max(10, player.MaxHP - (statLoss * 5)); lostStatName = $"Max HP (-{statLoss * 5})"; statLoss = statLoss * 5; break;
             }
 
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("combat.cold_presence"));
             terminal.WriteLine("\"Very well, mortal. But this bargain has a price...\"");
-            terminal.WriteLine($"You feel yourself grow weaker... (-{statLoss} to a random stat)");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("  ═══ Dark Bargain Summary ═══");
+            terminal.WriteLine($"  Darkness consumed: 10,000 ({darknessBefore:N0} -> {player.Darkness:N0})", "magenta");
+            terminal.WriteLine($"  Permanent stat loss: -{statLoss} {lostStatName}", "red");
+            terminal.WriteLine($"  HP restored: {selectedChoice.HPRestored}/{player.MaxHP}", "green");
+            terminal.WriteLine("");
         }
+
+        await terminal.PressAnyKey();
 
         return new ResurrectionResult
         {
@@ -16895,7 +17054,7 @@ public partial class CombatEngine
     private async Task ApplyDeathPenalties(CombatResult result)
     {
         var player = result.Player;
-        var random = new Random();
+        var random = Random.Shared;
 
         terminal.SetColor("red");
         terminal.WriteLine("");
@@ -19387,9 +19546,11 @@ public partial class CombatEngine
             }
         }
 
-        // Decrement Unmaking spell cooldown
+        // Decrement spell cooldowns
         if (player.UnmakingCooldown > 0)
             player.UnmakingCooldown--;
+        if (player.DelugeCooldown > 0)
+            player.DelugeCooldown--;
 
         // Decrement teammate ability cooldowns
         foreach (var tcEntry in teammateCooldowns.Values)
@@ -21376,6 +21537,9 @@ public partial class CombatEngine
         }
         if (eligibleSlots == 0) return;
 
+        // If player explicitly set 100% for themselves, respect that choice
+        if (player.TeamXPPercent[0] == 100) return;
+
         // Check if all teammate slots are at 0% (meaning player never configured XP sharing)
         bool allTeammateZero = true;
         for (int s = 1; s < player.TeamXPPercent.Length && s <= eligibleSlots; s++)
@@ -22006,12 +22170,14 @@ public partial class CombatEngine
                 var spell = SpellSystem.GetSpellInfo(player.Class, spellLevel.Value);
                 if (spell == null) continue;
                 int manaCost = SpellSystem.CalculateManaCost(spell, player);
-                // Check for Unmaking cooldown (Voidreaver spell 5)
-                bool onCooldown = player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0;
+                // Check for spell cooldowns
+                bool onCooldown = (player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0)
+                    || (player.Class == CharacterClass.Tidesworn && spellLevel.Value == 5 && player.DelugeCooldown > 0);
                 bool canCast = player.CanCastSpells() && player.Mana >= manaCost && SpellSystem.HasRequiredSpellWeapon(player) && !onCooldown;
                 string displayName;
+                int cdRemaining = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
                 if (onCooldown)
-                    displayName = $"{spell.Name} (CD:{player.UnmakingCooldown})";
+                    displayName = $"{spell.Name} (CD:{cdRemaining})";
                 else if (!SpellSystem.HasRequiredSpellWeapon(player))
                 {
                     var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
@@ -22083,8 +22249,13 @@ public partial class CombatEngine
                 if (spell != null)
                 {
                     int manaCost = SpellSystem.CalculateManaCost(spell, player);
-                    if (player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0)
-                        terminal.WriteLine($"{spell.Name} is on cooldown! ({player.UnmakingCooldown} round{(player.UnmakingCooldown > 1 ? "s" : "")} remaining)", "red");
+                    bool spellOnCD = (player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0)
+                        || (player.Class == CharacterClass.Tidesworn && spellLevel.Value == 5 && player.DelugeCooldown > 0);
+                    if (spellOnCD)
+                    {
+                        int cdLeft = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
+                        terminal.WriteLine($"{spell.Name} is on cooldown! ({cdLeft} round{(cdLeft > 1 ? "s" : "")} remaining)", "red");
+                    }
                     else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
                         var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
@@ -22197,8 +22368,13 @@ public partial class CombatEngine
                 if (spell != null)
                 {
                     int manaCost = SpellSystem.CalculateManaCost(spell, player);
-                    if (player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0)
-                        terminal.WriteLine($"{spell.Name} is on cooldown! ({player.UnmakingCooldown} round{(player.UnmakingCooldown > 1 ? "s" : "")} remaining)", "red");
+                    bool spellOnCD = (player.Class == CharacterClass.Voidreaver && spellLevel.Value == 5 && player.UnmakingCooldown > 0)
+                        || (player.Class == CharacterClass.Tidesworn && spellLevel.Value == 5 && player.DelugeCooldown > 0);
+                    if (spellOnCD)
+                    {
+                        int cdLeft = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
+                        terminal.WriteLine($"{spell.Name} is on cooldown! ({cdLeft} round{(cdLeft > 1 ? "s" : "")} remaining)", "red");
+                    }
                     else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
                         var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
@@ -22677,6 +22853,14 @@ public partial class CombatEngine
         // Player could also be tanking
         if (tank == null && boss.TauntedBy != null && boss.TauntedBy == player.DisplayName)
             tank = player;
+        // Tank classes passively absorb AoE even without active taunt
+        if (tank == null && player.IsAlive)
+        {
+            bool isTankClass = player.Class == CharacterClass.Warrior || player.Class == CharacterClass.Paladin
+                || player.Class == CharacterClass.Barbarian || player.Class == CharacterClass.Tidesworn;
+            if (isTankClass)
+                tank = player;
+        }
 
         double absorptionRate = tank != null ? BossContext.TankAbsorptionRate : 0.0;
 

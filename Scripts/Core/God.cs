@@ -50,7 +50,7 @@ public class God
         Name = alias;
         Id = playerId;
         RecordNumber = 1;
-        Age = new Random().Next(GameConfig.MinGodAge, GameConfig.MaxGodAge + 1); // random(5) + 2
+        Age = Random.Shared.Next(GameConfig.MinGodAge, GameConfig.MaxGodAge + 1); // random(5) + 2
         Sex = playerSex;
         AI = GameConfig.GodAIHuman;
         Level = 1;

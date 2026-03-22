@@ -597,7 +597,7 @@ public class PantheonLocation : BaseLocation
         var target = await PickTarget(targets, "RECRUIT BELIEVER", "bright_yellow", "Target #");
         if (target == null) return;
         bool isPagan = target.Status.Contains("Pagan");
-        var rng = new Random();
+        var rng = Random.Shared;
 
         currentPlayer.DeedsLeft--;
 
@@ -787,7 +787,7 @@ public class PantheonLocation : BaseLocation
 
         var target = await PickTarget(targets, "SMITE MORTAL", "bright_red", "Smite #");
         if (target == null) return;
-        var rng = new Random();
+        var rng = Random.Shared;
         float smitePercent = GameConfig.GodSmiteMinPercent + (float)(rng.NextDouble() * (GameConfig.GodSmiteMaxPercent - GameConfig.GodSmiteMinPercent));
 
         int expGain = GameConfig.GodSmiteExp;
@@ -854,7 +854,7 @@ public class PantheonLocation : BaseLocation
 
         currentPlayer.DeedsLeft--;
 
-        var rng = new Random();
+        var rng = Random.Shared;
         if (rng.NextDouble() < GameConfig.GodPoisonRelationshipChance)
         {
             currentPlayer.GodExperience += GameConfig.GodPoisonRelationshipExp;

@@ -350,7 +350,7 @@ namespace UsurperRemake.Systems
         {
             if (AmbientWisdom.TryGetValue(AwakeningLevel, out var phrases))
             {
-                return phrases[new Random().Next(phrases.Length)];
+                return phrases[Random.Shared.Next(phrases.Length)];
             }
             return "";
         }
@@ -371,7 +371,7 @@ namespace UsurperRemake.Systems
 
             if (AmbientWisdom.TryGetValue(effectiveLevel, out var phrases))
             {
-                return phrases[new Random().Next(phrases.Length)];
+                return phrases[Random.Shared.Next(phrases.Length)];
             }
             return "";
         }

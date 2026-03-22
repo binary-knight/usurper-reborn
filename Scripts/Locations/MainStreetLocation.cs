@@ -2143,7 +2143,7 @@ public class MainStreetLocation : BaseLocation
             "The wilderness holds secrets yet to be discovered.",
         };
 
-        var random = new Random();
+        var random = Random.Shared;
         forecasts.Add(genericForecasts[random.Next(genericForecasts.Count)]);
 
         // Pick up to 2 forecasts to display

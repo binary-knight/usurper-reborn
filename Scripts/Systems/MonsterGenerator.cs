@@ -16,7 +16,7 @@ public static class MonsterGenerator
     /// </summary>
     public static Monster GenerateMonster(int dungeonLevel, bool isBoss = false, bool isMiniBoss = false, Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
 
         // Clamp dungeon level to valid range (1-100)
         dungeonLevel = Math.Max(1, Math.Min(100, dungeonLevel));
@@ -396,7 +396,7 @@ public static class MonsterGenerator
     /// </summary>
     public static List<Monster> GenerateMonsterGroup(int dungeonLevel, Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
         var monsters = new List<Monster>();
 
         // Clamp dungeon level to valid range (1-100)

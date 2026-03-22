@@ -72,7 +72,7 @@ namespace UsurperRemake.Data
 
         public static WorldBossDefinition GetRandomBoss(Random? rng = null)
         {
-            rng ??= new Random();
+            rng ??= Random.Shared;
             return AllBosses[rng.Next(AllBosses.Count)];
         }
 

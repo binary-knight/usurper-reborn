@@ -10,7 +10,7 @@ using System.Linq;
 /// </summary>
 public static class EnhancedNPCBehaviors
 {
-    private static Random random = new Random();
+    private static Random random = Random.Shared;
     
     /// <summary>
     /// Enhanced inventory management - Pascal NPC_CHEC.PAS Check_Inventory

@@ -443,7 +443,7 @@ namespace UsurperRemake.Systems
                     break;
 
                 case EffectType.GiveItem:
-                    // TODO: Add item to inventory
+                    // Item inventory add not implemented for dialogue rewards
                     terminal?.WriteLine($"(Received: {effect.StringValue})", "bright_yellow");
                     break;
 

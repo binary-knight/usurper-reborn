@@ -24,7 +24,7 @@ public class MaintenanceSystem
     public MaintenanceSystem(TerminalUI terminal)
     {
         this.terminal = terminal;
-        this.random = new Random();
+        this.random = Random.Shared;
         this.maintenanceRunning = false;
         
         // Load last maintenance date
@@ -676,8 +676,9 @@ public class MaintenanceSystem
                 $"This file prevents multiple maintenance sessions.");
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
     }
     
     /// <summary>
@@ -696,8 +697,9 @@ public class MaintenanceSystem
             }
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
     }
     
     /// <summary>
@@ -721,8 +723,9 @@ public class MaintenanceSystem
             }
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
 
         // Default to yesterday to trigger maintenance
         lastMaintenanceDate = DateTime.Now.AddDays(-1);
@@ -752,8 +755,9 @@ public class MaintenanceSystem
             File.WriteAllText(datePath, lastMaintenanceDate.ToString("yyyy-MM-dd"));
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
     }
 }
 

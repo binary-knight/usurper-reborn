@@ -1270,10 +1270,10 @@ namespace UsurperRemake.Systems
                     IsDead = data.IsDead,
 
                     // Lifecycle - aging and natural death (with migration for legacy data)
-                    Age = data.Age > 0 ? data.Age : new Random().Next(18, 50),
+                    Age = data.Age > 0 ? data.Age : Random.Shared.Next(18, 50),
                     BirthDate = data.BirthDate > DateTime.MinValue
                         ? data.BirthDate
-                        : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : new Random().Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
+                        : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : Random.Shared.Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
                     IsAgedDeath = data.IsAgedDeath,
                     IsPermaDead = data.IsPermaDead,
                     PregnancyDueDate = data.PregnancyDueDate,
@@ -1693,7 +1693,7 @@ namespace UsurperRemake.Systems
 
                     // Process guard loyalty changes based on treasury health
                     var guardsToRemove = new List<RoyalGuard>();
-                    var random = new Random();
+                    var random = Random.Shared;
                     foreach (var guard in king.Guards)
                     {
                         if (king.Treasury < king.CalculateDailyExpenses())

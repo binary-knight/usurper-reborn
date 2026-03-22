@@ -908,7 +908,7 @@ public class MusicShopLocation : BaseLocation
         currentPlayer.SongBuffValue2 = value2;
 
         // Pick a random performance from the pool
-        var rng = new Random();
+        var rng = Random.Shared;
         var song = songPool[rng.Next(songPool.Length)];
 
         // Resolve the intro text — replace performer name and handle special cases

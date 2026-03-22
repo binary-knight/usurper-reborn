@@ -16,7 +16,7 @@ public class FeatureInteractionSystem
     private static FeatureInteractionSystem? _instance;
     public static FeatureInteractionSystem Instance => _instance ??= new FeatureInteractionSystem();
 
-    private Random random = new Random();
+    private Random random = Random.Shared;
 
     /// <summary>
     /// Process a feature interaction with meaningful outcomes

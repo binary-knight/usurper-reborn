@@ -12,7 +12,7 @@ namespace UsurperRemake.Systems
     /// </summary>
     public static class RareEncounters
     {
-        private static Random random = new Random();
+        private static Random random = Random.Shared;
 
         // Encounter chance: 5% per room exploration
         public const double RareEncounterChance = 0.05;
@@ -461,8 +461,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("encounter.minstrel.valor_play"));
                     terminal.WriteLine(Loc.Get("encounter.minstrel.valor_effect"));
-                    // TODO: Add temporary buff system
-                    player.Strength += 3; // Permanent for now
+                    player.Strength += 3; // Permanent +3 STR from minstrel's valor song
                     terminal.WriteLine(Loc.Get("encounter.minstrel.plus_strength"), "green");
                     break;
 
@@ -763,7 +762,7 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("magenta");
                             terminal.WriteLine("");
                             terminal.WriteLine(Loc.Get("encounter.damsel.rescue_blush"));
-                            // TODO: Add romance subplot tracking
+
                         }
                     }
                     else if (choice.ToUpper() == "W")
@@ -987,7 +986,7 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("bright_cyan");
                             terminal.WriteLine("");
                             terminal.WriteLine(Loc.Get("encounter.damsel.warrior_team_hint"));
-                            // TODO: Add companion system
+
                         }
                     }
                     else
@@ -2239,7 +2238,7 @@ namespace UsurperRemake.Systems
                     if (godFloors[i] > level) { nearestGodIdx = i; break; }
                 }
 
-                var rng = new Random();
+                var rng = Random.Shared;
                 var hints = new List<(string line1, string line2)>();
 
                 if (nearestSeal > 0 && nearestSeal - level <= 15)

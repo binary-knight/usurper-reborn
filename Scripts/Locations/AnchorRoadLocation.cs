@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 /// </summary>
 public class AnchorRoadLocation : BaseLocation
 {
-    private Random random = new Random();
+    private Random random = Random.Shared;
 
     public AnchorRoadLocation() : base(GameLocation.AnchorRoad, "Anchor Road", "Conjunction of Destinies")
     {

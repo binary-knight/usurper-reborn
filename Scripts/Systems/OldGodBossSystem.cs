@@ -1010,6 +1010,11 @@ namespace UsurperRemake.Systems
             player.Chivalry += 100;
             terminal.WriteLine(Loc.Get("old_god.saved_chivalry"), "bright_green");
 
+            // Saved gods give their artifact as a gift (instead of looting from their corpse)
+            terminal.WriteLine("");
+            terminal.WriteLine($"  {boss.Name} entrusts you with a sacred relic...", "bright_magenta");
+            await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
+
             // Award thematic crafting materials (same as defeat)
             var thematicMaterial = GameConfig.CraftingMaterials.FirstOrDefault(
                 m => m.ThematicGod == boss.Type.ToString());

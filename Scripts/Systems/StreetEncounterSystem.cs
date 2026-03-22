@@ -15,7 +15,7 @@ public class StreetEncounterSystem
     private static StreetEncounterSystem _instance;
     public static StreetEncounterSystem Instance => _instance ??= new StreetEncounterSystem();
 
-    private Random _random = new Random();
+    private Random _random = Random.Shared;
 
     /// <summary>
     /// Encounter chance modifiers by location
@@ -1051,7 +1051,7 @@ public class StreetEncounterSystem
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("street_encounter.beggar.strange_amulet"));
                 terminal.WriteLine(Loc.Get("street_encounter.beggar.luck_amulet"));
-                // TODO: Add amulet to inventory
+
             }
 
             result.GoldLost = 50;
@@ -1686,18 +1686,19 @@ public class StreetEncounterSystem
             Darkness = _random.Next(20, 80), // Hostile NPCs have high darkness
         };
 
-        // Generate stats based on level
-        npc.MaxHP = 30 + level * 15 + _random.Next(level * 5);
+        // Generate stats based on level (scaled to match player power curve)
+        int levelSq = level * level;
+        npc.MaxHP = 50 + level * 25 + levelSq / 2 + _random.Next(level * 10);
         npc.HP = npc.MaxHP;
-        npc.Strength = 10 + level * 2 + _random.Next(5);
-        npc.Dexterity = 10 + level + _random.Next(5);
-        npc.Constitution = 10 + level + _random.Next(5);
-        npc.Intelligence = 8 + _random.Next(8);
-        npc.Wisdom = 8 + _random.Next(8);
+        npc.Strength = 12 + level * 3 + levelSq / 20 + _random.Next(5);
+        npc.Dexterity = 10 + level * 2 + _random.Next(5);
+        npc.Constitution = 10 + level * 2 + _random.Next(5);
+        npc.Intelligence = 8 + level + _random.Next(8);
+        npc.Wisdom = 8 + level + _random.Next(8);
         npc.Charisma = 6 + _random.Next(6);
-        npc.Defence = 5 + level * 2;
-        npc.WeapPow = 5 + level * 3;
-        npc.ArmPow = 3 + level * 2;
+        npc.Defence = 8 + level * 3 + levelSq / 15;
+        npc.WeapPow = 8 + level * 4 + levelSq / 20;
+        npc.ArmPow = 5 + level * 3 + levelSq / 20;
 
         // Equipment is handled by WeapPow/ArmPow stats already set
         return npc;

@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 public partial class QuestSystem
 {
     private static List<Quest> questDatabase = new List<Quest>();
-    private static Random random = new Random();
+    private static Random random = Random.Shared;
 
     /// <summary>
     /// Add a pre-built quest to the database (for systems that create quests externally).

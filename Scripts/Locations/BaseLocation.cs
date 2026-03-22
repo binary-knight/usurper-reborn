@@ -1199,7 +1199,7 @@ public abstract class BaseLocation
 
         // Poison damage scales with poison level and player level
         // Base damage: 2-5 HP per turn, plus level scaling, plus poison intensity
-        var random = new Random();
+        var random = Random.Shared;
         int baseDamage = 2 + random.Next(4);  // 2-5 base damage
         int levelScaling = currentPlayer.Level / 10;  // +1 per 10 levels
         int poisonBonus = currentPlayer.Poison / 5;  // +1 per 5 poison intensity
@@ -1393,7 +1393,7 @@ public abstract class BaseLocation
             .ToList();
     }
 
-    private static Random _npcRandom = new Random();
+    private static Random _npcRandom = Random.Shared;
 
     /// <summary>
     /// Get a random shout/action for an NPC based on their personality
@@ -2950,7 +2950,7 @@ public abstract class BaseLocation
         }
 
         // Use one potion
-        long healAmount = 30 + currentPlayer.Level * 5 + new Random().Next(10, 30);
+        long healAmount = 30 + currentPlayer.Level * 5 + Random.Shared.Next(10, 30);
         healAmount = Math.Min(healAmount, currentPlayer.MaxHP - currentPlayer.HP);
         currentPlayer.HP += healAmount;
         currentPlayer.Healing--;
@@ -3438,6 +3438,10 @@ public abstract class BaseLocation
 
                     // Gather all available titles
                     var availableTitles = new List<string>();
+
+                    // King/Queen title (while on the throne)
+                    if (currentPlayer.King)
+                        availableTitles.Add(currentPlayer.Sex == CharacterSex.Female ? "Queen" : "King");
 
                     // Knight title
                     if (currentPlayer.IsKnighted)
@@ -3967,7 +3971,7 @@ public abstract class BaseLocation
         await Task.Delay(800);
 
         // Sometimes add a second line of dialogue for variety
-        if (new Random().NextDouble() < 0.5)
+        if (Random.Shared.NextDouble() < 0.5)
         {
             await Task.Delay(600);
             string moreTalk = npc.GetSmallTalk(player);
@@ -3992,7 +3996,7 @@ public abstract class BaseLocation
     /// </summary>
     private string[] GenerateNPCChat(NPC npc)
     {
-        var random = new Random();
+        var random = Random.Shared;
         var chatOptions = new List<string[]>();
 
         // Class-specific chat
@@ -4043,7 +4047,7 @@ public abstract class BaseLocation
         terminal.WriteLine($"  {Loc.Get("base.ask_rumors_to", npc.Name2)}");
         terminal.WriteLine("");
 
-        var random = new Random();
+        var random = Random.Shared;
         var rumors = GetRumors();
         var selectedRumor = rumors[random.Next(rumors.Length)];
 
@@ -4386,7 +4390,7 @@ public abstract class BaseLocation
     /// </summary>
     private bool ShouldNPCAcceptDuel(NPC npc)
     {
-        var random = new Random();
+        var random = Random.Shared;
 
         // Level difference affects acceptance
         int levelDiff = npc.Level - currentPlayer.Level;
@@ -6672,7 +6676,7 @@ public abstract class BaseLocation
             await backend.AddGoldToPlayer(offer.FromPlayer, offer.Gold);
         }
 
-        // TODO: return items to sender (create return package or add directly)
+        // Item returns not implemented — declined items are lost (gold is returned above)
 
         await backend.SendMessage("System", offer.FromPlayer, "trade",
             $"{currentPlayer.DisplayName} declined your package. Gold returned.");

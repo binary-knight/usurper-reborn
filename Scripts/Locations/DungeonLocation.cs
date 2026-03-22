@@ -20,7 +20,7 @@ public class DungeonLocation : BaseLocation
     internal List<Character> teammates = new();
     private int currentDungeonLevel = 1;
     private int maxDungeonLevel = 100;
-    private Random dungeonRandom = new Random();
+    private Random dungeonRandom = Random.Shared;
     private DungeonTerrain currentTerrain = DungeonTerrain.Underground;
 
     // Legacy encounter chances (for old ExploreLevel fallback)
@@ -911,29 +911,6 @@ public class DungeonLocation : BaseLocation
                 break;
 
             case 65:
-                // Soulweaver's Loom discovery - triggered by Veloura's save quest
-                if (StoryProgressionSystem.Instance.HasStoryFlag("veloura_save_quest") &&
-                    !ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
-                {
-                    await ShowStoryMoment(term, Loc.Get("dungeon.story_soulweaver_title"),
-                        new[] {
-                            Loc.Get("dungeon.story_soulweaver_1"),
-                            Loc.Get("dungeon.story_soulweaver_2"),
-                            Loc.Get("dungeon.story_soulweaver_3"),
-                            "",
-                            Loc.Get("dungeon.story_soulweaver_4"),
-                            Loc.Get("dungeon.story_soulweaver_5"),
-                        }, "bright_magenta");
-
-                    // Grant the artifact
-                    await ArtifactSystem.Instance.CollectArtifact(player, ArtifactType.SoulweaversLoom, term);
-
-                    term.WriteLine("");
-                    term.SetColor("bright_yellow");
-                    term.WriteLine(Loc.Get("dungeon.remember_veloura"));
-                    term.WriteLine(Loc.Get("dungeon.return_veloura_loom"), "yellow");
-                }
-
                 // Moral Paradox: Veloura's Cure (deeper choice about the Loom's cost)
                 if (MoralParadoxSystem.Instance.IsParadoxAvailable("velouras_cure", player))
                 {
@@ -3288,20 +3265,10 @@ public class DungeonLocation : BaseLocation
         else if (floor == 65)
         {
             var player65 = GetCurrentPlayer();
-            if (player65 != null)
+            if (player65 != null && MoralParadoxSystem.Instance.IsParadoxAvailable("velouras_cure", player65))
             {
-                // Check if the Soulweaver's Loom can be found here (save quest active, Loom not yet collected)
-                if (StoryProgressionSystem.Instance.HasStoryFlag("veloura_save_quest") &&
-                    !ArtifactSystem.Instance.HasArtifact(ArtifactType.SoulweaversLoom))
-                {
-                    hint = Loc.Get("dungeon.hint_loom_discovery");
-                    color = "bright_magenta";
-                }
-                else if (MoralParadoxSystem.Instance.IsParadoxAvailable("velouras_cure", player65))
-                {
-                    hint = Loc.Get("dungeon.hint_soulweaver_price");
-                    color = "bright_magenta";
-                }
+                hint = Loc.Get("dungeon.hint_soulweaver_price");
+                color = "bright_magenta";
             }
         }
         else if (floor == 70 && !story.HasStoryFlag("noctura_encountered"))
@@ -5317,7 +5284,7 @@ public class DungeonLocation : BaseLocation
                 return;
             _lastDungeonRespawnBroadcast = DateTime.Now;
         }
-        var msg = DungeonRespawnMessages[new Random().Next(DungeonRespawnMessages.Length)];
+        var msg = DungeonRespawnMessages[Random.Shared.Next(DungeonRespawnMessages.Length)];
         try { NewsSystem.Instance?.Newsy(msg); } catch { }
     }
 
@@ -12509,7 +12476,7 @@ public class DungeonLocation : BaseLocation
         // Ask 2 questions about specific positions to prevent lucky guesses
         int questionsNeeded = Math.Min(2, puzzle.Solution.Count);
         var askedPositions = new HashSet<int>();
-        var random = new Random();
+        var random = Random.Shared;
 
         for (int q = 0; q < questionsNeeded; q++)
         {

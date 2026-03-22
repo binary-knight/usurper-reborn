@@ -15,7 +15,7 @@ namespace UsurperRemake.Systems
         private static WorldEventSystem _instance;
         public static WorldEventSystem Instance => _instance ??= new WorldEventSystem();
 
-        private Random _random = new Random();
+        private Random _random = Random.Shared;
         private List<WorldEvent> _activeEvents = new();
         private int _lastEventDay = 0;
 

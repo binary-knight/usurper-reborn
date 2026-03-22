@@ -23,7 +23,7 @@ namespace UsurperRemake.Systems
             _ => "default"
         };
 
-        private static Random random = new Random();
+        private static Random random = Random.Shared;
 
         // Seal floors where Seven Seals are found
         private static readonly int[] SealFloors = { 15, 30, 45, 60, 80, 99 };
@@ -853,10 +853,12 @@ namespace UsurperRemake.Systems
                         break;
 
                     case RoomType.MerchantDen:
+                        // Merchant encounter removed — sold items had missing WeaponType
+                        // causing spell requirements to fail. Convert to treasure chest.
                         room.HasEvent = true;
-                        room.EventType = DungeonEventType.Merchant;
+                        room.EventType = DungeonEventType.TreasureChest;
                         room.HasMonsters = false;
-                        room.IsSafeRoom = true;
+                        room.HasTreasure = true;
                         break;
 
                     case RoomType.MemoryFragment:
@@ -961,7 +963,6 @@ namespace UsurperRemake.Systems
             var events = new[]
             {
                 DungeonEventType.TreasureChest,
-                DungeonEventType.Merchant,
                 DungeonEventType.Shrine,
                 DungeonEventType.Trap,
                 DungeonEventType.NPCEncounter,

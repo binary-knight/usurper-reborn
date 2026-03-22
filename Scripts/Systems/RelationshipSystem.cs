@@ -34,7 +34,7 @@ public partial class RelationshipSystem
         set => Instance._instanceRelationships = value;
     }
 
-    private static Random _random = new Random();
+    private static Random _random = Random.Shared;
 
     // Daily relationship gain tracking (v0.26) - prevents relationship flooding
     // Key format: "{character1}_{character2}_{date}" -> steps gained today

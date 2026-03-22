@@ -16,7 +16,7 @@ namespace UsurperRemake.Systems
         private static PuzzleSystem? _instance;
         public static PuzzleSystem Instance => _instance ??= new PuzzleSystem();
 
-        private Random random = new Random();
+        private Random random = Random.Shared;
 
         // Track solved puzzles per floor
         private Dictionary<int, HashSet<string>> solvedPuzzles = new();

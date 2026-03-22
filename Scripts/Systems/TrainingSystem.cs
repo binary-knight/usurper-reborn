@@ -239,7 +239,7 @@ public static class TrainingSystem
     /// </summary>
     public static RollResult RollD20(int modifier, int targetDC, Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
         int roll = random.Next(1, 21); // 1-20
         int total = roll + modifier;
 
@@ -264,7 +264,7 @@ public static class TrainingSystem
         int baseDC,
         Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
 
         // Get proficiency
         var proficiency = GetSkillProficiency(caster, skillId);
@@ -331,7 +331,7 @@ public static class TrainingSystem
         string? abilityId = null,
         Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
 
         // Base modifier from Strength (v0.41.4: reduced from /2 to /3 to slow hit scaling)
         int statMod = (int)((attacker.Strength - 10) / 3);
@@ -373,7 +373,7 @@ public static class TrainingSystem
         Character target,
         Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
 
         // Monster attack modifier (v0.41.4: Level/3 → Level/2 so monsters hit more reliably)
         int monsterMod = monster.Level / 2 + (int)((monster.Strength - 10) / 3);
@@ -497,7 +497,7 @@ public static class TrainingSystem
     /// <param name="maxLevel">Optional proficiency cap (use GetProficiencyCapForCharacter)</param>
     public static bool TryImproveFromUse(Character character, string skillId, Random? random = null, int maxLevel = (int)ProficiencyLevel.Legendary)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
 
         var currentLevel = GetSkillProficiency(character, skillId);
 

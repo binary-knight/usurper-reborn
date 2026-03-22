@@ -1836,7 +1836,7 @@ public static class ClassAbilitySystem
             Name = "Wave Echo",
             Description = "Project a focused wave of sound. Damage doubles if target is debuffed.",
             LevelRequired = 5, StaminaCost = 25, Cooldown = 2,
-            Type = AbilityType.Attack, BaseDamage = 70,
+            Type = AbilityType.Attack, BaseDamage = 100,
             SpecialEffect = "double_vs_debuffed",
             AvailableToClasses = new[] { CharacterClass.Wavecaller }
         },
@@ -2405,7 +2405,7 @@ public static class ClassAbilitySystem
     /// </summary>
     public static ClassAbilityResult UseAbility(Character user, string abilityId, Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
         var ability = GetAbility(abilityId);
         var result = new ClassAbilityResult();
 

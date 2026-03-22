@@ -19,7 +19,7 @@ public class NPCBrain
     private DateTime lastShoppingAttempt = DateTime.MinValue;
     private DateTime lastInventoryCheck = DateTime.MinValue;
     private Dictionary<string, DateTime> lastActivities = new();
-    private Random random = new Random();
+    private Random random = Random.Shared;
     
     public NPC Owner => owner;
     public PersonalityProfile Personality => personality;

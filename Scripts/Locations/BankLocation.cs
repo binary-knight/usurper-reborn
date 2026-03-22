@@ -1205,7 +1205,7 @@ public class BankLocation : BaseLocation
         }
 
         // Possible guard dog
-        var random = new Random();
+        var random = Random.Shared;
         if (random.Next(2) == 0)
         {
             terminal.SetColor("red");
@@ -1298,7 +1298,7 @@ public class BankLocation : BaseLocation
         }
 
         // War hounds — always present, fast and vicious
-        var random = new Random();
+        var random = Random.Shared;
         int houndCount = 1 + random.Next(3); // 1-3 war hounds
         for (int h = 0; h < houndCount; h++)
         {

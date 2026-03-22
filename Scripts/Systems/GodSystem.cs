@@ -22,7 +22,7 @@ public class GodSystem
         gods = new List<God>();
         godsByName = new Dictionary<string, God>();
         playerGods = new Dictionary<string, string>();
-        random = new Random();
+        random = Random.Shared;
         lastMaintenance = DateTime.Now;
         
         // Initialize with supreme creator if needed

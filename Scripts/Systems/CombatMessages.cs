@@ -94,7 +94,7 @@ public static class CombatMessages
     /// </summary>
     public static string GetPlayerAttackMessage(string targetName, long damage, long targetMaxHP, Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
         var tier = GetDamageTier(damage, targetMaxHP);
 
         if (tier == DamageTier.Miss)
@@ -114,7 +114,7 @@ public static class CombatMessages
     /// </summary>
     public static string GetAllyAttackMessage(string allyName, string targetName, long damage, long targetMaxHP, Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
         var tier = GetDamageTier(damage, targetMaxHP);
 
         if (tier == DamageTier.Miss)
@@ -146,7 +146,7 @@ public static class CombatMessages
     /// </summary>
     public static string GetMonsterAttackMessage(string monsterName, string monsterColor, long damage, long playerMaxHP, Random? random = null)
     {
-        random ??= new Random();
+        random ??= Random.Shared;
         var tier = GetDamageTier(damage, playerMaxHP);
 
         if (tier == DamageTier.Miss)
@@ -183,7 +183,7 @@ public static class CombatMessages
             $"[{color}]{name}[/] [bright_red]falls[/] in combat!"
         };
 
-        return messages[new Random().Next(messages.Count)];
+        return messages[Random.Shared.Next(messages.Count)];
     }
 
     /// <summary>

@@ -197,7 +197,7 @@ public class LoveCornerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("love_corner.acts_left", player.IntimacyActs));
 
         // Random chance to improve relationship
-        var random = new Random();
+        var random = Random.Shared;
         if (random.Next(2) == 0)
         {
             terminal.WriteLine(Loc.Get("love_corner.relationship_improved", targetName), TerminalEmulator.ColorGreen);

@@ -1151,7 +1151,7 @@ namespace UsurperRemake.Systems
             else if (player.MurderWeight >= 3) tier = 2;
             else tier = 1;
 
-            var rng = new Random();
+            var rng = Random.Shared;
 
             // Get nightmares for this tier (and lower tiers)
             var candidates = Nightmares

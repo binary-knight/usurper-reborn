@@ -488,7 +488,7 @@ public static class SpellSystem
     public static SpellResult CastSpell(Character caster, int spellLevel, Character? target = null, List<Character>? allTargets = null)
     {
         var result = new SpellResult();
-        var random = new Random();
+        var random = Random.Shared;
 
         if (!CanCastSpell(caster, spellLevel))
         {
@@ -602,7 +602,7 @@ public static class SpellSystem
     /// </summary>
     private static void ExecuteSpellEffect(Character caster, int spellLevel, Character target, List<Character> allTargets, SpellResult result)
     {
-        var random = new Random();
+        var random = Random.Shared;
 
         // Get proficiency multiplier (stored in result by CastSpell)
         float profMult = result.ProficiencyMultiplier;
@@ -1399,12 +1399,13 @@ public static class SpellSystem
                 result.IsMultiTarget = true;
                 result.Message += $" The Ocean shields the faithful! (+{result.ProtectionBonus} defense, +{result.AttackBonus} attack to all)";
                 break;
-            case 5: // Deluge of Sanctity - 200-280 AoE damage + heal self 100
+            case 5: // Deluge of Sanctity - 200-280 AoE damage + heal self 100 (2-round cooldown)
                 int tideDmg5 = 200 + random.Next(81);
                 result.Damage = ScaleSpellEffect(tideDmg5, caster, random, profMult);
                 result.Healing = ScaleHealingEffect(100, caster, random, profMult);
                 result.IsMultiTarget = true;
                 result.Message += $" The Ocean's wrath floods all enemies for {result.Damage} damage! {caster.Name2} is restored for {result.Healing} HP!";
+                caster.DelugeCooldown = 3; // Ticks down each round, castable again after 2 rounds
                 break;
         }
     }
@@ -1425,16 +1426,19 @@ public static class SpellSystem
                 result.IsMultiTarget = true;
                 result.Message += $" Shimmering wave-light protects all allies! (+{result.ProtectionBonus} defense)";
                 break;
-            case 3: // Siren's Lament - All enemies debuffed (crit = double duration + damage)
+            case 3: // Siren's Lament - All enemies debuffed + base damage (crit = double duration + bonus damage)
                 result.SpecialEffect = "weaken";
                 bool sirenCrit = result.Message.Contains("CRITICAL CAST");
                 result.Duration = sirenCrit ? 8 : 4;
-                result.Damage = sirenCrit ? ScaleSpellEffect(40 + random.Next(20), caster, random, profMult) : 0;
+                int sirenBaseDmg = 25 + random.Next(15) + (caster.Level / 2);
+                result.Damage = sirenCrit
+                    ? ScaleSpellEffect(40 + random.Next(20) + sirenBaseDmg, caster, random, profMult)
+                    : ScaleSpellEffect(sirenBaseDmg, caster, random, profMult);
                 result.IsMultiTarget = true;
                 if (sirenCrit)
                     result.Message += $" The Ocean's grief OVERWHELMS enemy will! (-30% ATK, -20% DEF for {result.Duration} rounds + {result.Damage} psychic damage!)";
                 else
-                    result.Message += $" The Ocean's grief saps enemy will! (-30% attack, -20% defense)";
+                    result.Message += $" The Ocean's grief saps enemy will! ({result.Damage} damage, -30% attack, -20% defense for {result.Duration} rounds)";
                 break;
             case 4: // Restorative Tide - 80-120 heal to all allies
                 int waveHeal4 = 80 + random.Next(41);

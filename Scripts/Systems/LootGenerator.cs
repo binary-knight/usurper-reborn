@@ -1337,7 +1337,7 @@ public static class LootGenerator
                 name.Contains("arcane") || name.Contains("enchanted") || name.Contains("mystic") ||
                 name.Contains("mage") || name.Contains("silk") || name.Contains("cloth") ||
                 name.Contains("robe") || name.Contains("vestment") || name.Contains("sorcery") ||
-                name.Contains("runed") || name.Contains("mind"))
+                name.Contains("mind"))
             {
                 item.LootEffects.Add(((int)SpecialEffect.Intelligence, primaryStat + manaBonus / 3));
                 item.Defence += Math.Max(1, finalPower / 9);
@@ -1399,9 +1399,10 @@ public static class LootGenerator
             else if (name.Contains("iron") || name.Contains("steel") || name.Contains("chain") ||
                      name.Contains("plate") || name.Contains("banded") || name.Contains("splint") ||
                      name.Contains("studded") || name.Contains("reinforced") || name.Contains("forged") ||
-                     name.Contains("ancient") || name.Contains("brigandine") || name.Contains("hauberk") ||
-                     name.Contains("heater") || name.Contains("wooden") || name.Contains("bone") ||
-                     name.Contains("copper") || name.Contains("gold") || name.Contains("silver"))
+                     name.Contains("ancient") || name.Contains("runed") || name.Contains("brigandine") ||
+                     name.Contains("hauberk") || name.Contains("heater") || name.Contains("wooden") ||
+                     name.Contains("bone") || name.Contains("copper") || name.Contains("gold") ||
+                     name.Contains("silver"))
             {
                 item.Defence += secondaryStat;
                 item.LootEffects.Add(((int)SpecialEffect.Constitution, hpBonus / 10));
@@ -1425,7 +1426,7 @@ public static class LootGenerator
             if (name.Contains("staff") || name.Contains("sorcery") || name.Contains("archmage") ||
                 name.Contains("magic") || name.Contains("mage") || name.Contains("soulstaff") ||
                 name.Contains("cosmos") || name.Contains("transmuter") || name.Contains("arcane") ||
-                name.Contains("mind") || name.Contains("runed") || name.Contains("void"))
+                name.Contains("mind") || name.Contains("void"))
             {
                 item.LootEffects.Add(((int)SpecialEffect.Intelligence, primaryStat));
                 item.Wisdom += secondaryStat;
@@ -1665,8 +1666,8 @@ public static class LootGenerator
                 item.LootEffects.Add(((int)SpecialEffect.Intelligence, finalPower / 3));
                 item.Defence += Math.Max(1, finalPower / 8);
             }
-            // Runed/Ancient themed
-            else if (lowerName.Contains("runed") || lowerName.Contains("ancient"))
+            // Ancient themed → INT + WIS
+            else if (lowerName.Contains("ancient"))
             {
                 item.LootEffects.Add(((int)SpecialEffect.Intelligence, finalPower / 3));
                 item.Wisdom += finalPower / 5;
@@ -1911,8 +1912,8 @@ public static class LootGenerator
                 item.LootEffects.Add(((int)SpecialEffect.Intelligence, finalPower / 3));
                 item.Defence += Math.Max(1, finalPower / 8);
             }
-            // Runed/Ancient themed
-            else if (lowerName.Contains("runed") || lowerName.Contains("ancient"))
+            // Ancient themed → INT + WIS
+            else if (lowerName.Contains("ancient"))
             {
                 item.LootEffects.Add(((int)SpecialEffect.Intelligence, finalPower / 3));
                 item.Wisdom += finalPower / 5;

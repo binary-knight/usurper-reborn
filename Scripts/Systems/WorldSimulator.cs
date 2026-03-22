@@ -14,7 +14,7 @@ public class WorldSimulator
 
     private bool isRunning = false;
     public bool IsRunning => isRunning;
-    private Random random = new Random();
+    private Random random = Random.Shared;
 
     /// <summary>
     /// Multiplier for NPC XP gains. Default 1.0 for normal mode.
@@ -200,7 +200,7 @@ public class WorldSimulator
         if (string.IsNullOrEmpty(text)) return;
         // Avoid duplicate gossip
         if (_gossipPool.Any(g => g.Text == text)) return;
-        _gossipPool.Add(new GossipItem { Text = text, TimesShared = 0, MaxShares = 2 + new Random().Next(2) });
+        _gossipPool.Add(new GossipItem { Text = text, TimesShared = 0, MaxShares = 2 + Random.Shared.Next(2) });
         while (_gossipPool.Count > MaxGossipPoolSize)
             _gossipPool.RemoveAt(0);
     }
@@ -4378,8 +4378,9 @@ public class WorldSimulator
             }
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
     }
 
     /// <summary>
@@ -4629,8 +4630,9 @@ public class WorldSimulator
             ChallengeSystem.Instance.ProcessMaintenanceChallenges();
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
     }
 
     /// <summary>
@@ -4643,8 +4645,9 @@ public class WorldSimulator
             PrisonActivitySystem.Instance.ProcessAllPrisonerActivities();
         }
         catch (Exception ex)
-        {
-        }
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
     }
 
     /// <summary>
@@ -5376,7 +5379,7 @@ public class WorldSimulator
             lock (_sleepLock) { currentSleeping = _sleepingNPCs.Count; }
             if (currentSleeping >= MAX_SLEEPING_NPCS) return;
 
-            var rng = new Random();
+            var rng = Random.Shared;
 
             // Pick eligible NPCs to go to sleep
             foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsStoryNPC && n.Level >= 3))

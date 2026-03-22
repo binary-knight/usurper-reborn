@@ -16,7 +16,7 @@ namespace UsurperRemake.Locations;
 /// </summary>
 public class LoveStreetLocation : BaseLocation
 {
-    private Random random = new Random();
+    private Random random = Random.Shared;
 
     // Per-visit state (cleared on each EnterLocation)
     private HashSet<string> _flirtedThisVisit = new();

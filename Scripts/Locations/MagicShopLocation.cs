@@ -31,7 +31,7 @@ public partial class MagicShopLocation : BaseLocation
     private int _accessoryPage = 0;
     private const int AccessoryItemsPerPage = 15;
 
-    private Random random = new Random();
+    private Random random = Random.Shared;
     
     // Local list to hold shop NPCs (replaces legacy global variable reference)
     private readonly List<NPC> npcs = new();
@@ -784,7 +784,11 @@ public partial class MagicShopLocation : BaseLocation
             targetItem.Strength += penalty / 2;
             targetItem.Dexterity += penalty / 3;
             targetItem.Wisdom += penalty / 3;
-            targetItem.HP += penalty * 2;
+            // Remove all negative stat LootEffects from curse (ApplyCursePenalties adds negative CON)
+            targetItem.LootEffects.RemoveAll(e => e.Item2 < 0 && (
+                e.Item1 == (int)LootGenerator.SpecialEffect.Constitution ||
+                e.Item1 == (int)LootGenerator.SpecialEffect.Intelligence ||
+                e.Item1 == (int)LootGenerator.SpecialEffect.AllStats));
 
             // Purification penalty: the curse's dark power was intertwined with the item's strength.
             // Removing the curse costs ~20% of the item's base power ON TOP of removing the curse boost.
@@ -1681,7 +1685,7 @@ public partial class MagicShopLocation : BaseLocation
         if (currentEnchantCount >= 3)
         {
             float failChance = currentEnchantCount == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
-            var rng = new Random();
+            var rng = Random.Shared;
             if (rng.NextDouble() < failChance)
             {
                 // FAILURE — gold consumed, random existing enchant destroyed

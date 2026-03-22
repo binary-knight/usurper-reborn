@@ -18,7 +18,7 @@ public class CastleLocation : BaseLocation
     private static List<RoyalMailMessage> royalMail = new();
     private const int MaxRoyalMail = 50;
     private bool playerIsKing = false;
-    private Random random = new Random();
+    private Random random = Random.Shared;
 
     public CastleLocation() : base(
         GameLocation.Castle,
@@ -3785,7 +3785,7 @@ public class CastleLocation : BaseLocation
             }
 
             currentKing.Treasury -= cost;
-            var random = new Random();
+            var random = Random.Shared;
             int loyaltyGain = 15 + random.Next(11); // 15-25
             member.LoyaltyToKing = Math.Min(100, member.LoyaltyToKing + loyaltyGain);
 
@@ -4068,7 +4068,7 @@ public class CastleLocation : BaseLocation
 
     private RoyalMercenary GenerateMercenary(string role, int level)
     {
-        var random = new Random();
+        var random = Random.Shared;
 
         // Pick a name not already in use
         var existingNames = currentPlayer.RoyalMercenaries.Select(m => m.Name).ToHashSet();
@@ -4901,6 +4901,7 @@ public class CastleLocation : BaseLocation
         bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
         ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before replacing
         currentPlayer.King = true;
+        currentPlayer.NobleTitle = currentPlayer.Sex == CharacterSex.Female ? "Queen" : "King";
         currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
         currentKing.Treasury = inheritedTreasury;
         playerIsKing = true;
@@ -5077,6 +5078,8 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             currentPlayer.King = false;
+            if (currentPlayer.NobleTitle == "King" || currentPlayer.NobleTitle == "Queen")
+                currentPlayer.NobleTitle = null;
             currentPlayer.RoyalMercenaries?.Clear(); // Dismiss bodyguards on abdication
             currentPlayer.RecalculateStats(); // Remove Royal Authority HP bonus
             ClearRoyalMarriage(currentKing); // Clear royal spouse before abdication
@@ -5387,7 +5390,7 @@ public class CastleLocation : BaseLocation
                 terminal.WriteLine("");
 
                 // Generate a special royal quest with better rewards
-                var random = new Random();
+                var random = Random.Shared;
                 int difficulty = Math.Min(4, 1 + currentPlayer.Level / 15);
                 long goldReward = (500 + random.Next(500)) * currentPlayer.Level * (difficulty + 1);
                 long xpReward = (100 + random.Next(100)) * currentPlayer.Level * (difficulty + 1);
@@ -6681,6 +6684,8 @@ public class CastleLocation : BaseLocation
 
         // Clear player state
         player.King = false;
+        if (player.NobleTitle == "King" || player.NobleTitle == "Queen")
+            player.NobleTitle = null;
         player.RoyalMercenaries?.Clear();
         player.RecalculateStats();
 
@@ -7699,6 +7704,7 @@ public class CastleLocation : BaseLocation
         bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
         ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before replacing
         currentPlayer.King = true;
+        currentPlayer.NobleTitle = currentPlayer.Sex == CharacterSex.Female ? "Queen" : "King";
         currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
         currentKing.Treasury = inheritedTreasury;
         playerIsKing = true;

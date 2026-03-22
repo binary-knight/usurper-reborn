@@ -83,7 +83,7 @@ public class Monster
     public int ArmorId { get; set; }
     public int Level { get; set; } = 1;
     
-    // Combat properties for AdvancedCombatEngine
+    // Combat properties
     public long WeaponPower { get; set; }       // Weapon power (settable)
     public long Gold { get; set; }              // Gold carried by monster
     public bool CanGrabWeapon { get; set; } = false;  // Can steal weapons
