@@ -846,6 +846,7 @@
   "combat.loot_epic_drop": "      ** EPIC DROP! **",
   "combat.loot_equip_failed": "Could not equip: {0}",
   "combat.loot_equip_failed_inventory": "Could not equip: {0}. Added to inventory.",
+  "combat.loot_change_character_option": "(</>) Change character",
   "combat.loot_equip_option": "(E)quip immediately",
   "combat.loot_found_on_corpse": "You found this on the {0}'s corpse.",
   "combat.loot_identify_hint": "  Take it to the Magic Shop to have it identified.",
