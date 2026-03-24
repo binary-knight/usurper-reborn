@@ -12,8 +12,8 @@ public class QuestHallLocation : BaseLocation
 {
     public QuestHallLocation(TerminalEmulator terminal) : base()
     {
-        LocationName = "Quest Hall";
-        LocationDescription = "The royal quest board where bounties and missions are posted.";
+        LocationName = Loc.Get("quest_hall.name");
+        LocationDescription = Loc.Get("quest_hall.description");
     }
 
     public override async Task EnterLocation(Character player, TerminalEmulator term)

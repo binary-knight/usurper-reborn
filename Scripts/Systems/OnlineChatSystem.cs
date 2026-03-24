@@ -234,7 +234,7 @@ namespace UsurperRemake.Systems
                     };
 
                     terminal.SetColor("darkgray");
-                    terminal.Write($"  [{entry.CreatedAt:MMM dd HH:mm}] ");
+                    terminal.Write($"  [{GameConfig.FormatShortDate(entry.CreatedAt, GameConfig.DateFormat)} {entry.CreatedAt:HH:mm}] ");
                     terminal.SetColor(color);
                     terminal.WriteLine(entry.Message);
                 }

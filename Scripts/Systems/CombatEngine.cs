@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using UsurperRemake.BBS;
@@ -946,7 +945,8 @@ public partial class CombatEngine
             // Troll racial passive regeneration
             if (player.Race == CharacterRace.Troll && player.HP < player.MaxHP && player.IsAlive)
             {
-                int regenAmount = Math.Min(1 + (int)(player.Level / 20), 3);
+                // Scale with level: ~2% of max HP per round, minimum 3
+                int regenAmount = Math.Max(3, (int)(player.MaxHP * 0.02));
 
                 // Drug ConstitutionBonus boosts Troll regeneration (e.g., Ironhide: +25 CON = +2 regen)
                 var conDrugEffects = DrugSystem.GetDrugEffects(player);
@@ -3073,6 +3073,10 @@ public partial class CombatEngine
 
         long actualDamage = Math.Max(1, attackPower - defense);
 
+        // Show defense calculation so player understands damage reduction
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine($"[{attackPower} damage vs {defense} defense]");
+
         // Log defense calculation for every player attack (single-monster path)
         DebugLogger.Instance.LogInfo("COMBAT_APPLY_DMG",
             $"player={attacker.Name} path=single attackPower={attackPower} defense={defense} " +
@@ -4227,6 +4231,10 @@ public partial class CombatEngine
         long minDamage = Math.Max(1, monsterAttack / 20);
         long actualDamage = Math.Max(minDamage, monsterAttack - playerDefense);
 
+        // Show defense calculation so player understands damage reduction
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine($"[{monsterAttack} damage vs {playerDefense} defense]");
+
         // Shield block: halve incoming damage on successful block
         if (blocked)
         {
@@ -4459,7 +4467,15 @@ public partial class CombatEngine
             }
             else
             {
-                long actualDamage = Math.Max(1, abilityResult.DirectDamage - (player.Defence / 3));
+                long abilityDefense = player.Defence / 3;
+                long actualDamage = Math.Max(1, abilityResult.DirectDamage - abilityDefense);
+
+                // Show defense calculation
+                if (abilityDefense > 0)
+                {
+                    terminal.SetColor("dark_gray");
+                    terminal.WriteLine($"[{abilityResult.DirectDamage} damage vs {abilityDefense} defense]");
+                }
 
                 // Drug MagicResistBonus reduces monster ability damage (e.g., ThirdEye: +25%)
                 var drugEffects = DrugSystem.GetDrugEffects(player);
@@ -6045,21 +6061,21 @@ public partial class CombatEngine
                 }
             }
 
-            // Apply attack buff to teammate
+            // Apply attack buff to teammate (use Math.Max — don't downgrade existing buffs, don't stack)
             if (abilityResult.AttackBonus > 0)
             {
                 // Teammates get 60% of the Bard's attack buff
                 int teamAtkBonus = (int)(abilityResult.AttackBonus * 0.6);
-                teammate.TempAttackBonus += teamAtkBonus;
+                teammate.TempAttackBonus = Math.Max(teammate.TempAttackBonus, teamAtkBonus);
                 teammate.TempAttackBonusDuration = Math.Max(teammate.TempAttackBonusDuration, abilityResult.Duration);
             }
 
-            // Apply defense buff to teammate
+            // Apply defense buff to teammate (use Math.Max — don't downgrade existing buffs, don't stack)
             if (abilityResult.DefenseBonus > 0)
             {
                 // Teammates get 60% of the Bard's defense buff
                 int teamDefBonus = (int)(abilityResult.DefenseBonus * 0.6);
-                teammate.TempDefenseBonus += teamDefBonus;
+                teammate.TempDefenseBonus = Math.Max(teammate.TempDefenseBonus, teamDefBonus);
                 teammate.TempDefenseBonusDuration = Math.Max(teammate.TempDefenseBonusDuration, abilityResult.Duration);
             }
         }
@@ -6962,7 +6978,9 @@ public partial class CombatEngine
     {
         // Ask player what to do — loop until we get valid E/T/P input
         string choice;
-        List<Character> party = [currentPlayer, .. this.currentTeammates];
+        List<Character> party = [currentPlayer, .. (this.currentTeammates ?? [])];
+        // Reset index to 0 (player) at start of each loot drop to avoid stale/out-of-bounds index
+        _droppedEquipmentPartyIdx = 0;
         Character selectedCharacter = party[_droppedEquipmentPartyIdx];
 
         // Check class restrictions for identified weapons/shields
@@ -6992,7 +7010,8 @@ public partial class CombatEngine
 
             if (lootItem.IsIdentified)
             {
-                terminal.WriteLine(Loc.Get("combat.loot_change_character_option"));
+                if (party.Count > 1)
+                    terminal.WriteLine(Loc.Get("combat.loot_change_character_option"));
 
                 if (canPlayerUseItem)
                 {
@@ -7006,18 +7025,43 @@ public partial class CombatEngine
             terminal.Write(Loc.Get("ui.your_choice"));
             choice = (await terminal.GetKeyInput()).ToUpper();
 
-            if (choice == ">")
+            if (choice == ">" && party.Count > 1)
             {
                 _droppedEquipmentPartyIdx = (_droppedEquipmentPartyIdx + 1) % (party.Count);
-                await RenderEquipment(lootItem, monster, party[_droppedEquipmentPartyIdx], lootBroadcastSb);
+                selectedCharacter = party[_droppedEquipmentPartyIdx];
+                // Recalculate class restrictions for the newly selected character
+                if (lootItem.IsIdentified)
+                {
+                    var (canUse, reason) = LootGenerator.CanClassUseLootItem(selectedCharacter.Class, lootItem);
+                    canPlayerUseItem = canUse;
+                    cantUseReason = reason;
+                }
+                else
+                {
+                    canPlayerUseItem = true;
+                    cantUseReason = null;
+                }
+                await RenderEquipment(lootItem, monster, selectedCharacter, lootBroadcastSb);
                 continue;
             }
 
-            if (choice == "<")
+            if (choice == "<" && party.Count > 1)
             {
-                _droppedEquipmentPartyIdx -= 1;
-                _droppedEquipmentPartyIdx = _droppedEquipmentPartyIdx < 0 ? party.Count - 1 : _droppedEquipmentPartyIdx;
-                await RenderEquipment(lootItem, monster, party[_droppedEquipmentPartyIdx], lootBroadcastSb);
+                _droppedEquipmentPartyIdx = _droppedEquipmentPartyIdx <= 0 ? party.Count - 1 : _droppedEquipmentPartyIdx - 1;
+                selectedCharacter = party[_droppedEquipmentPartyIdx];
+                // Recalculate class restrictions for the newly selected character
+                if (lootItem.IsIdentified)
+                {
+                    var (canUse, reason) = LootGenerator.CanClassUseLootItem(selectedCharacter.Class, lootItem);
+                    canPlayerUseItem = canUse;
+                    cantUseReason = reason;
+                }
+                else
+                {
+                    canPlayerUseItem = true;
+                    cantUseReason = null;
+                }
+                await RenderEquipment(lootItem, monster, selectedCharacter, lootBroadcastSb);
                 continue;
             }
             // Accept L as silent alias for P (backwards compatibility)
@@ -9025,7 +9069,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_cyan");
             terminal.Write($"║ ");
             terminal.SetColor("gray");
-            terminal.Write(Loc.Get("combat.status_label"));
+            terminal.Write(Loc.Get("combat.status_prefix"));
             DisplayPlayerStatusEffects(player);
             terminal.WriteLine("");
         }
@@ -9635,6 +9679,13 @@ public partial class CombatEngine
             }
         }
         long actualDamage = Math.Max(1, damage - effectiveArmor);
+
+        // Show defense calculation when armor reduces damage
+        if (effectiveArmor > 0 && effectiveArmor < damage)
+        {
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine($"[{damage} damage vs {effectiveArmor} defense]");
+        }
 
         // Log every player attack through ApplySingleMonsterDamage for diagnosis
         if (attacker != null)
@@ -13863,6 +13914,7 @@ public partial class CombatEngine
                 {
                     long pierceDmg = Math.Max(1, target.ArmPow);
                     target.HP -= pierceDmg;
+                    result.TotalDamageDealt += pierceDmg;
                     terminal.WriteLine($"The flames penetrate armor for {pierceDmg} bonus damage!", "bright_red");
                     if (target.HP <= 0)
                     {
@@ -14769,23 +14821,33 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Teammate drinks a mana potion to restore their own mana
+    /// Teammate drinks mana potions to restore their mana (uses multiple at once to fill up)
     /// </summary>
     private async Task<bool> TeammateUseManaPotion(Character teammate, CombatResult result)
     {
         if (teammate.ManaPotions <= 0 || teammate.Mana >= teammate.MaxMana)
             return false;
 
-        teammate.ManaPotions--;
-        int restoreAmount = 20 + teammate.Level * 3 + random.Next(5, 25);
         long oldMana = teammate.Mana;
-        teammate.Mana = Math.Min(teammate.MaxMana, teammate.Mana + restoreAmount);
+        int potionsUsed = 0;
+
+        while (teammate.ManaPotions > 0 && teammate.Mana < teammate.MaxMana)
+        {
+            teammate.ManaPotions--;
+            potionsUsed++;
+            int restoreAmount = 20 + teammate.Level * 3 + random.Next(5, 25);
+            teammate.Mana = Math.Min(teammate.MaxMana, teammate.Mana + restoreAmount);
+        }
+
         long actualRestore = teammate.Mana - oldMana;
 
         terminal.WriteLine("");
         terminal.SetColor("bright_blue");
-        terminal.WriteLine(Loc.Get("combat.teammate_mana_potion", teammate.DisplayName, actualRestore));
-        result.CombatLog.Add($"{teammate.DisplayName} uses a mana potion, restoring {actualRestore} MP.");
+        if (potionsUsed > 1)
+            terminal.WriteLine($"{teammate.DisplayName} drinks {potionsUsed} mana potions, restoring {actualRestore} MP!");
+        else
+            terminal.WriteLine(Loc.Get("combat.teammate_mana_potion", teammate.DisplayName, actualRestore));
+        result.CombatLog.Add($"{teammate.DisplayName} uses {potionsUsed} mana potion(s), restoring {actualRestore} MP.");
 
         await Task.Delay(GetCombatDelay(800));
         return true;
@@ -15651,6 +15713,11 @@ public partial class CombatEngine
                         // Use sqrt-scaled defense to prevent high-armor companions from absorbing all damage
                         long abilityDefense = (long)(Math.Sqrt(companion.Defence) * 3);
                         long actualDmg = Math.Max(1, abilityResult.DirectDamage - abilityDefense);
+                        if (abilityDefense > 0)
+                        {
+                            terminal.SetColor("dark_gray");
+                            terminal.WriteLine($"[{abilityResult.DirectDamage} damage vs {abilityDefense} defense]");
+                        }
                         // Cap ability damage per hit (same as player path)
                         double abCapPct = monster.IsBoss ? 0.85 : 0.75;
                         long abMaxDmg = Math.Max(1, (long)(companion.MaxHP * abCapPct));
@@ -15674,7 +15741,13 @@ public partial class CombatEngine
                         }
                         abilityDefense += companion.MagicACBonus;
                         abilityDefense += companion.TempDefenseBonus;
-                        long dmg = Math.Max(1, (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier) - abilityDefense);
+                        long rawAbilityDmg = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
+                        long dmg = Math.Max(1, rawAbilityDmg - abilityDefense);
+                        if (abilityDefense > 0)
+                        {
+                            terminal.SetColor("dark_gray");
+                            terminal.WriteLine($"[{rawAbilityDmg} damage vs {abilityDefense} defense]");
+                        }
                         // Cap ability damage per hit
                         double dmCapPct = monster.IsBoss ? 0.85 : 0.75;
                         long dmMaxDmg = Math.Max(1, (long)(companion.MaxHP * dmCapPct));
@@ -15785,6 +15858,13 @@ public partial class CombatEngine
         companionDefense += companion.TempDefenseBonus;
 
         long actualDamage = Math.Max(1, monsterAttack - companionDefense);
+
+        // Show defense calculation
+        if (companionDefense > 0 && companionDefense < monsterAttack)
+        {
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine($"[{monsterAttack} damage vs {companionDefense} defense]");
+        }
 
         // Defending companions take half damage
         if (companion.IsDefending)
@@ -21447,14 +21527,14 @@ public partial class CombatEngine
                 break;
 
             case "giant":
-                // Giant Form: grow to massive size — bonus defense + temporary HP
+                // Giant Form: grow to massive size — bonus defense + heal to full
                 {
                     int giantDef = 20 + (int)(caster.Level / 3);
                     caster.TempDefenseBonus += giantDef;
                     caster.TempDefenseBonusDuration = Math.Max(caster.TempDefenseBonusDuration, 999);
-                    long giantHP = caster.Level * 3;
-                    caster.HP = Math.Min(caster.MaxHP + giantHP, caster.HP + giantHP);
-                    terminal.WriteLine($"{caster.DisplayName} grows to enormous size! (+{giantDef} DEF, +{giantHP} HP)", "bright_green");
+                    long giantHeal = Math.Min(caster.Level * 3, caster.MaxHP - caster.HP);
+                    if (giantHeal > 0) caster.HP += giantHeal;
+                    terminal.WriteLine($"{caster.DisplayName} grows to enormous size! (+{giantDef} DEF, +{giantHeal} HP)", "bright_green");
                 }
                 break;
 
@@ -21649,9 +21729,9 @@ public partial class CombatEngine
                 {
                     int giantDef = 20 + (int)(caster.Level / 3);
                     caster.TempDefenseBonus += giantDef;
-                    long giantHP = caster.Level * 3;
-                    caster.HP = Math.Min(caster.MaxHP + giantHP, caster.HP + giantHP);
-                    terminal.WriteLine($"{caster.DisplayName} grows to enormous size! (+{giantDef} DEF, +{giantHP} HP)", "bright_green");
+                    long giantHeal = Math.Min(caster.Level * 3, caster.MaxHP - caster.HP);
+                    if (giantHeal > 0) caster.HP += giantHeal;
+                    terminal.WriteLine($"{caster.DisplayName} grows to enormous size! (+{giantDef} DEF, +{giantHeal} HP)", "bright_green");
                 }
                 break;
 
@@ -22029,6 +22109,94 @@ public partial class CombatEngine
     /// Auto-distribute XP evenly when teammates exist but all teammate slots are at 0%.
     /// Prevents new players from unknowingly starving their teammates of XP.
     /// </summary>
+    /// <summary>
+    /// Redistribute dead/max-level teammates' XP percentage to surviving members.
+    /// Dead teammates' shares are split evenly among the player and living teammates.
+    /// </summary>
+    private static void RedistributeDeadTeammateXP(Character player, List<Character>? teammates)
+    {
+        if (teammates == null) return;
+
+        // Count living XP-eligible teammates (already removed dead ones from list during combat)
+        int livingTeammates = 0;
+        foreach (var tm in teammates)
+        {
+            if (tm == null || tm.IsEcho || tm.IsGroupedPlayer) continue;
+            if (tm.IsAlive && tm.Level < 100) livingTeammates++;
+        }
+
+        // Count how many slots have XP allocated (slots 1+)
+        int allocatedSlots = 0;
+        int orphanedXP = 0;
+        for (int s = 1; s < player.TeamXPPercent.Length; s++)
+        {
+            if (player.TeamXPPercent[s] > 0)
+                allocatedSlots++;
+        }
+
+        // If more slots have XP than we have living teammates, some slots are orphaned
+        // (the teammate died and was removed from the list during combat)
+        if (allocatedSlots <= livingTeammates) return; // All slots map to living teammates
+
+        // Collect XP from orphaned slots (slots beyond what living teammates can fill)
+        // We reclaim from the highest-numbered slots first since dead teammates
+        // were removed from the list, shifting survivors to lower slot positions
+        int slotsToKeep = livingTeammates;
+        for (int s = player.TeamXPPercent.Length - 1; s >= 1; s--)
+        {
+            if (player.TeamXPPercent[s] <= 0) continue;
+
+            if (slotsToKeep > 0)
+            {
+                slotsToKeep--;
+                continue; // This slot maps to a living teammate
+            }
+
+            // Orphaned slot — reclaim its XP
+            orphanedXP += player.TeamXPPercent[s];
+            player.TeamXPPercent[s] = 0;
+        }
+
+        // Also check for still-present but dead/max-level teammates in the list
+        int xpSlot = 0;
+        var slotAlive = new bool[player.TeamXPPercent.Length];
+        slotAlive[0] = true;
+        int aliveSlotCount = 0;
+
+        for (int i = 0; i < teammates.Count; i++)
+        {
+            var tm = teammates[i];
+            if (tm == null || tm.IsEcho || tm.IsGroupedPlayer) continue;
+            xpSlot++;
+            if (xpSlot >= player.TeamXPPercent.Length) break;
+
+            if (!tm.IsAlive || tm.Level >= 100)
+            {
+                orphanedXP += player.TeamXPPercent[xpSlot];
+                player.TeamXPPercent[xpSlot] = 0;
+            }
+            else
+            {
+                slotAlive[xpSlot] = true;
+                aliveSlotCount++;
+            }
+        }
+
+        if (orphanedXP <= 0) return;
+
+        // Distribute orphaned XP evenly among player + living teammates
+        int totalRecipients = 1 + aliveSlotCount; // player + living teammates
+        int shareEach = orphanedXP / totalRecipients;
+        int remainder = orphanedXP - (shareEach * totalRecipients);
+
+        player.TeamXPPercent[0] += shareEach + remainder; // Player gets the remainder
+        for (int s = 1; s < player.TeamXPPercent.Length; s++)
+        {
+            if (slotAlive[s])
+                player.TeamXPPercent[s] += shareEach;
+        }
+    }
+
     private static void AutoDistributeTeamXP(Character player, List<Character>? teammates)
     {
         if (teammates == null || teammates.Count == 0) return;
@@ -22186,6 +22354,9 @@ public partial class CombatEngine
     private void DistributeTeamSlotXP(Character player, List<Character>? teammates, long totalXPPot, TerminalEmulator terminal)
     {
         if (teammates == null || teammates.Count == 0 || totalXPPot <= 0) return;
+
+        // Redistribute dead/max-level teammates' XP shares to surviving members
+        RedistributeDeadTeammateXP(player, teammates);
 
         bool headerShown = false;
         int xpSlot = 0; // Tracks which XP slot we're on (1-4), skipping grouped players/echoes

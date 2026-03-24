@@ -100,6 +100,7 @@ public partial class Quest
             QuestTarget.ReachFloor => Loc.Get("quest.target.reach_floor"),
             QuestTarget.ClearFloor => Loc.Get("quest.target.clear_floor"),
             QuestTarget.SurviveDungeon => Loc.Get("quest.target.survive_dungeon"),
+            QuestTarget.DefeatNPC => Loc.Get("quest.target.defeat_npc"),
             QuestTarget.BuyWeapon => Loc.Get("quest.target.buy_weapon"),
             QuestTarget.BuyArmor => Loc.Get("quest.target.buy_armor"),
             QuestTarget.BuyAccessory => Loc.Get("quest.target.buy_accessory"),
@@ -261,7 +262,16 @@ public partial class Quest
             _ => Loc.Get("quest.reward.unknown")
         };
 
-        return $"{level} {RewardType}";
+        string rewardTypeName = RewardType switch
+        {
+            QuestRewardType.Experience => Loc.Get("quest.reward_type.experience"),
+            QuestRewardType.Money => Loc.Get("quest.reward_type.money"),
+            QuestRewardType.Potions => Loc.Get("quest.reward_type.potions"),
+            QuestRewardType.Darkness => Loc.Get("quest.reward_type.darkness"),
+            QuestRewardType.Chivalry => Loc.Get("quest.reward_type.chivalry"),
+            _ => Loc.Get("quest.reward_type.unknown")
+        };
+        return $"{level} {rewardTypeName}";
     }
 }
 
@@ -405,12 +415,12 @@ public class QuestObjective
 
     public QuestObjective()
     {
-        Id = $"OBJ{DateTime.Now:HHmmss}{Random.Shared.Next(100, 999)}";
+        Id = $"OBJ{Guid.NewGuid():N}";
     }
 
     public QuestObjective(QuestObjectiveType type, string description, int required, string targetId = "", string targetName = "")
     {
-        Id = $"OBJ{DateTime.Now:HHmmss}{Random.Shared.Next(100, 999)}";
+        Id = $"OBJ{Guid.NewGuid():N}";
         ObjectiveType = type;
         Description = description;
         RequiredProgress = required;

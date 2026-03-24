@@ -563,6 +563,7 @@ public static class MonsterAbilities
             case AbilityType.Heal:
                 var bigHeal = Math.Max(20, monster.MaxHP / 4);
                 monster.HP = Math.Min(monster.HP + bigHeal, monster.MaxHP);
+                result.DamageMultiplier = 0; // Heal only — no damage to target
                 result.SkipNormalAttack = true;
                 result.IsSelfOnly = true;
                 result.Message = $"{monster.Name} heals for {bigHeal} HP!";
@@ -643,6 +644,7 @@ public static class MonsterAbilities
                 {
                     var phylHeal = monster.MaxHP / 3;
                     monster.HP = Math.Min(monster.HP + phylHeal, monster.MaxHP);
+                    result.DamageMultiplier = 0;
                     result.SkipNormalAttack = true;
                     result.IsSelfOnly = true;
                     result.Message = $"{monster.Name}'s phylactery pulses — it regenerates {phylHeal} HP!";
@@ -884,6 +886,7 @@ public static class MonsterAbilities
                 {
                     monster.HP = monster.MaxHP;
                     monster.HasEnraged = true;
+                    result.DamageMultiplier = 0;
                     result.SkipNormalAttack = true;
                     result.IsSelfOnly = true;
                     result.Message = $"{monster.Name} erupts in flame and is reborn!";
@@ -1019,6 +1022,7 @@ public static class MonsterAbilities
                     monster.ArmPow += monster.Level / 3;
                     monster.HasHardenedArmor = true;
                 }
+                result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
                 result.IsSelfOnly = true;
                 result.Message = $"{monster.Name} wraps itself in a cocoon, healing {cocoonHeal} HP!";
@@ -1072,6 +1076,7 @@ public static class MonsterAbilities
             case AbilityType.SelfRepair:
                 var repairAmount = Math.Max(15, monster.MaxHP / 5);
                 monster.HP = Math.Min(monster.HP + repairAmount, monster.MaxHP);
+                result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
                 result.IsSelfOnly = true;
                 result.Message = $"{monster.Name} repairs itself for {repairAmount} HP!";
@@ -1219,6 +1224,7 @@ public static class MonsterAbilities
                     monster.ArmPow += monster.Level / 3;
                     monster.HasHardenedArmor = true;
                 }
+                result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
                 result.IsSelfOnly = true;
                 result.Message = $"{monster.Name} creates a sanctuary, healing {sancHeal} HP!";

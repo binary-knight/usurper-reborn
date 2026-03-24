@@ -2714,18 +2714,59 @@ public abstract class BaseLocation
         }
         else
         {
-            foreach (var quest in activeQuests.Take(5)) // Show up to 5 quests
+            foreach (var quest in activeQuests.Take(8))
             {
                 terminal.SetColor("bright_yellow");
-                terminal.Write($"  • {quest.Title ?? Loc.Get("base.unknown_quest")}");
+                terminal.WriteLine($"  {quest.Title ?? Loc.Get("base.unknown_quest")}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($" - {quest.GetTargetDescription()}");
+                terminal.WriteLine($"    Type: {quest.GetTargetDescription()}  |  {quest.GetDifficultyString()}  |  {quest.DaysRemaining} days left");
+
+                // Show objectives with progress
+                if (quest.Objectives != null && quest.Objectives.Count > 0)
+                {
+                    foreach (var obj in quest.Objectives)
+                    {
+                        bool done = obj.IsComplete;
+                        string check = done ? "X" : " ";
+                        string progress = obj.RequiredProgress > 1
+                            ? $" ({obj.CurrentProgress}/{obj.RequiredProgress})"
+                            : "";
+                        terminal.SetColor(done ? "green" : "white");
+                        terminal.WriteLine($"    [{check}] {obj.Description}{progress}");
+                    }
+                }
+                else
+                {
+                    // Quests without structured objectives — show target info
+                    if (!string.IsNullOrEmpty(quest.TargetNPCName))
+                    {
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"    Target: {quest.TargetNPCName}");
+                    }
+                }
+
+                // Show reward
+                if (quest.BountyGold > 0)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"    Reward: {quest.BountyGold:N0} gold");
+                }
+                else
+                {
+                    long reward = quest.CalculateReward(currentPlayer?.Level ?? 1);
+                    if (reward > 0)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"    Reward: {reward:N0} {quest.RewardType.ToString().ToLower()}");
+                    }
+                }
+                terminal.WriteLine("");
             }
 
-            if (activeQuests.Count > 5)
+            if (activeQuests.Count > 8)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  {Loc.Get("base.more_quests", activeQuests.Count - 5)}");
+                terminal.WriteLine($"  {Loc.Get("base.more_quests", activeQuests.Count - 8)}");
             }
         }
 
@@ -3140,141 +3181,99 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine("");
 
+                string srDateFormat = currentPlayer.DateFormatPreference switch { 1 => "DD/MM/YYYY", 2 => "YYYY-MM-DD", _ => "MM/DD/YYYY" };
+
                 terminal.WriteLine($"{Loc.Get("prefs.options")}");
-                terminal.WriteLine($"1. {Loc.Get("prefs.toggle", Loc.Get("prefs.combat_speed"))}");
-                terminal.WriteLine($"2. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_heal"))}");
-                terminal.WriteLine($"3. {Loc.Get("prefs.toggle", Loc.Get("prefs.skip_intimate"))}");
-                terminal.WriteLine($"4. {Loc.Get("prefs.toggle", Loc.Get("prefs.screen_reader"))}");
-                terminal.WriteLine($"6. {Loc.Get("prefs.color_theme")}");
+                terminal.WriteLine("Gameplay:");
+                terminal.WriteLine($"  1. {Loc.Get("prefs.toggle", Loc.Get("prefs.combat_speed"))}");
+                terminal.WriteLine($"  2. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_heal"))}");
+                terminal.WriteLine($"  8. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_level"))}");
+                terminal.WriteLine($"  A. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_equip"))}");
+                terminal.WriteLine("Display:");
+                terminal.WriteLine($"  6. {Loc.Get("prefs.color_theme")}");
+                terminal.WriteLine($"  9. {Loc.Get("prefs.toggle", Loc.Get("prefs.compact_mode"))}");
+                terminal.WriteLine($"  D. Date Format ({srDateFormat})");
                 if (IsRunningInWezTerm())
-                    terminal.WriteLine($"7. {Loc.Get("prefs.terminal_font")}");
-                terminal.WriteLine($"8. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_level"))}");
-                terminal.WriteLine($"9. {Loc.Get("prefs.toggle", Loc.Get("prefs.compact_mode"))}");
-                terminal.WriteLine($"A. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_equip"))}");
-                terminal.WriteLine($"B. {Loc.Get("prefs.language")} ({UsurperRemake.Systems.Loc.GetLanguageName(currentPlayer.Language)})");
+                    terminal.WriteLine($"  7. {Loc.Get("prefs.terminal_font")}");
+                terminal.WriteLine("Accessibility:");
+                terminal.WriteLine($"  4. {Loc.Get("prefs.toggle", Loc.Get("prefs.screen_reader"))}");
+                terminal.WriteLine($"  B. {Loc.Get("prefs.language")} ({UsurperRemake.Systems.Loc.GetLanguageName(currentPlayer.Language)})");
+                terminal.WriteLine("Character:");
+                terminal.WriteLine($"  3. {Loc.Get("prefs.toggle", Loc.Get("prefs.skip_intimate"))}");
+                terminal.WriteLine($"  O. {Loc.Get("prefs.orientation")}");
+                terminal.WriteLine($"  T. Title");
                 terminal.WriteLine($"0. {Loc.Get("prefs.back")}");
                 terminal.WriteLine("");
             }
             else
             {
-                // Standard visual menu
+                // Standard visual menu — organized into categories
                 WriteBoxHeader(Loc.Get("prefs.title"), "bright_yellow");
                 terminal.WriteLine("");
 
-                terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("prefs.current_settings"));
-                terminal.WriteLine("");
+                // Helper to write a menu option line
+                void WriteMenuOption(string key, string label)
+                {
+                    terminal.Write("[");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write(key);
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"] {label}");
+                }
 
-                // Combat Speed
+                string onOff(bool v) => v ? Loc.Get("prefs.on") : Loc.Get("prefs.off");
                 string speedDesc = currentPlayer.CombatSpeed switch
                 {
                     CombatSpeed.Instant => Loc.Get("prefs.combat_speed.instant"),
                     CombatSpeed.Fast => Loc.Get("prefs.combat_speed.fast"),
                     _ => Loc.Get("prefs.combat_speed.normal")
                 };
-                terminal.WriteLine($"  {Loc.Get("prefs.combat_speed")}: {speedDesc}", "yellow");
-
-                // Auto-heal
-                terminal.WriteLine($"  {Loc.Get("prefs.auto_heal")}: {(currentPlayer.AutoHeal ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}", "yellow");
-
-                // Skip intimate scenes
-                terminal.WriteLine($"  {Loc.Get("prefs.skip_intimate")}: {(currentPlayer.SkipIntimateScenes ? Loc.Get("prefs.skip_intimate.on") : Loc.Get("prefs.skip_intimate.off"))}", "yellow");
-
-                // Screen reader mode
-                terminal.WriteLine($"  {Loc.Get("prefs.screen_reader")}: {(currentPlayer.ScreenReaderMode ? Loc.Get("prefs.screen_reader.on") : Loc.Get("prefs.disabled"))}", "yellow");
-
-                // Color Theme
-                terminal.WriteLine($"  {Loc.Get("prefs.color_theme")}: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)} - {ColorTheme.GetThemeDescription(currentPlayer.ColorTheme)}", "yellow");
-
-                // Auto-Level
-                terminal.WriteLine($"  {Loc.Get("prefs.auto_level")}: {(currentPlayer.AutoLevelUp ? Loc.Get("prefs.auto_level.on") : Loc.Get("prefs.auto_level.off"))}", "yellow");
-
-                // Compact Mode
-                terminal.WriteLine($"  {Loc.Get("prefs.compact_mode")}: {(currentPlayer.CompactMode ? Loc.Get("prefs.compact_mode.on") : Loc.Get("prefs.disabled"))}", "yellow");
-
-                // Auto-Equip
-                terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.auto_equip.off") : Loc.Get("prefs.auto_equip.on"))}", "yellow");
-
-                // Language
-                terminal.WriteLine($"  {Loc.Get("prefs.language")}: {UsurperRemake.Systems.Loc.GetLanguageName(currentPlayer.Language)}", "yellow");
-
-                // Terminal Font (only when running inside WezTerm)
-                if (IsRunningInWezTerm())
+                string dateFormatName = currentPlayer.DateFormatPreference switch
                 {
-                    terminal.WriteLine($"  {Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}", "yellow");
-                }
+                    1 => "DD/MM/YYYY",
+                    2 => "YYYY-MM-DD",
+                    _ => "MM/DD/YYYY"
+                };
+
+                // -- GAMEPLAY --
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("  GAMEPLAY");
+                terminal.SetColor("white");
+                WriteMenuOption("1", $"{Loc.Get("prefs.combat_speed")}: {speedDesc}");
+                WriteMenuOption("2", $"{Loc.Get("prefs.auto_heal")}: {onOff(currentPlayer.AutoHeal)}");
+                WriteMenuOption("8", $"{Loc.Get("prefs.auto_level")}: {onOff(currentPlayer.AutoLevelUp)}");
+                WriteMenuOption("A", $"{Loc.Get("prefs.auto_equip")}: {onOff(!currentPlayer.AutoEquipDisabled)}");
                 terminal.WriteLine("");
 
+                // -- DISPLAY --
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("  DISPLAY");
                 terminal.SetColor("white");
-                terminal.WriteLine($"{Loc.Get("prefs.options")}");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("1");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.toggle", Loc.Get("prefs.combat_speed"))}");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("2");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_heal"))}");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("3");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.toggle", Loc.Get("prefs.skip_intimate"))}");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("4");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.toggle", Loc.Get("prefs.screen_reader"))}");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("6");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.color_theme")} ({Loc.Get("prefs.current", ColorTheme.GetThemeName(currentPlayer.ColorTheme))})");
+                WriteMenuOption("6", $"{Loc.Get("prefs.color_theme")}: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)}");
+                WriteMenuOption("9", $"{Loc.Get("prefs.compact_mode")}: {onOff(currentPlayer.CompactMode)}");
+                WriteMenuOption("D", $"Date Format: {dateFormatName}");
                 if (IsRunningInWezTerm())
-                {
-                    terminal.Write("[");
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write("7");
-                    terminal.SetColor("white");
-                    terminal.WriteLine($"] {Loc.Get("prefs.terminal_font")} ({Loc.Get("prefs.current", ReadCurrentFont())})");
-                }
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("8");
+                    WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");
+                terminal.WriteLine("");
+
+                // -- ACCESSIBILITY --
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("  ACCESSIBILITY");
                 terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_level"))} ({Loc.Get("prefs.current", currentPlayer.AutoLevelUp ? Loc.Get("prefs.on") : Loc.Get("prefs.off"))})");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("9");
+                WriteMenuOption("4", $"{Loc.Get("prefs.screen_reader")}: {onOff(currentPlayer.ScreenReaderMode)}");
+                WriteMenuOption("B", $"{Loc.Get("prefs.language")}: {UsurperRemake.Systems.Loc.GetLanguageName(currentPlayer.Language)}");
+                terminal.WriteLine("");
+
+                // -- CHARACTER --
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("  CHARACTER");
                 terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.toggle", Loc.Get("prefs.compact_mode"))} ({Loc.Get("prefs.current", currentPlayer.CompactMode ? Loc.Get("prefs.on") : Loc.Get("prefs.off"))})");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("A");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_equip"))} ({Loc.Get("prefs.current", currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.off") : Loc.Get("prefs.on"))})");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("B");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.language")} ({Loc.Get("prefs.current", UsurperRemake.Systems.Loc.GetLanguageName(currentPlayer.Language))})");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("T");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] Title ({currentPlayer.NobleTitle ?? "None"})");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("O");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.orientation")} ({GetOrientationLabel(currentPlayer.Orientation)})");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("0");
-                terminal.SetColor("white");
-                terminal.WriteLine($"] {Loc.Get("prefs.back")}");
+                WriteMenuOption("3", $"{Loc.Get("prefs.skip_intimate")}: {(currentPlayer.SkipIntimateScenes ? Loc.Get("prefs.skip_intimate.on") : Loc.Get("prefs.skip_intimate.off"))}");
+                WriteMenuOption("O", $"{Loc.Get("prefs.orientation")}: {GetOrientationLabel(currentPlayer.Orientation)}");
+                WriteMenuOption("T", $"Title: {currentPlayer.NobleTitle ?? "None"}");
+                terminal.WriteLine("");
+
+                WriteMenuOption("0", Loc.Get("prefs.back"));
                 terminal.WriteLine("");
             }
 
@@ -3415,6 +3414,22 @@ public abstract class BaseLocation
                     }
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(1000);
+                    break;
+
+                case "D":
+                    // Cycle date format: MM/DD → DD/MM → YYYY-MM-DD → MM/DD
+                    currentPlayer.DateFormatPreference = (currentPlayer.DateFormatPreference + 1) % 3;
+                    GameConfig.DateFormat = currentPlayer.DateFormatPreference;
+                    string newDateFormat = currentPlayer.DateFormatPreference switch
+                    {
+                        1 => "DD/MM/YYYY",
+                        2 => "YYYY-MM-DD",
+                        _ => "MM/DD/YYYY"
+                    };
+                    terminal.WriteLine($"Date format set to: {newDateFormat}", "green");
+                    terminal.WriteLine($"  Example: {GameConfig.FormatDate(DateTime.Now, currentPlayer.DateFormatPreference)}", "gray");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(800);
                     break;
 
                 case "B":
@@ -6287,7 +6302,7 @@ public abstract class BaseLocation
                 {
                     var msg = inbox[i];
                     string unreadMark = msg.IsRead ? " " : "*";
-                    string dateStr = msg.CreatedAt.ToString("MMM dd");
+                    string dateStr = GameConfig.FormatShortDate(msg.CreatedAt, currentPlayer.DateFormatPreference);
                     string msgPreview = msg.Message.Length > 35 ? msg.Message.Substring(0, 32) + "..." : msg.Message;
 
                     terminal.SetColor(msg.IsRead ? "gray" : "white");
@@ -6380,7 +6395,7 @@ public abstract class BaseLocation
         }
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("base.mail_date", msg.CreatedAt.ToString("yyyy-MM-dd HH:mm")));
+        terminal.WriteLine(Loc.Get("base.mail_date", GameConfig.FormatDate(msg.CreatedAt, currentPlayer.DateFormatPreference, includeTime: true)));
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("base.mail_type", msg.MessageType));
         terminal.WriteLine("");

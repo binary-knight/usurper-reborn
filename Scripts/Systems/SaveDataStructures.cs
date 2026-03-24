@@ -394,6 +394,7 @@ namespace UsurperRemake.Systems
         public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // Player-selected color theme
         public bool AutoLevelUp { get; set; } = true;  // Auto-level on XP threshold (default on)
         public bool AutoEquipDisabled { get; set; }  // Shop purchases go to inventory
+        public int DateFormatPreference { get; set; }  // 0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD
         public int[]? TeamXPPercent { get; set; }  // Per-slot XP percentage distribution (player + 4 teammates)
         public int Loyalty { get; set; }    // Loyalty percentage (0-100)
         public int Haunt { get; set; }      // How many demons haunt player

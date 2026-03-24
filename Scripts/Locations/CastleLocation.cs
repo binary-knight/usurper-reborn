@@ -2690,7 +2690,7 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine($"{currentKing.GetTitle()} {currentKing.Name}");
             terminal.WriteLine(Loc.Get("castle.reign_days", currentKing.TotalReign));
-            terminal.WriteLine(Loc.Get("castle.coronation_date", currentKing.CoronationDate.ToString("d")));
+            terminal.WriteLine(Loc.Get("castle.coronation_date", GameConfig.FormatDate(currentKing.CoronationDate, currentPlayer.DateFormatPreference)));
         }
 
         terminal.WriteLine("");
@@ -3644,7 +3644,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine($"  \"{orphan.BackgroundStory}\"");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("castle.orphan_arrived", orphan.ArrivalDate.ToString("yyyy-MM-dd")));
+        terminal.WriteLine(Loc.Get("castle.orphan_arrived", GameConfig.FormatDate(orphan.ArrivalDate, currentPlayer.DateFormatPreference)));
 
         terminal.WriteLine("");
         await terminal.PressAnyKey();
@@ -3979,7 +3979,7 @@ public class CastleLocation : BaseLocation
         {
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("castle.already_married", currentKing.Spouse.Name));
-            terminal.WriteLine(Loc.Get("castle.married_on", currentKing.Spouse.MarriageDate.ToString("d")));
+            terminal.WriteLine(Loc.Get("castle.married_on", GameConfig.FormatDate(currentKing.Spouse.MarriageDate, currentPlayer.DateFormatPreference)));
             terminal.WriteLine(Loc.Get("castle.spouse_happiness", currentKing.Spouse.Happiness));
             terminal.WriteLine(Loc.Get("castle.original_faction", currentKing.Spouse.OriginalFaction));
             terminal.WriteLine("");
@@ -5237,6 +5237,10 @@ public class CastleLocation : BaseLocation
         if (currentKing.Name == currentPlayer.DisplayName || currentKing.Name == currentPlayer.Name2)
             return false;
 
+        // 24-hour grace period after coronation — new king needs time to set up defenses
+        if ((DateTime.Now - currentKing.CoronationDate).TotalHours < 24)
+            return false;
+
         // Level proximity check — challenger must not be too far below king's level (higher level always allowed)
         int kingLevel = GetKingLevel();
         if (kingLevel > 0 && kingLevel - currentPlayer.Level > GameConfig.KingChallengeLevelRange)
@@ -5364,36 +5368,43 @@ public class CastleLocation : BaseLocation
             return false;
         }
 
-        // PHASE 1: Fight through monster guards first
-        foreach (var monster in currentKing.MonsterGuards.ToList())
+        // PHASE 1: Fight ALL monster guards at once (group combat)
+        if (currentKing.MonsterGuards.Count > 0)
         {
             terminal.ClearScreen();
             terminal.SetColor("bright_red");
-            terminal.WriteLine(Loc.Get("castle.fight_monster_guard", monster.Name, monster.Level));
+            terminal.WriteLine($"  {currentKing.MonsterGuards.Count} monster guards stand between you and the throne!");
             terminal.WriteLine("");
 
-            // Create a Character wrapper from MonsterGuard data for PvP combat
-            var guardChar = new Character
+            // Create Monster objects from MonsterGuard data for multi-monster combat
+            var guardMonsters = new List<Monster>();
+            foreach (var mg in currentKing.MonsterGuards.ToList())
             {
-                Name2 = monster.Name,
-                Level = monster.Level,
-                HP = monster.HP,
-                MaxHP = monster.HP,
-                Strength = monster.Strength,
-                Defence = monster.Defence,
-                WeapPow = monster.WeapPow,
-                ArmPow = monster.ArmPow,
-                AI = CharacterAI.Computer,
-                Class = CharacterClass.Warrior
-            };
+                var m = new Monster
+                {
+                    Name = mg.Name,
+                    Level = mg.Level,
+                    HP = (int)Math.Min(mg.HP, int.MaxValue),
+                    MaxHP = (int)Math.Min(mg.MaxHP, int.MaxValue),
+                    Strength = (int)Math.Min(mg.Strength, int.MaxValue),
+                    Defence = (int)Math.Min(mg.Defence, int.MaxValue),
+                    Punch = (int)(mg.Level * 3 + 10),
+                    WeapPow = (int)Math.Min(mg.WeapPow, int.MaxValue),
+                    ArmPow = (int)Math.Min(mg.ArmPow, int.MaxValue),
+                    Gold = 0,
+                    Experience = 0,
+                    IsBoss = mg.Level >= 70
+                };
+                guardMonsters.Add(m);
+            }
 
             var combatEngine = new CombatEngine(terminal);
-            var result = await combatEngine.PlayerVsPlayer(currentPlayer, guardChar);
+            var result = await combatEngine.PlayerVsMonsters(currentPlayer, guardMonsters);
 
             if (result.Outcome != CombatOutcome.Victory)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("castle.slain_by_monster", monster.Name));
+                terminal.WriteLine("The monster guards overwhelm you!");
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                 terminal.WriteLine(Loc.Get("castle.challenge_failed"));
                 await Task.Delay(2500);
@@ -5402,11 +5413,10 @@ public class CastleLocation : BaseLocation
             else
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("castle.defeated_monster", monster.Name));
-                currentKing.MonsterGuards.Remove(monster);
-                NewsSystem.Instance?.Newsy(true, $"{currentPlayer.DisplayName} slew the monster guard {monster.Name}!");
+                terminal.WriteLine($"All {currentKing.MonsterGuards.Count} monster guards have been slain!");
+                NewsSystem.Instance?.Newsy(true, $"{currentPlayer.DisplayName} slew all monster guards defending the throne!");
+                currentKing.MonsterGuards.Clear();
 
-                // Show HP between fights
                 terminal.SetColor("cyan");
                 terminal.WriteLine("");
                 terminal.WriteLine($"You catch your breath... HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
@@ -5415,117 +5425,120 @@ public class CastleLocation : BaseLocation
             await Task.Delay(1500);
         }
 
-        // PHASE 2: Fight through NPC guards
-        foreach (var guard in currentKing.Guards.ToList())
+        // PHASE 2: Fight ALL NPC guards at once (group combat)
         {
-            // Skip if this guard is the player - they don't fight themselves!
-            if (guard.Name.Equals(currentPlayer.DisplayName, StringComparison.OrdinalIgnoreCase) ||
-                guard.Name.Equals(currentPlayer.Name2, StringComparison.OrdinalIgnoreCase))
+            // Remove self-guards (betrayal) and fleeing cowards first
+            var guardsToFight = new List<RoyalGuard>();
+            foreach (var guard in currentKing.Guards.ToList())
             {
-                terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("castle.slip_past"));
-                terminal.WriteLine(Loc.Get("castle.betrayal_noted"));
-                currentKing.Guards.Remove(guard);
-                NewsSystem.Instance?.Newsy(true, $"Guard {guard.Name} has betrayed the crown to challenge the throne!");
-                await Task.Delay(1500);
-                continue;
+                if (guard.Name.Equals(currentPlayer.DisplayName, StringComparison.OrdinalIgnoreCase) ||
+                    guard.Name.Equals(currentPlayer.Name2, StringComparison.OrdinalIgnoreCase))
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(Loc.Get("castle.slip_past"));
+                    terminal.WriteLine(Loc.Get("castle.betrayal_noted"));
+                    currentKing.Guards.Remove(guard);
+                    NewsSystem.Instance?.Newsy(true, $"Guard {guard.Name} has betrayed the crown to challenge the throne!");
+                    await Task.Delay(1500);
+                    continue;
+                }
+                if (guard.Loyalty < 30 && random.Next(100) < 30)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(Loc.Get("castle.guard_flees", guard.Name));
+                    currentKing.Guards.Remove(guard);
+                    NewsSystem.Instance?.Newsy(false, $"Cowardly guard {guard.Name} fled from {currentPlayer.DisplayName}!");
+                    await Task.Delay(1500);
+                    continue;
+                }
+                guardsToFight.Add(guard);
             }
 
-            terminal.ClearScreen();
-            terminal.SetColor("bright_red");
-            terminal.WriteLine(Loc.Get("castle.fight_royal_guard", guard.Name));
-            terminal.WriteLine("");
-
-            // Look up actual NPC stats if available, otherwise create fallback
-            var actualNpc = NPCSpawnSystem.Instance?.GetNPCByName(guard.Name);
-            int estKingLevel = currentKing != null ? Math.Max(20, (int)(currentKing.TotalReign / 5) + 20) : 20;
-
-            // Apply loyalty modifier to guard effectiveness
-            float loyaltyMod = guard.Loyalty / 100f;
-
-            // Low loyalty guards might flee before combat
-            if (guard.Loyalty < 30 && random.Next(100) < 30)
+            if (guardsToFight.Count > 0)
             {
-                terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("castle.guard_flees", guard.Name));
-                currentKing.Guards.Remove(guard);
-                NewsSystem.Instance?.Newsy(false, $"Cowardly guard {guard.Name} fled from {currentPlayer.DisplayName}!");
-                await Task.Delay(1500);
-                continue;
-            }
+                terminal.ClearScreen();
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"  {guardsToFight.Count} royal guards move to intercept you!");
+                terminal.WriteLine("");
 
-            // Prepare the guard character for PvP combat
-            Character guardCharacter;
-            if (actualNpc != null)
-            {
-                // NPC is already a Character — apply loyalty modifier to Strength
-                guardCharacter = actualNpc;
-                long originalStr = guardCharacter.Strength;
-                guardCharacter.Strength = (long)(guardCharacter.Strength * loyaltyMod);
+                // Convert NPC guards to Monster objects scaled to challenger's level
+                var guardMonsters = new List<Monster>();
+                int challengerLevel = currentPlayer.Level;
+                foreach (var guard in guardsToFight)
+                {
+                    var actualNpc = NPCSpawnSystem.Instance?.GetNPCByName(guard.Name);
+                    float loyaltyMod = guard.Loyalty / 100f;
 
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("castle.guard_stats", guardCharacter.Level, guardCharacter.Strength, guardCharacter.Defence, guard.Loyalty));
+                    // Scale guard level to at least 80% of challenger level (elite royal guards)
+                    int guardLevel = actualNpc != null
+                        ? Math.Max(actualNpc.Level, (int)(challengerLevel * 0.8))
+                        : Math.Max(20, (int)(challengerLevel * 0.8));
+
+                    // Stats scale with the effective guard level
+                    long guardHP = 300 + guardLevel * 60 + (guardLevel > 30 ? (guardLevel - 30) * 40 : 0);
+                    int guardStr = (int)((40 + guardLevel * 6) * loyaltyMod);
+                    int guardDef = 20 + guardLevel * 4;
+                    int guardPunch = 10 + guardLevel * 3;
+                    int guardArmor = 10 + guardLevel * 2;
+
+                    // If real NPC exists, use the higher of NPC stats or scaled stats
+                    if (actualNpc != null)
+                    {
+                        guardHP = Math.Max(guardHP, actualNpc.MaxHP);
+                        guardStr = Math.Max(guardStr, (int)(actualNpc.Strength * loyaltyMod));
+                        guardDef = Math.Max(guardDef, (int)actualNpc.Defence);
+                    }
+
+                    var m = new Monster
+                    {
+                        Name = $"Royal Guard {guard.Name}",
+                        Level = guardLevel,
+                        HP = (int)Math.Min(guardHP, int.MaxValue),
+                        MaxHP = (int)Math.Min(guardHP, int.MaxValue),
+                        Strength = guardStr,
+                        Defence = guardDef,
+                        Punch = guardPunch,
+                        WeapPow = 15 + guardLevel * 3,
+                        ArmPow = guardArmor,
+                        Gold = 0,
+                        Experience = 0
+                    };
+                    guardMonsters.Add(m);
+
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  {guard.Name} (Lv{guardLevel}, Loyalty: {guard.Loyalty}%)");
+                }
                 terminal.WriteLine("");
 
                 var combatEngine = new CombatEngine(terminal);
-                var result = await combatEngine.PlayerVsPlayer(currentPlayer, guardCharacter);
-
-                // Restore original Strength after combat
-                guardCharacter.Strength = originalStr;
+                var result = await combatEngine.PlayerVsMonsters(currentPlayer, guardMonsters);
 
                 if (result.Outcome != CombatOutcome.Victory)
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("castle.defeated_by_guard", guard.Name));
+                    terminal.WriteLine("The royal guards overwhelm you!");
                     currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                     terminal.WriteLine(Loc.Get("castle.challenge_failed"));
                     await Task.Delay(2500);
                     return false;
                 }
-            }
-            else
-            {
-                // Create fallback Character from estimated stats (buffed — royal guards are elite)
-                int guardLevel = Math.Max(15, estKingLevel - 3);
-                guardCharacter = new Character
+                else
                 {
-                    Name2 = guard.Name,
-                    Level = guardLevel,
-                    Strength = (long)((50 + estKingLevel * 8) * loyaltyMod),
-                    Defence = 15 + estKingLevel * 5,
-                    HP = 200 + estKingLevel * 50,
-                    MaxHP = 200 + estKingLevel * 50,
-                    WeapPow = 25 + estKingLevel * 3,
-                    ArmPow = 12 + estKingLevel * 2,
-                    AI = CharacterAI.Computer,
-                    Class = CharacterClass.Warrior
-                };
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"All royal guards have been defeated!");
+                    foreach (var guard in guardsToFight)
+                    {
+                        currentKing.Guards.Remove(guard);
+                    }
+                    NewsSystem.Instance?.Newsy(true, $"{currentPlayer.DisplayName} defeated all royal guards defending the throne!");
 
-                var combatEngine = new CombatEngine(terminal);
-                var result = await combatEngine.PlayerVsPlayer(currentPlayer, guardCharacter);
-
-                if (result.Outcome != CombatOutcome.Victory)
-                {
-                    terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("castle.defeated_by_guard", guard.Name));
-                    currentPlayer.HP = Math.Max(1, currentPlayer.HP);
-                    terminal.WriteLine(Loc.Get("castle.challenge_failed"));
-                    await Task.Delay(2500);
-                    return false;
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine("");
+                    terminal.WriteLine($"You catch your breath... HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
                 }
+
+                await Task.Delay(1500);
             }
-
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("castle.defeated_guard", guard.Name));
-            currentKing.Guards.Remove(guard);
-            NewsSystem.Instance?.Newsy(true, $"{currentPlayer.DisplayName} defeated guard {guard.Name}!");
-
-            // Show HP between fights
-            terminal.SetColor("cyan");
-            terminal.WriteLine("");
-            terminal.WriteLine($"You catch your breath... HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
-
-            await Task.Delay(1500);
         }
 
         // Fight the king — use real stats with defender bonus

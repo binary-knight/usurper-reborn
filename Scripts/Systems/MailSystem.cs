@@ -298,7 +298,7 @@ public static partial class MailSystem
         terminal.WriteLine($"From: {mail.Sender}", "yellow");
         terminal.WriteLine($"To: {mail.Receiver}", "white");
         terminal.WriteLine($"Subject: {mail.Subject}", "cyan");
-        terminal.WriteLine($"Date: {mail.Date:MM-dd-yyyy HH:mm}", "gray");
+        terminal.WriteLine($"Date: {GameConfig.FormatDate(mail.Date, GameConfig.DateFormat, includeTime: true)}", "gray");
         terminal.WriteLine("", "white");
         terminal.WriteLine(new string('-', 50), "gray");
         terminal.WriteLine("", "white");

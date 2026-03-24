@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.53.7** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.53.8** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -260,6 +260,9 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Audio and enhanced ANSI art
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
+
+### v0.53.8 - Ancestral Spirits (Combat Clarity, Quest Overhaul & QoL)
+Comprehensive class audit (all 17 classes, 40+ bugs across 200+ spells/abilities). Quest system overhaul (27 issues: impossible quests, auto-complete exploits, localization). Combat damage clarity with `[X damage vs Y defense]` calculation lines. Team XP auto-redistribution on teammate death. Monster self-heal companion damage fix (6 abilities). Date format preference (MM/DD, DD/MM, ISO). Preferences menu reorganized into categories. Troll regeneration scaling (2% MaxHP/round). Combat loot party switching (by Xykier). Hidden status stealth crit mechanic. 90+ localization keys across 5 languages.
 
 ### v0.53.7 - Ancestral Spirits (Relationships, Balance & Cleanup)
 Relationship system audit (17 bugs fixed across 5 passes): all marriage/divorce/death paths now sync across 4 data stores. Veloura save dialogue fixed (gives Loom directly). Old God damage 3x (Aurelion/Terravok/Manwe). AoE ability double-damage fix. Slot-filtered inventory (by Xykier). Blood Moon global event. Dead spouse cleanup. Heal spell protection on allies. Dev menu removed (3,268 lines). Shop thematic bonuses. Level cap 100. Bodyguard equipment exploit fixed.

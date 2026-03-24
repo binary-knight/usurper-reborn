@@ -1642,7 +1642,7 @@ public class MainStreetLocation : BaseLocation
         WriteSectionHeader(Loc.Get("main_street.section_time"), "gray");
         terminal.SetColor("white");
         terminal.WriteLine($"  {Loc.Get("main_street.stat_play_time"),-21} {stats.GetFormattedPlayTime(),10}     {Loc.Get("main_street.stat_sessions"),-17} {stats.TotalSessionsPlayed,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_created"),-21} {stats.CharacterCreated:yyyy-MM-dd}     {Loc.Get("main_street.stat_current_streak"),-17} {stats.CurrentStreak,8} {Loc.Get("main_street.stat_days")}");
+        terminal.WriteLine($"  {Loc.Get("main_street.stat_created"),-21} {GameConfig.FormatDate(stats.CharacterCreated, currentPlayer.DateFormatPreference),10}     {Loc.Get("main_street.stat_current_streak"),-17} {stats.CurrentStreak,8} {Loc.Get("main_street.stat_days")}");
         terminal.WriteLine($"  {Loc.Get("main_street.stat_longest_streak"),-21} {stats.LongestStreak,10} {Loc.Get("main_street.stat_days")}");
         terminal.WriteLine("");
 
@@ -1749,7 +1749,7 @@ public class MainStreetLocation : BaseLocation
                 if (unlockDate.HasValue)
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"     Unlocked: {unlockDate.Value:yyyy-MM-dd}   +{achievement.PointValue} pts");
+                    terminal.WriteLine($"     Unlocked: {GameConfig.FormatDate(unlockDate.Value, currentPlayer.DateFormatPreference)}   +{achievement.PointValue} pts");
                 }
             }
             else
@@ -2715,7 +2715,7 @@ public class MainStreetLocation : BaseLocation
         {
             var save = saves[i];
             terminal.WriteLine(Loc.Get("main_street.save_entry", i + 1, save.PlayerName, save.Level, save.CurrentDay, save.TurnsRemaining));
-            terminal.WriteLine(Loc.Get("main_street.save_saved_at", $"{save.SaveTime:yyyy-MM-dd HH:mm:ss}"));
+            terminal.WriteLine(Loc.Get("main_street.save_saved_at", GameConfig.FormatDate(save.SaveTime, currentPlayer.DateFormatPreference, includeTime: true)));
             terminal.WriteLine("");
         }
         
@@ -2830,7 +2830,7 @@ public class MainStreetLocation : BaseLocation
             terminal.WriteLine($"{Loc.Get("ui.level")}: {save.Level}");
             terminal.WriteLine(Loc.Get("save.current_day", save.CurrentDay));
             terminal.WriteLine(Loc.Get("save.turns_remaining", save.TurnsRemaining));
-            terminal.WriteLine(Loc.Get("save.last_saved", save.SaveTime.ToString("yyyy-MM-dd HH:mm:ss")));
+            terminal.WriteLine(Loc.Get("save.last_saved", GameConfig.FormatDate(save.SaveTime, currentPlayer.DateFormatPreference, includeTime: true)));
             terminal.WriteLine(Loc.Get("save.file", save.FileName));
             terminal.WriteLine("");
         }

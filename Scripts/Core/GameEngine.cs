@@ -4009,6 +4009,7 @@ public partial class GameEngine
             ColorTheme = playerData.ColorTheme,
             AutoLevelUp = playerData.AutoLevelUp,
             AutoEquipDisabled = playerData.AutoEquipDisabled,
+            DateFormatPreference = playerData.DateFormatPreference,
             TeamXPPercent = playerData.TeamXPPercent ?? TeamXPConfig.DefaultTeamXPPercent.ToArray(),
             Loyalty = playerData.Loyalty,
             Haunt = playerData.Haunt,
@@ -4665,6 +4666,7 @@ public partial class GameEngine
         else
         {
             GameConfig.Language = player.Language ?? "en";
+            GameConfig.DateFormat = player.DateFormatPreference;
         }
 
         return player;

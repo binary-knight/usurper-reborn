@@ -3560,6 +3560,45 @@ public class DungeonLocation : BaseLocation
         }
         terminal.WriteLine("");
 
+        // Active quests from Quest Hall
+        {
+            var questPlayerName = player?.Name2 ?? player?.DisplayName ?? "";
+            var activeQuests = QuestSystem.GetActiveQuestsForPlayer(questPlayerName);
+            if (activeQuests != null && activeQuests.Count > 0)
+            {
+                WriteSectionHeader("Active Quests", "bright_cyan");
+                foreach (var quest in activeQuests.Take(5))
+                {
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"  • {quest.Title ?? "(unnamed)"}");
+
+                    // Show objective summary inline
+                    if (quest.Objectives != null && quest.Objectives.Count > 0)
+                    {
+                        int done = quest.Objectives.Count(o => o.IsComplete);
+                        int total = quest.Objectives.Count;
+                        terminal.SetColor(done == total ? "green" : "white");
+                        terminal.WriteLine($"  [{done}/{total} objectives]");
+                        foreach (var obj in quest.Objectives)
+                        {
+                            string check = obj.IsComplete ? "X" : " ";
+                            string progress = obj.RequiredProgress > 1
+                                ? $" ({obj.CurrentProgress}/{obj.RequiredProgress})"
+                                : "";
+                            terminal.SetColor(obj.IsComplete ? "green" : "gray");
+                            terminal.WriteLine($"    [{check}] {obj.Description}{progress}");
+                        }
+                    }
+                    else
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  - {quest.GetTargetDescription()}");
+                    }
+                }
+                terminal.WriteLine("");
+            }
+        }
+
         // What you know so far
         WriteSectionHeader(Loc.Get("dungeon.section_learned"), "bright_magenta");
         terminal.SetColor("white");
@@ -10260,7 +10299,14 @@ public class DungeonLocation : BaseLocation
                     terminal.Write($"  {member.DisplayName,-18} ");
                     DrawBar(member.HP, member.MaxHP, 15, hpColor, "darkgray");
                     string status = hpPercent >= 100 ? " (Full)" : "";
-                    terminal.WriteLine($" {member.HP}/{member.MaxHP}{status}");
+                    terminal.Write($" {member.HP}/{member.MaxHP}{status}");
+                    // Show mana for casters
+                    if (member.MaxMana > 0)
+                    {
+                        terminal.SetColor("bright_cyan");
+                        terminal.Write($"  MP:{member.Mana}/{member.MaxMana}");
+                    }
+                    terminal.WriteLine("");
                 }
                 terminal.WriteLine("");
             }
@@ -10300,6 +10346,8 @@ public class DungeonLocation : BaseLocation
                     else
                         WriteSRMenuOption("M", Loc.Get("dungeon.no_mana_potions"));
                 }
+                if (player.ManaPotions > 0 && allPartyMembers.Any(m => m.MaxMana > 0 && m.Mana < m.MaxMana))
+                    WriteSRMenuOption("G", $"Give mana potion to teammate ({player.ManaPotions} remaining)");
                 if (player.Antidotes > 0 && player.Poison > 0)
                     WriteSRMenuOption("D", Loc.Get("dungeon.use_antidote", player.Antidotes));
                 else if (player.Antidotes > 0)
@@ -10404,6 +10452,19 @@ public class DungeonLocation : BaseLocation
                     }
                 }
 
+                // Give mana potion to teammate option
+                if (player.ManaPotions > 0 && allPartyMembers.Any(m => m.MaxMana > 0 && m.Mana < m.MaxMana))
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_cyan");
+                    terminal.Write("G");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($"Give mana potion to teammate ({player.ManaPotions} remaining)");
+                }
+
                 // Antidote option
                 if (player.Antidotes > 0 && player.Poison > 0)
                 {
@@ -10506,6 +10567,13 @@ public class DungeonLocation : BaseLocation
                     }
                     break;
 
+                case "G":
+                    if (player.ManaPotions > 0 && allPartyMembers.Count > 0)
+                    {
+                        await GiveManaPotsToTeammate(player, allPartyMembers);
+                    }
+                    break;
+
                 case "D":
                     if (player.Antidotes > 0 && player.Poison > 0)
                     {
@@ -10577,6 +10645,93 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Heal a specific teammate using the player's potions
     /// </summary>
+    private async Task GiveManaPotsToTeammate(Character player, List<Character> partyMembers)
+    {
+        // Filter to teammates that use mana and need it
+        var manaTeammates = partyMembers.Where(m => m.MaxMana > 0 && m.Mana < m.MaxMana).ToList();
+        if (manaTeammates.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine("No teammates need mana.");
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine("Give mana potions to:");
+        terminal.WriteLine("");
+
+        for (int i = 0; i < manaTeammates.Count; i++)
+        {
+            var tm = manaTeammates[i];
+            int mpPercent = tm.MaxMana > 0 ? (int)(100 * tm.Mana / tm.MaxMana) : 100;
+            string mpColor = mpPercent < 25 ? "red" : mpPercent < 50 ? "yellow" : "bright_cyan";
+            terminal.SetColor("white");
+            terminal.Write($"  [{i + 1}] {tm.DisplayName,-18} ");
+            terminal.SetColor(mpColor);
+            terminal.WriteLine($"MP: {tm.Mana}/{tm.MaxMana}");
+        }
+
+        terminal.SetColor("gray");
+        terminal.WriteLine("  [0] Cancel");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("ui.choice"));
+        string input = (await terminal.GetInput("")).Trim();
+
+        if (!int.TryParse(input, out int idx) || idx < 1 || idx > manaTeammates.Count)
+            return;
+
+        var target = manaTeammates[idx - 1];
+        long missingMP = target.MaxMana - target.Mana;
+        int restorePerPotion = 20 + player.Level * 3 + 15;
+        int potionsNeeded = (int)Math.Ceiling((double)missingMP / restorePerPotion);
+        potionsNeeded = Math.Min(potionsNeeded, (int)player.ManaPotions);
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"{target.DisplayName} is missing {missingMP} MP. Each potion restores ~{restorePerPotion} MP.");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine("[1] Give 1 potion");
+        if (potionsNeeded > 1)
+            terminal.WriteLine($"[F] Fully restore (up to {potionsNeeded} potions)");
+        terminal.SetColor("gray");
+        terminal.WriteLine("[0] Cancel");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("ui.choice"));
+        string potChoice = (await terminal.GetInput("")).Trim().ToUpper();
+
+        if (potChoice == "0" || string.IsNullOrEmpty(potChoice))
+            return;
+
+        int potionsToUse = 1;
+        if (potChoice == "F" && potionsNeeded > 1)
+            potionsToUse = potionsNeeded;
+        else if (potChoice != "1")
+            return;
+
+        long oldMana = target.Mana;
+        for (int i = 0; i < potionsToUse && target.Mana < target.MaxMana; i++)
+        {
+            player.ManaPotions--;
+            int restoreAmount = 20 + player.Level * 3 + Random.Shared.Next(5, 25);
+            target.Mana = Math.Min(target.MaxMana, target.Mana + restoreAmount);
+        }
+        long totalRestore = target.Mana - oldMana;
+
+        terminal.SetColor("bright_blue");
+        if (potionsToUse > 1)
+            terminal.WriteLine($"You give {potionsToUse} mana potions to {target.DisplayName}, restoring {totalRestore} MP! (MP: {target.Mana}/{target.MaxMana})");
+        else
+            terminal.WriteLine($"You give a mana potion to {target.DisplayName}, restoring {totalRestore} MP! (MP: {target.Mana}/{target.MaxMana})");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"Mana potions remaining: {player.ManaPotions}");
+        await Task.Delay(1500);
+    }
+
     private async Task HealTeammate(Character player, List<Character> companions)
     {
         terminal.WriteLine("");

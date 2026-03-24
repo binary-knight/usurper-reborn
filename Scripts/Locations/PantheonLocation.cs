@@ -206,7 +206,7 @@ public class PantheonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("pantheon.ascension_date_label"));
         terminal.SetColor("gray");
-        terminal.WriteLine($"{currentPlayer.AscensionDate:yyyy-MM-dd}");
+        terminal.WriteLine(GameConfig.FormatDate(currentPlayer.AscensionDate, currentPlayer.DateFormatPreference));
 
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("pantheon.daily_exp_label"));

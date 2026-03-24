@@ -567,7 +567,7 @@ public class ArenaLocation : BaseLocation
             {
                 bool attackerWon = string.Equals(fight.WinnerUsername, fight.AttackerName, StringComparison.OrdinalIgnoreCase);
                 terminal.SetColor("darkgray");
-                terminal.Write($"  {fight.CreatedAt:MM/dd HH:mm}  ");
+                terminal.Write($"  {GameConfig.FormatDate(fight.CreatedAt, currentPlayer.DateFormatPreference, includeTime: true)}  ");
                 terminal.SetColor(attackerWon ? "bright_green" : "red");
                 terminal.Write($"{fight.AttackerName}");
                 terminal.SetColor("white");

@@ -272,16 +272,25 @@ public class King
         if (Treasury < actualCost)
             return false;
 
+        // Stats scale quadratically at higher levels to make endgame guards formidable
+        long guardHP = 200 + (level * 50) + (level > 30 ? (level - 30) * 80 : 0);
+        long guardStr = 30 + (level * 5) + (level > 30 ? (level - 30) * 4 : 0);
+        long guardDef = 20 + (level * 3) + (level > 30 ? (level - 30) * 3 : 0);
+        int guardWeapPow = 15 + level * 3;
+        int guardArmPow = 10 + level * 2;
+
         var monster = new MonsterGuard
         {
             Name = monsterName,
             Level = level,
-            HP = 200 + (level * 50),
-            MaxHP = 200 + (level * 50),
-            Strength = 30 + (level * 5),
-            Defence = 20 + (level * 3),
+            HP = guardHP,
+            MaxHP = guardHP,
+            Strength = guardStr,
+            Defence = guardDef,
+            WeapPow = guardWeapPow,
+            ArmPow = guardArmPow,
             PurchaseCost = actualCost,
-            DailyFeedingCost = 50 + (level * 10),
+            DailyFeedingCost = 50 + (level * 10) + (level > 30 ? (level - 30) * 20 : 0),
             AcquiredDate = DateTime.Now
         };
 
@@ -460,7 +469,13 @@ public static class MonsterGuardTypes
         ("Manticore", 18, 12000L),
         ("Wyvern", 20, 15000L),
         ("Basilisk", 16, 10000L),
-        ("Iron Golem", 25, 20000L)
+        ("Iron Golem", 25, 20000L),
+        // High-tier guards — endgame throne defense
+        ("Elder Drake", 40, 100000L),
+        ("Abyssal Fiend", 55, 250000L),
+        ("Storm Titan", 70, 500000L),
+        ("Void Wyrm", 85, 1000000L),
+        ("Champion of Maelketh", 100, 5000000L)
     };
 }
 

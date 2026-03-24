@@ -683,6 +683,7 @@ namespace UsurperRemake.Systems
                 ColorTheme = player.ColorTheme,
                 AutoLevelUp = player.AutoLevelUp,
                 AutoEquipDisabled = player.AutoEquipDisabled,
+                DateFormatPreference = player.DateFormatPreference,
                 TeamXPPercent = player.TeamXPPercent,
                 Loyalty = player.Loyalty,
                 Haunt = player.Haunt,

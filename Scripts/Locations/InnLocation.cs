@@ -3123,7 +3123,7 @@ public class InnLocation : BaseLocation
             foreach (var evt in recentHistory)
             {
                 terminal.SetColor("gray");
-                terminal.Write($"  {evt.Timestamp:MMM dd} - ");
+                terminal.Write($"  {GameConfig.FormatShortDate(evt.Timestamp, currentPlayer.DateFormatPreference)} - ");
                 terminal.SetColor("white");
                 terminal.WriteLine(evt.Description);
             }

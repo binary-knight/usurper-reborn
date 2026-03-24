@@ -167,7 +167,7 @@ public partial class QuestSystem
         player.Fame += 5;
 
         // Track bounty completion separately for achievements
-        if (quest.Initiator == KING_BOUNTY_INITIATOR || quest.QuestTarget == QuestTarget.DefeatNPC)
+        if (quest.Initiator == KING_BOUNTY_INITIATOR || quest.QuestTarget == QuestTarget.DefeatNPC || quest.QuestTarget == QuestTarget.Assassin)
         {
             StatisticsManager.Current.RecordBountyComplete();
             player.Fame += 3; // Extra fame for royal bounties
@@ -217,7 +217,7 @@ public partial class QuestSystem
             player.Level >= q.MinLevel &&
             player.Level <= q.MaxLevel
         )
-        .GroupBy(q => q.Comment)     // Deduplicate by quest name
+        .GroupBy(q => q.Title)       // Deduplicate by quest title
         .Select(g => g.First())
         .Take(GameConfig.MaxAvailableQuestsShown) // Cap displayed quests
         .ToList();
@@ -374,14 +374,14 @@ public partial class QuestSystem
                 // Kill a specific boss - use level-appropriate monster
                 var (family, tier) = MonsterFamilies.GetMonsterForLevel(
                     Math.Min(playerLevel + quest.Difficulty * 3, maxAccessibleFloor), random);
-                // Quest data uses English to prevent localized text leaking into shared quests
-                var bossName = $"{tier.Name} Champion";
-                var bossId = tier.Name.ToLower().Replace(" ", "_") + "_champion";
+                // Use base tier name as targetId so it matches OnMonsterKilled tierId
+                var bossName = Loc.Get("quest.title.champion", tier.Name);
+                var bossId = tier.Name.ToLower().Replace(" ", "_");
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillBoss,
-                    $"Defeat the {bossName}",
+                    Loc.Get("quest.objective.defeat_boss", bossName),
                     1, bossId, bossName));
-                quest.Title = $"Defeat {bossName}";
+                quest.Title = Loc.Get("quest.title.defeat_boss", bossName);
                 break;
 
             case QuestTarget.ReachFloor:
@@ -395,15 +395,15 @@ public partial class QuestSystem
                     expeditionFloor = maxAccessibleFloor; // At cap, just use max — kill req still adds challenge
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ReachDungeonFloor,
-                    $"Reach Floor {expeditionFloor}",
+                    Loc.Get("quest.objective.reach_floor", expeditionFloor),
                     expeditionFloor, "", $"Floor {expeditionFloor}"));
                 // Required: kill monsters on the target floor to prove you fought there
-                int killCount = 3 + quest.Difficulty * 2;
+                int expeditionKillCount = 3 + quest.Difficulty * 2;
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillMonsters,
-                    $"Defeat {killCount} monsters on the expedition",
-                    killCount, "", "Monsters"));
-                quest.Title = $"Expedition to Floor {expeditionFloor}";
+                    Loc.Get("quest.objective.defeat_monsters_expedition", expeditionKillCount),
+                    expeditionKillCount, "", "Monsters"));
+                quest.Title = Loc.Get("quest.title.expedition", expeditionFloor);
                 break;
 
             case QuestTarget.ClearFloor:
@@ -411,13 +411,13 @@ public partial class QuestSystem
                 var clearFloor = CapFloor(playerLevel + quest.Difficulty + random.Next(-1, 3));
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ReachDungeonFloor,
-                    $"Descend to Floor {clearFloor}",
+                    Loc.Get("quest.objective.descend_floor", clearFloor),
                     clearFloor, "", $"Floor {clearFloor}"));
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ClearDungeonFloor,
-                    $"Clear all monsters on Floor {clearFloor}",
+                    Loc.Get("quest.objective.clear_monsters", clearFloor),
                     1, clearFloor.ToString(), $"Floor {clearFloor}"));
-                quest.Title = $"Dungeon Delve: Floor {clearFloor}";
+                quest.Title = Loc.Get("quest.title.clear_floor", clearFloor);
                 break;
 
             case QuestTarget.SurviveDungeon:
@@ -425,13 +425,13 @@ public partial class QuestSystem
                 var surviveFloors = Math.Min(quest.Difficulty * 3 + random.Next(2, 5), 15);
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.ReachDungeonFloor,
-                    $"Survive {surviveFloors} dungeon floors",
+                    Loc.Get("quest.objective.survive_floors", surviveFloors),
                     surviveFloors, "", "Floors"));
                 quest.Objectives.Add(new QuestObjective(
                     QuestObjectiveType.KillMonsters,
-                    "Defeat at least 10 monsters",
+                    Loc.Get("quest.objective.defeat_minimum"),
                     10, "", "Monsters") { IsOptional = false });
-                quest.Title = $"Survival: {surviveFloors} Floors";
+                quest.Title = Loc.Get("quest.title.survive_floors", surviveFloors);
                 break;
         }
     }
@@ -452,7 +452,7 @@ public partial class QuestSystem
             QuestType = QuestType.SingleQuest,
             QuestTarget = target,
             Difficulty = difficulty,
-            Comment = $"Dungeon quest in {dungeonName}",
+            Comment = Loc.Get("quest.dungeon_quest_comment", dungeonName),
             Date = DateTime.Now,
             MinLevel = Math.Max(1, playerLevel - 5),
             MaxLevel = playerLevel + 15,
@@ -509,7 +509,7 @@ public partial class QuestSystem
             var questTypes = new[] { QuestTarget.ClearBoss, QuestTarget.ReachFloor, QuestTarget.ClearFloor, QuestTarget.SurviveDungeon };
             var questType = questTypes[random.Next(questTypes.Length)];
 
-            CreateDungeonQuest(questType, difficulty, "The Dungeon", playerLevel, deepestFloor);
+            CreateDungeonQuest(questType, difficulty, Loc.Get("quest.dungeon_name"), playerLevel, deepestFloor);
             existingCount++;
         }
 
@@ -536,8 +536,8 @@ public partial class QuestSystem
         quest.RewardType = (QuestRewardType)random.Next(1, 6); // 1-5 (skip Nothing)
         
         // Set penalty (usually lower than reward)
-        // quest.Penalty = (byte)Math.Max(1, quest.Reward - 1);
-        // quest.PenaltyType = quest.RewardType;
+        quest.Penalty = (byte)Math.Max(1, quest.Reward - 1);
+        quest.PenaltyType = QuestRewardType.Money; // Always gold penalty
     }
     
     /// <summary>
@@ -556,45 +556,21 @@ public partial class QuestSystem
                 .All(o => o.IsComplete);
         }
 
-        // Legacy validation for quests without objectives
+        // Legacy validation for quests without objectives — these quests
+        // should always have objectives, so if we reach here, they're incomplete
         switch (quest.QuestTarget)
         {
             case QuestTarget.Monster:
-                // Check if player killed enough monsters using quest-specific tracking
-                // First check if there are KillMonsters objectives (preferred method)
-                var killObjectives = quest.Objectives?.Where(o =>
-                    o.ObjectiveType == QuestObjectiveType.KillMonsters ||
-                    o.ObjectiveType == QuestObjectiveType.KillSpecificMonster).ToList();
-
-                if (killObjectives != null && killObjectives.Count > 0)
-                {
-                    // Use objective-based tracking (quest-specific kills)
-                    return killObjectives.All(o => o.IsComplete);
-                }
-
-                // Legacy fallback: check Monsters list against objectives progress
-                if (quest.Monsters != null && quest.Monsters.Count > 0)
-                {
-                    int requiredKills = quest.Monsters.Sum(m => m.Count);
-                    // Check if any kill objective has enough progress
-                    var killProgress = quest.Objectives?.FirstOrDefault(o =>
-                        o.ObjectiveType == QuestObjectiveType.KillMonsters);
-                    if (killProgress != null)
-                    {
-                        return killProgress.CurrentProgress >= requiredKills;
-                    }
-                    // Last resort: assume incomplete if no tracking exists
-                    return false;
-                }
-                return true;
+                // No objectives means no tracking — quest is incomplete
+                return false;
 
             case QuestTarget.Assassin:
-                // Check assassination mission completion
-                return player.Assa > 0;
+                // Must use objective-based tracking, not lifetime stats
+                return false;
 
             case QuestTarget.Seduce:
-                // Check seduction mission completion
-                return player.IntimacyActs > 0;
+                // Must use objective-based tracking, not lifetime stats
+                return false;
 
             case QuestTarget.DefeatNPC:
                 // NPC defeat quest - check if target NPC was defeated
@@ -748,14 +724,21 @@ public partial class QuestSystem
     }
 
     /// <summary>
-    /// Apply quest failure penalty
+    /// Apply quest failure penalty — fame loss and news announcement.
+    /// The quest Penalty/PenaltyType fields are set by SetDefaultRewards.
     /// </summary>
     private static void ApplyQuestPenalty(Quest quest)
     {
-        // In a full implementation, would load player and apply penalties
-        // For now, just log the penalty
-        var penaltyAmount = quest.CalculateReward(10); // Use level 10 as default
-        // GD.Print($"[QuestSystem] Penalty applied: {quest.PenaltyType} -{penaltyAmount}");
+        if (quest.Penalty == 0) return;
+
+        string playerName = quest.Occupier;
+        if (string.IsNullOrEmpty(playerName)) return;
+
+        // Log the penalty
+        DebugLogger.Instance.LogInfo("QUEST", $"QUEST FAILED: {playerName} failed quest '{quest.Title}' (difficulty {quest.Difficulty})");
+
+        // Announce the failure
+        NewsSystem.Instance?.Newsy(true, Loc.Get("quest.failure_news", playerName, quest.Title));
     }
     
     /// <summary>
@@ -771,13 +754,7 @@ public partial class QuestSystem
     /// </summary>
     private static void GenerateQuestCompletionNews(Character player, Quest quest)
     {
-        var newsLines = new[]
-        {
-            $"{player.Name2} completed a {quest.GetDifficultyString()} quest!",
-            $"{player.Name2} returned home and received a reward."
-        };
-        
-        MailSystem.SendNewsMail("Successful Quest!", newsLines);
+        NewsSystem.Instance?.Newsy(true, Loc.Get("quest.completion_news", player.Name2, quest.GetDifficultyString()));
     }
     
     /// <summary>
@@ -1209,7 +1186,9 @@ public partial class QuestSystem
 
             // Give player the reward immediately
             player.Gold += reward;
-            player.Experience += Math.Max(bounty.Reward * 10, reward / 10); // XP scales with bounty
+            DebugLogger.Instance.LogInfo("GOLD", $"BOUNTY REWARD: {player.DisplayName} +{reward:N0}g for bounty on {npcName} (gold now {player.Gold:N0})");
+            long xpReward = Math.Max(player.Level * 50, reward / 5); // XP scales with player level and bounty
+            player.Experience += xpReward;
             totalReward += reward;
 
             // Mark bounty as completed
@@ -1221,7 +1200,7 @@ public partial class QuestSystem
             StatisticsManager.Current?.RecordBountyComplete();
 
             // Announce the bounty completion
-            NewsSystem.Instance?.Newsy(true, $"{player.Name2} collected the bounty on {npcName}! (+{reward:N0} gold)");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_collected_news", player.Name2, npcName, reward));
 
             // GD.Print($"[QuestSystem] Auto-completed bounty on {npcName} for {player.Name2}, reward: {reward} gold");
         }
@@ -1246,7 +1225,7 @@ public partial class QuestSystem
             q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrEmpty(q.Occupier) &&
             q.Occupier.Equals(playerName, StringComparison.OrdinalIgnoreCase) &&
-            (q.QuestTarget == QuestTarget.DefeatNPC));
+            (q.QuestTarget == QuestTarget.DefeatNPC || q.QuestTarget == QuestTarget.Assassin));
 
         if (claimed != null) return claimed.Initiator;
 
@@ -1256,7 +1235,7 @@ public partial class QuestSystem
             !string.IsNullOrEmpty(q.TargetNPCName) &&
             q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
             string.IsNullOrEmpty(q.Occupier) &&
-            (q.QuestTarget == QuestTarget.DefeatNPC));
+            (q.QuestTarget == QuestTarget.DefeatNPC || q.QuestTarget == QuestTarget.Assassin));
 
         return unclaimed?.Initiator;
     }
@@ -1344,61 +1323,51 @@ public partial class QuestSystem
         // each time they were regenerated, invalidating cached quest references.
 
         // Beginner quests (levels 1-15)
-        CreateStarterQuest("Wolf Pack",
-            "Wolves have been menacing travelers near the dungeon. Hunt them down.",
+        // Note: First arg is stable ID key (never changes), display title comes from Loc
+        CreateStarterQuest("Wolf Pack", "quest.starter.wolf_pack", "quest.starter.wolf_pack_desc",
             QuestTarget.Monster, 1, 1, 15,
             new[] { ("Wolf", 5), ("Dire Wolf", 2) });
 
-        CreateStarterQuest("The Goblin Menace",
-            "Goblins from the dungeon have been raiding merchant caravans. Thin their numbers.",
+        CreateStarterQuest("The Goblin Menace", "quest.starter.goblin_menace", "quest.starter.goblin_menace_desc",
             QuestTarget.Monster, 1, 1, 15,
             new[] { ("Goblin", 4), ("Hobgoblin", 2) });
 
-        CreateStarterQuest("Undead Rising",
-            "The undead are stirring in the dungeon depths. Destroy them before they spread.",
+        CreateStarterQuest("Undead Rising", "quest.starter.undead_rising", "quest.starter.undead_rising_desc",
             QuestTarget.Monster, 2, 5, 20,
             new[] { ("Zombie", 5), ("Ghoul", 2) });
 
         // Intermediate quests (levels 10-35)
-        CreateStarterQuest("The Orc Warlord",
-            "An orc warband grows in strength deep in the dungeon. Cull their forces.",
+        CreateStarterQuest("The Orc Warlord", "quest.starter.orc_warlord", "quest.starter.orc_warlord_desc",
             QuestTarget.Monster, 2, 10, 35,
             new[] { ("Orc", 6), ("Orc Warrior", 3), ("Orc Berserker", 1) });
 
-        CreateStarterQuest("Troll Hunt",
-            "Ogres and trolls lurk in the dungeon's middle levels. Clear them out.",
+        CreateStarterQuest("Troll Hunt", "quest.starter.troll_hunt", "quest.starter.troll_hunt_desc",
             QuestTarget.Monster, 2, 15, 40,
             new[] { ("Ogre", 3), ("Troll", 2) });
 
-        CreateStarterQuest("Dungeon Delve",
-            "Explore the dungeon depths and report back what you find.",
+        CreateStarterQuest("Dungeon Delve", "quest.starter.dungeon_delve", "quest.starter.dungeon_delve_desc",
             QuestTarget.ReachFloor, 2, 10, 40,
             floorTarget: 10);
 
         // Advanced quests (levels 20-55)
-        CreateStarterQuest("Dragon Hunt",
-            "Draconic creatures infest the deeper dungeon levels. Slay them.",
+        CreateStarterQuest("Dragon Hunt", "quest.starter.dragon_hunt", "quest.starter.dragon_hunt_desc",
             QuestTarget.Monster, 3, 20, 55,
             new[] { ("Drake", 3), ("Wyvern", 1) });
 
-        CreateStarterQuest("Deep Descent",
-            "Reach the 25th floor of the dungeon.",
+        CreateStarterQuest("Deep Descent", "quest.starter.deep_descent", "quest.starter.deep_descent_desc",
             QuestTarget.ReachFloor, 3, 20, 60,
             floorTarget: 25);
 
-        CreateStarterQuest("Deep Exploration",
-            "Scouts report strange activity on the 15th floor. Investigate the depths.",
+        CreateStarterQuest("Deep Exploration", "quest.starter.deep_exploration", "quest.starter.deep_exploration_desc",
             QuestTarget.ReachFloor, 3, 10, 40,
             floorTarget: 15);
 
         // Expert quests (levels 50+)
-        CreateStarterQuest("The Lich King",
-            "An ancient lich commands undead legions in the deep dungeon. Destroy them all.",
+        CreateStarterQuest("The Lich King", "quest.starter.lich_king", "quest.starter.lich_king_desc",
             QuestTarget.Monster, 4, 50, 100,
             new[] { ("Lich", 1), ("Wraith", 4), ("Shade", 3) });
 
-        CreateStarterQuest("Abyssal Expedition",
-            "Reach the 50th floor of the dungeon.",
+        CreateStarterQuest("Abyssal Expedition", "quest.starter.abyssal_expedition", "quest.starter.abyssal_expedition_desc",
             QuestTarget.ReachFloor, 4, 35, 100,
             floorTarget: 50);
 
@@ -1408,13 +1377,13 @@ public partial class QuestSystem
     /// <summary>
     /// Helper to create a starter quest
     /// </summary>
-    private static void CreateStarterQuest(string title, string description, QuestTarget target,
-        byte difficulty, int minLevel, int maxLevel,
+    private static void CreateStarterQuest(string stableKey, string titleKey, string descKey,
+        QuestTarget target, byte difficulty, int minLevel, int maxLevel,
         (string name, int count)[]? monsters = null, int floorTarget = 0)
     {
-        // Use deterministic ID based on title so starter quests survive
+        // Use deterministic ID based on stable key so starter quests survive
         // the remove/recreate cycle in MUD mode without changing IDs
-        string stableId = "STARTER_" + title.ToUpper().Replace(" ", "_");
+        string stableId = "STARTER_" + stableKey.ToUpper().Replace(" ", "_");
 
         // Skip if this starter quest already exists (claimed or unclaimed)
         if (questDatabase.Any(q => q.Id == stableId))
@@ -1422,12 +1391,12 @@ public partial class QuestSystem
 
         var quest = new Quest
         {
-            Title = title,
-            Initiator = "Royal Council",
+            Title = Loc.Get(titleKey),
+            Initiator = Loc.Get("quest.initiator.royal_council"),
             QuestType = QuestType.SingleQuest,
             QuestTarget = target,
             Difficulty = difficulty,
-            Comment = description,
+            Comment = Loc.Get(descKey),
             Date = DateTime.Now,
             MinLevel = minLevel,
             MaxLevel = maxLevel,
@@ -1617,7 +1586,7 @@ public partial class QuestSystem
         if (bounty != null)
         {
             questDatabase.Add(bounty);
-            NewsSystem.Instance?.Newsy(true, $"The Crown has posted a new bounty: {bounty.Title}");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("quest.new_bounty_news", bounty.Title));
         }
     }
 
@@ -1626,30 +1595,30 @@ public partial class QuestSystem
     /// </summary>
     private static Quest CreateNPCBounty(NPC target, string kingName)
     {
-        var crimes = new[]
+        var crimeKeys = new[]
         {
-            "wanted for crimes against the Crown",
-            "accused of treason",
-            "suspected of smuggling contraband",
-            "charged with theft from the Royal Treasury",
-            "wanted for disturbing the King's peace",
-            "accused of dark sorcery",
-            "wanted for assault on a royal guard",
-            "suspected of plotting rebellion"
+            "quest.crime.crown_crimes",
+            "quest.crime.treason",
+            "quest.crime.smuggling",
+            "quest.crime.treasury_theft",
+            "quest.crime.disturbing_peace",
+            "quest.crime.dark_sorcery",
+            "quest.crime.assault_guard",
+            "quest.crime.plotting_rebellion"
         };
 
-        var crime = crimes[random.Next(crimes.Length)];
+        var crime = Loc.Get(crimeKeys[random.Next(crimeKeys.Length)]);
         var difficulty = (byte)Math.Min(4, Math.Max(1, target.Level / 15 + 1));
         var reward = target.Level * 100 * difficulty;
 
         var bounty = new Quest
         {
-            Title = $"WANTED: {target.Name}",
+            Title = Loc.Get("quest.bounty.wanted", target.Name),
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
-            QuestTarget = QuestTarget.Assassin,
+            QuestTarget = QuestTarget.DefeatNPC,
             Difficulty = difficulty,
-            Comment = $"{target.Name} is {crime}. Bring them to justice!",
+            Comment = Loc.Get("quest.bounty.comment_npc", target.Name, crime),
             Date = DateTime.Now,
             MinLevel = Math.Max(1, target.Level - 10),
             MaxLevel = 9999,
@@ -1675,22 +1644,24 @@ public partial class QuestSystem
     /// </summary>
     private static Quest CreateGenericBounty(string kingName)
     {
-        var bountyTypes = new[]
+        var bountyTypeKeys = new[]
         {
-            ("Bandit Leader", "Hunt down a bandit leader and their gang in the dungeon", 5),
-            ("Escaped Prisoner", "A dangerous criminal has escaped into the dungeon", 3),
-            ("Cult Leader", "Root out a dark cult hiding in the dungeon depths", 6),
-            ("Rogue Mage", "A mage gone mad lurks in the dungeon", 4),
-            ("Orc Warlord", "An orc warlord and raiders have retreated into the dungeon", 7)
+            ("quest.generic_bounty.bandit_leader", "quest.generic_bounty.bandit_leader_desc", 5),
+            ("quest.generic_bounty.escaped_prisoner", "quest.generic_bounty.escaped_prisoner_desc", 3),
+            ("quest.generic_bounty.cult_leader", "quest.generic_bounty.cult_leader_desc", 6),
+            ("quest.generic_bounty.rogue_mage", "quest.generic_bounty.rogue_mage_desc", 4),
+            ("quest.generic_bounty.orc_warlord", "quest.generic_bounty.orc_warlord_desc", 7)
         };
 
-        var (title, desc, killCount) = bountyTypes[random.Next(bountyTypes.Length)];
+        var (titleKey, descKey, killCount) = bountyTypeKeys[random.Next(bountyTypeKeys.Length)];
+        var title = Loc.Get(titleKey);
+        var desc = Loc.Get(descKey);
         var difficulty = (byte)(random.Next(1, 5)); // 1-4 difficulty
         killCount += difficulty * 2; // Scale kills with difficulty
 
         var bounty = new Quest
         {
-            Title = $"WANTED: {title}",
+            Title = Loc.Get("quest.bounty.wanted", title),
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Monster,
@@ -1732,19 +1703,19 @@ public partial class QuestSystem
         {
             // Increase existing bounty
             existingBounty.BountyGold += bountyAmount;
-            existingBounty.Comment += $" Additional charge: {crime}.";
-            NewsSystem.Instance?.Newsy(true, $"The bounty on {playerName} has increased to {existingBounty.BountyGold:N0} gold!");
+            existingBounty.Comment += $" {Loc.Get("quest.bounty.additional_charge", crime)}";
+            NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_increased_news", playerName, existingBounty.BountyGold));
             return;
         }
 
         var bounty = new Quest
         {
-            Title = $"WANTED: {playerName}",
+            Title = Loc.Get("quest.bounty.wanted", playerName),
             Initiator = KING_BOUNTY_INITIATOR,
             QuestType = QuestType.SingleQuest,
-            QuestTarget = QuestTarget.Assassin,
+            QuestTarget = QuestTarget.DefeatNPC,
             Difficulty = 4, // Player bounties are always hard
-            Comment = $"{playerName} is wanted for {crime}. Bring them to justice!",
+            Comment = Loc.Get("quest.bounty.comment_player", playerName, crime),
             Date = DateTime.Now,
             MinLevel = 1,
             MaxLevel = 9999,
@@ -1763,7 +1734,7 @@ public partial class QuestSystem
         ));
 
         questDatabase.Add(bounty);
-        NewsSystem.Instance?.Newsy(true, $"The Crown has posted a bounty on {playerName}!");
+        NewsSystem.Instance?.Newsy(true, Loc.Get("quest.player_bounty_news", playerName));
         // GD.Print($"[QuestSystem] Bounty posted on player {playerName} for {crime}");
     }
 
@@ -1793,10 +1764,11 @@ public partial class QuestSystem
         }
         else if (questDescription.Contains("artifact") || questDescription.Contains("recover"))
         {
-            questTarget = QuestTarget.FindArtifact;
-            objectiveType = QuestObjectiveType.FindArtifact;
-            targetValue = 1;
-            targetName = "Royal Artifact";
+            // FindArtifact removed (no tracking/completion code) — treat as dungeon exploration
+            questTarget = QuestTarget.ReachFloor;
+            objectiveType = QuestObjectiveType.ReachDungeonFloor;
+            targetValue = Math.Max(1, player.Level + difficulty * 3);
+            targetName = $"Floor {targetValue}";
         }
         else if (questDescription.Contains("floor") || questDescription.Contains("clear"))
         {
@@ -1807,10 +1779,10 @@ public partial class QuestSystem
         }
         else if (questDescription.Contains("criminal") || questDescription.Contains("hunt"))
         {
-            questTarget = QuestTarget.Assassin;
+            questTarget = QuestTarget.DefeatNPC;
             objectiveType = QuestObjectiveType.KillBoss;
             targetValue = 1;
-            targetName = "Wanted Criminal";
+            targetName = Loc.Get("quest.wanted_criminal");
         }
         else // Default: dungeon investigation
         {
@@ -1822,7 +1794,7 @@ public partial class QuestSystem
 
         var quest = new Quest
         {
-            Title = $"Royal Commission: {questDescription}",
+            Title = Loc.Get("quest.royal_commission", questDescription),
             Initiator = kingName,
             QuestType = QuestType.SingleQuest,
             QuestTarget = questTarget,
@@ -1959,183 +1931,6 @@ public partial class QuestSystem
 
     #region Equipment Purchase Quests
 
-    private static string MERCHANT_GUILD_INITIATOR => "Merchant Guild";
-
-    /// <summary>
-    /// Get all equipment purchase quests
-    /// </summary>
-    public static List<Quest> GetEquipmentQuests()
-    {
-        return questDatabase.Where(q =>
-            !q.Deleted &&
-            q.Initiator == MERCHANT_GUILD_INITIATOR
-        ).ToList();
-    }
-
-    /// <summary>
-    /// Refresh equipment purchase quests on the bounty board
-    /// Creates variety by adding weapon, armor, and accessory purchase quests
-    /// </summary>
-    public static void RefreshEquipmentQuests(int playerLevel)
-    {
-        // Remove old unclaimed equipment quests
-        questDatabase.RemoveAll(q =>
-            q.Initiator == MERCHANT_GUILD_INITIATOR &&
-            string.IsNullOrEmpty(q.Occupier) &&
-            q.Date < DateTime.Now.AddDays(-3));
-
-        // Count existing equipment quests
-        var existingCount = questDatabase.Count(q =>
-            q.Initiator == MERCHANT_GUILD_INITIATOR &&
-            !q.Deleted &&
-            string.IsNullOrEmpty(q.Occupier));
-
-        // Maintain 2-3 equipment quests
-        var targetCount = 2 + random.Next(2);
-
-        while (existingCount < targetCount)
-        {
-            CreateEquipmentPurchaseQuest(playerLevel);
-            existingCount++;
-        }
-    }
-
-    /// <summary>
-    /// Create an equipment purchase quest
-    /// </summary>
-    private static void CreateEquipmentPurchaseQuest(int playerLevel)
-    {
-        // Determine quest type (weapon, armor, accessory, shield)
-        var questTypeRoll = random.Next(100);
-        QuestTarget questTarget;
-        Equipment? targetEquipment = null;
-        string questTitle;
-        string questDescription;
-
-        // Use shop-generated items (what players actually see in shops)
-        // Level filter matches shop display: MinLevel within playerLevel -20 to +15
-        int minLevel = Math.Max(1, playerLevel - 20);
-        int maxLevel = playerLevel + 15;
-
-        if (questTypeRoll < 35)
-        {
-            // Weapon quest (35%) — from Weapon Shop procedural inventory
-            questTarget = QuestTarget.BuyWeapon;
-            var weapons = EquipmentDatabase.GetShopWeapons(WeaponHandedness.OneHanded)
-                .Concat(EquipmentDatabase.GetShopWeapons(WeaponHandedness.TwoHanded))
-                .Where(w => w.MinLevel >= minLevel && w.MinLevel <= maxLevel)
-                .ToList();
-
-            if (weapons.Count > 0)
-            {
-                targetEquipment = weapons[random.Next(weapons.Count)];
-                questTitle = $"Acquire: {targetEquipment.Name}";
-                questDescription = $"The Merchant Guild seeks a {targetEquipment.Name}. Purchase one from the Weapon Shop.";
-            }
-            else
-            {
-                return; // No suitable weapons found
-            }
-        }
-        else if (questTypeRoll < 65)
-        {
-            // Armor quest (30%) — from Armor Shop procedural inventory
-            questTarget = QuestTarget.BuyArmor;
-            var armorSlots = new[] {
-                EquipmentSlot.Head, EquipmentSlot.Body, EquipmentSlot.Arms,
-                EquipmentSlot.Hands, EquipmentSlot.Legs, EquipmentSlot.Feet,
-                EquipmentSlot.Waist, EquipmentSlot.Face, EquipmentSlot.Cloak
-            };
-            var armor = new List<Equipment>();
-            foreach (var slot in armorSlots)
-            {
-                armor.AddRange(EquipmentDatabase.GetShopArmor(slot)
-                    .Where(a => a.MinLevel >= minLevel && a.MinLevel <= maxLevel));
-            }
-
-            if (armor.Count > 0)
-            {
-                targetEquipment = armor[random.Next(armor.Count)];
-                questTitle = $"Acquire: {targetEquipment.Name}";
-                questDescription = $"The Merchant Guild needs a {targetEquipment.Name}. Purchase one from the Armor Shop.";
-            }
-            else
-            {
-                return; // No suitable armor found
-            }
-        }
-        else if (questTypeRoll < 85)
-        {
-            // Accessory quest (20%) — from Magic Shop (uses static + shop accessories)
-            questTarget = QuestTarget.BuyAccessory;
-            var accessories = EquipmentDatabase.GetAccessories()
-                .Where(a => a.MinLevel <= playerLevel)
-                .ToList();
-
-            if (accessories.Count > 0)
-            {
-                targetEquipment = accessories[random.Next(accessories.Count)];
-                questTitle = $"Acquire: {targetEquipment.Name}";
-                questDescription = $"A collector is seeking a {targetEquipment.Name}. Purchase one from the Magic Shop.";
-            }
-            else
-            {
-                return; // No suitable accessories found
-            }
-        }
-        else
-        {
-            // Shield quest (15%) — from Weapon Shop procedural inventory
-            questTarget = QuestTarget.BuyShield;
-            var shields = EquipmentDatabase.GetShopShields()
-                .Where(s => s.MinLevel >= minLevel && s.MinLevel <= maxLevel)
-                .ToList();
-
-            if (shields.Count > 0)
-            {
-                targetEquipment = shields[random.Next(shields.Count)];
-                questTitle = $"Acquire: {targetEquipment.Name}";
-                questDescription = $"The city guard needs a {targetEquipment.Name}. Purchase one from the Weapon Shop.";
-            }
-            else
-            {
-                return; // No suitable shields found
-            }
-        }
-
-        if (targetEquipment == null) return;
-
-        // Determine difficulty based on item value relative to player level
-        var difficulty = (byte)Math.Min(4, Math.Max(1, (int)(targetEquipment.Value / (playerLevel * 100)) + 1));
-
-        var quest = new Quest
-        {
-            Title = questTitle,
-            Initiator = MERCHANT_GUILD_INITIATOR,
-            QuestType = QuestType.SingleQuest,
-            QuestTarget = questTarget,
-            Difficulty = difficulty,
-            Comment = questDescription,
-            Date = DateTime.Now,
-            MinLevel = Math.Max(1, playerLevel - 10),
-            MaxLevel = playerLevel + 20,
-            DaysToComplete = 7 + difficulty,
-            Reward = (byte)Math.Min(3, (int)difficulty), // Reward tier matches difficulty
-            RewardType = QuestRewardType.Money // Gold reward
-        };
-
-        // Add objective for equipment purchase
-        quest.Objectives.Add(new QuestObjective(
-            QuestObjectiveType.PurchaseEquipment,
-            Loc.Get("quest.objective.purchase_equipment", targetEquipment.Name),
-            1,
-            targetEquipment.Id.ToString(),
-            targetEquipment.Name
-        ));
-
-        questDatabase.Add(quest);
-    }
-
     /// <summary>
     /// Called when a player purchases equipment - checks if any quests are completed
     /// </summary>
@@ -2147,17 +1942,14 @@ public partial class QuestSystem
 
         foreach (var quest in playerQuests)
         {
-            // Check if this is an equipment purchase quest
             if (quest.QuestTarget == QuestTarget.BuyWeapon ||
                 quest.QuestTarget == QuestTarget.BuyArmor ||
                 quest.QuestTarget == QuestTarget.BuyAccessory ||
                 quest.QuestTarget == QuestTarget.BuyShield)
             {
-                // Check if any objective matches this equipment
                 foreach (var objective in quest.Objectives.Where(o =>
                     o.ObjectiveType == QuestObjectiveType.PurchaseEquipment && !o.IsComplete))
                 {
-                    // Match by equipment ID or name
                     if (objective.TargetId == equipment.Id.ToString() ||
                         objective.TargetName.Equals(equipment.Name, StringComparison.OrdinalIgnoreCase))
                     {
@@ -2169,14 +1961,11 @@ public partial class QuestSystem
     }
 
     /// <summary>
-    /// Equipment purchase quests removed — fundamentally broken with procedural shop inventory.
-    /// Items referenced by quest don't match shop-generated items, and turn-in checks fail.
+    /// Equipment purchase quests disabled — procedural shop inventory doesn't match static IDs.
     /// </summary>
     public static void EnsureEquipmentQuestsExist(int playerLevel)
     {
-        // Disabled: equipment purchase quests removed in v0.53.0
-        // The quest system referenced static equipment IDs/names but shops generate
-        // procedural inventory each session, so the items never match.
+        // No-op: equipment purchase quests removed in v0.53.0
     }
 
     #endregion

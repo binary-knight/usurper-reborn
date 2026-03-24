@@ -221,6 +221,28 @@ public static partial class GameConfig
     }
 
     /// <summary>
+    /// Date format preference — session-scoped for MUD, global for single-player.
+    /// 0=MM/DD/YYYY, 1=DD/MM/YYYY, 2=YYYY-MM-DD
+    /// </summary>
+    private static int _dateFormatGlobal = 0;
+    public static int DateFormat
+    {
+        get
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            return ctx != null ? ctx.DateFormat : _dateFormatGlobal;
+        }
+        set
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null)
+                ctx.DateFormat = value;
+            else
+                _dateFormatGlobal = value;
+        }
+    }
+
+    /// <summary>
     /// Maximum dungeon level (default: 100)
     /// </summary>
     public static int MaxDungeonLevel { get; set; } = 100;
@@ -1906,8 +1928,48 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
     public const int MaxNewsAge = 7;               // Days to keep news before archiving
     public const int MaxDailyNewsEntries = 500;    // Maximum news entries per day
     public const int NewsLineLength = 120;         // Maximum characters per news line
-    public const string NewsDateFormat = "MM/dd/yyyy HH:mm";  // Date format for news entries
     public const string NewsTimeFormat = "HH:mm";  // Time format for news entries
+
+    /// <summary>
+    /// Format a date according to the player's date format preference.
+    /// 0=MM/DD/YYYY (US), 1=DD/MM/YYYY (EU), 2=YYYY-MM-DD (ISO)
+    /// </summary>
+    public static string FormatDate(DateTime dt, int preference, bool includeTime = false)
+    {
+        string datePart = preference switch
+        {
+            1 => dt.ToString("dd/MM/yyyy"),
+            2 => dt.ToString("yyyy-MM-dd"),
+            _ => dt.ToString("MM/dd/yyyy")
+        };
+        return includeTime ? $"{datePart} {dt:HH:mm}" : datePart;
+    }
+
+    /// <summary>
+    /// Format a short date (no year) according to the player's date format preference.
+    /// </summary>
+    public static string FormatShortDate(DateTime dt, int preference)
+    {
+        return preference switch
+        {
+            1 => dt.ToString("dd/MM"),
+            2 => dt.ToString("MM-dd"),
+            _ => dt.ToString("MM/dd")
+        };
+    }
+
+    /// <summary>
+    /// Get the news date format string for the player's preference.
+    /// </summary>
+    public static string GetNewsDateFormat(int preference)
+    {
+        return preference switch
+        {
+            1 => "dd/MM/yyyy HH:mm",
+            2 => "yyyy-MM-dd HH:mm",
+            _ => "MM/dd/yyyy HH:mm"
+        };
+    }
     
     // News Categories (Pascal newsy types)
     public enum NewsCategory

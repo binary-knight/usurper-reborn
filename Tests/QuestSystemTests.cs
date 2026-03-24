@@ -106,7 +106,7 @@ public class QuestSystemTests
             o.ObjectiveType == QuestObjectiveType.KillBoss);
 
         bossObjective.Should().NotBeNull("Clear Boss quest should have a KillBoss objective");
-        quest.Title.Should().StartWith("Defeat ");
+        quest.Title.Should().StartWith("Slay ");
     }
 
     [Fact]
