@@ -1,15 +1,16 @@
-using UsurperRemake.Utils;
-using UsurperRemake.Data;
-using UsurperRemake.Systems;
-using UsurperRemake.Locations;
-using UsurperRemake.UI;
-using UsurperRemake.BBS;
-using UsurperRemake.Server;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using System.Linq;
+using UsurperRemake.BBS;
+using UsurperRemake.Data;
+using UsurperRemake.Locations;
+using UsurperRemake.Server;
+using UsurperRemake.Systems;
+using UsurperRemake.UI;
+using UsurperRemake.Utils;
 
 /// <summary>
 /// Combat Engine - Pascal-compatible combat system
@@ -38,6 +39,7 @@ public partial class CombatEngine
 
     // Current teammates for healing/support actions
     private List<Character> currentTeammates;
+    private int _droppedEquipmentPartyIdx = 0;
 
     // Boss combat context - set by OldGodBossSystem when routing boss fights through CombatEngine
     public BossCombatContext? BossContext { get; set; }
@@ -6956,440 +6958,24 @@ public partial class CombatEngine
         }
     }
 
-    /// <summary>
-    /// Display equipment drop with appropriate fanfare
-    /// </summary>
-    private async Task DisplayEquipmentDrop(Item lootItem, Monster monster, Character player)
+    private async Task<(string choice, Character selectedCharacter)> GetEquipmentDropInput(Item lootItem, Monster monster, Character player, System.Text.StringBuilder lootBroadcastSb)
     {
-        var rarity = LootGenerator.GetItemRarity(lootItem);
-        string rarityColor = LootGenerator.GetRarityColor(rarity);
-
-        terminal.WriteLine("");
-        terminal.SetColor("bright_yellow");
-
-        // More dramatic display for higher rarity
-        switch (rarity)
-        {
-            case LootGenerator.ItemRarity.Legendary:
-            case LootGenerator.ItemRarity.Artifact:
-                UIHelper.WriteBoxHeader(terminal, Loc.Get("combat.loot_legendary_drop"), "bright_cyan", 56);
-                break;
-            case LootGenerator.ItemRarity.Epic:
-                if (!GameConfig.ScreenReaderMode)
-                    terminal.WriteLine("═══════════════════════════════════════");
-                terminal.WriteLine(Loc.Get("combat.loot_epic_drop"));
-                if (!GameConfig.ScreenReaderMode)
-                    terminal.WriteLine("═══════════════════════════════════════");
-                break;
-            case LootGenerator.ItemRarity.Rare:
-                if (!GameConfig.ScreenReaderMode)
-                    terminal.WriteLine("═════════════════════════════");
-                terminal.WriteLine(Loc.Get("combat.loot_rare_drop"));
-                if (!GameConfig.ScreenReaderMode)
-                    terminal.WriteLine("═════════════════════════════");
-                break;
-            default:
-                if (!GameConfig.ScreenReaderMode)
-                    terminal.WriteLine("─────────────────────────────");
-                terminal.WriteLine(Loc.Get("combat.loot_item_found"));
-                if (!GameConfig.ScreenReaderMode)
-                    terminal.WriteLine("─────────────────────────────");
-                break;
-        }
-
-        terminal.WriteLine("");
-
-        // Build loot broadcast for group followers
-        var lootBroadcastSb = new System.Text.StringBuilder();
-        string rarityTag = rarity switch
-        {
-            LootGenerator.ItemRarity.Legendary or LootGenerator.ItemRarity.Artifact => "\u001b[1;33m*** LEGENDARY DROP! ***",
-            LootGenerator.ItemRarity.Epic => "\u001b[1;35m** EPIC DROP! **",
-            LootGenerator.ItemRarity.Rare => "\u001b[1;36m* RARE DROP! *",
-            _ => "\u001b[1;37mITEM FOUND!"
-        };
-        lootBroadcastSb.AppendLine($"  {rarityTag}\u001b[0m");
-
-        if (lootItem.IsIdentified)
-        {
-            // Identified - show full details
-            terminal.SetColor(rarityColor);
-            terminal.WriteLine($"  {lootItem.Name}");
-            terminal.SetColor("white");
-
-            lootBroadcastSb.AppendLine($"\u001b[37m  {lootItem.Name}\u001b[0m");
-
-            if (lootItem.Type == global::ObjType.Weapon)
-            {
-                terminal.WriteLine(Loc.Get("combat.loot_attack_power", lootItem.Attack));
-                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_attack_power", lootItem.Attack)}\u001b[0m");
-            }
-            else if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
-            {
-                // Accessories don't have armor — show item type instead
-                string itemTypeName = lootItem.Type == global::ObjType.Fingers ? Loc.Get("combat.loot_type_ring") : Loc.Get("combat.loot_type_necklace");
-                terminal.WriteLine(Loc.Get("combat.loot_type", itemTypeName));
-                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_type", itemTypeName)}\u001b[0m");
-            }
-            else if (lootItem.Type == global::ObjType.Shield)
-            {
-                // Shields have two unique stats: ShieldBonus and BlockChance
-                string itemTypeName = Loc.Get("combat.loot_type_shield");
-                terminal.WriteLine(Loc.Get("combat.loot_shield_bonus", lootItem.ShieldBonus));
-                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_shield_bonus", lootItem.ShieldBonus)}\u001b[0m");
-                terminal.WriteLine(Loc.Get("combat.loot_block_chance", lootItem.BlockChance));
-                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_block_chance", lootItem.BlockChance)}\u001b[0m");
-            }
-            else
-            {
-                terminal.WriteLine(Loc.Get("combat.loot_armor_power", lootItem.Armor));
-                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_armor_power", lootItem.Armor)}\u001b[0m");
-            }
-
-            var bonuses = new List<string>();
-            if (lootItem.Strength != 0) bonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
-            if (lootItem.Dexterity != 0) bonuses.Add($"Dex {lootItem.Dexterity:+#;-#;0}");
-            if (lootItem.Agility != 0) bonuses.Add($"Agi {lootItem.Agility:+#;-#;0}");
-            if (lootItem.Wisdom != 0) bonuses.Add($"Wis {lootItem.Wisdom:+#;-#;0}");
-            if (lootItem.Charisma != 0) bonuses.Add($"Cha {lootItem.Charisma:+#;-#;0}");
-            if (lootItem.Defence != 0) bonuses.Add($"Def {lootItem.Defence:+#;-#;0}");
-            int conFromEffects = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Item2) ?? 0;
-            int intFromEffects = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Item2) ?? 0;
-            if (conFromEffects != 0) bonuses.Add($"Con {conFromEffects:+#;-#;0}");
-            if (intFromEffects != 0) bonuses.Add($"Int {intFromEffects:+#;-#;0}");
-            if (lootItem.HP != 0) bonuses.Add($"HP {lootItem.HP:+#;-#;0}");
-            if (lootItem.Mana != 0) bonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
-            if (lootItem.Stamina != 0) bonuses.Add($"Sta {lootItem.Stamina:+#;-#;0}");
-
-            if (bonuses.Count > 0)
-            {
-                terminal.SetColor("cyan");
-                terminal.WriteLine($"  Bonuses: {string.Join(", ", bonuses)}");
-                lootBroadcastSb.AppendLine($"\u001b[36m  Bonuses: {string.Join(", ", bonuses)}\u001b[0m");
-            }
-
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("combat.loot_value", $"{lootItem.Value:N0}"));
-
-            if (lootItem.IsCursed)
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("combat.loot_cursed_warning"));
-                terminal.WriteLine(Loc.Get("combat.loot_cursed_hint"));
-                lootBroadcastSb.AppendLine("\u001b[31m  WARNING: CURSED!\u001b[0m");
-            }
-
-            // Weapon requirement warning — warn if equipping this would break ability/spell requirements
-            if (lootItem.Type == global::ObjType.Weapon)
-            {
-                var inferredType = ShopItemGenerator.InferWeaponType(lootItem.Name);
-
-                // Check spell requirements (Magician/Sage need Staff)
-                var spellReq = SpellSystem.GetSpellWeaponRequirement(player.Class);
-                if (spellReq != null && inferredType != spellReq.Value)
-                {
-                    terminal.SetColor("red");
-                    terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("combat.loot_spell_req_warning", player.Class, spellReq));
-                    terminal.WriteLine(Loc.Get("combat.loot_spell_req_block", inferredType));
-                    lootBroadcastSb.AppendLine($"\u001b[31m  NOTE: Requires {spellReq} for spells\u001b[0m");
-                }
-
-                // Check class ability requirements (Ranger→Bow, Assassin→Dagger)
-                var abilities = ClassAbilitySystem.GetClassAbilities(player.Class);
-                if (abilities != null)
-                {
-                    var blockedAbilities = abilities
-                        .Where(a => a.RequiredWeaponTypes != null && a.RequiredWeaponTypes.Length > 0
-                            && !a.RequiredWeaponTypes.Contains(inferredType))
-                        .ToList();
-                    if (blockedAbilities.Count > 0)
-                    {
-                        var reqType = blockedAbilities[0].RequiredWeaponTypes![0];
-                        terminal.SetColor("red");
-                        terminal.WriteLine("");
-                        terminal.WriteLine(Loc.Get("combat.loot_ability_req_warning", reqType));
-                        terminal.WriteLine(Loc.Get("combat.loot_ability_req_block", inferredType));
-                    }
-                }
-            }
-
-            await ShowEquipmentComparison(lootItem, player);
-        }
-        else
-        {
-            // Unidentified - show only type hint, no stats
-            string unidName = LootGenerator.GetUnidentifiedName(lootItem);
-            terminal.SetColor("magenta");
-            terminal.WriteLine($"  {unidName}");
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("combat.loot_unidentified"));
-            terminal.WriteLine(Loc.Get("combat.loot_identify_hint"));
-            lootBroadcastSb.AppendLine($"\u001b[35m  {unidName} (Unidentified)\u001b[0m");
-        }
-
-        terminal.WriteLine("");
-
-        // Broadcast loot details to group followers
-        {
-            var ctx = SessionContext.Current;
-            var lootGroup = ctx != null ? GroupSystem.Instance?.GetGroupFor(ctx.Username) : null;
-            if (lootGroup != null)
-                GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
-                    lootBroadcastSb.ToString(), excludeUsername: ctx!.Username);
-        }
-
-        // GROUP LOOT: Round-robin — primary recipient gets first dibs
-        // If the round-robin recipient is a grouped follower, prompt them via RemoteTerminal
-        // If they pass, cascade to other players, then companions
-        if (player.IsGroupedPlayer && player.RemoteTerminal != null)
-        {
-            // This recipient is a grouped follower — prompt them via their RemoteTerminal
-            string recipientName = player.DisplayName ?? player.Name2 ?? "Unknown";
-
-            // Notify leader's terminal who has first dibs
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("combat.loot_offered_to", recipientName));
-
-            // Show loot details on the follower's terminal
-            var followerTerm = player.RemoteTerminal;
-            followerTerm.SetColor("bright_yellow");
-            followerTerm.WriteLine("");
-            followerTerm.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("combat.loot_drop_from_sr", monster.Name) : Loc.Get("combat.loot_drop_from", monster.Name));
-            if (lootItem.IsIdentified)
-            {
-                followerTerm.SetColor(rarityColor);
-                followerTerm.WriteLine($"  {lootItem.Name}");
-                followerTerm.SetColor("white");
-                if (lootItem.Type == global::ObjType.Weapon)
-                    followerTerm.WriteLine(Loc.Get("combat.loot_attack_power", lootItem.Attack));
-                else
-                    followerTerm.WriteLine(Loc.Get("combat.loot_armor_power", lootItem.Armor));
-                followerTerm.SetColor("yellow");
-                followerTerm.WriteLine(Loc.Get("combat.loot_value", $"{lootItem.Value:N0}"));
-            }
-            else
-            {
-                string unidName = LootGenerator.GetUnidentifiedName(lootItem);
-                followerTerm.SetColor("magenta");
-                followerTerm.WriteLine($"  {unidName}");
-                followerTerm.SetColor("gray");
-                followerTerm.WriteLine(Loc.Get("combat.loot_unidentified"));
-            }
-
-            // Check class restrictions for the follower
-            bool followerCanUse = true;
-            string? followerCantUseReason = null;
-            if (lootItem.IsIdentified)
-            {
-                var (canUse, reason) = LootGenerator.CanClassUseLootItem(player.Class, lootItem);
-                followerCanUse = canUse;
-                followerCantUseReason = reason;
-            }
-
-            followerTerm.WriteLine("");
-            if (!followerCanUse && followerCantUseReason != null)
-            {
-                followerTerm.SetColor("red");
-                followerTerm.WriteLine(Loc.Get("combat.loot_cannot_equip", followerCantUseReason));
-                followerTerm.SetColor("white");
-                followerTerm.WriteLine("");
-            }
-
-            // Build prompt options
-            if (lootItem.IsIdentified && followerCanUse)
-                followerTerm.WriteLine(Loc.Get("combat.loot_equip_option"));
-            followerTerm.WriteLine(Loc.Get("combat.loot_take_option"));
-            followerTerm.WriteLine(Loc.Get("combat.loot_pass_option"));
-            followerTerm.WriteLine("");
-
-            // Read input with a 30-second timeout via CombatInputChannel
-            // (GroupFollowerLoop forwards input here when IsAwaitingCombatInput is set)
-            string followerChoice = "P";
-            try
-            {
-                followerTerm.Write(Loc.Get("ui.your_choice"));
-
-                // Use the combat input channel so GroupFollowerLoop forwards input to us
-                if (player.CombatInputChannel != null)
-                {
-                    player.IsAwaitingCombatInput = true;
-                    using var cts = new System.Threading.CancellationTokenSource(30000);
-                    try
-                    {
-                        followerChoice = (await player.CombatInputChannel.Reader.ReadAsync(cts.Token)).ToUpper();
-                        if (followerChoice == "L") followerChoice = "P";
-                        bool validChoice = followerChoice == "T" || followerChoice == "P"
-                            || (followerChoice == "E" && lootItem.IsIdentified && followerCanUse);
-                        if (!validChoice)
-                        {
-                            followerTerm.SetColor("yellow");
-                            followerTerm.WriteLine(Loc.Get("combat.loot_invalid_passing"));
-                            followerChoice = "P";
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        followerTerm.SetColor("yellow");
-                        followerTerm.WriteLine(Loc.Get("combat.loot_timed_out"));
-                    }
-                    finally
-                    {
-                        player.IsAwaitingCombatInput = false;
-                    }
-                }
-                else
-                {
-                    // Fallback for non-grouped or missing channel
-                    var inputTask = followerTerm.GetKeyInput();
-                    var completed = await Task.WhenAny(inputTask, Task.Delay(30000));
-                    if (completed == inputTask)
-                    {
-                        followerChoice = inputTask.Result.ToUpper();
-                        if (followerChoice == "L") followerChoice = "P";
-                        bool validChoice = followerChoice == "T" || followerChoice == "P"
-                            || (followerChoice == "E" && lootItem.IsIdentified && followerCanUse);
-                        if (!validChoice)
-                        {
-                            followerTerm.SetColor("yellow");
-                            followerTerm.WriteLine(Loc.Get("combat.loot_invalid_passing"));
-                            followerChoice = "P";
-                        }
-                    }
-                    else
-                    {
-                        followerTerm.SetColor("yellow");
-                        followerTerm.WriteLine(Loc.Get("combat.loot_timed_out"));
-                    }
-                }
-            }
-            catch { followerChoice = "P"; }
-
-            if (followerChoice == "E" && lootItem.IsIdentified && followerCanUse)
-            {
-                var equipResult = ConvertLootItemToEquipment(lootItem);
-                if (equipResult != null)
-                {
-                    EquipmentDatabase.RegisterDynamic(equipResult);
-                    if (player.EquipItem(equipResult, out string equipMsg))
-                    {
-                        player.RecalculateStats();
-                        followerTerm.SetColor("green");
-                        followerTerm.WriteLine(equipMsg);
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.loot_teammate_equips", recipientName, lootItem.Name));
-                    }
-                    else
-                    {
-                        player.Inventory?.Add(lootItem);
-                        followerTerm.SetColor("yellow");
-                        followerTerm.WriteLine(Loc.Get("combat.loot_equip_failed_inventory", equipMsg));
-                        terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, lootItem.Name));
-                    }
-                }
-                await Task.Delay(GetCombatDelay(1500));
-                return;
-            }
-            else if (followerChoice == "T")
-            {
-                player.Inventory?.Add(lootItem);
-                followerTerm.SetColor("cyan");
-                string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
-                followerTerm.WriteLine(Loc.Get("combat.loot_added_inventory", invName));
-                terminal.SetColor("cyan");
-                terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, lootItem.Name));
-                await Task.Delay(GetCombatDelay(1500));
-                return;
-            }
-            else
-            {
-                // Follower passed — try NPC auto-pickup first, then cascade to other players
-                followerTerm.SetColor("gray");
-                followerTerm.WriteLine(Loc.Get("combat.loot_you_pass"));
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("combat.loot_teammate_passes", recipientName, lootItem.Name));
-
-                bool itemTaken = false;
-
-                // Try companion/NPC auto-pickup first (instant, no waiting)
-                if (lootItem.IsIdentified && currentTeammates != null && currentTeammates.Count > 0)
-                {
-                    var pickup = TryTeammatePickupItem(lootItem);
-                    if (pickup.HasValue)
-                    {
-                        var (teammate, upgradePercent) = pickup.Value;
-                        var teammateEquip = ConvertLootItemToEquipment(lootItem);
-                        if (teammateEquip != null)
-                        {
-                            EquipmentDatabase.RegisterDynamic(teammateEquip);
-                            int invBefore = teammate.Inventory?.Count ?? 0;
-                            if (teammate.EquipItem(teammateEquip, out _))
-                            {
-                                teammate.RecalculateStats();
-                                // Move displaced items from companion inventory to player inventory
-                                if (teammate.Inventory != null && teammate.Inventory.Count > invBefore)
-                                {
-                                    var displaced = teammate.Inventory.Skip(invBefore).ToList();
-                                    foreach (var d in displaced)
-                                    {
-                                        teammate.Inventory.Remove(d);
-                                        player.Inventory?.Add(d);
-                                    }
-                                    if (displaced.Count > 0)
-                                    {
-                                        terminal.SetColor("cyan");
-                                        terminal.WriteLine(Loc.Get("combat.loot_displaced_to_inventory", displaced[0].Name));
-                                    }
-                                }
-                                CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
-                                string teammateName = teammate.Name2 ?? teammate.Name1 ?? "Your ally";
-                                terminal.SetColor("bright_green");
-                                terminal.WriteLine(Loc.Get("combat.loot_ally_picks_up", teammateName, lootItem.Name, upgradePercent));
-                                itemTaken = true;
-                            }
-                        }
-                    }
-                }
-
-                // If no NPC wanted it, offer to other grouped players (excluding this follower)
-                if (!itemTaken && lootItem.IsIdentified && currentTeammates != null)
-                {
-                    var otherPlayers = currentTeammates.Where(t => t.IsGroupedPlayer && t.IsAlive
-                        && t.RemoteTerminal != null && t != player).ToList();
-                    if (otherPlayers.Count > 0)
-                        itemTaken = await OfferLootToOtherPlayers(lootItem, player, otherPlayers, monster);
-                }
-
-                if (!itemTaken)
-                {
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("combat.loot_left_behind"));
-                }
-
-                await Task.Delay(GetCombatDelay(1500));
-                return;
-            }
-        }
-
-        // Solo loot (no grouped players) — original behavior
-        // Flush any buffered input (e.g. from auto-combat key presses) so it
-        // doesn't accidentally get consumed as the E/T/P choice.
-        terminal.FlushPendingInput();
+        // Ask player what to do — loop until we get valid E/T/P input
+        string choice;
+        List<Character> party = [currentPlayer, .. this.currentTeammates];
+        Character selectedCharacter = party[_droppedEquipmentPartyIdx];
 
         // Check class restrictions for identified weapons/shields
         bool canPlayerUseItem = true;
         string? cantUseReason = null;
+
         if (lootItem.IsIdentified)
         {
-            var (canUse, reason) = LootGenerator.CanClassUseLootItem(player.Class, lootItem);
+            var (canUse, reason) = LootGenerator.CanClassUseLootItem(selectedCharacter.Class, lootItem);
             canPlayerUseItem = canUse;
             cantUseReason = reason;
         }
 
-        // Ask player what to do — loop until we get valid E/T/P input
-        string choice;
         while (true)
         {
             terminal.SetColor("white");
@@ -7404,9 +6990,14 @@ public partial class CombatEngine
                 terminal.WriteLine("");
             }
 
-            if (lootItem.IsIdentified && canPlayerUseItem)
+            if (lootItem.IsIdentified)
             {
-                terminal.WriteLine(Loc.Get("combat.loot_equip_option"));
+                terminal.WriteLine(Loc.Get("combat.loot_change_character_option"));
+
+                if (canPlayerUseItem)
+                {
+                    terminal.WriteLine(Loc.Get("combat.loot_equip_option"));
+                }
             }
             terminal.WriteLine(Loc.Get("combat.loot_take_option"));
             terminal.WriteLine(Loc.Get("combat.loot_pass_option"));
@@ -7415,6 +7006,20 @@ public partial class CombatEngine
             terminal.Write(Loc.Get("ui.your_choice"));
             choice = (await terminal.GetKeyInput()).ToUpper();
 
+            if (choice == ">")
+            {
+                _droppedEquipmentPartyIdx = (_droppedEquipmentPartyIdx + 1) % (party.Count);
+                await RenderEquipment(lootItem, monster, party[_droppedEquipmentPartyIdx], lootBroadcastSb);
+                continue;
+            }
+
+            if (choice == "<")
+            {
+                _droppedEquipmentPartyIdx -= 1;
+                _droppedEquipmentPartyIdx = _droppedEquipmentPartyIdx < 0 ? party.Count - 1 : _droppedEquipmentPartyIdx;
+                await RenderEquipment(lootItem, monster, party[_droppedEquipmentPartyIdx], lootBroadcastSb);
+                continue;
+            }
             // Accept L as silent alias for P (backwards compatibility)
             if (choice == "L") choice = "P";
 
@@ -7434,6 +7039,16 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.loot_invalid_choice", choice));
             terminal.WriteLine("");
         }
+
+        return (choice, selectedCharacter);
+    }
+
+    private async Task HandleEquipmentDropInput(Item lootItem, Monster monster, Character player, System.Text.StringBuilder lootBroadcastSb)
+    {
+        // Ask player what to do — loop until we get valid E/T/P input
+        var result = await GetEquipmentDropInput(lootItem, monster, player, lootBroadcastSb);
+        string choice = result.choice;
+        player = result.selectedCharacter ?? player;
 
         switch (choice)
         {
@@ -7736,6 +7351,402 @@ public partial class CombatEngine
                 }
                 break;
         }
+    }
+
+    private async Task RenderEquipment(Item lootItem, Monster monster, Character character, System.Text.StringBuilder lootBroadcastSb)
+    {
+        var rarity = LootGenerator.GetItemRarity(lootItem);
+        string rarityColor = LootGenerator.GetRarityColor(rarity);
+        
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+
+        // More dramatic display for higher rarity
+        switch (rarity)
+        {
+            case LootGenerator.ItemRarity.Legendary:
+            case LootGenerator.ItemRarity.Artifact:
+                UIHelper.WriteBoxHeader(terminal, Loc.Get("combat.loot_legendary_drop"), "bright_cyan", 56);
+                break;
+            case LootGenerator.ItemRarity.Epic:
+                if (!GameConfig.ScreenReaderMode)
+                    terminal.WriteLine("═══════════════════════════════════════");
+                terminal.WriteLine(Loc.Get("combat.loot_epic_drop"));
+                if (!GameConfig.ScreenReaderMode)
+                    terminal.WriteLine("═══════════════════════════════════════");
+                break;
+            case LootGenerator.ItemRarity.Rare:
+                if (!GameConfig.ScreenReaderMode)
+                    terminal.WriteLine("═════════════════════════════");
+                terminal.WriteLine(Loc.Get("combat.loot_rare_drop"));
+                if (!GameConfig.ScreenReaderMode)
+                    terminal.WriteLine("═════════════════════════════");
+                break;
+            default:
+                if (!GameConfig.ScreenReaderMode)
+                    terminal.WriteLine("─────────────────────────────");
+                terminal.WriteLine(Loc.Get("combat.loot_item_found"));
+                if (!GameConfig.ScreenReaderMode)
+                    terminal.WriteLine("─────────────────────────────");
+                break;
+        }
+
+        terminal.WriteLine("");
+
+        string rarityTag = rarity switch
+        {
+            LootGenerator.ItemRarity.Legendary or LootGenerator.ItemRarity.Artifact => "\u001b[1;33m*** LEGENDARY DROP! ***",
+            LootGenerator.ItemRarity.Epic => "\u001b[1;35m** EPIC DROP! **",
+            LootGenerator.ItemRarity.Rare => "\u001b[1;36m* RARE DROP! *",
+            _ => "\u001b[1;37mITEM FOUND!"
+        };
+        lootBroadcastSb.AppendLine($"  {rarityTag}\u001b[0m");
+
+        if (lootItem.IsIdentified)
+        {
+            // Identified - show full details
+            terminal.SetColor(rarityColor);
+            terminal.WriteLine($"  {lootItem.Name}");
+            terminal.SetColor("white");
+
+            lootBroadcastSb.AppendLine($"\u001b[37m  {lootItem.Name}\u001b[0m");
+
+            if (lootItem.Type == global::ObjType.Weapon)
+            {
+                terminal.WriteLine(Loc.Get("combat.loot_attack_power", lootItem.Attack));
+                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_attack_power", lootItem.Attack)}\u001b[0m");
+            }
+            else if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)
+            {
+                // Accessories don't have armor — show item type instead
+                string itemTypeName = lootItem.Type == global::ObjType.Fingers ? Loc.Get("combat.loot_type_ring") : Loc.Get("combat.loot_type_necklace");
+                terminal.WriteLine(Loc.Get("combat.loot_type", itemTypeName));
+                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_type", itemTypeName)}\u001b[0m");
+            }
+            else if (lootItem.Type == global::ObjType.Shield)
+            {
+                // Shields have two unique stats: ShieldBonus and BlockChance
+                string itemTypeName = Loc.Get("combat.loot_type_shield");
+                terminal.WriteLine(Loc.Get("combat.loot_shield_bonus", lootItem.ShieldBonus));
+                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_shield_bonus", lootItem.ShieldBonus)}\u001b[0m");
+                terminal.WriteLine(Loc.Get("combat.loot_block_chance", lootItem.BlockChance));
+                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_block_chance", lootItem.BlockChance)}\u001b[0m");
+            }
+            else
+            {
+                terminal.WriteLine(Loc.Get("combat.loot_armor_power", lootItem.Armor));
+                lootBroadcastSb.AppendLine($"\u001b[37m  {Loc.Get("combat.loot_armor_power", lootItem.Armor)}\u001b[0m");
+            }
+
+            var bonuses = new List<string>();
+            if (lootItem.Strength != 0) bonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
+            if (lootItem.Dexterity != 0) bonuses.Add($"Dex {lootItem.Dexterity:+#;-#;0}");
+            if (lootItem.Agility != 0) bonuses.Add($"Agi {lootItem.Agility:+#;-#;0}");
+            if (lootItem.Wisdom != 0) bonuses.Add($"Wis {lootItem.Wisdom:+#;-#;0}");
+            if (lootItem.Charisma != 0) bonuses.Add($"Cha {lootItem.Charisma:+#;-#;0}");
+            if (lootItem.Defence != 0) bonuses.Add($"Def {lootItem.Defence:+#;-#;0}");
+            int conFromEffects = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Item2) ?? 0;
+            int intFromEffects = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Item2) ?? 0;
+            if (conFromEffects != 0) bonuses.Add($"Con {conFromEffects:+#;-#;0}");
+            if (intFromEffects != 0) bonuses.Add($"Int {intFromEffects:+#;-#;0}");
+            if (lootItem.HP != 0) bonuses.Add($"HP {lootItem.HP:+#;-#;0}");
+            if (lootItem.Mana != 0) bonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
+            if (lootItem.Stamina != 0) bonuses.Add($"Sta {lootItem.Stamina:+#;-#;0}");
+
+            if (bonuses.Count > 0)
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  Bonuses: {string.Join(", ", bonuses)}");
+                lootBroadcastSb.AppendLine($"\u001b[36m  Bonuses: {string.Join(", ", bonuses)}\u001b[0m");
+            }
+
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("combat.loot_value", $"{lootItem.Value:N0}"));
+
+            if (lootItem.IsCursed)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("");
+                terminal.WriteLine(Loc.Get("combat.loot_cursed_warning"));
+                terminal.WriteLine(Loc.Get("combat.loot_cursed_hint"));
+                lootBroadcastSb.AppendLine("\u001b[31m  WARNING: CURSED!\u001b[0m");
+            }
+
+            await ShowEquipmentComparison(lootItem, character, lootBroadcastSb);
+        }
+        else
+        {
+            // Unidentified - show only type hint, no stats
+            string unidName = LootGenerator.GetUnidentifiedName(lootItem);
+            terminal.SetColor("magenta");
+            terminal.WriteLine($"  {unidName}");
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("combat.loot_unidentified"));
+            terminal.WriteLine(Loc.Get("combat.loot_identify_hint"));
+            lootBroadcastSb.AppendLine($"\u001b[35m  {unidName} (Unidentified)\u001b[0m");
+        }
+
+        terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// Display equipment drop with appropriate fanfare
+    /// </summary>
+    private async Task DisplayEquipmentDrop(Item lootItem, Monster monster, Character player)
+    {
+        var lootBroadcastSb = new System.Text.StringBuilder();
+        var rarity = LootGenerator.GetItemRarity(lootItem);
+        string rarityColor = LootGenerator.GetRarityColor(rarity);
+        await RenderEquipment(lootItem, monster, player, lootBroadcastSb);
+
+        // Broadcast loot details to group followers
+        {
+            var ctx = SessionContext.Current;
+            var lootGroup = ctx != null ? GroupSystem.Instance?.GetGroupFor(ctx.Username) : null;
+            if (lootGroup != null)
+                GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
+                    lootBroadcastSb.ToString(), excludeUsername: ctx!.Username);
+        }
+
+        // GROUP LOOT: Round-robin — primary recipient gets first dibs
+        // If the round-robin recipient is a grouped follower, prompt them via RemoteTerminal
+        // If they pass, cascade to other players, then companions
+        if (player.IsGroupedPlayer && player.RemoteTerminal != null)
+        {
+            // This recipient is a grouped follower — prompt them via their RemoteTerminal
+            string recipientName = player.DisplayName ?? player.Name2 ?? "Unknown";
+
+            // Notify leader's terminal who has first dibs
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("combat.loot_offered_to", recipientName));
+
+            // Show loot details on the follower's terminal
+            var followerTerm = player.RemoteTerminal;
+            followerTerm.SetColor("bright_yellow");
+            followerTerm.WriteLine("");
+            followerTerm.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("combat.loot_drop_from_sr", monster.Name) : Loc.Get("combat.loot_drop_from", monster.Name));
+            if (lootItem.IsIdentified)
+            {
+                followerTerm.SetColor(rarityColor);
+                followerTerm.WriteLine($"  {lootItem.Name}");
+                followerTerm.SetColor("white");
+                if (lootItem.Type == global::ObjType.Weapon)
+                    followerTerm.WriteLine(Loc.Get("combat.loot_attack_power", lootItem.Attack));
+                else
+                    followerTerm.WriteLine(Loc.Get("combat.loot_armor_power", lootItem.Armor));
+                followerTerm.SetColor("yellow");
+                followerTerm.WriteLine(Loc.Get("combat.loot_value", $"{lootItem.Value:N0}"));
+            }
+            else
+            {
+                string unidName = LootGenerator.GetUnidentifiedName(lootItem);
+                followerTerm.SetColor("magenta");
+                followerTerm.WriteLine($"  {unidName}");
+                followerTerm.SetColor("gray");
+                followerTerm.WriteLine(Loc.Get("combat.loot_unidentified"));
+            }
+
+            // Check class restrictions for the follower
+            bool followerCanUse = true;
+            string? followerCantUseReason = null;
+            if (lootItem.IsIdentified)
+            {
+                var (canUse, reason) = LootGenerator.CanClassUseLootItem(player.Class, lootItem);
+                followerCanUse = canUse;
+                followerCantUseReason = reason;
+            }
+
+            followerTerm.WriteLine("");
+            if (!followerCanUse && followerCantUseReason != null)
+            {
+                followerTerm.SetColor("red");
+                followerTerm.WriteLine(Loc.Get("combat.loot_cannot_equip", followerCantUseReason));
+                followerTerm.SetColor("white");
+                followerTerm.WriteLine("");
+            }
+
+            // Build prompt options
+            if (lootItem.IsIdentified && followerCanUse)
+                followerTerm.WriteLine(Loc.Get("combat.loot_equip_option"));
+            followerTerm.WriteLine(Loc.Get("combat.loot_take_option"));
+            followerTerm.WriteLine(Loc.Get("combat.loot_pass_option"));
+            followerTerm.WriteLine("");
+
+            // Read input with a 30-second timeout via CombatInputChannel
+            // (GroupFollowerLoop forwards input here when IsAwaitingCombatInput is set)
+            string followerChoice = "P";
+            try
+            {
+                followerTerm.Write(Loc.Get("ui.your_choice"));
+
+                // Use the combat input channel so GroupFollowerLoop forwards input to us
+                if (player.CombatInputChannel != null)
+                {
+                    player.IsAwaitingCombatInput = true;
+                    using var cts = new System.Threading.CancellationTokenSource(30000);
+                    try
+                    {
+                        followerChoice = (await player.CombatInputChannel.Reader.ReadAsync(cts.Token)).ToUpper();
+                        if (followerChoice == "L") followerChoice = "P";
+                        bool validChoice = followerChoice == "T" || followerChoice == "P"
+                            || (followerChoice == "E" && lootItem.IsIdentified && followerCanUse);
+                        if (!validChoice)
+                        {
+                            followerTerm.SetColor("yellow");
+                            followerTerm.WriteLine(Loc.Get("combat.loot_invalid_passing"));
+                            followerChoice = "P";
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        followerTerm.SetColor("yellow");
+                        followerTerm.WriteLine(Loc.Get("combat.loot_timed_out"));
+                    }
+                    finally
+                    {
+                        player.IsAwaitingCombatInput = false;
+                    }
+                }
+                else
+                {
+                    // Fallback for non-grouped or missing channel
+                    var inputTask = followerTerm.GetKeyInput();
+                    var completed = await Task.WhenAny(inputTask, Task.Delay(30000));
+                    if (completed == inputTask)
+                    {
+                        followerChoice = inputTask.Result.ToUpper();
+                        if (followerChoice == "L") followerChoice = "P";
+                        bool validChoice = followerChoice == "T" || followerChoice == "P"
+                            || (followerChoice == "E" && lootItem.IsIdentified && followerCanUse);
+                        if (!validChoice)
+                        {
+                            followerTerm.SetColor("yellow");
+                            followerTerm.WriteLine(Loc.Get("combat.loot_invalid_passing"));
+                            followerChoice = "P";
+                        }
+                    }
+                    else
+                    {
+                        followerTerm.SetColor("yellow");
+                        followerTerm.WriteLine(Loc.Get("combat.loot_timed_out"));
+                    }
+                }
+            }
+            catch { followerChoice = "P"; }
+
+            if (followerChoice == "E" && lootItem.IsIdentified && followerCanUse)
+            {
+                var equipResult = ConvertLootItemToEquipment(lootItem);
+                if (equipResult != null)
+                {
+                    EquipmentDatabase.RegisterDynamic(equipResult);
+                    if (player.EquipItem(equipResult, out string equipMsg))
+                    {
+                        player.RecalculateStats();
+                        followerTerm.SetColor("green");
+                        followerTerm.WriteLine(equipMsg);
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine(Loc.Get("combat.loot_teammate_equips", recipientName, lootItem.Name));
+                    }
+                    else
+                    {
+                        player.Inventory?.Add(lootItem);
+                        followerTerm.SetColor("yellow");
+                        followerTerm.WriteLine(Loc.Get("combat.loot_equip_failed_inventory", equipMsg));
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, lootItem.Name));
+                    }
+                }
+                await Task.Delay(GetCombatDelay(1500));
+                return;
+            }
+            else if (followerChoice == "T")
+            {
+                player.Inventory?.Add(lootItem);
+                followerTerm.SetColor("cyan");
+                string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
+                followerTerm.WriteLine(Loc.Get("combat.loot_added_inventory", invName));
+                terminal.SetColor("cyan");
+                terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, lootItem.Name));
+                await Task.Delay(GetCombatDelay(1500));
+                return;
+            }
+            else
+            {
+                // Follower passed — try NPC auto-pickup first, then cascade to other players
+                followerTerm.SetColor("gray");
+                followerTerm.WriteLine(Loc.Get("combat.loot_you_pass"));
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("combat.loot_teammate_passes", recipientName, lootItem.Name));
+
+                bool itemTaken = false;
+
+                // Try companion/NPC auto-pickup first (instant, no waiting)
+                if (lootItem.IsIdentified && currentTeammates != null && currentTeammates.Count > 0)
+                {
+                    var pickup = TryTeammatePickupItem(lootItem);
+                    if (pickup.HasValue)
+                    {
+                        var (teammate, upgradePercent) = pickup.Value;
+                        var teammateEquip = ConvertLootItemToEquipment(lootItem);
+                        if (teammateEquip != null)
+                        {
+                            EquipmentDatabase.RegisterDynamic(teammateEquip);
+                            int invBefore = teammate.Inventory?.Count ?? 0;
+                            if (teammate.EquipItem(teammateEquip, out _))
+                            {
+                                teammate.RecalculateStats();
+                                // Move displaced items from companion inventory to player inventory
+                                if (teammate.Inventory != null && teammate.Inventory.Count > invBefore)
+                                {
+                                    var displaced = teammate.Inventory.Skip(invBefore).ToList();
+                                    foreach (var d in displaced)
+                                    {
+                                        teammate.Inventory.Remove(d);
+                                        player.Inventory?.Add(d);
+                                    }
+                                    if (displaced.Count > 0)
+                                    {
+                                        terminal.SetColor("cyan");
+                                        terminal.WriteLine(Loc.Get("combat.loot_displaced_to_inventory", displaced[0].Name));
+                                    }
+                                }
+                                CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
+                                string teammateName = teammate.Name2 ?? teammate.Name1 ?? "Your ally";
+                                terminal.SetColor("bright_green");
+                                terminal.WriteLine(Loc.Get("combat.loot_ally_picks_up", teammateName, lootItem.Name, upgradePercent));
+                                itemTaken = true;
+                            }
+                        }
+                    }
+                }
+
+                // If no NPC wanted it, offer to other grouped players (excluding this follower)
+                if (!itemTaken && lootItem.IsIdentified && currentTeammates != null)
+                {
+                    var otherPlayers = currentTeammates.Where(t => t.IsGroupedPlayer && t.IsAlive
+                        && t.RemoteTerminal != null && t != player).ToList();
+                    if (otherPlayers.Count > 0)
+                        itemTaken = await OfferLootToOtherPlayers(lootItem, player, otherPlayers, monster);
+                }
+
+                if (!itemTaken)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(Loc.Get("combat.loot_left_behind"));
+                }
+
+                await Task.Delay(GetCombatDelay(1500));
+                return;
+            }
+        }
+
+        // Solo loot (no grouped players) — original behavior
+        // Flush any buffered input (e.g. from auto-combat key presses) so it
+        // doesn't accidentally get consumed as the E/T/P choice.
+        terminal.FlushPendingInput();
+
+        await HandleEquipmentDropInput(lootItem, monster, player, lootBroadcastSb);
 
         await Task.Delay(GetCombatDelay(1500));
     }
@@ -8467,7 +8478,7 @@ public partial class CombatEngine
     /// <summary>
     /// Show comparison between dropped item and currently equipped item
     /// </summary>
-    private async Task ShowEquipmentComparison(Item lootItem, Character player)
+    private async Task ShowEquipmentComparison(Item lootItem, Character character, System.Text.StringBuilder lootBroadcastSb)
     {
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -8503,15 +8514,58 @@ public partial class CombatEngine
             _ => targetSlot.ToString()
         };
         terminal.SetColor("white");
-        terminal.WriteLine($"  COMPARISON ({slotDisplayName} slot):");
+        terminal.Write("  COMPARISON (");
+        terminal.SetColor("yellow");
+        terminal.Write(character.Name);
+        terminal.SetColor("white");
+        terminal.Write($"'s {slotDisplayName} slot):");
+        terminal.WriteLine("");
+
+
+        // Weapon requirement warning — warn if equipping this would break ability/spell requirements
+        if (lootItem.Type == global::ObjType.Weapon)
+        {
+            var inferredType = ShopItemGenerator.InferWeaponType(lootItem.Name);
+
+            // Check spell requirements (Magician/Sage need Staff)
+            var spellReq = SpellSystem.GetSpellWeaponRequirement(character.Class);
+            if (spellReq != null && inferredType != spellReq.Value)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine("");
+                terminal.WriteLine(Loc.Get("combat.loot_spell_req_warning", character.Class, spellReq));
+                terminal.WriteLine(Loc.Get("combat.loot_spell_req_block", inferredType));
+                terminal.WriteLine("");
+                lootBroadcastSb.AppendLine($"\u001b[31m  NOTE: Requires {spellReq} for spells\u001b[0m");
+            }
+
+            // Check class ability requirements (Ranger→Bow, Assassin→Dagger)
+            var abilities = ClassAbilitySystem.GetClassAbilities(character.Class);
+            if (abilities != null)
+            {
+                var blockedAbilities = abilities
+                    .Where(a => a.RequiredWeaponTypes != null && a.RequiredWeaponTypes.Length > 0
+                        && !a.RequiredWeaponTypes.Contains(inferredType))
+                    .ToList();
+                if (blockedAbilities.Count > 0)
+                {
+                    var reqType = blockedAbilities[0].RequiredWeaponTypes![0];
+                    terminal.SetColor("red");
+                    terminal.WriteLine("");
+                    terminal.WriteLine(Loc.Get("combat.loot_ability_req_warning", reqType));
+                    terminal.WriteLine(Loc.Get("combat.loot_ability_req_block", inferredType));
+                    terminal.WriteLine("");
+                }
+            }
+        }
 
         // Get currently equipped item
-        var currentEquip = player.GetEquipment(targetSlot);
+        var currentEquip = character.GetEquipment(targetSlot);
 
         if (currentEquip == null)
         {
             // Warn if equipping a shield/off-hand item would conflict with two-handed weapon
-            if (targetSlot == EquipmentSlot.OffHand && player.IsTwoHanding)
+            if (targetSlot == EquipmentSlot.OffHand && character.IsTwoHanding)
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  WARNING: You are using a two-handed weapon.");
