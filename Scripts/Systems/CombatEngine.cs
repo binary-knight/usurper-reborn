@@ -7307,7 +7307,7 @@ public partial class CombatEngine
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine("");
-                        terminal.WriteLine(Loc.Get("combat.cursed_bind"));
+                        terminal.WriteLine(Loc.Get("combat.cursed_bind", player.DisplayName));
                         terminal.WriteLine(Loc.Get("combat.cursed_hold"));
                     }
                     else
@@ -8596,7 +8596,7 @@ public partial class CombatEngine
                     var reqType = blockedAbilities[0].RequiredWeaponTypes![0];
                     terminal.SetColor("red");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("combat.loot_ability_req_warning", reqType));
+                    terminal.WriteLine(Loc.Get("combat.loot_ability_req_warning", character.DisplayName, reqType));
                     terminal.WriteLine(Loc.Get("combat.loot_ability_req_block", inferredType));
                     terminal.WriteLine("");
                 }
@@ -11995,7 +11995,7 @@ public partial class CombatEngine
 
             case "guaranteed_hit":
                 terminal.SetColor("cyan");
-                terminal.WriteLine(Loc.Get("combat.ranged_aim_true"));
+                terminal.WriteLine(Loc.Get("combat.ranged_aim_true", player.DisplayName));
                 break;
 
             // ═══════════════════════════════════════════════════════════════════════
@@ -18843,7 +18843,7 @@ public partial class CombatEngine
 
             case "guaranteed_hit":
                 terminal.SetColor("cyan");
-                terminal.WriteLine(Loc.Get("combat.ranged_aim_true"));
+                terminal.WriteLine(Loc.Get("combat.ranged_aim_true", player.DisplayName));
                 break;
 
             case "aoe_taunt":

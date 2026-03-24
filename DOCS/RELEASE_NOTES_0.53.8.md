@@ -201,6 +201,17 @@ The preferences menu was a flat list of 12+ options with no logical grouping. No
 
 Same key bindings, same functionality — just easier to scan. Screen reader menu also reorganized with category labels.
 
+## Loot Drop Party Message Fixes
+
+When using the `<`/`>` party switching on loot drops, several messages incorrectly said "You/Your" instead of the selected party member's name:
+- **Cursed item equip** — "You equip the item... and feel a dark presence" → now shows the character's name
+- **Ability weapon requirement** — "Some of your abilities require a Bow" → "Some of Lyris's abilities require a Bow"
+- **Spell weapon requirement** — "Your Magician spells require a Staff" → "Magician spells require a Staff"
+
+## Companion Ability Message Fix
+
+"Your aim is true!" (Precise Shot guaranteed hit) now shows the companion's name when used by a teammate (e.g., "Lyris's aim is true!"). The `combat.ranged_aim_true` key now takes a `{0}` name parameter.
+
 ## Wavecaller Resonance Cascade Fallthrough Fix
 
 Resonance Cascade (Wavecaller ability) had no proper `case` label in single-monster combat — it fell through to `grand_finale_jester`, executing Grand Finale's code instead (wrong damage, wrong inspire buff, wrong message). The actual Resonance Cascade handler was in an orphaned code block after the `break` and was completely unreachable (this was the `CS0162: Unreachable code` build warning). Separated the cases so each ability has its own handler.
