@@ -55,11 +55,11 @@ namespace UsurperRemake.Data
                 Name = "Maelketh, The Broken Blade",
                 Title = "God of War and Conquest",
                 Level = 28,           // Slightly above floor 25 - requires preparation
-                HP = 25000,           // God of War — a brutal, drawn-out battle
-                MaxHP = 25000,
-                Strength = 150,       // Hits hard - need good armor
-                Defence = 80,
-                Agility = 60,
+                HP = 100000,          // God of War — a brutal, drawn-out battle (4x)
+                MaxHP = 100000,
+                Strength = 600,       // Hits hard - need good armor (4x)
+                Defence = 320,        // (4x)
+                Agility = 240,        // (4x)
                 AttacksPerRound = 2,
 
                 EncounterLocation = "Dungeon Floor 25",
@@ -141,12 +141,12 @@ namespace UsurperRemake.Data
                 Name = "Veloura, The Withered Heart",
                 Title = "Goddess of Love and Passion",
                 Level = 44,           // Above floor 40 - requires preparation
-                HP = 50000,           // Goddess of Love — deceptively resilient
-                MaxHP = 50000,
-                Strength = 140,       // Charm and heartbreak hit hard
-                Defence = 100,
-                Agility = 120,
-                Charisma = 200,       // High charisma for charm effects
+                HP = 200000,          // Goddess of Love — deceptively resilient (4x)
+                MaxHP = 200000,
+                Strength = 560,       // Charm and heartbreak hit hard (4x)
+                Defence = 400,        // (4x)
+                Agility = 480,        // (4x)
+                Charisma = 800,       // High charisma for charm effects (4x)
                 AttacksPerRound = 2,
 
                 EncounterLocation = "Dungeon Floor 40",
@@ -246,11 +246,11 @@ namespace UsurperRemake.Data
                 Name = "Thorgrim, The Hollow Judge",
                 Title = "God of Law and Order",
                 Level = 60,           // Above floor 55 - requires preparation
-                HP = 100000,          // God of Law — immovable judge, endurance fight
-                MaxHP = 100000,
-                Strength = 200,       // The weight of unjust law
-                Defence = 200,        // High defense - need armor penetration
-                Agility = 50,
+                HP = 400000,          // God of Law — immovable judge, endurance fight (4x)
+                MaxHP = 400000,
+                Strength = 1200,      // The weight of unjust law — hits like a truck
+                Defence = 800,        // High defense - need armor penetration (4x)
+                Agility = 200,        // (4x)
                 AttacksPerRound = 2,
 
                 EncounterLocation = "Dungeon Floor 55",
@@ -335,12 +335,12 @@ namespace UsurperRemake.Data
                 Name = "Noctura, The Shadow Weaver",
                 Title = "Goddess of Shadow and Secrets",
                 Level = 75,           // Above floor 70 - requires preparation
-                HP = 150000,          // Goddess of Shadow — elusive but deadly
-                MaxHP = 150000,
-                Strength = 220,       // Shadow blades cut deep
-                Defence = 140,
-                Agility = 200,        // Very fast - hard to hit
-                Charisma = 150,
+                HP = 600000,          // Goddess of Shadow — elusive but deadly (4x)
+                MaxHP = 600000,
+                Strength = 1400,      // Shadow blades cut deep — must outpace her damage
+                Defence = 560,        // (4x)
+                Agility = 800,        // Very fast - hard to hit (4x)
+                Charisma = 600,       // (4x)
                 AttacksPerRound = 3,  // Multiple fast strikes
 
                 EncounterLocation = "Dungeon Floor 70",
@@ -446,10 +446,10 @@ namespace UsurperRemake.Data
                 Name = "Aurelion, The Fading Light",
                 Title = "God of Light and Truth",
                 Level = 90,           // Above floor 85 - requires preparation
-                HP = 250000,          // God of Light — radiant divine armor, enchanted weapons essential
-                MaxHP = 250000,
-                Strength = 840,       // Purifying light burns (3x to prevent cheesing)
-                Defence = 180,
+                HP = 800000,          // God of Light — radiant divine armor, enchanted weapons essential
+                MaxHP = 800000,
+                Strength = 1600,      // Purifying light burns — devastating holy strikes
+                Defence = 500,
                 Agility = 120,
                 Wisdom = 280,         // High magic damage
                 AttacksPerRound = 3,  // Relentless divine strikes
@@ -554,10 +554,10 @@ namespace UsurperRemake.Data
                 Name = "Terravok, The Sleeping Mountain",
                 Title = "God of Earth and Endurance",
                 Level = 98,           // Near floor 95 - penultimate challenge
-                HP = 350000,          // God of Earth — massive stone skin, demands full preparation
-                MaxHP = 350000,
-                Strength = 1050,      // Devastating mountain blows (3x to prevent cheesing)
-                Defence = 300,        // Incredibly tanky
+                HP = 1000000,         // God of Earth — massive stone skin, demands full preparation
+                MaxHP = 1000000,
+                Strength = 1800,      // Devastating mountain blows — each hit is catastrophic
+                Defence = 600,        // Incredibly tanky
                 Agility = 25,
                 AttacksPerRound = 2,  // Slow but each hit is brutal
 
@@ -663,10 +663,10 @@ namespace UsurperRemake.Data
                 Name = "Manwe, The Weary Creator",
                 Title = "Supreme God of Creation and Balance",
                 Level = 100,          // Final boss - the ultimate challenge
-                HP = 500000,          // The Creator — the ultimate battle, requires everything you've got
-                MaxHP = 500000,
-                Strength = 1200,      // The power of creation itself (3x to prevent cheesing)
-                Defence = 300,
+                HP = 1500000,         // The Creator — the ultimate battle, requires everything you've got
+                MaxHP = 1500000,
+                Strength = 2400,      // The power of creation itself — overwhelming divine force
+                Defence = 800,
                 Agility = 200,
                 Wisdom = 350,         // Master of all magic
                 Charisma = 300,

@@ -1273,7 +1273,7 @@ public partial class MagicShopLocation : BaseLocation
         [13] = new[] { ("shadow_silk_thread", 1), ("fading_starlight_dust", 1) },              // Frostbite
     };
 
-    private static readonly string[] StatNames = { "Weapon Power", "Strength", "Dexterity", "Defence", "Wisdom", "Armor Class" };
+    private static readonly string[] StatNames = { "Weapon Power", "Strength", "Dexterity", "Defence", "Wisdom", "Armor Power" };
 
     private async Task EnchantEquipment(Character player)
     {

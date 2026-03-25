@@ -10049,6 +10049,10 @@ public class DungeonLocation : BaseLocation
             }
 
             terminal.WriteLine("");
+            terminal.SetColor("gray");
+            string autoRedistStatus = currentPlayer.AutoRedistributeXP ? Loc.Get("ui.on") : Loc.Get("ui.off");
+            terminal.WriteLine($"  [R] Auto-redistribute on death: {autoRedistStatus}");
+            terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dungeon.xp_adjust_prompt"));
             terminal.WriteLine("");
@@ -10058,6 +10062,15 @@ public class DungeonLocation : BaseLocation
             if (input == "B" || string.IsNullOrEmpty(input))
             {
                 break;
+            }
+            else if (input == "R")
+            {
+                currentPlayer.AutoRedistributeXP = !currentPlayer.AutoRedistributeXP;
+                string newStatus = currentPlayer.AutoRedistributeXP ? Loc.Get("ui.on") : Loc.Get("ui.off");
+                terminal.SetColor("green");
+                terminal.WriteLine($"  Auto-redistribute XP on teammate death: {newStatus}");
+                await GameEngine.Instance.SaveCurrentGame();
+                await Task.Delay(1000);
             }
             else if (input == "E")
             {

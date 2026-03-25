@@ -4010,6 +4010,7 @@ public partial class GameEngine
             AutoLevelUp = playerData.AutoLevelUp,
             AutoEquipDisabled = playerData.AutoEquipDisabled,
             DateFormatPreference = playerData.DateFormatPreference,
+            AutoRedistributeXP = playerData.AutoRedistributeXP,
             TeamXPPercent = playerData.TeamXPPercent ?? TeamXPConfig.DefaultTeamXPPercent.ToArray(),
             Loyalty = playerData.Loyalty,
             Haunt = playerData.Haunt,

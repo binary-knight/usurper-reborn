@@ -2696,7 +2696,7 @@
 
     // Initial fetch + periodic refresh for stats/leaderboards (feeds stay live via SSE)
     fetchStats();
-    setInterval(fetchStats, 30000);
+    setInterval(fetchStats, 120000); // 2 minutes (matches server cache TTL)
 
     // Sponsors
     function fetchSponsors() {

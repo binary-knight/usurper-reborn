@@ -1335,18 +1335,18 @@ namespace UsurperRemake.Systems
             switch (godType)
             {
                 case OldGodType.Maelketh: // Floor 25 — Tutorial boss: enrage only
-                    ctx.EnrageRound = 25;
+                    ctx.EnrageRound = 40;
                     break;
 
                 case OldGodType.Veloura: // Floor 40 — Introduces AoE (party damage spread)
-                    ctx.EnrageRound = 22;
+                    ctx.EnrageRound = 35;
                     ctx.AoEFrequency = 4;
                     ctx.AoEDamage = 300;
                     ctx.AoEAbilityName = "Heartbreak Shatter";
                     break;
 
                 case OldGodType.Thorgrim: // Floor 55 — Introduces channeling (needs interrupter)
-                    ctx.EnrageRound = 20;
+                    ctx.EnrageRound = 35;
                     ctx.AoEFrequency = 4;
                     ctx.AoEDamage = 500;
                     ctx.AoEAbilityName = "Gavel of Judgment";
@@ -1356,7 +1356,7 @@ namespace UsurperRemake.Systems
                     break;
 
                 case OldGodType.Noctura: // Floor 70 — Introduces corruption (needs healer cleanse)
-                    ctx.EnrageRound = 18;
+                    ctx.EnrageRound = 30;
                     ctx.AoEFrequency = 3;
                     ctx.AoEDamage = 700;
                     ctx.AoEAbilityName = "Shadow Tempest";
@@ -1368,7 +1368,7 @@ namespace UsurperRemake.Systems
                     break;
 
                 case OldGodType.Aurelion: // Floor 85 — Introduces doom (needs healer dispel)
-                    ctx.EnrageRound = 16;
+                    ctx.EnrageRound = 28;
                     ctx.AoEFrequency = 3;
                     ctx.AoEDamage = 900;
                     ctx.AoEAbilityName = "Solar Cataclysm";
@@ -1381,7 +1381,7 @@ namespace UsurperRemake.Systems
                     break;
 
                 case OldGodType.Terravok: // Floor 95 — Full mechanics, tighter timers
-                    ctx.EnrageRound = 14;
+                    ctx.EnrageRound = 25;
                     ctx.AoEFrequency = 3;
                     ctx.AoEDamage = 1200;
                     ctx.AoEAbilityName = "World Breaker";
@@ -1394,7 +1394,7 @@ namespace UsurperRemake.Systems
                     break;
 
                 case OldGodType.Manwe: // Floor 100 — Everything at maximum, tightest timers
-                    ctx.EnrageRound = 12;
+                    ctx.EnrageRound = 25;
                     ctx.AoEFrequency = 2;
                     ctx.AoEDamage = 1500;
                     ctx.AoEAbilityName = "Creation's End";

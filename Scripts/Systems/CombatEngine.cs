@@ -3983,7 +3983,7 @@ public partial class CombatEngine
             monsterRoll.Modifier -= penalty;
             monsterRoll.Success = monsterRoll.Total >= monsterRoll.TargetDC;
             terminal.SetColor("dark_gray");
-            terminal.WriteLine($"[{monster.Name} rolls: {monsterRoll.NaturalRoll} + {monsterRoll.Modifier} = {monsterRoll.Total} vs AC {monsterRoll.TargetDC}] (distracted: -{penalty})");
+            terminal.WriteLine($"[{monster.Name} rolls: {monsterRoll.NaturalRoll} + {monsterRoll.Modifier} = {monsterRoll.Total} vs Hit Roll AC {monsterRoll.TargetDC}] (distracted: -{penalty})");
             monster.Distracted = false;
             monster.DistractedPenalty = 0;
         }
@@ -3991,7 +3991,7 @@ public partial class CombatEngine
         {
             // Show the roll result
             terminal.SetColor("dark_gray");
-            terminal.WriteLine($"[{monster.Name} rolls: {monsterRoll.NaturalRoll} + {monsterRoll.Modifier} = {monsterRoll.Total} vs AC {monsterRoll.TargetDC}]");
+            terminal.WriteLine($"[{monster.Name} rolls: {monsterRoll.NaturalRoll} + {monsterRoll.Modifier} = {monsterRoll.Total} vs Hit Roll AC {monsterRoll.TargetDC}]");
         }
 
         // Blur / duplicate miss chance (20%) - additional miss chance on top of D20
@@ -4093,17 +4093,17 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.you_block", monster.Name));
         }
 
-        // Player defense
-        long playerDefense = player.Defence + random.Next(0, (int)Math.Max(1, player.Defence / 8));
+        // Player defense: Defence stat + ArmPow (75-100% variance) + MagicACBonus
+        // This should match the DEF number shown on the combat status bar
+        long playerDefense = player.Defence;
         playerDefense += player.MagicACBonus;
 
         if (player.ArmPow > 0)
         {
-            // v0.41.4: Diminishing returns on armor absorption using sqrt scaling.
-            // Prevents high ArmPow from making players "untouchable" (damage always = 1).
-            // ArmPow 50 → avg 17, ArmPow 200 → avg 35, ArmPow 500 → avg 56
-            int armAbsorbMax = (int)(Math.Sqrt(player.ArmPow) * 5);
-            playerDefense += random.Next(0, armAbsorbMax + 1);
+            // Armor provides 75-100% of its value (same formula as player-attacks-monster path)
+            long armBase = player.ArmPow * 3 / 4;
+            int armVariance = (int)Math.Max(1, player.ArmPow / 4);
+            playerDefense += armBase + random.Next(0, armVariance + 1);
         }
 
         double defenseModifier = GetWeaponConfigDefenseModifier(player);
@@ -4467,7 +4467,8 @@ public partial class CombatEngine
             }
             else
             {
-                long abilityDefense = player.Defence / 3;
+                // Ability defense: Defence stat + 50% ArmPow + MagicACBonus (abilities partially bypass armor)
+                long abilityDefense = player.Defence + (player.ArmPow / 2) + player.MagicACBonus;
                 long actualDamage = Math.Max(1, abilityResult.DirectDamage - abilityDefense);
 
                 // Show defense calculation
@@ -4580,8 +4581,17 @@ public partial class CombatEngine
             }
             else
             {
-                long damage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
-                damage = Math.Max(1, damage - player.Defence);
+                long rawDamage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
+                // Ability defense: Defence stat + 50% ArmPow + MagicACBonus
+                long abilityDef = player.Defence + (player.ArmPow / 2) + player.MagicACBonus;
+                long damage = Math.Max(1, rawDamage - abilityDef);
+
+                // Show defense calculation
+                if (abilityDef > 0 && abilityDef < rawDamage)
+                {
+                    terminal.SetColor("dark_gray");
+                    terminal.WriteLine($"[{rawDamage} damage vs {abilityDef} defense]");
+                }
 
                 // Cap ability damage per hit
                 double capPercent = monster.IsBoss ? 0.85 : 0.75;
@@ -9276,6 +9286,11 @@ public partial class CombatEngine
             terminal.SetColor("bright_blue");
             terminal.Write($"(+{player.MagicACBonus})");
         }
+        // Hit-roll AC (what monsters roll against to determine if they hit)
+        terminal.SetColor("gray");
+        terminal.Write($"  {Loc.Get("combat.bar_ac")}:");
+        terminal.SetColor("bright_green");
+        terminal.Write($"{TrainingSystem.CalculatePlayerHitRollAC(player)}");
         if (player.DamageAbsorptionPool > 0)
         {
             terminal.SetColor("gray");
@@ -9288,7 +9303,7 @@ public partial class CombatEngine
         {
             var statuses = new List<string>();
             foreach (var kv in player.ActiveStatuses)
-                statuses.Add(kv.Value > 0 ? $"{kv.Key}({kv.Value})" : kv.Key.ToString());
+                statuses.Add(kv.Value >= 999 ? kv.Key.ToString() : kv.Value > 0 ? $"{kv.Key}({kv.Value})" : kv.Key.ToString());
             if (player.IsRaging && !statuses.Any(s => s.StartsWith("Raging")))
                 statuses.Add("Raging");
             terminal.SetColor("gray");
@@ -11215,15 +11230,74 @@ public partial class CombatEngine
             }
         }
 
-        // Apply healing
+        // Apply healing (with ally targeting for CanTargetAlly abilities)
         if (abilityResult.Healing > 0)
         {
-            long actualHealing = Math.Min(abilityResult.Healing, player.MaxHP - player.HP);
+            Character healTarget = player;
+            bool healedAlly = false;
+
+            // If ability can target allies, find the best target
+            if (ability.CanTargetAlly && result?.Teammates != null)
+            {
+                var aliveTeammates = result.Teammates.Where(t => t.IsAlive).ToList();
+                if (aliveTeammates.Count > 0)
+                {
+                    if (isPlayer)
+                    {
+                        // Player chooses: show teammate HP and prompt
+                        var candidates = new List<(int idx, Character c, double pct)>();
+                        candidates.Add((0, player, (double)player.HP / Math.Max(1, player.MaxHP)));
+                        for (int ti = 0; ti < aliveTeammates.Count; ti++)
+                            candidates.Add((ti + 1, aliveTeammates[ti], (double)aliveTeammates[ti].HP / Math.Max(1, aliveTeammates[ti].MaxHP)));
+
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine("  Target healing elixir:");
+                        foreach (var (idx, c, pct) in candidates)
+                        {
+                            string hpColor = pct > 0.5 ? "bright_green" : pct > 0.25 ? "yellow" : "red";
+                            terminal.SetColor(hpColor);
+                            terminal.WriteLine($"  [{idx}] {(idx == 0 ? "Yourself" : c.DisplayName)} ({c.HP}/{c.MaxHP} HP)");
+                        }
+                        terminal.SetColor("gray");
+                        string targetInput = await terminal.GetInput("  Target (ENTER=self): ");
+                        if (int.TryParse(targetInput, out int tidx) && tidx > 0 && tidx <= aliveTeammates.Count)
+                        {
+                            healTarget = aliveTeammates[tidx - 1];
+                            healedAlly = true;
+                        }
+                    }
+                    else
+                    {
+                        // NPC AI: heal the most injured party member (including player leader if available)
+                        var mostInjured = aliveTeammates
+                            .Where(t => t.HP < t.MaxHP)
+                            .OrderBy(t => (double)t.HP / Math.Max(1, t.MaxHP))
+                            .FirstOrDefault();
+                        double selfPct = (double)player.HP / Math.Max(1, player.MaxHP);
+                        // Check if there's a player leader who needs healing more
+                        if (mostInjured != null)
+                        {
+                            double worstPct = (double)mostInjured.HP / Math.Max(1, mostInjured.MaxHP);
+                            double npcPct = (double)player.HP / Math.Max(1, player.MaxHP);
+                            if (worstPct < npcPct)
+                            {
+                                healTarget = mostInjured;
+                                healedAlly = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            long actualHealing = Math.Min(abilityResult.Healing, healTarget.MaxHP - healTarget.HP);
             if (actualHealing > 0)
             {
-                player.HP += actualHealing;
+                healTarget.HP += actualHealing;
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_you_recover" : "combat.ability_npc_recovers", actorName, actualHealing));
+                if (healedAlly)
+                    terminal.WriteLine($"{actorName} heals {healTarget.DisplayName} for {actualHealing} HP!");
+                else
+                    terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_you_recover" : "combat.ability_npc_recovers", actorName, actualHealing));
             }
         }
 
@@ -12074,14 +12148,24 @@ public partial class CombatEngine
                 break;
 
             case "abyssal_anchor":
-                // +80 DEF (handled by ability) + enemies deal 20% less (Weakened)
-                if (target != null && target.IsAlive)
+            {
+                // AoE taunt + weaken: force all monsters to attack caster, -20% damage
+                int tauntDur = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                if (monsters != null)
                 {
-                    target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration);
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        m.TauntedBy = player.Name;
+                        m.TauntRoundsLeft = Math.Max(m.TauntRoundsLeft, tauntDur);
+                        m.WeakenRounds = Math.Max(m.WeakenRounds, tauntDur);
+                    }
                 }
+                // +80 DEF handled by DefenseBonus on ability
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine(Loc.Get("combat.ability_abyssal_anchor"));
+                terminal.WriteLine("You become an immovable reef! All enemies are forced to attack you!");
+                terminal.WriteLine("Enemies deal 20% less damage!", "bright_cyan");
                 break;
+            }
 
             case "sanctified_torrent":
             {
@@ -13470,7 +13554,7 @@ public partial class CombatEngine
                             int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
                             tm.MagicACBonus = spellResult.ProtectionBonus;
                             tm.ApplyStatus(StatusEffect.Blessed, dur);
-                            terminal.WriteLine($"{tm.DisplayName} is magically protected! (+{spellResult.ProtectionBonus} AC)", "blue");
+                            terminal.WriteLine($"{tm.DisplayName} is magically protected! (+{spellResult.ProtectionBonus} DEF)", "blue");
                         }
                         if (spellResult.AttackBonus > 0)
                         {
@@ -13532,7 +13616,7 @@ public partial class CombatEngine
                         {
                             tm.MagicACBonus = spellResult.ProtectionBonus;
                             tm.ApplyStatus(StatusEffect.Blessed, dur);
-                            terminal.WriteLine($"{tm.DisplayName} is magically protected! (+{spellResult.ProtectionBonus} AC)", "blue");
+                            terminal.WriteLine($"{tm.DisplayName} is magically protected! (+{spellResult.ProtectionBonus} DEF)", "blue");
                         }
                     }
                 }
@@ -13575,7 +13659,7 @@ public partial class CombatEngine
                         allyTarget.MagicACBonus = spellResult.ProtectionBonus;
                         allyTarget.ApplyStatus(StatusEffect.Blessed, dur);
                         terminal.SetColor("blue");
-                        terminal.WriteLine($"{allyTarget.DisplayName} is magically protected! (+{spellResult.ProtectionBonus} AC)");
+                        terminal.WriteLine($"{allyTarget.DisplayName} is magically protected! (+{spellResult.ProtectionBonus} DEF)");
                     }
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {allyTarget.DisplayName}.");
                 }
@@ -15736,8 +15820,8 @@ public partial class CombatEngine
                     }
                     if (abilityResult.DirectDamage > 0)
                     {
-                        // Use sqrt-scaled defense to prevent high-armor companions from absorbing all damage
-                        long abilityDefense = (long)(Math.Sqrt(companion.Defence) * 3);
+                        // Ability defense: Defence stat + 50% ArmPow (abilities partially bypass armor)
+                        long abilityDefense = companion.Defence + (companion.ArmPow / 2);
                         long actualDmg = Math.Max(1, abilityResult.DirectDamage - abilityDefense);
                         if (abilityDefense > 0)
                         {
@@ -18925,14 +19009,21 @@ public partial class CombatEngine
                 break;
 
             case "abyssal_anchor":
-                // +80 DEF (handled by ability) + enemies deal 20% less (Weakened)
+            {
+                // Taunt + weaken single monster
+                int tauntDur2 = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                 if (monster != null && monster.IsAlive)
                 {
-                    monster.WeakenRounds = Math.Max(monster.WeakenRounds, abilityResult.Duration);
+                    monster.TauntedBy = player.Name;
+                    monster.TauntRoundsLeft = Math.Max(monster.TauntRoundsLeft, tauntDur2);
+                    monster.WeakenRounds = Math.Max(monster.WeakenRounds, tauntDur2);
                 }
+                // +80 DEF handled by DefenseBonus on ability
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine(Loc.Get("combat.ability_abyssal_anchor"));
+                terminal.WriteLine("You become an immovable reef! All enemies are forced to attack you!");
+                terminal.WriteLine("Enemy deals 20% less damage!", "bright_cyan");
                 break;
+            }
 
             case "sanctified_torrent":
             {
@@ -20615,13 +20706,15 @@ public partial class CombatEngine
                 int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
                 attacker.MagicACBonus = spellResult.ProtectionBonus;
                 attacker.ApplyStatus(StatusEffect.Blessed, dur);
-                terminal.WriteLine($"You are magically protected! (+{spellResult.ProtectionBonus} AC for {dur} rounds)", "blue");
+                string durText = dur >= 999 ? "whole fight" : $"{dur} rounds";
+                terminal.WriteLine($"You are magically protected! (+{spellResult.ProtectionBonus} DEF for {durText})", "blue");
             }
             if (spellResult.AttackBonus > 0)
             {
                 int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
                 attacker.ApplyStatus(StatusEffect.PowerStance, dur);
-                terminal.WriteLine($"Your power surges! (+50% damage for {dur} rounds)", "red");
+                string durText = dur >= 999 ? "whole fight" : $"{dur} rounds";
+                terminal.WriteLine($"Your power surges! (+{spellResult.AttackBonus} attack for {durText})", "red");
             }
 
             // Apply special effects to defender (stun, poison, sleep, etc.)
@@ -21272,7 +21365,8 @@ public partial class CombatEngine
             int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
             caster.MagicACBonus = spellResult.ProtectionBonus;
             caster.ApplyStatus(StatusEffect.Blessed, dur);
-            terminal.WriteLine($"{caster.DisplayName} is magically protected! (+{spellResult.ProtectionBonus} AC for {dur} rounds)", "blue");
+            string durText = dur >= 999 ? "whole fight" : $"{dur} rounds";
+            terminal.WriteLine($"{caster.DisplayName} is magically protected! (+{spellResult.ProtectionBonus} DEF for {durText})", "blue");
         }
 
         if (spellResult.AttackBonus > 0)
@@ -21280,7 +21374,8 @@ public partial class CombatEngine
             int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
             caster.TempAttackBonus += spellResult.AttackBonus;
             caster.TempAttackBonusDuration = Math.Max(caster.TempAttackBonusDuration, dur);
-            terminal.WriteLine($"{caster.DisplayName}'s power surges! (+{spellResult.AttackBonus} attack for {dur} rounds)", "red");
+            string durText = dur >= 999 ? "whole fight" : $"{dur} rounds";
+            terminal.WriteLine($"{caster.DisplayName}'s power surges! (+{spellResult.AttackBonus} attack for {durText})", "red");
         }
         
         // Handle special effects

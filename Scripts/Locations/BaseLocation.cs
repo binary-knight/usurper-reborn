@@ -8346,10 +8346,13 @@ public abstract class BaseLocation
                 5 => EquipmentSlot.LFinger,
                 10 => EquipmentSlot.Neck,
                 9 => EquipmentSlot.Waist,
-                _ => EquipmentSlot.MainHand
+                _ => EquipmentSlot.None
             },
-            _ => EquipmentSlot.MainHand
+            _ => EquipmentSlot.None
         };
+
+        if (slot == EquipmentSlot.None)
+            return null; // Unknown item type — can't convert to equipment
 
         // Determine handedness
         WeaponHandedness handedness = WeaponHandedness.None;

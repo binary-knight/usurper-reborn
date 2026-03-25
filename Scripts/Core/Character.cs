@@ -126,6 +126,7 @@ public class Character
     public bool AutoLevelUp { get; set; } = true;  // auto-level when XP threshold met (on by default)
     public bool AutoEquipDisabled { get; set; }      // when true, shop purchases go straight to inventory
     public int DateFormatPreference { get; set; }    // 0=MM/DD/YYYY, 1=DD/MM/YYYY, 2=YYYY-MM-DD
+    public bool AutoRedistributeXP { get; set; } = true; // auto-redistribute XP when teammates die in combat
     public int[] TeamXPPercent { get; set; } = new int[] { 100, 0, 0, 0, 0 };  // per-slot XP percentage (player + 4 teammates, aggregate <= 100)
     public CharacterClass Class { get; set; }       // class
 

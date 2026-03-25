@@ -39,6 +39,7 @@ public static class ClassAbilitySystem
         public int AttackBonus { get; set; }
         public int Duration { get; set; } // Combat rounds
         public string SpecialEffect { get; set; } = "";
+        public bool CanTargetAlly { get; set; } // Heal abilities that can target teammates
     }
 
     public enum AbilityType
@@ -1192,12 +1193,13 @@ public static class ClassAbilitySystem
         {
             Id = "healing_elixir",
             Name = "Healing Elixir",
-            Description = "Drink a prepared healing potion. Enhanced by Potion Mastery.",
+            Description = "Throw a healing potion to yourself or a teammate. Enhanced by Potion Mastery.",
             LevelRequired = 8,
             StaminaCost = 20,
             Cooldown = 3,
             Type = AbilityType.Heal,
             BaseHealing = 50,  // Healing - scales with CON+WIS, +50% from Potion Mastery
+            CanTargetAlly = true,
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },
         ["smoke_bomb"] = new ClassAbility
@@ -1761,8 +1763,8 @@ public static class ClassAbilitySystem
         {
             Id = "abyssal_anchor",
             Name = "Abyssal Anchor",
-            Description = "Root yourself like a reef. +80 defense for 3 rounds. Enemies deal 20% less damage.",
-            LevelRequired = 50, StaminaCost = 65, Cooldown = 5,
+            Description = "Root yourself like a reef. All enemies forced to attack you for 3 rounds. +80 defense, enemies deal 20% less damage.",
+            LevelRequired = 50, StaminaCost = 65, Cooldown = 4,
             Type = AbilityType.Defense, DefenseBonus = 80, Duration = 3,
             SpecialEffect = "abyssal_anchor",
             AvailableToClasses = new[] { CharacterClass.Tidesworn }

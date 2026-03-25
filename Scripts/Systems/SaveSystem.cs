@@ -684,6 +684,7 @@ namespace UsurperRemake.Systems
                 AutoLevelUp = player.AutoLevelUp,
                 AutoEquipDisabled = player.AutoEquipDisabled,
                 DateFormatPreference = player.DateFormatPreference,
+                AutoRedistributeXP = player.AutoRedistributeXP,
                 TeamXPPercent = player.TeamXPPercent,
                 Loyalty = player.Loyalty,
                 Haunt = player.Haunt,

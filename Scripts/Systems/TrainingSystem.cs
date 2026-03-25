@@ -368,6 +368,25 @@ public static class TrainingSystem
     /// <summary>
     /// Roll for monster attack success
     /// </summary>
+    /// <summary>
+    /// Calculate the player's D20 hit-roll AC (what monsters roll against to hit).
+    /// This is NOT the same as ArmPow (damage reduction) or Defence stat.
+    /// </summary>
+    public static int CalculatePlayerHitRollAC(Character target)
+    {
+        int ac = 10 + (int)((target.Dexterity - 10) / 3) + (int)(target.ArmPow / 25) + (target.Level / 10);
+
+        if (target.MagicACBonus > 0)
+            ac += (int)(target.MagicACBonus / 25);
+
+        if (target.HasStatusEffect("evasion"))
+            ac += 10;
+        if (target.HasStatusEffect("invisible"))
+            ac += 5;
+
+        return ac;
+    }
+
     public static RollResult RollMonsterAttack(
         Monster monster,
         Character target,
@@ -378,14 +397,7 @@ public static class TrainingSystem
         // Monster attack modifier (v0.41.4: Level/3 → Level/2 so monsters hit more reliably)
         int monsterMod = monster.Level / 2 + (int)((monster.Strength - 10) / 3);
 
-        // Player's AC: DEX/3 (was /2), ArmPow/25 (was /15) to reduce armor stacking dominance
-        int playerAC = 10 + (int)((target.Dexterity - 10) / 3) + (int)(target.ArmPow / 25) + (target.Level / 10);
-
-        // Check for dodge/evasion effects
-        if (target.HasStatusEffect("evasion"))
-            playerAC += 10;
-        if (target.HasStatusEffect("invisible"))
-            playerAC += 5;
+        int playerAC = CalculatePlayerHitRollAC(target);
 
         return RollD20(monsterMod, playerAC, random);
     }

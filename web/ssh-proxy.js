@@ -43,7 +43,7 @@ const DB_PATH = process.env.DB_PATH || '/var/usurper/usurper_online.db';
 const MUD_MODE = process.env.MUD_MODE !== '0';
 const MUD_HOST = process.env.MUD_HOST || '127.0.0.1';
 const MUD_PORT = parseInt(process.env.MUD_PORT || '4001', 10);
-const CACHE_TTL = 30000; // 30 seconds
+const CACHE_TTL = 120000; // 2 minutes (uncached query takes ~20s with 275 players)
 let _ghReleasesCache = null;
 let _ghReleasesCacheTime = 0;
 const FEED_POLL_MS = 5000; // SSE feed polls DB every 5 seconds
@@ -2700,6 +2700,19 @@ httpServer.listen(WS_PORT, () => {
   console.log(`[usurper-web] Balance API: http://127.0.0.1:${WS_PORT}/api/balance/*`);
   console.log(`[usurper-web] Admin API: http://127.0.0.1:${WS_PORT}/api/admin/*`);
   console.log(`[usurper-web] Proxying SSH to ${SSH_HOST}:${SSH_PORT}`);
+
+  // Pre-warm stats cache on startup so first visitor doesn't wait 20s
+  setTimeout(() => {
+    try { getStats(); console.log('[usurper-web] Stats cache pre-warmed'); } catch (e) {}
+  }, 2000);
+
+  // Background cache refresh — rebuild cache before it expires so no visitor ever hits the cold path
+  setInterval(() => {
+    try {
+      statsCacheTime = 0; // Force cache miss
+      getStats();
+    } catch (e) {}
+  }, CACHE_TTL - 5000); // Refresh 5s before expiry
 });
 
 // --- WebSocket Connection Handler ---
