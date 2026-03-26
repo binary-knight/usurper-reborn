@@ -1540,6 +1540,12 @@ public partial class CombatEngine
             if (!DoorMode.IsInDoorMode && !GameConfig.CompactMode)
                 ShowCombatTipIfNeeded(player);
 
+            // Electron graphical client — emit full combat menu
+            if (GameConfig.ElectronMode)
+            {
+                EmitCombatMenu(player, monster, pvpOpponent, isPvP);
+            }
+
             terminal.SetColor("white");
             terminal.Write(Loc.Get("combat.choose_action"));
 
@@ -7578,6 +7584,33 @@ public partial class CombatEngine
         }
 
         terminal.WriteLine("");
+
+        // Electron client — emit loot item for graphical display
+        if (GameConfig.ElectronMode)
+        {
+            var bonusStats = new Dictionary<string, int>();
+            if (lootItem.Strength != 0) bonusStats["STR"] = lootItem.Strength;
+            if (lootItem.Dexterity != 0) bonusStats["DEX"] = lootItem.Dexterity;
+            if (lootItem.Wisdom != 0) bonusStats["WIS"] = lootItem.Wisdom;
+            if (lootItem.Defence != 0) bonusStats["DEF"] = lootItem.Defence;
+            if (lootItem.Charisma != 0) bonusStats["CHA"] = lootItem.Charisma;
+            if (lootItem.Agility != 0) bonusStats["AGI"] = lootItem.Agility;
+
+            ElectronBridge.EmitLootItem(
+                lootItem.Name,
+                lootItem.Type.ToString(),
+                lootItem.Attack,
+                lootItem.Armor,
+                bonusStats.Count > 0 ? bonusStats : null,
+                rarity.ToString(),
+                lootItem.IsIdentified,
+                new List<ElectronBridge.ChoiceOption>
+                {
+                    new() { Key = "E", Label = "Equip", Style = "treasure" },
+                    new() { Key = "T", Label = "Take", Style = "info" },
+                    new() { Key = "P", Label = "Pass", Style = "info" },
+                });
+        }
     }
 
     /// <summary>
@@ -8998,15 +9031,25 @@ public partial class CombatEngine
                 family = m.FamilyName ?? ""
             }).ToList();
 
+            var teammateData = currentTeammates?.Where(t => t.IsAlive).Select(t => new
+            {
+                name = t.DisplayName,
+                hp = t.HP,
+                maxHp = t.MaxHP,
+                isCompanion = t.IsCompanion,
+                className = t.ClassName
+            }).ToList() ?? new();
+
             ElectronBridge.Emit("combat_status", new
             {
-                round = 0, // round tracked in caller scope
+                round = 0,
                 playerHp = player.HP,
                 playerMaxHp = player.MaxHP,
                 playerMana = player.Mana,
                 playerMaxMana = player.MaxMana,
                 potions = player.Healing,
-                monsters = monsterData
+                monsters = monsterData,
+                teammates = teammateData
             });
         }
 
@@ -10053,6 +10096,12 @@ public partial class CombatEngine
             // Show combat tip occasionally (skip in compact mode to save lines)
             if (!DoorMode.IsInDoorMode && !GameConfig.CompactMode)
                 ShowCombatTipIfNeeded(player);
+
+            // Electron graphical client — emit full combat menu with monsters
+            if (GameConfig.ElectronMode)
+            {
+                EmitCombatMenuMulti(player, monsters);
+            }
 
             terminal.SetColor("white");
             terminal.Write(Loc.Get("combat.choose_action"));
@@ -23083,6 +23132,98 @@ public partial class CombatEngine
     private List<(string key, string name, bool available)> GetClassSpecificActions(Character player)
     {
         return GetQuickbarActions(player).Select(a => (a.key, a.displayName, a.available)).ToList();
+    }
+
+    /// <summary>
+    /// Emit the full combat menu for the Electron graphical client (single monster)
+    /// </summary>
+    private void EmitCombatMenu(Character player, Monster? monster, Character? pvpOpponent, bool isPvP)
+    {
+        var quickbar = GetQuickbarActions(player);
+        var targets = new List<object>();
+        if (monster != null)
+            targets.Add(new { index = 1, name = monster.Name, hp = monster.HP, maxHp = monster.MaxHP, family = monster.FamilyName ?? "" });
+
+        var teammates = currentTeammates?.Where(t => t.IsAlive).Select(t => new
+        {
+            name = t.DisplayName,
+            hp = t.HP,
+            maxHp = t.MaxHP,
+            isCompanion = t.IsCompanion,
+            className = t.ClassName
+        }).ToList() ?? new();
+
+        ElectronBridge.Emit("combat_menu", new
+        {
+            actions = new[]
+            {
+                new { key = "A", label = "Attack", available = true, style = "danger" },
+                new { key = "D", label = "Defend", available = true, style = "info" },
+                new { key = "P", label = "Power Attack", available = true, style = "danger" },
+                new { key = "E", label = "Precise Strike", available = true, style = "danger" },
+                new { key = "I", label = $"Potions ({player.Healing}/{player.MaxPotions})", available = player.Healing > 0, style = "feature" },
+                new { key = "R", label = isPvP ? "Flee" : "Retreat", available = true, style = "info" },
+                new { key = "T", label = "Taunt", available = true, style = "info" },
+                new { key = "L", label = "Hide", available = true, style = "info" },
+            },
+            quickbar = quickbar.Select(q => new { key = q.key, label = q.displayName, available = q.available }).ToArray(),
+            targets,
+            teammates,
+            potions = player.Healing,
+            maxPotions = player.MaxPotions,
+            herbs = player is Player pp ? pp.TotalHerbCount : 0,
+            singleTarget = true
+        });
+    }
+
+    /// <summary>
+    /// Emit the full combat menu for the Electron graphical client (multi-monster)
+    /// </summary>
+    private void EmitCombatMenuMulti(Character player, List<Monster> monsters)
+    {
+        var quickbar = GetQuickbarActions(player);
+        var targets = monsters.Where(m => m.IsAlive).Select((m, i) => new
+        {
+            index = i + 1,
+            name = m.Name,
+            hp = m.HP,
+            maxHp = m.MaxHP,
+            family = m.FamilyName ?? "",
+            status = m.Poisoned ? "poisoned" : m.StunRounds > 0 ? "stunned" : ""
+        }).ToList();
+
+        var teammates = currentTeammates?.Where(t => t.IsAlive).Select(t => new
+        {
+            name = t.DisplayName,
+            hp = t.HP,
+            maxHp = t.MaxHP,
+            isCompanion = t.IsCompanion,
+            className = t.ClassName
+        }).ToList() ?? new();
+
+        ElectronBridge.Emit("combat_menu", new
+        {
+            actions = new[]
+            {
+                new { key = "A", label = "Attack", available = true, style = "danger" },
+                new { key = "D", label = "Defend", available = true, style = "info" },
+                new { key = "P", label = "Power Attack", available = true, style = "danger" },
+                new { key = "E", label = "Precise Strike", available = true, style = "danger" },
+                new { key = "I", label = $"Potions ({player.Healing}/{player.MaxPotions})", available = player.Healing > 0, style = "feature" },
+                new { key = "H", label = "Aid Ally", available = teammates.Count > 0, style = "feature" },
+                new { key = "R", label = "Retreat", available = true, style = "info" },
+                new { key = "T", label = "Taunt", available = true, style = "info" },
+                new { key = "L", label = "Hide", available = true, style = "info" },
+                new { key = "J", label = "Herbs", available = (player is Player pp2 && pp2.TotalHerbCount > 0), style = "info" },
+            },
+            quickbar = quickbar.Select(q => new { key = q.key, label = q.displayName, available = q.available }).ToArray(),
+            targets,
+            teammates,
+            potions = player.Healing,
+            maxPotions = player.MaxPotions,
+            herbs = player is Player pp3 ? pp3.TotalHerbCount : 0,
+            singleTarget = false
+        });
     }
 
     /// <summary>

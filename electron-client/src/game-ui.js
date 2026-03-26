@@ -23,8 +23,16 @@ class GameUI {
       { keywords: ['main street'],                    image: 'main-street.png', filter: '' },
       { keywords: ['dungeon', 'floor'],               image: 'dungeon.png',     filter: '' },
       { keywords: ['inn', 'dormitory'],               image: 'inn.png',         filter: '' },
-      { keywords: ['weapon', 'armor', 'magic shop'],  image: 'inn.png',         filter: 'hue-rotate(20deg) saturate(0.8)' },
+      { keywords: ['weapon shop'],                     image: 'weapon-shop.png', filter: '' },
+      { keywords: ['armor shop'],                      image: 'weapon-shop.png', filter: 'hue-rotate(10deg)' },
+      { keywords: ['magic shop'],                      image: 'inn.png',         filter: 'hue-rotate(200deg) saturate(0.8)' },
+      { keywords: ['temple', 'church'],                image: 'temple.png',      filter: '' },
+      { keywords: ['bank'],                            image: 'bank.png',        filter: '' },
+      { keywords: ['healer'],                          image: 'healer.png',      filter: '' },
+      { keywords: ['castle'],                          image: 'castle.png',      filter: '' },
+      { keywords: ['wilderness'],                      image: 'wilderness.png',  filter: '' },
       { keywords: ['dark alley'],                      image: 'main-street.png', filter: 'brightness(0.35) saturate(0.4)' },
+      { keywords: ['home'],                            image: 'inn.png',         filter: 'brightness(1.1) saturate(0.7)' },
     ];
 
     // Dungeon theme → scene image
@@ -130,6 +138,19 @@ class GameUI {
             <div class="gui-scene-bg" id="gui-scene-bg">
               <div class="gui-npc-area" id="gui-npc-area"></div>
               <div class="gui-scene-title" id="gui-scene-title"></div>
+              <!-- Compass navigation overlay (dungeon) -->
+              <div class="gui-compass" id="gui-compass">
+                <button class="gui-compass-btn gui-compass-n" data-dir="N" title="North">&#9650;</button>
+                <button class="gui-compass-btn gui-compass-w" data-dir="W" title="West">&#9664;</button>
+                <button class="gui-compass-btn gui-compass-e" data-dir="E" title="East">&#9654;</button>
+                <button class="gui-compass-btn gui-compass-s" data-dir="S" title="South">&#9660;</button>
+              </div>
+              <!-- Room action buttons (Fight, Treasure, etc.) -->
+              <div class="gui-room-actions" id="gui-room-actions"></div>
+              <!-- Click-anywhere overlay for "Press any key" -->
+              <div class="gui-press-any" id="gui-press-any" style="display:none">
+                <span>Click or press any key to continue...</span>
+              </div>
             </div>
           </div>
           <!-- Toast notifications -->
@@ -164,6 +185,12 @@ class GameUI {
     this.toastArea = this.container.querySelector('#gui-toast-area');
     this.dock = this.container.querySelector('#gui-dock');
     this.inputEl = this.container.querySelector('#gui-input');
+    this.compass = this.container.querySelector('#gui-compass');
+    this.roomActions = this.container.querySelector('#gui-room-actions');
+    this.pressAny = this.container.querySelector('#gui-press-any');
+
+    // Track game screen state
+    this.screen = 'town'; // town | dungeon | combat | loot
 
     // Input handling
     this.inputEl.addEventListener('keydown', (e) => {
@@ -174,14 +201,44 @@ class GameUI {
       }
     });
 
-    // Keyboard shortcuts for buildings
+    // Compass direction buttons
+    this.compass.querySelectorAll('.gui-compass-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.sendInput(btn.dataset.dir + '\n');
+      });
+    });
+
+    // Press-any-key overlay
+    this.pressAny.addEventListener('click', () => {
+      this.sendInput('\n');
+      this.pressAny.style.display = 'none';
+    });
+
+    // Keyboard shortcuts — single key sends command immediately in graphical mode
     window.addEventListener('keydown', (e) => {
       if (e.target === this.inputEl) return; // don't intercept when typing
       if (e.key === 'F10' || e.key === 'F9') return; // let view toggle through
-      // Single key presses map to building commands
+
+      // Dismiss press-any-key on any keypress
+      if (this.pressAny.style.display !== 'none') {
+        this.sendInput('\n');
+        this.pressAny.style.display = 'none';
+        e.preventDefault();
+        return;
+      }
+
+      // Enter key sends newline (for prompts)
+      if (e.key === 'Enter') {
+        this.sendInput('\n');
+        e.preventDefault();
+        return;
+      }
+
+      // Single key presses map to game commands
       const key = e.key.toUpperCase();
       if (/^[A-Z0-9><!]$/.test(key) && !e.ctrlKey && !e.altKey) {
         this.sendInput(key + '\n');
+        e.preventDefault();
       }
     });
 
@@ -196,12 +253,18 @@ class GameUI {
 
     switch (type) {
       case 'location':
+        this.screen = 'town';
         this._setLocation(data.name);
         if (data.description) this.sceneTitle.textContent = data.description;
+        this.compass.style.display = 'none';
+        this.roomActions.innerHTML = '';
         break;
 
       case 'stats':
         this._updateHUD(data);
+        if (data.className) this.state.playerClass = data.className.toLowerCase().replace(/\s+/g, '-');
+        if (data.raceName) this.state.playerRace = data.raceName;
+        if (data.playerName) this.state.playerName = data.playerName;
         break;
 
       case 'menu':
@@ -226,24 +289,62 @@ class GameUI {
         break;
 
       case 'combat_start':
+        this.screen = 'combat';
         this.state.inCombat = true;
         this.state.combat = data;
         this.state.combatFamily = data.family;
+        this.compass.style.display = 'none';
+        this.roomActions.innerHTML = '';
         this._renderCombatStart(data);
         this._renderCombatDock();
         break;
 
       case 'combat_status':
         this._renderCombatStatus(data);
+        // Combat dock is now rendered by combat_menu event
+        break;
+
+      case 'combat_menu':
+        // Store teammates for rendering in combat_status
+        if (data.teammates) this.state.combatTeammates = data.teammates;
+        this._renderFullCombatMenu(data);
         break;
 
       case 'combat_end':
+        this.screen = 'dungeon';
         this.state.inCombat = false;
         this._renderCombatEnd(data);
         break;
 
       case 'narration':
         this._toast([{ text: data.text, fg: '#c0a050', bold: false }], 'system');
+        break;
+
+      case 'choice':
+        // Render choice buttons overlaid on the scene
+        this._renderChoiceButtons(data.context, data.title, data.options);
+        break;
+
+      case 'loot_item':
+        this._renderLootItem(data);
+        break;
+
+      case 'press_any_key':
+        this.pressAny.style.display = 'flex';
+        break;
+
+      case 'input_prompt':
+        // Generic input prompt — focus the input field
+        if (data.prompt) {
+          this.inputEl.placeholder = data.prompt;
+        }
+        break;
+
+      case 'confirm':
+        this._renderChoiceButtons('confirm', data.question, [
+          { key: 'Y', label: 'Yes', style: 'info' },
+          { key: 'N', label: 'No', style: 'info' },
+        ]);
         break;
 
       default:
@@ -378,7 +479,8 @@ class GameUI {
 
       case LineType.PROMPT:
         if (classified.pressAnyKey) {
-          this._toast([{ text: classified.raw, fg: '#c0a050', bold: false }], 'system');
+          // Show clickable overlay
+          this.pressAny.style.display = 'flex';
         }
         break;
 
@@ -398,11 +500,15 @@ class GameUI {
 
   clearScreen() {
     this.serverMenuItems = [];
-    this.npcArea.innerHTML = '';
     this.sceneTitle.textContent = '';
     this.matcher.resetCombat();
     // Reset location so it re-detects
     this.state.location = '';
+    // Don't clear npcArea or roomActions during combat — they hold monster cards and action buttons
+    if (this.screen !== 'combat') {
+      this.npcArea.innerHTML = '';
+      this.roomActions.innerHTML = '';
+    }
   }
 
   // ─── HUD ────────────────────────────────
@@ -599,12 +705,84 @@ class GameUI {
     this.serverMenuItems = [];
   }
 
+  // ─── Choice/Event Buttons ───────────────
+
+  _renderChoiceButtons(context, title, options) {
+    // Show choice buttons in the room actions area
+    this.roomActions.innerHTML = '';
+
+    if (title) {
+      const titleEl = document.createElement('div');
+      titleEl.className = 'gui-choice-title';
+      titleEl.textContent = title;
+      this.roomActions.appendChild(titleEl);
+    }
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'gui-choice-row';
+
+    for (const opt of options) {
+      const btn = document.createElement('button');
+      btn.className = `gui-room-action-btn ${opt.style || 'info'}`;
+      btn.innerHTML = `<span class="gui-room-action-key">${opt.key}</span>${opt.label}`;
+      btn.addEventListener('click', () => {
+        this.sendInput(opt.key + '\n');
+        this.roomActions.innerHTML = ''; // Clear after choice
+      });
+      btnRow.appendChild(btn);
+    }
+    this.roomActions.appendChild(btnRow);
+  }
+
+  _renderLootItem(data) {
+    // Show loot item card with equip/take/pass buttons
+    this.npcArea.innerHTML = '';
+    this.roomActions.innerHTML = '';
+
+    const loot = document.createElement('div');
+    loot.className = 'gui-loot-card';
+
+    let statsHtml = '';
+    if (data.attack > 0) statsHtml += `<span class="gui-loot-stat atk">ATK: ${data.attack}</span>`;
+    if (data.armor > 0) statsHtml += `<span class="gui-loot-stat def">AC: ${data.armor}</span>`;
+    if (data.bonusStats) {
+      for (const [stat, val] of Object.entries(data.bonusStats)) {
+        if (val > 0) statsHtml += `<span class="gui-loot-stat bonus">+${val} ${stat}</span>`;
+        else if (val < 0) statsHtml += `<span class="gui-loot-stat penalty">${val} ${stat}</span>`;
+      }
+    }
+
+    loot.innerHTML = `
+      <div class="gui-loot-rarity ${data.rarity.toLowerCase()}">${data.rarity}</div>
+      <div class="gui-loot-name">${data.isIdentified ? data.itemName : '??? Unidentified ???'}</div>
+      <div class="gui-loot-type">${data.itemType}</div>
+      <div class="gui-loot-stats">${statsHtml}</div>
+    `;
+    this.npcArea.appendChild(loot);
+
+    // Choice buttons
+    const btnRow = document.createElement('div');
+    btnRow.className = 'gui-choice-row';
+    for (const opt of data.options) {
+      const btn = document.createElement('button');
+      btn.className = `gui-room-action-btn ${opt.style || 'info'}`;
+      btn.innerHTML = `<span class="gui-room-action-key">${opt.key}</span>${opt.label}`;
+      btn.addEventListener('click', () => {
+        this.sendInput(opt.key + '\n');
+        this.roomActions.innerHTML = '';
+      });
+      btnRow.appendChild(btn);
+    }
+    this.roomActions.appendChild(btnRow);
+  }
+
   // ─── Dungeon Room Rendering ─────────────
 
   _renderDungeonRoom(data) {
-    // Clear NPC area and show room info
+    this.screen = 'dungeon';
     this.npcArea.innerHTML = '';
     this.toastArea.innerHTML = '';
+    this.pressAny.style.display = 'none';
 
     // Room info overlay
     const roomInfo = document.createElement('div');
@@ -613,21 +791,181 @@ class GameUI {
       <div class="gui-room-name">${data.roomName}</div>
       <div class="gui-room-desc">${data.description || ''}</div>
       ${data.atmosphere ? `<div class="gui-room-atmo">${data.atmosphere}</div>` : ''}
-      <div class="gui-room-indicators">
-        ${data.hasMonsters && !data.isCleared ? '<span class="gui-indicator danger">Monsters</span>' : ''}
-        ${data.isCleared ? '<span class="gui-indicator cleared">Cleared</span>' : ''}
-        ${data.hasTreasure ? '<span class="gui-indicator treasure">Treasure</span>' : ''}
-        ${data.hasEvent ? '<span class="gui-indicator event">Event</span>' : ''}
-        ${data.hasFeatures ? '<span class="gui-indicator feature">Feature</span>' : ''}
-      </div>
       <div class="gui-room-floor">Floor ${data.floor} — ${data.theme}</div>
     `;
     this.npcArea.appendChild(roomInfo);
+
+    // Update compass — show/hide direction buttons based on available exits
+    this.compass.style.display = 'flex';
+    const exits = data.exits || [];
+    this.compass.querySelector('.gui-compass-n').style.display = exits.includes('N') ? 'flex' : 'none';
+    this.compass.querySelector('.gui-compass-s').style.display = exits.includes('S') ? 'flex' : 'none';
+    this.compass.querySelector('.gui-compass-e').style.display = exits.includes('E') ? 'flex' : 'none';
+    this.compass.querySelector('.gui-compass-w').style.display = exits.includes('W') ? 'flex' : 'none';
+
+    // Room action buttons overlaid on the scene
+    this.roomActions.innerHTML = '';
+    const actions = [];
+    if (data.hasMonsters && !data.isCleared)
+      actions.push({ key: 'F', label: 'Fight', cls: 'danger' });
+    if (data.hasTreasure)
+      actions.push({ key: 'T', label: 'Treasure', cls: 'treasure' });
+    if (data.hasEvent)
+      actions.push({ key: 'V', label: 'Event', cls: 'event' });
+    if (data.hasFeatures)
+      actions.push({ key: 'X', label: 'Examine', cls: 'feature' });
+
+    for (const action of actions) {
+      const btn = document.createElement('button');
+      btn.className = `gui-room-action-btn ${action.cls}`;
+      btn.innerHTML = `<span class="gui-room-action-key">${action.key}</span>${action.label}`;
+      btn.addEventListener('click', () => this.sendInput(action.key + '\n'));
+      this.roomActions.appendChild(btn);
+    }
 
     this.sceneTitle.textContent = data.atmosphere || '';
   }
 
   // ─── Combat Rendering (DD-style) ────────
+
+  _renderFullCombatMenu(data) {
+    // Build dock with all combat actions + quickbar skills
+    this.dock.innerHTML = '';
+
+    // Section 1: Core combat actions
+    const coreSection = document.createElement('div');
+    coreSection.className = 'gui-dock-section';
+    for (const act of data.actions) {
+      if (!act.available && act.key !== 'I') continue; // hide unavailable except potions
+      const btn = this._createDockButton(act.key, act.label, act.available);
+      coreSection.appendChild(btn);
+    }
+    this.dock.appendChild(coreSection);
+
+    // Divider
+    if (data.quickbar && data.quickbar.length > 0) {
+      const div = document.createElement('div');
+      div.className = 'gui-dock-divider';
+      this.dock.appendChild(div);
+    }
+
+    // Section 2: Quickbar skills
+    if (data.quickbar && data.quickbar.length > 0) {
+      const skillSection = document.createElement('div');
+      skillSection.className = 'gui-dock-section';
+      for (const skill of data.quickbar) {
+        const btn = this._createDockButton(skill.key, skill.label, skill.available);
+        if (!skill.available) btn.classList.add('gui-building-disabled');
+        skillSection.appendChild(btn);
+      }
+      this.dock.appendChild(skillSection);
+    }
+
+    // Scene overlay: main action buttons + target selection
+    this.roomActions.innerHTML = '';
+
+    const needsTarget = !data.singleTarget && data.targets && data.targets.length > 1;
+
+    // Row 1: Core combat actions
+    const actionRow = document.createElement('div');
+    actionRow.className = 'gui-choice-row';
+
+    const coreActions = [
+      { key: 'A', label: 'Attack', style: 'danger', target: true },
+      { key: 'D', label: 'Defend', style: 'info', target: false },
+      { key: 'P', label: 'Power', style: 'danger', target: true },
+      { key: 'E', label: 'Precise', style: 'danger', target: true },
+    ];
+    if (data.potions > 0) coreActions.push({ key: 'I', label: `Heal (${data.potions})`, style: 'feature', target: false });
+    coreActions.push({ key: 'R', label: 'Retreat', style: 'info', target: false });
+
+    for (const act of coreActions) {
+      const btn = document.createElement('button');
+      btn.className = `gui-room-action-btn ${act.style}`;
+      btn.innerHTML = `<span class="gui-room-action-key">${act.key}</span>${act.label}`;
+      if (needsTarget && act.target) {
+        btn.addEventListener('click', () => this._showTargetPicker(data.targets, act.key));
+      } else {
+        btn.addEventListener('click', () => this.sendInput(act.key + '\n'));
+      }
+      actionRow.appendChild(btn);
+    }
+    this.roomActions.appendChild(actionRow);
+
+    // Row 2: Quickbar skills (if any)
+    if (data.quickbar && data.quickbar.length > 0) {
+      const skillRow = document.createElement('div');
+      skillRow.className = 'gui-choice-row gui-skill-row';
+
+      for (const skill of data.quickbar) {
+        const btn = document.createElement('button');
+        btn.className = `gui-room-action-btn ${skill.available ? 'event' : 'info'} gui-skill-btn`;
+        if (!skill.available) btn.classList.add('gui-btn-disabled');
+        btn.innerHTML = `<span class="gui-room-action-key">${skill.key}</span>${skill.label}`;
+        if (skill.available) {
+          if (needsTarget) {
+            btn.addEventListener('click', () => this._showTargetPicker(data.targets, skill.key));
+          } else {
+            btn.addEventListener('click', () => this.sendInput(skill.key + '\n'));
+          }
+        }
+        skillRow.appendChild(btn);
+      }
+      this.roomActions.appendChild(skillRow);
+    }
+  }
+
+  _createDockButton(key, label, available) {
+    const btn = document.createElement('div');
+    btn.className = 'gui-building' + (available ? '' : ' gui-building-disabled');
+    btn.innerHTML = `
+      <span class="gui-building-key">${key}</span>
+      <span class="gui-building-name">${label}</span>
+    `;
+    if (available) {
+      btn.addEventListener('click', () => this.sendInput(key + '\n'));
+    }
+    btn.title = `${label} [${key}]`;
+    return btn;
+  }
+
+  _showTargetPicker(targets, actionKey) {
+    // Replace room actions with clickable monster targets
+    this.roomActions.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'gui-choice-title';
+    title.textContent = 'Select Target';
+    this.roomActions.appendChild(title);
+
+    const row = document.createElement('div');
+    row.className = 'gui-choice-row';
+
+    for (const target of targets) {
+      const hpPct = target.maxHp > 0 ? Math.round(target.hp / target.maxHp * 100) : 0;
+      const btn = document.createElement('button');
+      btn.className = 'gui-room-action-btn danger';
+      btn.innerHTML = `<span class="gui-room-action-key">${target.index}</span>${target.name} (${hpPct}%)`;
+      btn.addEventListener('click', () => {
+        // Send action key + target number
+        this.sendInput(actionKey + '\n');
+        // Small delay then send target
+        setTimeout(() => this.sendInput(target.index + '\n'), 100);
+      });
+      row.appendChild(btn);
+    }
+
+    // Random target — send 0 for random
+    const rndBtn = document.createElement('button');
+    rndBtn.className = 'gui-room-action-btn info';
+    rndBtn.innerHTML = '<span class="gui-room-action-key">0</span>Random';
+    rndBtn.addEventListener('click', () => {
+      this.sendInput(actionKey + '\n');
+      setTimeout(() => this.sendInput('0\n'), 150);
+    });
+    row.appendChild(rndBtn);
+
+    this.roomActions.appendChild(row);
+  }
 
   _renderCombatDock() {
     const combatActions = [
@@ -642,69 +980,154 @@ class GameUI {
       { key: 'R', label: 'Retreat', category: 'escape', icon: 'leave' },
     ];
     this._renderDockFromServer(combatActions);
+
+    // Also render main combat buttons in the roomActions area (overlaid on scene)
+    this.roomActions.innerHTML = '';
+    const mainActions = [
+      { key: 'A', label: 'Attack', style: 'danger' },
+      { key: 'D', label: 'Defend', style: 'info' },
+      { key: 'P', label: 'Power', style: 'danger' },
+      { key: 'H', label: 'Heal', style: 'feature' },
+      { key: 'R', label: 'Retreat', style: 'info' },
+    ];
+    for (const action of mainActions) {
+      const btn = document.createElement('button');
+      btn.className = `gui-room-action-btn ${action.style}`;
+      btn.innerHTML = `<span class="gui-room-action-key">${action.key}</span>${action.label}`;
+      btn.addEventListener('click', () => this.sendInput(action.key + '\n'));
+      this.roomActions.appendChild(btn);
+    }
   }
 
   _renderCombatStart(data) {
     this.npcArea.innerHTML = '';
     this.toastArea.innerHTML = '';
 
-    const spriteFile = this.monsterSpriteMap[data.family] || '';
-    const spriteHtml = spriteFile
-      ? `<img class="gui-monster-sprite" src="./assets/monsters/${spriteFile}" alt="${data.monsterName}" onerror="this.style.display='none'">`
-      : '';
+    // DD-style layout: party on left, monsters on right
+    const battlefield = document.createElement('div');
+    battlefield.className = 'gui-battlefield';
 
-    const combat = document.createElement('div');
-    combat.className = 'gui-combat-encounter';
-    combat.innerHTML = `
-      <div class="gui-combat-title">COMBAT</div>
-      <div class="gui-monster-card">
-        ${spriteHtml}
-        <div class="gui-monster-name">${data.monsterName}</div>
-        <div class="gui-monster-level">Level ${data.monsterLevel}${data.isBoss ? ' — BOSS' : ''}</div>
-        <div class="gui-monster-hp-bar">
-          <div class="gui-monster-hp-fill" style="width: 100%"></div>
+    // Left: Player party
+    const partyDiv = document.createElement('div');
+    partyDiv.className = 'gui-party-side';
+    partyDiv.id = 'gui-party-side';
+    // Player character (class sprite facing right)
+    const playerClass = this.state.playerClass || 'warrior';
+    partyDiv.innerHTML = `
+      <div class="gui-combatant gui-player-char">
+        <img class="gui-combatant-sprite" src="./assets/classes/${playerClass}-east.png"
+             alt="${playerClass}" onerror="this.src='./assets/classes/${playerClass}.png'">
+        <div class="gui-combatant-name player-name">${this.state.playerName || 'You'}</div>
+        <div class="gui-combatant-hp-bar">
+          <div class="gui-combatant-hp-fill hp-player" id="gui-player-combat-hp" style="width:100%"></div>
         </div>
-        <div class="gui-monster-hp-text">${data.monsterHp.toLocaleString()} / ${data.monsterMaxHp.toLocaleString()}</div>
       </div>
     `;
-    this.npcArea.appendChild(combat);
+    battlefield.appendChild(partyDiv);
+
+    // Center: VS divider
+    const vs = document.createElement('div');
+    vs.className = 'gui-vs-divider';
+    vs.textContent = 'VS';
+    battlefield.appendChild(vs);
+
+    // Right: Monsters
+    const monsterDiv = document.createElement('div');
+    monsterDiv.className = 'gui-monster-side';
+    monsterDiv.id = 'gui-monster-side';
+    const spriteFile = this.monsterSpriteMap[data.family] || '';
+    // For now single monster — will update with combat_status for multi
+    monsterDiv.innerHTML = this._renderMonsterCombatant(data.monsterName, data.monsterLevel,
+      data.monsterHp, data.monsterMaxHp, data.isBoss, spriteFile, data.family);
+    battlefield.appendChild(monsterDiv);
+
+    this.npcArea.appendChild(battlefield);
+  }
+
+  _renderMonsterCombatant(name, level, hp, maxHp, isBoss, spriteFile, family) {
+    const hpPct = maxHp > 0 ? (hp / maxHp * 100) : 0;
+    const hpClass = hpPct < 25 ? 'critical' : hpPct < 50 ? 'warning' : '';
+    const sprite = spriteFile
+      ? `<img class="gui-combatant-sprite monster-sprite" src="./assets/monsters/${spriteFile}" alt="${name}" onerror="this.style.display='none'">`
+      : `<div class="gui-combatant-sprite gui-monster-placeholder">${name[0]}</div>`;
+    return `
+      <div class="gui-combatant gui-monster-combatant${isBoss ? ' boss' : ''}">
+        ${sprite}
+        <div class="gui-combatant-name monster-name">${name}${isBoss ? ' [BOSS]' : ''}</div>
+        <div class="gui-combatant-level">Lv.${level}</div>
+        <div class="gui-combatant-hp-bar">
+          <div class="gui-combatant-hp-fill hp-monster ${hpClass}" style="width:${hpPct}%"></div>
+        </div>
+        <div class="gui-combatant-hp-text">${hp.toLocaleString()} / ${maxHp.toLocaleString()}</div>
+      </div>
+    `;
   }
 
   _renderCombatStatus(data) {
-    // Update monster HP bars
-    if (data.monsters && data.monsters.length > 0) {
-      // Re-render the combat display with current state
-      this.npcArea.innerHTML = '';
-      const combat = document.createElement('div');
-      combat.className = 'gui-combat-encounter';
+    if (!data.monsters || data.monsters.length === 0) return;
 
-      let monstersHtml = '';
-      for (const m of data.monsters) {
-        const hpPct = m.maxHp > 0 ? (m.hp / m.maxHp * 100) : 0;
-        const hpClass = hpPct < 25 ? 'critical' : hpPct < 50 ? 'warning' : '';
-        const spriteFile = this.monsterSpriteMap[m.family] || '';
-        const spriteHtml = spriteFile
-          ? `<img class="gui-monster-sprite" src="./assets/monsters/${spriteFile}" alt="${m.name}" onerror="this.style.display='none'">`
-          : '';
-        monstersHtml += `
-          <div class="gui-monster-card">
-            ${spriteHtml}
-            <div class="gui-monster-name">${m.name}${m.isBoss ? ' [BOSS]' : ''}</div>
-            <div class="gui-monster-level">Lv.${m.level}${m.status ? ` — ${m.status}` : ''}</div>
-            <div class="gui-monster-hp-bar">
-              <div class="gui-monster-hp-fill ${hpClass}" style="width: ${hpPct}%"></div>
-            </div>
-            <div class="gui-monster-hp-text">${m.hp.toLocaleString()} / ${m.maxHp.toLocaleString()}</div>
+    // Re-render the battlefield with updated HP values
+    this.npcArea.innerHTML = '';
+
+    const battlefield = document.createElement('div');
+    battlefield.className = 'gui-battlefield';
+
+    // Left: Player party
+    const partyDiv = document.createElement('div');
+    partyDiv.className = 'gui-party-side';
+    const playerClass = this.state.playerClass || 'warrior';
+    const playerHpPct = data.playerMaxHp > 0 ? (data.playerHp / data.playerMaxHp * 100) : 100;
+    const playerHpClass = playerHpPct < 25 ? 'critical' : playerHpPct < 50 ? 'warning' : '';
+
+    let partyHtml = `
+      <div class="gui-combatant gui-player-char">
+        <img class="gui-combatant-sprite" src="./assets/classes/${playerClass}-east.png"
+             alt="${playerClass}" onerror="this.src='./assets/classes/${playerClass}.png'">
+        <div class="gui-combatant-name player-name">${this.state.playerName || 'You'}</div>
+        <div class="gui-combatant-hp-bar">
+          <div class="gui-combatant-hp-fill hp-player ${playerHpClass}" style="width:${playerHpPct}%"></div>
+        </div>
+      </div>
+    `;
+
+    // Add teammates if present (from combat_status or stored from combat_menu)
+    const teammates = data.teammates || this.state.combatTeammates || [];
+    for (const tm of teammates) {
+      const tmHpPct = tm.maxHp > 0 ? (tm.hp / tm.maxHp * 100) : 100;
+      const tmClass = (tm.className || '').toLowerCase().replace(/\s+/g, '-');
+      const tmSprite = tmClass
+        ? `<img class="gui-combatant-sprite" src="./assets/classes/${tmClass}-east.png" alt="${tm.name}" onerror="this.className='gui-combatant-sprite gui-teammate-placeholder'; this.textContent='${tm.name[0]}';">`
+        : `<div class="gui-combatant-sprite gui-teammate-placeholder">${tm.name[0]}</div>`;
+      partyHtml += `
+        <div class="gui-combatant gui-teammate">
+          ${tmSprite}
+          <div class="gui-combatant-name">${tm.name}</div>
+          <div class="gui-combatant-hp-bar">
+            <div class="gui-combatant-hp-fill hp-ally" style="width:${tmHpPct}%"></div>
           </div>
-        `;
-      }
-
-      combat.innerHTML = `
-        <div class="gui-combat-title">COMBAT — Round ${data.round || '?'}</div>
-        <div class="gui-combat-monsters">${monstersHtml}</div>
+        </div>
       `;
-      this.npcArea.appendChild(combat);
     }
+    partyDiv.innerHTML = partyHtml;
+    battlefield.appendChild(partyDiv);
+
+    // Center
+    const vs = document.createElement('div');
+    vs.className = 'gui-vs-divider';
+    battlefield.appendChild(vs);
+
+    // Right: Monsters
+    const monsterDiv = document.createElement('div');
+    monsterDiv.className = 'gui-monster-side';
+    let monstersHtml = '';
+    for (const m of data.monsters) {
+      const spriteFile = this.monsterSpriteMap[m.family] || '';
+      monstersHtml += this._renderMonsterCombatant(m.name, m.level, m.hp, m.maxHp, m.isBoss, spriteFile, m.family);
+    }
+    monsterDiv.innerHTML = monstersHtml;
+    battlefield.appendChild(monsterDiv);
+
+    this.npcArea.appendChild(battlefield);
 
     // Update player HUD
     if (data.playerHp !== undefined) {

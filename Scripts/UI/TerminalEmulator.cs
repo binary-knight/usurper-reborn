@@ -924,6 +924,12 @@ public partial class TerminalEmulator
     
     public async Task<string> GetInput(string prompt = "> ")
     {
+        // Electron graphical client — signal that we're waiting for input
+        if (GameConfig.ElectronMode)
+        {
+            ElectronBridge.Emit("input_prompt", new { prompt = prompt.Trim() });
+        }
+
         // MUD stream mode - read from TCP stream
         if (_streamWriter != null && _streamReader != null)
         {
@@ -1395,6 +1401,9 @@ public partial class TerminalEmulator
     public async Task PressAnyKey(string? message = null)
     {
         message ??= UsurperRemake.Systems.Loc.Get("ui.press_any_key");
+
+        // Electron graphical client — signal press-any-key
+        ElectronBridge.EmitPressAnyKey();
 
         // MUD stream mode — must use line input (Enter to continue)
         if (_streamWriter != null && _streamReader != null)

@@ -3,8 +3,12 @@ dist/
 out/
 *.log
 
+# Game save data (created when running locally)
+DATA/
+
 # PixelLab job tracking files (temp, regenerated as needed)
 assets/*_jobs.txt
+assets/*_jobs2.txt
 
 # API docs (downloaded on demand)
 pixellab-api-docs.txt

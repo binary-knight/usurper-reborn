@@ -55,12 +55,13 @@ public static class ElectronBridge
     // ─── Player Stats ─────────────────────────
 
     public static void EmitStats(long hp, long maxHp, long mana, long maxMana,
-        long stamina, long maxStamina, long gold, int level, string className, string raceName)
+        long stamina, long maxStamina, long gold, int level, string className, string raceName,
+        string? playerName = null)
     {
         Emit("stats", new
         {
             hp, maxHp, mana, maxMana, stamina, maxStamina,
-            gold, level, className, raceName
+            gold, level, className, raceName, playerName
         });
     }
 
@@ -100,7 +101,72 @@ public static class ElectronBridge
         Emit("prompt", new { prompt, options });
     }
 
+    // ─── Dungeon Events ──────────────────────
+
+    /// <summary>
+    /// Emit a choice prompt with labeled options for the Electron client.
+    /// The client renders these as clickable buttons.
+    /// </summary>
+    public static void EmitChoicePrompt(string context, string title, List<ChoiceOption> options)
+    {
+        Emit("choice", new { context, title, options });
+    }
+
+    /// <summary>Emit an event encounter with choices</summary>
+    public static void EmitEventEncounter(string eventType, string title, string description, List<ChoiceOption> options)
+    {
+        Emit("event_encounter", new { eventType, title, description, options });
+    }
+
+    /// <summary>Emit loot item for pickup</summary>
+    public static void EmitLootItem(string itemName, string itemType, int attack, int armor,
+        Dictionary<string, int>? bonusStats, string rarity, bool isIdentified, List<ChoiceOption> options)
+    {
+        Emit("loot_item", new { itemName, itemType, attack, armor, bonusStats, rarity, isIdentified, options });
+    }
+
+    /// <summary>Emit combat target selection</summary>
+    public static void EmitTargetSelection(string action, List<TargetOption> targets)
+    {
+        Emit("target_select", new { action, targets });
+    }
+
+    /// <summary>Emit floor overview</summary>
+    public static void EmitFloorOverview(int floor, string theme, int totalRooms, int clearedRooms,
+        bool hasStairs, bool hasBoss, List<ChoiceOption> options)
+    {
+        Emit("floor_overview", new { floor, theme, totalRooms, clearedRooms, hasStairs, hasBoss, options });
+    }
+
+    /// <summary>Emit a "press any key" signal</summary>
+    public static void EmitPressAnyKey()
+    {
+        Emit("press_any_key", new { });
+    }
+
+    /// <summary>Emit confirmation prompt (Y/N)</summary>
+    public static void EmitConfirm(string question)
+    {
+        Emit("confirm", new { question });
+    }
+
     // ─── Data Types ───────────────────────────
+
+    public class ChoiceOption
+    {
+        public string Key { get; set; } = "";
+        public string Label { get; set; } = "";
+        public string? Style { get; set; }  // "danger", "treasure", "info", etc.
+    }
+
+    public class TargetOption
+    {
+        public int Index { get; set; }
+        public string Name { get; set; } = "";
+        public long Hp { get; set; }
+        public long MaxHp { get; set; }
+        public string? Status { get; set; }
+    }
 
     public class MenuItemData
     {

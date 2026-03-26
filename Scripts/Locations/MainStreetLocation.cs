@@ -579,7 +579,8 @@ public class MainStreetLocation : BaseLocation
             isManaClass ? 0 : currentPlayer.Stamina,
             isManaClass ? 0 : currentPlayer.BaseStamina,
             currentPlayer.Gold, currentPlayer.Level,
-            currentPlayer.ClassName, currentPlayer.Race.ToString());
+            currentPlayer.ClassName, currentPlayer.Race.ToString(),
+            currentPlayer.DisplayName);
 
         // Menu items
         int tier = currentPlayer.Level <= 2 ? 1 : currentPlayer.Level <= 4 ? 2 : 3;

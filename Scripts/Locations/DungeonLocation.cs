@@ -2916,6 +2916,17 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// Helper: emit a choice prompt for the Electron graphical client before a GetInput call.
+    /// No-op if not in Electron mode.
+    /// </summary>
+    private void EmitChoices(string context, string title, params (string key, string label, string style)[] options)
+    {
+        if (!GameConfig.ElectronMode) return;
+        var choiceList = options.Select(o => new ElectronBridge.ChoiceOption { Key = o.key, Label = o.label, Style = o.style }).ToList();
+        ElectronBridge.EmitChoicePrompt(context, title, choiceList);
+    }
+
+    /// <summary>
     /// Emit structured dungeon state for the Electron graphical client
     /// </summary>
     private void EmitDungeonEvents(DungeonRoom room, Character player)
@@ -2974,7 +2985,8 @@ public class DungeonLocation : BaseLocation
             isManaClass ? player.Mana : 0, isManaClass ? player.MaxMana : 0,
             isManaClass ? 0 : player.Stamina, isManaClass ? 0 : player.BaseStamina,
             player.Gold, player.Level,
-            player.ClassName, player.Race.ToString());
+            player.ClassName, player.Race.ToString(),
+            player.DisplayName);
     }
 
     private void ShowQuickStatus(Character player)
@@ -6719,6 +6731,9 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         // Chance to find supplies
+        EmitChoices("fallen_adventurer", "Fallen Adventurer",
+            ("S", "Search Remains", "treasure"),
+            ("P", "Pray for the Fallen", "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.fallen_adventurer_choice"));
 
         if (choice.ToUpper() == "S")
@@ -6863,6 +6878,9 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.portal_description_2"));
         terminal.WriteLine("");
 
+        EmitChoices("portal", "Mysterious Portal",
+            ("E", "Enter the Portal", "event"),
+            ("S", "Study it Carefully", "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.portal_choice"));
         var currentPlayer = GetCurrentPlayer();
 
@@ -7021,6 +7039,9 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
+        EmitChoices("duelist", "A Challenger Approaches",
+            ("A", "Accept Challenge", "danger"),
+            ("D", "Decline", "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.duelist_choice"));
 
         if (choice.ToUpper() == "A")
@@ -7339,6 +7360,10 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.treasure_chest_discover"), "cyan");
         terminal.WriteLine("");
 
+        EmitChoices("treasure_chest", "Treasure Chest",
+            ("O", "Open", "treasure"),
+            ("S", "Search for Traps", "info"),
+            ("L", "Leave It", "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.treasure_chest_choice"));
 
         var currentPlayer = GetCurrentPlayer();
@@ -7723,6 +7748,10 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.wounded_begs"), "yellow");
         terminal.WriteLine("");
 
+        EmitChoices("wounded_man", "Wounded Man",
+            ("H", "Heal Him", "info"),
+            ("R", "Rob Him", "danger"),
+            ("I", "Ignore", "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.wounded_choice"));
 
         var currentPlayer = GetCurrentPlayer();
@@ -7807,6 +7836,10 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.shrine_offerings"), "gray");
         terminal.WriteLine("");
 
+        EmitChoices("shrine", "Mysterious Shrine",
+            ("P", "Pray", "info"),
+            ("D", "Desecrate", "danger"),
+            ("L", "Leave", "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.shrine_choice"));
 
         if (choice.ToUpper() == "P")
