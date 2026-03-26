@@ -192,17 +192,36 @@ public class MudServer
             }
 
             // Check for X-IP forwarded client IP from relay/proxy
+            string? proxyClientType = null;
             if (authLine != null && authLine.StartsWith("X-IP:"))
             {
                 forwardedIP = authLine.Substring(5).Trim();
                 Console.Error.WriteLine($"[MUD] Forwarded client IP: {forwardedIP}");
-                // Read the next line for AUTH header
+                // Read the next line for AUTH header or X-Client
                 authLine = null;
                 try
                 {
                     using var authCts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
                     authCts2.CancelAfter(TimeSpan.FromMilliseconds(500));
                     authLine = await ReadLineAsync(stream, authCts2.Token);
+                    // Check for X-Client type header (Web, Electron, etc.)
+                    if (authLine != null && authLine.StartsWith("X-Client:"))
+                    {
+                        proxyClientType = authLine.Substring(9).Trim();
+                        Console.Error.WriteLine($"[MUD] Client type: {proxyClientType}");
+                        // Read one more line for potential AUTH header
+                        authLine = null;
+                        try
+                        {
+                            using var authCts3 = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                            authCts3.CancelAfter(TimeSpan.FromMilliseconds(500));
+                            authLine = await ReadLineAsync(stream, authCts3.Token);
+                        }
+                        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                        {
+                            isInteractive = true;
+                        }
+                    }
                 }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                 {
@@ -250,7 +269,7 @@ public class MudServer
                     return;
                 }
                 username = result.Value.username;
-                connectionType = result.Value.connectionType;
+                connectionType = proxyClientType ?? result.Value.connectionType;
             }
             else
             {

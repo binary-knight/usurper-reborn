@@ -1,0 +1,475 @@
+/* Usurper Reborn — Darkest Dungeon-style Game UI */
+
+:root {
+  --bg-void: #020204;
+  --bg-darkest: #050508;
+  --bg-dark: #0a0a12;
+  --bg-panel: #12101a;
+  --bg-panel-hover: #1a1828;
+  --border-dark: #1a1a2e;
+  --border-accent: #8a7030;
+  --border-gold: #c0a050;
+  --text-default: #b0a898;
+  --text-bright: #e0d8c8;
+  --text-dim: #605850;
+  --text-faint: #3a3530;
+  --gold: #c0a050;
+  --gold-bright: #ffe0a0;
+  --gold-dim: #6a5828;
+  --red: #8a2020;
+  --red-bright: #cc3333;
+  --red-glow: #ff4444;
+  --green: #2a7a2a;
+  --green-bright: #55cc55;
+  --blue: #3344aa;
+  --blue-bright: #5577dd;
+  --parchment: #1a1610;
+  --parchment-light: #2a2418;
+}
+
+/* ═══════════════════════════════════════════ */
+/* FULL LAYOUT                                 */
+/* ═══════════════════════════════════════════ */
+
+.gui-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-void);
+  font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+  color: var(--text-default);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ═══════════════════════════════════════════ */
+/* TOP HUD BAR                                 */
+/* ═══════════════════════════════════════════ */
+
+.gui-hud {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  background:
+    linear-gradient(to bottom, rgba(20, 16, 10, 0.95), rgba(8, 6, 4, 0.98));
+  border-bottom: 1px solid var(--border-gold);
+  flex-shrink: 0;
+  gap: 12px;
+  z-index: 10;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.gui-hud-left, .gui-hud-right {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.gui-hud-center {
+  flex: 1;
+  text-align: center;
+}
+
+.gui-location-name {
+  color: var(--gold);
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(192, 160, 80, 0.4), 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.gui-hud-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gui-hud-label {
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.gui-hud-value {
+  font-size: 12px;
+  color: var(--text-bright);
+}
+
+.gui-gold { color: var(--gold-bright) !important; }
+
+/* Health/Resource bars */
+.gui-bar-track {
+  width: 110px;
+  height: 10px;
+  background: #0a0404;
+  border: 1px solid #2a1515;
+  border-radius: 1px;
+  overflow: hidden;
+  position: relative;
+}
+
+.gui-bar-track::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(0,0,0,0.1) 100%);
+  pointer-events: none;
+}
+
+.gui-bar-fill {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.gui-bar-hp {
+  background: linear-gradient(to bottom, #44aa44, #1a6a1a);
+}
+
+.gui-bar-hp.warning {
+  background: linear-gradient(to bottom, #aaaa33, #6a6a1a);
+}
+
+.gui-bar-hp.critical {
+  background: linear-gradient(to bottom, #aa2222, #6a1a1a);
+  animation: pulse-critical 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-critical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.gui-bar-stamina {
+  background: linear-gradient(to bottom, #aa8822, #6a5515);
+}
+
+.gui-bar-mana {
+  background: linear-gradient(to bottom, #3355aa, #1a2a6a);
+}
+
+/* ═══════════════════════════════════════════ */
+/* MAIN SCENE — Full screen estate view        */
+/* ═══════════════════════════════════════════ */
+
+.gui-main {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.gui-scene {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gui-scene-bg {
+  flex: 1;
+  position: relative;
+  background: radial-gradient(ellipse at center bottom, #0e0e1a 0%, var(--bg-void) 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  transition: filter 0.8s ease;
+}
+
+/* Vignette overlay for atmosphere */
+.gui-scene-bg::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.6) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Bottom shadow for dock readability */
+.gui-scene-bg::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 50%;
+  background: linear-gradient(to top, rgba(2, 2, 4, 0.85) 0%, rgba(2, 2, 4, 0.4) 40%, transparent 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Scene title bar (location description) */
+.gui-scene-title {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 20px;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  z-index: 3;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════ */
+/* TOAST NOTIFICATIONS (NPC activity, events)  */
+/* ═══════════════════════════════════════════ */
+
+.gui-toast-area {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 320px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.gui-toast {
+  padding: 8px 14px;
+  background: rgba(10, 8, 6, 0.88);
+  border: 1px solid var(--border-dark);
+  border-left: 3px solid var(--gold-dim);
+  border-radius: 2px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-default);
+  animation: toast-in 0.4s ease, toast-out 0.6s ease 5s forwards;
+  backdrop-filter: blur(4px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.gui-toast.toast-system {
+  border-left-color: var(--gold);
+  color: var(--gold);
+}
+
+.gui-toast.toast-npc {
+  border-left-color: #4a4a6a;
+  opacity: 0.8;
+}
+
+.gui-toast.toast-combat {
+  border-left-color: var(--red-bright);
+}
+
+.gui-toast.toast-heal {
+  border-left-color: var(--green-bright);
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; }
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ═══════════════════════════════════════════ */
+/* BUILDING DOCK — DD-style estate navigation  */
+/* ═══════════════════════════════════════════ */
+
+.gui-dock {
+  position: relative;
+  z-index: 5;
+  flex-shrink: 0;
+  background:
+    linear-gradient(to top, rgba(8, 6, 4, 0.98), rgba(14, 10, 8, 0.95));
+  border-top: 1px solid var(--border-gold);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.8);
+}
+
+.gui-dock-scroll {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  overflow-x: auto;
+  justify-content: center;
+}
+
+.gui-dock-scroll::-webkit-scrollbar { height: 0; }
+
+/* Building button */
+.gui-building {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 12px 6px;
+  min-width: 72px;
+  background: linear-gradient(to bottom, var(--bg-panel), var(--bg-darkest));
+  border: 1px solid var(--border-dark);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.gui-building::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--gold-dim), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.gui-building:hover {
+  background: linear-gradient(to bottom, var(--bg-panel-hover), var(--bg-panel));
+  border-color: var(--border-gold);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 20px rgba(192, 160, 80, 0.08);
+}
+
+.gui-building:hover::before {
+  opacity: 1;
+}
+
+.gui-building:active {
+  transform: translateY(0);
+  background: var(--parchment);
+}
+
+.gui-building-icon {
+  font-size: 20px;
+  line-height: 1;
+  filter: grayscale(0.3);
+}
+
+.gui-building:hover .gui-building-icon {
+  filter: grayscale(0);
+}
+
+.gui-building-name {
+  font-size: 8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.gui-building:hover .gui-building-name {
+  color: var(--gold);
+}
+
+.gui-building-key {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 8px;
+  color: var(--text-faint);
+  font-weight: bold;
+}
+
+.gui-building:hover .gui-building-key {
+  color: var(--gold-dim);
+}
+
+/* Building categories */
+.gui-dock-section {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.gui-dock-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--border-dark);
+  margin: 0 6px;
+  align-self: center;
+}
+
+/* ═══════════════════════════════════════════ */
+/* INPUT BAR                                   */
+/* ═══════════════════════════════════════════ */
+
+.gui-input-row {
+  padding: 4px 12px 6px;
+  background: var(--bg-darkest);
+  border-top: 1px solid var(--border-dark);
+  z-index: 5;
+}
+
+.gui-input {
+  width: 100%;
+  background: var(--bg-panel);
+  color: var(--text-bright);
+  border: 1px solid var(--border-dark);
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  border-radius: 2px;
+  outline: none;
+}
+
+.gui-input:focus {
+  border-color: var(--gold-dim);
+  box-shadow: 0 0 8px rgba(192, 160, 80, 0.1);
+}
+
+.gui-input::placeholder {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════ */
+/* NPC AREA — floating names in the scene      */
+/* ═══════════════════════════════════════════ */
+
+.gui-npc-area {
+  position: absolute;
+  bottom: 20%;
+  left: 5%;
+  right: 5%;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.gui-npc-tag {
+  padding: 3px 10px;
+  background: rgba(5, 5, 10, 0.7);
+  border: 1px solid rgba(100, 90, 70, 0.2);
+  border-radius: 2px;
+  font-size: 10px;
+  color: var(--text-dim);
+  backdrop-filter: blur(2px);
+  animation: npc-appear 0.6s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes npc-appear {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════ */
+/* GRAPHICAL VIEW container (active state)     */
+/* ═══════════════════════════════════════════ */
+
+#graphical-view {
+  display: none;
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+}
+
+#graphical-view.active {
+  display: flex;
+  flex-direction: column;
+}

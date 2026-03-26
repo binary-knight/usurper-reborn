@@ -296,6 +296,8 @@ const ALLOWED_ORIGINS = [
   'http://usurper-reborn.net',
   'http://www.usurper-reborn.net',
   'http://localhost',
+  'file://',            // Electron desktop client
+  'app://',             // Electron custom protocol
 ];
 
 // --- Database Setup ---
@@ -2733,10 +2735,14 @@ wss.on('connection', (ws, req) => {
     // MUD mode: connect directly to TCP game server (lower latency, no SSH overhead)
     // No AUTH header is sent — the MUD server detects the raw connection and
     // presents an interactive login/register menu directly to the user.
+    // Detect client type from origin header
+    const clientType = origin.startsWith('file://') || origin.startsWith('app://') ? 'Electron' : 'Web';
+
     const tcp = net.connect({ host: MUD_HOST, port: MUD_PORT }, () => {
-      console.log(`[usurper-web] TCP connected to MUD server for ${clientIP}`);
-      // Forward real client IP to game server before interactive auth begins
+      console.log(`[usurper-web] TCP connected to MUD server for ${clientIP} (${clientType})`);
+      // Forward real client IP and client type to game server
       tcp.write(`X-IP:${clientIP}\n`);
+      tcp.write(`X-Client:${clientType}\n`);
     });
 
     // TCP → WebSocket

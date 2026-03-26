@@ -445,6 +445,7 @@ namespace UsurperRemake.Systems
                 "BBS" => "BBS",
                 "Steam" => "Steam",
                 "Local" => "Local",
+                "Electron" => "App",
                 _ => "?"
             };
         }

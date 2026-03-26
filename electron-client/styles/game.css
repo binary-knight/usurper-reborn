@@ -1,0 +1,254 @@
+/* Usurper Reborn — Graphical Renderer Styles */
+
+/* Graphical view container */
+#graphical-view {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  background: #000000;
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+  color: #c0c0c0;
+}
+
+#graphical-view.active {
+  display: flex;
+}
+
+/* Status bar — persistent HP/MP/Gold/Level display */
+#gr-status-bar {
+  display: flex;
+  gap: 20px;
+  padding: 6px 12px;
+  background: #0a0a1a;
+  border-bottom: 1px solid #2a2a4a;
+  min-height: 28px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.gr-stat {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.gr-stat-label {
+  color: #888;
+  margin-right: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* Main output area */
+#gr-main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#gr-output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#gr-output::-webkit-scrollbar { width: 8px; }
+#gr-output::-webkit-scrollbar-track { background: #0a0a0a; }
+#gr-output::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 4px; }
+#gr-output::-webkit-scrollbar-thumb:hover { background: #c0a050; }
+
+/* Line types */
+.gr-line {
+  margin-bottom: 1px;
+  white-space: pre-wrap;
+  animation: fadeIn 0.15s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+
+.gr-empty { height: 8px; }
+
+/* Box rendering — styled borders instead of box-drawing chars */
+.gr-box-top {
+  border-top: 2px solid #4040aa;
+  margin-top: 8px;
+  height: 0;
+}
+
+.gr-box-bottom {
+  border-bottom: 2px solid #4040aa;
+  margin-bottom: 8px;
+  height: 0;
+}
+
+.gr-box-divider {
+  border-top: 1px solid #3030888;
+  margin: 4px 0;
+  height: 0;
+}
+
+.gr-box-line {
+  padding: 2px 8px;
+  background: rgba(20, 20, 60, 0.3);
+  white-space: pre-wrap;
+}
+
+.gr-separator {
+  border-top: 1px solid #2a2a4a;
+  margin: 6px 0;
+  height: 0;
+}
+
+/* Menu items — clickable */
+.gr-menu-item-line {
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+
+.gr-menu-item-line:hover {
+  background: rgba(192, 160, 80, 0.15);
+}
+
+.gr-menu-key {
+  color: #c0a050;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.gr-menu-label {
+  color: #c0c0c0;
+}
+
+/* Multi-item menu lines (inline clickable items) */
+.gr-multi-menu-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0;
+}
+
+.gr-inline-menu-item {
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 3px;
+  color: #c0c0c0;
+  font-size: 12px;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+
+.gr-inline-menu-item:hover {
+  background: rgba(192, 160, 80, 0.15);
+}
+
+.gr-inline-menu-item .gr-menu-key {
+  margin-right: 2px;
+}
+
+/* Combat line styles */
+.gr-combat-hit {
+  border-left: 3px solid #ff5555;
+  padding-left: 8px;
+  margin-left: 4px;
+}
+
+.gr-combat-miss {
+  border-left: 3px solid #555555;
+  padding-left: 8px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.gr-combat-heal {
+  border-left: 3px solid #55ff55;
+  padding-left: 8px;
+  margin-left: 4px;
+}
+
+.gr-prompt {
+  color: #c0a050;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* Input area */
+#gr-input-area {
+  flex-shrink: 0;
+  background: #0a0a1a;
+  border-top: 1px solid #2a2a4a;
+}
+
+/* Menu button bar */
+#gr-menu-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 8px;
+  min-height: 0;
+}
+
+#gr-menu-buttons:empty {
+  display: none;
+}
+
+.gr-menu-btn {
+  background: #1a1a3a;
+  color: #c0c0c0;
+  border: 1px solid #3a3a6a;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.1s;
+}
+
+.gr-menu-btn:hover {
+  background: #2a2a5a;
+  border-color: #c0a050;
+  color: #ffffff;
+}
+
+.gr-menu-btn:active {
+  background: #c0a050;
+  color: #000000;
+}
+
+.gr-btn-key {
+  color: #c0a050;
+  font-weight: bold;
+  margin-right: 2px;
+}
+
+/* Text input */
+#gr-input-row {
+  padding: 4px 8px 6px;
+}
+
+#gr-input {
+  width: 100%;
+  background: #111122;
+  color: #c0c0c0;
+  border: 1px solid #3a3a6a;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  border-radius: 3px;
+  outline: none;
+}
+
+#gr-input:focus {
+  border-color: #c0a050;
+  box-shadow: 0 0 8px rgba(192, 160, 80, 0.2);
+}
+
+#gr-input::placeholder {
+  color: #4a4a6a;
+}
