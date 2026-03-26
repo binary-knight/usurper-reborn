@@ -42,6 +42,16 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task ShowInventory()
         {
+            // Electron graphical client — show overlay, delegate actions to text system
+            if (GameConfig.ElectronMode)
+            {
+                EmitInventoryEvent();
+                var input = (await terminal.GetInput("")).Trim().ToUpper();
+                if (input == "Q" || input == "") return;
+                // Any other input (B1, B2, slot keys, U, etc.) falls through
+                // to the regular text inventory system which handles all validation
+            }
+
             bool exitInventory = false;
 
             while (!exitInventory)
@@ -54,6 +64,91 @@ namespace UsurperRemake.Systems
                 var choice = await terminal.GetInput(Loc.Get("inventory.prompt"));
                 exitInventory = await ProcessInventoryChoice(choice.ToUpper().Trim());
             }
+        }
+
+        private static ObjType SlotToObjType(EquipmentSlot slot) => slot switch
+        {
+            EquipmentSlot.MainHand => ObjType.Weapon,
+            EquipmentSlot.OffHand => ObjType.Shield,
+            EquipmentSlot.Head => ObjType.Head,
+            EquipmentSlot.Body => ObjType.Body,
+            EquipmentSlot.Arms => ObjType.Arms,
+            EquipmentSlot.Hands => ObjType.Hands,
+            EquipmentSlot.Legs => ObjType.Legs,
+            EquipmentSlot.Feet => ObjType.Feet,
+            EquipmentSlot.Waist => ObjType.Waist,
+            EquipmentSlot.Face => ObjType.Face,
+            EquipmentSlot.Cloak => ObjType.Abody,
+            EquipmentSlot.Neck => ObjType.Neck,
+            EquipmentSlot.LFinger => ObjType.Fingers,
+            EquipmentSlot.RFinger => ObjType.Fingers,
+            _ => ObjType.Weapon
+        };
+
+        private static EquipmentSlot InferSlotFromItem(Item item) => item.Type switch
+        {
+            ObjType.Weapon => EquipmentSlot.MainHand,
+            ObjType.Shield => EquipmentSlot.OffHand,
+            ObjType.Head => EquipmentSlot.Head,
+            ObjType.Body => EquipmentSlot.Body,
+            ObjType.Arms => EquipmentSlot.Arms,
+            ObjType.Hands => EquipmentSlot.Hands,
+            ObjType.Legs => EquipmentSlot.Legs,
+            ObjType.Feet => EquipmentSlot.Feet,
+            ObjType.Waist => EquipmentSlot.Waist,
+            ObjType.Face => EquipmentSlot.Face,
+            ObjType.Abody => EquipmentSlot.Cloak,
+            ObjType.Neck => EquipmentSlot.Neck,
+            ObjType.Fingers => EquipmentSlot.LFinger,
+            _ => EquipmentSlot.None
+        };
+
+        private void EmitInventoryEvent()
+        {
+            var slots = new[] {
+                EquipmentSlot.MainHand, EquipmentSlot.OffHand, EquipmentSlot.Head,
+                EquipmentSlot.Body, EquipmentSlot.Arms, EquipmentSlot.Hands,
+                EquipmentSlot.Legs, EquipmentSlot.Feet, EquipmentSlot.Waist,
+                EquipmentSlot.Face, EquipmentSlot.Cloak, EquipmentSlot.Neck,
+                EquipmentSlot.LFinger, EquipmentSlot.RFinger
+            };
+
+            var equipment = slots.Select(s =>
+            {
+                var item = player.GetEquipment(s);
+                if (item == null) return new { slot = s.ToString(), name = "(empty)", attack = 0, defense = 0, rarity = "common", identified = true };
+                return new
+                {
+                    slot = s.ToString(),
+                    name = item.IsIdentified ? item.Name : "???",
+                    attack = item.WeaponPower,
+                    defense = item.ArmorClass,
+                    rarity = item.Rarity.ToString().ToLower(),
+                    identified = item.IsIdentified,
+                };
+            }).ToList();
+
+            var backpack = player.Inventory?.Select(item => new
+            {
+                name = item.Name,
+                type = item.Type.ToString(),
+                attack = item.Attack,
+                defense = item.Armor,
+                value = item.Value,
+            }).ToList() ?? new();
+
+            ElectronBridge.Emit("inventory", new
+            {
+                playerName = player.DisplayName,
+                level = player.Level,
+                className = player.ClassName,
+                gold = player.Gold,
+                equipment,
+                backpack,
+                isTwoHanding = player.IsTwoHanding,
+                isDualWielding = player.IsDualWielding,
+                hasShield = player.HasShieldEquipped
+            });
         }
 
         private void DisplayInventoryHeader()

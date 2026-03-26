@@ -4447,6 +4447,39 @@ public abstract class BaseLocation
     /// </summary>
     protected virtual async Task ShowStatus()
     {
+        // Electron graphical client — emit full character sheet
+        if (GameConfig.ElectronMode)
+        {
+            var p = currentPlayer;
+            bool isMana = p is Player pp && pp.IsManaClass;
+            ElectronBridge.Emit("character_status", new
+            {
+                name = p.DisplayName,
+                className = p.ClassName,
+                race = p.Race.ToString(),
+                sex = p.Sex,
+                level = p.Level,
+                experience = p.Experience,
+                hp = p.HP, maxHp = p.MaxHP,
+                mana = isMana ? p.Mana : 0, maxMana = isMana ? p.MaxMana : 0,
+                stamina = isMana ? 0 : p.Stamina, maxStamina = isMana ? 0 : p.BaseStamina,
+                str = p.Strength, dex = p.Dexterity, agi = p.Agility,
+                con = p.Constitution, intel = p.Intelligence, wis = p.Wisdom,
+                cha = p.Charisma, def = p.Defence,
+                gold = p.Gold,
+                potions = p is Player pl ? pl.Healing : 0,
+                maxPotions = p is Player pl2 ? pl2.MaxPotions : 0,
+                isManaClass = isMana,
+                isKnighted = p.IsKnighted,
+                alignment = "Neutral",
+            });
+
+            // Skip text rendering in Electron mode
+            ElectronBridge.EmitPressAnyKey();
+            await terminal.PressAnyKey();
+            return;
+        }
+
         terminal.ClearScreen();
 
         // Header

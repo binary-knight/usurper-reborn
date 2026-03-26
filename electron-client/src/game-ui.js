@@ -288,6 +288,26 @@ class GameUI {
         this._renderDungeonRoom(data);
         break;
 
+      case 'dungeon_map':
+        this._renderDungeonMap(data);
+        break;
+
+      case 'inventory':
+        this._renderInventory(data);
+        break;
+
+      case 'character_status':
+        this._renderCharacterStatus(data);
+        break;
+
+      case 'party_status':
+        this._renderPartyStatus(data);
+        break;
+
+      case 'potions_menu':
+        this._renderPotionsMenu(data);
+        break;
+
       case 'combat_start':
         this.screen = 'combat';
         this.state.inCombat = true;
@@ -302,6 +322,10 @@ class GameUI {
       case 'combat_status':
         this._renderCombatStatus(data);
         // Combat dock is now rendered by combat_menu event
+        break;
+
+      case 'combat_action':
+        this._handleCombatAction(data);
         break;
 
       case 'combat_menu':
@@ -784,135 +808,685 @@ class GameUI {
     this.toastArea.innerHTML = '';
     this.pressAny.style.display = 'none';
 
-    // Room info overlay
+    // Danger stars
+    const dangerStars = '★'.repeat(Math.min(data.dangerRating || 0, 5));
+    const clearedBadge = data.isCleared ? '<span class="gui-room-cleared-badge">CLEARED</span>' : '';
+
+    // Features list
+    const features = data.features || [];
+    const featuresHtml = features.length > 0
+      ? `<div class="gui-room-features">${features.map(f => `<span class="gui-room-feature">· ${f}</span>`).join('')}</div>`
+      : '';
+
+    // Exits with cleared status
+    const exits = data.exits || [];
+    const exitsHtml = exits.length > 0
+      ? `<div class="gui-room-exits">${exits.map(e => {
+          const ex = typeof e === 'object' ? e : { dir: e, label: e, cleared: false };
+          return `<span class="gui-room-exit${ex.cleared ? ' cleared' : ''}">
+            <span class="gui-room-exit-dir">[${ex.dir}]</span> ${ex.label}${ex.cleared ? ' ✓' : ''}
+          </span>`;
+        }).join('')}</div>`
+      : '';
+
+    // Room info panel — left side overlay
     const roomInfo = document.createElement('div');
     roomInfo.className = 'gui-room-info';
     roomInfo.innerHTML = `
-      <div class="gui-room-name">${data.roomName}</div>
+      <div class="gui-room-header">
+        <div class="gui-room-name">${data.roomName}</div>
+        <div class="gui-room-meta">
+          <span class="gui-room-floor">Floor ${data.floor}</span>
+          <span class="gui-room-theme">${data.theme}</span>
+          <span class="gui-room-danger">${dangerStars}</span>
+          ${clearedBadge}
+        </div>
+      </div>
       <div class="gui-room-desc">${data.description || ''}</div>
       ${data.atmosphere ? `<div class="gui-room-atmo">${data.atmosphere}</div>` : ''}
-      <div class="gui-room-floor">Floor ${data.floor} — ${data.theme}</div>
+      ${featuresHtml}
+      <div class="gui-room-divider"></div>
+      <div class="gui-room-section-label">Exits</div>
+      ${exitsHtml}
+      ${data.potions !== undefined ? `<div class="gui-room-status">Potions: ${data.potions}/${data.maxPotions}</div>` : ''}
     `;
     this.npcArea.appendChild(roomInfo);
 
     // Update compass — show/hide direction buttons based on available exits
     this.compass.style.display = 'flex';
-    const exits = data.exits || [];
-    this.compass.querySelector('.gui-compass-n').style.display = exits.includes('N') ? 'flex' : 'none';
-    this.compass.querySelector('.gui-compass-s').style.display = exits.includes('S') ? 'flex' : 'none';
-    this.compass.querySelector('.gui-compass-e').style.display = exits.includes('E') ? 'flex' : 'none';
-    this.compass.querySelector('.gui-compass-w').style.display = exits.includes('W') ? 'flex' : 'none';
+    const exitDirs = exits.map(e => typeof e === 'object' ? e.dir : e);
+    this.compass.querySelector('.gui-compass-n').style.display = exitDirs.includes('N') ? 'flex' : 'none';
+    this.compass.querySelector('.gui-compass-s').style.display = exitDirs.includes('S') ? 'flex' : 'none';
+    this.compass.querySelector('.gui-compass-e').style.display = exitDirs.includes('E') ? 'flex' : 'none';
+    this.compass.querySelector('.gui-compass-w').style.display = exitDirs.includes('W') ? 'flex' : 'none';
 
-    // Room action buttons overlaid on the scene
+    // Room action buttons — all available actions
     this.roomActions.innerHTML = '';
-    const actions = [];
-    if (data.hasMonsters && !data.isCleared)
-      actions.push({ key: 'F', label: 'Fight', cls: 'danger' });
-    if (data.hasTreasure)
-      actions.push({ key: 'T', label: 'Treasure', cls: 'treasure' });
-    if (data.hasEvent)
-      actions.push({ key: 'V', label: 'Event', cls: 'event' });
-    if (data.hasFeatures)
-      actions.push({ key: 'X', label: 'Examine', cls: 'feature' });
 
-    for (const action of actions) {
-      const btn = document.createElement('button');
-      btn.className = `gui-room-action-btn ${action.cls}`;
-      btn.innerHTML = `<span class="gui-room-action-key">${action.key}</span>${action.label}`;
-      btn.addEventListener('click', () => this.sendInput(action.key + '\n'));
-      this.roomActions.appendChild(btn);
+    // Primary actions row (context-sensitive)
+    const primaryActions = [];
+    if (data.hasMonsters && !data.isCleared)
+      primaryActions.push({ key: 'F', label: 'Fight', cls: 'danger' });
+    if (data.hasTreasure)
+      primaryActions.push({ key: 'T', label: 'Treasure', cls: 'treasure' });
+    if (data.hasEvent)
+      primaryActions.push({ key: 'V', label: 'Event', cls: 'event' });
+    if (data.hasFeatures)
+      primaryActions.push({ key: 'X', label: 'Examine', cls: 'feature' });
+
+    if (primaryActions.length > 0) {
+      const primaryRow = document.createElement('div');
+      primaryRow.className = 'gui-choice-row';
+      for (const action of primaryActions) {
+        const btn = document.createElement('button');
+        btn.className = `gui-room-action-btn ${action.cls}`;
+        btn.innerHTML = `<span class="gui-room-action-key">${action.key}</span>${action.label}`;
+        btn.addEventListener('click', () => this.sendInput(action.key + '\n'));
+        primaryRow.appendChild(btn);
+      }
+      this.roomActions.appendChild(primaryRow);
     }
 
-    this.sceneTitle.textContent = data.atmosphere || '';
+    // Utility actions row
+    const utilRow = document.createElement('div');
+    utilRow.className = 'gui-choice-row gui-utility-row';
+    const utilActions = [
+      { key: 'R', label: 'Camp' },
+      { key: 'M', label: 'Map' },
+      { key: 'G', label: 'Guide' },
+      { key: 'I', label: 'Inventory' },
+      { key: 'P', label: 'Potions' },
+      { key: 'Y', label: 'Party' },
+      { key: '=', label: 'Status' },
+      { key: 'Q', label: 'Leave' },
+    ];
+    for (const action of utilActions) {
+      const btn = document.createElement('button');
+      btn.className = 'gui-room-action-btn info gui-util-btn';
+      btn.innerHTML = `<span class="gui-room-action-key">${action.key}</span>${action.label}`;
+      btn.addEventListener('click', () => this.sendInput(action.key + '\n'));
+      utilRow.appendChild(btn);
+    }
+    this.roomActions.appendChild(utilRow);
+
+    this.sceneTitle.textContent = '';
+  }
+
+  // ─── Dungeon Map Rendering ──────────────
+
+  _renderDungeonMap(data) {
+    this.npcArea.innerHTML = '';
+    this.roomActions.innerHTML = '';
+    this.compass.style.display = 'none';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gui-map-overlay';
+
+    // Header
+    overlay.innerHTML = `
+      <div class="gui-map-header">
+        <span class="gui-map-title">Dungeon Map — Floor ${data.floor} (${data.theme})</span>
+        <span class="gui-map-stats">${data.explored}/${data.total} explored, ${data.cleared}/${data.total} cleared</span>
+      </div>
+    `;
+
+    const rooms = data.rooms || [];
+    if (rooms.length === 0) {
+      overlay.innerHTML += '<div style="text-align:center;color:var(--text-dim);padding:40px;">Map unavailable</div>';
+      this.npcArea.appendChild(overlay);
+      return;
+    }
+
+    // Find bounds
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const r of rooms) {
+      if (r.x < minX) minX = r.x;
+      if (r.x > maxX) maxX = r.x;
+      if (r.y < minY) minY = r.y;
+      if (r.y > maxY) maxY = r.y;
+    }
+
+    // Position lookup
+    const posMap = {};
+    for (const r of rooms) posMap[`${r.x},${r.y}`] = r;
+
+    // Canvas-based map with corridors
+    const CELL = 44;   // cell size in px
+    const CORR = 16;   // corridor length between cells
+    const STEP = CELL + CORR; // total step per grid unit
+    const cols = maxX - minX + 1;
+    const rows = maxY - minY + 1;
+    const cw = cols * STEP - CORR + 20; // +padding
+    const ch = rows * STEP - CORR + 20;
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'gui-map-canvas';
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+
+    const ox = 10; // offset/padding
+    const oy = 10;
+
+    // Color map
+    const typeColors = {
+      player: '#ffdd44', cleared: '#44aa44', monsters: '#cc3333',
+      boss: '#ff4444', stairs: '#4477dd', safe: '#5599aa', unknown: '#444444'
+    };
+
+    // Draw corridors first
+    for (const room of rooms) {
+      const rx = (room.x - minX) * STEP + ox;
+      const ry = (room.y - minY) * STEP + oy;
+      const exits = room.exits || [];
+
+      ctx.strokeStyle = 'rgba(120, 100, 60, 0.5)';
+      ctx.lineWidth = 3;
+
+      for (const dir of exits) {
+        const d = dir.toUpperCase();
+        let tx, ty;
+        if (d === 'E') { tx = rx + CELL; ty = ry + CELL/2; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + CORR, ty); ctx.stroke(); }
+        if (d === 'S') { tx = rx + CELL/2; ty = ry + CELL; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty + CORR); ctx.stroke(); }
+        // Only draw E and S to avoid double-drawing
+      }
+    }
+
+    // Draw rooms
+    for (const room of rooms) {
+      const rx = (room.x - minX) * STEP + ox;
+      const ry = (room.y - minY) * STEP + oy;
+      const color = typeColors[room.type] || '#555';
+
+      // Room background
+      ctx.fillStyle = room.type === 'player' ? 'rgba(200, 180, 50, 0.2)' :
+                      room.type === 'monsters' ? 'rgba(180, 30, 30, 0.15)' :
+                      room.type === 'cleared' ? 'rgba(40, 120, 40, 0.1)' :
+                      room.type === 'boss' ? 'rgba(200, 30, 30, 0.25)' :
+                      room.type === 'stairs' ? 'rgba(40, 60, 160, 0.15)' :
+                      'rgba(30, 30, 30, 0.3)';
+      ctx.fillRect(rx + 1, ry + 1, CELL - 2, CELL - 2);
+
+      // Room border
+      ctx.strokeStyle = color;
+      ctx.lineWidth = room.type === 'player' ? 2 : 1;
+      ctx.strokeRect(rx + 0.5, ry + 0.5, CELL - 1, CELL - 1);
+
+      // Player glow
+      if (room.type === 'player') {
+        ctx.shadowColor = 'rgba(200, 180, 50, 0.6)';
+        ctx.shadowBlur = 8;
+        ctx.strokeRect(rx + 0.5, ry + 0.5, CELL - 1, CELL - 1);
+        ctx.shadowBlur = 0;
+      }
+
+      // Room symbol
+      ctx.fillStyle = color;
+      ctx.font = 'bold 18px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(room.symbol, rx + CELL/2, ry + CELL/2);
+    }
+
+    overlay.appendChild(canvas);
+
+    // Legend + footer row
+    const bottomRow = document.createElement('div');
+    bottomRow.className = 'gui-map-bottom';
+    bottomRow.innerHTML = `
+      <div class="gui-map-legend">
+        <span class="gui-map-legend-item"><span class="gui-map-sym-player">@</span> You</span>
+        <span class="gui-map-legend-item"><span class="gui-map-sym-cleared">#</span> Cleared</span>
+        <span class="gui-map-legend-item"><span class="gui-map-sym-monsters">█</span> Monsters</span>
+        <span class="gui-map-legend-item"><span class="gui-map-sym-stairs">></span> Stairs</span>
+        <span class="gui-map-legend-item"><span class="gui-map-sym-boss">B</span> Boss</span>
+        <span class="gui-map-legend-item"><span class="gui-map-sym-safe">·</span> Safe</span>
+        <span class="gui-map-legend-item"><span class="gui-map-sym-unknown">?</span> Unknown</span>
+      </div>
+      <div class="gui-map-footer">
+        <span>Location: ${data.currentRoomName}</span>
+        ${data.bossDefeated ? '<span class="gui-map-boss-defeated">★ BOSS DEFEATED</span>' : ''}
+      </div>
+    `;
+    overlay.appendChild(bottomRow);
+
+    this.npcArea.appendChild(overlay);
+  }
+
+  // ─── Inventory Rendering ────────────────
+
+  _renderInventory(data) {
+    this.npcArea.innerHTML = '';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gui-map-overlay gui-inv-overlay';
+
+    // Header
+    overlay.innerHTML = `
+      <div class="gui-map-header">
+        <span class="gui-map-title">Equipment — ${data.playerName}</span>
+        <span class="gui-map-stats">Lv.${data.level} ${data.className} | Gold: ${(data.gold || 0).toLocaleString()}</span>
+      </div>
+    `;
+
+    const body = document.createElement('div');
+    body.className = 'gui-inv-body';
+
+    // -- Left: Paperdoll with equipment slots --
+    const paperdoll = document.createElement('div');
+    paperdoll.className = 'gui-inv-paperdoll';
+
+    // Character portrait in center
+    const sprites = this._getClassSprite(data.className);
+    paperdoll.innerHTML = `<img class="gui-inv-portrait" src="${sprites.hdSrc}"
+      onerror="this.src='${sprites.regularSrc}'; this.onerror=function(){this.src='${sprites.fallbackSrc}';}">`;
+
+    // Equipment slots in display order (flows into 2-column grid)
+    const slotLayout = {
+      MainHand: { icon: '⚔' },
+      OffHand:  { icon: '🛡' },
+      Head:     { icon: '🎩' },
+      Body:     { icon: '👕' },
+      Arms:     { icon: '💪' },
+      Hands:    { icon: '🧤' },
+      Legs:     { icon: '👖' },
+      Feet:     { icon: '👢' },
+      Waist:    { icon: '🩳' },
+      Cloak:    { icon: '🧣' },
+      Face:     { icon: '👤' },
+      Neck:     { icon: '📿' },
+      LFinger:  { icon: '💍' },
+      RFinger:  { icon: '💍' },
+    };
+
+    const slotsGrid = document.createElement('div');
+    slotsGrid.className = 'gui-inv-slots-grid';
+
+    const eqMap = {};
+    for (const eq of (data.equipment || [])) eqMap[eq.slot] = eq;
+
+    for (const [slotName, layout] of Object.entries(slotLayout)) {
+      const eq = eqMap[slotName];
+      const isEmpty = !eq || eq.name === '(empty)';
+      const slot = document.createElement('div');
+      slot.className = `gui-inv-slot ${isEmpty ? 'empty' : (eq?.rarity || '')}`;
+      slot.title = isEmpty ? slotName : `${eq.name}\n${eq.attack ? 'ATK: ' + eq.attack : ''} ${eq.defense ? 'DEF: ' + eq.defense : ''}`;
+
+      slot.innerHTML = `
+        <span class="gui-inv-slot-icon">${isEmpty ? layout.icon : (eq.attack ? '⚔' : '🛡')}</span>
+        <span class="gui-inv-slot-name">${isEmpty ? slotName : eq.name}</span>
+      `;
+
+      // Click equipped slot — sends slot key to enter text slot manager
+      const slotKeys = { MainHand:'1', OffHand:'2', Head:'3', Body:'4', Arms:'5', Hands:'6', Legs:'7', Feet:'8', Waist:'9', Face:'F', Cloak:'C', Neck:'N', LFinger:'L', RFinger:'R' };
+      const slotKey = slotKeys[slotName];
+      if (slotKey) {
+        slot.addEventListener('click', () => {
+          this.npcArea.innerHTML = '';
+          this.sendInput(slotKey + '\n');
+        });
+        slot.style.cursor = 'pointer';
+      }
+
+      slotsGrid.appendChild(slot);
+    }
+
+    const leftPanel = document.createElement('div');
+    leftPanel.className = 'gui-inv-left';
+    leftPanel.appendChild(paperdoll);
+    leftPanel.appendChild(slotsGrid);
+    body.appendChild(leftPanel);
+
+    // -- Right: Backpack --
+    const rightPanel = document.createElement('div');
+    rightPanel.className = 'gui-inv-right';
+    rightPanel.innerHTML = `<div class="gui-inv-section-label">Backpack (${(data.backpack || []).length} items)</div>`;
+
+    const bpGrid = document.createElement('div');
+    bpGrid.className = 'gui-inv-bp-grid';
+
+    const backpack = data.backpack || [];
+    for (let i = 0; i < backpack.length; i++) {
+      const item = backpack[i];
+      const cell = document.createElement('div');
+      cell.className = 'gui-inv-bp-cell';
+      cell.title = `${item.name}\nType: ${item.type}\n${item.attack ? 'ATK: ' + item.attack : ''} ${item.defense ? 'DEF: ' + item.defense : ''}\n\nClick to equip`;
+      const typeIcon = item.type === 'Weapon' ? '⚔' : item.type === 'Shield' ? '🛡' :
+                       item.type === 'Head' ? '🎩' : item.type === 'Body' ? '👕' :
+                       item.type === 'Fingers' ? '💍' : item.type === 'Neck' ? '📿' : '🛡';
+      cell.innerHTML = `
+        <span class="gui-inv-bp-cell-icon">${typeIcon}</span>
+        <span class="gui-inv-bp-cell-name">${item.name}</span>
+        <span class="gui-inv-bp-cell-stats">${item.attack ? `ATK:${item.attack}` : ''} ${item.defense ? `DEF:${item.defense}` : ''}</span>
+      `;
+      // Click to manage — sends B{n} (1-indexed) to enter text item management
+      const bpNum = i + 1;
+      cell.addEventListener('click', () => {
+        this.npcArea.innerHTML = '';
+        this.sendInput(`B${bpNum}\n`);
+      });
+      cell.style.cursor = 'pointer';
+      bpGrid.appendChild(cell);
+    }
+
+    if ((data.backpack || []).length === 0) {
+      bpGrid.innerHTML = '<div style="color:var(--text-faint);padding:20px;text-align:center;">Backpack empty</div>';
+    }
+
+    rightPanel.appendChild(bpGrid);
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'gui-inv-actions';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'gui-room-action-btn info gui-util-btn';
+    closeBtn.innerHTML = '<span class="gui-room-action-key">Q</span>Close';
+    closeBtn.addEventListener('click', () => {
+      this.npcArea.innerHTML = '';
+      this.sendInput('Q\n');
+    });
+    actions.appendChild(closeBtn);
+    rightPanel.appendChild(actions);
+
+    body.appendChild(rightPanel);
+    overlay.appendChild(body);
+    this.npcArea.appendChild(overlay);
+  }
+
+  // ─── Character Status Rendering ───────────
+
+  _renderCharacterStatus(data) {
+    this.npcArea.innerHTML = '';
+    this.roomActions.innerHTML = '';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gui-map-overlay';
+
+    // Use class sprite as portrait
+    const sprites = this._getClassSprite(data.className);
+
+    overlay.innerHTML = `
+      <div class="gui-map-header">
+        <span class="gui-map-title">Character Status</span>
+        <span class="gui-map-stats">${data.isKnighted ? '⚔ ' : ''}${data.name}</span>
+      </div>
+      <div class="gui-status-body">
+        <div class="gui-status-portrait">
+          <img class="gui-status-portrait-img" src="${sprites.hdSrc}"
+               onerror="this.src='${sprites.regularSrc}'; this.onerror=function(){this.src='${sprites.fallbackSrc}';}">
+          <div class="gui-status-name">${data.name}</div>
+          <div class="gui-status-classrace">Lv.${data.level} ${data.className} ${data.race}</div>
+        </div>
+        <div class="gui-status-stats">
+          <div class="gui-status-bars">
+            <div class="gui-status-bar-row">
+              <span class="gui-status-bar-label">HP</span>
+              <div class="gui-status-bar"><div class="gui-status-bar-fill hp" style="width:${data.maxHp > 0 ? (data.hp/data.maxHp*100) : 0}%"></div></div>
+              <span class="gui-status-bar-val">${data.hp}/${data.maxHp}</span>
+            </div>
+            ${data.isManaClass ? `
+            <div class="gui-status-bar-row">
+              <span class="gui-status-bar-label">MP</span>
+              <div class="gui-status-bar"><div class="gui-status-bar-fill mp" style="width:${data.maxMana > 0 ? (data.mana/data.maxMana*100) : 0}%"></div></div>
+              <span class="gui-status-bar-val">${data.mana}/${data.maxMana}</span>
+            </div>` : `
+            <div class="gui-status-bar-row">
+              <span class="gui-status-bar-label">ST</span>
+              <div class="gui-status-bar"><div class="gui-status-bar-fill sta" style="width:${data.maxStamina > 0 ? (data.stamina/data.maxStamina*100) : 0}%"></div></div>
+              <span class="gui-status-bar-val">${data.stamina}/${data.maxStamina}</span>
+            </div>`}
+          </div>
+          <div class="gui-status-attributes">
+            ${['str','dex','agi','con','intel','wis','cha','def'].map(s => {
+              const label = s === 'intel' ? 'INT' : s.toUpperCase();
+              const val = data[s] || 0;
+              return `<div class="gui-status-attr"><span class="gui-status-attr-label">${label}</span><span class="gui-status-attr-val">${val}</span></div>`;
+            }).join('')}
+          </div>
+          <div class="gui-status-info">
+            <span>Gold: ${(data.gold || 0).toLocaleString()}</span>
+            <span>Potions: ${data.potions}/${data.maxPotions}</span>
+            <span>XP: ${(data.experience || 0).toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    this.npcArea.appendChild(overlay);
+  }
+
+  // ─── Party Status Rendering ───────────────
+
+  _renderPartyStatus(data) {
+    this.npcArea.innerHTML = '';
+    this.roomActions.innerHTML = '';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gui-map-overlay';
+    overlay.innerHTML = `<div class="gui-map-header"><span class="gui-map-title">Party Management</span></div>`;
+
+    const list = document.createElement('div');
+    list.className = 'gui-party-list';
+
+    for (const m of (data.members || [])) {
+      const hpPct = m.maxHp > 0 ? (m.hp / m.maxHp * 100) : 0;
+      const sprites = this._getClassSprite(m.className);
+      const card = document.createElement('div');
+      card.className = 'gui-party-card';
+      card.innerHTML = `
+        <img class="gui-party-portrait" src="${sprites.hdSrc}"
+             onerror="this.src='${sprites.regularSrc}'; this.onerror=function(){this.src='${sprites.fallbackSrc}';}">
+        <div class="gui-party-info">
+          <div class="gui-party-member-name">${m.name}</div>
+          <div class="gui-party-member-class">Lv.${m.level} ${m.className}</div>
+          <div class="gui-party-hp-row">
+            <span class="gui-party-hp-label">HP</span>
+            <div class="gui-party-hp-bar"><div class="gui-party-hp-fill" style="width:${hpPct}%"></div></div>
+            <span class="gui-party-hp-val">${m.hp}/${m.maxHp}</span>
+          </div>
+          ${m.isManaClass ? `
+          <div class="gui-party-hp-row">
+            <span class="gui-party-hp-label">MP</span>
+            <div class="gui-party-hp-bar"><div class="gui-party-hp-fill mp" style="width:${m.maxMana > 0 ? (m.mana/m.maxMana*100) : 0}%"></div></div>
+            <span class="gui-party-hp-val">${m.mana}/${m.maxMana}</span>
+          </div>` : ''}
+          <div class="gui-party-equip">⚔ ${m.weapon} | 🛡 ${m.armor}</div>
+        </div>
+      `;
+      list.appendChild(card);
+    }
+
+    if ((data.members || []).length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:40px;">No party members</div>';
+    }
+
+    overlay.appendChild(list);
+    this.npcArea.appendChild(overlay);
+  }
+
+  // ─── Potions Menu Rendering ───────────────
+
+  _renderPotionsMenu(data) {
+    this.npcArea.innerHTML = '';
+    this.roomActions.innerHTML = '';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gui-map-overlay';
+    const hpPct = data.playerMaxHp > 0 ? (data.playerHp / data.playerMaxHp * 100) : 0;
+
+    overlay.innerHTML = `
+      <div class="gui-map-header">
+        <span class="gui-map-title">Potions & Healing</span>
+        <span class="gui-map-stats">Gold: ${(data.gold || 0).toLocaleString()}</span>
+      </div>
+      <div class="gui-potions-player">
+        <div class="gui-potions-hp-row">
+          <span>HP</span>
+          <div class="gui-potions-bar"><div class="gui-potions-fill hp" style="width:${hpPct}%"></div></div>
+          <span>${data.playerHp}/${data.playerMaxHp}</span>
+        </div>
+        <div class="gui-potions-count">Potions: ${data.potions}/${data.maxPotions} | Heals: ${(data.healAmount || 0).toLocaleString()} HP each</div>
+      </div>
+    `;
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'gui-potions-actions';
+    const btns = [
+      { key: 'U', label: 'Use Potion (Self)', enabled: data.potions > 0 && data.playerHp < data.playerMaxHp },
+      { key: 'H', label: 'Heal to Full', enabled: data.potions > 0 && data.playerHp < data.playerMaxHp },
+      { key: 'B', label: `Buy Potion (${data.potionCost}g)`, enabled: data.gold >= data.potionCost && data.potions < data.maxPotions },
+      { key: 'T', label: 'Heal Teammate', enabled: data.potions > 0 && (data.teammates || []).length > 0 },
+      { key: 'A', label: 'Heal All', enabled: data.potions > 0 },
+      { key: 'Q', label: 'Back', enabled: true },
+    ];
+    for (const b of btns) {
+      const btn = document.createElement('button');
+      btn.className = `gui-room-action-btn ${b.enabled ? 'feature' : 'info'}${b.enabled ? '' : ' gui-btn-disabled'}`;
+      btn.innerHTML = `<span class="gui-room-action-key">${b.key}</span>${b.label}`;
+      if (b.enabled) btn.addEventListener('click', () => this.sendInput(b.key + '\n'));
+      actions.appendChild(btn);
+    }
+    overlay.appendChild(actions);
+
+    // Teammate HP bars
+    if ((data.teammates || []).length > 0) {
+      const tmSection = document.createElement('div');
+      tmSection.className = 'gui-potions-team';
+      tmSection.innerHTML = '<div class="gui-inv-section-label">Team Status</div>';
+      for (const tm of data.teammates) {
+        const tmHpPct = tm.maxHp > 0 ? (tm.hp / tm.maxHp * 100) : 0;
+        const row = document.createElement('div');
+        row.className = 'gui-potions-tm-row';
+        row.innerHTML = `
+          <span class="gui-potions-tm-name">${tm.name}</span>
+          <div class="gui-potions-bar"><div class="gui-potions-fill hp" style="width:${tmHpPct}%"></div></div>
+          <span class="gui-potions-tm-val">${tm.hp}/${tm.maxHp}</span>
+        `;
+        tmSection.appendChild(row);
+      }
+      overlay.appendChild(tmSection);
+    }
+
+    this.npcArea.appendChild(overlay);
   }
 
   // ─── Combat Rendering (DD-style) ────────
 
   _renderFullCombatMenu(data) {
-    // Build dock with all combat actions + quickbar skills
+    // Hide the dock during combat — ability bar goes in the scene
     this.dock.innerHTML = '';
 
-    // Section 1: Core combat actions
-    const coreSection = document.createElement('div');
-    coreSection.className = 'gui-dock-section';
-    for (const act of data.actions) {
-      if (!act.available && act.key !== 'I') continue; // hide unavailable except potions
-      const btn = this._createDockButton(act.key, act.label, act.available);
-      coreSection.appendChild(btn);
-    }
-    this.dock.appendChild(coreSection);
-
-    // Divider
-    if (data.quickbar && data.quickbar.length > 0) {
-      const div = document.createElement('div');
-      div.className = 'gui-dock-divider';
-      this.dock.appendChild(div);
-    }
-
-    // Section 2: Quickbar skills
-    if (data.quickbar && data.quickbar.length > 0) {
-      const skillSection = document.createElement('div');
-      skillSection.className = 'gui-dock-section';
-      for (const skill of data.quickbar) {
-        const btn = this._createDockButton(skill.key, skill.label, skill.available);
-        if (!skill.available) btn.classList.add('gui-building-disabled');
-        skillSection.appendChild(btn);
-      }
-      this.dock.appendChild(skillSection);
-    }
-
-    // Scene overlay: main action buttons + target selection
+    // Build the DD-style ability bar at the bottom of the scene
     this.roomActions.innerHTML = '';
 
     const needsTarget = !data.singleTarget && data.targets && data.targets.length > 1;
 
-    // Row 1: Core combat actions
-    const actionRow = document.createElement('div');
-    actionRow.className = 'gui-choice-row';
+    const abilityBar = document.createElement('div');
+    abilityBar.className = 'gui-combat-ability-bar';
 
-    const coreActions = [
-      { key: 'A', label: 'Attack', style: 'danger', target: true },
-      { key: 'D', label: 'Defend', style: 'info', target: false },
-      { key: 'P', label: 'Power', style: 'danger', target: true },
-      { key: 'E', label: 'Precise', style: 'danger', target: true },
-    ];
-    if (data.potions > 0) coreActions.push({ key: 'I', label: `Heal (${data.potions})`, style: 'feature', target: false });
-    coreActions.push({ key: 'R', label: 'Retreat', style: 'info', target: false });
+    // -- Character portrait --
+    const playerClass = this.state.playerClass || 'warrior';
+    const sprites = this._getClassSprite(playerClass);
+    const portrait = document.createElement('div');
+    portrait.className = 'gui-combat-portrait hd';
+    portrait.innerHTML = `<img src="${sprites.hdSrc}" alt="${playerClass}"
+      onerror="this.parentElement.classList.remove('hd'); this.src='${sprites.regularSrc}'; this.onerror=function(){this.src='${sprites.fallbackSrc}';}">`;
+    abilityBar.appendChild(portrait);
 
-    for (const act of coreActions) {
-      const btn = document.createElement('button');
-      btn.className = `gui-room-action-btn ${act.style}`;
-      btn.innerHTML = `<span class="gui-room-action-key">${act.key}</span>${act.label}`;
-      if (needsTarget && act.target) {
-        btn.addEventListener('click', () => this._showTargetPicker(data.targets, act.key));
-      } else {
-        btn.addEventListener('click', () => this.sendInput(act.key + '\n'));
-      }
-      actionRow.appendChild(btn);
+    // -- Mini stats panel --
+    const hpPct = this.state.maxHp > 0 ? (this.state.hp / this.state.maxHp * 100) : 100;
+    const mpPct = this.state.maxMana > 0 ? (this.state.mana / this.state.maxMana * 100) : 0;
+    const staPct = this.state.maxStamina > 0 ? (this.state.stamina / this.state.maxStamina * 100) : 0;
+    const statsPanel = document.createElement('div');
+    statsPanel.className = 'gui-combat-stats-mini';
+    statsPanel.innerHTML = `
+      <div class="stat-row">
+        <span class="stat-label">HP</span>
+        <div class="stat-bar"><div class="stat-fill hp" style="width:${hpPct}%"></div></div>
+        <span class="stat-value">${this.state.hp}/${this.state.maxHp}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">${this.state.maxMana > 0 ? 'MP' : 'ST'}</span>
+        <div class="stat-bar"><div class="stat-fill ${this.state.maxMana > 0 ? 'mp' : 'sta'}" style="width:${this.state.maxMana > 0 ? mpPct : staPct}%"></div></div>
+        <span class="stat-value">${this.state.maxMana > 0 ? `${this.state.mana}/${this.state.maxMana}` : `${this.state.stamina}/${this.state.maxStamina}`}</span>
+      </div>
+      ${data.potions !== undefined ? `<div class="stat-row"><span class="stat-label" style="color:#cc5555">⚗</span><span class="stat-value" style="flex:1">${data.potions} potions</span></div>` : ''}
+    `;
+    abilityBar.appendChild(statsPanel);
+
+    // -- Skill slots container --
+    const skillsContainer = document.createElement('div');
+    skillsContainer.className = 'gui-combat-skills';
+
+    // Skill icon map for core actions
+    const skillIcons = {
+      'A': { icon: '⚔', label: 'Attack', cat: 'combat', target: true },
+      'D': { icon: '🛡', label: 'Defend', cat: 'defense', target: false },
+      'P': { icon: '💥', label: 'Power', cat: 'combat', target: true },
+      'E': { icon: '🎯', label: 'Precise', cat: 'combat', target: true },
+      'T': { icon: '📢', label: 'Taunt', cat: 'tactics', target: true },
+      'I': { icon: '🗡', label: 'Disarm', cat: 'tactics', target: true },
+      'W': { icon: '👤', label: 'Hide', cat: 'tactics', target: false },
+      'H': { icon: '❤', label: 'Heal', cat: 'heal', target: false },
+      'R': { icon: '🏃', label: 'Flee', cat: 'escape', target: false },
+    };
+
+    // Core combat actions as skill slots
+    const coreKeys = ['A', 'P', 'E', 'D', 'T', 'W', 'H', 'R'];
+    for (const key of coreKeys) {
+      const info = skillIcons[key];
+      if (!info) continue;
+      // Check if this action is available from server data
+      const serverAction = data.actions ? data.actions.find(a => a.key === key) : null;
+      const isAvailable = serverAction ? serverAction.available : true;
+      // Special: hide potions button if no potions
+      if (key === 'H' && data.potions !== undefined && data.potions <= 0) continue;
+
+      const slot = this._createSkillSlot(key, info.icon, info.label, info.cat, isAvailable,
+        needsTarget && info.target ? data.targets : null);
+      skillsContainer.appendChild(slot);
     }
-    this.roomActions.appendChild(actionRow);
 
-    // Row 2: Quickbar skills (if any)
+    // Separator before quickbar
     if (data.quickbar && data.quickbar.length > 0) {
-      const skillRow = document.createElement('div');
-      skillRow.className = 'gui-choice-row gui-skill-row';
+      const sep = document.createElement('div');
+      sep.style.cssText = 'width:1px; height:40px; background:rgba(140,100,40,0.3); margin:0 4px; flex-shrink:0;';
+      skillsContainer.appendChild(sep);
 
+      // Quickbar skills
       for (const skill of data.quickbar) {
-        const btn = document.createElement('button');
-        btn.className = `gui-room-action-btn ${skill.available ? 'event' : 'info'} gui-skill-btn`;
-        if (!skill.available) btn.classList.add('gui-btn-disabled');
-        btn.innerHTML = `<span class="gui-room-action-key">${skill.key}</span>${skill.label}`;
-        if (skill.available) {
-          if (needsTarget) {
-            btn.addEventListener('click', () => this._showTargetPicker(data.targets, skill.key));
-          } else {
-            btn.addEventListener('click', () => this.sendInput(skill.key + '\n'));
-          }
-        }
-        skillRow.appendChild(btn);
+        const slot = this._createSkillSlot(
+          skill.key, '✦', skill.label, 'spell', skill.available,
+          needsTarget ? data.targets : null
+        );
+        skillsContainer.appendChild(slot);
       }
-      this.roomActions.appendChild(skillRow);
     }
+
+    abilityBar.appendChild(skillsContainer);
+    this.roomActions.appendChild(abilityBar);
+  }
+
+  /** Create a single DD-style skill slot button */
+  _createSkillSlot(key, icon, label, category, available, targets) {
+    const slot = document.createElement('div');
+    slot.className = `gui-skill-slot ${category}${available ? '' : ' disabled'}`;
+    slot.innerHTML = `
+      <span class="gui-skill-key">${key}</span>
+      <span class="gui-skill-icon">${icon}</span>
+      <span class="gui-skill-label">${label}</span>
+    `;
+    slot.title = `${label} [${key}]`;
+
+    if (available) {
+      if (targets && targets.length > 1) {
+        slot.addEventListener('click', () => this._showTargetPicker(targets, key));
+      } else {
+        slot.addEventListener('click', () => this.sendInput(key + '\n'));
+      }
+    }
+    return slot;
   }
 
   _createDockButton(key, label, available) {
@@ -968,166 +1542,180 @@ class GameUI {
   }
 
   _renderCombatDock() {
-    const combatActions = [
-      { key: 'A', label: 'Attack', category: 'combat', icon: 'fight' },
-      { key: 'D', label: 'Defend', category: 'combat', icon: 'armor' },
-      { key: 'P', label: 'Power', category: 'combat', icon: 'weapons' },
-      { key: 'E', label: 'Precise', category: 'combat', icon: 'examine' },
-      { key: 'H', label: 'Potions', category: 'items', icon: 'healer' },
-      { key: 'T', label: 'Taunt', category: 'tactics', icon: 'temple' },
-      { key: 'I', label: 'Disarm', category: 'tactics', icon: 'examine' },
-      { key: 'W', label: 'Hide', category: 'tactics', icon: 'wilderness' },
-      { key: 'R', label: 'Retreat', category: 'escape', icon: 'leave' },
-    ];
-    this._renderDockFromServer(combatActions);
-
-    // Also render main combat buttons in the roomActions area (overlaid on scene)
-    this.roomActions.innerHTML = '';
-    const mainActions = [
-      { key: 'A', label: 'Attack', style: 'danger' },
-      { key: 'D', label: 'Defend', style: 'info' },
-      { key: 'P', label: 'Power', style: 'danger' },
-      { key: 'H', label: 'Heal', style: 'feature' },
-      { key: 'R', label: 'Retreat', style: 'info' },
-    ];
-    for (const action of mainActions) {
-      const btn = document.createElement('button');
-      btn.className = `gui-room-action-btn ${action.style}`;
-      btn.innerHTML = `<span class="gui-room-action-key">${action.key}</span>${action.label}`;
-      btn.addEventListener('click', () => this.sendInput(action.key + '\n'));
-      this.roomActions.appendChild(btn);
-    }
+    // In DD-style, the dock is hidden during combat — the ability bar is rendered inside the scene
+    this.dock.innerHTML = '';
   }
 
   _renderCombatStart(data) {
     this.npcArea.innerHTML = '';
     this.toastArea.innerHTML = '';
+    this.roomActions.innerHTML = '';
+    this.state.combatLog = [];
 
-    // DD-style layout: party on left, monsters on right
-    const battlefield = document.createElement('div');
-    battlefield.className = 'gui-battlefield';
+    this._renderBattlefield(data);
+  }
 
-    // Left: Player party
-    const partyDiv = document.createElement('div');
-    partyDiv.className = 'gui-party-side';
-    partyDiv.id = 'gui-party-side';
-    // Player character (class sprite facing right)
+  /** Get the best available sprite for a player/ally class */
+  _getClassSprite(className) {
+    const cls = (className || 'warrior').toLowerCase().replace(/\s+/g, '-');
+    // Check if HD sprite exists (we'll try HD first, fallback to regular)
+    return {
+      hdSrc: `./assets/classes-hd/${cls}.png`,
+      regularSrc: `./assets/classes/${cls}-east.png`,
+      fallbackSrc: `./assets/classes/${cls}.png`,
+      className: cls
+    };
+  }
+
+  _renderPlayerCombatant(name, hpPct, hpClass, isPlayer) {
     const playerClass = this.state.playerClass || 'warrior';
-    partyDiv.innerHTML = `
-      <div class="gui-combatant gui-player-char">
-        <img class="gui-combatant-sprite" src="./assets/classes/${playerClass}-east.png"
-             alt="${playerClass}" onerror="this.src='./assets/classes/${playerClass}.png'">
-        <div class="gui-combatant-name player-name">${this.state.playerName || 'You'}</div>
-        <div class="gui-combatant-hp-bar">
-          <div class="gui-combatant-hp-fill hp-player" id="gui-player-combat-hp" style="width:100%"></div>
+    const sprites = this._getClassSprite(playerClass);
+    return `
+      <div class="gui-combatant gui-player-char${isPlayer ? ' active' : ''}">
+        <img class="gui-combatant-sprite hd-sprite"
+             src="${sprites.hdSrc}"
+             alt="${playerClass}"
+             onerror="this.className='gui-combatant-sprite'; this.src='${sprites.regularSrc}'; this.onerror=function(){this.src='${sprites.fallbackSrc}';}">
+        <div class="gui-combatant-info">
+          <div class="gui-combatant-name player-name">${name || 'You'}</div>
+          <div class="gui-combatant-hp-bar">
+            <div class="gui-combatant-hp-fill hp-player ${hpClass}" style="width:${hpPct}%"></div>
+          </div>
         </div>
       </div>
     `;
-    battlefield.appendChild(partyDiv);
+  }
 
-    // Center: VS divider
-    const vs = document.createElement('div');
-    vs.className = 'gui-vs-divider';
-    vs.textContent = 'VS';
-    battlefield.appendChild(vs);
+  _renderTeammateCombatant(tm) {
+    const tmHpPct = tm.maxHp > 0 ? (tm.hp / tm.maxHp * 100) : 100;
+    const tmHpClass = tmHpPct < 25 ? 'critical' : tmHpPct < 50 ? 'warning' : '';
+    const tmClass = (tm.className || '').toLowerCase().replace(/\s+/g, '-');
+    const sprites = this._getClassSprite(tmClass);
+    const isDead = tm.hp <= 0;
 
-    // Right: Monsters
-    const monsterDiv = document.createElement('div');
-    monsterDiv.className = 'gui-monster-side';
-    monsterDiv.id = 'gui-monster-side';
-    const spriteFile = this.monsterSpriteMap[data.family] || '';
-    // For now single monster — will update with combat_status for multi
-    monsterDiv.innerHTML = this._renderMonsterCombatant(data.monsterName, data.monsterLevel,
-      data.monsterHp, data.monsterMaxHp, data.isBoss, spriteFile, data.family);
-    battlefield.appendChild(monsterDiv);
+    const spriteHtml = tmClass
+      ? `<img class="gui-combatant-sprite hd-sprite"
+             src="${sprites.hdSrc}" alt="${tm.name}"
+             onerror="this.className='gui-combatant-sprite'; this.src='${sprites.regularSrc}'; this.onerror=function(){this.src='${sprites.fallbackSrc}';};">`
+      : `<div class="gui-combatant-sprite gui-teammate-placeholder">${(tm.name || '?')[0]}</div>`;
 
-    this.npcArea.appendChild(battlefield);
+    return `
+      <div class="gui-combatant gui-teammate${isDead ? ' defeated' : ''}">
+        ${spriteHtml}
+        <div class="gui-combatant-info">
+          <div class="gui-combatant-name ally-name">${tm.name}</div>
+          <div class="gui-combatant-hp-bar">
+            <div class="gui-combatant-hp-fill hp-ally ${tmHpClass}" style="width:${tmHpPct}%"></div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   _renderMonsterCombatant(name, level, hp, maxHp, isBoss, spriteFile, family) {
     const hpPct = maxHp > 0 ? (hp / maxHp * 100) : 0;
     const hpClass = hpPct < 25 ? 'critical' : hpPct < 50 ? 'warning' : '';
+    const isDead = hp <= 0;
+    // Try HD monster sprite first, fallback to regular
+    const baseName = spriteFile ? spriteFile.replace('.png', '') : '';
     const sprite = spriteFile
-      ? `<img class="gui-combatant-sprite monster-sprite" src="./assets/monsters/${spriteFile}" alt="${name}" onerror="this.style.display='none'">`
-      : `<div class="gui-combatant-sprite gui-monster-placeholder">${name[0]}</div>`;
+      ? `<img class="gui-combatant-sprite hd-sprite monster-sprite"
+             src="./assets/monsters-hd/${spriteFile}" alt="${name}"
+             onerror="this.className='gui-combatant-sprite monster-sprite'; this.src='./assets/monsters/${spriteFile}'; this.onerror=function(){this.style.display='none';};">`
+      : `<div class="gui-combatant-sprite gui-monster-placeholder">${(name || '?')[0]}</div>`;
     return `
-      <div class="gui-combatant gui-monster-combatant${isBoss ? ' boss' : ''}">
+      <div class="gui-combatant gui-monster-combatant${isBoss ? ' boss' : ''}${isDead ? ' defeated' : ''}">
         ${sprite}
-        <div class="gui-combatant-name monster-name">${name}${isBoss ? ' [BOSS]' : ''}</div>
-        <div class="gui-combatant-level">Lv.${level}</div>
-        <div class="gui-combatant-hp-bar">
-          <div class="gui-combatant-hp-fill hp-monster ${hpClass}" style="width:${hpPct}%"></div>
+        <div class="gui-combatant-info">
+          <div class="gui-combatant-name monster-name">${name}${isBoss ? ' ★' : ''}</div>
+          <div class="gui-combatant-level">Lv.${level}</div>
+          <div class="gui-combatant-hp-bar">
+            <div class="gui-combatant-hp-fill hp-monster ${hpClass}" style="width:${hpPct}%"></div>
+          </div>
+          <div class="gui-combatant-hp-text">${hp.toLocaleString()} / ${maxHp.toLocaleString()}</div>
         </div>
-        <div class="gui-combatant-hp-text">${hp.toLocaleString()} / ${maxHp.toLocaleString()}</div>
       </div>
     `;
   }
 
-  _renderCombatStatus(data) {
-    if (!data.monsters || data.monsters.length === 0) return;
-
-    // Re-render the battlefield with updated HP values
+  /** Render the full battlefield with party left, monsters right */
+  _renderBattlefield(data) {
     this.npcArea.innerHTML = '';
 
     const battlefield = document.createElement('div');
     battlefield.className = 'gui-battlefield';
 
-    // Left: Player party
+    // -- Left: Player party --
     const partyDiv = document.createElement('div');
     partyDiv.className = 'gui-party-side';
-    const playerClass = this.state.playerClass || 'warrior';
+
     const playerHpPct = data.playerMaxHp > 0 ? (data.playerHp / data.playerMaxHp * 100) : 100;
     const playerHpClass = playerHpPct < 25 ? 'critical' : playerHpPct < 50 ? 'warning' : '';
 
-    let partyHtml = `
-      <div class="gui-combatant gui-player-char">
-        <img class="gui-combatant-sprite" src="./assets/classes/${playerClass}-east.png"
-             alt="${playerClass}" onerror="this.src='./assets/classes/${playerClass}.png'">
-        <div class="gui-combatant-name player-name">${this.state.playerName || 'You'}</div>
-        <div class="gui-combatant-hp-bar">
-          <div class="gui-combatant-hp-fill hp-player ${playerHpClass}" style="width:${playerHpPct}%"></div>
-        </div>
-      </div>
-    `;
+    let partyHtml = this._renderPlayerCombatant(this.state.playerName, playerHpPct, playerHpClass, true);
 
-    // Add teammates if present (from combat_status or stored from combat_menu)
+    // Add teammates
     const teammates = data.teammates || this.state.combatTeammates || [];
     for (const tm of teammates) {
-      const tmHpPct = tm.maxHp > 0 ? (tm.hp / tm.maxHp * 100) : 100;
-      const tmClass = (tm.className || '').toLowerCase().replace(/\s+/g, '-');
-      const tmSprite = tmClass
-        ? `<img class="gui-combatant-sprite" src="./assets/classes/${tmClass}-east.png" alt="${tm.name}" onerror="this.className='gui-combatant-sprite gui-teammate-placeholder'; this.textContent='${tm.name[0]}';">`
-        : `<div class="gui-combatant-sprite gui-teammate-placeholder">${tm.name[0]}</div>`;
-      partyHtml += `
-        <div class="gui-combatant gui-teammate">
-          ${tmSprite}
-          <div class="gui-combatant-name">${tm.name}</div>
-          <div class="gui-combatant-hp-bar">
-            <div class="gui-combatant-hp-fill hp-ally" style="width:${tmHpPct}%"></div>
-          </div>
-        </div>
-      `;
+      partyHtml += this._renderTeammateCombatant(tm);
     }
     partyDiv.innerHTML = partyHtml;
     battlefield.appendChild(partyDiv);
 
-    // Center
+    // -- Center: Divider line --
     const vs = document.createElement('div');
     vs.className = 'gui-vs-divider';
     battlefield.appendChild(vs);
 
-    // Right: Monsters
+    // -- Right: Monsters --
     const monsterDiv = document.createElement('div');
     monsterDiv.className = 'gui-monster-side';
-    let monstersHtml = '';
-    for (const m of data.monsters) {
-      const spriteFile = this.monsterSpriteMap[m.family] || '';
-      monstersHtml += this._renderMonsterCombatant(m.name, m.level, m.hp, m.maxHp, m.isBoss, spriteFile, m.family);
+
+    if (data.monsters && data.monsters.length > 0) {
+      let monstersHtml = '';
+      for (const m of data.monsters) {
+        const spriteFile = this.monsterSpriteMap[m.family] || '';
+        monstersHtml += this._renderMonsterCombatant(m.name, m.level, m.hp, m.maxHp, m.isBoss, spriteFile, m.family);
+      }
+      monsterDiv.innerHTML = monstersHtml;
+    } else if (data.monsterName) {
+      // Single monster from combat_start event
+      const spriteFile = this.monsterSpriteMap[data.family] || '';
+      monsterDiv.innerHTML = this._renderMonsterCombatant(
+        data.monsterName, data.monsterLevel,
+        data.monsterHp, data.monsterMaxHp,
+        data.isBoss, spriteFile, data.family
+      );
     }
-    monsterDiv.innerHTML = monstersHtml;
     battlefield.appendChild(monsterDiv);
 
+    // -- Combat log overlay --
+    const logDiv = document.createElement('div');
+    logDiv.className = 'gui-combat-log';
+    logDiv.id = 'gui-combat-log';
+    battlefield.appendChild(logDiv);
+
+    // -- Turn indicator --
+    const turnDiv = document.createElement('div');
+    turnDiv.className = 'gui-turn-indicator';
+    turnDiv.id = 'gui-turn-indicator';
+    turnDiv.textContent = 'Combat';
+    battlefield.appendChild(turnDiv);
+
+    // Add density class based on max combatants per side
+    const partyCount = partyDiv.querySelectorAll('.gui-combatant').length;
+    const monsterCount = monsterDiv.querySelectorAll('.gui-combatant').length;
+    const maxPerSide = Math.max(partyCount, monsterCount);
+    if (maxPerSide >= 5) battlefield.classList.add('dense-5');
+    else if (maxPerSide >= 4) battlefield.classList.add('dense-4');
+    else if (maxPerSide >= 3) battlefield.classList.add('dense-3');
+
     this.npcArea.appendChild(battlefield);
+  }
+
+  _renderCombatStatus(data) {
+    if (!data.monsters || data.monsters.length === 0) return;
+    this._renderBattlefield(data);
 
     // Update player HUD
     if (data.playerHp !== undefined) {
@@ -1138,12 +1726,53 @@ class GameUI {
     }
   }
 
+  /** Handle a combat_action event — feed the combat log and show damage numbers */
+  _handleCombatAction(data) {
+    const { actor, action, target, damage, targetHp, targetMaxHp } = data;
+    // Determine log type
+    let type = 'info';
+    let text = '';
+    if (damage > 0) {
+      const isHeal = action && (action.toLowerCase().includes('heal') || action.toLowerCase().includes('potion'));
+      if (isHeal) {
+        type = 'heal';
+        text = `${actor} heals ${target} for ${damage.toLocaleString()} HP`;
+      } else {
+        type = 'damage';
+        text = `${actor} ${action || 'attacks'} ${target} for ${damage.toLocaleString()} damage`;
+      }
+    } else if (action) {
+      type = action.toLowerCase().includes('defend') ? 'buff' : 'info';
+      text = `${actor} uses ${action}${target ? ` on ${target}` : ''}`;
+    } else {
+      text = `${actor} attacks ${target}`;
+    }
+    this._addCombatLog(text, type);
+  }
+
+  /** Add entry to combat log */
+  _addCombatLog(text, type) {
+    const log = document.getElementById('gui-combat-log');
+    if (!log) return;
+    const entry = document.createElement('div');
+    entry.className = `gui-combat-log-entry ${type || 'info'}`;
+    entry.textContent = text;
+    log.appendChild(entry);
+    // Keep scrolled to bottom
+    log.scrollTop = log.scrollHeight;
+    // Limit entries
+    while (log.children.length > 30) {
+      log.removeChild(log.firstChild);
+    }
+  }
+
   _renderCombatEnd(data) {
-    this.npcArea.innerHTML = '';
+    // Keep battlefield visible, overlay the result
     const result = document.createElement('div');
     result.className = 'gui-combat-result';
+    const isDefeat = data.outcome && data.outcome.toLowerCase().includes('defeat');
     result.innerHTML = `
-      <div class="gui-combat-result-title">${data.outcome}</div>
+      <div class="gui-combat-result-title${isDefeat ? ' defeat' : ''}">${data.outcome}</div>
       <div class="gui-combat-rewards">
         ${data.xpGained ? `<span class="gui-reward-xp">+${data.xpGained.toLocaleString()} XP</span>` : ''}
         ${data.goldGained ? `<span class="gui-reward-gold">+${data.goldGained.toLocaleString()} Gold</span>` : ''}
@@ -1151,6 +1780,9 @@ class GameUI {
       </div>
     `;
     this.npcArea.appendChild(result);
+
+    // Clear ability bar
+    this.roomActions.innerHTML = '';
 
     // Auto-clear after a few seconds
     setTimeout(() => {

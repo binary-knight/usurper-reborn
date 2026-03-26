@@ -2934,7 +2934,17 @@ public class DungeonLocation : BaseLocation
         if (!GameConfig.ElectronMode) return;
 
         // Room state
-        var exits = room.Exits.Keys.Select(d => d.ToString().Substring(0, 1)).ToList();
+        var exitData = room.Exits.Select(e =>
+        {
+            var targetRoom = currentFloor?.Rooms?.FirstOrDefault(r => r.Id == e.Value.TargetRoomId);
+            return new
+            {
+                dir = e.Key.ToString().Substring(0, 1),
+                label = e.Key.ToString(),
+                cleared = targetRoom?.IsCleared ?? false,
+                desc = e.Value.Description ?? ""
+            };
+        }).ToList();
 
         ElectronBridge.Emit("dungeon_room", new
         {
@@ -2949,8 +2959,11 @@ public class DungeonLocation : BaseLocation
             hasEvent = room.HasEvent,
             hasTreasure = room.HasTreasure,
             hasFeatures = room.Features?.Count > 0,
+            features = room.Features?.Select(f => f.Name).ToList() ?? new List<string>(),
             dangerRating = room.DangerRating,
-            exits = exits,
+            exits = exitData,
+            potions = player is Player pp ? pp.Healing : 0,
+            maxPotions = player is Player pp2 ? pp2.MaxPotions : 0,
         });
 
         // Actions available
@@ -9519,6 +9532,32 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task ManagePartyInDungeon()
     {
+        // Electron graphical client — emit party data
+        if (GameConfig.ElectronMode)
+        {
+            var partyData = teammates.Select((tm, i) => new
+            {
+                index = i + 1,
+                name = tm.DisplayName,
+                level = tm.Level,
+                className = tm.ClassName,
+                hp = tm.HP, maxHp = tm.MaxHP,
+                mana = tm.IsManaClass ? tm.Mana : 0,
+                maxMana = tm.IsManaClass ? tm.MaxMana : 0,
+                isManaClass = tm.IsManaClass,
+                weapon = tm.GetEquipment(EquipmentSlot.MainHand)?.Name ?? "(none)",
+                armor = tm.GetEquipment(EquipmentSlot.Body)?.Name ?? "(none)",
+                isCompanion = !tm.IsGroupedPlayer && !tm.IsEcho,
+            }).ToList();
+
+            ElectronBridge.Emit("party_status", new { members = partyData });
+
+            // Skip text rendering in Electron mode
+            ElectronBridge.EmitPressAnyKey();
+            await terminal.GetInput("");
+            return;
+        }
+
         while (true)
         {
             terminal.ClearScreen();
@@ -10381,6 +10420,32 @@ public class DungeonLocation : BaseLocation
     private async Task UsePotions()
     {
         var player = GetCurrentPlayer();
+
+        // Electron graphical client — emit potions data
+        if (GameConfig.ElectronMode)
+        {
+            var allMembers = GetAllPartyMembers();
+            var memberData = allMembers.Select(m => new
+            {
+                name = m.DisplayName,
+                hp = m.HP, maxHp = m.MaxHP,
+                mana = m.IsManaClass ? m.Mana : 0,
+                maxMana = m.IsManaClass ? m.MaxMana : 0,
+                isManaClass = m.IsManaClass,
+            }).ToList();
+
+            ElectronBridge.Emit("potions_menu", new
+            {
+                playerHp = player.HP, playerMaxHp = player.MaxHP,
+                potions = player is Player pp ? pp.Healing : 0,
+                maxPotions = player is Player pp2 ? pp2.MaxPotions : 0,
+                gold = player.Gold,
+                healAmount = player.MaxHP / 4,
+                potionCost = 50 + (player.Level * 10),
+                teammates = memberData,
+            });
+            // Don't skip text for potions — user needs the interactive menu
+        }
 
         // Get all party members: NPC teammates + Companions
         var allPartyMembers = GetAllPartyMembers();
@@ -11408,6 +11473,64 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.no_floor_map"), "gray");
             await Task.Delay(1500);
             return;
+        }
+
+        // Electron graphical client — emit map data
+        if (GameConfig.ElectronMode)
+        {
+            var mapPositions = BuildRoomPositionMap();
+            if (mapPositions.Count > 0)
+            {
+                var rooms = mapPositions.Select(kvp =>
+                {
+                    var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == kvp.Key);
+                    if (room == null) return null;
+                    bool isCurrent = room.Id == currentFloor.CurrentRoomId;
+                    return new
+                    {
+                        id = room.Id,
+                        x = kvp.Value.x,
+                        y = kvp.Value.y,
+                        name = room.Name,
+                        symbol = GetRoomMapChar(room).ToString(),
+                        type = isCurrent ? "player" :
+                               !room.IsExplored ? "unknown" :
+                               room.IsBossRoom && !room.IsCleared ? "boss" :
+                               room.HasStairsDown ? "stairs" :
+                               room.IsCleared ? "cleared" :
+                               room.HasMonsters ? "monsters" : "safe",
+                        explored = room.IsExplored,
+                        cleared = room.IsCleared,
+                        hasMonsters = room.HasMonsters,
+                        isBoss = room.IsBossRoom,
+                        hasStairs = room.HasStairsDown,
+                        hasTreasure = room.HasTreasure,
+                        hasEvent = room.HasEvent,
+                        exits = room.Exits.Keys.Select(d => d.ToString().Substring(0, 1)).ToList()
+                    };
+                }).Where(r => r != null).ToList();
+
+                int mapExplored = currentFloor.Rooms.Count(r => r.IsExplored);
+                int mapCleared = currentFloor.Rooms.Count(r => r.IsCleared);
+                int mapTotal = currentFloor.Rooms.Count;
+
+                ElectronBridge.Emit("dungeon_map", new
+                {
+                    floor = currentDungeonLevel,
+                    theme = currentFloor.Theme.ToString(),
+                    rooms,
+                    explored = mapExplored,
+                    cleared = mapCleared,
+                    total = mapTotal,
+                    bossDefeated = currentFloor.BossDefeated,
+                    currentRoomName = currentFloor.GetCurrentRoom()?.Name ?? "Unknown"
+                });
+
+                // In Electron mode, skip text rendering — graphical overlay handles it
+                ElectronBridge.EmitPressAnyKey();
+                await terminal.GetInput("");
+                return;
+            }
         }
 
         if (GameConfig.ScreenReaderMode)

@@ -444,10 +444,10 @@
 
 .gui-npc-area {
   position: absolute;
-  top: 10px;
-  left: 5%;
-  right: 5%;
-  bottom: 40%;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
@@ -455,6 +455,12 @@
   justify-content: center;
   align-items: flex-start;
   align-content: flex-start;
+  padding: 10px 5%;
+}
+
+/* In non-combat mode, keep NPC tags in upper area */
+.gui-npc-area:not(:has(.gui-battlefield)) {
+  bottom: 40%;
 }
 
 .gui-npc-tag {
@@ -548,12 +554,18 @@
   position: absolute;
   bottom: 8px;
   left: 10px;
-  right: 140px; /* leave space for compass */
-  z-index: 10;
+  right: 10px;
+  z-index: 15;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+
+/* When compass is visible (dungeon non-combat), leave space */
+.gui-compass[style*="grid"] ~ .gui-room-actions,
+.gui-compass[style*="display: grid"] ~ .gui-room-actions {
+  right: 140px;
 }
 
 .gui-room-action-btn {
@@ -652,12 +664,11 @@
 
 .gui-press-any {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  left: 0; right: 0; bottom: 60px;
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
   cursor: pointer;
   animation: press-any-pulse 2s ease-in-out infinite;
 }
@@ -762,32 +773,147 @@
 /* ═══════════════════════════════════════════ */
 
 .gui-room-info {
-  text-align: center;
-  padding: 20px;
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  max-width: 420px;
+  padding: 12px 16px;
+  background: rgba(5, 4, 3, 0.85);
+  border: 1px solid rgba(140, 100, 40, 0.2);
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
+  z-index: 5;
+  text-align: left;
+}
+
+.gui-room-header {
+  margin-bottom: 8px;
 }
 
 .gui-room-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: bold;
   color: var(--gold);
-  text-shadow: 0 0 20px rgba(192, 160, 80, 0.4), 0 2px 4px rgba(0, 0, 0, 0.8);
-  margin-bottom: 8px;
+  text-shadow: 0 0 12px rgba(192, 160, 80, 0.3);
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+
+.gui-room-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 10px;
+}
+
+.gui-room-floor {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.gui-room-theme {
+  color: var(--text-dim);
+}
+
+.gui-room-danger {
+  color: #cc6633;
   letter-spacing: 2px;
 }
 
+.gui-room-cleared-badge {
+  color: var(--green-bright);
+  font-weight: bold;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 1px 6px;
+  border: 1px solid rgba(80, 200, 80, 0.3);
+  border-radius: 2px;
+}
+
 .gui-room-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-default);
   margin-bottom: 6px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  line-height: 1.4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .gui-room-atmo {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-dim);
   font-style: italic;
-  margin-bottom: 12px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  margin-bottom: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.gui-room-features {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.gui-room-feature {
+  font-size: 10px;
+  color: #8899aa;
+}
+
+.gui-room-divider {
+  height: 1px;
+  background: rgba(140, 100, 40, 0.15);
+  margin: 6px 0;
+}
+
+.gui-room-section-label {
+  font-size: 8px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.gui-room-exits {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.gui-room-exit {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.gui-room-exit.cleared {
+  color: var(--green);
+}
+
+.gui-room-exit-dir {
+  color: var(--gold-dim);
+  font-weight: bold;
+}
+
+.gui-room-status {
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+/* Utility button row — smaller, compact */
+.gui-utility-row {
+  gap: 4px !important;
+}
+
+.gui-util-btn {
+  padding: 4px 8px !important;
+  font-size: 9px !important;
+  letter-spacing: 0 !important;
+  opacity: 0.7;
+}
+
+.gui-util-btn:hover {
+  opacity: 1;
 }
 
 .gui-room-indicators {
@@ -844,28 +970,377 @@
 }
 
 /* ═══════════════════════════════════════════ */
-/* COMBAT BATTLEFIELD (DD-style: party vs monsters) */
+/* DUNGEON MAP OVERLAY                         */
 /* ═══════════════════════════════════════════ */
 
-.gui-battlefield {
+.gui-map-overlay {
+  position: absolute;
+  top: 0; left: 1%; right: 1%; bottom: 0;
+  background: rgba(5, 4, 3, 0.96);
+  border: 1px solid rgba(140, 100, 40, 0.3);
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+  z-index: 60; /* above press-any-key (z-index 50) */
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  width: 100%;
-  padding: 10px;
-  animation: combat-appear 0.5s ease;
+  flex-direction: column;
+  padding: 10px 14px;
+  animation: combat-appear 0.3s ease;
+  overflow: hidden;
 }
 
+.gui-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(140, 100, 40, 0.2);
+}
+
+.gui-map-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+
+.gui-map-stats {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Canvas map */
+.gui-map-canvas {
+  flex: 1;
+  min-height: 0;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+.gui-map-bottom {
+  flex-shrink: 0;
+}
+
+/* Legend */
+.gui-map-legend {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  padding: 8px 0;
+  margin-top: 8px;
+  border-top: 1px solid rgba(140, 100, 40, 0.15);
+}
+
+.gui-map-legend-item {
+  font-size: 9px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gui-map-sym-player { color: #ffdd44; font-weight: bold; }
+.gui-map-sym-cleared { color: #55cc55; font-weight: bold; }
+.gui-map-sym-monsters { color: #dd4444; font-weight: bold; }
+.gui-map-sym-stairs { color: #5577dd; font-weight: bold; }
+.gui-map-sym-boss { color: #ff4444; font-weight: bold; }
+.gui-map-sym-safe { color: #66bbcc; font-weight: bold; }
+.gui-map-sym-unknown { color: #555; font-weight: bold; }
+
+/* Footer */
+.gui-map-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-dim);
+  padding-top: 4px;
+}
+
+.gui-map-boss-defeated {
+  color: var(--green-bright);
+  font-weight: bold;
+}
+
+/* ═══════════════════════════════════════════ */
+/* INVENTORY SCREEN                            */
+/* ═══════════════════════════════════════════ */
+
+/* Inventory overlay — wider */
+.gui-inv-overlay { left: 2%; right: 2%; }
+
+.gui-inv-section-label {
+  font-size: 9px; color: var(--gold-dim); text-transform: uppercase;
+  letter-spacing: 2px; margin-bottom: 6px; padding-bottom: 3px;
+  border-bottom: 1px solid rgba(140, 100, 40, 0.15);
+}
+
+/* Paperdoll layout: left panel (portrait + slots) | right panel (backpack) */
+.gui-inv-body {
+  display: flex; gap: 16px; flex: 1; min-height: 0; padding: 6px 0;
+  overflow-y: auto;
+}
+
+.gui-inv-left {
+  display: flex; flex-direction: row; align-items: flex-start; gap: 8px;
+  flex-shrink: 0;
+}
+
+.gui-inv-portrait {
+  width: 80px; height: 80px; object-fit: contain; image-rendering: auto;
+  filter: drop-shadow(2px 4px 8px rgba(0,0,0,0.8));
+  flex-shrink: 0;
+}
+
+/* Equipment slots grid — 2 columns, compact */
+.gui-inv-slots-grid {
+  display: grid; grid-template-columns: repeat(2, 88px);
+  grid-auto-rows: min-content; gap: 2px;
+}
+
+.gui-inv-slot {
+  background: rgba(15, 12, 8, 0.8); border: 1px solid rgba(60, 50, 30, 0.3);
+  border-radius: 3px; padding: 3px 5px; display: flex; flex-direction: column;
+  align-items: center; gap: 1px; transition: all 0.15s;
+  min-height: 36px; justify-content: center;
+}
+
+.gui-inv-slot:hover:not(.empty) {
+  border-color: var(--gold); background: rgba(40, 30, 16, 0.8);
+  transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.gui-inv-slot.empty { opacity: 0.6; }
+.gui-inv-slot.empty:hover { opacity: 0.8; border-color: rgba(100, 80, 40, 0.4); }
+.gui-inv-slot.uncommon { border-color: rgba(80, 200, 80, 0.4); }
+.gui-inv-slot.rare { border-color: rgba(80, 120, 255, 0.4); }
+.gui-inv-slot.epic { border-color: rgba(170, 80, 255, 0.4); }
+.gui-inv-slot.legendary { border-color: rgba(255, 170, 0, 0.5); box-shadow: 0 0 6px rgba(255, 170, 0, 0.15); }
+
+.gui-inv-slot-icon { font-size: 14px; }
+.gui-inv-slot-name {
+  font-size: 8px; color: var(--text-default); text-align: center;
+  max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gui-inv-slot:not(.empty) .gui-inv-slot-name { color: var(--text-bright); font-weight: bold; }
+.gui-inv-slot.empty .gui-inv-slot-name { color: var(--text-default); text-transform: capitalize; font-size: 8px; }
+.gui-inv-slot.empty .gui-inv-slot-icon { opacity: 0.5; }
+
+/* Right panel: backpack + actions */
+.gui-inv-right {
+  flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0;
+}
+
+.gui-inv-bp-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 4px; flex: 1; overflow-y: auto; align-content: start;
+}
+
+.gui-inv-bp-cell {
+  background: rgba(15, 12, 8, 0.7); border: 1px solid rgba(60, 50, 30, 0.25);
+  border-radius: 3px; padding: 6px 8px; display: flex; flex-direction: column;
+  align-items: center; gap: 2px; transition: all 0.15s;
+}
+
+.gui-inv-bp-cell:hover {
+  border-color: var(--gold); background: rgba(40, 30, 16, 0.8);
+  transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.gui-inv-bp-cell-icon { font-size: 18px; }
+.gui-inv-bp-cell-name { font-size: 9px; color: var(--text-bright); font-weight: bold; text-align: center; }
+.gui-inv-bp-cell-stats { font-size: 8px; color: var(--text-dim); }
+
+.gui-inv-actions {
+  display: flex; gap: 4px; flex-wrap: wrap; padding-top: 6px;
+  border-top: 1px solid rgba(140, 100, 40, 0.15); flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════ */
+/* CHARACTER STATUS SCREEN                     */
+/* ═══════════════════════════════════════════ */
+
+.gui-status-body {
+  display: flex; gap: 20px; flex: 1; min-height: 0; padding: 8px 0;
+}
+
+.gui-status-portrait {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 180px; flex-shrink: 0;
+}
+
+.gui-status-portrait-img {
+  width: 160px; height: 160px; object-fit: contain;
+  image-rendering: auto; filter: drop-shadow(2px 4px 8px rgba(0,0,0,0.8));
+}
+
+.gui-status-name {
+  font-size: 14px; font-weight: bold; color: var(--gold);
+  text-shadow: 0 0 8px rgba(192, 160, 80, 0.3);
+}
+
+.gui-status-classrace { font-size: 10px; color: var(--text-dim); }
+
+.gui-status-stats { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+
+.gui-status-bars { display: flex; flex-direction: column; gap: 4px; }
+.gui-status-bar-row { display: flex; align-items: center; gap: 6px; }
+.gui-status-bar-label { font-size: 9px; color: var(--text-faint); width: 20px; text-transform: uppercase; font-weight: bold; }
+.gui-status-bar { flex: 1; height: 14px; background: rgba(10, 4, 4, 0.8); border: 1px solid rgba(40, 20, 20, 0.4); border-radius: 1px; overflow: hidden; max-width: 250px; }
+.gui-status-bar-fill { height: 100%; transition: width 0.4s ease; }
+.gui-status-bar-fill.hp { background: linear-gradient(to bottom, #44bb44, #1a7a1a); }
+.gui-status-bar-fill.mp { background: linear-gradient(to bottom, #3355cc, #1a2a7a); }
+.gui-status-bar-fill.sta { background: linear-gradient(to bottom, #cc9922, #7a5a15); }
+.gui-status-bar-val { font-size: 10px; color: var(--text-dim); min-width: 70px; }
+
+.gui-status-attributes {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+}
+
+.gui-status-attr {
+  display: flex; justify-content: space-between; padding: 4px 8px;
+  background: rgba(15, 12, 8, 0.6); border: 1px solid rgba(60, 50, 30, 0.2);
+  border-radius: 2px;
+}
+
+.gui-status-attr-label { font-size: 9px; color: var(--gold-dim); font-weight: bold; }
+.gui-status-attr-val { font-size: 11px; color: var(--text-bright); font-weight: bold; }
+
+.gui-status-info {
+  display: flex; gap: 16px; font-size: 10px; color: var(--text-dim);
+  padding-top: 6px; border-top: 1px solid rgba(140, 100, 40, 0.15);
+}
+
+/* ═══════════════════════════════════════════ */
+/* PARTY STATUS SCREEN                         */
+/* ═══════════════════════════════════════════ */
+
+.gui-party-list {
+  display: flex; flex-direction: column; gap: 6px; flex: 1;
+  overflow-y: auto; padding: 8px 0;
+}
+
+.gui-party-card {
+  display: flex; gap: 12px; padding: 8px 12px; align-items: center;
+  background: rgba(15, 12, 8, 0.6); border: 1px solid rgba(60, 50, 30, 0.2);
+  border-radius: 3px;
+}
+
+.gui-party-portrait {
+  width: 64px; height: 64px; object-fit: contain; image-rendering: auto;
+  filter: drop-shadow(1px 2px 4px rgba(0,0,0,0.7)); flex-shrink: 0;
+}
+
+.gui-party-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.gui-party-member-name { font-size: 12px; font-weight: bold; color: var(--text-bright); }
+.gui-party-member-class { font-size: 9px; color: var(--text-dim); }
+
+.gui-party-hp-row { display: flex; align-items: center; gap: 6px; }
+.gui-party-hp-label { font-size: 8px; color: var(--text-faint); width: 18px; font-weight: bold; }
+.gui-party-hp-bar { flex: 1; height: 8px; background: rgba(10, 4, 4, 0.8); border: 1px solid rgba(40, 20, 20, 0.3); border-radius: 1px; overflow: hidden; max-width: 200px; }
+.gui-party-hp-fill { height: 100%; background: linear-gradient(to bottom, #44bb44, #1a7a1a); }
+.gui-party-hp-fill.mp { background: linear-gradient(to bottom, #3355cc, #1a2a7a); }
+.gui-party-hp-val { font-size: 9px; color: var(--text-dim); min-width: 60px; }
+.gui-party-equip { font-size: 9px; color: var(--text-faint); }
+
+/* ═══════════════════════════════════════════ */
+/* POTIONS MENU SCREEN                         */
+/* ═══════════════════════════════════════════ */
+
+.gui-potions-player { padding: 8px 0; }
+
+.gui-potions-hp-row {
+  display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim);
+}
+
+.gui-potions-bar {
+  flex: 1; height: 12px; background: rgba(10, 4, 4, 0.8);
+  border: 1px solid rgba(40, 20, 20, 0.4); border-radius: 1px; overflow: hidden; max-width: 300px;
+}
+
+.gui-potions-fill { height: 100%; }
+.gui-potions-fill.hp { background: linear-gradient(to bottom, #44bb44, #1a7a1a); }
+
+.gui-potions-count { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+
+.gui-potions-actions {
+  display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 0;
+  border-top: 1px solid rgba(140, 100, 40, 0.15);
+  border-bottom: 1px solid rgba(140, 100, 40, 0.15);
+  margin: 6px 0;
+}
+
+.gui-potions-team { padding-top: 8px; }
+
+.gui-potions-tm-row {
+  display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 10px;
+}
+
+.gui-potions-tm-name { width: 140px; color: var(--text-bright); }
+.gui-potions-tm-val { color: var(--text-dim); min-width: 70px; }
+
+/* ═══════════════════════════════════════════ */
+/* COMBAT BATTLEFIELD (Darkest Dungeon style)  */
+/* ═══════════════════════════════════════════ */
+
+/* Full-bleed battlefield container — covers entire scene area */
+.gui-battlefield {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: flex-end; /* feet anchored to ground */
+  justify-content: center;
+  padding-bottom: 72px; /* space for ability bar */
+  animation: combat-appear 0.5s ease;
+  z-index: 2;
+}
+
+/* Dark combat overlay — heavier vignette during combat */
+.gui-battlefield::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(ellipse at center 40%, transparent 30%, rgba(0, 0, 0, 0.7) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Torch flicker overlay */
+.gui-battlefield::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 50% 60%,
+    rgba(180, 120, 40, 0.05) 0%,
+    transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+  animation: torch-flicker 4s ease-in-out infinite;
+}
+
+@keyframes torch-flicker {
+  0%, 100% { opacity: 1; }
+  25% { opacity: 0.7; }
+  50% { opacity: 0.9; }
+  75% { opacity: 0.6; }
+}
+
+/* Party and monster sides — overlapping line formation */
 .gui-party-side, .gui-monster-side {
   display: flex;
   flex-direction: row;
-  gap: 6px;
   align-items: flex-end;
-  flex-wrap: wrap;
-  justify-content: center;
+  z-index: 1;
+  flex: 0 1 auto;
   max-width: 45%;
 }
+
+/* Characters overlap slightly like DD */
+.gui-party-side .gui-combatant + .gui-combatant { margin-left: -20px; }
+.gui-monster-side .gui-combatant + .gui-combatant { margin-left: -15px; }
 
 .gui-party-side {
   justify-content: flex-end;
@@ -875,248 +1350,551 @@
   justify-content: flex-start;
 }
 
+/* Battle divider — gap between sides, no visible line */
 .gui-vs-divider {
-  color: var(--red-bright);
-  font-size: 10px;
-  font-weight: bold;
-  letter-spacing: 2px;
-  text-shadow: 0 0 12px rgba(200, 50, 50, 0.4);
-  opacity: 0.5;
-  padding: 0 8px;
+  width: 40px;
+  min-width: 30px;
+  flex-shrink: 0;
 }
 
-/* Individual combatant (player, teammate, or monster) */
+/* ─── Individual combatant (player, teammate, monster) ─── */
 .gui-combatant {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: rgba(10, 8, 6, 0.7);
-  border: 1px solid var(--border-dark);
-  border-radius: 3px;
-  padding: 6px 10px;
-  min-width: 100px;
-  backdrop-filter: blur(2px);
+  position: relative;
+  padding: 0;
+  background: none;
+  border: none;
+  transition: transform 0.2s ease;
 }
 
-.gui-combatant.boss {
-  border-color: var(--red);
-  box-shadow: 0 0 12px rgba(200, 50, 50, 0.2);
+/* Selected/active combatant — subtle ground highlight */
+.gui-combatant.active::after {
+  content: '';
+  position: absolute;
+  bottom: 18px;
+  left: 15%; right: 15%;
+  height: 2px;
+  background: var(--gold);
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(192, 160, 80, 0.5);
 }
 
+/* Boss combatant glow */
+.gui-combatant.boss .gui-combatant-sprite {
+  filter: drop-shadow(0 0 8px rgba(200, 50, 50, 0.5))
+          drop-shadow(0 0 20px rgba(200, 50, 50, 0.2));
+}
+
+/* ─── Sprite rendering ─── */
 .gui-combatant-sprite {
-  width: 80px;
-  height: 80px;
+  width: 220px;
+  height: 220px;
   image-rendering: pixelated;
-  margin-bottom: 4px;
+  object-fit: contain;
+  filter: drop-shadow(2px 4px 8px rgba(0, 0, 0, 0.9));
+  transition: filter 0.3s ease;
 }
 
+/* HD sprites don't need pixelated rendering */
+.gui-combatant-sprite.hd-sprite {
+  image-rendering: auto;
+  width: 240px;
+  height: 240px;
+}
+
+/* Monster sprites face left (mirrored) */
 .gui-combatant-sprite.monster-sprite {
-  transform: scaleX(-1); /* Mirror monsters to face left */
+  transform: scaleX(-1);
+}
+
+/* Boss monsters loom large */
+.gui-combatant.boss .gui-combatant-sprite {
+  width: 280px;
+  height: 280px;
+}
+
+/* ─── Density scaling: shrink sprites when many combatants ─── */
+/* 3 per side */
+.gui-battlefield.dense-3 .gui-combatant-sprite { width: 180px; height: 180px; }
+.gui-battlefield.dense-3 .gui-combatant-sprite.hd-sprite { width: 190px; height: 190px; }
+.gui-battlefield.dense-3 .gui-combatant.boss .gui-combatant-sprite { width: 220px; height: 220px; }
+
+/* 4 per side */
+.gui-battlefield.dense-4 .gui-combatant-sprite { width: 150px; height: 150px; }
+.gui-battlefield.dense-4 .gui-combatant-sprite.hd-sprite { width: 160px; height: 160px; }
+.gui-battlefield.dense-4 .gui-combatant.boss .gui-combatant-sprite { width: 190px; height: 190px; }
+
+/* 5 per side */
+.gui-battlefield.dense-5 .gui-combatant-sprite { width: 120px; height: 120px; }
+.gui-battlefield.dense-5 .gui-combatant-sprite.hd-sprite { width: 130px; height: 130px; }
+.gui-battlefield.dense-5 .gui-combatant.boss .gui-combatant-sprite { width: 160px; height: 160px; }
+.gui-battlefield.dense-5 .gui-combatant-hp-bar { width: 80px; }
+.gui-battlefield.dense-5 .gui-combatant-name { font-size: 8px; }
+
+/* Tighter overlap for dense battles */
+.gui-battlefield.dense-4 .gui-party-side .gui-combatant + .gui-combatant { margin-left: -30px; }
+.gui-battlefield.dense-4 .gui-monster-side .gui-combatant + .gui-combatant { margin-left: -25px; }
+.gui-battlefield.dense-5 .gui-party-side .gui-combatant + .gui-combatant { margin-left: -40px; }
+.gui-battlefield.dense-5 .gui-monster-side .gui-combatant + .gui-combatant { margin-left: -35px; }
+
+/* Reduce gap in VS divider for dense battles */
+.gui-battlefield.dense-4 .gui-vs-divider,
+.gui-battlefield.dense-5 .gui-vs-divider { width: 20px; min-width: 15px; }
+
+/* Death/defeated animation */
+.gui-combatant.defeated .gui-combatant-sprite {
+  filter: grayscale(0.8) brightness(0.3) drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.8));
+  transform: rotate(-15deg) translateY(10px);
+  transition: all 0.5s ease;
+}
+
+/* Hit flash */
+.gui-combatant.hit .gui-combatant-sprite {
+  animation: combat-hit 0.3s ease;
+}
+
+@keyframes combat-hit {
+  0% { filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.8)); }
+  30% { filter: brightness(3) drop-shadow(0 0 12px rgba(255, 255, 255, 0.8)); }
+  100% { filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.8)); }
+}
+
+/* ─── Combatant info below sprite ─── */
+.gui-combatant-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 0;
 }
 
 .gui-combatant-name {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: bold;
   color: var(--text-bright);
-  margin-bottom: 2px;
+  margin-bottom: 1px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 1);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 
-.gui-combatant-name.player-name {
-  color: var(--green-bright);
-}
-
-.gui-combatant-name.monster-name {
-  color: var(--red-bright);
-}
+.gui-combatant-name.player-name { color: var(--green-bright); }
+.gui-combatant-name.monster-name { color: var(--red-bright); }
+.gui-combatant-name.ally-name { color: #66aadd; }
 
 .gui-combatant-level {
-  font-size: 9px;
-  color: var(--text-dim);
-  margin-bottom: 4px;
+  font-size: 7px;
+  color: var(--text-faint);
+  margin-bottom: 1px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
+/* ─── HP Bar (small, right at feet like DD) ─── */
 .gui-combatant-hp-bar {
-  width: 90px;
-  height: 8px;
-  background: #1a0808;
-  border: 1px solid #2a1515;
+  width: 80px;
+  height: 6px;
+  background: rgba(10, 4, 4, 0.85);
+  border: 1px solid rgba(60, 20, 20, 0.5);
   border-radius: 1px;
   overflow: hidden;
-  margin-bottom: 2px;
+  position: relative;
 }
 
 .gui-combatant-hp-fill {
   height: 100%;
   transition: width 0.5s ease;
+  position: relative;
+}
+
+/* Sheen overlay on HP fill */
+.gui-combatant-hp-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 40%;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
+  pointer-events: none;
 }
 
 .gui-combatant-hp-fill.hp-player {
-  background: linear-gradient(to bottom, #44aa44, #1a6a1a);
+  background: linear-gradient(to bottom, #44bb44, #1a7a1a);
 }
 
 .gui-combatant-hp-fill.hp-ally {
-  background: linear-gradient(to bottom, #4488cc, #1a4a6a);
+  background: linear-gradient(to bottom, #4499dd, #1a5a8a);
 }
 
 .gui-combatant-hp-fill.hp-monster {
-  background: linear-gradient(to bottom, #aa2222, #661515);
+  background: linear-gradient(to bottom, #bb2222, #771515);
 }
 
 .gui-combatant-hp-fill.warning {
-  background: linear-gradient(to bottom, #aa8822, #665515);
+  background: linear-gradient(to bottom, #cc9922, #886615);
 }
 
 .gui-combatant-hp-fill.critical {
-  background: linear-gradient(to bottom, #cc2222, #881111);
-  animation: pulse-critical 1.5s ease-in-out infinite;
+  background: linear-gradient(to bottom, #dd2222, #991111);
+  animation: pulse-critical 1s ease-in-out infinite;
 }
 
 .gui-combatant-hp-text {
-  font-size: 8px;
+  font-size: 7px;
   color: var(--text-dim);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  margin-top: 0;
 }
 
+/* ─── Placeholder sprites ─── */
 .gui-monster-placeholder, .gui-teammate-placeholder {
-  width: 80px;
-  height: 80px;
+  width: 220px;
+  height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 60px;
   font-weight: bold;
-  color: var(--text-dim);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.06);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* Legacy combat encounter (keep for backwards compat) */
-.gui-combat-encounter {
-  text-align: center;
-  padding: 10px;
-  animation: combat-appear 0.5s ease;
-  width: 100%;
-}
-
-@keyframes combat-appear {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.gui-combat-title {
-  font-size: 11px;
+/* ─── Floating damage numbers ─── */
+.gui-damage-number {
+  position: absolute;
+  font-size: 18px;
   font-weight: bold;
   color: var(--red-bright);
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  margin-bottom: 6px;
-  text-shadow: 0 0 20px rgba(200, 50, 50, 0.4);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 0 8px rgba(200, 50, 50, 0.5);
+  pointer-events: none;
+  animation: damage-float 1.2s ease-out forwards;
+  z-index: 20;
 }
 
-.gui-combat-monsters {
+.gui-damage-number.heal {
+  color: var(--green-bright);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 0 8px rgba(50, 200, 50, 0.5);
+}
+
+.gui-damage-number.crit {
+  font-size: 24px;
+  color: #ffaa00;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 0 12px rgba(255, 170, 0, 0.6);
+}
+
+@keyframes damage-float {
+  0% { opacity: 1; transform: translateY(0) scale(1.2); }
+  20% { transform: translateY(-20px) scale(1); }
+  100% { opacity: 0; transform: translateY(-60px) scale(0.8); }
+}
+
+/* ═══════════════════════════════════════════ */
+/* COMBAT ABILITY BAR (DD-style bottom panel)  */
+/* ═══════════════════════════════════════════ */
+
+.gui-combat-ability-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  background: linear-gradient(to top,
+    rgba(8, 6, 4, 0.98) 0%,
+    rgba(14, 10, 8, 0.95) 80%,
+    rgba(14, 10, 8, 0.85) 100%);
+  border-top: 1px solid rgba(140, 100, 40, 0.3);
+  padding: 6px 12px;
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Character portrait in ability bar */
+.gui-combat-portrait {
+  width: 52px;
+  height: 52px;
+  border: 2px solid var(--gold-dim);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-darkest);
+}
+
+.gui-combat-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.gui-combat-portrait.hd img {
+  image-rendering: auto;
+}
+
+/* Stats panel next to portrait */
+.gui-combat-stats-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.gui-combat-stats-mini .stat-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gui-combat-stats-mini .stat-label {
+  font-size: 8px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  width: 20px;
+}
+
+.gui-combat-stats-mini .stat-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(10, 4, 4, 0.9);
+  border: 1px solid rgba(40, 20, 20, 0.5);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.gui-combat-stats-mini .stat-fill {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.gui-combat-stats-mini .stat-fill.hp { background: linear-gradient(to bottom, #44bb44, #1a7a1a); }
+.gui-combat-stats-mini .stat-fill.mp { background: linear-gradient(to bottom, #3355cc, #1a2a7a); }
+.gui-combat-stats-mini .stat-fill.sta { background: linear-gradient(to bottom, #cc9922, #7a5a15); }
+
+.gui-combat-stats-mini .stat-value {
+  font-size: 9px;
+  color: var(--text-dim);
+  min-width: 50px;
+  text-align: right;
+}
+
+/* Skill slots — the core DD ability bar */
+.gui-combat-skills {
+  display: flex;
+  gap: 3px;
+  flex: 1;
   justify-content: center;
   flex-wrap: wrap;
 }
 
-.gui-monster-card {
-  background: rgba(10, 8, 6, 0.85);
-  border: 1px solid var(--red);
+.gui-skill-slot {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(to bottom, rgba(20, 16, 12, 0.95), rgba(10, 8, 6, 0.98));
+  border: 1px solid rgba(80, 60, 30, 0.4);
   border-radius: 3px;
-  padding: 8px 14px;
-  min-width: 140px;
-  max-width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.gui-skill-slot:hover {
+  border-color: var(--gold);
+  background: linear-gradient(to bottom, rgba(40, 30, 16, 0.95), rgba(20, 15, 8, 0.98));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 8px rgba(192, 160, 80, 0.15);
+}
+
+.gui-skill-slot:active {
+  transform: translateY(0);
+  background: rgba(192, 160, 80, 0.2);
+}
+
+.gui-skill-slot.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.gui-skill-slot.disabled:hover {
+  transform: none;
+  border-color: rgba(80, 60, 30, 0.4);
+  box-shadow: none;
+}
+
+/* Hotkey badge on skill slot */
+.gui-skill-key {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  font-size: 7px;
+  color: var(--text-faint);
+  font-weight: bold;
+}
+
+.gui-skill-slot:hover .gui-skill-key {
+  color: var(--gold-dim);
+}
+
+/* Skill icon (text-based for now) */
+.gui-skill-icon {
+  font-size: 16px;
+  line-height: 1;
+  margin-bottom: 1px;
+}
+
+.gui-skill-label {
+  font-size: 7px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  line-height: 1.1;
+  max-width: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gui-skill-slot:hover .gui-skill-label {
+  color: var(--gold);
+}
+
+/* Skill category colors */
+.gui-skill-slot.combat .gui-skill-icon { color: var(--red-bright); }
+.gui-skill-slot.defense .gui-skill-icon { color: #5588dd; }
+.gui-skill-slot.heal .gui-skill-icon { color: var(--green-bright); }
+.gui-skill-slot.spell .gui-skill-icon { color: #aa66ff; }
+.gui-skill-slot.escape .gui-skill-icon { color: #888; }
+.gui-skill-slot.tactics .gui-skill-icon { color: #cc9933; }
+
+/* ═══════════════════════════════════════════ */
+/* COMBAT LOG (scrolling text on right side)   */
+/* ═══════════════════════════════════════════ */
+
+.gui-combat-log {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 280px;
+  max-height: 50%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 4px;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+}
+
+.gui-combat-log::-webkit-scrollbar { width: 0; }
+
+.gui-combat-log-entry {
+  font-size: 10px;
+  padding: 2px 6px;
+  color: var(--text-dim);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  animation: log-fade-in 0.3s ease;
+  line-height: 1.3;
+}
+
+.gui-combat-log-entry.damage { color: var(--red-bright); }
+.gui-combat-log-entry.heal { color: var(--green-bright); }
+.gui-combat-log-entry.buff { color: #aa88ff; }
+.gui-combat-log-entry.info { color: var(--text-default); }
+.gui-combat-log-entry.critical { color: #ffaa00; font-weight: bold; }
+
+@keyframes log-fade-in {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ═══════════════════════════════════════════ */
+/* COMBAT TURN INDICATOR                       */
+/* ═══════════════════════════════════════════ */
+
+.gui-turn-indicator {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  font-size: 11px;
+  color: var(--gold);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  text-shadow: 0 0 12px rgba(192, 160, 80, 0.4), 0 2px 4px rgba(0, 0, 0, 0.9);
+  padding: 4px 16px;
+  background: rgba(10, 8, 6, 0.6);
+  border: 1px solid rgba(140, 100, 40, 0.2);
+  border-radius: 2px;
   backdrop-filter: blur(4px);
 }
 
-.gui-monster-sprite {
-  width: 64px;
-  height: 64px;
-  image-rendering: pixelated;
-  margin-bottom: 4px;
-  filter: drop-shadow(0 0 6px rgba(200, 50, 50, 0.3));
+@keyframes combat-appear {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-.gui-monster-name {
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--red-bright);
-  margin-bottom: 4px;
-  text-shadow: 0 0 12px rgba(200, 50, 50, 0.3);
-}
-
-.gui-monster-level {
-  font-size: 11px;
-  color: var(--text-dim);
-  margin-bottom: 10px;
-}
-
-.gui-monster-hp-bar {
-  width: 100%;
-  height: 10px;
-  background: #1a0808;
-  border: 1px solid #3a1515;
-  border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 2px;
-}
-
-.gui-monster-hp-fill {
-  height: 100%;
-  background: linear-gradient(to bottom, #aa2222, #661515);
-  transition: width 0.5s ease;
-  border-radius: 1px;
-}
-
-.gui-monster-hp-fill.warning {
-  background: linear-gradient(to bottom, #aa8822, #665515);
-}
-
-.gui-monster-hp-fill.critical {
-  background: linear-gradient(to bottom, #cc2222, #881111);
-  animation: pulse-critical 1s ease-in-out infinite;
-}
-
-.gui-monster-hp-text {
-  font-size: 9px;
-  color: var(--text-dim);
-}
-
-/* Combat Result */
+/* Combat Result — victory/defeat splash */
 .gui-combat-result {
-  text-align: center;
-  padding: 40px 20px;
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.6);
   animation: combat-appear 0.5s ease;
 }
 
 .gui-combat-result-title {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: bold;
   color: var(--gold-bright);
   text-transform: uppercase;
-  letter-spacing: 4px;
-  margin-bottom: 16px;
-  text-shadow: 0 0 30px rgba(192, 160, 80, 0.5);
+  letter-spacing: 6px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 40px rgba(192, 160, 80, 0.6), 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+.gui-combat-result-title.defeat {
+  color: var(--red-bright);
+  text-shadow: 0 0 40px rgba(200, 50, 50, 0.6), 0 2px 4px rgba(0, 0, 0, 0.9);
 }
 
 .gui-combat-rewards {
   display: flex;
-  gap: 20px;
+  gap: 24px;
   justify-content: center;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .gui-reward-xp {
   color: var(--blue-bright);
   font-weight: bold;
+  text-shadow: 0 0 8px rgba(80, 120, 220, 0.4);
 }
 
 .gui-reward-gold {
   color: var(--gold-bright);
   font-weight: bold;
+  text-shadow: 0 0 8px rgba(192, 160, 80, 0.4);
 }
 
 .gui-reward-loot {
   color: var(--green-bright);
   font-weight: bold;
+  text-shadow: 0 0 8px rgba(80, 200, 80, 0.4);
 }
