@@ -3890,6 +3890,7 @@ public partial class GameEngine
             TurnsRemaining = playerData.TurnsRemaining,
             GameTimeMinutes = playerData.GameTimeMinutes > 0 ? playerData.GameTimeMinutes : GameConfig.NewGameStartHour * 60,
             DaysInPrison = (byte)playerData.DaysInPrison,
+            IsMurderConvict = playerData.IsMurderConvict,
             CellDoorOpen = playerData.CellDoorOpen,
             RescuedBy = playerData.RescuedBy ?? "",
             PrisonEscapes = (byte)playerData.PrisonEscapes,

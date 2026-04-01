@@ -42,14 +42,11 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task ShowInventory()
         {
-            // Electron graphical client — show overlay, delegate actions to text system
+            // Electron graphical client — fully interactive graphical inventory
             if (GameConfig.ElectronMode)
             {
-                EmitInventoryEvent();
-                var input = (await terminal.GetInput("")).Trim().ToUpper();
-                if (input == "Q" || input == "") return;
-                // Any other input (B1, B2, slot keys, U, etc.) falls through
-                // to the regular text inventory system which handles all validation
+                await RunElectronInventory();
+                return;
             }
 
             bool exitInventory = false;
@@ -149,6 +146,237 @@ namespace UsurperRemake.Systems
                 isDualWielding = player.IsDualWielding,
                 hasShield = player.HasShieldEquipped
             });
+        }
+
+        /// <summary>
+        /// Fully interactive Electron inventory — no text rendering, all validation server-side.
+        /// Handles EQUIP:{idx}, EQUIP:{idx}:{slot}, UNEQUIP:{slot}, DROP:{idx}, Q commands.
+        /// </summary>
+        private async Task RunElectronInventory()
+        {
+            while (true)
+            {
+                EmitInventoryEvent();
+                var input = (await terminal.GetInput("")).Trim().ToUpper();
+
+                if (input == "Q" || input == "") return;
+
+                string resultMessage = "";
+                string resultType = "info"; // info, success, error
+
+                try
+                {
+                    if (input.StartsWith("EQUIP:"))
+                    {
+                        var parts = input.Substring(6).Split(':');
+                        if (int.TryParse(parts[0], out var idx) && idx >= 0 && idx < player.Inventory.Count)
+                        {
+                            var item = player.Inventory[idx];
+
+                            // Check for non-equippable types
+                            bool isMagicEquipment = item.Type == ObjType.Magic &&
+                                ((int)item.MagicType == 5 || (int)item.MagicType == 9 || (int)item.MagicType == 10);
+                            if (item.Type == ObjType.Food || item.Type == ObjType.Drink ||
+                                item.Type == ObjType.Potion || (item.Type == ObjType.Magic && !isMagicEquipment))
+                            {
+                                resultMessage = "Cannot equip this item type";
+                                resultType = "error";
+                            }
+                            else
+                            {
+                                // Determine target slot
+                                EquipmentSlot targetSlot;
+                                if (parts.Length > 1 && Enum.TryParse<EquipmentSlot>(parts[1], out var explicitSlot))
+                                    targetSlot = explicitSlot;
+                                else
+                                    targetSlot = InferSlotFromItem(item);
+
+                                if (targetSlot == EquipmentSlot.None)
+                                {
+                                    resultMessage = "Cannot determine equipment slot";
+                                    resultType = "error";
+                                }
+                                else
+                                {
+                                    // Convert Item → Equipment with full metadata
+                                    GetHandedness(item, out var handedness, out var weaponType);
+                                    var equipment = new Equipment
+                                    {
+                                        Name = item.Name,
+                                        Slot = targetSlot,
+                                        Handedness = handedness,
+                                        WeaponType = weaponType,
+                                        WeaponPower = item.Attack,
+                                        ArmorClass = item.Armor,
+                                        ShieldBonus = item.Type == ObjType.Shield ? item.Armor : 0,
+                                        BlockChance = item.BlockChance,
+                                        DefenceBonus = item.Defence,
+                                        StrengthBonus = item.Strength,
+                                        DexterityBonus = item.Dexterity,
+                                        AgilityBonus = item.Agility,
+                                        WisdomBonus = item.Wisdom,
+                                        CharismaBonus = item.Charisma,
+                                        MaxHPBonus = item.HP,
+                                        MaxManaBonus = item.Mana,
+                                        Value = item.Value,
+                                        IsCursed = item.IsCursed,
+                                        MinLevel = item.MinLevel,
+                                        Rarity = EquipmentRarity.Common
+                                    };
+
+                                    // Transfer CON/INT from LootEffects
+                                    if (item.LootEffects != null)
+                                    {
+                                        foreach (var (effectType, value) in item.LootEffects)
+                                        {
+                                            var effect = (LootGenerator.SpecialEffect)effectType;
+                                            switch (effect)
+                                            {
+                                                case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
+                                                case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
+                                                case LootGenerator.SpecialEffect.AllStats:
+                                                    equipment.ConstitutionBonus += value;
+                                                    equipment.IntelligenceBonus += value;
+                                                    equipment.CharismaBonus += value;
+                                                    break;
+                                            }
+                                        }
+                                    }
+
+                                    // Check if this needs slot selection (1H weapon or ring)
+                                    bool needsSlotPick = parts.Length <= 1 &&
+                                        ((item.Type == ObjType.Fingers || (int)item.MagicType == 5) ||
+                                         (item.Type == ObjType.Weapon && handedness == WeaponHandedness.OneHanded));
+
+                                    if (needsSlotPick)
+                                    {
+                                        // Emit slot picker request — JS will re-send with explicit slot
+                                        var options = new List<object>();
+                                        if (item.Type == ObjType.Fingers || (int)item.MagicType == 5)
+                                        {
+                                            options.Add(new { slot = "LFinger", label = "Left Finger", current = player.GetEquipment(EquipmentSlot.LFinger)?.Name ?? "(empty)" });
+                                            options.Add(new { slot = "RFinger", label = "Right Finger", current = player.GetEquipment(EquipmentSlot.RFinger)?.Name ?? "(empty)" });
+                                        }
+                                        else
+                                        {
+                                            options.Add(new { slot = "MainHand", label = "Main Hand", current = player.GetEquipment(EquipmentSlot.MainHand)?.Name ?? "(empty)" });
+                                            options.Add(new { slot = "OffHand", label = "Off Hand", current = player.GetEquipment(EquipmentSlot.OffHand)?.Name ?? "(empty)" });
+                                        }
+                                        ElectronBridge.Emit("inventory_slot_pick", new
+                                        {
+                                            itemIndex = idx,
+                                            itemName = item.Name,
+                                            options
+                                        });
+                                        continue; // Wait for next input (EQUIP:idx:SlotName)
+                                    }
+
+                                    // Validate with CanEquip
+                                    EquipmentDatabase.RegisterDynamic(equipment);
+                                    if (!equipment.CanEquip(player, out string reason))
+                                    {
+                                        resultMessage = reason;
+                                        resultType = "error";
+                                    }
+                                    else if (player.EquipItem(equipment, targetSlot, out string equipMsg))
+                                    {
+                                        // Find and remove original Item
+                                        int removeIdx = player.Inventory.IndexOf(item);
+                                        if (removeIdx >= 0)
+                                            player.Inventory.RemoveAt(removeIdx);
+                                        player.RecalculateStats();
+                                        resultMessage = $"Equipped {item.Name}" + (equipMsg != "" ? $" ({equipMsg})" : "");
+                                        resultType = "success";
+                                    }
+                                    else
+                                    {
+                                        resultMessage = equipMsg != "" ? equipMsg : "Cannot equip this item";
+                                        resultType = "error";
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else if (input.StartsWith("UNEQUIP:"))
+                    {
+                        var slotName = input.Substring(8);
+                        if (Enum.TryParse<EquipmentSlot>(slotName, out var slot))
+                        {
+                            var equipped = player.GetEquipment(slot);
+                            if (equipped == null)
+                            {
+                                // Slot might have an ID that's not in the database — force clear it
+                                if (player.EquippedItems.TryGetValue(slot, out var rawId) && rawId != 0)
+                                {
+                                    player.EquippedItems[slot] = 0;
+                                    player.RecalculateStats();
+                                    resultMessage = "Slot cleared";
+                                    resultType = "success";
+                                }
+                                else
+                                {
+                                    resultMessage = "Nothing equipped in that slot";
+                                    resultType = "error";
+                                }
+                            }
+                            else if (equipped.IsCursed)
+                            {
+                                resultMessage = "Cannot remove cursed item!";
+                                resultType = "error";
+                            }
+                            else
+                            {
+                                var unequipped = player.UnequipSlot(slot);
+                                if (unequipped != null)
+                                {
+                                    var legacyItem = player.ConvertEquipmentToLegacyItem(unequipped);
+                                    player.Inventory.Add(legacyItem);
+                                    player.RecalculateStats();
+                                    resultMessage = $"Unequipped {unequipped.Name}";
+                                    resultType = "success";
+                                }
+                                else
+                                {
+                                    // UnequipSlot cleared the slot but couldn't find the Equipment
+                                    player.RecalculateStats();
+                                    resultMessage = "Slot cleared (item data lost)";
+                                    resultType = "success";
+                                }
+                            }
+                        }
+                    }
+                    else if (input.StartsWith("DROP:"))
+                    {
+                        if (int.TryParse(input.Substring(5), out var idx) && idx >= 0 && idx < player.Inventory.Count)
+                        {
+                            var item = player.Inventory[idx];
+                            if (item.IsCursed)
+                            {
+                                resultMessage = "Cannot drop cursed item!";
+                                resultType = "error";
+                            }
+                            else
+                            {
+                                player.Inventory.RemoveAt(idx);
+                                resultMessage = $"Dropped {item.Name}";
+                                resultType = "success";
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    resultMessage = "Error: " + ex.Message;
+                    resultType = "error";
+                    DebugLogger.Instance?.Log(DebugLogger.LogLevel.Error, "INVENTORY", $"Electron inventory error: {ex}");
+                }
+
+                // Send result message to JS
+                if (!string.IsNullOrEmpty(resultMessage))
+                {
+                    ElectronBridge.Emit("inventory_result", new { message = resultMessage, type = resultType });
+                }
+            }
         }
 
         private void DisplayInventoryHeader()

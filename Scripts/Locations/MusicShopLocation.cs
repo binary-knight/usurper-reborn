@@ -391,7 +391,8 @@ public class MusicShopLocation : BaseLocation
             .ToList();
 
         int playerLevel = currentPlayer.Level;
-        instruments = instruments.Where(i => i.MinLevel <= playerLevel + 15 && i.MinLevel >= Math.Max(1, playerLevel - 20)).ToList();
+        // Show instruments within a wide range — companions may be higher level than the player
+        instruments = instruments.Where(i => i.MinLevel <= playerLevel + 30 && i.MinLevel >= Math.Max(1, playerLevel - 20)).ToList();
 
         if (instruments.Count == 0)
         {
@@ -517,7 +518,8 @@ public class MusicShopLocation : BaseLocation
             .Where(w => w.WeaponType == WeaponType.Instrument)
             .ToList();
         int playerLevel = currentPlayer.Level;
-        instruments = instruments.Where(i => i.MinLevel <= playerLevel + 15 && i.MinLevel >= Math.Max(1, playerLevel - 20)).ToList();
+        // Show instruments within a wide range — companions may be higher level than the player
+        instruments = instruments.Where(i => i.MinLevel <= playerLevel + 30 && i.MinLevel >= Math.Max(1, playerLevel - 20)).ToList();
 
         if (itemNum > instruments.Count) return;
         await PurchaseInstrument(instruments[itemNum - 1]);
@@ -525,13 +527,8 @@ public class MusicShopLocation : BaseLocation
 
     private async Task PurchaseInstrument(Equipment item)
     {
-        if (currentPlayer.Level < item.MinLevel)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("shop.level_requirement", item.MinLevel));
-            await terminal.PressAnyKey();
-            return;
-        }
+        // Instruments are bought for companions (Melodia) — don't restrict by player level
+        // The companion's level is what matters, and the shop already filters display by level range
 
         // Calculate tax
         var (kingTax, cityTax, totalCost) = CityControlSystem.CalculateTaxedPrice(item.Value);

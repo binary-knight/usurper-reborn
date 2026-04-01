@@ -693,7 +693,10 @@ public class DailySystemManager
         if (player != null && player.DaysInPrison > 0)
         {
             player.DaysInPrison--;
-            player.PrisonEscapes = (byte)Math.Min(player.PrisonEscapes + 1, GameConfig.MaxPrisonEscapeAttempts);
+            if (player.DaysInPrison == 0 && player.IsMurderConvict)
+                player.IsMurderConvict = false; // Sentence served
+            if (!player.IsMurderConvict)
+                player.PrisonEscapes = (byte)Math.Min(player.PrisonEscapes + 1, GameConfig.MaxPrisonEscapeAttempts);
             if (terminal != null)
             {
                 terminal.WriteLine($"A day passes in prison... ({player.DaysInPrison} day{(player.DaysInPrison == 1 ? "" : "s")} remaining)", "yellow");

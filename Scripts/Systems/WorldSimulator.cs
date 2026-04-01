@@ -545,8 +545,8 @@ public class WorldSimulator
         bool permadeath = RollPermadeath(npc, basePermadeathChance);
         if (permadeath)
         {
-            npc.IsPermaDead = true;
-            deadNPCRespawnTimers.Remove(npc.Name);
+            // npc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
+            // deadNPCRespawnTimers.Remove(npc.Name);
 
             // Big news — this one isn't coming back
             NewsSystem.Instance?.Newsy(

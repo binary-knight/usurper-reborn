@@ -1278,6 +1278,7 @@ public class Character
     public byte Wrestlings { get; set; }            // wrestling matches left
     public byte DrinksLeft { get; set; }            // drinks left today
     public byte DaysInPrison { get; set; }          // days left in prison
+    public bool IsMurderConvict { get; set; }         // maximum security — no escape, no bail, no rescue
     public bool CellDoorOpen { get; set; }            // has someone unlocked the cell door (rescued)?
     public string RescuedBy { get; set; } = "";       // name of the rescuer
 

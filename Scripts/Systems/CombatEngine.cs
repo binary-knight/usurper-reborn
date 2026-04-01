@@ -1257,6 +1257,15 @@ public partial class CombatEngine
                 ProcessShamanTotemEffects(player, monsters, result);
             }
 
+            // Process totem effects for NPC teammates (Shaman NPCs can place totems too)
+            if (result.Teammates != null)
+            {
+                foreach (var tm in result.Teammates.Where(t => t.IsAlive && t.ActiveTotemRounds > 0))
+                {
+                    ProcessShamanTotemEffects(tm, monsters, result);
+                }
+            }
+
             // Short pause between rounds
             await Task.Delay(GetCombatDelay(1000));
         }
@@ -11564,11 +11573,19 @@ public partial class CombatEngine
                 break;
 
             case "charm":
-                if (target != null && target.IsAlive && random.Next(100) < 40)
+                if (target != null && target.IsAlive)
                 {
-                    target.Charmed = true;
-                    terminal.SetColor("magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_charmed", target.Name));
+                    if (random.Next(100) < 40)
+                    {
+                        target.Charmed = true;
+                        terminal.SetColor("magenta");
+                        terminal.WriteLine(Loc.Get("combat.ability_charmed", target.Name));
+                    }
+                    else
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  {target.Name} resists the charm!");
+                    }
                 }
                 break;
 
@@ -18515,11 +18532,19 @@ public partial class CombatEngine
                 break;
 
             case "charm":
-                if (monster != null && random.Next(100) < 40)
+                if (monster != null)
                 {
-                    monster.Charmed = true;
-                    terminal.SetColor("magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_charmed", monster.Name));
+                    if (random.Next(100) < 40)
+                    {
+                        monster.Charmed = true;
+                        terminal.SetColor("magenta");
+                        terminal.WriteLine(Loc.Get("combat.ability_charmed", monster.Name));
+                    }
+                    else
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  {monster.Name} resists the charm!");
+                    }
                 }
                 break;
 
@@ -20454,21 +20479,34 @@ public partial class CombatEngine
             case 2: // Earthbind Totem — ATK reduction applied in monster damage calc
                 terminal.WriteLine(Loc.Get("combat.shaman_totem_earthbind_pulse"), "yellow");
                 break;
-            case 3: // Searing Totem
-                if (livingMonster != null)
+            case 3: // Searing Totem — AoE fire damage + burn to ALL living monsters
+            {
+                var allLiving = monsters?.Where(m => m.IsAlive).ToList() ?? new();
+                if (allLiving.Count > 0)
                 {
-                    long searingDmg = player.ActiveTotemPower + random.Next(20);
-                    livingMonster.HP -= (int)searingDmg;
-                    result.TotalDamageDealt += searingDmg;
-                    terminal.WriteLine(Loc.Get("combat.shaman_totem_searing_pulse", searingDmg), "bright_red");
-                    if (livingMonster.HP <= 0)
+                    long totalSearingDmg = 0;
+                    foreach (var m in allLiving)
                     {
-                        livingMonster.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(livingMonster))
-                            result.DefeatedMonsters.Add(livingMonster);
+                        long searingDmg = player.ActiveTotemPower + random.Next(20);
+                        m.HP -= (int)searingDmg;
+                        totalSearingDmg += searingDmg;
+                        result.TotalDamageDealt += searingDmg;
+                        // Apply burn effect
+                        if (!m.IsBurning) m.IsBurning = true;
+                        if (m.HP <= 0)
+                        {
+                            m.HP = 0;
+                            if (!result.DefeatedMonsters.Contains(m))
+                                result.DefeatedMonsters.Add(m);
+                        }
                     }
+                    if (allLiving.Count == 1)
+                        terminal.WriteLine(Loc.Get("combat.shaman_totem_searing_pulse", totalSearingDmg), "bright_red");
+                    else
+                        terminal.WriteLine($"  Searing Totem blasts {allLiving.Count} enemies for {totalSearingDmg} total fire damage!", "bright_red");
                 }
                 break;
+            }
             case 4: // Windfury — handled in GetAttackCount
                 break;
             case 5: // Spirit Link — redistribute HP among party (solo: self-heal 15% MaxHP)
@@ -22437,39 +22475,45 @@ public partial class CombatEngine
     {
         if (teammates == null || teammates.Count == 0) return;
 
-        // Count XP-eligible teammate slots (not grouped players, not echoes)
+        // Count XP-eligible teammate slots (alive, not grouped players, not echoes)
         int eligibleSlots = 0;
         foreach (var t in teammates)
         {
-            if (t != null && !t.IsGroupedPlayer && !t.IsEcho)
+            if (t != null && !t.IsGroupedPlayer && !t.IsEcho && t.IsAlive && t.HP > 0)
                 eligibleSlots++;
         }
-        if (eligibleSlots == 0) return;
+        if (eligibleSlots == 0)
+        {
+            // All teammates dead — player gets 100%
+            player.TeamXPPercent[0] = 100;
+            for (int s = 1; s < player.TeamXPPercent.Length; s++)
+                player.TeamXPPercent[s] = 0;
+            return;
+        }
 
         // If player explicitly set 100% for themselves, respect that choice
         if (player.TeamXPPercent[0] == 100) return;
 
-        // Check if all teammate slots are at 0% (meaning player never configured XP sharing)
-        bool allTeammateZero = true;
-        for (int s = 1; s < player.TeamXPPercent.Length && s <= eligibleSlots; s++)
-        {
-            if (player.TeamXPPercent[s] > 0)
-            {
-                allTeammateZero = false;
-                break;
-            }
-        }
-
-        if (!allTeammateZero) return; // Player has already configured XP sharing
-
-        // Auto-set even split: e.g. 2 teammates → 50/25/25, 3 teammates → 40/20/20/20
-        int totalSlots = 1 + eligibleSlots; // player + teammates
+        // Always redistribute evenly among surviving members (player + alive teammates)
+        // This handles the case where a teammate dies mid-combat and their share needs redistribution
+        int totalSlots = 1 + eligibleSlots; // player + alive teammates
         int evenShare = 100 / totalSlots;
         int remainder = 100 - (evenShare * totalSlots);
         player.TeamXPPercent[0] = evenShare + remainder; // Player gets remainder
+
+        int aliveIdx = 0;
         for (int s = 1; s < player.TeamXPPercent.Length; s++)
         {
-            player.TeamXPPercent[s] = s <= eligibleSlots ? evenShare : 0;
+            if (s - 1 < teammates.Count)
+            {
+                var t = teammates[s - 1];
+                bool isAlive = t != null && !t.IsGroupedPlayer && !t.IsEcho && t.IsAlive && t.HP > 0;
+                player.TeamXPPercent[s] = isAlive ? evenShare : 0;
+            }
+            else
+            {
+                player.TeamXPPercent[s] = 0;
+            }
         }
     }
 

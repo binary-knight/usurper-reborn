@@ -278,6 +278,7 @@ namespace UsurperRemake.Systems
         public int TurnsRemaining { get; set; }  // Legacy: now just stores manual override
         public int GameTimeMinutes { get; set; }  // Single-player time-of-day: minutes since midnight (0-1439)
         public int DaysInPrison { get; set; }
+        public bool IsMurderConvict { get; set; }  // Maximum security — no escape/bail/rescue
         public bool CellDoorOpen { get; set; }  // Has been rescued
         public string RescuedBy { get; set; } = "";  // Name of rescuer
         public int PrisonEscapes { get; set; }  // Escape attempts remaining

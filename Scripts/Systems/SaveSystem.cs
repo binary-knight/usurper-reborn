@@ -440,6 +440,7 @@ namespace UsurperRemake.Systems
                 TurnsRemaining = player.TurnsRemaining,
                 GameTimeMinutes = player.GameTimeMinutes,
                 DaysInPrison = player.DaysInPrison,
+                IsMurderConvict = player.IsMurderConvict,
                 CellDoorOpen = player.CellDoorOpen,
                 RescuedBy = player.RescuedBy ?? "",
                 PrisonEscapes = player.PrisonEscapes,

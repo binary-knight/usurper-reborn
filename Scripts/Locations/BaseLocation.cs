@@ -4357,6 +4357,61 @@ public abstract class BaseLocation
             return;
         }
 
+        // Check if this NPC is a bounty target — bounty kills skip murder consequences
+        string npcName = npc.Name2 ?? npc.Name ?? "";
+        var bountyInitiator = QuestSystem.GetActiveBountyInitiator(currentPlayer.Name2, npcName);
+        bool isBountyTarget = bountyInitiator != null;
+
+        // === MURDER WARNING (non-bounty kills only) ===
+        if (!isBountyTarget)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("");
+            terminal.WriteLine("  ══════════════════════════════════════════");
+            terminal.WriteLine("              ⚠  CAPITAL OFFENSE  ⚠");
+            terminal.WriteLine("  ══════════════════════════════════════════");
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine("  Murder is the most serious crime in the realm.");
+            terminal.WriteLine("  If you kill this person, the Crown WILL respond:");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  • You will be arrested and imprisoned");
+            terminal.WriteLine("  • There is a 50% chance you will be EXECUTED");
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("    (your character will be permanently deleted)");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  • If spared, you lose ALL equipment and gold");
+            terminal.WriteLine("  • You will serve 3 days in maximum security prison");
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine("  This action CANNOT be undone.");
+            terminal.WriteLine("  ══════════════════════════════════════════");
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.Write("  Do you still wish to commit murder? (Y/N): ");
+            var murderConfirm = await terminal.GetInput("");
+            if (murderConfirm.Trim().ToUpper() != "Y")
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine("  You come to your senses and walk away.");
+                await Task.Delay(1500);
+                return;
+            }
+
+            // Second confirmation for severity
+            terminal.SetColor("bright_red");
+            terminal.Write("  Are you ABSOLUTELY sure? Type 'MURDER' to confirm: ");
+            var finalConfirm = await terminal.GetInput("");
+            if (finalConfirm.Trim().ToUpper() != "MURDER")
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine("  Wise choice. You step back from the brink.");
+                await Task.Delay(1500);
+                return;
+            }
+        }
+
         // Warn if NPC is much higher level
         if (npc.Level > currentPlayer.Level + 10)
         {
@@ -4399,6 +4454,12 @@ public abstract class BaseLocation
 
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("base.attack_darkness", GameConfig.MurderDarknessGain));
+
+            // === MURDER CONSEQUENCES (non-bounty kills only) ===
+            if (!result.WasBountyKill)
+            {
+                await ApplyMurderConsequences(currentPlayer, npc);
+            }
         }
         else
         {
@@ -4408,9 +4469,204 @@ public abstract class BaseLocation
             terminal.WriteLine(Loc.Get("base.attack_remember"));
             currentPlayer.PDefeats++;
             currentPlayer.Darkness += 10; // Still get some darkness for the attempt
+
+            // Even failed murder attempts have consequences
+            if (!isBountyTarget)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("\n  Guards rush to the scene! You are arrested for attempted murder!");
+                if (currentPlayer is Player p)
+                {
+                    p.DaysInPrison = 1; // 1 day for attempted murder
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("  You are thrown into prison for 1 day.");
+                }
+            }
         }
 
         await Task.Delay(2000);
+    }
+
+    /// <summary>
+    /// Apply severe consequences for non-bounty NPC murder:
+    /// 50% chance of execution (character deletion) or prison (3 days) + strip all belongings.
+    /// Called from BaseLocation.AttackNPC and MagicShopLocation.CastDeathSpell.
+    /// </summary>
+    internal async Task ApplyMurderConsequences(Character player, NPC victim)
+    {
+        await Task.Delay(1500);
+
+        terminal.SetColor("bright_red");
+        terminal.WriteLine("");
+        terminal.WriteLine("  ══════════════════════════════════════════");
+        terminal.WriteLine("         THE CROWN'S JUSTICE");
+        terminal.WriteLine("  ══════════════════════════════════════════");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine("  Guards surround you before you can flee.");
+        terminal.SetColor("red");
+        terminal.WriteLine($"  \"You are under arrest for the murder of {victim.Name2 ?? victim.Name}!\"");
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+
+        // 50% execution, 50% prison + strip
+        bool isExecuted = Random.Shared.Next(100) < 50;
+
+        if (isExecuted)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("  ══════════════════════════════════════════");
+            terminal.WriteLine("              DEATH SENTENCE");
+            terminal.WriteLine("  ══════════════════════════════════════════");
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine("  The magistrate's verdict is swift and merciless.");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("  \"For the crime of cold-blooded murder, you are");
+            terminal.WriteLine("   hereby sentenced to DEATH by execution.\"");
+            terminal.WriteLine("");
+            terminal.SetColor("dark_red");
+            terminal.WriteLine("  The executioner's axe falls...");
+            terminal.WriteLine("");
+            await Task.Delay(3000);
+
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("  ╔══════════════════════════════════════╗");
+            terminal.WriteLine("  ║     YOUR CHARACTER HAS BEEN         ║");
+            terminal.WriteLine("  ║     PERMANENTLY DELETED.             ║");
+            terminal.WriteLine("  ╚══════════════════════════════════════╝");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            // Broadcast the execution
+            if (DoorMode.IsOnlineMode)
+            {
+                NewsSystem.Instance?.Newsy(
+                    $"⚖ {player.Name2} was executed by the Crown for the murder of {victim.Name2 ?? victim.Name}. Justice is served.");
+            }
+
+            // Delete the character
+            if (player is Player p)
+            {
+                if (DoorMode.IsOnlineMode)
+                {
+                    // Delete from online database — character and all related data
+                    try
+                    {
+                        var connStr = $"Data Source={DoorMode.OnlineDatabasePath}";
+                        using var conn = new Microsoft.Data.Sqlite.SqliteConnection(connStr);
+                        conn.Open();
+                        // Try both display name (lowercase) and exact match
+                        var username = p.Name2.ToLower();
+                        using var tx = conn.BeginTransaction();
+                        foreach (var table in new[] { "players", "online_players", "sleeping_players", "guild_members" })
+                        {
+                            using var cmd = conn.CreateCommand();
+                            cmd.Transaction = tx;
+                            cmd.CommandText = $"DELETE FROM {table} WHERE username = @u";
+                            cmd.Parameters.AddWithValue("@u", username);
+                            cmd.ExecuteNonQuery();
+                        }
+                        // Also try display_name match for players table
+                        using var cmd2 = conn.CreateCommand();
+                        cmd2.Transaction = tx;
+                        cmd2.CommandText = "DELETE FROM players WHERE LOWER(display_name) = @d";
+                        cmd2.Parameters.AddWithValue("@d", username);
+                        cmd2.ExecuteNonQuery();
+                        tx.Commit();
+                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Info, "MURDER", $"Executed player {p.Name2} — deleted from database");
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Error, "MURDER", $"Failed to delete executed player: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    // Delete local save
+                    SaveSystem.Instance.DeleteSave(p.Name2);
+                }
+
+                // Force disconnect
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Press any key to exit...");
+                await terminal.PressAnyKey();
+
+                // In MUD mode, throw to disconnect session; in single-player, exit
+                if (DoorMode.IsOnlineMode)
+                    throw new Exception("CHARACTER_EXECUTED");
+                else
+                    Environment.Exit(0);
+            }
+        }
+        else
+        {
+            // Prison + strip all belongings
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("  ══════════════════════════════════════════");
+            terminal.WriteLine("              LIFE SPARED");
+            terminal.WriteLine("  ══════════════════════════════════════════");
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine("  The magistrate shows a shred of mercy.");
+            terminal.SetColor("yellow");
+            terminal.WriteLine("");
+            terminal.WriteLine("  \"For the crime of murder, you are sentenced to");
+            terminal.WriteLine("   3 days in maximum security prison.\"");
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine("  \"All your possessions are hereby confiscated.\"");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+
+            if (player is Player p)
+            {
+                // Strip ALL equipment
+                foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+                {
+                    if (slot == EquipmentSlot.None) continue;
+                    p.UnequipSlot(slot);
+                }
+
+                // Clear inventory
+                p.Inventory.Clear();
+
+                // Take all gold
+                long goldTaken = p.Gold;
+                p.Gold = 0;
+                p.BankGold = 0; // Bank seized too
+
+                // Prison for 3 real days — maximum security, no escape
+                p.DaysInPrison = 3;
+                p.IsMurderConvict = true;
+                p.PrisonEscapes = 0;
+                p.CellDoorOpen = false;
+
+                p.RecalculateStats();
+
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Gold confiscated: {goldTaken:N0}");
+                terminal.WriteLine("  All equipment confiscated.");
+                terminal.WriteLine("  Bank account frozen and seized.");
+                terminal.WriteLine("");
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("  You are dragged to maximum security prison.");
+                terminal.WriteLine("  There is NO chance of escape.");
+                terminal.WriteLine("");
+            }
+
+            // Broadcast
+            if (DoorMode.IsOnlineMode)
+            {
+                NewsSystem.Instance?.Newsy(
+                    $"⚖ {player.Name2} was imprisoned for 3 days for the murder of {victim.Name2 ?? victim.Name}. All possessions confiscated.");
+            }
+
+            terminal.SetColor("gray");
+            terminal.WriteLine("  Press any key to continue...");
+            await terminal.PressAnyKey();
+        }
     }
 
     /// <summary>

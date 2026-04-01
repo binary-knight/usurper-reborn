@@ -2913,7 +2913,7 @@ public class StreetEncounterSystem
             {
                 realNpc.HP = 0;
                 realNpc.IsDead = true;
-                realNpc.IsPermaDead = true;  // Murder is always permanent
+                // realNpc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
             }
 
             // === GOLD THEFT ===
@@ -2982,6 +2982,9 @@ public class StreetEncounterSystem
 
             long bountyReward = QuestSystem.AutoCompleteBountyForNPC(player, npcNameForBounty);
             QuestSystem.OnNPCDefeated(player, npc);
+
+            // Track whether this was a sanctioned kill (bounty/contract)
+            result.WasBountyKill = bountyInitiator != null;
 
             if (bountyReward > 0)
             {
@@ -3110,6 +3113,7 @@ public class EncounterResult
     public bool EncounterOccurred { get; set; }
     public StreetEncounterSystem.EncounterType Type { get; set; }
     public bool Victory { get; set; }
+    public bool WasBountyKill { get; set; }
     public string Message { get; set; } = "";
     public long GoldLost { get; set; }
     public long GoldGained { get; set; }

@@ -1409,7 +1409,7 @@ public class CastleLocation : BaseLocation
             if (npc != null)
             {
                 npc.IsDead = true;
-                npc.IsPermaDead = true;
+                // npc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
                 npc.DaysInPrison = 0;
                 npc.HP = 0;
             }

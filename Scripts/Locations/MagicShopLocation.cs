@@ -643,8 +643,18 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage(Loc.Get("magic_shop.curse_intro_3"), "cyan");
         DisplayMessage("");
 
-        // Find cursed items in player inventory
+        // Find cursed items in player inventory (backpack)
         var cursedItems = player.Inventory.Where(i => i.IsCursed).ToList();
+
+        // Find cursed equipment WORN by the player
+        var cursedPlayerGear = new List<(EquipmentSlot slot, Equipment equip)>();
+        foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
+        {
+            if (slot == EquipmentSlot.None) continue;
+            var equip = player.GetEquipment(slot);
+            if (equip != null && equip.IsCursed)
+                cursedPlayerGear.Add((slot, equip));
+        }
 
         // Find cursed equipment on companions and NPC teammates
         var cursedTeamGear = new List<(string ownerName, EquipmentSlot slot, Equipment equip)>();
@@ -682,25 +692,41 @@ public partial class MagicShopLocation : BaseLocation
             }
         }
 
-        if (cursedItems.Count == 0 && cursedTeamGear.Count == 0)
+        if (cursedItems.Count == 0 && cursedPlayerGear.Count == 0 && cursedTeamGear.Count == 0)
         {
             DisplayMessage(Loc.Get("magic_shop.no_cursed_items"), "gray");
             DisplayMessage(Loc.Get("magic_shop.curse_fortunate"), "cyan");
             return;
         }
 
-        int totalEntries = cursedItems.Count + cursedTeamGear.Count;
+        int displayNum = 0;
 
-        // List player's cursed items
+        // List player's cursed backpack items
         if (cursedItems.Count > 0)
         {
             DisplayMessage(Loc.Get("magic_shop.cursed_items_list"), "darkred");
             for (int i = 0; i < cursedItems.Count; i++)
             {
+                displayNum++;
                 var item = cursedItems[i];
                 long removalCost = CalculateCurseRemovalCost(item, player);
-                DisplayMessage(Loc.Get("magic_shop.cursed_item_entry", $"{i + 1}", item.Name, $"{removalCost:N0}"), "red");
+                DisplayMessage(Loc.Get("magic_shop.cursed_item_entry", $"{displayNum}", item.Name, $"{removalCost:N0}"), "red");
                 DisplayCurseDetails(item);
+            }
+        }
+
+        // List player's cursed EQUIPPED items
+        if (cursedPlayerGear.Count > 0)
+        {
+            DisplayMessage("");
+            DisplayMessage("Cursed gear you are wearing:", "darkred");
+            for (int i = 0; i < cursedPlayerGear.Count; i++)
+            {
+                displayNum++;
+                var (slot, equip) = cursedPlayerGear[i];
+                long removalCost = CalculateEquipmentCurseRemovalCost(equip);
+                DisplayMessage($"  {displayNum}. {equip.Name} (your {slot.GetDisplayName()}) — {removalCost:N0} gold", "red");
+                DisplayEquipmentCurseDetails(equip);
             }
         }
 
@@ -711,13 +737,15 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage("Cursed gear found on your team members:", "darkred");
             for (int i = 0; i < cursedTeamGear.Count; i++)
             {
+                displayNum++;
                 var (ownerName, slot, equip) = cursedTeamGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
-                int displayNum = cursedItems.Count + i + 1;
                 DisplayMessage($"  {displayNum}. {equip.Name} ({ownerName}'s {slot.GetDisplayName()}) — {removalCost:N0} gold", "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
+
+        int totalEntries = displayNum;
 
         DisplayMessage("");
         var input = await terminal.GetInput(Loc.Get("magic_shop.uncurse_prompt"));
@@ -725,17 +753,24 @@ public partial class MagicShopLocation : BaseLocation
         if (!int.TryParse(input, out int itemIndex) || itemIndex <= 0 || itemIndex > totalEntries)
             return;
 
-        // Determine if this is a player item or team gear
+        // Determine which category this selection falls into
         if (itemIndex <= cursedItems.Count)
         {
-            // Player item — existing logic
+            // Player backpack item
             var targetItem = cursedItems[itemIndex - 1];
             await RemoveCurseFromPlayerItem(player, targetItem);
+        }
+        else if (itemIndex <= cursedItems.Count + cursedPlayerGear.Count)
+        {
+            // Player equipped item
+            int gearIdx = itemIndex - cursedItems.Count - 1;
+            var (slot, targetEquip) = cursedPlayerGear[gearIdx];
+            await RemoveCurseFromTeamEquipment(player, player.DisplayName, slot, targetEquip);
         }
         else
         {
             // Team member equipment
-            int teamIdx = itemIndex - cursedItems.Count - 1;
+            int teamIdx = itemIndex - cursedItems.Count - cursedPlayerGear.Count - 1;
             var (ownerName, slot, targetEquip) = cursedTeamGear[teamIdx];
             await RemoveCurseFromTeamEquipment(player, ownerName, slot, targetEquip);
         }
@@ -3239,11 +3274,10 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine($"  'It is done. {targetNPC.Name1} has passed beyond the veil.'");
 
-            // Kill the NPC — dark magic assassination is always permanent
+            // Kill the NPC — will respawn after world sim cycle
             targetNPC.IsDead = true;
-            targetNPC.IsPermaDead = true;
+            // targetNPC.IsPermaDead = true;  // Disabled — NPCs now respawn after death
             targetNPC.HP = 0;
-            // No respawn — IsPermaDead blocks it
 
             // Blood price for dark magic kill
             WorldSimulator.ApplyBloodPrice(player, targetNPC, GameConfig.MurderWeightPerDarkMagicKill, isDeliberate: true);
@@ -3274,6 +3308,9 @@ public partial class MagicShopLocation : BaseLocation
             // Prevent save cheesing — persist negative outcomes immediately
             if (DoorMode.IsOnlineMode)
                 _ = GameEngine.Instance.SaveCurrentGame();
+
+            // === MURDER CONSEQUENCES — same as street murder ===
+            await ApplyMurderConsequences(player, targetNPC);
         }
         else
         {

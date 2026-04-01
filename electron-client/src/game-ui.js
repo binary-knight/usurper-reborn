@@ -296,6 +296,14 @@ class GameUI {
         this._renderInventory(data);
         break;
 
+      case 'inventory_result':
+        this._showInventoryResult(data);
+        break;
+
+      case 'inventory_slot_pick':
+        this._showSlotPicker(data);
+        break;
+
       case 'character_status':
         this._renderCharacterStatus(data);
         break;
@@ -1117,15 +1125,14 @@ class GameUI {
         <span class="gui-inv-slot-name">${isEmpty ? slotName : eq.name}</span>
       `;
 
-      // Click equipped slot — sends slot key to enter text slot manager
-      const slotKeys = { MainHand:'1', OffHand:'2', Head:'3', Body:'4', Arms:'5', Hands:'6', Legs:'7', Feet:'8', Waist:'9', Face:'F', Cloak:'C', Neck:'N', LFinger:'L', RFinger:'R' };
-      const slotKey = slotKeys[slotName];
-      if (slotKey) {
+      // Click equipped slot — send UNEQUIP command (stays in graphical overlay)
+      if (!isEmpty) {
+        const sn = slotName;
         slot.addEventListener('click', () => {
-          this.npcArea.innerHTML = '';
-          this.sendInput(slotKey + '\n');
+          this.sendInput(`UNEQUIP:${sn}\n`);
         });
         slot.style.cursor = 'pointer';
+        slot.title += '\n\nClick to unequip';
       }
 
       slotsGrid.appendChild(slot);
@@ -1159,11 +1166,15 @@ class GameUI {
         <span class="gui-inv-bp-cell-name">${item.name}</span>
         <span class="gui-inv-bp-cell-stats">${item.attack ? `ATK:${item.attack}` : ''} ${item.defense ? `DEF:${item.defense}` : ''}</span>
       `;
-      // Click to manage — sends B{n} (1-indexed) to enter text item management
-      const bpNum = i + 1;
+      // Click to equip (or drop if drop mode active)
+      const bpIdx = i;
       cell.addEventListener('click', () => {
-        this.npcArea.innerHTML = '';
-        this.sendInput(`B${bpNum}\n`);
+        if (this._inventoryDropMode) {
+          this.sendInput(`DROP:${bpIdx}\n`);
+          this._inventoryDropMode = false;
+        } else {
+          this.sendInput(`EQUIP:${bpIdx}\n`);
+        }
       });
       cell.style.cursor = 'pointer';
       bpGrid.appendChild(cell);
@@ -1178,10 +1189,24 @@ class GameUI {
     // Action buttons
     const actions = document.createElement('div');
     actions.className = 'gui-inv-actions';
+    const dropBtn = document.createElement('button');
+    dropBtn.className = 'gui-room-action-btn info gui-util-btn';
+    dropBtn.innerHTML = '<span class="gui-room-action-key">D</span>Drop Mode';
+    dropBtn.addEventListener('click', () => {
+      // Toggle drop mode — next backpack click drops instead of equips
+      this._inventoryDropMode = !this._inventoryDropMode;
+      dropBtn.classList.toggle('active-mode', this._inventoryDropMode);
+      dropBtn.innerHTML = this._inventoryDropMode
+        ? '<span class="gui-room-action-key">D</span>Drop Mode ON'
+        : '<span class="gui-room-action-key">D</span>Drop Mode';
+    });
+    actions.appendChild(dropBtn);
+
     const closeBtn = document.createElement('button');
     closeBtn.className = 'gui-room-action-btn info gui-util-btn';
     closeBtn.innerHTML = '<span class="gui-room-action-key">Q</span>Close';
     closeBtn.addEventListener('click', () => {
+      this._inventoryDropMode = false;
       this.npcArea.innerHTML = '';
       this.sendInput('Q\n');
     });
@@ -1191,6 +1216,52 @@ class GameUI {
     body.appendChild(rightPanel);
     overlay.appendChild(body);
     this.npcArea.appendChild(overlay);
+  }
+
+  /** Show equip/unequip result as a toast in the inventory overlay */
+  _showInventoryResult(data) {
+    const existing = document.querySelector('.gui-inv-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `gui-inv-toast gui-inv-toast-${data.type || 'info'}`;
+    toast.textContent = data.message;
+    // Insert at top of the overlay
+    const overlay = this.npcArea.querySelector('.gui-inv-overlay');
+    if (overlay) {
+      overlay.insertBefore(toast, overlay.children[1]); // After header
+    }
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  /** Show slot picker for rings or 1H weapons */
+  _showSlotPicker(data) {
+    const existing = document.querySelector('.gui-inv-slot-picker');
+    if (existing) existing.remove();
+
+    const picker = document.createElement('div');
+    picker.className = 'gui-inv-slot-picker';
+    picker.innerHTML = `<div class="gui-inv-picker-title">Where to equip ${data.itemName}?</div>`;
+
+    for (const opt of (data.options || [])) {
+      const btn = document.createElement('button');
+      btn.className = 'gui-room-action-btn feature';
+      btn.innerHTML = `${opt.label}<br><span style="font-size:8px;color:var(--text-dim)">${opt.current}</span>`;
+      btn.addEventListener('click', () => {
+        picker.remove();
+        this.sendInput(`EQUIP:${data.itemIndex}:${opt.slot}\n`);
+      });
+      picker.appendChild(btn);
+    }
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'gui-room-action-btn info';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', () => picker.remove());
+    picker.appendChild(cancelBtn);
+
+    const overlay = this.npcArea.querySelector('.gui-inv-overlay');
+    if (overlay) overlay.appendChild(picker);
   }
 
   // ─── Character Status Rendering ───────────

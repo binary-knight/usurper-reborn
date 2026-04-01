@@ -3496,31 +3496,33 @@ public class InnLocation : BaseLocation
         // Use the slot the player already picked (no need to ask which hand)
         EquipmentSlot? targetSlot = selectedSlot.Value;
 
-        // Remove from player
-        if (wasEquipped && sourceSlot.HasValue)
-        {
-            currentPlayer.UnequipSlot(sourceSlot.Value);
-            currentPlayer.RecalculateStats();
-        }
-        else
-        {
-            // Remove from inventory (find by name)
-            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-            if (invItem != null)
-            {
-                currentPlayer.Inventory.Remove(invItem);
-            }
-        }
-
         // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
         var targetInventoryBefore = target.Inventory.Count;
 
-        // Equip to target - EquipItem adds displaced items to target's inventory
+        // Equip to target FIRST - EquipItem adds displaced items to target's inventory
         var result = target.EquipItem(selectedItem, targetSlot, out string message);
         target.RecalculateStats();
 
         if (result)
         {
+            // Equip succeeded — NOW remove the source item from player
+            if (wasEquipped && sourceSlot.HasValue)
+            {
+                currentPlayer.UnequipSlot(sourceSlot.Value);
+                currentPlayer.RecalculateStats();
+            }
+            else
+            {
+                // Remove from inventory by reference (not name — avoids wrong-item removal with duplicates)
+                // Find the matching Item by name, value, attack — use best match
+                var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
+                    i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass);
+                if (invItem == null)
+                    invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+                if (invItem != null)
+                    currentPlayer.Inventory.Remove(invItem);
+            }
+
             // Move any items that were added to target's inventory (displaced equipment) to player's inventory
             if (target.Inventory.Count > targetInventoryBefore)
             {
@@ -3543,9 +3545,7 @@ public class InnLocation : BaseLocation
         }
         else
         {
-            // Failed - return item to player
-            var legacyItem = CompanionConvertEquipmentToItem(selectedItem);
-            currentPlayer.Inventory.Add(legacyItem);
+            // Failed - item was never removed from player, just show error
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("inn.failed_equip", message));
         }

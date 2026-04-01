@@ -314,10 +314,12 @@ public class MaintenanceSystem
 
                 player.UnpaidWageDays[npcKey]++;
 
-                if (player.UnpaidWageDays[npcKey] >= GameConfig.MaxUnpaidWageDays)
-                {
-                    npcsToRemove.Add(npc);
-                }
+                // NPCs on player teams never leave for unpaid wages — loyalty is permanent
+                // (wages system was causing frustration for players who spent time levelling NPCs)
+                // if (player.UnpaidWageDays[npcKey] >= GameConfig.MaxUnpaidWageDays)
+                // {
+                //     npcsToRemove.Add(npc);
+                // }
             }
 
             // Process NPC departures

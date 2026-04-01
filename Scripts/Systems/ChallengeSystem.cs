@@ -177,9 +177,11 @@ public class ChallengeSystem
 
             var npcChallenger = qualified[random.Next(qualified.Count)];
 
-            // Must leave team
+            // Must leave team — but NEVER remove from a player's team
             if (!string.IsNullOrEmpty(npcChallenger.Team))
             {
+                if (WorldSimulator.IsPlayerTeam(npcChallenger.Team))
+                    return; // Player team NPCs cannot leave to challenge for the throne
                 if (npcChallenger.Brain?.Personality?.Ambition < 0.8f)
                     return;
                 CityControlSystem.Instance.ForceLeaveTeam(npcChallenger);

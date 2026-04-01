@@ -346,6 +346,13 @@ public partial class PrisonLocation : BaseLocation
     /// </summary>
     private async Task<bool> HandlePayBail(Character player)
     {
+        if (player.IsMurderConvict)
+        {
+            await terminal.WriteColorLineAsync("  Murder convicts are not eligible for bail.", TerminalEmulator.ColorRed);
+            await Task.Delay(1500);
+            return false;
+        }
+
         var king = CastleLocation.GetCurrentKing();
         if (king == null)
         {
@@ -663,7 +670,14 @@ public partial class PrisonLocation : BaseLocation
     private async Task HandleOpenCellDoor(Character player)
     {
         await terminal.WriteLineAsync();
-        
+
+        if (player.IsMurderConvict)
+        {
+            await terminal.WriteColorLineAsync("  Maximum security. The door is sealed with enchanted locks.", TerminalEmulator.ColorRed);
+            await Task.Delay(1500);
+            return;
+        }
+
         // Check if cell door can be opened (player was rescued)
         if (await CanOpenCellDoor(player))
         {
@@ -680,6 +694,14 @@ public partial class PrisonLocation : BaseLocation
     
     private async Task HandleDemandRelease(Character player)
     {
+        if (player.IsMurderConvict)
+        {
+            await terminal.WriteLineAsync();
+            await terminal.WriteColorLineAsync("  The guards laugh. \"Murderers don't make demands.\"", TerminalEmulator.ColorRed);
+            await Task.Delay(1500);
+            return;
+        }
+
         await terminal.WriteLineAsync();
         await terminal.WriteLineAsync();
         await terminal.WriteColorAsync(Loc.Get("prison.clear_throat"), TerminalEmulator.ColorWhite);
@@ -729,6 +751,17 @@ public partial class PrisonLocation : BaseLocation
     private async Task<bool> HandleEscapeAttempt(Character player)
     {
         await terminal.WriteLineAsync();
+
+        // Murder convicts cannot escape — maximum security
+        if (player.IsMurderConvict)
+        {
+            await terminal.WriteColorLineAsync("", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync("  You are in MAXIMUM SECURITY for murder.", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync("  There is absolutely no chance of escape.", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync("  You must serve your full sentence.", TerminalEmulator.ColorRed);
+            await Task.Delay(2000);
+            return false;
+        }
 
         if (player.PrisonEscapes < 1)
         {
