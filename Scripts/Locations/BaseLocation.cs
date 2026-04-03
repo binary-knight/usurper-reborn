@@ -1884,7 +1884,7 @@ public abstract class BaseLocation
         {
             // Screen reader: plain text list without decorative brackets or divider
             terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("ui.quick_commands")}: S {Loc.Get("menu.action.status")}, ");
+            terminal.Write($"{Loc.Get("ui.quick_commands")}: % {Loc.Get("menu.action.status")}, ");
             if (LocationId != GameLocation.MainStreet)
                 terminal.Write($"R {Loc.Get("ui.return")}, ");
             terminal.Write($"* {Loc.Get("menu.action.inventory")}, ? {Loc.Get("menu.action.help")}, ");
@@ -1907,7 +1907,7 @@ public abstract class BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
-        terminal.Write("S");
+        terminal.Write("%");
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
@@ -2093,7 +2093,7 @@ public abstract class BaseLocation
     {
         var npcsHere = GetLiveNPCsAtLocation();
         terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("S"); terminal.SetColor("darkgray"); terminal.Write("]");
+        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("%"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write(Loc.Get("base.qc_status_suffix") + " ");
         terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("*"); terminal.SetColor("darkgray"); terminal.Write("]");
         terminal.SetColor("white"); terminal.Write(Loc.Get("base.qc_inv") + " ");
@@ -2568,7 +2568,7 @@ public abstract class BaseLocation
 
         WriteQuickKey("*", Loc.Get("base.help_key_inventory"));
         WriteQuickKey("~", Loc.Get("base.help_key_prefs"));
-        WriteQuickKey("S", Loc.Get("base.help_key_status"));
+        WriteQuickKey("%", Loc.Get("base.help_key_status"));
         WriteQuickKey("?", Loc.Get("base.help_key_help"));
         WriteQuickKey("!", Loc.Get("base.help_key_bug"));
 
@@ -2657,7 +2657,7 @@ public abstract class BaseLocation
         terminal.WriteLine(Loc.Get("base.help_quick_keys"));
         terminal.WriteLine($"* {Loc.Get("base.help_key_inventory")}");
         terminal.WriteLine($"~ {Loc.Get("base.help_key_prefs")}");
-        terminal.WriteLine($"S {Loc.Get("base.help_key_status")}");
+        terminal.WriteLine($"% {Loc.Get("base.help_key_status")}");
         terminal.WriteLine($"? {Loc.Get("base.help_key_help")}");
         terminal.WriteLine($"! {Loc.Get("base.help_key_bug")}");
 
@@ -3051,7 +3051,7 @@ public abstract class BaseLocation
         // Check for special commands
         switch (upperChoice)
         {
-            case "S":
+            case "%":
                 await ShowStatus();
                 break;
             case "*":
@@ -3082,7 +3082,7 @@ public abstract class BaseLocation
                 terminal.SetColor("gray");
                 terminal.Write($"{Loc.Get("base.try_hint")}: [");
                 terminal.SetColor("bright_yellow");
-                terminal.Write("S");
+                terminal.Write("%");
                 terminal.SetColor("gray");
                 terminal.Write("]");
                 terminal.Write(Loc.Get("base.qc_status_suffix"));
