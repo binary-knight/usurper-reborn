@@ -1330,7 +1330,7 @@ namespace UsurperRemake.Systems
         private void ConfigureBossPartyMechanics(BossCombatContext ctx, OldGodType godType)
         {
             // All bosses get potion cooldown (teaches reliance on healers)
-            ctx.PotionCooldownRounds = GameConfig.BossPotionCooldownRounds;
+            ctx.PotionCooldownRounds = GameConfig.ModBossPotionCooldownRounds;
 
             switch (godType)
             {

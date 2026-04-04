@@ -65,6 +65,18 @@ namespace UsurperConsole
             // Initialize localization system (loads language JSON files)
             UsurperRemake.Systems.Loc.Initialize();
 
+            // Initialize moddable game data loader (loads GameData/ JSON overrides if present)
+            UsurperRemake.Systems.GameDataLoader.Initialize();
+
+            // Handle --export-data flag: export all default game data to GameData/ directory and exit
+            if (args.Contains("--export-data"))
+            {
+                var outputDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GameData");
+                UsurperRemake.Systems.GameDataLoader.ExportDefaults(outputDir);
+                Console.WriteLine($"Default game data exported to: {outputDir}");
+                return;
+            }
+
             // Handle --version flag: print version and exit immediately
             if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v" || args[0] == "-V"))
             {

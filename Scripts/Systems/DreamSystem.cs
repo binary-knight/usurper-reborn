@@ -39,7 +39,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// All possible dreams organized by player progress
         /// </summary>
-        public static readonly List<NarrativeDreamData> Dreams = new()
+        private static readonly List<NarrativeDreamData> _builtInDreams = new()
         {
             // ====== EARLY GAME DREAMS (Levels 1-20) ======
 
@@ -773,6 +773,18 @@ namespace UsurperRemake.Systems
                 PhilosophicalHint = "Different face every time. Same ending."
             }
         };
+
+        /// <summary>
+        /// Returns the built-in dream list (for export by GameDataLoader.ExportDefaults).
+        /// </summary>
+        public static List<NarrativeDreamData> GetBuiltInDreams() => _builtInDreams;
+
+        /// <summary>
+        /// Active dreams list — returns modded data from GameDataLoader if available,
+        /// otherwise falls back to the built-in defaults.
+        /// </summary>
+        public static List<NarrativeDreamData> Dreams =>
+            GameDataLoader.Dreams ?? _builtInDreams;
 
         /// <summary>
         /// Environmental visions triggered by dungeon exploration

@@ -3273,7 +3273,7 @@ public partial class CombatEngine
             result.CombatLog.Add($"Player heals for {healAmount} HP");
             // Apply potion cooldown in boss fights (+1 to offset start-of-round decrement)
             if (BossContext != null)
-                player.PotionCooldownRounds = GameConfig.BossPotionCooldownRounds + 1;
+                player.PotionCooldownRounds = GameConfig.ModBossPotionCooldownRounds + 1;
         }
         else
         {
@@ -3320,7 +3320,7 @@ public partial class CombatEngine
             result.CombatLog.Add($"Player heals for {totalHeal} HP using {potionsToUse} potions");
             // Apply potion cooldown in boss fights (+1 to offset start-of-round decrement)
             if (BossContext != null)
-                player.PotionCooldownRounds = GameConfig.BossPotionCooldownRounds + 1;
+                player.PotionCooldownRounds = GameConfig.ModBossPotionCooldownRounds + 1;
         }
 
         await Task.Delay(GetCombatDelay(1000));
@@ -3539,7 +3539,7 @@ public partial class CombatEngine
         
         // Backstab calculation (Pascal-compatible, with weapon soft cap)
         long backstabPower = player.Strength + GetEffectiveWeapPow(player.WeapPow);
-        backstabPower = (long)(backstabPower * GameConfig.BackstabMultiplier); // 3x damage
+        backstabPower = (long)(backstabPower * GameConfig.ModBackstabMultiplier); // 3x damage
 
         // Backstab success chance based on dexterity
         // Formula: DEX * 2, but capped at 75% to prevent guaranteed success exploit
@@ -18028,7 +18028,7 @@ public partial class CombatEngine
 
         // Boss fight potion cooldown
         if (BossContext != null)
-            player.PotionCooldownRounds = GameConfig.BossPotionCooldownRounds + 1; // +1 to offset start-of-round decrement
+            player.PotionCooldownRounds = GameConfig.ModBossPotionCooldownRounds + 1; // +1 to offset start-of-round decrement
 
         await Task.Delay(GetCombatDelay(1500));
     }
@@ -18060,7 +18060,7 @@ public partial class CombatEngine
 
         // Boss fight potion cooldown
         if (BossContext != null)
-            player.PotionCooldownRounds = GameConfig.BossPotionCooldownRounds + 1;
+            player.PotionCooldownRounds = GameConfig.ModBossPotionCooldownRounds + 1;
 
         await Task.Delay(GetCombatDelay(1500));
     }
@@ -23697,9 +23697,9 @@ public partial class CombatEngine
         {
             ctx.IsEnraged = true;
             bossMonster.IsEnraged = true;
-            bossMonster.Strength = (long)(bossMonster.Strength * GameConfig.BossEnrageDamageMultiplier);
-            bossMonster.Defence = (int)(bossMonster.Defence * GameConfig.BossEnrageDefenseMultiplier);
-            ctx.AttacksPerRound += GameConfig.BossEnrageExtraAttacks;
+            bossMonster.Strength = (long)(bossMonster.Strength * GameConfig.ModBossEnrageDamageMultiplier);
+            bossMonster.Defence = (int)(bossMonster.Defence * GameConfig.ModBossEnrageDefenseMultiplier);
+            ctx.AttacksPerRound += GameConfig.ModBossEnrageExtraAttacks;
 
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
@@ -23725,7 +23725,7 @@ public partial class CombatEngine
     {
         if (target.CorruptionStacks <= 0 || !target.IsAlive) return;
 
-        int damagePerStack = BossContext?.CorruptionDamagePerStack ?? GameConfig.BossCorruptionDamageBase;
+        int damagePerStack = BossContext?.CorruptionDamagePerStack ?? GameConfig.ModBossCorruptionDamageBase;
         long corruptionDamage = target.CorruptionStacks * damagePerStack;
         target.HP = Math.Max(0, target.HP - corruptionDamage);
 
@@ -23745,7 +23745,7 @@ public partial class CombatEngine
     private void ApplyCorruptionStacks(Character target, int stacks)
     {
         if (target == null || !target.IsAlive) return;
-        target.CorruptionStacks = Math.Min(target.CorruptionStacks + stacks, GameConfig.BossCorruptionMaxStacks);
+        target.CorruptionStacks = Math.Min(target.CorruptionStacks + stacks, GameConfig.ModBossCorruptionMaxStacks);
         terminal.SetColor("dark_magenta");
         terminal.WriteLine($"  {target.DisplayName} gains {stacks} corruption! (Total: {target.CorruptionStacks})");
     }
@@ -23858,10 +23858,10 @@ public partial class CombatEngine
 
         // Speed check — need high Agility to even attempt
         int agility = (int)(interrupter.Agility + interrupter.Dexterity / 2);
-        if (agility < GameConfig.BossChannelInterruptSpeedThreshold) return false;
+        if (agility < GameConfig.ModBossChannelInterruptSpeedThreshold) return false;
 
         // Assassin/Ranger get bonus chance
-        double chance = GameConfig.BossChannelInterruptChance;
+        double chance = GameConfig.ModBossChannelInterruptChance;
         if (interrupter.Class == CharacterClass.Assassin || interrupter.Class == CharacterClass.Ranger)
             chance += 0.20;
         if (interrupter.Class == CharacterClass.Voidreaver)
@@ -24032,11 +24032,11 @@ public partial class CombatEngine
     {
         if (boss.IsPhysicalImmune && !isMagicalDamage)
         {
-            return (long)(damage * GameConfig.BossPhaseImmunityResidual);
+            return (long)(damage * GameConfig.ModBossPhaseImmunityResidual);
         }
         if (boss.IsMagicalImmune && isMagicalDamage)
         {
-            return (long)(damage * GameConfig.BossPhaseImmunityResidual);
+            return (long)(damage * GameConfig.ModBossPhaseImmunityResidual);
         }
         return damage;
     }

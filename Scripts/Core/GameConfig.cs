@@ -95,6 +95,31 @@ public static partial class GameConfig
     public static bool MonsterTalk = true;           // Whether monsters can speak
 
     // ============================================================
+    // Moddable Balance Values (loaded from GameData/balance.json)
+    // Default to the const values above; overridden by GameDataLoader
+    // ============================================================
+    public static int ModCriticalHitChance { get; set; } = CriticalHitChance;
+    public static float ModCriticalHitMultiplier { get; set; } = CriticalHitMultiplier;
+    public static float ModBackstabMultiplier { get; set; } = BackstabMultiplier;
+    public static float ModBerserkMultiplier { get; set; } = BerserkMultiplier;
+    public static int ModBossPotionCooldownRounds { get; set; } = BossPotionCooldownRounds;
+    public static double ModBossEnrageDamageMultiplier { get; set; } = BossEnrageDamageMultiplier;
+    public static double ModBossEnrageDefenseMultiplier { get; set; } = BossEnrageDefenseMultiplier;
+    public static int ModBossEnrageExtraAttacks { get; set; } = BossEnrageExtraAttacks;
+    public static int ModBossCorruptionDamageBase { get; set; } = BossCorruptionDamageBase;
+    public static int ModBossCorruptionMaxStacks { get; set; } = BossCorruptionMaxStacks;
+    public static int ModBossDoomDefaultRounds { get; set; } = BossDoomDefaultRounds;
+    public static double ModBossTankAoEAbsorption { get; set; } = BossTankAoEAbsorption;
+    public static double ModBossPhaseImmunityResidual { get; set; } = BossPhaseImmunityResidual;
+    public static int ModBossChannelInterruptSpeedThreshold { get; set; } = BossChannelInterruptSpeedThreshold;
+    public static double ModBossChannelInterruptChance { get; set; } = BossChannelInterruptChance;
+    public static int ModDefaultGymSessions { get; set; } = DefaultGymSessions;
+    public static int ModDefaultDrinksAtOrbs { get; set; } = DefaultDrinksAtOrbs;
+    public static int ModDefaultIntimacyActs { get; set; } = DefaultIntimacyActs;
+    public static int ModDefaultMaxWrestlings { get; set; } = DefaultMaxWrestlings;
+    public static int ModDefaultPickPocketAttempts { get; set; } = DefaultPickPocketAttempts;
+
+    // ============================================================
     // SysOp-Configurable Settings (BBS door mode administration)
     // These can be modified at runtime by SysOps via the admin console
     // ============================================================

@@ -393,12 +393,12 @@ public class MaintenanceSystem
         player.Allowed = true;                          // Player allowed to play
         
         // Reset location-specific daily limits
-        player.GymSessions = GameConfig.DefaultGymSessions;
-        player.DrinkslLeft = GameConfig.DefaultDrinksAtOrbs;
-        player.IntimacyActs = GameConfig.DefaultIntimacyActs;
-        player.Wrestlings = GameConfig.DefaultMaxWrestlings;
+        player.GymSessions = (byte)GameConfig.ModDefaultGymSessions;
+        player.DrinkslLeft = GameConfig.ModDefaultDrinksAtOrbs;
+        player.IntimacyActs = GameConfig.ModDefaultIntimacyActs;
+        player.Wrestlings = (byte)GameConfig.ModDefaultMaxWrestlings;
         player.PrisonEscapes = GameConfig.DefaultPrisonEscapeAttempts;
-        player.PickPocketAttempts = GameConfig.DefaultPickPocketAttempts;
+        player.PickPocketAttempts = GameConfig.ModDefaultPickPocketAttempts;
         player.BankRobberyAttempts = GameConfig.DefaultBankRobberyAttempts;
         
         // Reset shop haggling attempts (Pascal: daily haggling reset)

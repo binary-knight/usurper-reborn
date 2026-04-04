@@ -2248,6 +2248,9 @@ public abstract class BaseLocation
 
         switch (upperChoice)
         {
+            case "%":
+                await ShowStatus();
+                return (true, false);
             case "*":
                 await ShowInventory();
                 return (true, false);

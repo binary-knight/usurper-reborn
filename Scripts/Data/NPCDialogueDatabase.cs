@@ -88,6 +88,23 @@ namespace UsurperRemake.Data
         }
 
         /// <summary>
+        /// Returns a merged list of all built-in dialogue lines from the hardcoded DialogueLines_* source files.
+        /// Used by GameDataLoader.ExportDefaults() to export the default data for modders.
+        /// </summary>
+        public static List<DialogueLine> GetAllBuiltInLines()
+        {
+            var lines = new List<DialogueLine>();
+            lines.AddRange(DialogueLines_Greetings.GetLines());
+            lines.AddRange(DialogueLines_SmallTalk.GetLines());
+            lines.AddRange(DialogueLines_Farewells.GetLines());
+            lines.AddRange(DialogueLines_Reactions.GetLines());
+            lines.AddRange(DialogueLines_MoodPrefixes.GetLines());
+            lines.AddRange(DialogueLines_Memory.GetLines());
+            lines.AddRange(DialogueLines_StoryNPCs.GetLines());
+            return lines;
+        }
+
+        /// <summary>
         /// Initialize the database by collecting lines from all dialogue source files.
         /// Called once at startup.
         /// </summary>
@@ -95,16 +112,11 @@ namespace UsurperRemake.Data
         {
             if (_allLines != null) return;
 
-            _allLines = new List<DialogueLine>();
-
-            // Collect from all dialogue source files
-            _allLines.AddRange(DialogueLines_Greetings.GetLines());
-            _allLines.AddRange(DialogueLines_SmallTalk.GetLines());
-            _allLines.AddRange(DialogueLines_Farewells.GetLines());
-            _allLines.AddRange(DialogueLines_Reactions.GetLines());
-            _allLines.AddRange(DialogueLines_MoodPrefixes.GetLines());
-            _allLines.AddRange(DialogueLines_Memory.GetLines());
-            _allLines.AddRange(DialogueLines_StoryNPCs.GetLines());
+            // Use modded dialogue lines from GameDataLoader if available
+            if (UsurperRemake.Systems.GameDataLoader.DialogueLines != null)
+                _allLines = UsurperRemake.Systems.GameDataLoader.DialogueLines;
+            else
+                _allLines = GetAllBuiltInLines();
         }
 
         /// <summary>

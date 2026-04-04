@@ -549,11 +549,11 @@ namespace UsurperRemake.Systems
             if (slot == null)
             {
                 backpackPage = _backpackPage;
-                _backpackPage = Math.Clamp(_backpackPage, 0, totalPages - 1);
+                _backpackPage = totalPages > 0 ? Math.Clamp(_backpackPage, 0, totalPages - 1) : 0;
             } else
             {
                 backpackPage = _filteredBackpackPage;
-                _filteredBackpackPage = Math.Clamp(_filteredBackpackPage, 0, totalPages - 1);
+                _filteredBackpackPage = totalPages > 0 ? Math.Clamp(_filteredBackpackPage, 0, totalPages - 1) : 0;
             }
 
             int startIndex = backpackPage * BackpackPageSize;

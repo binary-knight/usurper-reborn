@@ -42,9 +42,21 @@ public static class MonsterFamilies
     }
 
     /// <summary>
-    /// All monster families in the game
+    /// All monster families in the game. Checks GameDataLoader first for moddable overrides.
     /// </summary>
-    public static readonly List<MonsterFamily> AllFamilies = new()
+    public static List<MonsterFamily> AllFamilies =>
+        UsurperRemake.Systems.GameDataLoader.MonsterFamilies ?? _builtInFamilies;
+
+    /// <summary>
+    /// Returns built-in hardcoded families, bypassing GameDataLoader.
+    /// Used by ExportDefaults() so --export-data always exports the originals.
+    /// </summary>
+    public static List<MonsterFamily> GetBuiltInFamilies() => _builtInFamilies;
+
+    /// <summary>
+    /// Built-in hardcoded monster families (used when no GameData override exists)
+    /// </summary>
+    private static readonly List<MonsterFamily> _builtInFamilies = new()
     {
         // GOBLINOID FAMILY - Twisted by Maelketh's endless war
         new MonsterFamily

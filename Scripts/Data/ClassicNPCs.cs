@@ -21,7 +21,22 @@ namespace UsurperRemake.Data
     /// </summary>
     public static class ClassicNPCs
     {
+        /// <summary>
+        /// Returns NPCs for gameplay — checks GameDataLoader for modded overrides first.
+        /// </summary>
         public static List<NPCTemplate> GetClassicNPCs()
+        {
+            if (UsurperRemake.Systems.GameDataLoader.NPCs != null)
+                return UsurperRemake.Systems.GameDataLoader.NPCs;
+
+            return GetBuiltInNPCs();
+        }
+
+        /// <summary>
+        /// Returns built-in hardcoded NPCs, bypassing GameDataLoader.
+        /// Used by ExportDefaults() so --export-data always exports the originals.
+        /// </summary>
+        public static List<NPCTemplate> GetBuiltInNPCs()
         {
             return new List<NPCTemplate>
             {

@@ -170,10 +170,22 @@ public static class AchievementSystem
         if (_initialized) return;
         _initialized = true;
 
+        var achievements = UsurperRemake.Systems.GameDataLoader.Achievements ?? GetBuiltInAchievements();
+        foreach (var a in achievements)
+            Register(a);
+    }
+
+    /// <summary>
+    /// Returns the list of all built-in achievement definitions (for export by GameDataLoader.ExportDefaults).
+    /// </summary>
+    public static List<Achievement> GetBuiltInAchievements()
+    {
+        return new List<Achievement>
+        {
         // ============ COMBAT ACHIEVEMENTS ============
 
         // First kills
-        Register(new Achievement
+        new Achievement
         {
             Id = "first_steps",
             Name = "First Steps",
@@ -183,9 +195,9 @@ public static class AchievementSystem
             PointValue = 10,
             GoldReward = 500,
             UnlockMessage = "Captain Aldric nods approvingly. You've proven yourself, recruit."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "first_blood",
             Name = "First Blood",
@@ -195,9 +207,9 @@ public static class AchievementSystem
             PointValue = 5,
             GoldReward = 50,
             UnlockMessage = "Your journey as a warrior begins!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "guardian_slayer",
             Name = "Guardian Slayer",
@@ -208,9 +220,9 @@ public static class AchievementSystem
             GoldReward = 500,
             ExperienceReward = 500,
             UnlockMessage = "The Guardian acknowledges your worth!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "monster_slayer_10",
             Name = "Monster Slayer",
@@ -219,9 +231,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Bronze,
             PointValue = 10,
             GoldReward = 100
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "monster_slayer_100",
             Name = "Veteran Hunter",
@@ -230,9 +242,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 25,
             GoldReward = 500
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "monster_slayer_500",
             Name = "Monster Bane",
@@ -241,9 +253,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Gold,
             PointValue = 50,
             GoldReward = 2500
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "monster_slayer_1000",
             Name = "Legendary Slayer",
@@ -252,9 +264,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Platinum,
             PointValue = 100,
             GoldReward = 10000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "boss_killer",
             Name = "Boss Killer",
@@ -264,9 +276,9 @@ public static class AchievementSystem
             PointValue = 20,
             GoldReward = 500,
             UnlockMessage = "The bigger they are..."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "boss_slayer_10",
             Name = "Boss Hunter",
@@ -275,9 +287,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Gold,
             PointValue = 50,
             GoldReward = 2000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "unique_killer",
             Name = "Unique Encounter",
@@ -287,9 +299,9 @@ public static class AchievementSystem
             PointValue = 30,
             GoldReward = 1000,
             UnlockMessage = "A rare and dangerous foe has fallen!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "critical_master",
             Name = "Critical Master",
@@ -298,9 +310,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 25,
             GoldReward = 500
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "damage_dealer_10000",
             Name = "Damage Dealer",
@@ -309,9 +321,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 20,
             GoldReward = 300
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "damage_dealer_100000",
             Name = "Destroyer",
@@ -320,9 +332,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Gold,
             PointValue = 50,
             GoldReward = 2000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "survivor",
             Name = "Survivor",
@@ -332,9 +344,9 @@ public static class AchievementSystem
             PointValue = 25,
             GoldReward = 500,
             UnlockMessage = "That was too close!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "flawless_victory",
             Name = "Flawless Victory",
@@ -343,9 +355,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 30,
             GoldReward = 750
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "pvp_victor",
             Name = "PvP Victor",
@@ -354,9 +366,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 25,
             GoldReward = 500
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "pvp_veteran",
             Name = "Arena Veteran",
@@ -365,9 +377,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Gold,
             PointValue = 50,
             GoldReward = 2000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "pvp_champion",
             Name = "PvP Champion",
@@ -376,9 +388,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Platinum,
             PointValue = 100,
             GoldReward = 5000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "gauntlet_champion",
             Name = "Gauntlet Champion",
@@ -387,11 +399,11 @@ public static class AchievementSystem
             Tier = AchievementTier.Gold,
             PointValue = 50,
             GoldReward = 250
-        });
+        },
 
         // ============ PROGRESSION ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "level_5",
             Name = "Adventurer",
@@ -400,9 +412,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Bronze,
             PointValue = 10,
             ExperienceReward = 100
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "level_10",
             Name = "Seasoned",
@@ -411,9 +423,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Bronze,
             PointValue = 15,
             ExperienceReward = 500
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "level_25",
             Name = "Veteran",
@@ -422,9 +434,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 30,
             ExperienceReward = 2000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "level_50",
             Name = "Elite",
@@ -433,9 +445,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Gold,
             PointValue = 50,
             ExperienceReward = 10000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "level_75",
             Name = "Master",
@@ -444,9 +456,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Platinum,
             PointValue = 75,
             ExperienceReward = 25000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "level_100",
             Name = "Legend",
@@ -457,11 +469,11 @@ public static class AchievementSystem
             GoldReward = 100000,
             ExperienceReward = 0,
             UnlockMessage = "You have achieved legendary status!"
-        });
+        },
 
         // ============ ECONOMY ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "gold_1000",
             Name = "Getting Started",
@@ -469,9 +481,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Economy,
             Tier = AchievementTier.Bronze,
             PointValue = 5
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "gold_10000",
             Name = "Comfortable",
@@ -479,9 +491,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Economy,
             Tier = AchievementTier.Bronze,
             PointValue = 10
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "gold_100000",
             Name = "Wealthy",
@@ -489,9 +501,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Economy,
             Tier = AchievementTier.Silver,
             PointValue = 25
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "gold_500000",
             Name = "Rich",
@@ -499,9 +511,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Economy,
             Tier = AchievementTier.Gold,
             PointValue = 50
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "gold_1000000",
             Name = "Millionaire",
@@ -510,9 +522,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Platinum,
             PointValue = 100,
             UnlockMessage = "You're swimming in gold!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "big_spender",
             Name = "Big Spender",
@@ -520,9 +532,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Economy,
             Tier = AchievementTier.Silver,
             PointValue = 20
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "shopaholic",
             Name = "Shopaholic",
@@ -530,11 +542,11 @@ public static class AchievementSystem
             Category = AchievementCategory.Economy,
             Tier = AchievementTier.Silver,
             PointValue = 20
-        });
+        },
 
         // ============ EXPLORATION ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dungeon_5",
             Name = "Dungeon Crawler",
@@ -542,9 +554,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Exploration,
             Tier = AchievementTier.Bronze,
             PointValue = 10
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dungeon_10",
             Name = "Deep Delver",
@@ -552,9 +564,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Exploration,
             Tier = AchievementTier.Silver,
             PointValue = 25
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dungeon_25",
             Name = "Depth Seeker",
@@ -562,9 +574,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Exploration,
             Tier = AchievementTier.Gold,
             PointValue = 50
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dungeon_50",
             Name = "Abyss Walker",
@@ -572,9 +584,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Exploration,
             Tier = AchievementTier.Platinum,
             PointValue = 75
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dungeon_100",
             Name = "Lord of the Deep",
@@ -584,9 +596,9 @@ public static class AchievementSystem
             PointValue = 150,
             GoldReward = 50000,
             UnlockMessage = "You have conquered the deepest depths!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "treasure_hunter",
             Name = "Treasure Hunter",
@@ -595,9 +607,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 25,
             GoldReward = 1000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "secret_finder",
             Name = "Secret Finder",
@@ -606,11 +618,11 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 30,
             GoldReward = 500
-        });
+        },
 
         // ============ SOCIAL ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "first_friend",
             Name = "Friendly",
@@ -618,9 +630,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Social,
             Tier = AchievementTier.Bronze,
             PointValue = 10
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "popular",
             Name = "Popular",
@@ -628,9 +640,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Social,
             Tier = AchievementTier.Silver,
             PointValue = 25
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "married",
             Name = "Happily Married",
@@ -639,9 +651,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Silver,
             PointValue = 30,
             UnlockMessage = "May your love last forever!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "team_player",
             Name = "Team Player",
@@ -649,9 +661,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Social,
             Tier = AchievementTier.Bronze,
             PointValue = 15
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "ruler",
             Name = "Ruler",
@@ -661,9 +673,9 @@ public static class AchievementSystem
             PointValue = 100,
             GoldReward = 10000,
             UnlockMessage = "All hail the new ruler!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "ascended",
             Name = "Ascended",
@@ -673,11 +685,11 @@ public static class AchievementSystem
             PointValue = 200,
             GoldReward = 50000,
             UnlockMessage = "You have transcended mortality and joined the Divine Realm!"
-        });
+        },
 
         // ============ CHALLENGE ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "nightmare_survivor",
             Name = "Nightmare Survivor",
@@ -686,9 +698,9 @@ public static class AchievementSystem
             Tier = AchievementTier.Gold,
             PointValue = 75,
             GoldReward = 5000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "nightmare_master",
             Name = "Nightmare Master",
@@ -698,9 +710,9 @@ public static class AchievementSystem
             PointValue = 200,
             GoldReward = 50000,
             UnlockMessage = "You have conquered the impossible!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "persistent",
             Name = "Persistent",
@@ -708,9 +720,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Challenge,
             Tier = AchievementTier.Silver,
             PointValue = 25
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dedicated",
             Name = "Dedicated",
@@ -718,9 +730,9 @@ public static class AchievementSystem
             Category = AchievementCategory.Challenge,
             Tier = AchievementTier.Gold,
             PointValue = 75
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "no_death_10",
             Name = "Untouchable",
@@ -728,11 +740,11 @@ public static class AchievementSystem
             Category = AchievementCategory.Challenge,
             Tier = AchievementTier.Gold,
             PointValue = 50
-        });
+        },
 
         // ============ QUEST ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "quest_starter",
             Name = "Quest Starter",
@@ -742,9 +754,9 @@ public static class AchievementSystem
             PointValue = 10,
             GoldReward = 100,
             UnlockMessage = "Your first quest complete - many more await!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "quest_master",
             Name = "Quest Master",
@@ -754,9 +766,9 @@ public static class AchievementSystem
             PointValue = 50,
             GoldReward = 2500,
             UnlockMessage = "A true adventurer completes what they start!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "bounty_hunter",
             Name = "Bounty Hunter",
@@ -766,11 +778,11 @@ public static class AchievementSystem
             PointValue = 30,
             GoldReward = 1000,
             UnlockMessage = "Justice has been served!"
-        });
+        },
 
         // ============ SECRET ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "easter_egg_1",
             Name = "???",
@@ -781,9 +793,9 @@ public static class AchievementSystem
             PointValue = 50,
             IsSecret = true,
             GoldReward = 1000
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "completionist",
             Name = "Completionist",
@@ -794,11 +806,11 @@ public static class AchievementSystem
             IsSecret = true,
             GoldReward = 100000,
             UnlockMessage = "You have done everything there is to do!"
-        });
+        },
 
         // ============ MAGIC SHOP ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "first_enchant",
             Name = "Apprentice Enchanter",
@@ -808,9 +820,9 @@ public static class AchievementSystem
             PointValue = 10,
             GoldReward = 500,
             UnlockMessage = "Your gear glows with arcane power!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "master_enchanter",
             Name = "Master Enchanter",
@@ -820,9 +832,9 @@ public static class AchievementSystem
             PointValue = 25,
             GoldReward = 2000,
             UnlockMessage = "Ravanella considers you a fellow artisan."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "love_magician",
             Name = "Lovelorn Mage",
@@ -832,9 +844,9 @@ public static class AchievementSystem
             PointValue = 15,
             GoldReward = 1000,
             UnlockMessage = "The heart wants what magic commands."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dark_magician",
             Name = "Shadow Caster",
@@ -845,9 +857,9 @@ public static class AchievementSystem
             GoldReward = 1500,
             IsSecret = true,
             UnlockMessage = "You have stepped into the darkness."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "angel_of_death",
             Name = "Angel of Death",
@@ -858,9 +870,9 @@ public static class AchievementSystem
             GoldReward = 5000,
             IsSecret = true,
             UnlockMessage = "Death follows in your wake."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "big_spender_magic",
             Name = "Magical Patron",
@@ -870,9 +882,9 @@ public static class AchievementSystem
             PointValue = 30,
             GoldReward = 5000,
             UnlockMessage = "Ravanella names a shelf after you."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "corruption_fragment",
             Name = "The Corruption Remembered",
@@ -883,9 +895,9 @@ public static class AchievementSystem
             GoldReward = 3000,
             IsSecret = true,
             UnlockMessage = "The corruption is not evil. It is forgetting."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "accessory_collector",
             Name = "Bejeweled",
@@ -895,11 +907,11 @@ public static class AchievementSystem
             PointValue = 10,
             GoldReward = 500,
             UnlockMessage = "You sparkle with magical accessories!"
-        });
+        },
 
         // ============ DARK ALLEY ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dark_alley_gambler",
             Name = "High Roller",
@@ -909,9 +921,9 @@ public static class AchievementSystem
             PointValue = 25,
             GoldReward = 500,
             UnlockMessage = "Lady Luck favors the bold!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dark_alley_pit_champion",
             Name = "Pit Champion",
@@ -921,9 +933,9 @@ public static class AchievementSystem
             PointValue = 50,
             GoldReward = 1000,
             UnlockMessage = "The crowd roars your name!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dark_alley_pickpocket",
             Name = "Light Fingers",
@@ -933,9 +945,9 @@ public static class AchievementSystem
             PointValue = 25,
             GoldReward = 500,
             UnlockMessage = "Your fingers are quicker than the eye!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dark_alley_debt_free",
             Name = "Debt Free",
@@ -945,9 +957,9 @@ public static class AchievementSystem
             PointValue = 10,
             GoldReward = 200,
             UnlockMessage = "Freedom from debt is the sweetest reward."
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dark_alley_king",
             Name = "King of the Alley",
@@ -957,11 +969,11 @@ public static class AchievementSystem
             PointValue = 100,
             GoldReward = 2000,
             UnlockMessage = "The underground bows to your authority!"
-        });
+        },
 
         // ============ WORLD BOSS ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "world_boss_first",
             Name = "World Slayer",
@@ -971,9 +983,9 @@ public static class AchievementSystem
             PointValue = 50,
             GoldReward = 5000,
             UnlockMessage = "You helped bring down a titan!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "world_boss_5_unique",
             Name = "Boss Hunter",
@@ -983,9 +995,9 @@ public static class AchievementSystem
             PointValue = 100,
             GoldReward = 25000,
             UnlockMessage = "No boss is safe from your blade!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "world_boss_25_total",
             Name = "Legend Killer",
@@ -995,9 +1007,9 @@ public static class AchievementSystem
             PointValue = 200,
             GoldReward = 100000,
             UnlockMessage = "Your legend echoes across the realm!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "world_boss_mvp",
             Name = "MVP",
@@ -1007,11 +1019,11 @@ public static class AchievementSystem
             PointValue = 50,
             GoldReward = 10000,
             UnlockMessage = "You were the realm's greatest champion!"
-        });
+        },
 
         // ============ LOGIN STREAK ACHIEVEMENTS ============
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "dedicated_adventurer",
             Name = "Dedicated Adventurer",
@@ -1022,9 +1034,9 @@ public static class AchievementSystem
             GoldReward = 500,
             ExperienceReward = 200,
             UnlockMessage = "Your daily dedication has been recognized!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "devoted_champion",
             Name = "Devoted Champion",
@@ -1035,9 +1047,9 @@ public static class AchievementSystem
             GoldReward = 2000,
             ExperienceReward = 1000,
             UnlockMessage = "A full month of unwavering commitment!"
-        });
+        },
 
-        Register(new Achievement
+        new Achievement
         {
             Id = "legendary_devotion",
             Name = "Legendary Devotion",
@@ -1048,7 +1060,8 @@ public static class AchievementSystem
             GoldReward = 5000,
             ExperienceReward = 5000,
             UnlockMessage = "Your legendary devotion echoes through the ages!"
-        });
+        },
+        };
     }
 
     /// <summary>
