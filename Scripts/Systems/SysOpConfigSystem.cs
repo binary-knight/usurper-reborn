@@ -106,6 +106,9 @@ namespace UsurperRemake.Systems
 
             // Feature toggles
             GameConfig.DisableOnlinePlay = _config.DisableOnlinePlay;
+            // Accessibility: only restore from config if CLI flag did not already enable it
+            if (!GameConfig.ScreenReaderMode)
+                GameConfig.ScreenReaderMode = _config.ScreenReaderMode;
 
             // Online server
             GameConfig.OnlineServerAddress = string.IsNullOrWhiteSpace(_config.OnlineServerAddress)
@@ -151,6 +154,7 @@ namespace UsurperRemake.Systems
             _config.IdleTimeoutMinutes = DoorMode.IdleTimeoutMinutes;
             _config.DefaultColorTheme = GameConfig.DefaultColorTheme.ToString();
             _config.DisableOnlinePlay = GameConfig.DisableOnlinePlay;
+            _config.ScreenReaderMode = GameConfig.ScreenReaderMode;
             _config.OnlineServerAddress = GameConfig.OnlineServerAddress;
             _config.OnlineServerPort = GameConfig.OnlineServerPort;
         }
@@ -195,6 +199,8 @@ namespace UsurperRemake.Systems
 
         // Feature toggles
         public bool DisableOnlinePlay { get; set; } = false;
+        // Accessibility
+        public bool ScreenReaderMode { get; set; } = false;
 
         // Online server
         public string OnlineServerAddress { get; set; } = "play.usurper-reborn.net";

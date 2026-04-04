@@ -738,6 +738,7 @@ public partial class GameEngine
 
             case "A":
                 GameConfig.ScreenReaderMode = !GameConfig.ScreenReaderMode;
+                UsurperRemake.Systems.SysOpConfigSystem.Instance.SaveConfig();
                 terminal.WriteLine("");
                 if (GameConfig.ScreenReaderMode)
                 {
@@ -944,6 +945,9 @@ public partial class GameEngine
 
         // Load SysOp configuration (for BBS door mode settings persistence)
         UsurperRemake.Systems.SysOpConfigSystem.Instance.LoadConfig();
+        // If --screen-reader CLI flag was passed, persist the preference for future launches
+        if (GameConfig.ScreenReaderMode)
+            UsurperRemake.Systems.SysOpConfigSystem.Instance.SaveConfig();
 
         // Create the LocationManager early so that it becomes the singleton before NPCs are loaded
         if (locationManager == null)
@@ -1534,6 +1538,7 @@ public partial class GameEngine
                     break;
                 case "A":
                     GameConfig.ScreenReaderMode = !GameConfig.ScreenReaderMode;
+                    UsurperRemake.Systems.SysOpConfigSystem.Instance.SaveConfig();
                     terminal.WriteLine("");
                     if (GameConfig.ScreenReaderMode)
                     {
