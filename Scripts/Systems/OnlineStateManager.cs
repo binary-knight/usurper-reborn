@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using UsurperRemake.BBS;
+using UsurperRemake.Data;
 using UsurperRemake.Server;
 
 namespace UsurperRemake.Systems
@@ -1231,7 +1232,15 @@ namespace UsurperRemake.Systems
                             ArmorPiercing = equip.ArmorPiercing,
                             Thorns = equip.Thorns,
                             HPRegen = equip.HPRegen,
-                            ManaRegen = equip.ManaRegen
+                            ManaRegen = equip.ManaRegen,
+                            WeightClass = (int)equip.WeightClass,
+                            StrengthRequired = equip.StrengthRequired,
+                            RequiresGood = equip.RequiresGood,
+                            RequiresEvil = equip.RequiresEvil,
+                            ClassRestrictions = equip.ClassRestrictions?.Select(c => (int)c).ToList(),
+                            IsUnique = equip.IsUnique,
+                            HasBossSlayer = equip.HasBossSlayer,
+                            HasTitanResolve = equip.HasTitanResolve
                         }).ToList() ?? new List<DynamicEquipmentData>(),
 
                     // AI state - for dashboard analytics
@@ -1250,6 +1259,34 @@ namespace UsurperRemake.Systems
                     // Enemies
                     Enemies = npc.Enemies?.ToList() ?? new List<string>(),
 
+                    // Divine worship
+                    WorshippedGod = npc.WorshippedGod ?? "",
+
+                    // Dialogue tracking
+                    RecentDialogueIds = NPCDialogueDatabase.GetRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? ""),
+
+                    // Social emergence
+                    EmergentRole = npc.EmergentRole ?? "",
+                    RoleStabilityTicks = npc.RoleStabilityTicks,
+
+                    // Skill proficiency
+                    SkillProficiencies = npc.SkillProficiencies?.ToDictionary(
+                        kvp => kvp.Key, kvp => (int)kvp.Value) ?? new Dictionary<string, int>(),
+                    SkillTrainingProgress = npc.SkillTrainingProgress ?? new Dictionary<string, int>(),
+
+                    // Market inventory for NPC trading
+                    MarketInventory = npc.MarketInventory?.Select(item => new MarketItemData
+                    {
+                        ItemName = item.Name,
+                        ItemValue = item.Value,
+                        ItemType = item.Type,
+                        Attack = item.Attack,
+                        Armor = item.Armor,
+                        Strength = item.Strength,
+                        Defence = item.Defence,
+                        IsCursed = item.IsCursed
+                    }).ToList() ?? new List<MarketItemData>(),
+
                     // Lifecycle
                     Age = npc.Age,
                     BirthDate = npc.BirthDate,
@@ -1257,6 +1294,11 @@ namespace UsurperRemake.Systems
                     IsPermaDead = npc.IsPermaDead,
                     PregnancyDueDate = npc.PregnancyDueDate,
                     PregnancyFatherName = npc.PregnancyFatherName,
+
+                    // Hostility, social graph, and gang affiliation
+                    IsHostile = npc.IsHostile,
+                    KnownCharacters = npc.KnownCharacters?.ToList() ?? new List<string>(),
+                    GangId = npc.GangId ?? ""
                 });
             }
 
@@ -1292,6 +1334,8 @@ namespace UsurperRemake.Systems
                 Jealousy = profile.Jealousy,
                 Commitment = profile.Commitment,
                 Adventurousness = profile.Adventurousness,
+                Exhibitionism = profile.Exhibitionism,
+                Voyeurism = profile.Voyeurism,
                 Flirtatiousness = profile.Flirtatiousness,
                 Passion = profile.Passion,
                 Tenderness = profile.Tenderness

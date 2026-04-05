@@ -104,6 +104,9 @@ namespace UsurperRemake.Systems
 
         // Social emergence - cultural memes (v0.42.0)
         public CulturalMemeSaveData? CulturalMemes { get; set; }
+
+        // Amnesia System
+        public AmnesiaData? Amnesia { get; set; }
     }
 
     /// <summary>
@@ -588,6 +591,7 @@ namespace UsurperRemake.Systems
         public DateTime LastBindingOfSoulsRealDate { get; set; }
         public int SethFightsToday { get; set; }
         public int ArmWrestlesToday { get; set; }
+        public int SethDefeatsTotal { get; set; }   // Lifetime Seth Able defeats (persistent)
         public int RoyQuestsToday { get; set; }
         public int Quests { get; set; }            // total completed missions/quests
         public long RoyQuests { get; set; }        // royal quests accomplished
@@ -791,6 +795,11 @@ namespace UsurperRemake.Systems
         // Skill proficiency (stored as int values of TrainingSystem.ProficiencyLevel)
         public Dictionary<string, int> SkillProficiencies { get; set; } = new();
         public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();
+
+        // Hostility, social graph, and gang affiliation
+        public bool IsHostile { get; set; }
+        public List<string> KnownCharacters { get; set; } = new();
+        public string GangId { get; set; } = "";
     }
 
     /// <summary>
@@ -908,6 +917,16 @@ namespace UsurperRemake.Systems
         public int Thorns { get; set; }
         public int HPRegen { get; set; }
         public int ManaRegen { get; set; }
+
+        // Equipment restrictions and special effects (v0.54.0)
+        public int WeightClass { get; set; }
+        public int StrengthRequired { get; set; }
+        public bool RequiresGood { get; set; }
+        public bool RequiresEvil { get; set; }
+        public List<int>? ClassRestrictions { get; set; }
+        public bool IsUnique { get; set; }
+        public bool HasBossSlayer { get; set; }
+        public bool HasTitanResolve { get; set; }
     }
 
     /// <summary>
@@ -1689,6 +1708,11 @@ namespace UsurperRemake.Systems
         public bool Deleted { get; set; }
         public DateTime LastUpdated { get; set; }
         public int CreatedOnGameDay { get; set; } // In-game day when relationship started (v0.26)
+        public bool BannedMarry { get; set; }    // Banned from marriage by King
+        public int MarriedTimes { get; set; }    // Times married
+        public int Kids { get; set; }            // Children produced
+        public int KilledBy1 { get; set; }       // Name2 killed by Name1 count
+        public int KilledBy2 { get; set; }       // Name1 killed by Name2 count
     }
 
 } 

@@ -47,6 +47,9 @@ public abstract class BaseLocation
     /// </summary>
     protected void RequestRedisplay() => _locationEntryDisplayed = false;
 
+    // Companion death trigger tracking — once per game day
+    private static int _lastCompanionDeathCheckDay = -1;
+
     // World boss notification tracking — static so it persists across location changes
     private static string? _lastNotifiedBossName = null;
     private static DateTime _lastBossNotifyTime = DateTime.MinValue;
@@ -564,6 +567,25 @@ public abstract class BaseLocation
                 await DailySystemManager.Instance.DisplayDailyResetMessage();
             }
 
+            // Companion death triggers (once per game day)
+            if (currentPlayer != null && CompanionSystem.Instance != null)
+            {
+                int gameDay = GameEngine.Instance?.SessionCurrentDay ?? 0;
+                if (gameDay > _lastCompanionDeathCheckDay)
+                {
+                    _lastCompanionDeathCheckDay = gameDay;
+                    var deathCheck = CompanionSystem.Instance.CheckDeathTriggers(currentPlayer);
+                    if (deathCheck?.TriggeredCompanion != null && deathCheck.TriggerType.HasValue)
+                    {
+                        await CompanionSystem.Instance.KillCompanion(
+                            deathCheck.TriggeredCompanion.Value,
+                            deathCheck.TriggerType.Value,
+                            deathCheck.TriggerReason ?? "Unknown",
+                            terminal);
+                    }
+                }
+            }
+
             // In MUD streaming mode: show the full location display only on the first iteration
             // (or after `look`/`l` resets the flag). Subsequent iterations just flow output
             // continuously without wiping the scroll buffer — real MUD behaviour.
@@ -595,6 +617,9 @@ public abstract class BaseLocation
                 // Display location
                 DisplayLocation();
                 _locationEntryDisplayed = true;
+
+                // Immersion text — overheard NPC dialogue and world-state flavor
+                ShowImmersionText();
 
                 // Co-presence: show other online players at this location (MUD mode only)
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode && _coPresenceCache.Count > 0)
@@ -1364,7 +1389,136 @@ public abstract class BaseLocation
         // Status line
         ShowStatusLine();
     }
-    
+
+    /// <summary>
+    /// Show immersion text after location display — overheard NPC dialogue and world-state flavor.
+    /// </summary>
+    protected virtual void ShowImmersionText()
+    {
+        if (currentPlayer == null || terminal == null) return;
+
+        // Dungeon has its own atmosphere system
+        if (LocationId == GameLocation.Dungeons) return;
+
+        // World-state flavor (always show if available — these are rare by nature)
+        var worldFlavor = GetWorldStateFlavor();
+        if (worldFlavor != null)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {worldFlavor}");
+        }
+
+        // NPC overheard dialogue (20% chance)
+        if (Random.Shared.Next(100) < 20)
+        {
+            var overheard = GenerateOverheardDialogue();
+            if (overheard != null)
+            {
+                terminal.SetColor("dark_cyan");
+                terminal.WriteLine($"  {overheard}");
+                terminal.SetColor("white");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Generate an overheard dialogue snippet between two NPCs at this location.
+    /// Returns null if fewer than 2 NPCs are present.
+    /// </summary>
+    protected virtual string? GenerateOverheardDialogue()
+    {
+        var npcsHere = GetLiveNPCsAtLocation();
+        if (npcsHere.Count < 2) return null;
+
+        // Pick two random NPCs
+        var shuffled = npcsHere.OrderBy(_ => Random.Shared.Next()).Take(2).ToList();
+        var npc1 = shuffled[0];
+        var npc2 = shuffled[1];
+
+        // Location-specific dialogue templates
+        var templates = LocationId switch
+        {
+            GameLocation.TheInn or GameLocation.BobsBeer or GameLocation.Orbs => new[]
+            {
+                $"You overhear {npc1.Name} and {npc2.Name} arguing about whose round it is.",
+                $"{npc1.Name} leans toward {npc2.Name}: \"Did you hear about the dungeon?\"",
+                $"\"{npc2.Name}, you look terrible,\" says {npc1.Name}. \"Long night.\"",
+                $"{npc1.Name} is telling {npc2.Name} an increasingly unlikely story about a dragon.",
+                $"\"Trust no one,\" {npc1.Name} whispers to {npc2.Name}. They both look at you.",
+            },
+            GameLocation.MainStreet => new[]
+            {
+                $"You catch {npc1.Name} and {npc2.Name} exchanging a guarded glance.",
+                $"{npc1.Name} is complaining to {npc2.Name} about the price of potions.",
+                $"\"The king won't last,\" mutters {npc1.Name}. {npc2.Name} quickly shushes them.",
+                $"{npc1.Name} nods curtly to {npc2.Name} as they pass. Old history there.",
+                $"You overhear {npc2.Name} asking {npc1.Name} about work in the dungeon.",
+            },
+            GameLocation.Temple or GameLocation.Church => new[]
+            {
+                $"{npc1.Name} and {npc2.Name} pray quietly, shoulder to shoulder.",
+                $"\"The gods are silent,\" {npc1.Name} murmurs to {npc2.Name}. \"When were they not?\"",
+                $"{npc2.Name} lights a candle. {npc1.Name} watches with an unreadable expression.",
+                $"\"Faith isn't certainty,\" {npc1.Name} tells {npc2.Name}. \"It's choosing anyway.\"",
+            },
+            GameLocation.Healer => new[]
+            {
+                $"{npc1.Name} winces as the healer works. {npc2.Name} pretends not to watch.",
+                $"\"Dungeon floor twenty,\" {npc1.Name} says. {npc2.Name} nods knowingly.",
+                $"{npc2.Name} is describing their wounds to {npc1.Name}. Unnecessarily.",
+            },
+            _ => new[]
+            {
+                $"You catch {npc1.Name} mid-conversation with {npc2.Name}. They lower their voices.",
+                $"{npc1.Name} and {npc2.Name} are deep in discussion.",
+                $"\"Things are changing,\" {npc1.Name} tells {npc2.Name}. \"Can you feel it?\"",
+                $"{npc2.Name} whispers something to {npc1.Name}. They both glance your way.",
+            }
+        };
+
+        return templates[Random.Shared.Next(templates.Length)];
+    }
+
+    /// <summary>
+    /// Return a single world-state flavor line based on current game state, or null.
+    /// Only returns a line for notable conditions — most of the time returns null.
+    /// </summary>
+    protected virtual string? GetWorldStateFlavor()
+    {
+        // Blood Moon is already shown in the main display — skip it here
+        // World boss active
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            var bossName = WorldBossSystem.Instance?.ActiveBossName;
+            if (!string.IsNullOrEmpty(bossName))
+                return $"The ground trembles faintly. {bossName} rampages somewhere in the world.";
+        }
+
+        // Recent coup — new king (within 3 real-time days of coronation)
+        var king = CastleLocation.GetCurrentKing();
+        if (king != null && king.IsActive)
+        {
+            if ((DateTime.Now - king.CoronationDate).TotalDays <= 3)
+                return $"People whisper about the new ruler, {king.Name}. Opinions are... divided.";
+        }
+
+        // Time of day flavor (single-player only, non-dungeon)
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
+        {
+            int hour = currentPlayer.GameTimeMinutes / 60;
+            if (hour >= 0 && hour < 5)
+                return "The streets are empty. Only the desperate are out at this hour.";
+            if (hour >= 5 && hour < 7)
+                return "Dawn light creeps through the streets. The town stirs.";
+            if (hour >= 20 && hour < 22)
+                return "Lanterns flicker in windows. The town settles into evening.";
+            if (hour >= 22)
+                return "Night falls heavy. Shadows grow long between the buildings.";
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Map GameLocation enum to NPC location strings
     /// </summary>
@@ -3561,6 +3715,9 @@ public abstract class BaseLocation
                     exitPrefs = true;
                     // Force location redraw so theme/compact/language changes are visible immediately
                     _locationEntryDisplayed = false;
+                    // MUD mode: clear the screen so stale preferences menu doesn't linger
+                    if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+                        terminal.WriteRawAnsi("\x1b[2J\x1b[H");
                     break;
 
                 default:
@@ -5166,6 +5323,21 @@ public abstract class BaseLocation
                 string herbName = ((HerbType)currentPlayer.HerbBuffType).ToString();
                 terminal.SetColor("green");
                 terminal.WriteLine($"  - {herbName} ({currentPlayer.HerbBuffCombats} combats)");
+            }
+            if (currentPlayer.HasActiveFoodBuff)
+            {
+                string foodName = currentPlayer.FoodBuffType switch
+                {
+                    1 => "Dragon Steak (+10% dmg)",
+                    2 => "Honey Bread (+10% def)",
+                    3 => "Iron Rations (+15% max HP)",
+                    4 => "Mushroom Soup (+15% spell dmg)",
+                    5 => "Food Poisoning (-5% stats)",
+                    _ => "Food"
+                };
+                string foodColor = currentPlayer.FoodBuffType == 5 ? "dark_red" : "bright_yellow";
+                terminal.SetColor(foodColor);
+                terminal.WriteLine($"  - {foodName} ({currentPlayer.FoodBuffCombats} combats)");
             }
             if (currentPlayer.LoversBlissCombats > 0)
             {
@@ -8787,6 +8959,12 @@ public abstract class BaseLocation
                         equipment.ConstitutionBonus += value;
                         equipment.IntelligenceBonus += value;
                         equipment.CharismaBonus += value;
+                        break;
+                    case LootGenerator.SpecialEffect.BossSlayer:
+                        equipment.HasBossSlayer = true;
+                        break;
+                    case LootGenerator.SpecialEffect.TitanResolve:
+                        equipment.HasTitanResolve = true;
                         break;
                 }
             }

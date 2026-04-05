@@ -278,6 +278,14 @@ namespace UsurperRemake.Systems
             if (ExperiencedMoments.Contains(AwakeningMoment.AllSealsCollected)) level++;
             if (ExperiencedMoments.Contains(AwakeningMoment.MemoriesRecovered)) level++;
             if (ExperiencedMoments.Contains(AwakeningMoment.TrueIdentityRevealed)) level = 7; // Auto-max
+            if (ExperiencedMoments.Contains(AwakeningMoment.LetGoOfPower)) level++;
+            if (ExperiencedMoments.Contains(AwakeningMoment.AcceptedDeath)) level++;
+            if (ExperiencedMoments.Contains(AwakeningMoment.CompanionSacrifice)) level++;
+            if (ExperiencedMoments.Contains(AwakeningMoment.ForgaveBetrayerMercy)) level++;
+            if (ExperiencedMoments.Contains(AwakeningMoment.AcceptedGrief)) level++;
+            if (ExperiencedMoments.Contains(AwakeningMoment.RejectedParadise)) level++;
+            if (ExperiencedMoments.Contains(AwakeningMoment.AbsorbedDarkness)) level++;
+            if (ExperiencedMoments.Contains(AwakeningMoment.HeardOldGodLoreSong)) level++;
 
             return Math.Min(7, level);
         }
@@ -338,6 +346,63 @@ namespace UsurperRemake.Systems
                     "You ARE Manwe. You ARE the Ocean. " +
                     "You are everything that has ever loved.",
                     7
+                ),
+                AwakeningMoment.LetGoOfPower => new OceanInsight(
+                    "Open Hands",
+                    "Power flows through open hands, not clenched fists. " +
+                    "In releasing your grip, you felt the current of something " +
+                    "far greater than any throne or weapon could contain.",
+                    3
+                ),
+                AwakeningMoment.AcceptedDeath => new OceanInsight(
+                    "The Still Water",
+                    "You looked into the void and did not flinch. " +
+                    "Death is not the opposite of life — it is the shore " +
+                    "where every wave finally rests.",
+                    4
+                ),
+                AwakeningMoment.CompanionSacrifice => new OceanInsight(
+                    "The Gift of Depth",
+                    "They gave everything so you could continue. " +
+                    "In their sacrifice, the boundary between self and other " +
+                    "dissolved entirely. Love is not a transaction — it is water " +
+                    "pouring itself into water.",
+                    4
+                ),
+                AwakeningMoment.ForgaveBetrayerMercy => new OceanInsight(
+                    "The River Forgives the Stone",
+                    "To forgive is to remember that the one who hurt you " +
+                    "is also hurting. Every wave crashes against every other wave, " +
+                    "but beneath the surface, they are the same water.",
+                    3
+                ),
+                AwakeningMoment.AcceptedGrief => new OceanInsight(
+                    "The Tide Returns",
+                    "Grief is not a wound to heal — it is the ocean mourning " +
+                    "a wave that has returned home. You carried the weight " +
+                    "until it became wisdom.",
+                    4
+                ),
+                AwakeningMoment.RejectedParadise => new OceanInsight(
+                    "The Dreamer Stays Awake",
+                    "You were offered a perfect dream, and chose the imperfect truth. " +
+                    "The ocean does not hide from its storms. " +
+                    "Only in accepting all of it does the water become whole.",
+                    5
+                ),
+                AwakeningMoment.AbsorbedDarkness => new OceanInsight(
+                    "The Deep Accepts All",
+                    "You took the world's shadow into yourself. " +
+                    "The ocean does not reject its deepest trenches. " +
+                    "Light and dark are both water, seen from different angles.",
+                    5
+                ),
+                AwakeningMoment.HeardOldGodLoreSong => new OceanInsight(
+                    "The Song Beneath",
+                    "The melody carried truths older than words. " +
+                    "For a moment, you heard the sound the ocean makes " +
+                    "when it remembers what it lost.",
+                    2
                 ),
                 _ => null
             };

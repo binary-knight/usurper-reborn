@@ -922,7 +922,12 @@ public partial class RelationshipSystem
                         MarriedDays = relation.MarriedDays,
                         Deleted = relation.Deleted,
                         LastUpdated = relation.LastUpdated,
-                        CreatedOnGameDay = relation.CreatedOnGameDay  // In-game day tracking (v0.26)
+                        CreatedOnGameDay = relation.CreatedOnGameDay,  // In-game day tracking (v0.26)
+                        BannedMarry = relation.BannedMarry,
+                        MarriedTimes = relation.MarriedTimes,
+                        Kids = relation.Kids,
+                        KilledBy1 = relation.KilledBy1,
+                        KilledBy2 = relation.KilledBy2
                     });
                 }
             }
@@ -960,7 +965,12 @@ public partial class RelationshipSystem
                 MarriedDays = saved.MarriedDays,
                 Deleted = saved.Deleted,
                 LastUpdated = saved.LastUpdated,
-                CreatedOnGameDay = saved.CreatedOnGameDay  // Restore in-game day tracking (v0.26)
+                CreatedOnGameDay = saved.CreatedOnGameDay,  // Restore in-game day tracking (v0.26)
+                BannedMarry = saved.BannedMarry,
+                MarriedTimes = saved.MarriedTimes,
+                Kids = saved.Kids,
+                KilledBy1 = saved.KilledBy1,
+                KilledBy2 = saved.KilledBy2
             };
         }
 

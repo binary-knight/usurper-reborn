@@ -1637,7 +1637,8 @@ namespace UsurperRemake.Systems
                         AND LENGTH(p.player_data) > 2
                         AND json_extract(p.player_data, '$.player.level') IS NOT NULL
                         AND p.username NOT LIKE 'emergency_%'
-                        AND COALESCE(json_extract(p.player_data, '$.player.isImmortal'), 0) != 1;
+                        AND COALESCE(json_extract(p.player_data, '$.player.isImmortal'), 0) != 1
+                        AND COALESCE(json_extract(p.player_data, '$.player.hp'), 0) > 0;
                 ";
 
                 using var reader = await cmd.ExecuteReaderAsync();

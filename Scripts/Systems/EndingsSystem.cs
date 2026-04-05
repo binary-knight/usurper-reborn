@@ -593,6 +593,9 @@ namespace UsurperRemake.Systems
             // Mark Ocean Philosophy complete
             OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.TrueIdentityRevealed);
 
+            // Moment of silence — the wave remembers
+            await UIHelper.MomentOfSilence(terminal, 6000);
+
             await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
         }
 
@@ -707,6 +710,9 @@ namespace UsurperRemake.Systems
                 SaveSystem.Instance.DeleteSave(playerName);
 
                 await Task.Delay(3000);
+
+                // Moment of silence — complete dissolution
+                await UIHelper.MomentOfSilence(terminal, 8000);
 
                 terminal.Clear();
                 terminal.WriteLine("");

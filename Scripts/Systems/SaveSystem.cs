@@ -551,7 +551,15 @@ namespace UsurperRemake.Systems
                     ArmorPiercing = equip.ArmorPiercing,
                     Thorns = equip.Thorns,
                     HPRegen = equip.HPRegen,
-                    ManaRegen = equip.ManaRegen
+                    ManaRegen = equip.ManaRegen,
+                    WeightClass = (int)equip.WeightClass,
+                    StrengthRequired = equip.StrengthRequired,
+                    RequiresGood = equip.RequiresGood,
+                    RequiresEvil = equip.RequiresEvil,
+                    ClassRestrictions = equip.ClassRestrictions?.Select(c => (int)c).ToList(),
+                    IsUnique = equip.IsUnique,
+                    HasBossSlayer = equip.HasBossSlayer,
+                    HasTitanResolve = equip.HasTitanResolve
                 }).ToList(),
 
                 // Base stats
@@ -867,6 +875,7 @@ namespace UsurperRemake.Systems
                 LastBindingOfSoulsRealDate = player.LastBindingOfSoulsRealDate,
                 SethFightsToday = player.SethFightsToday,
                 ArmWrestlesToday = player.ArmWrestlesToday,
+                SethDefeatsTotal = player.SethDefeatsTotal,
                 RoyQuestsToday = player.RoyQuestsToday,
                 Quests = player.Quests,
                 RoyQuests = player.RoyQuests,
@@ -1236,13 +1245,26 @@ namespace UsurperRemake.Systems
                             ArmorPiercing = equip.ArmorPiercing,
                             Thorns = equip.Thorns,
                             HPRegen = equip.HPRegen,
-                            ManaRegen = equip.ManaRegen
+                            ManaRegen = equip.ManaRegen,
+                            WeightClass = (int)equip.WeightClass,
+                            StrengthRequired = equip.StrengthRequired,
+                            RequiresGood = equip.RequiresGood,
+                            RequiresEvil = equip.RequiresEvil,
+                            ClassRestrictions = equip.ClassRestrictions?.Select(c => (int)c).ToList(),
+                            IsUnique = equip.IsUnique,
+                            HasBossSlayer = equip.HasBossSlayer,
+                            HasTitanResolve = equip.HasTitanResolve
                         }).ToList() ?? new List<DynamicEquipmentData>(),
 
                     // Skill proficiency
                     SkillProficiencies = npc.SkillProficiencies?.ToDictionary(
                         kvp => kvp.Key, kvp => (int)kvp.Value) ?? new Dictionary<string, int>(),
-                    SkillTrainingProgress = npc.SkillTrainingProgress ?? new Dictionary<string, int>()
+                    SkillTrainingProgress = npc.SkillTrainingProgress ?? new Dictionary<string, int>(),
+
+                    // Hostility, social graph, and gang affiliation
+                    IsHostile = npc.IsHostile,
+                    KnownCharacters = npc.KnownCharacters?.ToList() ?? new List<string>(),
+                    GangId = npc.GangId ?? ""
                 });
             }
 
@@ -2035,6 +2057,16 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
+            // Amnesia System
+            try
+            {
+                data.Amnesia = AmnesiaSystem.Instance.Serialize();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
+            }
+
             return data;
         }
 
@@ -2610,6 +2642,19 @@ namespace UsurperRemake.Systems
                 CulturalMemeSystem.Instance?.RestoreFromSaveData(data?.CulturalMemes);
                 if (data?.CulturalMemes != null)
                 {
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
+            }
+
+            // Amnesia System
+            try
+            {
+                if (data.Amnesia != null)
+                {
+                    AmnesiaSystem.Instance.Deserialize(data.Amnesia);
                 }
             }
             catch (Exception ex)

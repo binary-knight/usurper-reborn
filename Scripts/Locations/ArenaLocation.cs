@@ -382,24 +382,24 @@ public class ArenaLocation : BaseLocation
         }
         else if (result.Outcome == CombatOutcome.PlayerDied)
         {
-            // Defender wins - steal 10% of attacker's gold
-            goldStolen = (long)(currentPlayer.Gold * GameConfig.PvPGoldStealPercent);
-            goldStolen = Math.Max(0, goldStolen);
-
-            // Deduct stolen gold from attacker (on top of death penalty)
-            currentPlayer.Gold = Math.Max(0, currentPlayer.Gold - goldStolen);
-
-            // Add stolen gold to defender's save atomically
-            if (goldStolen > 0)
-                await backend.AddGoldToPlayer(defenderUsername, goldStolen);
-
-            // Apply PvP death penalties and resurrect player here
+            // Apply PvP death penalties FIRST, then gold theft
             // to prevent the standard HandleDeath() from also triggering
             // (which would show "Monster defeats" and double-penalize)
             long expLoss = currentPlayer.Experience / 10;  // 10% XP loss
             long goldLoss = currentPlayer.Gold / 4;        // 25% gold loss
             currentPlayer.Experience = Math.Max(0, currentPlayer.Experience - expLoss);
             currentPlayer.Gold = Math.Max(0, currentPlayer.Gold - goldLoss);
+
+            // Defender wins - steal 10% of attacker's remaining gold (after death penalty)
+            goldStolen = (long)(currentPlayer.Gold * GameConfig.PvPGoldStealPercent);
+            goldStolen = Math.Max(0, goldStolen);
+
+            // Deduct stolen gold from attacker
+            currentPlayer.Gold = Math.Max(0, currentPlayer.Gold - goldStolen);
+
+            // Add stolen gold to defender's save atomically
+            if (goldStolen > 0)
+                await backend.AddGoldToPlayer(defenderUsername, goldStolen);
 
             // Resurrect at Inn with half HP (prevents standard death handler)
             currentPlayer.HP = Math.Max(1, currentPlayer.MaxHP / 2);

@@ -12,7 +12,6 @@ using UsurperRemake.BBS;
 /// </summary>
 public class SettlementLocation : BaseLocation
 {
-    private static readonly Random _random = new();
 
     /// <summary>
     /// Immediately persist settlement state to world_state in online mode.
@@ -1124,7 +1123,7 @@ public class SettlementLocation : BaseLocation
 
         // Give a random herb
         var herbTypes = Enum.GetValues(typeof(HerbType)).Cast<HerbType>().Where(h => h != HerbType.None).ToArray();
-        var herb = herbTypes[_random.Next(herbTypes.Length)];
+        var herb = herbTypes[Random.Shared.Next(herbTypes.Length)];
 
         // Check if player can carry more
         int currentCount = currentPlayer.GetHerbCount(herb);
@@ -1179,7 +1178,7 @@ public class SettlementLocation : BaseLocation
         }
 
         currentPlayer.Gold -= bet;
-        bool win = _random.NextDouble() < 0.5;
+        bool win = Random.Shared.NextDouble() < 0.5;
 
         if (win)
         {
@@ -1215,7 +1214,7 @@ public class SettlementLocation : BaseLocation
             Loc.Get("settlement.oracle_hint_9"),
         };
 
-        string hint = hints[_random.Next(hints.Length)];
+        string hint = hints[Random.Shared.Next(hints.Length)];
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("");

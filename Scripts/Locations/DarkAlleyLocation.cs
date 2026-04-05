@@ -1578,7 +1578,7 @@ namespace UsurperRemake.Locations
 
             // Get bet amount
             long minBet = 10;
-            long maxBet = Math.Max(minBet, currentPlayer.Gold / 10);
+            long maxBet = Math.Max(minBet, Math.Min(currentPlayer.Gold / 10, (long)currentPlayer.Level * 500));
             if (currentPlayer.Gold < minBet)
             {
                 terminal.SetColor("red");

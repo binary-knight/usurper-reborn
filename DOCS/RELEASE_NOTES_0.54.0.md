@@ -283,3 +283,54 @@ Comprehensive balance audit across player scaling, monster scaling, equipment, e
 - `Localization/hu.json` — Session fatigue keys
 - `Localization/it.json` — Session fatigue keys
 - `Localization/fr.json` — Session fatigue keys
+
+---
+
+## Inn Overhaul
+
+### X-bit the Bartender
+
+New bartender NPC **"X-bit"** — a grizzled ex-adventurer who runs the bar. Talk to him via `[B] Talk to Bartender` for three services:
+- **Buy a Drink** — the classic 5g drink with minor stat effects
+- **Ask for Rumors** — context-sensitive hints based on game state: Old God progress, companion commentary, spouse questions, recent NPC deaths, or tavern wisdom
+- **Ask About Someone** — type an NPC name and X-bit tells you their personality, mood, faction, and who they've been seen with
+
+### Food Variety System
+
+Replaced the old "Order Food" (permanent +5 Stamina for 10g exploit) with 6 dishes offering temporary combat buffs:
+- **Hearty Stew** (15g+) — Restores 10% HP
+- **Grilled Dragon Steak** (50g+) — +10% damage for 5 combats
+- **Elven Honey Bread** (35g+) — +10% defense for 5 combats
+- **Dwarven Iron Rations** (40g+) — +15% max HP for 5 combats
+- **Mystic Mushroom Soup** (45g+) — +15% spell damage for 5 combats
+- **Seth's Mystery Meat** (25g+) — Random effect (any buff above, or food poisoning)
+
+Prices scale with level. One food buff active at a time. Limited to 3 meals per day. Food buffs shown in `/health`.
+
+### Inn Bug Fixes
+
+**Skull & Bones hand display** — Drawn tiles were wiped after each hit due to `playerHand.Clear()` inside the draw loop. Hand now accumulates correctly.
+
+**Seth Able defeats counter persisted** — Lifetime Seth defeats now survive save/load, so the diminishing XP returns system works across sessions.
+
+**Duel counter separated from Seth** — NPC duels at the Inn now use an independent daily counter (3/day) instead of sharing with Seth Able fights.
+
+**Color theme instant apply** — Theme changes in preferences now take effect immediately in MUD streaming mode. Previously required a relog due to AsyncLocal copy-on-write semantics for value types. Fixed by storing theme on SessionContext (matching Language/CompactMode pattern).
+
+### Inn Localization
+
+114 hardcoded English strings converted to `Loc.Get()` keys across: Seth Able combat, gift responses, drinking game, drunk comments, gossip prefixes, companion dialogue, food menu, equipment slots, stat training, gambling tiles, guard names, and bartender dialogue.
+
+### Inn Files Changed
+- `Scripts/Locations/InnLocation.cs` — X-bit bartender (rumors, ask-about, drink); food variety system; Skull & Bones fix; Seth counter persistence; separate duel counter; 114 localized strings
+- `Scripts/Core/Character.cs` — SethDefeatsTotal, InnDuelsToday, MealsToday, FoodBuffType/Combats/Value
+- `Scripts/Systems/SaveDataStructures.cs` — SethDefeatsTotal in PlayerData
+- `Scripts/Systems/SaveSystem.cs` — Serialize SethDefeatsTotal
+- `Scripts/Core/GameEngine.cs` — Deserialize SethDefeatsTotal
+- `Scripts/Systems/DailySystemManager.cs` — Reset InnDuelsToday and MealsToday daily
+- `Scripts/Systems/CombatEngine.cs` — Food buff application (attack/defense/HP) and decrement in both combat paths
+- `Scripts/Systems/SpellSystem.cs` — Mushroom Soup +15% spell damage
+- `Scripts/Locations/BaseLocation.cs` — Food buff in /health Active Buffs
+- `Scripts/UI/ColorTheme.cs` — SessionContext storage instead of AsyncLocal
+- `Scripts/Server/SessionContext.cs` — ColorTheme property
+- `Localization/en.json` — 114 new Inn keys

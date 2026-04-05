@@ -204,6 +204,12 @@ public static class TrainingSystem
             CharacterClass.Warrior => 0,     // Standard
             CharacterClass.Barbarian => 0,   // Instinct over training
             CharacterClass.Jester => 0,      // Learns by doing
+            CharacterClass.MysticShaman => 2, // Spiritual training
+            CharacterClass.Tidesworn => 1,   // Ocean discipline
+            CharacterClass.Wavecaller => 2,  // Harmonic study
+            CharacterClass.Cyclebreaker => 2, // Temporal mastery
+            CharacterClass.Abysswarden => 1, // Prison warden training
+            CharacterClass.Voidreaver => 2,  // Void mastery
             _ => 0
         };
 

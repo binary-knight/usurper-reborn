@@ -157,6 +157,25 @@ public static class MudChatSystem
     }
 
     /// <summary>
+    /// Find a session by character display name or login username.
+    /// Tries character display name first, then falls back to login username.
+    /// </summary>
+    private static PlayerSession? FindSessionByNameOrUsername(string name)
+    {
+        var server = MudServer.Instance;
+        if (server == null) return null;
+
+        // Try character display name first
+        var session = server.ActiveSessions.Values.FirstOrDefault(s =>
+            s.ActiveCharacterName?.Equals(name, StringComparison.OrdinalIgnoreCase) == true);
+        if (session != null) return session;
+
+        // Fall back to login username
+        return server.ActiveSessions.Values.FirstOrDefault(s =>
+            s.Username.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
     /// Returns the display name for a player: character name (not login name).
     /// Gods: "DivineName the Lesser Spirit", others: Name2 → Name1 → login username fallback.
     /// </summary>
@@ -255,14 +274,15 @@ public static class MudChatSystem
             return true;
         }
 
-        // Try to send in-memory first
+        // Try to send in-memory first — resolve by display name or username
         var displayName = GetChatDisplayName(username);
-        var server = MudServer.Instance;
-        if (server != null && server.SendToPlayer(targetName,
-            $"\u001b[35m  {displayName} tells you: {message}\u001b[0m"))
+        var targetSession = FindSessionByNameOrUsername(targetName);
+        if (targetSession != null)
         {
+            targetSession.EnqueueMessage($"\u001b[35m  {displayName} tells you: {message}\u001b[0m");
+            var targetDisplayName = GetSessionDisplayName(targetSession, targetName);
             terminal.SetColor("magenta");
-            terminal.WriteLine($"  You tell {targetName}: {message}");
+            terminal.WriteLine($"  You tell {targetDisplayName}: {message}");
         }
         else
         {
@@ -803,9 +823,8 @@ public static class MudChatSystem
             return true;
         }
 
-        // Find target player
-        var targetSession = server.ActiveSessions.Values
-            .FirstOrDefault(p => p.Username.Equals(targetName, StringComparison.OrdinalIgnoreCase));
+        // Find target player — resolve by display name or username
+        var targetSession = FindSessionByNameOrUsername(targetName);
         if (targetSession == null || !targetSession.IsInGame)
         {
             terminal.SetColor("gray");

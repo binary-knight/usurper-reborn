@@ -689,8 +689,13 @@ public static class SpellSystem
         if (caster.HerbBuffType == (int)HerbType.StarbloomEssence && caster.HerbBuffCombats > 0)
             herbSpellMult = 1.0 + caster.HerbBuffValue;
 
+        // Mystic Mushroom Soup food buff: +15% spell damage
+        double foodSpellMult = 1.0;
+        if (caster.FoodBuffCombats > 0 && caster.FoodBuffType == 4)
+            foodSpellMult = 1.0 + caster.FoodBuffValue;
+
         // Calculate final effect including proficiency bonus
-        double scaledEffect = baseEffect * levelMultiplier * statBonus * variance * proficiencyMult * drugSpellMult * herbSpellMult;
+        double scaledEffect = baseEffect * levelMultiplier * statBonus * variance * proficiencyMult * drugSpellMult * herbSpellMult * foodSpellMult;
 
         return Math.Max(1, (int)scaledEffect);
     }

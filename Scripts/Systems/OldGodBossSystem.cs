@@ -1034,6 +1034,9 @@ namespace UsurperRemake.Systems
 
             await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
 
+            // Moment of silence — let the gravity of salvation settle
+            await UsurperRemake.UI.UIHelper.MomentOfSilence(terminal, 4000);
+
             return new BossEncounterResult
             {
                 Success = true,
@@ -1119,6 +1122,9 @@ namespace UsurperRemake.Systems
             QueueStrangerOldGodEncounter(StrangerContextEvent.OldGodDefeated);
 
             await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+
+            // Moment of silence — the weight of a god's fall
+            await UsurperRemake.UI.UIHelper.MomentOfSilence(terminal, 4000);
 
             // === NOCTURA BETRAYAL — Post-Manwe surprise boss fight ===
             if (boss.Type == OldGodType.Manwe && StoryProgressionSystem.Instance.HasStoryFlag("noctura_ally"))

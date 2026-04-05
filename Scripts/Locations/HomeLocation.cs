@@ -4137,7 +4137,8 @@ public class HomeLocation : BaseLocation
                 var npc = allWorldNPCs.FirstOrDefault(n => n.ID == lover.NPCId);
 
                 // Check IsDead (permanent death) OR !IsAlive (currently at 0 HP)
-                if (npc != null && (npc.IsDead || !npc.IsAlive) && !deadMembers.Contains(npc))
+                // Skip aged death and permadead NPCs (matching spouse path guards)
+                if (npc != null && (npc.IsDead || !npc.IsAlive) && !npc.IsAgedDeath && !npc.IsPermaDead && !deadMembers.Contains(npc))
                 {
                     deadMembers.Add(npc);
                 }
@@ -4291,11 +4292,8 @@ toResurrect.IsDead = false;
         // Force NPC world_state save so equipment survives world-sim reload cycles
         if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
         {
-            _ = Task.Run(async () =>
-            {
-                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                catch { /* best-effort */ }
-            });
+            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("HOME", $"SaveAllSharedState failed after equipment change: {ex.Message}"); }
         }
     }
 
@@ -4331,6 +4329,8 @@ toResurrect.IsDead = false;
             DisplayEquipmentSlot(target, EquipmentSlot.Hands, "Hands");
             DisplayEquipmentSlot(target, EquipmentSlot.Legs, "Legs");
             DisplayEquipmentSlot(target, EquipmentSlot.Feet, "Feet");
+            DisplayEquipmentSlot(target, EquipmentSlot.Waist, "Belt");
+            DisplayEquipmentSlot(target, EquipmentSlot.Face, "Face");
             DisplayEquipmentSlot(target, EquipmentSlot.Cloak, "Cloak");
             DisplayEquipmentSlot(target, EquipmentSlot.Neck, "Neck");
             DisplayEquipmentSlot(target, EquipmentSlot.LFinger, "Left Ring");
@@ -4496,7 +4496,10 @@ toResurrect.IsDead = false;
         else
         {
             // Remove from inventory (find by name)
-            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+            // Two-pass match: first try Name+Attack+ArmorClass for precision, then fallback to name-only
+            var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
+                i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
+                ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
             if (invItem != null)
             {
                 currentPlayer.Inventory.Remove(invItem);

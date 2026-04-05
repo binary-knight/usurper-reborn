@@ -19,19 +19,25 @@ public static class ColorTheme
 {
     /// <summary>
     /// The currently active color theme. Set from player preferences on load.
-    /// In MUD mode this is per-session via AsyncLocal to avoid cross-player bleed.
-    /// (ThreadStatic is unsafe — async tasks can hop threads, causing theme leakage.)
+    /// In MUD mode this is per-session via SessionContext (a shared reference object)
+    /// to avoid cross-player bleed. AsyncLocal was previously used but has copy-on-write
+    /// semantics for value types — theme changes in child async scopes didn't flow back
+    /// to the parent, causing the theme to revert after leaving preferences.
     /// </summary>
-    private static readonly AsyncLocal<ColorThemeType?> _currentAsync = new();
     private static ColorThemeType _currentGlobal = ColorThemeType.Default;
 
     public static ColorThemeType Current
     {
-        get => _currentAsync.Value ?? _currentGlobal;
+        get
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            return ctx != null ? ctx.ColorTheme : _currentGlobal;
+        }
         set
         {
-            if (UsurperRemake.Server.SessionContext.IsActive)
-                _currentAsync.Value = value;
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null)
+                ctx.ColorTheme = value;
             else
                 _currentGlobal = value;
         }

@@ -973,6 +973,7 @@ public class LevelMasterLocation : BaseLocation
                 player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
                 player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
                 player.BaseAgility = Math.Max(1, player.BaseAgility - 1);
+                player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 6);
                 player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 8);
                 break;
             default:
@@ -1130,13 +1131,13 @@ public class LevelMasterLocation : BaseLocation
                 expMana += levelsGained * 10;
                 break;
             case CharacterClass.Voidreaver:
-                expStr  += levelsGained * 5;
-                expInt  += levelsGained * 5;
-                expDex  += levelsGained * 4;
+                expStr  += levelsGained * 4;
+                expInt  += levelsGained * 3;
+                expDex  += levelsGained * 3;
                 expAgi  += levelsGained * 3;
                 expSta  += levelsGained * 2;
-                expHP   += levelsGained * 6;
-                expMana += levelsGained * 12;
+                expHP   += levelsGained * 5;
+                expMana += levelsGained * 10;
                 break;
             case CharacterClass.MysticShaman:
                 expStr  += levelsGained * 2;
@@ -1145,6 +1146,7 @@ public class LevelMasterLocation : BaseLocation
                 expCon  += levelsGained * 2;
                 expSta  += levelsGained * 2;
                 expAgi  += levelsGained;
+                expHP   += levelsGained * 6;
                 expMana += levelsGained * 8;
                 break;
             default:

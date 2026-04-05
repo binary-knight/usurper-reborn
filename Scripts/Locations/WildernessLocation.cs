@@ -12,7 +12,6 @@ using UsurperRemake.BBS;
 /// </summary>
 public class WildernessLocation : BaseLocation
 {
-    private static readonly Random _random = new();
 
     protected override void DisplayLocation()
     {
@@ -175,7 +174,7 @@ public class WildernessLocation : BaseLocation
         await Task.Delay(2000);
 
         // Roll encounter type: 40% combat, 25% foraging, 15% ruins, 10% traveler, 10% shrine
-        int roll = _random.Next(100);
+        int roll = Random.Shared.Next(100);
         if (roll < 40)
             await CombatEncounter(region);
         else if (roll < 65)
@@ -188,7 +187,7 @@ public class WildernessLocation : BaseLocation
             await ShrineEncounter(region);
 
         // Chance to discover something new (10% per trip)
-        if (_random.Next(100) < 10)
+        if (Random.Shared.Next(100) < 10)
             await CheckForDiscovery(region);
     }
 
@@ -198,7 +197,7 @@ public class WildernessLocation : BaseLocation
 
     private async Task CombatEncounter(WildernessRegion region)
     {
-        string monsterName = region.MonsterNames[_random.Next(region.MonsterNames.Length)];
+        string monsterName = region.MonsterNames[Random.Shared.Next(region.MonsterNames.Length)];
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("wilderness.monster_emerges", monsterName, region.Name.ToLower()));
@@ -206,7 +205,7 @@ public class WildernessLocation : BaseLocation
         await Task.Delay(1500);
 
         // Generate monster scaled to player level (capped by region difficulty)
-        int monsterLevel = Math.Max(region.MinLevel, currentPlayer.Level - 2 + _random.Next(5));
+        int monsterLevel = Math.Max(region.MinLevel, currentPlayer.Level - 2 + Random.Shared.Next(5));
         var monster = MonsterGenerator.GenerateMonster(monsterLevel);
         monster.Name = monsterName;
 
@@ -224,7 +223,7 @@ public class WildernessLocation : BaseLocation
         if (result.Outcome == CombatOutcome.Victory)
         {
             // Bonus wilderness gold
-            long bonusGold = (long)(_random.Next(10, 30) * (1 + region.MinLevel / 10.0));
+            long bonusGold = (long)(Random.Shared.Next(10, 30) * (1 + region.MinLevel / 10.0));
             currentPlayer.Gold += bonusGold;
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("wilderness.bonus_gold", bonusGold));
@@ -235,7 +234,7 @@ public class WildernessLocation : BaseLocation
 
     private async Task ForagingEncounter(WildernessRegion region)
     {
-        var result = region.ForagingResults[_random.Next(region.ForagingResults.Length)];
+        var result = region.ForagingResults[Random.Shared.Next(region.ForagingResults.Length)];
 
         terminal.SetColor("green");
         terminal.WriteLine(Loc.Get("wilderness.search_area"));
@@ -346,19 +345,19 @@ public class WildernessLocation : BaseLocation
                 }
                 break;
             case "gold_small":
-                long goldS = 20 * levelScale + _random.Next(20);
+                long goldS = 20 * levelScale + Random.Shared.Next(20);
                 currentPlayer.Gold += goldS;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldS));
                 break;
             case "gold_medium":
-                long goldM = 50 * levelScale + _random.Next(50);
+                long goldM = 50 * levelScale + Random.Shared.Next(50);
                 currentPlayer.Gold += goldM;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldM));
                 break;
             case "gold_large":
-                long goldL = 100 * levelScale + _random.Next(100);
+                long goldL = 100 * levelScale + Random.Shared.Next(100);
                 currentPlayer.Gold += goldL;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldL));
@@ -372,7 +371,7 @@ public class WildernessLocation : BaseLocation
 
     private async Task RuinsEncounter(WildernessRegion region)
     {
-        string ruins = region.RuinsEncounters[_random.Next(region.RuinsEncounters.Length)];
+        string ruins = region.RuinsEncounters[Random.Shared.Next(region.RuinsEncounters.Length)];
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("wilderness.discover_ruins"));
@@ -392,16 +391,16 @@ public class WildernessLocation : BaseLocation
         if (choice.ToUpper() == "S")
         {
             // 60% treasure, 20% trap, 20% nothing
-            int roll = _random.Next(100);
+            int roll = Random.Shared.Next(100);
             if (roll < 60)
             {
-                long gold = 30 + (long)(currentPlayer.Level * 3) + _random.Next(50);
+                long gold = 30 + (long)(currentPlayer.Level * 3) + Random.Shared.Next(50);
                 currentPlayer.Gold += gold;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.ruins_gold_found", gold));
 
                 // Small chance of a healing potion
-                if (_random.Next(100) < 30)
+                if (Random.Shared.Next(100) < 30)
                 {
                     currentPlayer.Healing = Math.Min(currentPlayer.Healing + 1, currentPlayer.MaxPotions);
                     terminal.SetColor("green");
@@ -432,7 +431,7 @@ public class WildernessLocation : BaseLocation
 
     private async Task TravelerEncounter(WildernessRegion region)
     {
-        var traveler = region.TravelerEncounters[_random.Next(region.TravelerEncounters.Length)];
+        var traveler = region.TravelerEncounters[Random.Shared.Next(region.TravelerEncounters.Length)];
 
         terminal.SetColor("cyan");
         terminal.WriteLine(traveler.text);
@@ -447,11 +446,11 @@ public class WildernessLocation : BaseLocation
         if (choice.ToUpper() == "T")
         {
             // Travelers offer random benefits
-            int roll = _random.Next(100);
+            int roll = Random.Shared.Next(100);
             if (roll < 40)
             {
                 // Trade offer
-                long cost = 20 + _random.Next(30);
+                long cost = 20 + Random.Shared.Next(30);
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("wilderness.traveler_sell_potion", traveler.name, cost));
                 terminal.SetColor("bright_yellow");
@@ -513,7 +512,7 @@ public class WildernessLocation : BaseLocation
 
         if (choice.ToUpper() == "P")
         {
-            int roll = _random.Next(100);
+            int roll = Random.Shared.Next(100);
             if (roll < 30)
             {
                 // Heal
@@ -529,7 +528,7 @@ public class WildernessLocation : BaseLocation
             else if (roll < 55)
             {
                 // Small stat buff
-                int stat = _random.Next(3);
+                int stat = Random.Shared.Next(3);
                 terminal.SetColor("bright_cyan");
                 if (stat == 0)
                 {
@@ -584,7 +583,7 @@ public class WildernessLocation : BaseLocation
 
         if (undiscovered.Length == 0) return;
 
-        var discovery = undiscovered[_random.Next(undiscovered.Length)];
+        var discovery = undiscovered[Random.Shared.Next(undiscovered.Length)];
         currentPlayer.WildernessDiscoveries.Add(discovery.Id);
 
         terminal.WriteLine("");

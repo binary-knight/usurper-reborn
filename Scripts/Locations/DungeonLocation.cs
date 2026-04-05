@@ -141,6 +141,9 @@ public class DungeonLocation : BaseLocation
             roomsExploredThisFloor = wasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
             hasCampedThisFloor = false;
 
+            // Reset companion idle comment history so comments can repeat on new dungeon runs
+            CompanionSystem.ResetIdleCommentHistory();
+
             // Track dungeon exploration statistics
             player.Statistics.RecordDungeonLevel(currentDungeonLevel);
 
@@ -3761,7 +3764,7 @@ public class DungeonLocation : BaseLocation
             return Loc.Get("dungeon.objective_more_seals");
         if (story.CollectedSeals.Count < 7)
             return Loc.Get("dungeon.objective_deeper");
-        if (!story.HasStoryFlag("manwe_defeated"))
+        if (!story.HasStoryFlag("manwe_destroyed") && !story.HasStoryFlag("manwe_saved"))
             return Loc.Get("dungeon.objective_face_manwe");
         return Loc.Get("dungeon.objective_ending");
     }
@@ -4312,6 +4315,43 @@ public class DungeonLocation : BaseLocation
                 // knows where they are (especially important for screen reader users)
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dungeon.you_return_room", targetRoom.Name));
+            }
+
+            // 15% chance: companion idle comment while exploring
+            if (teammates.Count > 0 && Random.Shared.Next(100) < 15)
+            {
+                var companionChars = teammates.Where(t =>
+                    t is not NPC && Enum.TryParse<CompanionId>(t.Name2 ?? t.DisplayName, out _)).ToList();
+                if (companionChars.Count == 0)
+                {
+                    // Try by companion system active companions
+                    var activeIds = CompanionSystem.Instance?.GetActiveCompanionIds();
+                    if (activeIds != null && activeIds.Count > 0)
+                    {
+                        var pickId = activeIds[Random.Shared.Next(activeIds.Count)];
+                        var comment = CompanionSystem.GetCompanionIdleComment(pickId, currentDungeonLevel, GetCurrentPlayer(), false);
+                        if (comment != null)
+                        {
+                            terminal.SetColor("dark_cyan");
+                            terminal.WriteLine($"  {comment}");
+                            terminal.SetColor("white");
+                        }
+                    }
+                }
+                else
+                {
+                    var pick = companionChars[Random.Shared.Next(companionChars.Count)];
+                    if (Enum.TryParse<CompanionId>(pick.Name2 ?? pick.DisplayName, out var cId))
+                    {
+                        var comment = CompanionSystem.GetCompanionIdleComment(cId, currentDungeonLevel, GetCurrentPlayer(), false);
+                        if (comment != null)
+                        {
+                            terminal.SetColor("dark_cyan");
+                            terminal.WriteLine($"  {comment}");
+                            terminal.SetColor("white");
+                        }
+                    }
+                }
             }
         }
 
@@ -5062,7 +5102,7 @@ public class DungeonLocation : BaseLocation
             }
 
             // Special handling for Manwe - trigger the full ending sequence (cinematic ending, credits, NG+ offer)
-            if (godType.Value == OldGodType.Manwe && result.Outcome != BossOutcome.Fled)
+            if (godType.Value == OldGodType.Manwe && (result.Outcome == BossOutcome.Defeated || result.Outcome == BossOutcome.Saved || result.Outcome == BossOutcome.Allied))
             {
                 var endingType = EndingsSystem.Instance.DetermineEnding(player);
                 await EndingsSystem.Instance.TriggerEnding(player, endingType, terminal);
@@ -9813,27 +9853,28 @@ public class DungeonLocation : BaseLocation
 
         EquipmentSlot? targetSlot = selectedSlot.Value;
 
-        // Remove from player
-        if (wasEquipped && sourceSlot.HasValue)
-        {
-            currentPlayer.UnequipSlot(sourceSlot.Value);
-            currentPlayer.RecalculateStats();
-        }
-        else
-        {
-            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-            if (invItem != null)
-                currentPlayer.Inventory.Remove(invItem);
-        }
-
         // Track displaced items
         var targetInventoryBefore = target.Inventory.Count;
 
+        // Equip first, then remove from player on success (prevents item loss if equip fails)
         var result = target.EquipItem(selectedItem, targetSlot, out string message);
         target.RecalculateStats();
 
         if (result)
         {
+            // Remove from player AFTER successful equip
+            if (wasEquipped && sourceSlot.HasValue)
+            {
+                currentPlayer.UnequipSlot(sourceSlot.Value);
+                currentPlayer.RecalculateStats();
+            }
+            else
+            {
+                var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+                if (invItem != null)
+                    currentPlayer.Inventory.Remove(invItem);
+            }
+
             // Move displaced items to player inventory
             if (target.Inventory.Count > targetInventoryBefore)
             {
@@ -9857,21 +9898,19 @@ public class DungeonLocation : BaseLocation
             // Sync equipment and save — prevents item loss on disconnect
             if (target.IsCompanion)
                 CompanionSystem.Instance?.SyncCompanionEquipment(target);
-            _ = GameEngine.Instance.SaveCurrentGame();
+            else
+                CombatEngine.SyncNPCTeammateToActiveNPCs(target);
+            SaveSystem.Instance.ResetAutoSaveThrottle();
+            await SaveSystem.Instance.AutoSave(currentPlayer);
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
-                _ = Task.Run(async () =>
-                {
-                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                    catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after equip: {ex.Message}"); }
-                });
+                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+                catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after equip: {ex.Message}"); }
             }
         }
         else
         {
-            // Failed - return item
-            var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(selectedItem);
-            currentPlayer.Inventory.Add(legacyItem);
+            // Failed - item was never removed from player, nothing to return
             terminal.SetColor("red");
             terminal.WriteLine($"  Failed: {message}");
         }
@@ -9944,14 +9983,14 @@ public class DungeonLocation : BaseLocation
         // Sync equipment and save — prevents item loss on disconnect
         if (target.IsCompanion)
             CompanionSystem.Instance?.SyncCompanionEquipment(target);
-        _ = GameEngine.Instance.SaveCurrentGame();
+        else
+            CombatEngine.SyncNPCTeammateToActiveNPCs(target);
+        SaveSystem.Instance.ResetAutoSaveThrottle();
+        await SaveSystem.Instance.AutoSave(currentPlayer);
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
-            _ = Task.Run(async () =>
-            {
-                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after unequip: {ex.Message}"); }
-            });
+            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after unequip: {ex.Message}"); }
         }
 
         terminal.WriteLine("");

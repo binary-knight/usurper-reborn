@@ -17,7 +17,7 @@ public class InnLocation : BaseLocation
     private NPC sethAble = null!;
     private bool sethAbleAvailable = true;
     private int sethFightsToday = 0;     // Daily fight counter - max 3 per day
-    private int sethDefeatsTotal = 0;    // Total times player has beaten Seth this session
+    // currentPlayer.SethDefeatsTotal removed — now persisted on Character.SethDefeatsTotal
     private int lastSethFightDay = -1;   // Track which game day the fights counter is for
     
     public InnLocation() : base(
@@ -346,6 +346,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.activities"));
             terminal.WriteLine("");
             WriteSRMenuOption("D", $"{Loc.Get("inn.drink")} (5 {Loc.Get("status.gold_label")})");
+            WriteSRMenuOption("B", Loc.Get("inn.bartender"));
             WriteSRMenuOption("T", Loc.Get("inn.talk"));
             WriteSRMenuOption("F", Loc.Get("inn.fight_seth"));
             WriteSRMenuOption("G", Loc.Get("inn.drinking_game"));
@@ -396,72 +397,33 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.activities"));
             terminal.WriteLine("");
 
-            // Row 1
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("D");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("inn.drink")} (5 {Loc.Get("status.gold_label")})      ");
+            // Two-column menu with dynamic padding
+            void InnMenuRow(string key1, string label1, string key2, string label2)
+            {
+                const int col = 34;
+                string left = $"[{key1}] {label1}";
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(key1);
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.Write(label1.PadRight(col - key1.Length - 4));
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(key2);
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine(label2);
+            }
 
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("T");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("inn.talk"));
-
-            // Row 2
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("F");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("inn.fight_seth")}       ");
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("G");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("inn.drinking_game"));
-
-            // Row 3
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("U");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("inn.gossip")}          ");
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("E");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("inn.rest"));
-
-            // Row 4
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("O");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine($"{Loc.Get("inn.order_food")} (10 {Loc.Get("status.gold_label")})");
+            InnMenuRow("D", $"{Loc.Get("inn.drink")} (5 {Loc.Get("status.gold_label")})", "B", Loc.Get("inn.bartender"));
+            InnMenuRow("T", Loc.Get("inn.talk"), "F", Loc.Get("inn.fight_seth"));
+            InnMenuRow("G", Loc.Get("inn.drinking_game"), "U", Loc.Get("inn.gossip"));
+            InnMenuRow("E", Loc.Get("inn.rest"), "O", Loc.Get("inn.order_food"));
             terminal.WriteLine("");
 
             if (recruitableCompanions.Any())
@@ -640,8 +602,8 @@ public class InnLocation : BaseLocation
         // Menu rows
         terminal.SetColor("yellow");
         terminal.WriteLine($" {Loc.Get("inn.activities")}");
-        ShowBBSMenuRow(("D", "bright_yellow", Loc.Get("inn.bbs_drink")), ("F", "bright_yellow", Loc.Get("inn.bbs_seth")), ("T", "bright_yellow", Loc.Get("inn.bbs_talk")), ("G", "bright_yellow", Loc.Get("inn.bbs_drinking_game")));
-        ShowBBSMenuRow(("U", "bright_yellow", Loc.Get("inn.bbs_gossip")), ("E", "bright_yellow", Loc.Get("inn.bbs_rest")), ("O", "bright_yellow", Loc.Get("inn.bbs_food")));
+        ShowBBSMenuRow(("D", "bright_yellow", Loc.Get("inn.bbs_drink")), ("B", "bright_yellow", Loc.Get("inn.bbs_bartender")), ("F", "bright_yellow", Loc.Get("inn.bbs_seth")), ("T", "bright_yellow", Loc.Get("inn.bbs_talk")));
+        ShowBBSMenuRow(("G", "bright_yellow", Loc.Get("inn.bbs_drinking_game")), ("U", "bright_yellow", Loc.Get("inn.bbs_gossip")), ("E", "bright_yellow", Loc.Get("inn.bbs_rest")), ("O", "bright_yellow", Loc.Get("inn.bbs_food")));
 
         terminal.SetColor("cyan");
         terminal.WriteLine($" {Loc.Get("inn.special_areas")}");
@@ -650,9 +612,9 @@ public class InnLocation : BaseLocation
         {
             var items = new List<(string, string, string)>();
             if (recruitableCompanions.Any())
-                items.Add(("A", "bright_yellow", $"Stranger({recruitableCompanions.Count})"));
+                items.Add(("A", "bright_yellow", Loc.Get("inn.bbs_stranger", recruitableCompanions.Count)));
             if (recruitedCompanions.Any())
-                items.Add(("P", "bright_yellow", $"Party({recruitedCompanions.Count})"));
+                items.Add(("P", "bright_yellow", Loc.Get("inn.bbs_party", recruitedCompanions.Count)));
             ShowBBSMenuRow(items.ToArray());
         }
 
@@ -660,18 +622,18 @@ public class InnLocation : BaseLocation
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
             long roomCost = (long)(currentPlayer.Level * GameConfig.InnRoomCostPerLevel);
-            ShowBBSMenuRow(("N", "bright_yellow", $"Room({roomCost}g)"), ("K", "bright_yellow", "Attack Sleeper"));
+            ShowBBSMenuRow(("N", "bright_yellow", Loc.Get("inn.bbs_room", roomCost)), ("K", "bright_yellow", Loc.Get("inn.bbs_attack_sleeper")));
         }
 
         // Single-player: Sleep/Wait option
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
         {
-            string zLabel = DailySystemManager.CanRestForNight(currentPlayer) ? "Sleep" : "Wait";
-            ShowBBSMenuRow(("Z", "bright_yellow", zLabel), ("R", "bright_yellow", "eturn"));
+            string zLabel = DailySystemManager.CanRestForNight(currentPlayer) ? Loc.Get("inn.bbs_sleep") : Loc.Get("inn.bbs_wait");
+            ShowBBSMenuRow(("Z", "bright_yellow", zLabel), ("R", "bright_yellow", Loc.Get("inn.return")));
         }
         else
         {
-            ShowBBSMenuRow(("R", "bright_yellow", "eturn"));
+            ShowBBSMenuRow(("R", "bright_yellow", Loc.Get("inn.return")));
         }
 
         // Footer: status + quick commands
@@ -694,7 +656,11 @@ public class InnLocation : BaseLocation
             case "D":
                 await BuyDrink();
                 return false;
-                
+
+            case "B":
+                await TalkToBartender();
+                return false;
+
             case "F":
                 await ChallengeSethAble();
                 return false;
@@ -800,7 +766,7 @@ public class InnLocation : BaseLocation
         }
 
         // Show tax breakdown
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Drink", drinkBasePrice);
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("inn.tax_drink"), drinkBasePrice);
 
         currentPlayer.Gold -= drinkTotalWithTax;
         CityControlSystem.Instance.ProcessSaleTax(drinkBasePrice);
@@ -879,11 +845,11 @@ public class InnLocation : BaseLocation
         // Seth's drunken response
         var responses = new[]
         {
-            "*hiccup* You want a piece of me?!",
-            "You lookin' at me funny, stranger?",
-            "*burp* Think you can take the great Seth Able?",
-            "I'll show you what a REAL fighter can do!",
-            "*sways* Come on then, if you think you're hard enough!"
+            Loc.Get("inn.seth_taunt1"),
+            Loc.Get("inn.seth_taunt2"),
+            Loc.Get("inn.seth_taunt3"),
+            Loc.Get("inn.seth_taunt4"),
+            Loc.Get("inn.seth_taunt5"),
         };
 
         terminal.SetColor("yellow");
@@ -960,11 +926,11 @@ public class InnLocation : BaseLocation
             hps: sethHP,
             strength: sethStr,
             defence: sethDef,
-            phrase: "You lookin' at me funny?!",
+            phrase: Loc.Get("inn.seth_phrase"),
             grabweap: false,
             grabarm: false,
-            weapon: "Massive Fists",
-            armor: "Thick Skin",
+            weapon: Loc.Get("inn.seth_weapon"),
+            armor: Loc.Get("inn.seth_armor"),
             poisoned: false,
             disease: false,
             punch: sethPunch,
@@ -998,11 +964,11 @@ public class InnLocation : BaseLocation
         switch (result.Outcome)
         {
             case CombatOutcome.Victory:
-                sethDefeatsTotal++;
+                currentPlayer.SethDefeatsTotal++;
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("");
 
-                if (sethDefeatsTotal == 1)
+                if (currentPlayer.SethDefeatsTotal == 1)
                 {
                     terminal.WriteLine(Loc.Get("inn.seth_incredible"));
                     terminal.WriteLine(Loc.Get("inn.seth_shocked_silence"));
@@ -1027,7 +993,7 @@ public class InnLocation : BaseLocation
                 long goldReward = 50 + currentPlayer.Level * 5;
 
                 // Diminishing returns: halve rewards after 3rd lifetime win
-                if (sethDefeatsTotal > 3)
+                if (currentPlayer.SethDefeatsTotal > 3)
                 {
                     xpReward /= 2;
                     goldReward /= 2;
@@ -1128,7 +1094,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(IsScreenReader ? $"0. {Loc.Get("inn.return_to_menu")}" : $"[0] {Loc.Get("inn.return_to_menu")}");
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInput($"Choose (0-{displayCount}): ");
+        var choice = await terminal.GetInput(Loc.Get("inn.choose_npc_prompt", displayCount));
 
         if (int.TryParse(choice, out int npcIndex) && npcIndex > 0 && npcIndex <= displayCount)
         {
@@ -1250,9 +1216,9 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.challenging_npc", npc.Name2));
         terminal.WriteLine("");
 
-        // Daily duel limit — prevent XP farming by dueling the same NPCs repeatedly
+        // Daily duel limit — prevent XP farming by dueling the same NPCs repeatedly (separate from Seth fights)
         const int maxDuelsPerDay = 3;
-        if (currentPlayer.SethFightsToday >= maxDuelsPerDay)
+        if (currentPlayer.InnDuelsToday >= maxDuelsPerDay)
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("inn.too_many_duels"));
@@ -1291,11 +1257,11 @@ public class InnLocation : BaseLocation
             hps: npc.HP,
             strength: npc.Strength,
             defence: npc.Defence,
-            phrase: $"{npc.Name2} readies for battle!",
+            phrase: Loc.Get("inn.npc_readies", npc.Name2),
             grabweap: false,
             grabarm: false,
-            weapon: "Weapon",
-            armor: "Armor",
+            weapon: Loc.Get("inn.npc_weapon"),
+            armor: Loc.Get("inn.npc_armor"),
             poisoned: false,
             disease: false,
             punch: npc.Strength / 2,
@@ -1327,7 +1293,7 @@ public class InnLocation : BaseLocation
 
             // XP already awarded by combat engine — no double reward
             currentPlayer.PKills++;
-            currentPlayer.SethFightsToday++; // Count toward daily duel limit
+            currentPlayer.InnDuelsToday++; // Count toward daily NPC duel limit (separate from Seth fights)
 
             // Update relationship negatively
             RelationshipSystem.UpdateRelationship(currentPlayer, npc, -1, 5, false, false);
@@ -1336,7 +1302,7 @@ public class InnLocation : BaseLocation
             npc.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.Defeated,
-                Description = $"Defeated in a tavern duel by {currentPlayer.Name2}",
+                Description = Loc.Get("inn.memory_defeated_duel", currentPlayer.Name2),
                 InvolvedCharacter = currentPlayer.Name2,
                 Importance = 0.8f,
                 EmotionalImpact = -0.7f,
@@ -1344,7 +1310,7 @@ public class InnLocation : BaseLocation
             });
 
             // Generate news
-            NewsSystem.Instance?.Newsy(true, $"{currentPlayer.Name} defeated {npc.Name2} in a tavern brawl!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("inn.news_defeated_brawl", currentPlayer.Name, npc.Name2));
         }
         else if (result.Outcome == CombatOutcome.PlayerDied)
         {
@@ -1379,9 +1345,9 @@ public class InnLocation : BaseLocation
 
         var random = Random.Shared;
         var responses = new[] {
-            $"{npc.Name2}'s eyes light up. \"For me? How thoughtful!\"",
-            $"{npc.Name2} accepts the gift graciously. \"You're too kind.\"",
-            $"{npc.Name2} smiles broadly. \"I won't forget this kindness.\"",
+            Loc.Get("inn.gift_response1", npc.Name2),
+            Loc.Get("inn.gift_response2", npc.Name2),
+            Loc.Get("inn.gift_response3", npc.Name2),
         };
 
         terminal.SetColor("white");
@@ -1490,16 +1456,16 @@ public class InnLocation : BaseLocation
         // Show opponents joining
         var howdyLines = new[]
         {
-            " accepts your challenge! \"I need to show you who's the master!\"",
-            " sits down and says: \"I'm in! I can't see any competition here though...\"",
-            " sits down and stares at you intensely...",
-            " sits down and says: \"I feel sorry for you, {0}!\"",
-            " sits down and mutters something you can't hear.",
-            " sits down and says: \"Are you ready to lose, {0}!? Haha!\"",
-            " sits down and says: \"Make room for me, you cry-babies!\"",
-            " sits down and says: \"I can't lose!\"",
-            " sits down and says: \"You are looking at the current Beer Champion!\"",
-            " sits down without saying a word....",
+            Loc.Get("inn.drinking_howdy1"),
+            Loc.Get("inn.drinking_howdy2"),
+            Loc.Get("inn.drinking_howdy3"),
+            Loc.Get("inn.drinking_howdy4"),
+            Loc.Get("inn.drinking_howdy5"),
+            Loc.Get("inn.drinking_howdy6"),
+            Loc.Get("inn.drinking_howdy7"),
+            Loc.Get("inn.drinking_howdy8"),
+            Loc.Get("inn.drinking_howdy9"),
+            Loc.Get("inn.drinking_howdy10"),
         };
 
         foreach (var npc in allNPCs)
@@ -1550,24 +1516,24 @@ public class InnLocation : BaseLocation
         string drinkName;
         int drinkStrength;
         string drinkReaction;
-        var drinkChoice = (await terminal.GetInput("  Your choice: ")).Trim().ToUpperInvariant();
+        var drinkChoice = (await GetChoice()).Trim().ToUpperInvariant();
 
         switch (drinkChoice)
         {
             case "S":
-                drinkName = "Stout";
+                drinkName = Loc.Get("inn.drinking_drink_stout");
                 drinkStrength = 3;
-                drinkReaction = "Your choice seems to have made everybody content...";
+                drinkReaction = Loc.Get("inn.drinking_reaction_stout");
                 break;
             case "K":
-                drinkName = "Seth's Bomber";
+                drinkName = Loc.Get("inn.drinking_drink_bomber");
                 drinkStrength = 6;
-                drinkReaction = "There is a buzz of wonder in the crowded bar...";
+                drinkReaction = Loc.Get("inn.drinking_reaction_bomber");
                 break;
             default: // A or anything else
-                drinkName = "Ale";
+                drinkName = Loc.Get("inn.drinking_drink_ale");
                 drinkStrength = 2;
-                drinkReaction = "\"That was a wimpy choice!\", someone shouts from the back.";
+                drinkReaction = Loc.Get("inn.drinking_reaction_ale");
                 break;
         }
 
@@ -1891,21 +1857,21 @@ public class InnLocation : BaseLocation
     /// </summary>
     private static string GetDrunkComment(long soberness)
     {
-        if (soberness <= 0) return "*Blind drunk, out of competition*";
-        if (soberness <= 1) return "Burp. WhheramIi?3$...???";
-        if (soberness <= 4) return "Hihiii! I can see that everybody has a twin!";
-        if (soberness <= 8) return "Gosh! That floor IS REALLY moving!";
-        if (soberness <= 12) return "Stand still you rats! Why is the room spinning!?";
-        if (soberness <= 15) return "I'm a little dizzy, that's all!";
-        if (soberness <= 18) return "That beer hasn't got to me yet!";
-        if (soberness <= 24) return "I'm fine, but where is the bathroom please!";
-        if (soberness <= 30) return "And a happy new year to ya all! (burp..)";
-        if (soberness <= 35) return "Gimme another one, Bartender!";
-        if (soberness <= 40) return "Ha! I'm unbeatable!";
-        if (soberness <= 50) return "Sober as a rock...";
-        if (soberness <= 55) return "A clear and steady mind...";
-        if (soberness <= 60) return "Refill please!";
-        return "This is boriiiing... (yawn)";
+        if (soberness <= 0) return Loc.Get("inn.drunk_blind");
+        if (soberness <= 1) return Loc.Get("inn.drunk_level1");
+        if (soberness <= 4) return Loc.Get("inn.drunk_level4");
+        if (soberness <= 8) return Loc.Get("inn.drunk_level8");
+        if (soberness <= 12) return Loc.Get("inn.drunk_level12");
+        if (soberness <= 15) return Loc.Get("inn.drunk_level15");
+        if (soberness <= 18) return Loc.Get("inn.drunk_level18");
+        if (soberness <= 24) return Loc.Get("inn.drunk_level24");
+        if (soberness <= 30) return Loc.Get("inn.drunk_level30");
+        if (soberness <= 35) return Loc.Get("inn.drunk_level35");
+        if (soberness <= 40) return Loc.Get("inn.drunk_level40");
+        if (soberness <= 50) return Loc.Get("inn.drunk_level50");
+        if (soberness <= 55) return Loc.Get("inn.drunk_level55");
+        if (soberness <= 60) return Loc.Get("inn.drunk_level60");
+        return Loc.Get("inn.drunk_level_high");
     }
     
     /// <summary>
@@ -1927,13 +1893,13 @@ public class InnLocation : BaseLocation
         {
             var gossipPrefixes = new[]
             {
-                "\"Did you hear?",
-                "\"Word around town is that",
-                "\"I heard from a friend that",
-                "\"Someone was saying",
-                "\"You won't believe this, but",
-                "\"The talk of the town is that",
-                "\"Between you and me,",
+                Loc.Get("inn.gossip_prefix1"),
+                Loc.Get("inn.gossip_prefix2"),
+                Loc.Get("inn.gossip_prefix3"),
+                Loc.Get("inn.gossip_prefix4"),
+                Loc.Get("inn.gossip_prefix5"),
+                Loc.Get("inn.gossip_prefix6"),
+                Loc.Get("inn.gossip_prefix7"),
             };
 
             foreach (var item in gossip)
@@ -1965,11 +1931,11 @@ public class InnLocation : BaseLocation
             // Fallback to static rumors when no simulation events exist yet
             var staticRumors = new[]
             {
-                "\"They say the King is planning to increase the royal guard...\"",
-                "\"Word is that someone found a magical sword in the dungeons last week.\"",
-                "\"The priests at the temple are worried about strange omens.\"",
-                "\"A new monster has been spotted in the lower dungeon levels.\"",
-                "\"The weapon shop is expecting a shipment of rare items soon.\"",
+                Loc.Get("inn.static_rumor1"),
+                Loc.Get("inn.static_rumor2"),
+                Loc.Get("inn.static_rumor3"),
+                Loc.Get("inn.static_rumor4"),
+                Loc.Get("inn.static_rumor5"),
             };
 
             terminal.SetColor("white");
@@ -1982,8 +1948,322 @@ public class InnLocation : BaseLocation
 
         await terminal.PressAnyKey();
     }
-    
-    
+
+    /// <summary>
+    /// Talk to X-bit, the bartender. Offers drinks, rumors, and NPC intel.
+    /// </summary>
+    private async Task TalkToBartender()
+    {
+        terminal.ClearScreen();
+        WriteSectionHeader(Loc.Get("inn.bartender_header"), "bright_yellow");
+        terminal.WriteLine("");
+
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("inn.bartender_desc"));
+        terminal.WriteLine("");
+
+        // Random greeting
+        var greetings = new[]
+        {
+            Loc.Get("inn.bartender_greeting1"),
+            Loc.Get("inn.bartender_greeting2"),
+            Loc.Get("inn.bartender_greeting3"),
+        };
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"{Loc.Get("inn.bartender_name")}: {greetings[Random.Shared.Next(greetings.Length)]}");
+        terminal.WriteLine("");
+
+        // Menu
+        if (IsScreenReader)
+        {
+            WriteSRMenuOption("1", Loc.Get("inn.bartender_option_drink"));
+            WriteSRMenuOption("2", Loc.Get("inn.bartender_option_rumors"));
+            WriteSRMenuOption("3", Loc.Get("inn.bartender_option_ask_about"));
+            WriteSRMenuOption("0", Loc.Get("inn.bartender_option_leave"));
+        }
+        else
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("1");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("inn.bartender_option_drink"));
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("2");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("inn.bartender_option_rumors"));
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("3");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("inn.bartender_option_ask_about"));
+
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("0");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("inn.bartender_option_leave"));
+        }
+        terminal.WriteLine("");
+
+        var choice = (await GetChoice()).Trim();
+
+        switch (choice)
+        {
+            case "1":
+                await BuyDrink();
+                break;
+            case "2":
+                await BartenderRumors();
+                break;
+            case "3":
+                await BartenderAskAbout();
+                break;
+            default:
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Bartender shares a rumor based on game state.
+    /// </summary>
+    private async Task BartenderRumors()
+    {
+        terminal.ClearScreen();
+        WriteSectionHeader(Loc.Get("inn.bartender_header"), "bright_yellow");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_yellow");
+        string rumor = GetBartenderRumor();
+        terminal.WriteLine($"{Loc.Get("inn.bartender_name")}: {rumor}");
+        terminal.WriteLine("");
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Picks a context-sensitive rumor from the bartender.
+    /// Priority: Old Gods -> companions -> marriage -> NPC death -> random wisdom.
+    /// </summary>
+    private string GetBartenderRumor()
+    {
+        var story = StoryProgressionSystem.Instance;
+
+        // Check Old God progression
+        if (story != null)
+        {
+            // Map gods to their floors in order
+            var godFloorMap = new (OldGodType God, int Floor, string Name)[]
+            {
+                (OldGodType.Maelketh, 25, "Maelketh"),
+                (OldGodType.Veloura, 40, "Veloura"),
+                (OldGodType.Thorgrim, 55, "Thorgrim"),
+                (OldGodType.Noctura, 70, "Noctura"),
+                (OldGodType.Aurelion, 85, "Aurelion"),
+                (OldGodType.Terravok, 95, "Terravok"),
+                (OldGodType.Manwe, 100, "Manwe"),
+            };
+
+            bool anyDefeated = false;
+            foreach (var entry in godFloorMap)
+            {
+                if (story.OldGodStates.TryGetValue(entry.God, out var state) && state.Status == GodStatus.Defeated)
+                {
+                    anyDefeated = true;
+                    continue;
+                }
+
+                // Found the next undefeated god
+                if (anyDefeated)
+                {
+                    // Hint about the next god
+                    return Loc.Get("inn.bartender_rumor_next_god", entry.Floor, entry.Name);
+                }
+                else
+                {
+                    // No gods defeated yet -- hint about floor 25
+                    return Loc.Get("inn.bartender_rumor_floor25");
+                }
+            }
+        }
+
+        // Check for recruited companions
+        var companions = CompanionSystem.Instance?.GetRecruitedCompanions()?.ToList();
+        if (companions != null && companions.Count > 0)
+        {
+            // Pick a random recruited companion to comment on
+            var comp = companions[Random.Shared.Next(companions.Count)];
+            string key = comp.Id switch
+            {
+                CompanionId.Aldric => "inn.bartender_rumor_companion_aldric",
+                CompanionId.Vex => "inn.bartender_rumor_companion_vex",
+                CompanionId.Lyris => "inn.bartender_rumor_companion_lyris",
+                CompanionId.Mira => "inn.bartender_rumor_companion_mira",
+                CompanionId.Melodia => "inn.bartender_rumor_companion_melodia",
+                _ => "inn.bartender_rumor_wisdom1",
+            };
+            return Loc.Get(key);
+        }
+
+        // Check for marriage
+        if (currentPlayer.IsMarried && !string.IsNullOrEmpty(currentPlayer.SpouseName))
+        {
+            return Loc.Get("inn.bartender_rumor_married", currentPlayer.SpouseName);
+        }
+
+        // Check for recent NPC death
+        var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (npcs != null)
+        {
+            var recentlyDead = npcs.FirstOrDefault(n => n.IsDead);
+            if (recentlyDead != null)
+            {
+                return Loc.Get("inn.bartender_rumor_death", recentlyDead.Name2);
+            }
+        }
+
+        // Random tavern wisdom
+        var wisdomKeys = new[]
+        {
+            Loc.Get("inn.bartender_rumor_wisdom1"),
+            Loc.Get("inn.bartender_rumor_wisdom2"),
+            Loc.Get("inn.bartender_rumor_wisdom3"),
+            Loc.Get("inn.bartender_rumor_wisdom4"),
+            Loc.Get("inn.bartender_rumor_wisdom5"),
+            Loc.Get("inn.bartender_rumor_wisdom6"),
+        };
+        return wisdomKeys[Random.Shared.Next(wisdomKeys.Length)];
+    }
+
+    /// <summary>
+    /// Bartender shares what he knows about a named NPC.
+    /// </summary>
+    private async Task BartenderAskAbout()
+    {
+        terminal.ClearScreen();
+        WriteSectionHeader(Loc.Get("inn.bartender_header"), "bright_yellow");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        var nameInput = (await terminal.GetInput(Loc.Get("inn.bartender_ask_prompt"))).Trim();
+
+        if (string.IsNullOrWhiteSpace(nameInput))
+            return;
+
+        terminal.WriteLine("");
+
+        // Special case: asking about Seth Able
+        if (nameInput.Equals("Seth", StringComparison.OrdinalIgnoreCase) ||
+            nameInput.Equals("Seth Able", StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"{Loc.Get("inn.bartender_name")}: {Loc.Get("inn.bartender_ask_seth")}");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Special case: asking about the bartender
+        if (nameInput.Equals("X-bit", StringComparison.OrdinalIgnoreCase) ||
+            nameInput.Equals("Xbit", StringComparison.OrdinalIgnoreCase) ||
+            nameInput.Equals("Bartender", StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"{Loc.Get("inn.bartender_name")}: {Loc.Get("inn.bartender_ask_self")}");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Look up the NPC
+        var npc = NPCSpawnSystem.Instance?.GetNPCByName(nameInput, includeDead: true);
+
+        if (npc == null)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"{Loc.Get("inn.bartender_name")}: {Loc.Get("inn.bartender_ask_nobody")}");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // NPC found -- bartender shares info
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"{Loc.Get("inn.bartender_name")}: {Loc.Get("inn.bartender_ask_name", npc.Name2)}");
+        terminal.WriteLine("");
+
+        // Check if dead
+        if (npc.IsDead)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("inn.bartender_ask_dead", npc.Name2)}");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Class and level
+        string archetype = !string.IsNullOrEmpty(npc.Archetype) ? Loc.Get("inn.bartender_ask_archetype", npc.Archetype) : "";
+        terminal.SetColor("white");
+        terminal.WriteLine($"  {Loc.Get("inn.bartender_ask_class", npc.ClassName, npc.Level, archetype)}");
+
+        // Faction
+        if (npc.NPCFaction != null)
+        {
+            string factionLine = npc.NPCFaction.Value switch
+            {
+                Faction.TheCrown => Loc.Get("inn.bartender_ask_faction_crown"),
+                Faction.TheShadows => Loc.Get("inn.bartender_ask_faction_shadows"),
+                Faction.TheFaith => Loc.Get("inn.bartender_ask_faction_faith"),
+                _ => Loc.Get("inn.bartender_ask_no_faction"),
+            };
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {factionLine}");
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("inn.bartender_ask_no_faction")}");
+        }
+
+        // Location
+        if (!string.IsNullOrEmpty(npc.CurrentLocation))
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine($"  {Loc.Get("inn.bartender_ask_location", npc.CurrentLocation)}");
+        }
+
+        // Mood
+        string moodLine;
+        if (npc.Darkness > npc.Chivalry + 200)
+            moodLine = Loc.Get("inn.bartender_ask_mood_dark");
+        else if (npc.Chivalry > npc.Darkness + 200)
+            moodLine = Loc.Get("inn.bartender_ask_mood_bright");
+        else
+            moodLine = Loc.Get("inn.bartender_ask_mood_normal");
+
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {moodLine}");
+        terminal.WriteLine("");
+
+        await terminal.PressAnyKey();
+    }
+
     /// <summary>
     /// Rest at table for minor healing
     /// </summary>
@@ -2184,38 +2464,231 @@ public class InnLocation : BaseLocation
     }
 
     /// <summary>
-    /// Order food for stamina boost
+    /// Order food — multiple dishes with temporary combat buffs (replaces old +5 stamina exploit).
+    /// Only one food buff active at a time; limit 3 meals per day.
+    /// Prices scale with level: basePrice + level * 2.
     /// </summary>
     private async Task OrderFood()
     {
-        long mealBasePrice = 10;
-        var (mealKingTax, mealCityTax, mealTotalWithTax) = CityControlSystem.CalculateTaxedPrice(mealBasePrice);
+        const int maxMealsPerDay = 3;
+        if (currentPlayer.MealsToday >= maxMealsPerDay)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("The bartender shakes his head. \"You've eaten enough for today, friend.\"");
+            await terminal.PressAnyKey();
+            return;
+        }
 
-        if (currentPlayer.Gold < mealTotalWithTax)
+        int level = currentPlayer.Level;
+
+        // Base prices scale with level
+        long priceStew = 15 + level * 2;
+        long priceDragonSteak = 50 + level * 2;
+        long priceHoneyBread = 35 + level * 2;
+        long priceIronRations = 40 + level * 2;
+        long priceMushroomSoup = 45 + level * 2;
+        long priceMysteryMeat = 25 + level * 2;
+
+        terminal.ClearScreen();
+        WriteBoxHeader(Loc.Get("inn.food_header"), "bright_yellow");
+        terminal.WriteLine("");
+
+        if (currentPlayer.HasActiveFoodBuff)
+        {
+            string activeName = currentPlayer.FoodBuffType switch
+            {
+                1 => Loc.Get("inn.food_name_dragon_steak"), 2 => Loc.Get("inn.food_name_honey_bread"), 3 => Loc.Get("inn.food_name_iron_rations"),
+                4 => Loc.Get("inn.food_name_mushroom_soup"), 5 => Loc.Get("inn.food_name_food_poisoning"), _ => Loc.Get("inn.food_name_food")
+            };
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("inn.food_active_buff", activeName, currentPlayer.FoodBuffCombats));
+            terminal.WriteLine(Loc.Get("inn.food_replace_warning"));
+            terminal.WriteLine("");
+        }
+
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("inn.food_meals_remaining", maxMealsPerDay - currentPlayer.MealsToday));
+        terminal.WriteLine("");
+
+        // Menu
+        terminal.SetColor("bright_cyan");
+        terminal.Write("  [1] "); terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("inn.food_menu_stew", priceStew));
+        terminal.SetColor("bright_cyan");
+        terminal.Write("  [2] "); terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("inn.food_menu_dragon_steak", priceDragonSteak));
+        terminal.SetColor("bright_cyan");
+        terminal.Write("  [3] "); terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("inn.food_menu_honey_bread", priceHoneyBread));
+        terminal.SetColor("bright_cyan");
+        terminal.Write("  [4] "); terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("inn.food_menu_iron_rations", priceIronRations));
+        terminal.SetColor("bright_cyan");
+        terminal.Write("  [5] "); terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("inn.food_menu_mushroom_soup", priceMushroomSoup));
+        terminal.SetColor("bright_cyan");
+        terminal.Write("  [6] "); terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("inn.food_menu_mystery_meat", priceMysteryMeat));
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.Write("  [R] "); terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("inn.food_return"));
+        terminal.WriteLine("");
+
+        string choice = await GetChoice();
+        if (string.IsNullOrWhiteSpace(choice) || choice.ToUpper() == "R") return;
+
+        long basePrice;
+        string dishName;
+        int buffType = 0;
+        int buffCombats = 5;
+        float buffValue = 0f;
+        bool isHealOnly = false;
+
+        switch (choice)
+        {
+            case "1":
+                basePrice = priceStew;
+                dishName = Loc.Get("inn.food_name_stew");
+                isHealOnly = true;
+                break;
+            case "2":
+                basePrice = priceDragonSteak;
+                dishName = Loc.Get("inn.food_name_dragon_steak");
+                buffType = 1; // +damage
+                buffValue = 0.10f;
+                break;
+            case "3":
+                basePrice = priceHoneyBread;
+                dishName = Loc.Get("inn.food_name_honey_bread");
+                buffType = 2; // +defense
+                buffValue = 0.10f;
+                break;
+            case "4":
+                basePrice = priceIronRations;
+                dishName = Loc.Get("inn.food_name_iron_rations");
+                buffType = 3; // +maxHP
+                buffValue = 0.15f;
+                break;
+            case "5":
+                basePrice = priceMushroomSoup;
+                dishName = Loc.Get("inn.food_name_mushroom_soup");
+                buffType = 4; // +spell damage
+                buffValue = 0.15f;
+                break;
+            case "6":
+                basePrice = priceMysteryMeat;
+                dishName = Loc.Get("inn.food_name_mystery_meat");
+                // Random effect resolved after purchase
+                break;
+            default:
+                return;
+        }
+
+        var (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(basePrice);
+
+        if (currentPlayer.Gold < totalWithTax)
         {
             terminal.WriteLine(Loc.Get("ui.not_enough_gold_meal"), "red");
             await Task.Delay(2000);
             return;
         }
 
-        // Show tax breakdown
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Meal", mealBasePrice);
+        // Show tax breakdown and deduct gold
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, dishName, basePrice);
+        currentPlayer.Gold -= totalWithTax;
+        CityControlSystem.Instance.ProcessSaleTax(basePrice);
+        currentPlayer.Statistics?.RecordGoldSpent(totalWithTax);
+        currentPlayer.MealsToday++;
 
-        currentPlayer.Gold -= mealTotalWithTax;
-        CityControlSystem.Instance.ProcessSaleTax(mealBasePrice);
-        
-        terminal.WriteLine(Loc.Get("inn.food_hearty_meal"), "green");
-        terminal.WriteLine(Loc.Get("inn.food_stamina_boost"));
-        
-        currentPlayer.Stamina += 5;
-        var healing = Math.Min(15, currentPlayer.MaxHP - currentPlayer.HP);
-        if (healing > 0)
+        terminal.WriteLine("");
+
+        if (isHealOnly)
         {
-            currentPlayer.HP += healing;
-            terminal.WriteLine(Loc.Get("inn.food_hp_recover", healing), "green");
+            // Hearty Stew: restore 10% HP, no combat buff
+            long healAmount = Math.Max(1, currentPlayer.MaxHP / 10);
+            long actualHeal = Math.Min(healAmount, currentPlayer.MaxHP - currentPlayer.HP);
+            if (actualHeal > 0)
+            {
+                currentPlayer.HP += actualHeal;
+                terminal.SetColor("green");
+                terminal.WriteLine(Loc.Get("inn.food_stew_eat", actualHeal));
+            }
+            else
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine(Loc.Get("inn.food_stew_full"));
+            }
+            await terminal.PressAnyKey();
+            return;
         }
 
-        await Task.Delay(2500);
+        // Mystery Meat: resolve random effect
+        if (choice == "6")
+        {
+            int roll = Random.Shared.Next(6); // 0-5
+            switch (roll)
+            {
+                case 0: // Heals like stew
+                    long mysteryHeal = Math.Max(1, currentPlayer.MaxHP / 10);
+                    long actualMysteryHeal = Math.Min(mysteryHeal, currentPlayer.MaxHP - currentPlayer.HP);
+                    if (actualMysteryHeal > 0) currentPlayer.HP += actualMysteryHeal;
+                    terminal.SetColor("green");
+                    terminal.WriteLine(Loc.Get("inn.food_mystery_heal", actualMysteryHeal));
+                    await terminal.PressAnyKey();
+                    return;
+                case 1: buffType = 1; buffValue = 0.10f; dishName = Loc.Get("inn.food_mystery_dragon"); break;
+                case 2: buffType = 2; buffValue = 0.10f; dishName = Loc.Get("inn.food_mystery_honey"); break;
+                case 3: buffType = 3; buffValue = 0.15f; dishName = Loc.Get("inn.food_mystery_rations"); break;
+                case 4: buffType = 4; buffValue = 0.15f; dishName = Loc.Get("inn.food_mystery_mushroom"); break;
+                case 5: // Food poisoning!
+                    buffType = 5; buffValue = -0.05f; buffCombats = 3;
+                    dishName = Loc.Get("inn.food_mystery_poison");
+                    break;
+            }
+        }
+
+        // Apply food buff (replaces any existing food buff)
+        currentPlayer.FoodBuffType = buffType;
+        currentPlayer.FoodBuffCombats = buffCombats;
+        currentPlayer.FoodBuffValue = buffValue;
+
+        // Display result
+        switch (buffType)
+        {
+            case 1:
+                terminal.SetColor("bright_red");
+                terminal.WriteLine(Loc.Get("inn.food_buff_damage", dishName));
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("inn.food_buff_damage_desc", buffCombats));
+                break;
+            case 2:
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(Loc.Get("inn.food_buff_defense", dishName));
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("inn.food_buff_defense_desc", buffCombats));
+                break;
+            case 3:
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine(Loc.Get("inn.food_buff_maxhp", dishName));
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("inn.food_buff_maxhp_desc", buffCombats));
+                break;
+            case 4:
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine(Loc.Get("inn.food_buff_spell", dishName));
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("inn.food_buff_spell_desc", buffCombats));
+                break;
+            case 5:
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("inn.food_poison"));
+                terminal.SetColor("dark_red");
+                terminal.WriteLine(Loc.Get("inn.food_poison_desc", buffCombats));
+                break;
+        }
+
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -2831,12 +3304,12 @@ public class InnLocation : BaseLocation
         {
             return companion.Id switch
             {
-                CompanionId.Lyris => "I never thought I'd find someone I could trust again. You've given me hope.",
-                CompanionId.Aldric => "You remind me of what I used to fight for. It's... good to feel that again.",
-                CompanionId.Mira => "With you, healing feels like it means something. Thank you for that.",
-                CompanionId.Vex => "You know, for once... I'm glad I'm still here. Don't tell anyone I said that.",
-                CompanionId.Melodia => "Every adventure is a verse in a song that's still being written. Ours is becoming my favorite.",
-                _ => "We've been through a lot together."
+                CompanionId.Lyris => Loc.Get("inn.companion_high_lyris"),
+                CompanionId.Aldric => Loc.Get("inn.companion_high_aldric"),
+                CompanionId.Mira => Loc.Get("inn.companion_high_mira"),
+                CompanionId.Vex => Loc.Get("inn.companion_high_vex"),
+                CompanionId.Melodia => Loc.Get("inn.companion_high_melodia"),
+                _ => Loc.Get("inn.companion_high_default")
             };
         }
         // Medium loyalty
@@ -2844,12 +3317,12 @@ public class InnLocation : BaseLocation
         {
             return companion.Id switch
             {
-                CompanionId.Lyris => "There's something about you... like we've met before, in another life.",
-                CompanionId.Aldric => "You fight well. I'm glad to have my shield at your side.",
-                CompanionId.Mira => "I've been thinking about what you said. Maybe there is a reason to keep going.",
-                CompanionId.Vex => "Not bad for an adventurer. Maybe I'll stick around a bit longer.",
-                CompanionId.Melodia => "You have an interesting rhythm to you. I might write a song about it someday.",
-                _ => "We're starting to understand each other."
+                CompanionId.Lyris => Loc.Get("inn.companion_mid_lyris"),
+                CompanionId.Aldric => Loc.Get("inn.companion_mid_aldric"),
+                CompanionId.Mira => Loc.Get("inn.companion_mid_mira"),
+                CompanionId.Vex => Loc.Get("inn.companion_mid_vex"),
+                CompanionId.Melodia => Loc.Get("inn.companion_mid_melodia"),
+                _ => Loc.Get("inn.companion_mid_default")
             };
         }
         // Low loyalty - use default hints
@@ -2904,7 +3377,7 @@ public class InnLocation : BaseLocation
                     terminal.WriteLine("");
                     terminal.SetColor("white");
                     terminal.WriteLine(Loc.Get("inn.nods_gratefully", companion.Name));
-                    CompanionSystem.Instance.ModifyLoyalty(companion.Id, 10, "Accepted personal quest");
+                    CompanionSystem.Instance.ModifyLoyalty(companion.Id, 10, "accepted_personal_quest");
                 }
             }
         }
@@ -3200,6 +3673,7 @@ public class InnLocation : BaseLocation
                 companion.EquippedItems[kvp.Key] = kvp.Value;
         }
 
+        SaveSystem.Instance.ResetAutoSaveThrottle();
         await SaveSystem.Instance.AutoSave(currentPlayer);
     }
 
@@ -3217,10 +3691,10 @@ public class InnLocation : BaseLocation
 
             // Show target's stats
             terminal.SetColor("white");
-            terminal.WriteLine($"  Level: {target.Level}  Class: {target.ClassName}  Race: {target.Race}");
-            terminal.WriteLine($"  HP: {target.HP}/{target.MaxHP}  Mana: {target.Mana}/{target.MaxMana}");
-            terminal.WriteLine($"  STR: {target.Strength}  DEX: {target.Dexterity}  AGI: {target.Agility}  CON: {target.Constitution}");
-            terminal.WriteLine($"  INT: {target.Intelligence}  WIS: {target.Wisdom}  CHA: {target.Charisma}  DEF: {target.Defence}");
+            terminal.WriteLine(Loc.Get("inn.npc_stat_line", target.Level, target.ClassName, target.Race));
+            terminal.WriteLine(Loc.Get("inn.npc_hp_mp_line", target.HP, target.MaxHP, target.Mana, target.MaxMana));
+            terminal.WriteLine(Loc.Get("inn.npc_str_dex_line", target.Strength, target.Dexterity, target.Agility, target.Constitution));
+            terminal.WriteLine(Loc.Get("inn.npc_int_wis_line", target.Intelligence, target.Wisdom, target.Charisma, target.Defence));
             terminal.WriteLine("");
 
             // Show current equipment
@@ -3228,20 +3702,20 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.current_equipment"));
             terminal.SetColor("white");
 
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.MainHand, "Main Hand");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.OffHand, "Off Hand");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Head, "Head");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Body, "Body");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Arms, "Arms");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Hands, "Hands");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Legs, "Legs");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Feet, "Feet");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Waist, "Belt");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Face, "Face");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Cloak, "Cloak");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Neck, "Neck");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.LFinger, "Left Ring");
-            CompanionDisplayEquipmentSlot(target, EquipmentSlot.RFinger, "Right Ring");
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.MainHand, Loc.Get("inn.slot_main_hand"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.OffHand, Loc.Get("inn.slot_off_hand"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Head, Loc.Get("inn.slot_head"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Body, Loc.Get("inn.slot_body"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Arms, Loc.Get("inn.slot_arms"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Hands, Loc.Get("inn.slot_hands"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Legs, Loc.Get("inn.slot_legs"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Feet, Loc.Get("inn.slot_feet"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Waist, Loc.Get("inn.slot_belt"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Face, Loc.Get("inn.slot_face"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Cloak, Loc.Get("inn.slot_cloak"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.Neck, Loc.Get("inn.slot_neck"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.LFinger, Loc.Get("inn.slot_left_ring"));
+            CompanionDisplayEquipmentSlot(target, EquipmentSlot.RFinger, Loc.Get("inn.slot_right_ring"));
             terminal.WriteLine("");
 
             // Show options
@@ -3324,20 +3798,20 @@ public class InnLocation : BaseLocation
         if (item.IsIdentified) return item.Name;
         return item.Slot switch
         {
-            EquipmentSlot.MainHand => "Unidentified Weapon",
-            EquipmentSlot.OffHand => item.WeaponPower > 0 ? "Unidentified Weapon" : "Unidentified Shield",
-            EquipmentSlot.Head => "Unidentified Helm",
-            EquipmentSlot.Body => "Unidentified Armor",
-            EquipmentSlot.Arms => "Unidentified Bracers",
-            EquipmentSlot.Hands => "Unidentified Gauntlets",
-            EquipmentSlot.Legs => "Unidentified Greaves",
-            EquipmentSlot.Feet => "Unidentified Boots",
-            EquipmentSlot.Waist => "Unidentified Belt",
-            EquipmentSlot.Face => "Unidentified Mask",
-            EquipmentSlot.Cloak => "Unidentified Cloak",
-            EquipmentSlot.Neck => "Unidentified Amulet",
-            EquipmentSlot.LFinger or EquipmentSlot.RFinger => "Unidentified Ring",
-            _ => "Unidentified Item"
+            EquipmentSlot.MainHand => Loc.Get("inn.unid_weapon"),
+            EquipmentSlot.OffHand => item.WeaponPower > 0 ? Loc.Get("inn.unid_weapon") : Loc.Get("inn.unid_shield"),
+            EquipmentSlot.Head => Loc.Get("inn.unid_helm"),
+            EquipmentSlot.Body => Loc.Get("inn.unid_armor"),
+            EquipmentSlot.Arms => Loc.Get("inn.unid_bracers"),
+            EquipmentSlot.Hands => Loc.Get("inn.unid_gauntlets"),
+            EquipmentSlot.Legs => Loc.Get("inn.unid_greaves"),
+            EquipmentSlot.Feet => Loc.Get("inn.unid_boots"),
+            EquipmentSlot.Waist => Loc.Get("inn.unid_belt"),
+            EquipmentSlot.Face => Loc.Get("inn.unid_mask"),
+            EquipmentSlot.Cloak => Loc.Get("inn.unid_cloak"),
+            EquipmentSlot.Neck => Loc.Get("inn.unid_amulet"),
+            EquipmentSlot.LFinger or EquipmentSlot.RFinger => Loc.Get("inn.unid_ring"),
+            _ => Loc.Get("inn.unid_item")
         };
     }
 
@@ -3449,7 +3923,7 @@ public class InnLocation : BaseLocation
         else
         {
             terminal.SetColor("darkgray");
-            terminal.WriteLine("Empty");
+            terminal.WriteLine(Loc.Get("inn.slot_empty"));
         }
         terminal.WriteLine("");
 
@@ -3833,6 +4307,8 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("inn.equip_best_done", equippedCount, target.DisplayName));
+            // Sync wrapper equipment back to companion BEFORE saving
+            CompanionSystem.Instance?.SyncCompanionEquipment(target);
             await SaveSystem.Instance.AutoSave(currentPlayer);
         }
         else
@@ -4032,10 +4508,10 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("");
 
         var statNames = new[] { "STR", "DEX", "CON", "INT", "WIS", "CHA", "AGI", "STA" };
-        var statLabels = new[] { "Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma", "Agility", "Stamina" };
+        var statLabels = new[] { Loc.Get("inn.train_stat_strength"), Loc.Get("inn.train_stat_dexterity"), Loc.Get("inn.train_stat_constitution"), Loc.Get("inn.train_stat_intelligence"), Loc.Get("inn.train_stat_wisdom"), Loc.Get("inn.train_stat_charisma"), Loc.Get("inn.train_stat_agility"), Loc.Get("inn.train_stat_stamina") };
 
         terminal.SetColor("cyan");
-        terminal.WriteLine($"{"#",-4} {"Stat",-16} {"Current",-10} {"Trained",-10} {"Next Cost",-12}");
+        terminal.WriteLine($"{Loc.Get("inn.train_header_num"),-4} {Loc.Get("inn.train_header_stat"),-16} {Loc.Get("inn.train_header_current"),-10} {Loc.Get("inn.train_header_trained"),-10} {Loc.Get("inn.train_header_next_cost"),-12}");
         WriteDivider(55, "darkgray");
 
         for (int i = 0; i < statNames.Length; i++)
@@ -4049,7 +4525,7 @@ public class InnLocation : BaseLocation
             if (timesTrained >= GameConfig.MaxStatTrainingsPerStat)
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine($"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {"MAXED",-12}");
+                terminal.WriteLine($"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {Loc.Get("inn.train_maxed"),-12}");
             }
             else
             {
@@ -4534,7 +5010,7 @@ public class InnLocation : BaseLocation
         }
 
         var rng = Random.Shared;
-        string[] faceTiles = { "Skull", "Crown", "Sword" };
+        string[] faceTiles = { Loc.Get("inn.tile_skull"), Loc.Get("inn.tile_crown"), Loc.Get("inn.tile_sword") };
 
         // Player's turn
         int playerTotal = 0;
@@ -4594,9 +5070,9 @@ public class InnLocation : BaseLocation
 
             if (action == "H")
             {
-                playerHand.Clear();
                 int newTile = rng.Next(1, 11);
                 string tileName = newTile == 10 ? faceTiles[rng.Next(faceTiles.Length)] : newTile.ToString();
+                playerHand.Add(tileName);
                 playerTotal += newTile;
                 playerCards++;
                 terminal.SetColor("bright_yellow");
@@ -4821,14 +5297,14 @@ public class InnLocation : BaseLocation
 
     #region Rent a Room (Online Mode)
 
-    private static readonly (string type, string name, int baseCost, int baseHp)[] GuardOptions = new[]
+    private static (string type, string name, int baseCost, int baseHp)[] GetGuardOptions() => new[]
     {
-        ("rookie_npc",  "Rookie Guard",  GameConfig.GuardRookieBaseCost,  80),
-        ("veteran_npc", "Veteran Guard", GameConfig.GuardVeteranBaseCost, 150),
-        ("elite_npc",   "Elite Guard",   GameConfig.GuardEliteBaseCost,   250),
-        ("hound",       "Guard Hound",   GameConfig.GuardHoundBaseCost,   60),
-        ("troll",       "Guard Troll",   GameConfig.GuardTrollBaseCost,   200),
-        ("drake",       "Guard Drake",   GameConfig.GuardDrakeBaseCost,   300),
+        ("rookie_npc",  Loc.Get("inn.guard_rookie"),  GameConfig.GuardRookieBaseCost,  80),
+        ("veteran_npc", Loc.Get("inn.guard_veteran"), GameConfig.GuardVeteranBaseCost, 150),
+        ("elite_npc",   Loc.Get("inn.guard_elite"),   GameConfig.GuardEliteBaseCost,   250),
+        ("hound",       Loc.Get("inn.guard_hound"),   GameConfig.GuardHoundBaseCost,   60),
+        ("troll",       Loc.Get("inn.guard_troll"),    GameConfig.GuardTrollBaseCost,   200),
+        ("drake",       Loc.Get("inn.guard_drake"),    GameConfig.GuardDrakeBaseCost,   300),
     };
 
     private async Task RentRoom()
@@ -4867,10 +5343,11 @@ public class InnLocation : BaseLocation
             }
             terminal.WriteLine("");
 
+            var guardOptions = GetGuardOptions();
             terminal.SetColor("white");
-            for (int i = 0; i < GuardOptions.Length; i++)
+            for (int i = 0; i < guardOptions.Length; i++)
             {
-                var opt = GuardOptions[i];
+                var opt = guardOptions[i];
                 int cost = GetGuardCost(opt.baseCost, levelMultiplier, hiredGuards.Count);
                 int hp = (int)(opt.baseHp * levelMultiplier);
                 bool canAfford = currentPlayer.Gold + currentPlayer.BankGold - roomCost - totalGuardCost >= cost;
@@ -4888,9 +5365,9 @@ public class InnLocation : BaseLocation
             if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "D")
                 break;
 
-            if (int.TryParse(input.Trim(), out int guardIdx) && guardIdx >= 1 && guardIdx <= GuardOptions.Length)
+            if (int.TryParse(input.Trim(), out int guardIdx) && guardIdx >= 1 && guardIdx <= guardOptions.Length)
             {
-                var chosen = GuardOptions[guardIdx - 1];
+                var chosen = guardOptions[guardIdx - 1];
                 int cost = GetGuardCost(chosen.baseCost, levelMultiplier, hiredGuards.Count);
                 int hp = (int)(chosen.baseHp * levelMultiplier);
 
@@ -5141,7 +5618,7 @@ public class InnLocation : BaseLocation
             npc.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.Murdered,
-                Description = $"Murdered in my sleep at the Inn by {currentPlayer.Name2}",
+                Description = Loc.Get("inn.memory_murdered_sleep", currentPlayer.Name2),
                 InvolvedCharacter = currentPlayer.Name2,
                 Importance = 1.0f,
                 EmotionalImpact = -1.0f,
@@ -5164,7 +5641,7 @@ public class InnLocation : BaseLocation
                 witness.Memory?.RecordEvent(new MemoryEvent
                 {
                     Type = MemoryType.SawDeath,
-                    Description = $"Witnessed {currentPlayer.Name2} murder {npcName} at the Inn",
+                    Description = Loc.Get("inn.memory_witnessed_murder", currentPlayer.Name2, npcName),
                     InvolvedCharacter = currentPlayer.Name2,
                     Importance = 0.8f,
                     EmotionalImpact = -0.6f,
@@ -5174,7 +5651,7 @@ public class InnLocation : BaseLocation
 
             WorldSimulator.WakeUpNPC(npcName);
 
-            try { OnlineStateManager.Instance?.AddNews($"{currentPlayer.Name2} murdered {npcName} in their sleep at the Inn!", "combat"); } catch { }
+            try { OnlineStateManager.Instance?.AddNews(Loc.Get("inn.news_murdered_sleep", currentPlayer.Name2, npcName), "combat"); } catch { }
 
             await Task.Delay(2000);
         }
@@ -5220,7 +5697,7 @@ public class InnLocation : BaseLocation
                 {
                     if (g == null) continue;
                     string gType = g["type"]?.GetValue<string>() ?? "rookie_npc";
-                    string gName = g["name"]?.GetValue<string>() ?? "Guard";
+                    string gName = g["name"]?.GetValue<string>() ?? Loc.Get("inn.guard_default");
                     int gHp = g["hp"]?.GetValue<int>() ?? 50;
                     int gMaxHp = g["max_hp"]?.GetValue<int>() ?? gHp;
                     guards.Add((gType, gName, gHp, gMaxHp));

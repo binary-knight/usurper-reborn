@@ -637,7 +637,16 @@ public class Character
     public DateTime LastBindingOfSoulsRealDate { get; set; } = DateTime.MinValue;
     public int SethFightsToday { get; set; } = 0;
     public int ArmWrestlesToday { get; set; } = 0;
+    public int SethDefeatsTotal { get; set; } = 0;   // Lifetime times player has beaten Seth Able (persistent)
+    public int InnDuelsToday { get; set; } = 0;       // Daily NPC duel counter (transient, resets daily, max 3)
+    public int MealsToday { get; set; } = 0;          // Daily meal counter (transient, resets daily, max 3)
     public bool DivineFavorTriggeredThisCombat { get; set; } = false; // Transient: reset each combat
+
+    // Food buff tracking (Inn meals, v0.53.14) — transient, not serialized
+    public int FoodBuffType { get; set; }       // 0=none, 1=DragonSteak(+dmg), 2=HoneyBread(+def), 3=IronRations(+maxHP), 4=MushroomSoup(+spell), 5=FoodPoisoning(-stats)
+    public int FoodBuffCombats { get; set; }    // Remaining combats for active food buff
+    public float FoodBuffValue { get; set; }    // Buff multiplier (e.g. 0.10 = 10%)
+    public bool HasActiveFoodBuff => FoodBuffType > 0 && FoodBuffCombats > 0;
 
     // Dark Alley Overhaul (v0.41.0)
     public int GroggoShadowBlessingDex { get; set; } = 0;      // Active Groggo DEX buff (removed on rest)
@@ -1005,6 +1014,12 @@ public class Character
         if (equipment.MagicResistance > 0)
             item.LootEffects.Add(((int)LootGenerator.SpecialEffect.MagicResist, equipment.MagicResistance));
 
+        // Preserve world boss exclusive effects
+        if (equipment.HasBossSlayer)
+            item.LootEffects.Add(((int)LootGenerator.SpecialEffect.BossSlayer, 10));
+        if (equipment.HasTitanResolve)
+            item.LootEffects.Add(((int)LootGenerator.SpecialEffect.TitanResolve, 5));
+
         return item;
     }
 
@@ -1027,7 +1042,7 @@ public class Character
             item.RemoveFromCharacter(this);
         }
 
-        EquippedItems[slot] = 0;
+        EquippedItems.Remove(slot);
         return item;
     }
 

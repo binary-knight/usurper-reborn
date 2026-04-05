@@ -1190,7 +1190,6 @@ public class MainStreetLocation : BaseLocation
             //     return false;
 
             case "9":
-                await TestCombat();
                 return false;
             
             // Quick navigation
@@ -3306,7 +3305,7 @@ public class MainStreetLocation : BaseLocation
         {
             terminal.WriteLine($"  {Loc.Get("main_street.hint_seals")}");
         }
-        else if (!story.HasStoryFlag("manwe_defeated"))
+        else if (!story.HasStoryFlag("manwe_destroyed") && !story.HasStoryFlag("manwe_saved"))
         {
             terminal.WriteLine($"  {Loc.Get("main_street.hint_creator")}");
         }

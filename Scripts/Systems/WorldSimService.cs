@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using UsurperRemake.Data;
 
 namespace UsurperRemake.Systems
 {
@@ -1223,6 +1224,16 @@ namespace UsurperRemake.Systems
         /// Restore NPCs from saved data. Follows the same pattern as GameEngine.RestoreNPCs()
         /// but without requiring a GameEngine instance.
         /// </summary>
+        /// <summary>
+        /// Cap a legacy-migrated NPC age at 60% of the race's max lifespan to prevent instant aging deaths.
+        /// </summary>
+        private static int CapLegacyAge(CharacterRace race, int randomAge)
+        {
+            int maxLifespan = GameConfig.RaceLifespan.TryGetValue(race, out var lifespan) ? lifespan : 75;
+            int cap = (int)(maxLifespan * 0.6);
+            return Math.Min(randomAge, cap);
+        }
+
         private void RestoreNPCsFromData(List<NPCData> npcData)
         {
             // Clear existing NPCs
@@ -1270,10 +1281,11 @@ namespace UsurperRemake.Systems
                     IsDead = data.IsDead,
 
                     // Lifecycle - aging and natural death (with migration for legacy data)
-                    Age = data.Age > 0 ? data.Age : Random.Shared.Next(18, 50),
+                    // Cap at 60% of race's max lifespan to prevent instant aging deaths
+                    Age = data.Age > 0 ? data.Age : CapLegacyAge(data.Race, Random.Shared.Next(18, 50)),
                     BirthDate = data.BirthDate > DateTime.MinValue
                         ? data.BirthDate
-                        : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : Random.Shared.Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
+                        : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : CapLegacyAge(data.Race, Random.Shared.Next(18, 50))) * GameConfig.NpcLifecycleHoursPerYear),
                     IsAgedDeath = data.IsAgedDeath,
                     IsPermaDead = data.IsPermaDead,
                     PregnancyDueDate = data.PregnancyDueDate,
@@ -1501,6 +1513,39 @@ namespace UsurperRemake.Systems
                     }
                 }
 
+                // Restore fields not set in the NPC constructor initializer
+                npc.WorshippedGod = data.WorshippedGod ?? "";
+                npc.EmergentRole = data.EmergentRole ?? "";
+                npc.RoleStabilityTicks = data.RoleStabilityTicks;
+                npc.IsHostile = data.IsHostile;
+                npc.GangId = data.GangId ?? "";
+
+                if (data.RecentDialogueIds?.Count > 0)
+                {
+                    npc.RecentDialogueIds = new List<string>(data.RecentDialogueIds);
+                    NPCDialogueDatabase.RestoreRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? "", data.RecentDialogueIds);
+                }
+
+                if (data.Enemies?.Count > 0)
+                {
+                    npc.Enemies = new List<string>(data.Enemies);
+                }
+
+                if (data.KnownCharacters?.Count > 0)
+                {
+                    npc.KnownCharacters = new List<string>(data.KnownCharacters);
+                }
+
+                if (data.SkillProficiencies?.Count > 0)
+                {
+                    npc.SkillProficiencies = data.SkillProficiencies.ToDictionary(
+                        kvp => kvp.Key, kvp => (TrainingSystem.ProficiencyLevel)kvp.Value);
+                }
+                if (data.SkillTrainingProgress?.Count > 0)
+                {
+                    npc.SkillTrainingProgress = new Dictionary<string, int>(data.SkillTrainingProgress);
+                }
+
                 // Fix XP for legacy data
                 if (npc.Experience <= 0 && npc.Level > 1)
                 {
@@ -1570,7 +1615,15 @@ namespace UsurperRemake.Systems
                             ArmorPiercing = equipData.ArmorPiercing,
                             Thorns = equipData.Thorns,
                             HPRegen = equipData.HPRegen,
-                            ManaRegen = equipData.ManaRegen
+                            ManaRegen = equipData.ManaRegen,
+                            WeightClass = (ArmorWeightClass)equipData.WeightClass,
+                            StrengthRequired = equipData.StrengthRequired,
+                            RequiresGood = equipData.RequiresGood,
+                            RequiresEvil = equipData.RequiresEvil,
+                            ClassRestrictions = equipData.ClassRestrictions?.Select(c => (CharacterClass)c).ToList() ?? new List<CharacterClass>(),
+                            IsUnique = equipData.IsUnique,
+                            HasBossSlayer = equipData.HasBossSlayer,
+                            HasTitanResolve = equipData.HasTitanResolve
                         };
 
                         int newId = EquipmentDatabase.RegisterDynamic(equipment);

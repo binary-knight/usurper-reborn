@@ -128,7 +128,15 @@ public static class PlayerCharacterLoader
                     ArmorPiercing = equipData.ArmorPiercing,
                     Thorns = equipData.Thorns,
                     HPRegen = equipData.HPRegen,
-                    ManaRegen = equipData.ManaRegen
+                    ManaRegen = equipData.ManaRegen,
+                    WeightClass = (ArmorWeightClass)equipData.WeightClass,
+                    StrengthRequired = equipData.StrengthRequired,
+                    RequiresGood = equipData.RequiresGood,
+                    RequiresEvil = equipData.RequiresEvil,
+                    ClassRestrictions = equipData.ClassRestrictions?.Select(c => (CharacterClass)c).ToList() ?? new List<CharacterClass>(),
+                    IsUnique = equipData.IsUnique,
+                    HasBossSlayer = equipData.HasBossSlayer,
+                    HasTitanResolve = equipData.HasTitanResolve
                 };
 
                 // Migration: fix legacy items with WeaponType=None

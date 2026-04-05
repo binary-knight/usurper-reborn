@@ -100,6 +100,7 @@ public class SessionContext : IDisposable
     public string Language { get; set; } = "en";
     public bool CompactMode { get; set; } = false;
     public int DateFormat { get; set; } = 0;
+    public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;
 
     // --- Per-Session Notifications ---
     public Queue<string> PendingNotifications { get; } = new();

@@ -1696,11 +1696,8 @@ public class TeamCornerLocation : BaseLocation
         // Force NPC world_state save so equipment survives world-sim reload cycles
         if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
         {
-            _ = Task.Run(async () =>
-            {
-                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                catch { /* best-effort */ }
-            });
+            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after equipment change: {ex.Message}"); }
         }
     }
 
@@ -1737,6 +1734,8 @@ public class TeamCornerLocation : BaseLocation
             DisplayEquipmentSlot(target, EquipmentSlot.Hands, Loc.Get("team.slot_hands"));
             DisplayEquipmentSlot(target, EquipmentSlot.Legs, Loc.Get("team.slot_legs"));
             DisplayEquipmentSlot(target, EquipmentSlot.Feet, Loc.Get("team.slot_feet"));
+            DisplayEquipmentSlot(target, EquipmentSlot.Waist, Loc.Get("team.slot_waist", "Belt"));
+            DisplayEquipmentSlot(target, EquipmentSlot.Face, Loc.Get("team.slot_face", "Face"));
             DisplayEquipmentSlot(target, EquipmentSlot.Cloak, Loc.Get("team.slot_cloak"));
             DisplayEquipmentSlot(target, EquipmentSlot.Neck, Loc.Get("team.slot_neck"));
             DisplayEquipmentSlot(target, EquipmentSlot.LFinger, Loc.Get("team.slot_left_ring"));
@@ -1880,7 +1879,10 @@ public class TeamCornerLocation : BaseLocation
         else
         {
             // Remove from inventory (find by name)
-            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+            // Two-pass match: first try Name+Attack+ArmorClass for precision, then fallback to name-only
+            var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
+                i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
+                ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
             if (invItem != null)
             {
                 currentPlayer.Inventory.Remove(invItem);

@@ -188,30 +188,30 @@ public static class MonsterGenerator
         float bossMultiplier = isBoss ? 2.0f : (isMiniBoss ? 1.5f : 1.0f);
         float totalMultiplier = powerMultiplier * bossMultiplier;
 
-        // REBALANCED HP (v0.47.5: +45% so fights last 4-8 hits; was 35*level + level^1.15*10)
-        // Formula: 50*level + level^1.2 * 15
-        // Level 1: ~65, Level 10: ~738, Level 25: ~2,058, Level 50: ~5,085, Level 100: ~12,870
-        long baseHP = (long)((50 * level) + Math.Pow(level, 1.2) * 15);
+        // Soft cap: full formula up to floor 50, then diminishing growth beyond
+        // This prevents monster offense from exponentially outpacing player stats at high floors
+        int effectiveLevel = level <= 50 ? level : 50 + (int)((level - 50) * 0.6);
+
+        // REBALANCED HP (v0.47.5: +45% so fights last 4-8 hits; v0.54.0: soft-capped past floor 50)
+        // Formula: 50*level + level^1.2 * 15, using effectiveLevel for offensive stats
+        long baseHP = (long)((50 * effectiveLevel) + Math.Pow(effectiveLevel, 1.2) * 15);
         long hp = (long)(baseHP * totalMultiplier);
 
-        // REBALANCED STRENGTH: Reduced to match new player damage scaling
-        // Formula: 2*level + level^1.05 * 1.5 (was 4*level + level^1.15 * 2)
-        long baseStrength = (long)((2 * level) + Math.Pow(level, 1.05) * 1.5);
+        // REBALANCED STRENGTH: uses effectiveLevel to prevent one-shots at high floors
+        long baseStrength = (long)((2 * effectiveLevel) + Math.Pow(effectiveLevel, 1.05) * 1.5);
         long strength = (long)(baseStrength * totalMultiplier);
 
-        // Monster defence (v0.47.5: removed 0.8x penalty — monsters need real defense)
+        // Monster defence — uses raw level (monsters should be tanky, not one-shotting)
         // Formula: level + level^1.02 * 0.5
         long baseDefence = (long)((level) + Math.Pow(level, 1.02) * 0.5);
         long defence = (long)(baseDefence * totalMultiplier);
 
-        // REBALANCED PUNCH: Reduced natural attack bonus
-        // Formula: level + level^1.02 * 0.5 (was 1.5*level + level^1.1 * 1)
-        long basePunch = (long)((level) + Math.Pow(level, 1.02) * 0.5);
+        // REBALANCED PUNCH: uses effectiveLevel
+        long basePunch = (long)((effectiveLevel) + Math.Pow(effectiveLevel, 1.02) * 0.5);
         long punch = (long)(basePunch * totalMultiplier);
 
-        // REBALANCED WEAPON POWER: Reduced so monsters don't one-shot players
-        // Formula: 1.5*level + level^1.05 * 1 (was 3*level + level^1.15 * 1.5)
-        long baseWeaponPower = (long)((1.5 * level) + Math.Pow(level, 1.05) * 1);
+        // REBALANCED WEAPON POWER: uses effectiveLevel
+        long baseWeaponPower = (long)((1.5 * effectiveLevel) + Math.Pow(effectiveLevel, 1.05) * 1);
         long weaponPower = (long)(baseWeaponPower * totalMultiplier);
 
         // Monster armor power (v0.41.4: raised from 0.4f to 0.7f so monsters have real armor)

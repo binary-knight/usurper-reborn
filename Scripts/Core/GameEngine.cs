@@ -4128,7 +4128,15 @@ public partial class GameEngine
                     ArmorPiercing = equipData.ArmorPiercing,
                     Thorns = equipData.Thorns,
                     HPRegen = equipData.HPRegen,
-                    ManaRegen = equipData.ManaRegen
+                    ManaRegen = equipData.ManaRegen,
+                    WeightClass = (ArmorWeightClass)equipData.WeightClass,
+                    StrengthRequired = equipData.StrengthRequired,
+                    RequiresGood = equipData.RequiresGood,
+                    RequiresEvil = equipData.RequiresEvil,
+                    ClassRestrictions = equipData.ClassRestrictions?.Select(c => (CharacterClass)c).ToList() ?? new List<CharacterClass>(),
+                    IsUnique = equipData.IsUnique,
+                    HasBossSlayer = equipData.HasBossSlayer,
+                    HasTitanResolve = equipData.HasTitanResolve
                 };
 
                 // Migration: legacy loot items may have WeaponType=None because InferWeaponType
@@ -4512,6 +4520,7 @@ public partial class GameEngine
         player.LastBindingOfSoulsRealDate = playerData.LastBindingOfSoulsRealDate;
         player.SethFightsToday = playerData.SethFightsToday;
         player.ArmWrestlesToday = playerData.ArmWrestlesToday;
+        player.SethDefeatsTotal = playerData.SethDefeatsTotal;
         player.RoyQuestsToday = playerData.RoyQuestsToday;
         player.Quests = playerData.Quests;
         player.RoyQuests = playerData.RoyQuests;
@@ -4837,10 +4846,21 @@ public partial class GameEngine
     /// <summary>
     /// Restore NPCs from save data
     /// </summary>
+    /// <summary>
+    /// Cap a legacy-migrated NPC age at 60% of the race's max lifespan to prevent instant aging deaths.
+    /// </summary>
+    private static int CapLegacyAge(CharacterRace race, int randomAge)
+    {
+        int maxLifespan = GameConfig.RaceLifespan.TryGetValue(race, out var lifespan) ? lifespan : 75;
+        int cap = (int)(maxLifespan * 0.6);
+        return Math.Min(randomAge, cap);
+    }
+
     private async Task RestoreNPCs(List<NPCData> npcData)
     {
         if (npcData == null || npcData.Count == 0)
         {
+            DebugLogger.Instance.LogError("NPC", "No NPC data in save — NPCs will be empty!");
             return;
         }
 
@@ -4901,10 +4921,11 @@ public partial class GameEngine
                 IsDead = data.IsDead,
 
                 // Lifecycle - aging and natural death
-                Age = data.Age > 0 ? data.Age : Random.Shared.Next(18, 50),
+                // Legacy age migration: cap at 60% of race's max lifespan to prevent instant aging deaths
+                Age = data.Age > 0 ? data.Age : CapLegacyAge(data.Race, Random.Shared.Next(18, 50)),
                 BirthDate = data.BirthDate > DateTime.MinValue
                     ? data.BirthDate
-                    : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : Random.Shared.Next(18, 50)) * GameConfig.NpcLifecycleHoursPerYear),
+                    : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : CapLegacyAge(data.Race, Random.Shared.Next(18, 50))) * GameConfig.NpcLifecycleHoursPerYear),
                 IsAgedDeath = data.IsAgedDeath,
                 IsPermaDead = data.IsPermaDead,
                 PregnancyDueDate = data.PregnancyDueDate,
@@ -5142,6 +5163,14 @@ public partial class GameEngine
                 npc.SkillTrainingProgress = new Dictionary<string, int>(data.SkillTrainingProgress);
             }
 
+            // Restore hostility, social graph, and gang affiliation
+            npc.IsHostile = data.IsHostile;
+            if (data.KnownCharacters?.Count > 0)
+            {
+                npc.KnownCharacters = new List<string>(data.KnownCharacters);
+            }
+            npc.GangId = data.GangId ?? "";
+
             // Migrate: Assign faction to NPCs that don't have one (legacy save compatibility)
             if (!npc.NPCFaction.HasValue)
             {
@@ -5198,7 +5227,15 @@ public partial class GameEngine
                         ArmorPiercing = equipData.ArmorPiercing,
                         Thorns = equipData.Thorns,
                         HPRegen = equipData.HPRegen,
-                        ManaRegen = equipData.ManaRegen
+                        ManaRegen = equipData.ManaRegen,
+                        WeightClass = (ArmorWeightClass)equipData.WeightClass,
+                        StrengthRequired = equipData.StrengthRequired,
+                        RequiresGood = equipData.RequiresGood,
+                        RequiresEvil = equipData.RequiresEvil,
+                        ClassRestrictions = equipData.ClassRestrictions?.Select(c => (CharacterClass)c).ToList() ?? new List<CharacterClass>(),
+                        IsUnique = equipData.IsUnique,
+                        HasBossSlayer = equipData.HasBossSlayer,
+                        HasTitanResolve = equipData.HasTitanResolve
                     };
 
                     // Register and get the new ID (may differ from saved ID)

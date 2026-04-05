@@ -1102,7 +1102,7 @@ public class HealerLocation : BaseLocation
                 cursedItems.Add((equipment.Name, slot.ToString(), () =>
                 {
                     // Remove from modern equipment system
-                    player.EquippedItems[capturedSlot] = 0;
+                    player.EquippedItems.Remove(capturedSlot);
                     // Also clear the curse flags if applicable
                     if (capturedSlot == EquipmentSlot.MainHand)
                         player.WeaponCursed = false;

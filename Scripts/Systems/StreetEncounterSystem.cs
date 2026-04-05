@@ -1613,10 +1613,15 @@ public class StreetEncounterSystem
                 protectedIds.Add(lover.NPCId);
         }
 
-        // Find NPCs at this location who might be hostile (excluding romantic partners)
+        // Find NPCs at this location who might be hostile (excluding romantic partners,
+        // player's team members, and player's spouse)
+        string playerTeam = (player as Player)?.Team ?? "";
+        string playerSpouse = (player as Player)?.SpouseName ?? "";
         var potentialEnemies = npcs
             .Where(n => n.IsAlive && n.Level >= player.Level - 5 && n.Level <= player.Level + 5)
             .Where(n => !protectedIds.Contains(n.ID)) // Never attack romantic partners
+            .Where(n => string.IsNullOrEmpty(playerTeam) || !playerTeam.Equals(n.Team, StringComparison.OrdinalIgnoreCase)) // Skip player's team
+            .Where(n => string.IsNullOrEmpty(playerSpouse) || !(n.Name2 ?? n.Name).Equals(playerSpouse, StringComparison.OrdinalIgnoreCase)) // Skip player's spouse
             .Where(n => n.Darkness > n.Chivalry || _random.Next(100) < 20) // Evil or random chance
             .ToList();
 

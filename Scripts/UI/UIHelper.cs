@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace UsurperRemake.UI
 {
@@ -312,6 +313,20 @@ namespace UsurperRemake.UI
             if (GameConfig.ScreenReaderMode) return;
             terminal.SetColor(color);
             terminal.WriteLine(new string('─', width));
+        }
+
+        /// <summary>
+        /// A moment of silence — clears the screen and holds for a dramatic pause.
+        /// Skipped in screen reader mode (silence is meaningless without visuals).
+        /// </summary>
+        public static async Task MomentOfSilence(TerminalEmulator terminal, int durationMs)
+        {
+            if (GameConfig.ScreenReaderMode) return;
+            if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+                terminal.WriteRawAnsi("\x1b[2J\x1b[H");
+            else
+                terminal.ClearScreen();
+            await Task.Delay(durationMs);
         }
     }
 }

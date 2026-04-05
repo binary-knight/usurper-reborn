@@ -239,6 +239,12 @@ namespace UsurperRemake.Systems
                                                     equipment.IntelligenceBonus += value;
                                                     equipment.CharismaBonus += value;
                                                     break;
+                                                case LootGenerator.SpecialEffect.BossSlayer:
+                                                    equipment.HasBossSlayer = true;
+                                                    break;
+                                                case LootGenerator.SpecialEffect.TitanResolve:
+                                                    equipment.HasTitanResolve = true;
+                                                    break;
                                             }
                                         }
                                     }
@@ -308,7 +314,7 @@ namespace UsurperRemake.Systems
                                 // Slot might have an ID that's not in the database — force clear it
                                 if (player.EquippedItems.TryGetValue(slot, out var rawId) && rawId != 0)
                                 {
-                                    player.EquippedItems[slot] = 0;
+                                    player.EquippedItems.Remove(slot);
                                     player.RecalculateStats();
                                     resultMessage = "Slot cleared";
                                     resultType = "success";
@@ -1142,6 +1148,12 @@ namespace UsurperRemake.Systems
                             equipment.ConstitutionBonus += value;
                             equipment.IntelligenceBonus += value;
                             equipment.CharismaBonus += value;
+                            break;
+                        case LootGenerator.SpecialEffect.BossSlayer:
+                            equipment.HasBossSlayer = true;
+                            break;
+                        case LootGenerator.SpecialEffect.TitanResolve:
+                            equipment.HasTitanResolve = true;
                             break;
                     }
                 }

@@ -389,6 +389,14 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Get the IDs of currently active companions.
+        /// </summary>
+        public List<CompanionId> GetActiveCompanionIds()
+        {
+            return activeCompanions.ToList();
+        }
+
+        /// <summary>
         /// Get all recruited companions (active or not, but alive)
         /// </summary>
         public IEnumerable<Companion> GetRecruitedCompanions()
@@ -865,7 +873,8 @@ namespace UsurperRemake.Systems
                 if (companion == null || companion.IsDead) continue;
 
                 // Check if companion has Sacrifice ability
-                if (!companion.Abilities.Contains("Sacrifice")) continue;
+                bool canSacrifice = companion.Id == CompanionId.Aldric || companion.LoyaltyLevel >= 90;
+                if (!canSacrifice) continue;
 
                 // Check if companion has enough loyalty/trust to sacrifice
                 // Higher loyalty = more likely to sacrifice
@@ -1009,6 +1018,9 @@ namespace UsurperRemake.Systems
             // Display death scene
             await DisplayDeathScene(companion, type, circumstance, terminal);
 
+            // Moment of silence — let the weight of loss sink in
+            await UsurperRemake.UI.UIHelper.MomentOfSilence(terminal, 5000);
+
             companion.IsDead = true;
             companion.IsActive = false;
             companion.DeathType = type;
@@ -1036,6 +1048,11 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("companion.equipment_returned", companion.Name, itemsReturned));
                     }
+                }
+                else
+                {
+                    DebugLogger.Instance.LogError("COMPANION", $"KillCompanion: player is null, cannot return {companion.EquippedItems.Count} equipped items from {companion.Name}");
+                    companion.EquippedItems.Clear();
                 }
             }
 
@@ -2288,6 +2305,146 @@ namespace UsurperRemake.Systems
                     companion.BaseStats.HealingPower = 0;
                     break;
             }
+        }
+
+        #endregion
+
+        #region Dungeon Idle Comments
+
+        private static HashSet<string>? _recentIdleComments;
+
+        /// <summary>
+        /// Clear the idle comment history — call on dungeon entry to allow repeats on new runs.
+        /// </summary>
+        public static void ResetIdleCommentHistory()
+        {
+            _recentIdleComments = new HashSet<string>();
+        }
+
+        /// <summary>
+        /// Get a context-sensitive idle comment from a companion, or null if nothing to say.
+        /// Returns null ~85% of the time (15% trigger rate is handled by caller).
+        /// </summary>
+        public static string? GetCompanionIdleComment(CompanionId id, int dungeonLevel, Character player, bool afterCombat)
+        {
+            _recentIdleComments ??= new HashSet<string>();
+
+            var pool = new List<string>();
+
+            // Base comments per companion
+            switch (id)
+            {
+                case CompanionId.Aldric:
+                    pool.AddRange(new[]
+                    {
+                        "Aldric checks the walls for structural weaknesses, old habits from Fort Ashwall.",
+                        "Aldric adjusts his shield. \"Tight corridors. Good for defense.\"",
+                        "\"I've held worse positions than this,\" Aldric murmurs, scanning ahead.",
+                        "Aldric runs a hand along the stone. \"Dwarven work. Old, but solid.\"",
+                        "\"Stay close. I don't like these blind corners.\"",
+                        "Aldric pauses to tighten a strap. \"Ready when you are.\"",
+                        "\"Fort Ashwall had tunnels like these. We lost good men in them.\"",
+                        "Aldric nods to you. \"I've got your back. Always.\"",
+                        "\"These walls have seen worse than us,\" Aldric says quietly.",
+                        "Aldric peers into the darkness ahead. \"Something moved. Maybe.\"",
+                    });
+                    if (afterCombat) pool.Add("Aldric cleans his blade. \"Not bad. Could've been cleaner.\"");
+                    if (dungeonLevel >= 40) pool.Add("\"We're deep now. The air feels... wrong.\"");
+                    if (dungeonLevel >= 70) pool.Add("\"I can feel them. The Old Gods. Even the stone is afraid.\"");
+                    if (player.HP < player.MaxHP / 3) pool.Add("\"You're hurt. We should find somewhere safe.\"");
+                    break;
+
+                case CompanionId.Vex:
+                    pool.AddRange(new[]
+                    {
+                        "Vex is rummaging through a pile of rubble. \"Nope. Junk. More junk.\"",
+                        "\"You know what this dungeon needs? Better loot. I'm just saying.\"",
+                        "Vex coughs quietly, then waves it off. \"Dust. It's the dust.\"",
+                        "\"Did you know that ancient treasure vaults always smell like this? Me neither.\"",
+                        "Vex flips a coin. Catches it. Grins.",
+                        "\"I'm not dying down here. That would be embarrassing.\"",
+                        "Vex picks a lock on a chest that doesn't exist. \"Practice.\"",
+                        "\"My disease doesn't define me. But it does have excellent timing.\"",
+                        "Vex leans against a wall. \"Just... resting my eyes. One second.\"",
+                        "\"Think there's treasure behind this wall? There's always treasure behind walls.\"",
+                    });
+                    if (afterCombat) pool.Add("\"Dibs on anything shiny. I called it first.\"");
+                    if (dungeonLevel >= 50) pool.Add("Vex is unusually quiet. You catch him staring at nothing.");
+                    if (player.Gold > 10000) pool.Add("\"You know, for a hero, you're sitting on a lot of gold. Just observing.\"");
+                    break;
+
+                case CompanionId.Lyris:
+                    pool.AddRange(new[]
+                    {
+                        "Lyris tilts her head, listening to something only she can hear.",
+                        "\"The air currents here... they flow deeper than they should.\"",
+                        "Lyris traces a glyph on the wall. \"Old magic. Fading.\"",
+                        "\"Nature doesn't reach down here. That's what makes it sad.\"",
+                        "Lyris closes her eyes briefly. \"The spirits are restless on this floor.\"",
+                        "\"Do you feel it? The stone remembers who built these halls.\"",
+                        "Lyris adjusts her bow. \"Something ahead. I can sense it.\"",
+                        "\"Aurelion walked these halls once. I can feel his footprints in the light.\"",
+                        "Lyris hums a melody you almost recognize. Then stops.",
+                        "\"The deeper we go, the closer to the truth.\"",
+                    });
+                    if (afterCombat) pool.Add("Lyris touches a fallen enemy gently. \"Return to the earth.\"");
+                    if (dungeonLevel >= 60) pool.Add("\"We're close to his domain. Aurelion... I'm coming.\"");
+                    if (dungeonLevel >= 80) pool.Add("Lyris's eyes glow faintly. \"The divine and mortal are thin here.\"");
+                    break;
+
+                case CompanionId.Mira:
+                    pool.AddRange(new[]
+                    {
+                        "Mira presses her hand against the wall. \"So much suffering in these stones.\"",
+                        "\"Let me know if anyone needs healing. That's... what I'm here for.\"",
+                        "Mira whispers a prayer. The shadows pull back, just slightly.",
+                        "\"Every room we clear, someone doesn't have to die in it.\"",
+                        "\"I used to wonder if healing was enough. Down here, it has to be.\"",
+                        "Mira checks her bandages. Always prepared. Always worried.",
+                        "\"Faith isn't about certainty. It's about walking into the dark anyway.\"",
+                        "Mira looks at her hands. \"I've healed so many. Why can't I heal myself?\"",
+                        "\"Stay safe. I only have so many miracles left today.\"",
+                        "Mira smiles, barely. \"We're alive. That's today's victory.\"",
+                    });
+                    if (afterCombat) pool.Add("Mira kneels beside a wound. \"Hold still. This will sting.\"");
+                    if (player.HP < player.MaxHP / 2) pool.Add("\"You're hurt — come here, let me look at that.\"");
+                    if (dungeonLevel >= 50) pool.Add("\"The deeper we go, the more I question. Is any god worth this?\"");
+                    break;
+
+                case CompanionId.Melodia:
+                    pool.AddRange(new[]
+                    {
+                        "Melodia hums softly. The acoustics down here are surprisingly good.",
+                        "\"Every dungeon has a rhythm. Listen — can you hear it?\"",
+                        "Melodia taps a wall. \"E flat. This whole corridor is in E flat.\"",
+                        "\"My old party used to sing in places like this. Before...\"",
+                        "Melodia adjusts her instrument. \"Music soothes monsters too. Sometimes.\"",
+                        "\"I'm composing something. In my head. For when we get out.\"",
+                        "Melodia pauses at an echo. \"Beautiful. Terrible. Both.\"",
+                        "\"They say Thorgrim once played a war drum that shook mountains.\"",
+                        "Melodia strums a quiet chord. The darkness seems less heavy.",
+                        "\"A song for the fallen. I keep adding verses.\"",
+                    });
+                    if (afterCombat) pool.Add("Melodia plays a brief requiem. \"For those who fell here before us.\"");
+                    if (dungeonLevel >= 50) pool.Add("\"The Lost Opus... I can almost hear it echoing from deeper down.\"");
+                    if (dungeonLevel >= 70) pool.Add("\"The Old Gods had their own songs. Terrible, beautiful songs.\"");
+                    break;
+            }
+
+            if (pool.Count == 0) return null;
+
+            // Filter out recently used comments
+            var available = pool.Where(c => !_recentIdleComments.Contains(c)).ToList();
+            if (available.Count == 0)
+            {
+                // All used — reset and allow all again
+                _recentIdleComments.Clear();
+                available = pool;
+            }
+
+            var comment = available[Random.Shared.Next(available.Count)];
+            _recentIdleComments.Add(comment);
+            return comment;
         }
 
         #endregion

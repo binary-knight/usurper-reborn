@@ -339,6 +339,8 @@ public class DailySystemManager
         player.SethFightsToday = 0;
         player.ArmWrestlesToday = 0;
         player.RoyQuestsToday = 0;
+        player.InnDuelsToday = 0;
+        player.MealsToday = 0;
         player.LastPrayerRealDate = DateTime.MinValue;
         player.LastInnerSanctumRealDate = DateTime.MinValue;
         player.LastBindingOfSoulsRealDate = DateTime.MinValue;
@@ -442,7 +444,15 @@ public class DailySystemManager
             player.Gold += servantsGold;
             terminal?.WriteLine($"Your servants collected {servantsGold:N0} gold in rent and services.", "bright_yellow");
         }
-        
+
+        // Child daily gold bonus
+        var childGold = FamilySystem.Instance?.GetChildDailyGoldBonus(player) ?? 0;
+        if (childGold > 0)
+        {
+            player.Gold += childGold;
+            terminal?.WriteLine($"Your children contributed {childGold:N0} gold to the household.", "bright_yellow");
+        }
+
         // Process daily events
         // In online mode, only process player-specific events (WorldSimService handles king/world)
         if (DoorMode.IsOnlineMode)

@@ -264,6 +264,24 @@ public partial class CombatEngine
                 attacker.SongBuffValue2 = 0f;
             }
         }
+        if (attacker.FoodBuffCombats > 0)
+        {
+            attacker.FoodBuffCombats--;
+            if (attacker.FoodBuffCombats <= 0)
+            {
+                attacker.FoodBuffType = 0;
+                attacker.FoodBuffValue = 0f;
+            }
+        }
+
+        // Iron Rations food buff: temporarily increase max HP by 15%
+        long ironRationsHPBonus = 0;
+        if (attacker.FoodBuffCombats > 0 && attacker.FoodBuffType == 3)
+        {
+            ironRationsHPBonus = (long)(attacker.MaxHP * attacker.FoodBuffValue);
+            attacker.MaxHP += ironRationsHPBonus;
+            attacker.HP += ironRationsHPBonus;
+        }
 
         // Ensure abilities are learned based on current level (fixes abilities not showing in quickbar)
         if (!ClassAbilitySystem.IsSpellcaster(attacker.Class))
@@ -377,6 +395,13 @@ public partial class CombatEngine
         {
             attacker.HP = godModeHP;
             attacker.Mana = godModeMana;
+        }
+
+        // Reverse Iron Rations temporary MaxHP boost after PvP combat
+        if (ironRationsHPBonus > 0)
+        {
+            attacker.MaxHP -= ironRationsHPBonus;
+            if (attacker.HP > attacker.MaxHP) attacker.HP = attacker.MaxHP;
         }
 
         // Advance game time based on combat duration (single-player only)
@@ -510,6 +535,15 @@ public partial class CombatEngine
                 player.SongBuffValue2 = 0f;
             }
         }
+        if (player.FoodBuffCombats > 0)
+        {
+            player.FoodBuffCombats--;
+            if (player.FoodBuffCombats <= 0)
+            {
+                player.FoodBuffType = 0;
+                player.FoodBuffValue = 0f;
+            }
+        }
         if (player.SettlementBuffCombats > 0)
         {
             // TrapResist buff counts down per trap encounter, not per combat
@@ -522,6 +556,15 @@ public partial class CombatEngine
                     player.SettlementBuffValue = 0f;
                 }
             }
+        }
+
+        // Iron Rations food buff: temporarily increase max HP by 15%
+        long mmIronRationsHPBonus = 0;
+        if (player.FoodBuffCombats > 0 && player.FoodBuffType == 3)
+        {
+            mmIronRationsHPBonus = (long)(player.MaxHP * player.FoodBuffValue);
+            player.MaxHP += mmIronRationsHPBonus;
+            player.HP += mmIronRationsHPBonus;
         }
 
         // Ensure abilities are learned based on current level (fixes abilities not showing)
@@ -1406,6 +1449,13 @@ public partial class CombatEngine
             };
             int fatigueCost = Math.Max(1, (int)(baseFatigueCost * armorFatigueMult));
             player.Fatigue = Math.Min(100, player.Fatigue + fatigueCost);
+        }
+
+        // Reverse Iron Rations temporary MaxHP boost after multi-monster combat
+        if (mmIronRationsHPBonus > 0)
+        {
+            player.MaxHP -= mmIronRationsHPBonus;
+            if (player.HP > player.MaxHP) player.HP = player.MaxHP;
         }
 
         return result;
@@ -2945,6 +2995,12 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * attacker.HerbBuffValue);
         }
 
+        // Inn food buff: Dragon Steak (+10% damage) or Food Poisoning (-5% damage)
+        if (attacker.FoodBuffCombats > 0 && (attacker.FoodBuffType == 1 || attacker.FoodBuffType == 5))
+        {
+            attackPower += (long)(attackPower * attacker.FoodBuffValue);
+        }
+
         // Song buff: War March (+ATK%) or Battle Hymn (+ATK%)
         if (attacker.SongBuffCombats > 0 && (attacker.SongBuffType == 1 || attacker.SongBuffType == 4))
         {
@@ -4192,6 +4248,12 @@ public partial class CombatEngine
         if (player.HerbBuffType == (int)HerbType.IronbarkRoot && player.HerbBuffCombats > 0)
         {
             playerDefense += (long)(playerDefense * player.HerbBuffValue);
+        }
+
+        // Inn food buff: Honey Bread (+10% defense) or Food Poisoning (-5% defense)
+        if (player.FoodBuffCombats > 0 && (player.FoodBuffType == 2 || player.FoodBuffType == 5))
+        {
+            playerDefense += (long)(playerDefense * player.FoodBuffValue);
         }
 
         // Song buff: Lullaby of Iron (+DEF%) or Battle Hymn (+DEF%)
@@ -7292,6 +7354,12 @@ public partial class CombatEngine
                                 equipment.ConstitutionBonus += value;
                                 equipment.IntelligenceBonus += value;
                                 equipment.CharismaBonus += value;
+                                break;
+                            case LootGenerator.SpecialEffect.BossSlayer:
+                                equipment.HasBossSlayer = true;
+                                break;
+                            case LootGenerator.SpecialEffect.TitanResolve:
+                                equipment.HasTitanResolve = true;
                                 break;
                         }
                     }
@@ -10469,6 +10537,8 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * player.LoversBlissBonus);
                         if (player.HerbBuffType == (int)HerbType.FirebloomPetal && player.HerbBuffCombats > 0)
                             attackPower += (long)(attackPower * player.HerbBuffValue);
+                        if (player.FoodBuffCombats > 0 && (player.FoodBuffType == 1 || player.FoodBuffType == 5))
+                            attackPower += (long)(attackPower * player.FoodBuffValue);
                         if (player.SongBuffCombats > 0 && (player.SongBuffType == 1 || player.SongBuffType == 4))
                             attackPower += (long)(attackPower * player.SongBuffValue);
                         if (player.DivineBlessingCombats > 0 && player.DivineBlessingBonus > 0f)
@@ -22892,14 +22962,14 @@ public partial class CombatEngine
 
     /// <summary>
     /// Apply diminishing returns to weapon power for combat calculations.
-    /// First 800 WeapPow has full effect; above that, 50% effectiveness.
+    /// First 1200 WeapPow has full effect; above that, 50% effectiveness.
     /// This prevents extreme weapon stacking from producing absurd damage
     /// while preserving normal high-level progression.
     /// Display/UI code should still show raw WeapPow.
     /// </summary>
     private static long GetEffectiveWeapPow(long weapPow)
     {
-        const long SoftCap = 800;
+        const long SoftCap = 1200;
         const float DiminishingRate = 0.50f;
         if (weapPow <= SoftCap) return weapPow;
         return SoftCap + (long)((weapPow - SoftCap) * DiminishingRate);

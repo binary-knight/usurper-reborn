@@ -372,9 +372,10 @@ public class WorldSimulator
         // Skip age-dead and perma-dead NPCs - they don't come back
         foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead))
         {
-            if (!deadNPCRespawnTimers.ContainsKey(npc.Name))
+            var respawnKey = npc.Id ?? npc.Name;
+            if (!deadNPCRespawnTimers.ContainsKey(respawnKey))
             {
-                deadNPCRespawnTimers[npc.Name] = NPC_RESPAWN_TICKS;
+                deadNPCRespawnTimers[respawnKey] = NPC_RESPAWN_TICKS;
                 if (!IsCatchUpMode)
                     UsurperRemake.Systems.DebugLogger.Instance.LogDebug("NPC", $"{npc.Name} added to respawn queue ({NPC_RESPAWN_TICKS} ticks)");
             }
@@ -545,21 +546,24 @@ public class WorldSimulator
         bool permadeath = RollPermadeath(npc, basePermadeathChance);
         if (permadeath)
         {
-            // npc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
-            // deadNPCRespawnTimers.Remove(npc.Name);
+            // Permadeath is disabled — NPCs now respawn after death.
+            // npc.IsPermaDead = true;
+            // deadNPCRespawnTimers.Remove(npc.Id ?? npc.Name);
 
-            // Big news — this one isn't coming back
-            NewsSystem.Instance?.Newsy(
-                $"\u2620 {npc.Name} has been slain by {killerName} and will not return. The realm mourns.");
+            // Permadeath news and log suppressed because permadeath is disabled.
+            // NPCs will respawn, so "will not return" messages would be misleading.
+            // NewsSystem.Instance?.Newsy(
+            //     $"\u2620 {npc.Name} has been slain by {killerName} and will not return. The realm mourns.");
 
             // Witnesses record the permanent death
             SocialInfluenceSystem.RecordWitnesses(npcs, location,
                 killerName, npc.Name2 ?? npc.Name, WitnessEventType.SawMurder);
 
-            DebugLogger.Instance.LogInfo("PERMADEATH", $"{npc.Name} permanently killed by {killerName} (chance was {basePermadeathChance:P0})");
+            // DebugLogger.Instance.LogInfo("PERMADEATH", $"{npc.Name} permanently killed by {killerName} (chance was {basePermadeathChance:P0})");
 
-            // Widow the spouse and clear marriage registry
-            if (npc.Married || npc.IsMarried)
+            // Only trigger bereavement for truly permanent deaths (aged death or permadeath).
+            // Temporary deaths (NPC will respawn) should not destroy marriages.
+            if ((npc.IsAgedDeath || npc.IsPermaDead) && (npc.Married || npc.IsMarried))
             {
                 HandleSpouseBereavement(npc);
             }
@@ -569,7 +573,7 @@ public class WorldSimulator
         }
         else
         {
-            QueueNPCForRespawn(npc.Name);
+            QueueNPCForRespawn(npc.Id ?? npc.Name);
             NewsSystem.Instance.WriteDeathNews(npc.Name, killerName, location);
         }
 
@@ -652,10 +656,11 @@ public class WorldSimulator
         // Skip permanently dead NPCs (aged death and permadeath)
         foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead))
         {
-            if (!deadNPCRespawnTimers.ContainsKey(npc.Name))
+            var respawnKey = npc.Id ?? npc.Name;
+            if (!deadNPCRespawnTimers.ContainsKey(respawnKey))
             {
                 // NPCs from saves respawn faster - just 2 ticks (~2 min) instead of 10
-                deadNPCRespawnTimers[npc.Name] = 2;
+                deadNPCRespawnTimers[respawnKey] = 2;
                 UsurperRemake.Systems.DebugLogger.Instance.LogDebug("NPC", $"Queued {npc.Name} for fast respawn (2 ticks)");
             }
         }
@@ -684,7 +689,7 @@ public class WorldSimulator
 
         foreach (var npcName in toRespawn)
         {
-            var npc = npcs.FirstOrDefault(n => n.Name == npcName);
+            var npc = npcs.FirstOrDefault(n => (n.Id ?? n.Name) == npcName);
             if (npc != null)
             {
                 // Age death and permadeath are permanent - they don't come back
@@ -885,7 +890,7 @@ public class WorldSimulator
                     CheckKingDeath(npc);
 
                     // Remove from respawn queue if somehow queued
-                    deadNPCRespawnTimers.Remove(npc.Name);
+                    deadNPCRespawnTimers.Remove(npc.Id ?? npc.Name);
 
                     // Handle marriage - widow the spouse
                     if (npc.Married || npc.IsMarried)
@@ -917,8 +922,8 @@ public class WorldSimulator
     {
         var aliveNPCs = npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead).ToList();
 
-        // Skip diversity immigration when population is high — only extinction prevention
-        bool populationHigh = aliveNPCs.Count >= 200;
+        // Diversity immigration runs regardless of population size
+        bool populationHigh = false;
 
         // Calculate average level of alive NPCs for immigrant scaling
         int avgLevel = aliveNPCs.Count > 0 ? Math.Max(1, (int)aliveNPCs.Average(n => n.Level)) : 5;
@@ -934,17 +939,17 @@ public class WorldSimulator
                 raceCounts[npc.Race]++;
         }
 
-        // Phase 1: Extinction prevention — races below 2 get immediate immigrants (always active)
+        // Phase 1: Extinction prevention — races below 5 get immediate immigrants (always active)
         foreach (var kvp in raceCounts)
         {
-            if (kvp.Value >= 2) continue;
+            if (kvp.Value >= 5) continue;
 
-            int needed = 2 - kvp.Value;
-            var sexes = new[] { CharacterSex.Male, CharacterSex.Female };
+            int needed = 5 - kvp.Value;
 
-            for (int i = 0; i < needed && i < sexes.Length; i++)
+            for (int i = 0; i < needed; i++)
             {
-                SpawnImmigrant(kvp.Key, sexes[i], avgLevel);
+                var sex = (i % 2 == 0) ? CharacterSex.Male : CharacterSex.Female;
+                SpawnImmigrant(kvp.Key, sex, avgLevel);
             }
         }
 

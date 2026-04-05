@@ -748,6 +748,10 @@ public class Equipment
     public int HPRegen { get; set; }               // HP restored per combat round
     public int ManaRegen { get; set; }             // Mana restored per combat round
 
+    // World boss exclusive loot effects (v0.54.0)
+    public bool HasBossSlayer { get; set; }        // +10% damage vs bosses
+    public bool HasTitanResolve { get; set; }      // +5% defense
+
     /// <summary>
     /// Create a new equipment item
     /// </summary>
