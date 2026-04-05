@@ -151,8 +151,9 @@ jobs:
           dotnet publish usurper-reloaded.csproj -c Release -r win-x64 -o build/windows-x64 \
             -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
           if [ -f "build/windows-x64/UsurperReborn.exe" ]; then
-            # Copy Windows launcher
+            # Copy Windows launcher and auto-update script
             cp launchers/UsurperReborn.bat build/windows-x64/
+            cp scripts-server/updatecheck.ps1 build/windows-x64/
             echo "✅ Windows 64-bit publish successful"
           else
             echo "Windows 64-bit publish failed"
@@ -166,8 +167,9 @@ jobs:
           dotnet publish usurper-reloaded.csproj -c Release -r win-x86 -o build/windows-x86 \
             -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
           if [ -f "build/windows-x86/UsurperReborn.exe" ]; then
-            # Copy Windows launcher
+            # Copy Windows launcher and auto-update script
             cp launchers/UsurperReborn.bat build/windows-x86/
+            cp scripts-server/updatecheck.ps1 build/windows-x86/
             echo "✅ Windows 32-bit publish successful"
           else
             echo "Windows 32-bit publish failed"
@@ -184,6 +186,8 @@ jobs:
             chmod +x "build/linux-x64/UsurperReborn"
             cp launchers/usurper-reborn.sh build/linux-x64/
             chmod +x build/linux-x64/usurper-reborn.sh
+            cp scripts-server/updatecheck.sh build/linux-x64/
+            chmod +x build/linux-x64/updatecheck.sh
             echo "✅ Linux x64 publish successful"
           else
             echo "Linux x64 publish failed"
@@ -200,6 +204,8 @@ jobs:
             chmod +x "build/linux-arm64/UsurperReborn"
             cp launchers/usurper-reborn.sh build/linux-arm64/
             chmod +x build/linux-arm64/usurper-reborn.sh
+            cp scripts-server/updatecheck.sh build/linux-arm64/
+            chmod +x build/linux-arm64/updatecheck.sh
             echo "✅ Linux ARM64 publish successful"
           else
             echo "Linux ARM64 publish failed"
