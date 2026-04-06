@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.54.0";
+    public const string Version = "0.54.1";
     public const string VersionName = "The Soul Update";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -969,10 +969,22 @@ public static partial class GameConfig
     public const float FatigueExhaustedDefensePenalty = -0.10f; // -10% defense when Exhausted
     public const float FatigueExhaustedXPPenalty = -0.10f;    // -10% XP when Exhausted
     // Session XP diminishing returns (v0.54.0) — online mode only
-    public const long SessionXPDiminishThreshold = 50000;      // XP earned before diminishing kicks in
+    // Threshold scales with level: max(50000, XP_for_next_level * 2) — always allows ~2 full levels per session
+    public const long SessionXPDiminishBaseThreshold = 50000;   // Minimum threshold for low-level players
     public const double SessionXPDiminishRate = 0.002;          // 0.2% reduction per 1000 XP over threshold
     public const double SessionXPDiminishFloor = 0.25;          // Never reduce below 25% XP
     public const int SessionXPDiminishMessageInterval = 10;     // Show fatigue message every N combats
+
+    /// <summary>
+    /// Get the session XP threshold for a given player level.
+    /// Scales with level so higher-level players can earn proportionally more XP per session.
+    /// At level 10: 50,000. At level 50: 260,100. At level 71: 518,400. At level 100: 1,020,100.
+    /// </summary>
+    public static long GetSessionXPThreshold(int level)
+    {
+        long nextLevelXP = (long)(Math.Pow(level + 1, 2.0) * 50);
+        return Math.Max(SessionXPDiminishBaseThreshold, nextLevelXP * 2);
+    }
     // Study / Library
     public const float StudyXPBonus = 0.05f;                  // +5% XP from combat
     // Servants' Quarters
@@ -2289,5 +2301,5 @@ public static class TeamXPConfig
     // Catch-up XP bonus for underleveled teammates
     // When an NPC/companion is below the player's level, they get bonus XP to close the gap
     public const double CatchUpBonusPerLevel = 0.10;  // +10% per level behind (e.g. 10 levels behind = +100% = 2x XP)
-    public const double CatchUpMaxMultiplier = 4.0;   // Cap at 4x total XP (prevents extreme jumps)
+    public const double CatchUpMaxMultiplier = double.MaxValue;   // Uncapped — underleveled NPCs scale freely
 }

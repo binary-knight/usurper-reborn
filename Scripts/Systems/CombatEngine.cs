@@ -22558,10 +22558,11 @@ public partial class CombatEngine
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
             return expReward;
 
-        // Apply diminishing returns if over threshold
-        if (player.SessionXPEarned > GameConfig.SessionXPDiminishThreshold)
+        // Apply diminishing returns if over threshold (scales with level)
+        long threshold = GameConfig.GetSessionXPThreshold(player.Level);
+        if (player.SessionXPEarned > threshold)
         {
-            long overThreshold = player.SessionXPEarned - GameConfig.SessionXPDiminishThreshold;
+            long overThreshold = player.SessionXPEarned - threshold;
             double diminishFactor = Math.Max(GameConfig.SessionXPDiminishFloor, 1.0 - (overThreshold / 1000.0) * GameConfig.SessionXPDiminishRate);
             expReward = (long)(expReward * diminishFactor);
 
@@ -22644,7 +22645,7 @@ public partial class CombatEngine
     /// <summary>
     /// Award experience to NPC teammates (spouses, lovers, team members)
     /// NPCs get 75% of the player's XP and can level up during combat (v0.41.4: raised from 50%)
-    /// Underleveled teammates get a catch-up bonus (+10% per level behind, up to 4x)
+    /// Underleveled teammates get a catch-up bonus (+10% per level behind, uncapped)
     /// </summary>
     private void AwardTeammateExperience(List<Character> teammates, long playerXP, TerminalEmulator terminal, int playerLevel = 0)
     {
@@ -25037,9 +25038,10 @@ public partial class CombatEngine
                 playerExp = (long)(playerExp * groupXPMult);
 
             // Session XP diminishing returns (online mode only) — grouped player path
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && groupedPlayer.SessionXPEarned > GameConfig.SessionXPDiminishThreshold)
+            long gpThreshold = GameConfig.GetSessionXPThreshold(groupedPlayer.Level);
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && groupedPlayer.SessionXPEarned > gpThreshold)
             {
-                long gpOverThreshold = groupedPlayer.SessionXPEarned - GameConfig.SessionXPDiminishThreshold;
+                long gpOverThreshold = groupedPlayer.SessionXPEarned - gpThreshold;
                 double gpDiminishFactor = Math.Max(GameConfig.SessionXPDiminishFloor, 1.0 - (gpOverThreshold / 1000.0) * GameConfig.SessionXPDiminishRate);
                 playerExp = (long)(playerExp * gpDiminishFactor);
             }
@@ -25080,10 +25082,10 @@ public partial class CombatEngine
                     rewardMsg += $"\n\u001b[33m  (Group level gap penalty: {(int)(groupXPMult * 100)}% XP rate)\u001b[0m";
 
                 // Session XP diminishing message for grouped players
-                if (groupedPlayer.SessionXPEarned > GameConfig.SessionXPDiminishThreshold
+                if (groupedPlayer.SessionXPEarned > gpThreshold
                     && groupedPlayer.SessionCombatCount % GameConfig.SessionXPDiminishMessageInterval == 0)
                 {
-                    long gpMsgOver = groupedPlayer.SessionXPEarned - GameConfig.SessionXPDiminishThreshold;
+                    long gpMsgOver = groupedPlayer.SessionXPEarned - gpThreshold;
                     int gpPct = (int)(Math.Max(GameConfig.SessionXPDiminishFloor, 1.0 - (gpMsgOver / 1000.0) * GameConfig.SessionXPDiminishRate) * 100);
                     rewardMsg += $"\n\u001b[33m  {Loc.Get("combat.session_xp_diminished")}\u001b[0m";
                     rewardMsg += $"\n\u001b[33m  {Loc.Get("combat.session_xp_reduced", gpPct.ToString())}\u001b[0m";

@@ -1003,13 +1003,13 @@ namespace UsurperRemake.Systems
             int targetPerClass = aliveNPCs.Count / classCount;
             int minThreshold = Math.Max(3, (targetPerClass * 2) / 3); // Classes below this get donors
 
-            // Count alive NPCs per class
+            // Count alive NPCs per class (base classes only — prestige/MysticShaman excluded from rebalancing)
             var classCounts = new Dictionary<CharacterClass, int>();
             for (int i = 0; i < classCount; i++)
                 classCounts[(CharacterClass)i] = 0;
             foreach (var npc in aliveNPCs)
             {
-                if ((int)npc.Class < classCount)
+                if (classCounts.ContainsKey(npc.Class))
                     classCounts[npc.Class]++;
             }
 
@@ -1047,6 +1047,7 @@ namespace UsurperRemake.Systems
                 int donorFloor = Math.Max(minThreshold, classCounts[targetClass] + 2);
                 var donorPool = aliveNPCs
                     .Where(n => n.Class != targetClass
+                        && classCounts.ContainsKey(n.Class)
                         && classCounts[n.Class] > donorFloor
                         && string.IsNullOrEmpty(n.Team)
                         && !n.CTurf
@@ -1060,7 +1061,7 @@ namespace UsurperRemake.Systems
                 {
                     if (needed <= 0) break;
                     // Don't drain donor class below the donor floor
-                    if (classCounts[npc.Class] <= donorFloor) continue;
+                    if (!classCounts.ContainsKey(npc.Class) || classCounts[npc.Class] <= donorFloor) continue;
 
                     // Reassign class
                     var oldClass = npc.Class;
