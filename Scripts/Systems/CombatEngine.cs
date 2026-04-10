@@ -22742,14 +22742,44 @@ public partial class CombatEngine
         // If player explicitly set 100% for themselves, respect that choice
         if (player.TeamXPPercent[0] == 100) return;
 
-        // Always redistribute evenly among surviving members (player + alive teammates)
-        // This handles the case where a teammate dies mid-combat and their share needs redistribution
+        // Check if the player has a custom XP distribution set (any teammate slot > 0%)
+        bool hasCustomDistribution = false;
+        for (int s = 1; s < player.TeamXPPercent.Length; s++)
+        {
+            if (player.TeamXPPercent[s] > 0)
+            {
+                hasCustomDistribution = true;
+                break;
+            }
+        }
+
+        if (hasCustomDistribution)
+        {
+            // Player set custom XP distribution — only zero out dead teammate slots
+            // and redistribute their share to the player
+            for (int s = 1; s < player.TeamXPPercent.Length; s++)
+            {
+                if (s - 1 < teammates.Count)
+                {
+                    var t = teammates[s - 1];
+                    bool isAlive = t != null && !t.IsGroupedPlayer && !t.IsEcho && t.IsAlive && t.HP > 0;
+                    if (!isAlive && player.TeamXPPercent[s] > 0)
+                    {
+                        // Dead teammate — give their share to the player
+                        player.TeamXPPercent[0] += player.TeamXPPercent[s];
+                        player.TeamXPPercent[s] = 0;
+                    }
+                }
+            }
+            return;
+        }
+
+        // No custom distribution — auto-distribute evenly among surviving members
         int totalSlots = 1 + eligibleSlots; // player + alive teammates
         int evenShare = 100 / totalSlots;
         int remainder = 100 - (evenShare * totalSlots);
         player.TeamXPPercent[0] = evenShare + remainder; // Player gets remainder
 
-        int aliveIdx = 0;
         for (int s = 1; s < player.TeamXPPercent.Length; s++)
         {
             if (s - 1 < teammates.Count)

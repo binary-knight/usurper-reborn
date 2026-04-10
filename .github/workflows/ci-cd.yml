@@ -1,238 +1,128 @@
-﻿name: CI/CD Pipeline - Fixed
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   release:
-    types: [ published ]
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      deploy_server:
+        description: 'Deploy to production server'
+        type: boolean
+        default: false
 
 env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+  DOTNET_VERSION: '8.0.x'
+
+# ═══════════════════════════════════════════════════════════════════
+# Job dependency graph:
+#
+#   test ──┬── build (matrix: 6 platforms) ──┬── smoke-test (matrix: 4 platforms)
+#          │                                  ├── bundle-desktop (WezTerm, release only)
+#          │                                  ├── deploy-server (release or manual)
+#          │                                  │
+#          └── build-steam (matrix: 4, rel) ──┤
+#                                             │
+#                                    attach-to-release (release only)
+#                                    steam-package (release only) ── steam-upload
+# ═══════════════════════════════════════════════════════════════════
 
 jobs:
+
+  # ─── TEST ────────────────────────────────────────────────────────
   test:
-    name: Run Tests
+    name: Test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          lfs: false
           fetch-depth: 1
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Cache .NET packages
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+          restore-keys: ${{ runner.os }}-nuget-
 
-      - name: Restore .NET dependencies
-        run: dotnet restore usurper-reloaded.csproj
-        env:
-          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+      - name: Build
+        run: dotnet build usurper-reloaded.csproj -c Release
 
-      - name: Restore Tests dependencies
-        run: |
-          if [ -d "Tests" ] && [ -f "Tests/Tests.csproj" ]; then
-            echo "Restoring Tests project dependencies..."
-            dotnet restore Tests/Tests.csproj
-          fi
-        env:
-          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+      - name: Run tests
+        run: dotnet test Tests/Tests.csproj -c Release --no-build --verbosity normal --logger "console;verbosity=detailed"
 
-      - name: Build C# project
-        run: dotnet build usurper-reloaded.csproj --configuration Release --no-restore
-        env:
-          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
-
-      - name: Build Tests project
-        run: |
-          if [ -d "Tests" ] && [ -f "Tests/Tests.csproj" ]; then
-            echo "Building Tests project..."
-            dotnet build Tests/Tests.csproj --configuration Release --no-restore
-          else
-            echo "No Tests project found, skipping test build"
-          fi
-        env:
-          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
-
-      - name: Run Unit Tests
-        run: |
-          if [ -d "Tests" ] && [ -f "Tests/Tests.csproj" ]; then
-            echo "Running unit tests..."
-            dotnet test Tests/Tests.csproj --configuration Release --no-build --verbosity normal --logger "console;verbosity=detailed"
-          else
-            echo "⚠️ No Tests project found, skipping tests"
-          fi
-        env:
-          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
-
-      - name: Validation Summary
-        run: |
-          echo "✅ Build successful"
-          if [ -d "Tests" ]; then
-            echo "✅ Tests executed"
-          fi
-          echo "✅ Ready for platform builds"
-
+  # ─── BUILD (6 platforms, parallel matrix) ────────────────────────
   build:
-    name: Build All Platforms
+    name: Build ${{ matrix.name }}
     runs-on: ubuntu-latest
     needs: [test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,     name: Windows x64,  artifact: windows-x64-build, platform: windows }
+          - { rid: win-x86,     name: Windows x86,  artifact: windows-x86-build, platform: windows }
+          - { rid: linux-x64,   name: Linux x64,    artifact: linux-x64-build,   platform: linux }
+          - { rid: linux-arm64, name: Linux ARM64,   artifact: linux-arm64-build, platform: linux }
+          - { rid: osx-x64,     name: macOS Intel,  artifact: mac-build,         platform: macos }
+          - { rid: osx-arm64,   name: macOS ARM64,  artifact: mac-arm64-build,   platform: macos }
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
         with:
-          lfs: false
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/cache@v4
         with:
-          dotnet-version: '8.0.x'
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
 
-      - name: Build C# project
-        run: dotnet build usurper-reloaded.csproj --configuration Release
-        env:
-          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
-
-      - name: Create GPL compliance source archive
+      - name: Publish
         run: |
-          # Create source code archive for GPL compliance
-          git archive --format=zip --prefix=usurper-reborn-source/ HEAD > usurper-reborn-source.zip
-          
-          # Create a GPL notice file
-          cat > GPL_NOTICE.txt << 'EOF'
-          USURPER REBORN - GPL v2 COMPLIANCE NOTICE
-          ============================================
-          
-          This software is distributed under the GNU General Public License v2.
-          
-          As required by GPL v2, the complete source code is included with this
-          distribution. You have the right to:
-          
-          - Use this software for any purpose
-          - Study and modify the source code
-          - Distribute copies of the software
-          - Distribute modified versions under the same license
-          
-          SOURCE CODE LOCATION:
-          - Full source: usurper-reborn-source.zip (included)
-          - Online repository: https://github.com/binary-knight/usurper-reborn
-          
-          LICENSE:
-          See LICENSE file for complete GPL v2 terms and conditions.
-          
-          COPYRIGHT:
-          Original Usurper game concept and mechanics.
-          This remake implementation is licensed under GPL v2.
-          EOF
-
-      - name: Create build directories
-        run: |
-          mkdir -p build/windows-x64
-          mkdir -p build/windows-x86
-          mkdir -p build/linux-x64
-          mkdir -p build/linux-arm64
-          mkdir -p build/mac
-
-      # --- Publish platform executables directly from main project ---
-      - name: Publish Windows 64-bit executable
-        run: |
-          echo "Publishing Windows 64-bit executable..."
-          dotnet publish usurper-reloaded.csproj -c Release -r win-x64 -o build/windows-x64 \
+          dotnet publish usurper-reloaded.csproj -c Release -r ${{ matrix.rid }} -o build/ \
             -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-          if [ -f "build/windows-x64/UsurperReborn.exe" ]; then
-            # Copy Windows launcher and auto-update script
-            cp launchers/UsurperReborn.bat build/windows-x64/
-            cp scripts-server/updatecheck.ps1 build/windows-x64/
-            echo "✅ Windows 64-bit publish successful"
-          else
-            echo "Windows 64-bit publish failed"
-            ls -la build/windows-x64/
-            exit 1
-          fi
+          echo "Build output:"
+          ls -lh build/ | head -5
 
-      - name: Publish Windows 32-bit executable
+      - name: Add launchers (Windows)
+        if: matrix.platform == 'windows'
         run: |
-          echo "Publishing Windows 32-bit executable..."
-          dotnet publish usurper-reloaded.csproj -c Release -r win-x86 -o build/windows-x86 \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-          if [ -f "build/windows-x86/UsurperReborn.exe" ]; then
-            # Copy Windows launcher and auto-update script
-            cp launchers/UsurperReborn.bat build/windows-x86/
-            cp scripts-server/updatecheck.ps1 build/windows-x86/
-            echo "✅ Windows 32-bit publish successful"
-          else
-            echo "Windows 32-bit publish failed"
-            ls -la build/windows-x86/
-            exit 1
-          fi
+          cp launchers/UsurperReborn.bat build/
+          cp scripts-server/updatecheck.ps1 build/
 
-      - name: Publish Linux x64 executable
+      - name: Add launchers (Linux)
+        if: matrix.platform == 'linux'
         run: |
-          echo "Publishing Linux x64 executable..."
-          dotnet publish usurper-reloaded.csproj -c Release -r linux-x64 -o build/linux-x64 \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-          if [ -f "build/linux-x64/UsurperReborn" ]; then
-            chmod +x "build/linux-x64/UsurperReborn"
-            cp launchers/usurper-reborn.sh build/linux-x64/
-            chmod +x build/linux-x64/usurper-reborn.sh
-            cp scripts-server/updatecheck.sh build/linux-x64/
-            chmod +x build/linux-x64/updatecheck.sh
-            echo "✅ Linux x64 publish successful"
-          else
-            echo "Linux x64 publish failed"
-            ls -la build/linux-x64/
-            exit 1
-          fi
+          chmod +x build/UsurperReborn
+          cp launchers/usurper-reborn.sh build/ && chmod +x build/usurper-reborn.sh
+          cp scripts-server/updatecheck.sh build/ && chmod +x build/updatecheck.sh
 
-      - name: Publish Linux ARM64 executable
+      - name: Create app bundle (macOS)
+        if: matrix.platform == 'macos'
         run: |
-          echo "Publishing Linux ARM64 executable..."
-          dotnet publish usurper-reloaded.csproj -c Release -r linux-arm64 -o build/linux-arm64 \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-          if [ -f "build/linux-arm64/UsurperReborn" ]; then
-            chmod +x "build/linux-arm64/UsurperReborn"
-            cp launchers/usurper-reborn.sh build/linux-arm64/
-            chmod +x build/linux-arm64/usurper-reborn.sh
-            cp scripts-server/updatecheck.sh build/linux-arm64/
-            chmod +x build/linux-arm64/updatecheck.sh
-            echo "✅ Linux ARM64 publish successful"
-          else
-            echo "Linux ARM64 publish failed"
-            ls -la build/linux-arm64/
-            exit 1
-          fi
+          VERSION="${{ github.event.release.tag_name || '0.0.0-dev' }}"
+          VERSION="${VERSION#v}"
+          ARCH=${{ matrix.rid == 'osx-arm64' && 'arm64' || 'x86_64' }}
 
-      - name: Build macOS executable
-        run: |
-          echo "Building macOS executable..."
-          dotnet publish usurper-reloaded.csproj -c Release -r osx-x64 -o build/mac-temp \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-          
-          # Create macOS app bundle structure
-          mkdir -p "build/mac/usurper-reborn.app/Contents/MacOS"
-          mkdir -p "build/mac/usurper-reborn.app/Contents/Resources"
-          
-          # Copy executable
-          if [ -f "build/mac-temp/UsurperReborn" ]; then
-            cp "build/mac-temp/UsurperReborn" "build/mac/usurper-reborn.app/Contents/MacOS/usurper-reborn"
-            chmod +x "build/mac/usurper-reborn.app/Contents/MacOS/usurper-reborn"
-            
-            # Copy other files
-            cp -r build/mac-temp/* build/mac/usurper-reborn.app/Contents/Resources/ 2>/dev/null || true
-            
-            # Create Info.plist
-            cat > "build/mac/usurper-reborn.app/Contents/Info.plist" << 'EOF'
+          # Move publish output aside, rebuild as app bundle
+          mv build publish-out
+          mkdir -p build/usurper-reborn.app/Contents/MacOS
+          mkdir -p build/usurper-reborn.app/Contents/Resources
+
+          cp publish-out/UsurperReborn build/usurper-reborn.app/Contents/MacOS/usurper-reborn
+          chmod +x build/usurper-reborn.app/Contents/MacOS/usurper-reborn
+          cp -r publish-out/* build/usurper-reborn.app/Contents/Resources/ 2>/dev/null || true
+
+          cat > build/usurper-reborn.app/Contents/Info.plist << PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -244,308 +134,234 @@ jobs:
             <key>CFBundleName</key>
             <string>Usurper Reborn</string>
             <key>CFBundleVersion</key>
-            <string>1.0</string>
+            <string>${VERSION}</string>
             <key>CFBundleShortVersionString</key>
-            <string>1.0</string>
-          </dict>
-          </plist>
-          EOF
-            
-            # Copy macOS launcher (alternative to app bundle)
-            cp launchers/usurper-reborn-mac.command build/mac/
-            chmod +x build/mac/usurper-reborn-mac.command
-
-            # Create zip file
-            cd "build/mac"
-            zip -r "usurper-reborn.zip" "usurper-reborn.app" "usurper-reborn-mac.command"
-            cd "../.."
-
-            echo "✅ macOS build successful"
-          else
-            echo "ERROR: macOS build failed - executable not created"
-            ls -la build/mac-temp/
-            exit 1
-          fi
-
-      - name: Build macOS ARM64 executable
-        run: |
-          echo "Building macOS ARM64 (Apple Silicon) executable..."
-          dotnet publish usurper-reloaded.csproj -c Release -r osx-arm64 -o build/mac-arm64-temp \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-
-          # Create macOS app bundle structure for ARM64
-          mkdir -p "build/mac-arm64/usurper-reborn.app/Contents/MacOS"
-          mkdir -p "build/mac-arm64/usurper-reborn.app/Contents/Resources"
-
-          # Copy executable
-          if [ -f "build/mac-arm64-temp/UsurperReborn" ]; then
-            cp "build/mac-arm64-temp/UsurperReborn" "build/mac-arm64/usurper-reborn.app/Contents/MacOS/usurper-reborn"
-            chmod +x "build/mac-arm64/usurper-reborn.app/Contents/MacOS/usurper-reborn"
-
-            # Copy other files
-            cp -r build/mac-arm64-temp/* build/mac-arm64/usurper-reborn.app/Contents/Resources/ 2>/dev/null || true
-
-            # Create Info.plist
-            cat > "build/mac-arm64/usurper-reborn.app/Contents/Info.plist" << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleExecutable</key>
-            <string>usurper-reborn</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.usurperreloaded.game</string>
-            <key>CFBundleName</key>
-            <string>Usurper Reborn</string>
-            <key>CFBundleVersion</key>
-            <string>1.0</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0</string>
+            <string>${VERSION}</string>
             <key>LSArchitecturePriority</key>
             <array>
-              <string>arm64</string>
+              <string>${ARCH}</string>
             </array>
           </dict>
           </plist>
-          EOF
+          PLIST
 
-            # Copy macOS launcher
-            cp launchers/usurper-reborn-mac.command build/mac-arm64/
-            chmod +x build/mac-arm64/usurper-reborn-mac.command
+          cp launchers/usurper-reborn-mac.command build/
+          chmod +x build/usurper-reborn-mac.command
+          rm -rf publish-out
 
-            # Create zip file
-            cd "build/mac-arm64"
-            zip -r "usurper-reborn.zip" "usurper-reborn.app" "usurper-reborn-mac.command"
-            cd "../.."
+      - name: Add GPL compliance files
+        run: |
+          cp LICENSE build/
+          cp dist/GPL_NOTICE.txt build/
+          cp dist/README.txt build/
 
-            echo "✅ macOS ARM64 build successful"
-          else
-            echo "ERROR: macOS ARM64 build failed - executable not created"
-            ls -la build/mac-arm64-temp/
-            exit 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: build/
+
+  # ─── SMOKE TESTS (4 platforms, parallel matrix) ──────────────────
+  smoke-test:
+    name: Smoke test ${{ matrix.name }}
+    needs: [build]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            artifact: windows-x64-build
+            runner: windows-latest
+            exe: build/UsurperReborn.exe
+          - name: Linux
+            artifact: linux-x64-build
+            runner: ubuntu-latest
+            exe: build/UsurperReborn
+          - name: macOS Intel (Rosetta)
+            artifact: mac-build
+            runner: macos-14
+            exe: build/usurper-reborn.app/Contents/MacOS/usurper-reborn
+            prefix: arch -x86_64
+          - name: macOS ARM64
+            artifact: mac-arm64-build
+            runner: macos-14
+            exe: build/usurper-reborn.app/Contents/MacOS/usurper-reborn
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: build/
+
+      - name: Run executable
+        shell: bash
+        run: |
+          chmod +x "${{ matrix.exe }}" 2>/dev/null || true
+          ${{ matrix.prefix }} "${{ matrix.exe }}" --help && echo "Passed" || echo "Non-zero exit OK for --help"
+
+  # ─── BUILD STEAM (4 platforms, parallel matrix, release only) ────
+  build-steam:
+    name: Build Steam ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'release'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,    name: Windows,     artifact: steam-windows }
+          - { rid: linux-x64,  name: Linux,       artifact: steam-linux }
+          - { rid: osx-x64,    name: macOS Intel, artifact: steam-macos-x64 }
+          - { rid: osx-arm64,  name: macOS ARM64, artifact: steam-macos-arm64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Publish Steam build
+        run: |
+          dotnet publish usurper-reloaded.csproj -c Steam -r ${{ matrix.rid }} -o build/ \
+            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
+
+      - name: Add launchers and localization
+        run: |
+          cp -r Localization build/ 2>/dev/null || true
+          RID="${{ matrix.rid }}"
+          if [[ "$RID" == win-* ]]; then
+            cp launchers/Play.bat build/
+            cp launchers/Play-Accessible.bat build/
+          elif [[ "$RID" == linux-* ]]; then
+            chmod +x build/UsurperReborn
+            cp launchers/play.sh build/ && chmod +x build/play.sh
+            cp launchers/play-accessible.sh build/ && chmod +x build/play-accessible.sh
+          elif [[ "$RID" == osx-* ]]; then
+            chmod +x build/UsurperReborn 2>/dev/null || true
+            cp launchers/play-mac.sh build/play.sh 2>/dev/null || cp launchers/play.sh build/play.sh
+            cp launchers/play-mac-accessible.sh build/play-accessible.sh 2>/dev/null || cp launchers/play-accessible.sh build/play-accessible.sh
+            chmod +x build/play.sh build/play-accessible.sh
           fi
 
-      - name: Add GPL compliance files to builds
+      - name: Add GPL compliance files
         run: |
-          # Copy GPL compliance files to all build directories
-          for dir in build/windows-x64 build/windows-x86 build/linux-x64 build/linux-arm64 build/mac build/mac-arm64; do
-            cp LICENSE "$dir/"
-            cp GPL_NOTICE.txt "$dir/"
-            cp usurper-reborn-source.zip "$dir/"
-          done
+          cp LICENSE build/
+          cp dist/GPL_NOTICE.txt build/
 
-          # Create README files for each platform
-          echo "# Usurper Reborn - Complete Medieval World Simulation" > build/windows-x64/README.txt
-          echo "" >> build/windows-x64/README.txt
-          echo "**FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**" >> build/windows-x64/README.txt
-          echo "" >> build/windows-x64/README.txt
-          echo "## About" >> build/windows-x64/README.txt
-          echo "A faithful remake of the classic BBS door game Usurper with advanced NPC AI." >> build/windows-x64/README.txt
-          echo "From peasant to ruler, the path of the Usurper awaits!" >> build/windows-x64/README.txt
-          echo "" >> build/windows-x64/README.txt
-          echo "## GPL v2 COMPLIANCE" >> build/windows-x64/README.txt
-          echo "- This software is licensed under GPL v2" >> build/windows-x64/README.txt
-          echo "- Complete source code included: usurper-reborn-source.zip" >> build/windows-x64/README.txt
-          echo "- License terms: LICENSE file" >> build/windows-x64/README.txt
-          echo "- Full notice: GPL_NOTICE.txt" >> build/windows-x64/README.txt
-          echo "" >> build/windows-x64/README.txt
-          echo "## Your Rights" >> build/windows-x64/README.txt
-          echo "✅ Use for any purpose (personal, commercial, educational)" >> build/windows-x64/README.txt
-          echo "✅ Study and modify the complete source code" >> build/windows-x64/README.txt
-          echo "✅ Distribute copies freely" >> build/windows-x64/README.txt
-          echo "✅ Distribute your modifications under GPL v2" >> build/windows-x64/README.txt
-          echo "" >> build/windows-x64/README.txt
-          echo "This is truly FREE software - you own it completely!" >> build/windows-x64/README.txt
-          echo "" >> build/windows-x64/README.txt
-          echo "## Repository" >> build/windows-x64/README.txt
-          echo "https://github.com/binary-knight/usurper-reborn" >> build/windows-x64/README.txt
-
-          # Copy README to other platforms
-          cp build/windows-x64/README.txt build/windows-x86/README.txt
-          cp build/windows-x64/README.txt build/linux-x64/README.txt
-          cp build/windows-x64/README.txt build/linux-arm64/README.txt
-          cp build/windows-x64/README.txt build/mac/README.txt
-          cp build/windows-x64/README.txt build/mac-arm64/README.txt
-
-          echo "GPL compliance files added to all builds"
-
-      - name: Upload Windows 64-bit Build
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: windows-x64-build
-          path: build/windows-x64/
+          name: ${{ matrix.artifact }}
+          path: build/
 
-      - name: Upload Windows 32-bit Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-x86-build
-          path: build/windows-x86/
-
-      - name: Upload Linux x64 Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-x64-build
-          path: build/linux-x64/
-
-      - name: Upload Linux ARM64 Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm64-build
-          path: build/linux-arm64/
-
-      - name: Upload macOS Intel Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: mac-build
-          path: build/mac/
-
-      - name: Upload macOS ARM64 Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: mac-arm64-build
-          path: build/mac-arm64/
-
-  # ============================================
-  # DESKTOP (WEZTERM) BUNDLES
-  # Bundle game + WezTerm terminal for standalone/Steam play
-  # Existing plain builds remain unchanged for BBS/server use
-  # ============================================
-
-  build-desktop:
-    name: Build Desktop (WezTerm) Bundles
+  # ─── BUNDLE DESKTOP (WezTerm + plain builds, release only) ──────
+  bundle-desktop:
+    name: Bundle Desktop (WezTerm)
     runs-on: ubuntu-latest
     needs: [build]
+    if: github.event_name == 'release'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Download plain build artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: "*-build"
 
-      - name: Resolve latest WezTerm version
-        id: wezterm-version
+      - name: Resolve WezTerm version
+        id: wezterm
         run: |
-          LATEST=$(curl -sL https://api.github.com/repos/wezterm/wezterm/releases/latest | \
+          VER=$(curl -sL https://api.github.com/repos/wezterm/wezterm/releases/latest | \
             python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
-          if [ -z "$LATEST" ]; then
-            echo "ERROR: Could not resolve latest WezTerm version from GitHub API"
-            exit 1
-          fi
-          echo "WEZTERM_VERSION=$LATEST" >> "$GITHUB_ENV"
-          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
-          echo "Latest WezTerm version: $LATEST"
+          [ -z "$VER" ] && { echo "ERROR: Could not resolve WezTerm version"; exit 1; }
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "WezTerm version: $VER"
 
       - name: Cache WezTerm downloads
         uses: actions/cache@v4
         with:
           path: wezterm-cache
-          key: wezterm-${{ steps.wezterm-version.outputs.version }}
+          key: wezterm-${{ steps.wezterm.outputs.version }}
 
-      - name: Download WezTerm portables
+      - name: Download WezTerm
+        env:
+          VER: ${{ steps.wezterm.outputs.version }}
         run: |
           mkdir -p wezterm-cache
-          BASE="https://github.com/wezterm/wezterm/releases/download/$WEZTERM_VERSION"
+          BASE="https://github.com/wezterm/wezterm/releases/download/$VER"
           [ -f "wezterm-cache/wezterm-win.zip" ] || \
-            curl -fSL -o "wezterm-cache/wezterm-win.zip" \
-              "$BASE/WezTerm-windows-${WEZTERM_VERSION}.zip"
+            curl -fSL -o "wezterm-cache/wezterm-win.zip" "$BASE/WezTerm-windows-${VER}.zip"
           [ -f "wezterm-cache/wezterm-linux.AppImage" ] || \
-            curl -fSL -o "wezterm-cache/wezterm-linux.AppImage" \
-              "$BASE/WezTerm-${WEZTERM_VERSION}-Ubuntu20.04.AppImage"
+            curl -fSL -o "wezterm-cache/wezterm-linux.AppImage" "$BASE/WezTerm-${VER}-Ubuntu20.04.AppImage"
           [ -f "wezterm-cache/wezterm-macos.zip" ] || \
-            curl -fSL -o "wezterm-cache/wezterm-macos.zip" \
-              "$BASE/WezTerm-macos-${WEZTERM_VERSION}.zip"
+            curl -fSL -o "wezterm-cache/wezterm-macos.zip" "$BASE/WezTerm-macos-${VER}.zip"
+
+      - name: Install wine + rcedit (for icon patching)
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wine64 > /dev/null 2>&1
+          curl -fSL -o /tmp/rcedit-x64.exe \
+            "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
 
       - name: Bundle Windows x64 Desktop
         run: |
           mkdir -p desktop/UsurperReborn-win64/wezterm
-          # Extract WezTerm — ZIP has a version-named subdirectory
-          unzip -qo wezterm-cache/wezterm-win.zip -d desktop/wez-tmp
-          # Find the directory containing wezterm-gui.exe and copy all its contents
-          WEZDIR=$(find desktop/wez-tmp -name "wezterm-gui.exe" -type f -printf '%h\n' 2>/dev/null | head -1)
-          if [ -n "$WEZDIR" ]; then
-            cp -r "$WEZDIR"/* desktop/UsurperReborn-win64/wezterm/
-            echo "Extracted WezTerm from: $WEZDIR"
-          else
-            echo "ERROR: wezterm-gui.exe not found in Windows ZIP"
-            find desktop/wez-tmp -type f
-            exit 1
-          fi
-          rm -rf desktop/wez-tmp
-          # Copy game files from plain build
+          unzip -qo wezterm-cache/wezterm-win.zip -d /tmp/wez-tmp
+          WEZDIR=$(find /tmp/wez-tmp -name "wezterm-gui.exe" -type f -printf '%h\n' 2>/dev/null | head -1)
+          [ -n "$WEZDIR" ] && cp -r "$WEZDIR"/* desktop/UsurperReborn-win64/wezterm/ || { echo "ERROR: wezterm-gui.exe not found"; exit 1; }
+          rm -rf /tmp/wez-tmp
+
+          # Patch WezTerm icon with game icon
+          wine /tmp/rcedit-x64.exe \
+            "desktop/UsurperReborn-win64/wezterm/wezterm-gui.exe" \
+            --set-icon "app.ico" 2>/dev/null || echo "Icon patching failed (non-critical)"
+
+          # Copy game files + launchers
           cp -r windows-x64-build/* desktop/UsurperReborn-win64/
-          # Copy WezTerm config, launcher, and fonts
           cp wezterm.lua desktop/UsurperReborn-win64/
           cp launchers/Play.bat desktop/UsurperReborn-win64/
           cp launchers/Play-Accessible.bat desktop/UsurperReborn-win64/
           cp -r fonts desktop/UsurperReborn-win64/
-
-      - name: Patch WezTerm icon (Windows)
-        run: |
-          # Use wine + rcedit to replace WezTerm icon with game icon
-          sudo dpkg --add-architecture i386
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq wine64 > /dev/null 2>&1
-          # Download rcedit
-          curl -fSL -o /tmp/rcedit-x64.exe \
-            "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
-          # Patch the icon
-          wine /tmp/rcedit-x64.exe \
-            "desktop/UsurperReborn-win64/wezterm/wezterm-gui.exe" \
-            --set-icon "app.ico" 2>/dev/null && \
-            echo "✅ WezTerm icon patched with game icon" || \
-            echo "⚠️ Icon patching failed (non-critical, continuing)"
 
       - name: Bundle Linux x64 Desktop
         run: |
           mkdir -p desktop/UsurperReborn-linux64/wezterm
           cp wezterm-cache/wezterm-linux.AppImage desktop/UsurperReborn-linux64/wezterm/wezterm-gui
           chmod +x desktop/UsurperReborn-linux64/wezterm/wezterm-gui
-          # Copy game files from plain build
           cp -r linux-x64-build/* desktop/UsurperReborn-linux64/
           chmod +x desktop/UsurperReborn-linux64/UsurperReborn
-          # Copy WezTerm config, launcher, and fonts
           cp wezterm.lua desktop/UsurperReborn-linux64/
           cp launchers/play.sh desktop/UsurperReborn-linux64/
           cp launchers/play-accessible.sh desktop/UsurperReborn-linux64/
-          chmod +x desktop/UsurperReborn-linux64/play.sh
-          chmod +x desktop/UsurperReborn-linux64/play-accessible.sh
+          chmod +x desktop/UsurperReborn-linux64/play.sh desktop/UsurperReborn-linux64/play-accessible.sh
           cp -r fonts desktop/UsurperReborn-linux64/
 
       - name: Bundle macOS x64 Desktop
         run: |
           mkdir -p desktop/UsurperReborn-macos/wezterm
-          unzip -qo wezterm-cache/wezterm-macos.zip -d desktop/wez-tmp
-          # Find wezterm-gui binary regardless of ZIP nesting depth
-          WEZGUI=$(find desktop/wez-tmp -name "wezterm-gui" -type f 2>/dev/null | head -1)
-          if [ -n "$WEZGUI" ]; then
-            cp "$WEZGUI" desktop/UsurperReborn-macos/wezterm/wezterm-gui
-            echo "Found wezterm-gui at: $WEZGUI"
-          else
-            echo "ERROR: wezterm-gui not found in macOS ZIP"
-            find desktop/wez-tmp -type f
-            exit 1
-          fi
+          unzip -qo wezterm-cache/wezterm-macos.zip -d /tmp/wez-tmp
+          WEZGUI=$(find /tmp/wez-tmp -name "wezterm-gui" -type f 2>/dev/null | head -1)
+          [ -n "$WEZGUI" ] && cp "$WEZGUI" desktop/UsurperReborn-macos/wezterm/wezterm-gui || { echo "ERROR: wezterm-gui not found"; exit 1; }
           chmod +x desktop/UsurperReborn-macos/wezterm/wezterm-gui
-          rm -rf desktop/wez-tmp
-          # Copy game executable from plain build (extract from app bundle)
+          rm -rf /tmp/wez-tmp
+
+          # Copy game executable from app bundle
           if [ -f "mac-build/usurper-reborn.app/Contents/MacOS/usurper-reborn" ]; then
             cp mac-build/usurper-reborn.app/Contents/MacOS/usurper-reborn desktop/UsurperReborn-macos/UsurperReborn
-          elif [ -f "mac-build/UsurperReborn" ]; then
-            cp mac-build/UsurperReborn desktop/UsurperReborn-macos/
           fi
           chmod +x desktop/UsurperReborn-macos/UsurperReborn 2>/dev/null || true
-          # Copy GPL files from plain build
           cp mac-build/LICENSE desktop/UsurperReborn-macos/ 2>/dev/null || true
           cp mac-build/GPL_NOTICE.txt desktop/UsurperReborn-macos/ 2>/dev/null || true
           cp mac-build/README.txt desktop/UsurperReborn-macos/ 2>/dev/null || true
-          # Copy WezTerm config, launcher, and fonts
           cp wezterm.lua desktop/UsurperReborn-macos/
           cp launchers/play.sh desktop/UsurperReborn-macos/
           cp launchers/play-accessible.sh desktop/UsurperReborn-macos/
-          chmod +x desktop/UsurperReborn-macos/play.sh
-          chmod +x desktop/UsurperReborn-macos/play-accessible.sh
+          chmod +x desktop/UsurperReborn-macos/play.sh desktop/UsurperReborn-macos/play-accessible.sh
           cp -r fonts desktop/UsurperReborn-macos/
 
       - name: Create desktop distribution archives
@@ -555,8 +371,7 @@ jobs:
           tar -czf ../UsurperReborn-WezTerm-Linux-x64.tar.gz UsurperReborn-linux64/
           zip -qr ../UsurperReborn-WezTerm-macOS-x64.zip UsurperReborn-macos/
           cd ..
-          echo "=== WezTerm bundles ==="
-          ls -lh UsurperReborn-WezTerm-*.zip UsurperReborn-WezTerm-*.tar.gz
+          ls -lh UsurperReborn-WezTerm-*
 
       - name: Upload WezTerm Windows x64
         uses: actions/upload-artifact@v4
@@ -576,170 +391,254 @@ jobs:
           name: desktop-macos-x64
           path: UsurperReborn-WezTerm-macOS-x64.zip
 
-  # ============================================
-  # PLATFORM SMOKE TESTS
-  # Verify builds actually run on target platforms
-  # ============================================
-
-  test-windows:
-    name: Test Windows Build
-    runs-on: windows-latest
-    needs: [build]
-    steps:
-      - name: Download Windows x64 Build
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-x64-build
-          path: build/
-
-      - name: Test Windows executable
-        shell: pwsh
-        run: |
-          Write-Host "Testing Windows x64 build..."
-          if (Test-Path "build/UsurperReborn.exe") {
-            # Run with --help flag (should exit quickly)
-            $process = Start-Process -FilePath "build/UsurperReborn.exe" -ArgumentList "--help" -Wait -PassThru -NoNewWindow
-            if ($process.ExitCode -eq 0) {
-              Write-Host "✅ Windows x64 executable runs successfully"
-            } else {
-              Write-Host "⚠️ Windows x64 executable exited with code: $($process.ExitCode)"
-              # Exit code might be non-zero for --help, that's OK as long as it ran
-              Write-Host "✅ Windows x64 executable launched (non-zero exit is OK for --help)"
-            }
-          } else {
-            Write-Host "❌ UsurperReborn.exe not found"
-            Get-ChildItem -Path build/ -Recurse
-            exit 1
-          }
-
-  test-linux:
-    name: Test Linux Build
+  # ─── STEAM PACKAGE (assemble depots, release only) ──────────────
+  steam-package:
+    name: Package Steam Depots
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build-steam, bundle-desktop]
+    if: github.event_name == 'release'
     steps:
-      - name: Download Linux x64 Build
+      - uses: actions/checkout@v4
+
+      - name: Download Steam build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: linux-x64-build
-          path: build/
+          pattern: "steam-*"
 
-      - name: Test Linux executable
+      - name: Resolve WezTerm version
+        id: wezterm
         run: |
-          echo "Testing Linux x64 build..."
-          chmod +x build/UsurperReborn
-          # Run with --help flag
-          if ./build/UsurperReborn --help; then
-            echo "✅ Linux x64 executable runs successfully"
-          else
-            # Exit code might be non-zero for --help, that's OK
-            echo "✅ Linux x64 executable launched (non-zero exit is OK for --help)"
-          fi
+          VER=$(curl -sL https://api.github.com/repos/wezterm/wezterm/releases/latest | \
+            python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
+          [ -z "$VER" ] && { echo "ERROR: Could not resolve WezTerm version"; exit 1; }
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
 
-  test-macos-intel:
-    name: Test macOS Intel Build (via Rosetta)
-    runs-on: macos-14  # ARM64 runner - test Intel binary via Rosetta 2
-    needs: [build]
-    steps:
-      - name: Download macOS Build
-        uses: actions/download-artifact@v4
+      - name: Cache WezTerm downloads
+        uses: actions/cache@v4
         with:
-          name: mac-build
-          path: build/
+          path: wezterm-cache
+          key: wezterm-${{ steps.wezterm.outputs.version }}
 
-      - name: Test macOS Intel executable via Rosetta 2
+      - name: Download WezTerm (cache hit expected from bundle-desktop)
+        env:
+          VER: ${{ steps.wezterm.outputs.version }}
         run: |
-          echo "Testing macOS Intel (x64) build via Rosetta 2 on ARM64..."
-          # Extract the app bundle if it's zipped
-          if [ -f "build/usurper-reborn.zip" ]; then
-            cd build && unzip -o usurper-reborn.zip && cd ..
-          fi
+          mkdir -p wezterm-cache
+          BASE="https://github.com/wezterm/wezterm/releases/download/$VER"
+          [ -f "wezterm-cache/wezterm-win.zip" ] || \
+            curl -fSL -o "wezterm-cache/wezterm-win.zip" "$BASE/WezTerm-windows-${VER}.zip"
+          [ -f "wezterm-cache/wezterm-linux.AppImage" ] || \
+            curl -fSL -o "wezterm-cache/wezterm-linux.AppImage" "$BASE/WezTerm-${VER}-Ubuntu20.04.AppImage"
+          [ -f "wezterm-cache/wezterm-macos.zip" ] || \
+            curl -fSL -o "wezterm-cache/wezterm-macos.zip" "$BASE/WezTerm-macos-${VER}.zip"
 
-          chmod +x "build/usurper-reborn.app/Contents/MacOS/usurper-reborn" 2>/dev/null || true
+      - name: Organize Steam depots
+        run: |
+          mkdir -p steam-build/depot-windows steam-build/depot-linux steam-build/depot-macos
 
-          if [ -f "build/usurper-reborn.app/Contents/MacOS/usurper-reborn" ]; then
-            # Run with --help flag using arch -x86_64 to force Rosetta 2
-            if arch -x86_64 ./build/usurper-reborn.app/Contents/MacOS/usurper-reborn --help; then
-              echo "✅ macOS Intel executable runs successfully via Rosetta 2"
-            else
-              echo "✅ macOS Intel executable launched via Rosetta 2 (non-zero exit is OK for --help)"
-            fi
+          # Move Steam build artifacts into depots
+          cp -r steam-windows/* steam-build/depot-windows/
+          cp -r steam-linux/* steam-build/depot-linux/
+
+          # macOS: combine x64 + arm64 into one depot with architecture suffixes
+          cp steam-macos-x64/UsurperReborn steam-build/depot-macos/UsurperReborn-x64
+          cp steam-macos-arm64/UsurperReborn steam-build/depot-macos/UsurperReborn-arm64
+          chmod +x steam-build/depot-macos/UsurperReborn-x64 steam-build/depot-macos/UsurperReborn-arm64
+
+          # Copy macOS launchers and localization from x64 build
+          cp -r steam-macos-x64/Localization steam-build/depot-macos/ 2>/dev/null || true
+          cp steam-macos-x64/play.sh steam-build/depot-macos/ 2>/dev/null || true
+          cp steam-macos-x64/play-accessible.sh steam-build/depot-macos/ 2>/dev/null || true
+          chmod +x steam-build/depot-macos/play.sh steam-build/depot-macos/play-accessible.sh 2>/dev/null || true
+
+      - name: Download Steamworks.NET native libraries
+        run: |
+          SWNET_VERSION="20.1.0"
+          wget -q "https://github.com/rlabrecque/Steamworks.NET/releases/download/${SWNET_VERSION}/Steamworks.NET-Standalone_${SWNET_VERSION}.zip" \
+            -O /tmp/steamworks.zip || true
+
+          if [ -f "/tmp/steamworks.zip" ]; then
+            unzip -q /tmp/steamworks.zip -d /tmp/steamworks || true
+            WIN_DLL=$(find /tmp/steamworks -name "steam_api64.dll" -type f 2>/dev/null | head -1)
+            LINUX_SO=$(find /tmp/steamworks -name "libsteam_api.so" -type f 2>/dev/null | head -1)
+            MAC_DYLIB=$(find /tmp/steamworks -name "libsteam_api.dylib" -type f 2>/dev/null | head -1)
+            [ -n "$WIN_DLL" ] && cp "$WIN_DLL" steam-build/depot-windows/ && echo "Copied steam_api64.dll"
+            [ -n "$LINUX_SO" ] && cp "$LINUX_SO" steam-build/depot-linux/ && echo "Copied libsteam_api.so"
+            [ -n "$MAC_DYLIB" ] && cp "$MAC_DYLIB" steam-build/depot-macos/ && echo "Copied libsteam_api.dylib"
+            rm -rf /tmp/steamworks /tmp/steamworks.zip
           else
-            echo "❌ macOS executable not found"
-            find build/ -type f -name "*" | head -20
-            exit 1
+            echo "WARNING: Could not download Steamworks.NET release"
           fi
 
-  test-macos-arm:
-    name: Test macOS ARM64 Build
-    runs-on: macos-14  # Apple Silicon (ARM64) runner
-    needs: [build]
-    steps:
-      - name: Download macOS ARM64 Build
-        uses: actions/download-artifact@v4
+          # Verify critical files
+          [ ! -f "steam-build/depot-windows/steam_api64.dll" ] && echo "CRITICAL: steam_api64.dll missing!"
+          [ ! -f "steam-build/depot-linux/libsteam_api.so" ] && echo "CRITICAL: libsteam_api.so missing!"
+
+      - name: Bundle WezTerm into Steam depots
+        run: |
+          # Windows
+          mkdir -p steam-build/depot-windows/wezterm
+          unzip -qo wezterm-cache/wezterm-win.zip -d /tmp/wez-tmp
+          WEZDIR=$(find /tmp/wez-tmp -name "wezterm-gui.exe" -type f -printf '%h\n' 2>/dev/null | head -1)
+          [ -n "$WEZDIR" ] && cp -r "$WEZDIR"/* steam-build/depot-windows/wezterm/ || echo "WARNING: wezterm-gui.exe not found"
+          rm -rf /tmp/wez-tmp
+
+          # Linux
+          mkdir -p steam-build/depot-linux/wezterm
+          cp wezterm-cache/wezterm-linux.AppImage steam-build/depot-linux/wezterm/wezterm-gui
+          chmod +x steam-build/depot-linux/wezterm/wezterm-gui
+
+          # macOS
+          if [ -f "wezterm-cache/wezterm-macos.zip" ]; then
+            mkdir -p steam-build/depot-macos/wezterm
+            unzip -qo wezterm-cache/wezterm-macos.zip -d /tmp/wez-mac-tmp
+            WEZAPP=$(find /tmp/wez-mac-tmp -name "WezTerm.app" -type d 2>/dev/null | head -1)
+            [ -n "$WEZAPP" ] && cp -r "$WEZAPP" steam-build/depot-macos/wezterm/
+            rm -rf /tmp/wez-mac-tmp
+          fi
+
+          # Copy config and fonts to all depots
+          for dir in steam-build/depot-windows steam-build/depot-linux steam-build/depot-macos; do
+            cp wezterm.lua "$dir/"
+            cp -r fonts "$dir/"
+          done
+
+      # NOTE: macOS WezTerm icon patching intentionally skipped.
+      # Modifying files inside a .app bundle invalidates the code signature,
+      # causing macOS Gatekeeper to block it with "damaged" error.
+      - name: Patch WezTerm icon (Windows only)
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wine64 > /dev/null 2>&1
+          curl -fSL -o /tmp/rcedit-x64.exe \
+            "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
+          wine /tmp/rcedit-x64.exe \
+            "steam-build/depot-windows/wezterm/wezterm-gui.exe" \
+            --set-icon "app.ico" 2>/dev/null || echo "Icon patching failed (non-critical)"
+
+      - name: Add GPL compliance files
+        run: |
+          git archive --format=zip --prefix=usurper-reborn-source/ HEAD > usurper-reborn-source.zip
+          for dir in steam-build/depot-windows steam-build/depot-linux steam-build/depot-macos; do
+            cp LICENSE "$dir/"
+            cp usurper-reborn-source.zip "$dir/"
+          done
+
+      - name: Generate Steam configuration
+        env:
+          STEAM_APP_ID: ${{ vars.STEAM_APP_ID || 'YOUR_STEAM_APP_ID' }}
+          STEAM_DEPOT_WINDOWS: ${{ vars.STEAM_DEPOT_WINDOWS || 'YOUR_WINDOWS_DEPOT_ID' }}
+          STEAM_DEPOT_LINUX: ${{ vars.STEAM_DEPOT_LINUX || 'YOUR_LINUX_DEPOT_ID' }}
+          STEAM_DEPOT_MACOS: ${{ vars.STEAM_DEPOT_MACOS || 'YOUR_MACOS_DEPOT_ID' }}
+        run: |
+          cat > steam-build/app_build.vdf << EOF
+          "appbuild"
+          {
+            "appid" "${STEAM_APP_ID}"
+            "desc" "Usurper Reborn ${{ github.ref_name || 'dev' }} (GPL v2)"
+            "buildoutput" "../steam-logs/"
+            "contentroot" ""
+            "setlive" ""
+            "preview" "0"
+            "local" ""
+
+            "depots"
+            {
+              "${STEAM_DEPOT_WINDOWS}" { "FileMapping" { "LocalPath" "depot-windows/*" "DepotPath" "." "recursive" "1" } }
+              "${STEAM_DEPOT_LINUX}"   { "FileMapping" { "LocalPath" "depot-linux/*"   "DepotPath" "." "recursive" "1" } }
+              "${STEAM_DEPOT_MACOS}"   { "FileMapping" { "LocalPath" "depot-macos/*"   "DepotPath" "." "recursive" "1" } }
+            }
+          }
+          EOF
+
+          cat > steam-build/STEAM_LAUNCH_CONFIG.md << 'GUIDE'
+          # Steam Launch Configuration
+
+          ## Windows
+          - Executable: `Play.bat`
+          - Screen Reader: `Play-Accessible.bat` (launch option)
+
+          ## Linux
+          - Executable: `play.sh`
+          - Screen Reader: `play-accessible.sh` (launch option)
+
+          ## macOS
+          - Executable: `play.sh`
+          - Screen Reader: `play-accessible.sh` (launch option)
+
+          ## Notes
+          - WezTerm is bundled in `wezterm/` inside each depot
+          - `wezterm.lua` configures terminal appearance
+          - Font choice saved to `font-choice.txt`, applies on next launch
+          GUIDE
+
+          echo "=== Steam depot contents ==="
+          for d in depot-windows depot-linux depot-macos; do
+            echo "--- $d ---"
+            ls steam-build/$d/ | head -10
+          done
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: mac-arm64-build
-          path: build/
+          name: steam-release
+          path: steam-build/
 
-      - name: Test macOS ARM64 executable
-        run: |
-          echo "Testing macOS ARM64 (Apple Silicon) build..."
-          # Extract the app bundle if it's zipped
-          if [ -f "build/usurper-reborn.zip" ]; then
-            cd build && unzip -o usurper-reborn.zip && cd ..
-          fi
-
-          chmod +x "build/usurper-reborn.app/Contents/MacOS/usurper-reborn" 2>/dev/null || true
-
-          if [ -f "build/usurper-reborn.app/Contents/MacOS/usurper-reborn" ]; then
-            # Run with --help flag
-            if ./build/usurper-reborn.app/Contents/MacOS/usurper-reborn --help; then
-              echo "✅ macOS ARM64 executable runs successfully"
-            else
-              echo "✅ macOS ARM64 executable launched (non-zero exit is OK for --help)"
-            fi
-          else
-            echo "❌ macOS ARM64 executable not found"
-            find build/ -type f -name "*" | head -20
-            exit 1
-          fi
-
+  # ─── ATTACH TO RELEASE ──────────────────────────────────────────
   attach-to-release:
     name: Attach Builds to Release
     runs-on: ubuntu-latest
-    needs: [build, build-desktop, test-windows, test-linux, test-macos-intel, test-macos-arm]
+    needs: [build, bundle-desktop, smoke-test]
     if: github.event_name == 'release'
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: "*-build"
 
-      - name: Download WezTerm artifacts
+      - name: Download desktop artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: "desktop-*"
 
-      - name: Create release zip files
+      - name: Create GPL source archive
+        run: git archive --format=zip --prefix=usurper-reborn-source/ HEAD > usurper-reborn-source.zip
+
+      - name: Create release archives
         run: |
-          # Plain builds (BBS/server/terminal users)
-          cd windows-x64-build && zip -r ../UsurperReborn-${{ github.ref_name }}-Windows-x64.zip . && cd ..
-          cd windows-x86-build && zip -r ../UsurperReborn-${{ github.ref_name }}-Windows-x86.zip . && cd ..
-          cd linux-x64-build && zip -r ../UsurperReborn-${{ github.ref_name }}-Linux-x64.zip . && cd ..
-          cd linux-arm64-build && zip -r ../UsurperReborn-${{ github.ref_name }}-Linux-ARM64.zip . && cd ..
-          cd mac-build && zip -r ../UsurperReborn-${{ github.ref_name }}-macOS-Intel.zip . && cd ..
-          cd mac-arm64-build && zip -r ../UsurperReborn-${{ github.ref_name }}-macOS-AppleSilicon.zip . && cd ..
+          TAG="${{ github.ref_name }}"
 
-          # WezTerm bundles — already zipped by build-desktop
+          # Plain builds: add source archive, then zip
+          for entry in \
+            "windows-x64-build:Windows-x64" \
+            "windows-x86-build:Windows-x86" \
+            "linux-x64-build:Linux-x64" \
+            "linux-arm64-build:Linux-ARM64" \
+            "mac-build:macOS-Intel" \
+            "mac-arm64-build:macOS-AppleSilicon"; do
+
+            DIR="${entry%%:*}"
+            LABEL="${entry##*:}"
+            cp usurper-reborn-source.zip "$DIR/"
+            cd "$DIR" && zip -qr "../UsurperReborn-${TAG}-${LABEL}.zip" . && cd ..
+          done
+
+          # Desktop bundles: already zipped by bundle-desktop
           cp desktop-windows-x64/UsurperReborn-WezTerm-Windows-x64.zip \
-            "UsurperReborn-${{ github.ref_name }}-WezTerm-Windows-x64.zip"
+            "UsurperReborn-${TAG}-WezTerm-Windows-x64.zip"
           cp desktop-linux-x64/UsurperReborn-WezTerm-Linux-x64.tar.gz \
-            "UsurperReborn-${{ github.ref_name }}-WezTerm-Linux-x64.tar.gz"
+            "UsurperReborn-${TAG}-WezTerm-Linux-x64.tar.gz"
           cp desktop-macos-x64/UsurperReborn-WezTerm-macOS-x64.zip \
-            "UsurperReborn-${{ github.ref_name }}-WezTerm-macOS-x64.zip"
+            "UsurperReborn-${TAG}-WezTerm-macOS-x64.zip"
 
-          ls -la *.zip *.tar.gz
+          echo "=== Release assets ==="
+          ls -lh UsurperReborn-${TAG}-*
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v1
@@ -757,445 +656,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  steam-prep:
-    name: Steam Release Preparation
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Build Steam Windows executable
-        run: |
-          echo "Building Windows executable with STEAM_BUILD flag..."
-          dotnet publish usurper-reloaded.csproj -c Steam -r win-x64 -o steam-build/depot-windows \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-          if [ -f "steam-build/depot-windows/UsurperReborn.exe" ]; then
-            cp launchers/Play.bat steam-build/depot-windows/
-            cp launchers/Play-Accessible.bat steam-build/depot-windows/
-            cp -r Localization steam-build/depot-windows/
-            echo "✅ Steam Windows build successful (with STEAM_BUILD flag)"
-          else
-            echo "❌ Steam Windows build failed"
-            exit 1
-          fi
-
-      - name: Build Steam Linux executable
-        run: |
-          echo "Building Linux executable with STEAM_BUILD flag..."
-          dotnet publish usurper-reloaded.csproj -c Steam -r linux-x64 -o steam-build/depot-linux \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-          if [ -f "steam-build/depot-linux/UsurperReborn" ]; then
-            chmod +x "steam-build/depot-linux/UsurperReborn"
-            cp launchers/play.sh steam-build/depot-linux/
-            cp launchers/play-accessible.sh steam-build/depot-linux/
-            chmod +x steam-build/depot-linux/play.sh
-            chmod +x steam-build/depot-linux/play-accessible.sh
-            cp -r Localization steam-build/depot-linux/
-            echo "✅ Steam Linux build successful (with STEAM_BUILD flag)"
-          else
-            echo "❌ Steam Linux build failed"
-            exit 1
-          fi
-
-      - name: Build Steam macOS executables (Intel + Apple Silicon)
-        run: |
-          echo "Building macOS Intel (x64) executable..."
-          dotnet publish usurper-reloaded.csproj -c Steam -r osx-x64 -o steam-build/mac-x64-temp \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-
-          echo "Building macOS Apple Silicon (arm64) executable..."
-          dotnet publish usurper-reloaded.csproj -c Steam -r osx-arm64 -o steam-build/mac-arm64-temp \
-            -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
-
-          # Ensure Localization files are present in both temp builds
-          for tmpdir in steam-build/mac-x64-temp steam-build/mac-arm64-temp; do
-            if [ ! -d "$tmpdir/Localization" ]; then
-              cp -r Localization "$tmpdir/"
-            fi
-          done
-
-          # Place both binaries in the depot with architecture suffixes
-          mkdir -p steam-build/depot-macos
-          if [ -f "steam-build/mac-x64-temp/UsurperReborn" ] && [ -f "steam-build/mac-arm64-temp/UsurperReborn" ]; then
-            cp steam-build/mac-x64-temp/UsurperReborn steam-build/depot-macos/UsurperReborn-x64
-            cp steam-build/mac-arm64-temp/UsurperReborn steam-build/depot-macos/UsurperReborn-arm64
-            chmod +x steam-build/depot-macos/UsurperReborn-x64
-            chmod +x steam-build/depot-macos/UsurperReborn-arm64
-
-            # Copy universal macOS launchers (detect Intel vs Apple Silicon at runtime)
-            cp launchers/play-mac.sh steam-build/depot-macos/play.sh
-            cp launchers/play-mac-accessible.sh steam-build/depot-macos/play-accessible.sh
-            chmod +x steam-build/depot-macos/play.sh
-            chmod +x steam-build/depot-macos/play-accessible.sh
-
-            # Copy Localization files to macOS depot
-            cp -r Localization steam-build/depot-macos/
-
-            echo "✅ Steam macOS universal build successful (x64 + arm64)"
-          else
-            echo "❌ Steam macOS build failed"
-            ls -la steam-build/mac-x64-temp/ steam-build/mac-arm64-temp/ 2>/dev/null
-            exit 1
-          fi
-          rm -rf steam-build/mac-x64-temp steam-build/mac-arm64-temp
-
-      - name: Copy Steam native libraries from NuGet package
-        run: |
-          # Debug: Show what's in the Steamworks.NET package
-          echo "=== Searching for Steamworks.NET package ==="
-          STEAMWORKS_PKG=$(find ~/.nuget/packages/steamworks.net -maxdepth 1 -type d 2>/dev/null | head -1)
-
-          if [ -n "$STEAMWORKS_PKG" ]; then
-            echo "Found Steamworks.NET package at: $STEAMWORKS_PKG"
-            echo "Package contents:"
-            find "$STEAMWORKS_PKG" -type f -name "*.dll" -o -name "*.so" -o -name "*.dylib" 2>/dev/null || echo "No native files found"
-
-            # Search for native Steam libraries anywhere in the package
-            WIN_DLL=$(find "$STEAMWORKS_PKG" -name "steam_api64.dll" -type f 2>/dev/null | head -1)
-            LINUX_SO=$(find "$STEAMWORKS_PKG" -name "libsteam_api.so" -type f 2>/dev/null | head -1)
-            MAC_DYLIB=$(find "$STEAMWORKS_PKG" -name "libsteam_api.dylib" -type f 2>/dev/null | head -1)
-
-            if [ -n "$WIN_DLL" ]; then
-              cp "$WIN_DLL" steam-build/depot-windows/
-              echo "✅ Copied steam_api64.dll from: $WIN_DLL"
-            else
-              echo "⚠️ steam_api64.dll not found in NuGet package"
-            fi
-
-            if [ -n "$LINUX_SO" ]; then
-              cp "$LINUX_SO" steam-build/depot-linux/
-              echo "✅ Copied libsteam_api.so from: $LINUX_SO"
-            else
-              echo "⚠️ libsteam_api.so not found in NuGet package"
-            fi
-
-            if [ -n "$MAC_DYLIB" ]; then
-              cp "$MAC_DYLIB" steam-build/depot-macos/
-              echo "✅ Copied libsteam_api.dylib from: $MAC_DYLIB"
-            else
-              echo "⚠️ libsteam_api.dylib not found in NuGet package"
-            fi
-          else
-            echo "❌ Steamworks.NET package not found in NuGet cache"
-          fi
-
-          # If native libs still missing, download from Steamworks.NET GitHub releases
-          if [ ! -f "steam-build/depot-windows/steam_api64.dll" ] || [ ! -f "steam-build/depot-linux/libsteam_api.so" ] || [ ! -f "steam-build/depot-macos/libsteam_api.dylib" ]; then
-            echo ""
-            echo "=== Downloading native libraries from Steamworks.NET GitHub ==="
-
-            # Download the Steamworks.NET release which includes native binaries
-            SWNET_VERSION="20.1.0"
-            wget -q "https://github.com/rlabrecque/Steamworks.NET/releases/download/${SWNET_VERSION}/Steamworks.NET-Standalone_${SWNET_VERSION}.zip" -O /tmp/steamworks.zip || true
-
-            if [ -f "/tmp/steamworks.zip" ]; then
-              unzip -q /tmp/steamworks.zip -d /tmp/steamworks || true
-
-              # Find and copy the native libraries
-              WIN_DLL=$(find /tmp/steamworks -name "steam_api64.dll" -type f 2>/dev/null | head -1)
-              LINUX_SO=$(find /tmp/steamworks -name "libsteam_api.so" -type f 2>/dev/null | head -1)
-              MAC_DYLIB=$(find /tmp/steamworks -name "libsteam_api.dylib" -type f 2>/dev/null | head -1)
-
-              if [ -n "$WIN_DLL" ] && [ ! -f "steam-build/depot-windows/steam_api64.dll" ]; then
-                cp "$WIN_DLL" steam-build/depot-windows/
-                echo "✅ Downloaded and copied steam_api64.dll"
-              fi
-
-              if [ -n "$LINUX_SO" ] && [ ! -f "steam-build/depot-linux/libsteam_api.so" ]; then
-                cp "$LINUX_SO" steam-build/depot-linux/
-                echo "✅ Downloaded and copied libsteam_api.so"
-              fi
-
-              if [ -n "$MAC_DYLIB" ] && [ ! -f "steam-build/depot-macos/libsteam_api.dylib" ]; then
-                cp "$MAC_DYLIB" steam-build/depot-macos/
-                echo "✅ Downloaded and copied libsteam_api.dylib"
-              fi
-
-              rm -rf /tmp/steamworks /tmp/steamworks.zip
-            else
-              echo "⚠️ Could not download Steamworks.NET release"
-            fi
-          fi
-
-          echo ""
-          echo "=== Final Steam depot native libraries ==="
-          ls -la steam-build/depot-windows/*.dll 2>/dev/null || echo "No DLLs in Windows depot"
-          ls -la steam-build/depot-linux/*.so 2>/dev/null || echo "No .so files in Linux depot"
-
-          # Verify critical files exist
-          if [ ! -f "steam-build/depot-windows/steam_api64.dll" ]; then
-            echo "❌ CRITICAL: steam_api64.dll missing - Steam integration will not work on Windows!"
-          fi
-          if [ ! -f "steam-build/depot-linux/libsteam_api.so" ]; then
-            echo "❌ CRITICAL: libsteam_api.so missing - Steam integration will not work on Linux!"
-          fi
-
-      - name: Resolve latest WezTerm version (Steam)
-        run: |
-          LATEST=$(curl -sL https://api.github.com/repos/wezterm/wezterm/releases/latest | \
-            python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
-          if [ -z "$LATEST" ]; then
-            echo "ERROR: Could not resolve latest WezTerm version from GitHub API"
-            exit 1
-          fi
-          echo "WEZTERM_VERSION=$LATEST" >> "$GITHUB_ENV"
-          echo "Latest WezTerm version: $LATEST"
-
-      - name: Bundle WezTerm into Steam depots
-        run: |
-          BASE="https://github.com/wezterm/wezterm/releases/download/$WEZTERM_VERSION"
-
-          # Download WezTerm for Windows and Linux
-          mkdir -p wezterm-cache
-          [ -f "wezterm-cache/wezterm-win.zip" ] || \
-            curl -fSL -o "wezterm-cache/wezterm-win.zip" \
-              "$BASE/WezTerm-windows-${WEZTERM_VERSION}.zip"
-          [ -f "wezterm-cache/wezterm-linux.AppImage" ] || \
-            curl -fSL -o "wezterm-cache/wezterm-linux.AppImage" \
-              "$BASE/WezTerm-${WEZTERM_VERSION}-Ubuntu20.04.AppImage"
-
-          # Windows depot: extract WezTerm
-          mkdir -p steam-build/depot-windows/wezterm
-          unzip -qo wezterm-cache/wezterm-win.zip -d /tmp/wez-tmp
-          WEZDIR=$(find /tmp/wez-tmp -name "wezterm-gui.exe" -type f -printf '%h\n' 2>/dev/null | head -1)
-          if [ -n "$WEZDIR" ]; then
-            cp -r "$WEZDIR"/* steam-build/depot-windows/wezterm/
-          else
-            echo "WARNING: wezterm-gui.exe not found in ZIP, trying fallback"
-            mv /tmp/wez-tmp/*/* steam-build/depot-windows/wezterm/ 2>/dev/null || true
-          fi
-          rm -rf /tmp/wez-tmp
-
-          # Linux depot: copy AppImage
-          mkdir -p steam-build/depot-linux/wezterm
-          cp wezterm-cache/wezterm-linux.AppImage steam-build/depot-linux/wezterm/wezterm-gui
-          chmod +x steam-build/depot-linux/wezterm/wezterm-gui
-
-          # Download WezTerm for macOS
-          [ -f "wezterm-cache/wezterm-mac.zip" ] || \
-            curl -fSL -o "wezterm-cache/wezterm-mac.zip" \
-              "$BASE/WezTerm-macos-${WEZTERM_VERSION}.zip" || true
-
-          # macOS depot: extract WezTerm app bundle
-          if [ -f "wezterm-cache/wezterm-mac.zip" ]; then
-            mkdir -p steam-build/depot-macos/wezterm
-            unzip -qo wezterm-cache/wezterm-mac.zip -d /tmp/wez-mac-tmp
-            WEZAPP=$(find /tmp/wez-mac-tmp -name "WezTerm.app" -type d 2>/dev/null | head -1)
-            if [ -n "$WEZAPP" ]; then
-              cp -r "$WEZAPP" steam-build/depot-macos/wezterm/
-              echo "✅ WezTerm.app copied to macOS depot"
-            else
-              echo "⚠️ WezTerm.app not found in macOS ZIP"
-            fi
-            rm -rf /tmp/wez-mac-tmp
-          else
-            echo "⚠️ Could not download WezTerm for macOS"
-          fi
-
-          # Copy config, fonts to all depots
-          for dir in steam-build/depot-windows steam-build/depot-linux steam-build/depot-macos; do
-            cp wezterm.lua "$dir/"
-            cp -r fonts "$dir/"
-          done
-
-          echo "✅ WezTerm bundled into Steam depots"
-
-      # NOTE: macOS WezTerm icon patching REMOVED in v0.53.1
-      # Modifying any file inside a .app bundle invalidates its code signature,
-      # causing macOS Gatekeeper to block it with "WezTerm is damaged" error.
-      # Windows icon patching (rcedit) is fine — PE modification doesn't have this issue.
-
-      - name: Patch WezTerm icon for Steam (Windows)
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq wine64 > /dev/null 2>&1
-          curl -fSL -o /tmp/rcedit-x64.exe \
-            "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
-          wine /tmp/rcedit-x64.exe \
-            "steam-build/depot-windows/wezterm/wezterm-gui.exe" \
-            --set-icon "app.ico" 2>/dev/null && \
-            echo "✅ Steam WezTerm icon patched" || \
-            echo "⚠️ Icon patching failed (non-critical)"
-
-      - name: Add GPL compliance files to Steam builds
-        run: |
-          # Create source archive
-          git archive --format=zip --prefix=usurper-reborn-source/ HEAD > usurper-reborn-source.zip
-
-          # Copy to depots
-          for dir in steam-build/depot-windows steam-build/depot-linux steam-build/depot-macos; do
-            cp LICENSE "$dir/"
-            cp usurper-reborn-source.zip "$dir/"
-          done
-
-          echo "=== Steam depot contents ==="
-          ls -la steam-build/depot-windows/
-          ls -la steam-build/depot-linux/
-          ls -la steam-build/depot-macos/
-
-      - name: Generate Steam configuration
-        env:
-          STEAM_APP_ID: ${{ vars.STEAM_APP_ID || 'YOUR_STEAM_APP_ID' }}
-          STEAM_DEPOT_WINDOWS: ${{ vars.STEAM_DEPOT_WINDOWS || 'YOUR_WINDOWS_DEPOT_ID' }}
-          STEAM_DEPOT_LINUX: ${{ vars.STEAM_DEPOT_LINUX || 'YOUR_LINUX_DEPOT_ID' }}
-          STEAM_DEPOT_MACOS: ${{ vars.STEAM_DEPOT_MACOS || 'YOUR_MACOS_DEPOT_ID' }}
-        run: |
-          # Generate app_build.vdf with actual IDs from repository variables
-          cat > steam-build/app_build.vdf << EOF
-          "appbuild"
-          {
-            "appid" "${STEAM_APP_ID}"
-            "desc" "Usurper Reborn v${{ github.ref_name || 'development' }} (GPL v2)"
-            "buildoutput" "../steam-logs/"
-            "contentroot" ""
-            "setlive" ""
-            "preview" "0"
-            "local" ""
-
-            "depots"
-            {
-              "${STEAM_DEPOT_WINDOWS}"
-              {
-                "FileMapping"
-                {
-                  "LocalPath" "depot-windows/*"
-                  "DepotPath" "."
-                  "recursive" "1"
-                }
-              }
-
-              "${STEAM_DEPOT_LINUX}"
-              {
-                "FileMapping"
-                {
-                  "LocalPath" "depot-linux/*"
-                  "DepotPath" "."
-                  "recursive" "1"
-                }
-              }
-
-              "${STEAM_DEPOT_MACOS}"
-              {
-                "FileMapping"
-                {
-                  "LocalPath" "depot-macos/*"
-                  "DepotPath" "."
-                  "recursive" "1"
-                }
-              }
-            }
-          }
-          EOF
-
-          echo "Generated app_build.vdf with App ID: ${STEAM_APP_ID}"
-
-      - name: Create Steam launch configuration guide
-        run: |
-          cat > steam-build/STEAM_LAUNCH_CONFIG.md << 'EOF'
-          # Steam Launch Configuration for Usurper Reborn
-
-          ## Launch Targets (set in Steamworks Partner)
-
-          ### Windows
-          - **Executable:** `Play.bat`
-          - **Arguments:** (none needed)
-          - **Launch Type:** Launch (Default)
-          - **Note:** Launches the game inside bundled WezTerm branded terminal
-
-          ### Linux
-          - **Executable:** `play.sh`
-          - **Arguments:** (none needed)
-          - **Launch Type:** Launch (Default)
-          - **Note:** Launches the game inside bundled WezTerm branded terminal
-
-          ### macOS
-          - **Executable:** `play.sh`
-          - **Arguments:** (none needed)
-          - **Launch Type:** Launch (Default)
-          - **OS:** macOS
-          - **Note:** Launches the game inside bundled WezTerm branded terminal
-
-          ## Notes
-          - WezTerm is bundled in the `wezterm/` directory inside each depot
-          - `wezterm.lua` configures the terminal appearance (colors, font, window title)
-          - Players can change fonts via the in-game Preferences menu
-          - Font choice is saved to `font-choice.txt` and applies on next launch
-          EOF
-
-      - name: Create release notes
-        run: |
-          cat > steam-build/RELEASE_NOTES.md << 'EOF'
-          # Usurper Reborn - Complete Medieval World Simulation
-          
-          **🆓 FREE AND OPEN SOURCE SOFTWARE - GPL v2 Licensed**
-          
-          ##  21 Major Phases Complete!
-          
-          This release includes the complete Usurper remake with 100% Pascal source compatibility:
-          
-          ###  Core Systems
-          - Character creation with 4 classes and personality systems
-          - Advanced turn-based combat with 6 combat modes
-          - 50-level dungeon system with terrain-based encounters
-          - Royal court with complete kingdom management
-          
-          ###  Social Systems  
-          - Enhanced NPC AI with Pascal-compatible behaviors
-          - Advanced relationship tracking with memory and consequences
-          - Marriage and family systems with child management
-          - Gang formation, warfare, and territorial control
-          
-          ###  World Systems
-          - Religious pantheon with 6 major deities and divine powers
-          - Magic system with 15+ spells and advanced casting mechanics
-          - Complete shop ecosystem (weapons, armor, magic, banking)
-          - Medical system with comprehensive healing services
-          - Prison system with justice, escape, and rehabilitation
-          
-          ###  Technical Achievements
-          - **50,000+ lines** of Pascal-compatible code
-          - **100+ files** across comprehensive systems
-          - **300+ test cases** ensuring quality
-          - **Multi-platform** Windows, Linux, macOS support
-          - **Steam-ready** with automated CI/CD pipeline
-          
-          ## 📜 GPL v2 LICENSE COMPLIANCE
-          
-          **YOUR RIGHTS:**
-          - ✅ Use for any purpose (personal, commercial, educational)
-          - ✅ Study and modify the complete source code
-          - ✅ Distribute copies freely
-          - ✅ Distribute your modifications under GPL v2
-          
-          **SOURCE CODE INCLUDED:**
-          - Complete source code archive included with every download
-          - Online repository: https://github.com/binary-knight/usurper-reborn
-          - All build scripts, assets, and documentation included
-          
-          **This is truly FREE software - you own it completely!**
-          
-          Ready for commercial Steam release with full GPL compliance!
-          EOF
-
-      - name: Upload Steam artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: steam-release
-          path: steam-build/
-
+  # ─── STEAM UPLOAD ───────────────────────────────────────────────
   steam-upload:
     name: Upload to Steam
     runs-on: ubuntu-latest
-    needs: [steam-prep]
-    # Only upload on release tags or manual trigger
+    needs: [steam-package]
     if: github.event_name == 'release'
     steps:
       - name: Download Steam artifacts
@@ -1206,10 +671,9 @@ jobs:
 
       - name: Install steamcmd
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lib32gcc-s1
-          mkdir -p ~/steamcmd
-          cd ~/steamcmd
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lib32gcc-s1
+          mkdir -p ~/steamcmd && cd ~/steamcmd
           curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf -
 
       - name: Configure Steam authentication
@@ -1224,12 +688,8 @@ jobs:
         env:
           STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
         run: |
-          # Use absolute path for app_build.vdf
           BUILD_FILE="$(pwd)/steam-build/app_build.vdf"
-          echo "Build file: $BUILD_FILE"
-          ls -la steam-build/
           ~/steamcmd/steamcmd.sh +login "$STEAM_USERNAME" +run_app_build "$BUILD_FILE" +quit
-          echo "Steam upload complete!"
 
       - name: Upload Steam logs
         if: always()
@@ -1238,38 +698,66 @@ jobs:
           name: steam-upload-logs
           path: steam-logs/
 
-  report:
-    name: Build Report
+  # ─── DEPLOY TO SERVER ──────────────────────────────────────────
+  deploy-server:
+    name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: [build, build-desktop, steam-prep]
-    if: always()
+    needs: [build, smoke-test]
+    if: >-
+      (github.event_name == 'release') ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_server == 'true')
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     steps:
-      - name: Generate build report
+      - name: Download Linux x64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-x64-build
+          path: build/
+
+      - name: Determine version
+        id: version
         run: |
-          echo " **Usurper Reborn CI/CD Pipeline Report**"
-          echo ""
-          echo " **Build Status Summary:**"
-          echo "-  .NET Build: SUCCESS"
-          echo "-  GPL Compliance: SUCCESS ✅"
-          echo "-  Source Code Archive: INCLUDED"
-          echo "-  Multi-platform preparation: SUCCESS" 
-          echo "-  Steam release preparation: SUCCESS"
-          echo ""
-          echo " **GPL v2 Compliance Status:**"
-          echo "- ✅ **Complete source code** included with all builds"
-          echo "- ✅ **LICENSE file** distributed with binaries"
-          echo "- ✅ **GPL notice** included in all packages"
-          echo "- ✅ **User rights** clearly documented"
-          echo ""
-          echo " **Project Status:**"
-          echo "- **21 Major Phases**: Complete"
-          echo "- **Pascal Compatibility**: 100%"
-          echo "- **Code Base**: 50,000+ lines"
-          echo "- **Test Coverage**: 300+ test cases"
-          echo "- **Platforms**: Windows, Linux, macOS"
-          echo "- **License**: GPL v2 (Free & Open Source)"
-          echo ""
-          echo " **🆓 FREE Medieval World Simulation Ready for Steam Release!**"
-          echo ""
-          echo "*From peasant to ruler, the path of the Usurper awaits!*"
-          echo "*Complete source code included - modify and redistribute freely!*"
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=manual-$(date +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create deployment tarball
+        run: cd build && tar -czf ../server.tar.gz . && cd ..
+
+      - name: Deploy to production
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          HOST: ${{ vars.SERVER_HOST || '3.150.229.205' }}
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          SSH="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new ubuntu@$HOST"
+          SCP="scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new"
+
+          # Upload tarball
+          $SCP server.tar.gz "ubuntu@$HOST:/tmp/usurper-reborn-server.tar.gz"
+
+          # Stop services, extract, restart
+          $SSH "\
+            sudo systemctl stop sshd-usurper && \
+            sudo systemctl stop usurper-mud && \
+            sudo tar -xzf /tmp/usurper-reborn-server.tar.gz -C /opt/usurper/ && \
+            sudo chmod +x /opt/usurper/UsurperReborn && \
+            sudo chown -R usurper:usurper /opt/usurper && \
+            echo '${VERSION#v}' | sudo tee /opt/usurper/version.txt > /dev/null && \
+            sudo systemctl start usurper-mud && \
+            sudo systemctl start sshd-usurper && \
+            echo 'Deploy complete: ${VERSION}'"
+
+          # Cleanup
+          rm -f ~/.ssh/deploy_key

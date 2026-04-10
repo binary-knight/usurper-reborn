@@ -642,7 +642,7 @@ public class Character
     public int MealsToday { get; set; } = 0;          // Daily meal counter (transient, resets daily, max 3)
     public bool DivineFavorTriggeredThisCombat { get; set; } = false; // Transient: reset each combat
 
-    // Food buff tracking (Inn meals, v0.53.14) — transient, not serialized
+    // Food buff tracking (Inn meals, v0.53.14)
     public int FoodBuffType { get; set; }       // 0=none, 1=DragonSteak(+dmg), 2=HoneyBread(+def), 3=IronRations(+maxHP), 4=MushroomSoup(+spell), 5=FoodPoisoning(-stats)
     public int FoodBuffCombats { get; set; }    // Remaining combats for active food buff
     public float FoodBuffValue { get; set; }    // Buff multiplier (e.g. 0.10 = 10%)

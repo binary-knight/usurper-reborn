@@ -1229,12 +1229,20 @@ public class WorldSimulator
         if (string.IsNullOrEmpty(otherID) && string.IsNullOrEmpty(otherName))
             return true; // Unknown parent = effectively dead
 
-        // Check if other parent is the player (player is alive — don't orphan)
+        // Check if other parent is a player character (not an NPC).
+        // In online mode, CurrentPlayer is null in the world sim context,
+        // so we detect player parents by their ID format (NPC IDs start with "npc_").
+        // Player characters don't permadeath, so they're always considered alive.
         var player = GameEngine.Instance?.CurrentPlayer;
         if (player != null)
         {
             if (player.DisplayName == otherName || player.Name2 == otherName)
                 return false; // Player is alive, child is not orphaned
+        }
+        else if (!string.IsNullOrEmpty(otherID) && !otherID.StartsWith("npc_"))
+        {
+            // Parent has a non-NPC ID — this is a player character (always alive)
+            return false;
         }
 
         // Check NPC list (includes dead NPCs since they stay in ActiveNPCs)

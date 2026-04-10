@@ -553,6 +553,12 @@ namespace UsurperRemake.Systems
         public float SongBuffValue2 { get; set; }
         public List<int> HeardLoreSongs { get; set; } = new();
 
+        // Food buff properties (Inn meals, v0.54.2)
+        public int FoodBuffType { get; set; }
+        public int FoodBuffCombats { get; set; }
+        public float FoodBuffValue { get; set; }
+        public int MealsToday { get; set; }
+
         // Dungeon Settlements & Wilderness (v0.49.4)
         public List<string> VisitedSettlements { get; set; } = new();
         public List<string> SettlementLoreRead { get; set; } = new();

@@ -4453,6 +4453,12 @@ public partial class GameEngine
         player.SongBuffValue2 = playerData.SongBuffValue2;
         player.HeardLoreSongs = playerData.HeardLoreSongs != null ? new HashSet<int>(playerData.HeardLoreSongs) : new HashSet<int>();
 
+        // Restore food buff properties (Inn meals)
+        player.FoodBuffType = playerData.FoodBuffType;
+        player.FoodBuffCombats = playerData.FoodBuffCombats;
+        player.FoodBuffValue = playerData.FoodBuffValue;
+        player.MealsToday = playerData.MealsToday;
+
         // Dungeon Settlements & Wilderness (v0.49.4)
         player.VisitedSettlements = playerData.VisitedSettlements != null ? new HashSet<string>(playerData.VisitedSettlements) : new HashSet<string>();
         player.SettlementLoreRead = playerData.SettlementLoreRead != null ? new HashSet<string>(playerData.SettlementLoreRead) : new HashSet<string>();

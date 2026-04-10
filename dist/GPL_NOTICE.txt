@@ -1,0 +1,18 @@
+USURPER REBORN - GPL v2 COMPLIANCE NOTICE
+============================================
+
+This software is distributed under the GNU General Public License v2.
+
+As required by GPL v2, the complete source code is available:
+
+  - Online repository: https://github.com/binary-knight/usurper-reborn
+  - Source code is also attached to each GitHub release
+
+You have the right to:
+
+  - Use this software for any purpose
+  - Study and modify the source code
+  - Distribute copies of the software
+  - Distribute modified versions under the same license
+
+See the LICENSE file for complete GPL v2 terms and conditions.

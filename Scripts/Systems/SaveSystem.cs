@@ -838,6 +838,12 @@ namespace UsurperRemake.Systems
                 SongBuffValue2 = player.SongBuffValue2,
                 HeardLoreSongs = player.HeardLoreSongs?.ToList() ?? new List<int>(),
 
+                // Food buff properties (Inn meals)
+                FoodBuffType = player.FoodBuffType,
+                FoodBuffCombats = player.FoodBuffCombats,
+                FoodBuffValue = player.FoodBuffValue,
+                MealsToday = player.MealsToday,
+
                 // Dungeon Settlements & Wilderness (v0.49.4)
                 VisitedSettlements = player.VisitedSettlements?.ToList() ?? new List<string>(),
                 SettlementLoreRead = player.SettlementLoreRead?.ToList() ?? new List<string>(),
