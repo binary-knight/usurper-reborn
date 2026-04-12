@@ -65,7 +65,7 @@ public class DailySystemManager
             var oldMode = currentMode;
             currentMode = mode;
             
-            terminal?.WriteLine($"Daily cycle mode changed from {oldMode} to {mode}", "bright_cyan");
+            terminal?.WriteLine(Loc.Get("daily.mode_changed", oldMode, mode), "bright_cyan");
             
             // Adjust reset time based on new mode
             AdjustResetTimeForMode();
@@ -238,13 +238,13 @@ public class DailySystemManager
 
         var message = currentMode switch
         {
-            DailyCycleMode.SessionBased => $"        NEW SESSION BEGINS! (Day {currentDay})",
-            DailyCycleMode.RealTime24Hour => $"        NEW DAY DAWNS! (Day {currentDay})",
-            DailyCycleMode.Accelerated4Hour => $"        TIME ADVANCES! (Day {currentDay})",
-            DailyCycleMode.Accelerated8Hour => $"        TIME ADVANCES! (Day {currentDay})",
-            DailyCycleMode.Accelerated12Hour => $"        TIME ADVANCES! (Day {currentDay})",
-            DailyCycleMode.Endless => $"        ENDLESS ADVENTURE CONTINUES! (Day {currentDay})",
-            _ => $"        DAY {currentDay} BEGINS!"
+            DailyCycleMode.SessionBased => $"        {Loc.Get("daily.new_session", currentDay)}",
+            DailyCycleMode.RealTime24Hour => $"        {Loc.Get("daily.new_day_dawns", currentDay)}",
+            DailyCycleMode.Accelerated4Hour => $"        {Loc.Get("daily.time_advances", currentDay)}",
+            DailyCycleMode.Accelerated8Hour => $"        {Loc.Get("daily.time_advances", currentDay)}",
+            DailyCycleMode.Accelerated12Hour => $"        {Loc.Get("daily.time_advances", currentDay)}",
+            DailyCycleMode.Endless => $"        {Loc.Get("daily.endless_continues", currentDay)}",
+            _ => $"        {Loc.Get("daily.day_begins", currentDay)}"
         };
         
         terminal.WriteLine(message, "bright_yellow");
@@ -255,13 +255,13 @@ public class DailySystemManager
         // Mode-specific flavor text
         var flavorText = currentMode switch
         {
-            DailyCycleMode.SessionBased => "Your strength and resolve have been restored!",
-            DailyCycleMode.RealTime24Hour => "The sun rises on a new day of adventure!",
-            DailyCycleMode.Accelerated4Hour => "Time flows swiftly in this realm!",
-            DailyCycleMode.Accelerated8Hour => "The hours pass quickly here!",
-            DailyCycleMode.Accelerated12Hour => "Day and night cycle rapidly!",
-            DailyCycleMode.Endless => "Time has no meaning in your endless quest!",
-            _ => "A new day of adventure awaits!"
+            DailyCycleMode.SessionBased => Loc.Get("daily.flavor_session"),
+            DailyCycleMode.RealTime24Hour => Loc.Get("daily.flavor_realtime"),
+            DailyCycleMode.Accelerated4Hour => Loc.Get("daily.flavor_accel_4h"),
+            DailyCycleMode.Accelerated8Hour => Loc.Get("daily.flavor_accel_8h"),
+            DailyCycleMode.Accelerated12Hour => Loc.Get("daily.flavor_accel_12h"),
+            DailyCycleMode.Endless => Loc.Get("daily.flavor_endless"),
+            _ => Loc.Get("daily.flavor_default")
         };
         
         terminal.WriteLine(flavorText, "cyan");
@@ -293,7 +293,7 @@ public class DailySystemManager
             };
 
             player.TurnsRemaining = turnsToRestore;
-            terminal?.WriteLine($"Your daily limits have been restored! ({turnsToRestore} turns)", "bright_green");
+            terminal?.WriteLine(Loc.Get("daily.limits_restored", turnsToRestore), "bright_green");
         }
         else
         {
@@ -301,7 +301,7 @@ public class DailySystemManager
             if (player.TurnsRemaining < 50)
             {
                 player.TurnsRemaining += 25;
-                terminal?.WriteLine("Your energy has been partially restored!", "bright_green");
+                terminal?.WriteLine(Loc.Get("daily.energy_restored"), "bright_green");
             }
         }
 
@@ -411,11 +411,11 @@ public class DailySystemManager
             // Blood Moon just started for this player
             terminal?.WriteLine("", "white");
             if (GameConfig.ScreenReaderMode)
-                terminal?.WriteLine("  [BLOOD MOON RISING]", "bright_red");
+                terminal?.WriteLine($"  {Loc.Get("daily.blood_moon_rising_sr")}", "bright_red");
             else
-                terminal?.WriteLine("  ★ BLOOD MOON RISING! ★", "bright_red");
-            terminal?.WriteLine("  The sky turns crimson... Monsters grow fierce!", "red");
-            terminal?.WriteLine("  Monsters: +50% power | XP: x2 | Gold: x3", "red");
+                terminal?.WriteLine($"  {Loc.Get("daily.blood_moon_rising")}", "bright_red");
+            terminal?.WriteLine($"  {Loc.Get("daily.blood_moon_desc")}", "red");
+            terminal?.WriteLine($"  {Loc.Get("daily.blood_moon_effects")}", "red");
             terminal?.WriteLine("", "white");
 
             // Server-wide broadcast (once per Blood Moon, not per player)
@@ -425,7 +425,7 @@ public class DailySystemManager
                 if ((now - _lastBloodMoonBroadcast).TotalMinutes > 30)
                 {
                     _lastBloodMoonBroadcast = now;
-                    try { UsurperRemake.Server.MudServer.Instance?.BroadcastToAll("\r\n\x1b[1;31m  ★ BLOOD MOON RISING! Monsters are fiercer but rewards are greater! ★\x1b[0m\r\n"); }
+                    try { UsurperRemake.Server.MudServer.Instance?.BroadcastToAll($"\r\n\x1b[1;31m  ★ {Loc.Get("daily.blood_moon_broadcast")} ★\x1b[0m\r\n"); }
                     catch { }
                 }
             }
@@ -433,7 +433,7 @@ public class DailySystemManager
         else if (wasBloodMoon && !isBloodMoonDay)
         {
             // Blood Moon just ended
-            terminal?.WriteLine("  The Blood Moon fades... The world returns to normal.", "gray");
+            terminal?.WriteLine($"  {Loc.Get("daily.blood_moon_fades")}", "gray");
             terminal?.WriteLine("", "white");
         }
 
@@ -445,7 +445,7 @@ public class DailySystemManager
         {
             long servantsGold = GameConfig.ServantsDailyGoldBase + (player.Level * GameConfig.ServantsDailyGoldPerLevel);
             player.Gold += servantsGold;
-            terminal?.WriteLine($"Your servants collected {servantsGold:N0} gold in rent and services.", "bright_yellow");
+            terminal?.WriteLine(Loc.Get("daily.servants_gold", $"{servantsGold:N0}"), "bright_yellow");
         }
 
         // Child daily gold bonus
@@ -453,7 +453,7 @@ public class DailySystemManager
         if (childGold > 0)
         {
             player.Gold += childGold;
-            terminal?.WriteLine($"Your children contributed {childGold:N0} gold to the household.", "bright_yellow");
+            terminal?.WriteLine(Loc.Get("daily.child_gold", $"{childGold:N0}"), "bright_yellow");
         }
 
         // Process daily events
@@ -540,7 +540,7 @@ public class DailySystemManager
     
     private async Task ProcessSessionBasedReset()
     {
-        terminal?.WriteLine("Session-based reset: Ready for a new adventure session!", "bright_cyan");
+        terminal?.WriteLine(Loc.Get("daily.session_reset"), "bright_cyan");
         
         // Process NPCs during player absence (minimal)
         await ProcessNPCsDuringAbsence(TimeSpan.FromHours(1)); // Assume 1 hour offline
@@ -549,7 +549,7 @@ public class DailySystemManager
     private async Task ProcessRealTimeReset()
     {
         var timeSinceLastReset = DateTime.Now - lastResetTime;
-        terminal?.WriteLine($"Real-time reset: {timeSinceLastReset.TotalHours:F1} hours have passed!", "bright_cyan");
+        terminal?.WriteLine(Loc.Get("daily.realtime_reset", $"{timeSinceLastReset.TotalHours:F1}"), "bright_cyan");
         
         // Process NPCs during real-time absence
         await ProcessNPCsDuringAbsence(timeSinceLastReset);
@@ -568,7 +568,7 @@ public class DailySystemManager
             _ => "accelerated"
         };
         
-        terminal?.WriteLine($"Accelerated reset: {cycleName} cycle completed!", "bright_cyan");
+        terminal?.WriteLine(Loc.Get("daily.accel_reset", cycleName), "bright_cyan");
         
         // Process accelerated world simulation
         var simulatedTime = currentMode switch
@@ -584,7 +584,7 @@ public class DailySystemManager
     
     private async Task ProcessEndlessReset()
     {
-        terminal?.WriteLine("Endless mode: Time flows differently here...", "bright_magenta");
+        terminal?.WriteLine(Loc.Get("daily.endless_reset"), "bright_magenta");
         
         // In endless mode, still process some world simulation but less frequently
         if (currentDay % 7 == 0) // Weekly world updates
@@ -616,13 +616,13 @@ public class DailySystemManager
     /// </summary>
     private Task ProcessNPCsDuringAbsence(TimeSpan timeSpan)
     {
-        terminal?.WriteLine($"NPCs have been active during your absence ({timeSpan.TotalHours:F1} hours simulated)", "yellow");
+        terminal?.WriteLine(Loc.Get("daily.npcs_active", $"{timeSpan.TotalHours:F1}"), "yellow");
         return Task.CompletedTask;
     }
 
     private Task ProcessWorldEventsDuringAbsence(TimeSpan timeSpan)
     {
-        terminal?.WriteLine("World events have unfolded in your absence!", "yellow");
+        terminal?.WriteLine(Loc.Get("daily.world_events_absence"), "yellow");
         return Task.CompletedTask;
     }
     
@@ -638,7 +638,7 @@ public class DailySystemManager
             if (success)
             {
                 lastAutoSave = DateTime.Now;
-                terminal?.WriteLine("Auto-saved", "gray");
+                terminal?.WriteLine(Loc.Get("daily.auto_saved"), "gray");
             }
         }
     }
@@ -689,8 +689,9 @@ public class DailySystemManager
         autoSaveEnabled = enabled;
         autoSaveInterval = interval;
         
-        terminal?.WriteLine($"Auto-save {(enabled ? "enabled" : "disabled")}" + 
-                          (enabled ? $" (every {interval.TotalMinutes} minutes)" : ""), "cyan");
+        terminal?.WriteLine(enabled
+            ? Loc.Get("daily.autosave_enabled", $"{interval.TotalMinutes}")
+            : Loc.Get("daily.autosave_disabled"), "cyan");
     }
     
     /// <summary>
@@ -712,7 +713,7 @@ public class DailySystemManager
                 player.PrisonEscapes = (byte)Math.Min(player.PrisonEscapes + 1, GameConfig.MaxPrisonEscapeAttempts);
             if (terminal != null)
             {
-                terminal.WriteLine($"A day passes in prison... ({player.DaysInPrison} day{(player.DaysInPrison == 1 ? "" : "s")} remaining)", "yellow");
+                terminal.WriteLine(Loc.Get("daily.prison_day", player.DaysInPrison), "yellow");
             }
         }
 
@@ -727,7 +728,7 @@ public class DailySystemManager
                 if (grief.CurrentStage != previousStage && terminal != null)
                 {
                     terminal.WriteLine("");
-                    terminal.WriteLine($"Your grief has evolved... ({previousStage} --> {grief.CurrentStage})", "dark_magenta");
+                    terminal.WriteLine(Loc.Get("daily.grief_evolved", previousStage, grief.CurrentStage), "dark_magenta");
                     var effects = grief.GetCurrentEffects();
                     if (!string.IsNullOrEmpty(effects.Description))
                         terminal.WriteLine($"  {effects.Description}", "gray");
@@ -765,13 +766,13 @@ public class DailySystemManager
                 if (terminal != null)
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine($"Loan Shark: Interest of {interest:N0}g accrued. You owe {player.LoanAmount:N0}g ({Math.Max(0, player.LoanDaysRemaining)} day{(player.LoanDaysRemaining == 1 ? "" : "s")} remaining).");
+                    terminal.WriteLine(Loc.Get("daily.loan_interest", $"{interest:N0}", $"{player.LoanAmount:N0}", Math.Max(0, player.LoanDaysRemaining)));
                 }
 
                 if (player.LoanDaysRemaining <= 0 && terminal != null)
                 {
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine("WARNING: The Loan Shark's enforcers are looking for you!");
+                    terminal.WriteLine(Loc.Get("daily.loan_enforcers"));
                 }
             }
         }
@@ -823,7 +824,7 @@ public class DailySystemManager
             prisoner.PrisonEscapes = (byte)Math.Min(prisoner.PrisonEscapes + 1, GameConfig.MaxPrisonEscapeAttempts);
             if (terminal != null)
             {
-                terminal.WriteLine($"A day passes in prison... ({prisoner.DaysInPrison} day{(prisoner.DaysInPrison == 1 ? "" : "s")} remaining)", "yellow");
+                terminal.WriteLine(Loc.Get("daily.prison_day_passes", prisoner.DaysInPrison), "yellow");
             }
         }
 
@@ -846,7 +847,7 @@ public class DailySystemManager
                 if (grief.CurrentStage != previousStage && terminal != null)
                 {
                     terminal.WriteLine("");
-                    terminal.WriteLine($"Your grief has evolved... ({previousStage} --> {grief.CurrentStage})", "dark_magenta");
+                    terminal.WriteLine(Loc.Get("daily.grief_evolved", previousStage, grief.CurrentStage), "dark_magenta");
 
                     // Show stage effect
                     var effects = grief.GetCurrentEffects();
@@ -890,7 +891,7 @@ public class DailySystemManager
                 if (terminal != null)
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine($"Loan Shark: Interest of {interest:N0}g accrued. You owe {loanPlayer.LoanAmount:N0}g ({Math.Max(0, loanPlayer.LoanDaysRemaining)} day{(loanPlayer.LoanDaysRemaining == 1 ? "" : "s")} remaining).");
+                    terminal.WriteLine(Loc.Get("daily.loan_interest", $"{interest:N0}", $"{loanPlayer.LoanAmount:N0}", Math.Max(0, loanPlayer.LoanDaysRemaining)));
                 }
 
                 if (loanPlayer.LoanDaysRemaining <= 0)
@@ -898,7 +899,7 @@ public class DailySystemManager
                     if (terminal != null)
                     {
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine("WARNING: The Loan Shark's enforcers are looking for you!");
+                        terminal.WriteLine(Loc.Get("daily.loan_enforcers"));
                     }
                 }
             }
@@ -921,7 +922,7 @@ public class DailySystemManager
                         if (terminal != null)
                         {
                             terminal.SetColor("yellow");
-                            terminal.WriteLine($"Royal Debt: Your loan of {(long)(royalLoanPlayer.RoyalLoanAmount * 1.10):N0}g is {daysOverdue} day{(daysOverdue == 1 ? "" : "s")} overdue! (-{GameConfig.RoyalLoanChivalryLossEarly} Chivalry)");
+                            terminal.WriteLine(Loc.Get("daily.royal_debt_early", $"{(long)(royalLoanPlayer.RoyalLoanAmount * 1.10):N0}", daysOverdue, GameConfig.RoyalLoanChivalryLossEarly));
                         }
                     }
                     else if (daysOverdue <= 14)
@@ -937,7 +938,7 @@ public class DailySystemManager
                         if (terminal != null)
                         {
                             terminal.SetColor("red");
-                            terminal.WriteLine($"Royal Debt: A BOUNTY has been posted for your unpaid loan! ({daysOverdue} days overdue, -{GameConfig.RoyalLoanChivalryLossMid} Chivalry)");
+                            terminal.WriteLine(Loc.Get("daily.royal_debt_bounty", daysOverdue, GameConfig.RoyalLoanChivalryLossMid));
                         }
                     }
                     else
@@ -947,7 +948,7 @@ public class DailySystemManager
                         if (terminal != null)
                         {
                             terminal.SetColor("bright_red");
-                            terminal.WriteLine($"Royal Debt: The Crown demands immediate repayment! ({daysOverdue} days overdue, -{GameConfig.RoyalLoanChivalryLossLate} Chivalry)");
+                            terminal.WriteLine(Loc.Get("daily.royal_debt_late", daysOverdue, GameConfig.RoyalLoanChivalryLossLate));
                         }
                     }
                 }
@@ -1116,16 +1117,16 @@ public class DailySystemManager
         var uptime = DateTime.Now - gameStartTime;
         var modeText = currentMode switch
         {
-            DailyCycleMode.SessionBased => "Session",
-            DailyCycleMode.RealTime24Hour => "Real-time",
-            DailyCycleMode.Accelerated4Hour => "Fast (4h)",
-            DailyCycleMode.Accelerated8Hour => "Fast (8h)",
-            DailyCycleMode.Accelerated12Hour => "Fast (12h)",
-            DailyCycleMode.Endless => "Endless",
-            _ => "Unknown"
+            DailyCycleMode.SessionBased => Loc.Get("daily.mode_session"),
+            DailyCycleMode.RealTime24Hour => Loc.Get("daily.mode_realtime"),
+            DailyCycleMode.Accelerated4Hour => Loc.Get("daily.mode_fast_4h"),
+            DailyCycleMode.Accelerated8Hour => Loc.Get("daily.mode_fast_8h"),
+            DailyCycleMode.Accelerated12Hour => Loc.Get("daily.mode_fast_12h"),
+            DailyCycleMode.Endless => Loc.Get("daily.mode_endless"),
+            _ => Loc.Get("daily.mode_unknown")
         };
-        
-        return $"Day {currentDay} | Mode: {modeText} | Uptime: {uptime.Days}d {uptime.Hours}h {uptime.Minutes}m";
+
+        return Loc.Get("daily.time_status", currentDay, modeText, uptime.Days, uptime.Hours, uptime.Minutes);
     }
     
     public bool IsNewDay()
@@ -1166,7 +1167,7 @@ public class DailySystemManager
         if (believerExp > 0)
         {
             god.GodExperience += believerExp;
-            terminal?.WriteLine($"  Your {believers} believer{(believers == 1 ? "" : "s")} grant you {believerExp:N0} divine power.", "bright_yellow");
+            terminal?.WriteLine(Loc.Get("daily.believers_power", believers, $"{believerExp:N0}"), "bright_yellow");
         }
 
         // Recalculate god level from exp thresholds
@@ -1184,11 +1185,11 @@ public class DailySystemManager
         {
             god.GodLevel = newLevel;
             int titleIdx = Math.Clamp(newLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-            terminal?.WriteLine($"  Your divine power grows! You are now a {GameConfig.GodTitles[titleIdx]}!", "bright_cyan");
+            terminal?.WriteLine(Loc.Get("daily.divine_power_grows", GameConfig.GodTitles[titleIdx]), "bright_cyan");
             NewsSystem.Instance?.Newsy(true, $"{god.DivineName} has ascended to the rank of {GameConfig.GodTitles[titleIdx]}!");
         }
 
-        terminal?.WriteLine($"  Your deeds have been restored ({god.DeedsLeft} available).", "yellow");
+        terminal?.WriteLine(Loc.Get("daily.deeds_restored", god.DeedsLeft), "yellow");
     }
 
     /// <summary>
@@ -1306,12 +1307,12 @@ public class DailySystemManager
     {
         return GetTimeOfDay(player) switch
         {
-            GameTimePeriod.Dawn => "Dawn",
-            GameTimePeriod.Morning => "Morning",
-            GameTimePeriod.Afternoon => "Afternoon",
-            GameTimePeriod.Evening => "Evening",
-            GameTimePeriod.Night => "Night",
-            _ => "Day"
+            GameTimePeriod.Dawn => Loc.Get("daily.time_dawn"),
+            GameTimePeriod.Morning => Loc.Get("daily.time_morning"),
+            GameTimePeriod.Afternoon => Loc.Get("daily.time_afternoon"),
+            GameTimePeriod.Evening => Loc.Get("daily.time_evening"),
+            GameTimePeriod.Night => Loc.Get("daily.time_night"),
+            _ => Loc.Get("daily.time_day")
         };
     }
 
@@ -1447,22 +1448,22 @@ public class DailySystemManager
         {
             return currentPeriod switch
             {
-                GameTimePeriod.Dawn => "You sense dawn breaking somewhere far above.",
-                GameTimePeriod.Morning => "The dungeon air shifts subtly — morning has come to the world above.",
-                GameTimePeriod.Afternoon => "Time blurs underground, but your gut says it's afternoon.",
-                GameTimePeriod.Evening => "A chill deepens in the stone walls. Evening must be approaching.",
-                GameTimePeriod.Night => "The darkness feels heavier now. Night has fallen above.",
+                GameTimePeriod.Dawn => Loc.Get("daily.dungeon_dawn"),
+                GameTimePeriod.Morning => Loc.Get("daily.dungeon_morning"),
+                GameTimePeriod.Afternoon => Loc.Get("daily.dungeon_afternoon"),
+                GameTimePeriod.Evening => Loc.Get("daily.dungeon_evening"),
+                GameTimePeriod.Night => Loc.Get("daily.dungeon_night"),
                 _ => null
             };
         }
 
         return currentPeriod switch
         {
-            GameTimePeriod.Dawn => "The first light of dawn creeps across the sky.",
-            GameTimePeriod.Morning => "The morning sun warms the cobblestones.",
-            GameTimePeriod.Afternoon => "The sun climbs high overhead as afternoon begins.",
-            GameTimePeriod.Evening => "The sky turns to gold and crimson as evening approaches.",
-            GameTimePeriod.Night => "Stars emerge as darkness settles over the realm.",
+            GameTimePeriod.Dawn => Loc.Get("daily.surface_dawn"),
+            GameTimePeriod.Morning => Loc.Get("daily.surface_morning"),
+            GameTimePeriod.Afternoon => Loc.Get("daily.surface_afternoon"),
+            GameTimePeriod.Evening => Loc.Get("daily.surface_evening"),
+            GameTimePeriod.Night => Loc.Get("daily.surface_night"),
             _ => null
         };
     }
@@ -1478,7 +1479,7 @@ public class DailySystemManager
         int currentHour = player.GameTimeMinutes / 60;
         if (currentHour >= GameConfig.RestAvailableHour || currentHour < 5)
         {
-            term.WriteLine("It's already late enough to rest for the night.", "gray");
+            term.WriteLine(Loc.Get("daily.already_late_enough"), "gray");
             return;
         }
 
@@ -1487,7 +1488,7 @@ public class DailySystemManager
         int hoursToWait = minutesToWait / 60;
 
         term.WriteLine("", "white");
-        term.WriteLine("You settle in and while away the hours...", "gray");
+        term.WriteLine(Loc.Get("daily.while_away_hours"), "gray");
         await Task.Delay(1000);
 
         for (int i = 0; i < hoursToWait; i++)
@@ -1496,11 +1497,11 @@ public class DailySystemManager
             int simHour = (currentHour + i + 1) % 24;
             var period = simHour switch
             {
-                >= 5 and < 7 => "Dawn",
-                >= 7 and < 12 => "Morning",
-                >= 12 and < 17 => "Afternoon",
-                >= 17 and < 21 => "Evening",
-                _ => "Night"
+                >= 5 and < 7 => Loc.Get("daily.time_dawn"),
+                >= 7 and < 12 => Loc.Get("daily.time_morning"),
+                >= 12 and < 17 => Loc.Get("daily.time_afternoon"),
+                >= 17 and < 21 => Loc.Get("daily.time_evening"),
+                _ => Loc.Get("daily.time_night")
             };
 
             if (i == 0 || (i + 1) == hoursToWait || (i % 3 == 0))
@@ -1519,7 +1520,7 @@ public class DailySystemManager
         _lastDisplayedPeriod = GameTimePeriod.Night;
 
         term.WriteLine("", "white");
-        term.WriteLine("Night has fallen. You can now rest for the night.", "dark_cyan");
+        term.WriteLine(Loc.Get("daily.night_fallen_rest"), "dark_cyan");
     }
 }
 

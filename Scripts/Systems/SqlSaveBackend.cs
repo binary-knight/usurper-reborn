@@ -403,6 +403,22 @@ namespace UsurperRemake.Systems
             }
             catch { /* Column already exists - expected */ }
 
+            // Migration: add screen_reader and language columns (account-level preferences)
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE players ADD COLUMN screen_reader INTEGER DEFAULT 0;";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE players ADD COLUMN language TEXT DEFAULT 'en';";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
             DebugLogger.Instance.LogInfo("SQL", $"Database initialized at {databasePath}");
         }
 
@@ -427,17 +443,25 @@ namespace UsurperRemake.Systems
 
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
+                // Persist account-level preferences so they apply before character load
+                int screenReaderFlag = data.Player?.ScreenReaderMode == true ? 1 : 0;
+                string language = data.Player?.Language ?? "en";
+
                 cmd.CommandText = @"
-                    INSERT INTO players (username, display_name, player_data, last_login)
-                    VALUES (@username, @displayName, @data, datetime('now'))
+                    INSERT INTO players (username, display_name, player_data, last_login, screen_reader, language)
+                    VALUES (@username, @displayName, @data, datetime('now'), @screenReader, @language)
                     ON CONFLICT(username) DO UPDATE SET
                         display_name = @displayName,
                         player_data = @data,
-                        last_login = datetime('now');
+                        last_login = datetime('now'),
+                        screen_reader = @screenReader,
+                        language = @language;
                 ";
                 cmd.Parameters.AddWithValue("@username", normalizedUsername);
                 cmd.Parameters.AddWithValue("@displayName", displayName);
                 cmd.Parameters.AddWithValue("@data", json);
+                cmd.Parameters.AddWithValue("@screenReader", screenReaderFlag);
+                cmd.Parameters.AddWithValue("@language", language);
 
                 try
                 {
@@ -450,7 +474,9 @@ namespace UsurperRemake.Systems
                     cmd.CommandText = @"
                         UPDATE players SET
                             player_data = @data,
-                            last_login = datetime('now')
+                            last_login = datetime('now'),
+                            screen_reader = @screenReader,
+                            language = @language
                         WHERE LOWER(username) = LOWER(@username);
                     ";
                     await cmd.ExecuteNonQueryAsync();
@@ -2626,41 +2652,43 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Authenticate a player. Returns (success, displayName, message).
         /// </summary>
-        public async Task<(bool success, string displayName, string message)> AuthenticatePlayer(string username, string password)
+        public async Task<(bool success, string displayName, string message, bool screenReader, string language)> AuthenticatePlayer(string username, string password)
         {
             try
             {
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT display_name, password_hash, is_banned, ban_reason FROM players WHERE LOWER(username) = LOWER(@username);";
+                cmd.CommandText = "SELECT display_name, password_hash, is_banned, ban_reason, COALESCE(screen_reader, 0), COALESCE(language, 'en') FROM players WHERE LOWER(username) = LOWER(@username);";
                 cmd.Parameters.AddWithValue("@username", username);
 
                 using var reader = await cmd.ExecuteReaderAsync();
                 if (!await reader.ReadAsync())
-                    return (false, "", "Unknown username. Type 'R' to register a new account.");
+                    return (false, "", "Unknown username. Type 'R' to register a new account.", false, "en");
 
                 string displayName = reader.GetString(0);
                 string storedHash = reader.GetString(1);
                 bool isBanned = reader.GetInt32(2) != 0;
                 string? banReason = reader.IsDBNull(3) ? null : reader.GetString(3);
+                bool screenReader = reader.GetInt32(4) != 0;
+                string language = reader.IsDBNull(5) ? "en" : reader.GetString(5);
 
                 if (isBanned)
                 {
                     string msg = "Your account has been banned.";
                     if (!string.IsNullOrEmpty(banReason))
                         msg += $" Reason: {banReason}";
-                    return (false, "", msg);
+                    return (false, "", msg, false, "en");
                 }
 
                 if (!VerifyPassword(password, storedHash))
-                    return (false, "", "Incorrect password.");
+                    return (false, "", "Incorrect password.", false, "en");
 
-                return (true, displayName, "Login successful!");
+                return (true, displayName, "Login successful!", screenReader, language);
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to authenticate player: {ex.Message}");
-                return (false, "", "Authentication failed. Please try again.");
+                return (false, "", "Authentication failed. Please try again.", false, "en");
             }
         }
 
@@ -2672,7 +2700,7 @@ namespace UsurperRemake.Systems
             try
             {
                 // Verify old password first
-                var (authenticated, _, _) = await AuthenticatePlayer(username, oldPassword);
+                var (authenticated, _, _, _, _) = await AuthenticatePlayer(username, oldPassword);
                 if (!authenticated)
                     return (false, "Current password is incorrect.");
 

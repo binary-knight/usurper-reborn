@@ -5404,7 +5404,7 @@ public class CastleLocation : BaseLocation
             if (result.Outcome != CombatOutcome.Victory)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine("The monster guards overwhelm you!");
+                terminal.WriteLine(Loc.Get("castle.monster_guards_overwhelm"));
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                 terminal.WriteLine(Loc.Get("castle.challenge_failed"));
                 await Task.Delay(2500);
@@ -5413,13 +5413,13 @@ public class CastleLocation : BaseLocation
             else
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"All {currentKing.MonsterGuards.Count} monster guards have been slain!");
+                terminal.WriteLine(Loc.Get("castle.monster_guards_slain", currentKing.MonsterGuards.Count));
                 NewsSystem.Instance?.Newsy(true, $"{currentPlayer.DisplayName} slew all monster guards defending the throne!");
                 currentKing.MonsterGuards.Clear();
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine("");
-                terminal.WriteLine($"You catch your breath... HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
+                terminal.WriteLine(Loc.Get("castle.catch_breath", currentPlayer.HP, currentPlayer.MaxHP));
             }
 
             await Task.Delay(1500);
@@ -5458,7 +5458,7 @@ public class CastleLocation : BaseLocation
             {
                 terminal.ClearScreen();
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"  {guardsToFight.Count} royal guards move to intercept you!");
+                terminal.WriteLine(Loc.Get("castle.guards_intercept", guardsToFight.Count));
                 terminal.WriteLine("");
 
                 // Convert NPC guards to Monster objects scaled to challenger's level
@@ -5516,7 +5516,7 @@ public class CastleLocation : BaseLocation
                 if (result.Outcome != CombatOutcome.Victory)
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine("The royal guards overwhelm you!");
+                    terminal.WriteLine(Loc.Get("castle.royal_guards_overwhelm"));
                     currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                     terminal.WriteLine(Loc.Get("castle.challenge_failed"));
                     await Task.Delay(2500);
@@ -5525,7 +5525,7 @@ public class CastleLocation : BaseLocation
                 else
                 {
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"All royal guards have been defeated!");
+                    terminal.WriteLine(Loc.Get("castle.royal_guards_defeated"));
                     foreach (var guard in guardsToFight)
                     {
                         currentKing.Guards.Remove(guard);
@@ -5534,7 +5534,7 @@ public class CastleLocation : BaseLocation
 
                     terminal.SetColor("cyan");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"You catch your breath... HP: {currentPlayer.HP}/{currentPlayer.MaxHP}");
+                    terminal.WriteLine(Loc.Get("castle.catch_breath", currentPlayer.HP, currentPlayer.MaxHP));
                 }
 
                 await Task.Delay(1500);
@@ -6381,6 +6381,7 @@ public class CastleLocation : BaseLocation
 
             string title = currentPlayer.Sex == CharacterSex.Male ? "Sir" : "Dame";
             currentPlayer.NobleTitle = title;
+            currentPlayer.IsKnighted = true;
 
             // Persist knight title to MetaProgression so it survives NG+ cycles
             MetaProgressionSystem.Instance.UnlockedTitles.Add(title);

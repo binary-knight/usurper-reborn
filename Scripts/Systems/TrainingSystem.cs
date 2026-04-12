@@ -320,7 +320,7 @@ public static class TrainingSystem
                 TargetDC = baseDC,
                 Success = false,
                 IsCriticalFailure = true,
-                FailureReason = "Skill failure! You fumbled the ability."
+                FailureReason = Loc.Get("training.skill_fumble")
             };
         }
 
@@ -679,14 +679,14 @@ public static class TrainingSystem
             terminal.ClearScreen();
             UIHelper.WriteSectionHeader(terminal, Loc.Get("training.reset_header"), "bright_yellow");
             terminal.WriteLine("");
-            terminal.WriteLine("The Level Master leans forward, studying you carefully.", "white");
+            terminal.WriteLine(Loc.Get("training.reset_lore_1"), "white");
             terminal.WriteLine("");
-            terminal.WriteLine("\"Ah, you seek the Unmaking? To have your training", "bright_cyan");
-            terminal.WriteLine("unraveled and your potential restored? It can be done...\"", "bright_cyan");
+            terminal.WriteLine(Loc.Get("training.reset_lore_2"), "bright_cyan");
+            terminal.WriteLine(Loc.Get("training.reset_lore_3"), "bright_cyan");
             terminal.WriteLine("");
-            terminal.WriteLine("He gestures to a shelf of shimmering silver vials.", "white");
+            terminal.WriteLine(Loc.Get("training.reset_lore_4"), "white");
             terminal.WriteLine("");
-            terminal.WriteLine("\"The Draught of Forgetting does not come cheap.\"", "bright_cyan");
+            terminal.WriteLine(Loc.Get("training.reset_lore_5"), "bright_cyan");
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("training.service_fee", $"{goldCost:N0}"), "yellow");
             terminal.WriteLine(Loc.Get("training.your_gold", $"{player.Gold:N0}"), player.Gold >= goldCost ? "bright_green" : "red");
@@ -794,24 +794,24 @@ public static class TrainingSystem
 
             terminal.ClearScreen();
             terminal.WriteLine("");
-            terminal.WriteLine("The Level Master nods slowly and reaches for a vial of", "white");
-            terminal.WriteLine("shimmering silver liquid on the shelf behind him.", "white");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_1"), "white");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_2"), "white");
             await Task.Delay(1500);
             terminal.WriteLine("");
-            terminal.WriteLine("\"Drink this. It will feel... strange.\"", "bright_cyan");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_3"), "bright_cyan");
             await Task.Delay(1500);
             terminal.WriteLine("");
-            terminal.WriteLine("As the liquid touches your lips, the Level Master presses", "white");
-            terminal.WriteLine("his thumb to your forehead and whispers ancient words.", "white");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_4"), "white");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_5"), "white");
             await Task.Delay(1500);
             terminal.WriteLine("");
-            terminal.WriteLine($"\"Oblivius... tractum... {skillName.ToLower()}...\"", "bright_magenta");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_6", skillName.ToLower()), "bright_magenta");
             await Task.Delay(1500);
             terminal.WriteLine("");
-            terminal.WriteLine("A chill runs through your body. The countless hours of", "white");
-            terminal.WriteLine($"training in {skillName} dissolve like morning frost.", "white");
-            terminal.WriteLine("Your muscles forget. Your instincts unravel.", "white");
-            terminal.WriteLine("But the potential remains, waiting to be reshaped.", "white");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_7"), "white");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_8", skillName), "white");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_9"), "white");
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_10"), "white");
             await Task.Delay(2000);
             terminal.WriteLine("");
             UIHelper.WriteSectionHeader(terminal, Loc.Get("training.skill_reset_header"), "bright_yellow");
@@ -882,29 +882,29 @@ public static class TrainingSystem
 
         terminal.ClearScreen();
         terminal.WriteLine("");
-        terminal.WriteLine("The Level Master draws a circle of salt around you", "white");
-        terminal.WriteLine("and places candles at the four cardinal points.", "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_1"), "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_2"), "white");
         await Task.Delay(1500);
         terminal.WriteLine("");
-        terminal.WriteLine("\"This is no small thing you ask. To unmake all that", "bright_cyan");
-        terminal.WriteLine("you have learned... it requires a deeper forgetting.\"", "bright_cyan");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_3"), "bright_cyan");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_4"), "bright_cyan");
         await Task.Delay(2000);
         terminal.WriteLine("");
-        terminal.WriteLine("He pours an entire flask of silver liquid over your head.", "white");
-        terminal.WriteLine("Both hands press against your temples.", "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_5"), "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_6"), "white");
         await Task.Delay(1500);
         terminal.WriteLine("");
-        terminal.WriteLine("\"Oblivius... totalus... anima... revertum!\"", "bright_magenta");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_7"), "bright_magenta");
         await Task.Delay(1500);
         terminal.WriteLine("");
-        terminal.WriteLine("A wave of cold fire washes through you. Every technique,", "white");
-        terminal.WriteLine("every practiced motion, every honed instinct — all of it", "white");
-        terminal.WriteLine("stripped away in an instant. You gasp, feeling lighter.", "white");
-        terminal.WriteLine("Empty. But full of possibility.", "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_8"), "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_9"), "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_10"), "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_11"), "white");
         await Task.Delay(2000);
         terminal.WriteLine("");
-        terminal.WriteLine("The Level Master catches you as you stumble.", "white");
-        terminal.WriteLine("\"Easy now. You are a blank slate once more.\"", "bright_cyan");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_12"), "white");
+        terminal.WriteLine(Loc.Get("training.all_reset_lore_13"), "bright_cyan");
         await Task.Delay(1500);
         terminal.WriteLine("");
         UIHelper.WriteSectionHeader(terminal, Loc.Get("training.reset_all_header"), "bright_yellow");
@@ -1111,7 +1111,7 @@ public static class TrainingSystem
         var skills = new List<(string, string)>();
 
         // Basic attack
-        skills.Add(("basic_attack", "Basic Attack"));
+        skills.Add(("basic_attack", Loc.Get("training.basic_attack")));
 
         // Class abilities
         var classAbilities = ClassAbilitySystem.GetClassAbilities(character.Class);
@@ -1174,13 +1174,13 @@ public class RollResult
     /// </summary>
     public string GetRollDescription()
     {
-        if (IsCriticalSuccess) return "CRITICAL HIT!";
-        if (IsCriticalFailure) return !string.IsNullOrEmpty(FailureReason) ? FailureReason : "CRITICAL MISS!";
-        if (!Success) return "Miss!";
+        if (IsCriticalSuccess) return Loc.Get("training.roll_critical_hit");
+        if (IsCriticalFailure) return !string.IsNullOrEmpty(FailureReason) ? FailureReason : Loc.Get("training.roll_critical_miss");
+        if (!Success) return Loc.Get("training.roll_miss");
 
         int excess = Total - TargetDC;
-        if (excess >= 10) return "Devastating blow!";
-        if (excess >= 5) return "Solid hit!";
-        return "Hit!";
+        if (excess >= 10) return Loc.Get("training.roll_devastating");
+        if (excess >= 5) return Loc.Get("training.roll_solid_hit");
+        return Loc.Get("training.roll_hit");
     }
 }

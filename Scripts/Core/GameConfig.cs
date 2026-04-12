@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.54.5";
+    public const string Version = "0.54.6";
     public const string VersionName = "The Soul Update";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 

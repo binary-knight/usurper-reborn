@@ -494,7 +494,7 @@ public class LocationManager
     /// </summary>
     public string GetCurrentLocationDescription()
     {
-        return currentLocation?.GetLocationDescription() ?? "Unknown location";
+        return currentLocation?.GetLocationDescription() ?? Loc.Get("location.unknown");
     }
     
     /// <summary>
@@ -624,8 +624,8 @@ public class PlaceholderLocation : BaseLocation
         
         LocationActions = new List<string>
         {
-            "This location is not yet implemented",
-            "Return to Main Street"
+            Loc.Get("location.not_implemented"),
+            Loc.Get("location.return_main_street")
         };
     }
     
@@ -646,7 +646,7 @@ public class PlaceholderLocation : BaseLocation
                 return false;
                 
             default:
-                terminal.WriteLine("This location is not yet implemented. Press M to return to Main Street.", "yellow");
+                terminal.WriteLine(Loc.Get("location.not_implemented_press_m"), "yellow");
                 await Task.Delay(2000);
                 return false;
         }
@@ -673,15 +673,15 @@ public class PlaceholderLocation : BaseLocation
         
         // Implementation notice
         terminal.SetColor("gray");
-        terminal.WriteLine("This location is not yet fully implemented.");
-        terminal.WriteLine("More features will be added in future updates.");
+        terminal.WriteLine(Loc.Get("location.not_fully_implemented"));
+        terminal.WriteLine(Loc.Get("location.more_features_coming"));
         terminal.WriteLine("");
-        
+
         // Simple navigation
         terminal.SetColor("yellow");
-        terminal.WriteLine("Navigation:");
-        terminal.WriteLine("(M) Return to Main Street");
-        terminal.WriteLine("(S) Status");
+        terminal.WriteLine(Loc.Get("location.navigation_header"));
+        terminal.WriteLine(Loc.Get("location.nav_main_street"));
+        terminal.WriteLine(Loc.Get("location.nav_status"));
         terminal.WriteLine("");
         
         // Status line

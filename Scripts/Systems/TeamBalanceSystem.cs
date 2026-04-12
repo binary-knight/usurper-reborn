@@ -102,21 +102,21 @@ namespace UsurperRemake.Systems
                     string reason;
                     if (levelGap <= LevelGapThreshold)
                     {
-                        reason = "Within level range - no fee";
+                        reason = Loc.Get("team.within_level_range");
                     }
                     else
                     {
                         float discount = GetRelationshipDiscount(player, npc);
                         if (discount >= SpouseDiscount)
-                            reason = $"+{levelGap} levels (spouse discount)";
+                            reason = Loc.Get("team.levels_spouse_discount", levelGap);
                         else if (discount >= LoverDiscount)
-                            reason = $"+{levelGap} levels (lover discount)";
+                            reason = Loc.Get("team.levels_lover_discount", levelGap);
                         else if (discount > 0)
-                            reason = $"+{levelGap} levels (relationship bonus)";
+                            reason = Loc.Get("team.levels_relationship_bonus", levelGap);
                         else if (discount < 0)
-                            reason = $"+{levelGap} levels (low relationship surcharge)";
+                            reason = Loc.Get("team.levels_low_relationship", levelGap);
                         else
-                            reason = $"+{levelGap} levels above you";
+                            reason = Loc.Get("team.levels_above_you", levelGap);
                     }
 
                     breakdown.Add((npc, fee, reason));
@@ -206,15 +206,15 @@ namespace UsurperRemake.Systems
             float multiplier = CalculateXPMultiplier(player, teammates);
 
             if (multiplier >= 1.0f)
-                return "Full XP (no penalty)";
+                return Loc.Get("team.xp_no_penalty");
             else if (multiplier >= 0.75f)
-                return $"{(int)(multiplier * 100)}% XP (minor level gap penalty)";
+                return Loc.Get("team.xp_minor_penalty", (int)(multiplier * 100));
             else if (multiplier >= 0.50f)
-                return $"{(int)(multiplier * 100)}% XP (moderate level gap penalty)";
+                return Loc.Get("team.xp_moderate_penalty", (int)(multiplier * 100));
             else if (multiplier >= 0.25f)
-                return $"{(int)(multiplier * 100)}% XP (significant level gap penalty)";
+                return Loc.Get("team.xp_significant_penalty", (int)(multiplier * 100));
             else
-                return $"{(int)(multiplier * 100)}% XP (severe level gap penalty)";
+                return Loc.Get("team.xp_severe_penalty", (int)(multiplier * 100));
         }
 
         /// <summary>
@@ -263,15 +263,15 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             if (!GameConfig.ScreenReaderMode)
-                terminal.WriteLine("═══ PARTY BALANCE ═══");
+                terminal.WriteLine($"═══ {Loc.Get("team.party_balance")} ═══");
             else
-                terminal.WriteLine("PARTY BALANCE");
+                terminal.WriteLine(Loc.Get("team.party_balance"));
 
             // Show fee breakdown
             if (breakdown.Any(b => b.fee > 0))
             {
                 terminal.SetColor("white");
-                terminal.WriteLine("Dungeon entry fees (higher-level allies demand payment):");
+                terminal.WriteLine(Loc.Get("team.dungeon_entry_fees"));
 
                 foreach (var (npc, fee, reason) in breakdown)
                 {
@@ -287,9 +287,9 @@ namespace UsurperRemake.Systems
                 }
 
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  Total fee: {totalFee:N0} gold");
+                terminal.WriteLine(Loc.Get("team.total_fee", $"{totalFee:N0}"));
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  Your gold: {player.Gold:N0}");
+                terminal.WriteLine(Loc.Get("team.your_gold", $"{player.Gold:N0}"));
             }
 
             // Show XP penalty
@@ -297,9 +297,9 @@ namespace UsurperRemake.Systems
             {
                 terminal.WriteLine("");
                 terminal.SetColor("red");
-                terminal.WriteLine($"XP Penalty: {GetXPPenaltyDescription(player, teammates)}");
+                terminal.WriteLine(Loc.Get("team.xp_penalty_label", GetXPPenaltyDescription(player, teammates)));
                 terminal.SetColor("gray");
-                terminal.WriteLine("  (High-level allies reduce your learning from combat)");
+                terminal.WriteLine(Loc.Get("team.xp_penalty_explanation"));
             }
 
             terminal.WriteLine("");

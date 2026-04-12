@@ -323,6 +323,11 @@ namespace UsurperRemake.BBS
                 DiagnoseWindowsHandle(_sessionInfo.SocketHandle);
             }
 
+            // Store the original handle from DOOR32.SYS for CloseHandle on dispose.
+            // Must be set BEFORE either I/O path is attempted — the Socket path and raw
+            // FileStream path both need the original handle closed on exit.
+            _rawSocketHandle = new IntPtr(_sessionInfo.SocketHandle);
+
             try
             {
                 // Create socket from inherited handle
@@ -639,7 +644,6 @@ namespace UsurperRemake.BBS
                 // On Windows: this is a SOCKET handle (UINT_PTR)
                 // On Linux: this is a file descriptor (int)
                 var intPtrHandle = new IntPtr(handle);
-                _rawSocketHandle = intPtrHandle; // Store for CloseHandle on dispose
                 LogVerbose($"IntPtr created: {intPtrHandle}");
 
                 var safeHandle = new SafeSocketHandle(intPtrHandle, ownsHandle: false);

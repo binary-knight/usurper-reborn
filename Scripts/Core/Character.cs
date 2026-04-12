@@ -1449,7 +1449,7 @@ public class Character
     public int DaysInPower { get; set; } = 0; // Days as king/ruler
     public int Fame { get; set; } = 0; // Fame/reputation level
     public string? NobleTitle { get; set; } = null; // Noble title (Sir, Dame, Lord, Lady, etc.)
-    public bool IsKnighted => !string.IsNullOrEmpty(NobleTitle); // Convenience check for knighthood
+    public bool IsKnighted { get; set; } // True only when knighted at the Castle by the King
     public string MudTitle { get; set; } = ""; // Custom /who title (set via /title command, ANSI codes allowed)
     public long RoyalLoanAmount { get; set; } = 0; // Outstanding loan from the king
     public int RoyalLoanDueDay { get; set; } = 0; // Day number when loan is due (0 = no loan)

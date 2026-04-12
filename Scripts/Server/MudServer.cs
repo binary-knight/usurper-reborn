@@ -335,7 +335,7 @@ public class MudServer
                 // If password was provided, verify it against the database
                 if (password != null)
                 {
-                    var (success, displayName, message) = await sqlBackend.AuthenticatePlayer(username, password);
+                    var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username, password);
                     if (!success)
                     {
                         Console.Error.WriteLine($"[MUD] Auth failed for '{username}': {message}");
@@ -343,6 +343,11 @@ public class MudServer
                         client.Close();
                         return;
                     }
+                    // Apply account-level preferences before game starts
+                    if (screenReader)
+                        GameConfig.ScreenReaderMode = true;
+                    if (!string.IsNullOrEmpty(language))
+                        GameConfig.Language = language;
                     // Do NOT replace username with displayName — displayName is a cosmetic
                     // value from save data that can be corrupted (e.g., by alt character bugs).
                     // The session identity must always be the login key (account name).
@@ -594,7 +599,7 @@ public class MudServer
             }
 
             // Authenticate
-            var (success, displayName, message) = await sqlBackend.AuthenticatePlayer(username!, password!);
+            var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username!, password!);
             if (!success)
             {
                 Console.Error.WriteLine($"[MUD] Auth failed for '{username}': {message}");
@@ -604,6 +609,12 @@ public class MudServer
                     await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {message}\u001b[0m\r\n\r\n", isCp437);
                 continue;
             }
+
+            // Apply account-level preferences before game starts
+            if (screenReader)
+                GameConfig.ScreenReaderMode = true;
+            if (!string.IsNullOrEmpty(language))
+                GameConfig.Language = language;
 
             // Do NOT replace username with displayName — displayName is cosmetic.
             // The session identity must always be the login key (account name).
@@ -1165,6 +1176,22 @@ public class MudServer
                     if (!string.IsNullOrEmpty(message))
                         BroadcastToAll($"\u001b[1;33m  *** {message} ***\u001b[0m");
                     _sqlBackend.MarkAdminCommandExecuted(cmd.Id, string.IsNullOrEmpty(message) ? "Broadcast cleared" : $"Broadcast set: {message}");
+                    break;
+
+                case "shutdown":
+                    int shutdownSeconds = 120; // Default 2 minutes
+                    if (!string.IsNullOrEmpty(cmd.Args))
+                    {
+                        try
+                        {
+                            using var sdDoc = JsonDocument.Parse(cmd.Args);
+                            if (sdDoc.RootElement.TryGetProperty("seconds", out var secEl))
+                                shutdownSeconds = secEl.GetInt32();
+                        }
+                        catch { }
+                    }
+                    _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Shutdown initiated ({shutdownSeconds}s): {reason ?? "Server update"}");
+                    _ = InitiateShutdown(shutdownSeconds, reason ?? "Server update");
                     break;
 
                 case "snoop_start":

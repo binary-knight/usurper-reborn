@@ -853,7 +853,7 @@ public class InnLocation : BaseLocation
         };
 
         terminal.SetColor("yellow");
-        terminal.WriteLine($"Seth Able: \"{responses[Random.Shared.Next(0, responses.Length)]}\"");
+        terminal.WriteLine(Loc.Get("inn.seth_says", responses[Random.Shared.Next(0, responses.Length)]));
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -2474,7 +2474,7 @@ public class InnLocation : BaseLocation
         if (currentPlayer.MealsToday >= maxMealsPerDay)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("The bartender shakes his head. \"You've eaten enough for today, friend.\"");
+            terminal.WriteLine(Loc.Get("inn.bartender_enough_food"));
             await terminal.PressAnyKey();
             return;
         }
@@ -3604,7 +3604,10 @@ public class InnLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("inn.days_together", companion.RecruitedDay > 0 ? StoryProgressionSystem.Instance.CurrentGameDay - companion.RecruitedDay : 0));
+        int daysTogether = companion.RecruitedDate != DateTime.MinValue
+            ? Math.Max(0, (int)(DateTime.UtcNow - companion.RecruitedDate).TotalDays)
+            : Math.Max(0, StoryProgressionSystem.Instance.CurrentGameDay - companion.RecruitedDay);
+        terminal.WriteLine(Loc.Get("inn.days_together", daysTogether));
         terminal.WriteLine(Loc.Get("inn.total_loyalty", companion.LoyaltyLevel));
 
         await terminal.PressAnyKey();

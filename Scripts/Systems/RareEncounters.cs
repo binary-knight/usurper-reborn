@@ -237,7 +237,7 @@ namespace UsurperRemake.Systems
                         if (player.TavernStrangerTalkedToday)
                         {
                             terminal.SetColor("gray");
-                            terminal.WriteLine("The stranger waves you off. \"We've talked enough for today. Come back tomorrow.\"");
+                            terminal.WriteLine(Loc.Get("encounter.stranger_waves_off"));
                         }
                         else
                         {

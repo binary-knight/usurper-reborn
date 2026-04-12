@@ -179,7 +179,7 @@ namespace UsurperRemake.Systems
                             if (item.Type == ObjType.Food || item.Type == ObjType.Drink ||
                                 item.Type == ObjType.Potion || (item.Type == ObjType.Magic && !isMagicEquipment))
                             {
-                                resultMessage = "Cannot equip this item type";
+                                resultMessage = Loc.Get("inventory.cannot_equip_type");
                                 resultType = "error";
                             }
                             else
@@ -193,7 +193,7 @@ namespace UsurperRemake.Systems
 
                                 if (targetSlot == EquipmentSlot.None)
                                 {
-                                    resultMessage = "Cannot determine equipment slot";
+                                    resultMessage = Loc.Get("inventory.cannot_determine_slot");
                                     resultType = "error";
                                 }
                                 else
@@ -291,12 +291,12 @@ namespace UsurperRemake.Systems
                                         if (removeIdx >= 0)
                                             player.Inventory.RemoveAt(removeIdx);
                                         player.RecalculateStats();
-                                        resultMessage = $"Equipped {item.Name}" + (equipMsg != "" ? $" ({equipMsg})" : "");
+                                        resultMessage = Loc.Get("inventory.equipped_item", item.Name) + (equipMsg != "" ? $" ({equipMsg})" : "");
                                         resultType = "success";
                                     }
                                     else
                                     {
-                                        resultMessage = equipMsg != "" ? equipMsg : "Cannot equip this item";
+                                        resultMessage = equipMsg != "" ? equipMsg : Loc.Get("inventory.cannot_equip");
                                         resultType = "error";
                                     }
                                 }
@@ -316,18 +316,18 @@ namespace UsurperRemake.Systems
                                 {
                                     player.EquippedItems.Remove(slot);
                                     player.RecalculateStats();
-                                    resultMessage = "Slot cleared";
+                                    resultMessage = Loc.Get("inventory.slot_cleared");
                                     resultType = "success";
                                 }
                                 else
                                 {
-                                    resultMessage = "Nothing equipped in that slot";
+                                    resultMessage = Loc.Get("inventory.nothing_equipped");
                                     resultType = "error";
                                 }
                             }
                             else if (equipped.IsCursed)
                             {
-                                resultMessage = "Cannot remove cursed item!";
+                                resultMessage = Loc.Get("inventory.cannot_remove_cursed");
                                 resultType = "error";
                             }
                             else
@@ -338,14 +338,14 @@ namespace UsurperRemake.Systems
                                     var legacyItem = player.ConvertEquipmentToLegacyItem(unequipped);
                                     player.Inventory.Add(legacyItem);
                                     player.RecalculateStats();
-                                    resultMessage = $"Unequipped {unequipped.Name}";
+                                    resultMessage = Loc.Get("inventory.unequipped_item", unequipped.Name);
                                     resultType = "success";
                                 }
                                 else
                                 {
                                     // UnequipSlot cleared the slot but couldn't find the Equipment
                                     player.RecalculateStats();
-                                    resultMessage = "Slot cleared (item data lost)";
+                                    resultMessage = Loc.Get("inventory.slot_cleared_data_lost");
                                     resultType = "success";
                                 }
                             }
@@ -358,13 +358,13 @@ namespace UsurperRemake.Systems
                             var item = player.Inventory[idx];
                             if (item.IsCursed)
                             {
-                                resultMessage = "Cannot drop cursed item!";
+                                resultMessage = Loc.Get("inventory.cannot_drop_cursed");
                                 resultType = "error";
                             }
                             else
                             {
                                 player.Inventory.RemoveAt(idx);
-                                resultMessage = $"Dropped {item.Name}";
+                                resultMessage = Loc.Get("inventory.dropped_item", item.Name);
                                 resultType = "success";
                             }
                         }

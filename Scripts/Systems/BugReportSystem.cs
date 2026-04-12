@@ -55,7 +55,7 @@ public static class BugReportSystem
         }
         terminal.SetColor("white");
         terminal.WriteLine("");
-        terminal.WriteLine("Describe the bug briefly. What happened? What did you expect?");
+        terminal.WriteLine(Loc.Get("bug_report.describe_bug"));
         terminal.WriteLine("");
 
         // Get bug description from user
@@ -64,14 +64,14 @@ public static class BugReportSystem
 
         if (string.IsNullOrWhiteSpace(description))
         {
-            terminal.WriteLine("Bug report cancelled.", "yellow");
+            terminal.WriteLine(Loc.Get("bug_report.cancelled"), "yellow");
             terminal.WriteLine("");
             await terminal.PressAnyKey();
             return;
         }
 
         terminal.WriteLine("");
-        terminal.WriteLine("Collecting diagnostic information...", "gray");
+        terminal.WriteLine(Loc.Get("bug_report.collecting_info"), "gray");
 
         // Collect diagnostic info
         var diagnostics = CollectDiagnostics(player);
@@ -86,21 +86,21 @@ public static class BugReportSystem
         terminal.WriteLine("");
         if (localPath != null)
         {
-            terminal.WriteLine($"Report saved to: bug_reports/", "green");
+            terminal.WriteLine(Loc.Get("bug_report.saved_locally"), "green");
         }
 
         if (discordSent)
         {
             terminal.SetColor("bright_green");
-            terminal.WriteLine("Report sent to the developer! Thank you for the feedback.");
+            terminal.WriteLine(Loc.Get("bug_report.sent_success"));
         }
         else
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("Could not send report online (no internet?).");
+            terminal.WriteLine(Loc.Get("bug_report.send_failed"));
             if (localPath != null)
             {
-                terminal.WriteLine("Your report was saved locally - the SysOp can forward it.");
+                terminal.WriteLine(Loc.Get("bug_report.saved_sysop_forward"));
             }
         }
 

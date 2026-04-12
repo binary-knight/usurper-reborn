@@ -201,8 +201,10 @@ public class MainStreetLocation : BaseLocation
             HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer.HintsShown);
         }
 
-        // Show mana/spells hint if player's class has mana but no spells learned
-        if (currentPlayer.MaxMana > 0 && SpellSystem.GetAvailableSpells(currentPlayer).Count == 0)
+        // Show mana/spells hint if player's class has spells but none learned yet
+        // Exclude Mystic Shaman — they use mana for abilities, not spells, and can't learn spells at the Magic Shop
+        if (currentPlayer.MaxMana > 0 && currentPlayer.Class != CharacterClass.MysticShaman
+            && SpellSystem.GetAvailableSpells(currentPlayer).Count == 0)
         {
             HintSystem.Instance.TryShowHint(HintSystem.HINT_MANA_SPELLS, terminal, currentPlayer.HintsShown);
         }

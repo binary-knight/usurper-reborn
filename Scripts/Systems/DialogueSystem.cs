@@ -149,7 +149,7 @@ namespace UsurperRemake.Systems
         {
             if (terminal == null) return null;
 
-            terminal.WriteLine("What do you say?", "cyan");
+            terminal.WriteLine(Loc.Get("dialogue.what_do_you_say"), "cyan");
             terminal.WriteLine("");
 
             for (int i = 0; i < choices.Count; i++)
@@ -160,7 +160,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"{prefix} {choice.Text}", color);
             }
 
-            terminal.WriteLine("[0] (Say nothing)", "dark_gray");
+            terminal.WriteLine(Loc.Get("dialogue.say_nothing_option"), "dark_gray");
             terminal.WriteLine("");
 
             while (true)
@@ -177,7 +177,7 @@ namespace UsurperRemake.Systems
                     return choices[choice - 1];
                 }
 
-                terminal.WriteLine("Please enter a valid choice.", "red");
+                terminal.WriteLine(Loc.Get("dialogue.invalid_choice"), "red");
             }
         }
 

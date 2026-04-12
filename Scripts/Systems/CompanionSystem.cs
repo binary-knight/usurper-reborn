@@ -81,15 +81,15 @@ namespace UsurperRemake.Systems
 
                 BaseStats = new CompanionStats
                 {
-                    HP = 200,
-                    Attack = 25,
-                    Defense = 15,
-                    MagicPower = 50,
-                    Speed = 35,
-                    HealingPower = 30
+                    HP = 220,
+                    Attack = 30,
+                    Defense = 18,
+                    MagicPower = 10,
+                    Speed = 40,
+                    HealingPower = 15
                 },
 
-                CombatRole = CombatRole.Hybrid,
+                CombatRole = CombatRole.Damage,
                 Abilities = new[] { "Precise Shot", "Hunter's Mark", "Nature's Blessing", "Camouflage" },
 
                 PersonalQuestName = "The Deepwood's Heart",
@@ -475,6 +475,7 @@ namespace UsurperRemake.Systems
 
             companion.IsRecruited = true;
             companion.RecruitedDay = GetGameDay();
+            companion.RecruitedDate = DateTime.UtcNow;
 
             // Initialize companion's level and scale stats
             InitializeCompanionLevel(companion);
@@ -859,10 +860,30 @@ namespace UsurperRemake.Systems
             {
                 if (companions.TryGetValue(charWrapper.CompanionId.Value, out var companion))
                 {
+                    // Log equipment changes for debugging companion equipment reversion issues
+                    var oldEquip = new Dictionary<EquipmentSlot, int>(companion.EquippedItems);
                     companion.EquippedItems.Clear();
                     foreach (var kvp in charWrapper.EquippedItems)
                     {
                         companion.EquippedItems[kvp.Key] = kvp.Value;
+                    }
+
+                    // Detect and log any equipment differences
+                    foreach (var kvp in companion.EquippedItems)
+                    {
+                        if (!oldEquip.TryGetValue(kvp.Key, out int oldId) || oldId != kvp.Value)
+                        {
+                            DebugLogger.Instance.LogInfo("COMPANION_EQUIP",
+                                $"SyncEquipment {companion.Name}: slot {kvp.Key} changed {(oldEquip.ContainsKey(kvp.Key) ? oldEquip[kvp.Key].ToString() : "empty")} -> {kvp.Value}");
+                        }
+                    }
+                    foreach (var kvp in oldEquip)
+                    {
+                        if (!companion.EquippedItems.ContainsKey(kvp.Key))
+                        {
+                            DebugLogger.Instance.LogInfo("COMPANION_EQUIP",
+                                $"SyncEquipment {companion.Name}: slot {kvp.Key} removed (was {kvp.Value})");
+                        }
                     }
                 }
             }
@@ -1162,7 +1183,9 @@ namespace UsurperRemake.Systems
             var vex = GetCompanion(CompanionId.Vex);
             if (vex != null && vex.IsRecruited && !vex.IsDead && vex.HasTimedDeath)
             {
-                int daysWithVex = GetGameDay() - vex.RecruitedDay;
+                int daysWithVex = vex.RecruitedDate != DateTime.MinValue
+                    ? Math.Max(0, (int)(DateTime.UtcNow - vex.RecruitedDate).TotalDays)
+                    : Math.Max(0, GetGameDay() - vex.RecruitedDay);
                 if (daysWithVex >= vex.DaysUntilDeath)
                 {
                     result.TriggeredCompanion = CompanionId.Vex;
@@ -1525,6 +1548,7 @@ namespace UsurperRemake.Systems
                     PersonalQuestCompleted = c.PersonalQuestCompleted,
                     PersonalQuestSuccess = c.PersonalQuestSuccess,
                     RecruitedDay = c.RecruitedDay,
+                    RecruitedDate = c.RecruitedDate,
                     DeathType = c.DeathType,
                     History = c.History.ToList(),
                     HealingPotions = c.HealingPotions,
@@ -1627,6 +1651,7 @@ namespace UsurperRemake.Systems
                     companion.PersonalQuestCompleted = save.PersonalQuestCompleted;
                     companion.PersonalQuestSuccess = save.PersonalQuestSuccess;
                     companion.RecruitedDay = save.RecruitedDay;
+                    companion.RecruitedDate = save.RecruitedDate != DateTime.MinValue ? save.RecruitedDate : DateTime.UtcNow;
                     companion.DeathType = save.DeathType;
                     companion.History = save.History?.ToList() ?? new List<CompanionEvent>();
                     companion.HealingPotions = save.HealingPotions;
@@ -2603,6 +2628,7 @@ namespace UsurperRemake.Systems
         public int RomanceLevel { get; set; } = 0;
         public bool RomancedToday { get; set; } = false;
         public int RecruitedDay { get; set; }
+        public DateTime RecruitedDate { get; set; } = DateTime.MinValue;
 
         // Experience and leveling
         public int Level { get; set; } = 1;
@@ -2700,6 +2726,7 @@ namespace UsurperRemake.Systems
         public bool PersonalQuestCompleted { get; set; }
         public bool PersonalQuestSuccess { get; set; }
         public int RecruitedDay { get; set; }
+        public DateTime RecruitedDate { get; set; }
         public DeathType? DeathType { get; set; }
         public List<CompanionEvent> History { get; set; } = new();
         public int HealingPotions { get; set; }

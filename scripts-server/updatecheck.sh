@@ -62,7 +62,7 @@ die() { log "ERROR: $*"; exit 2; }
 # ─── Get current version ─────────────────────
 get_current_version() {
     if [ -f "$INSTALL_DIR/version.txt" ]; then
-        cat "$INSTALL_DIR/version.txt" | tr -d '[:space:]'
+        head -1 "$INSTALL_DIR/version.txt" | tr -d '[:space:]'
     elif [ -x "$GAME_BINARY" ]; then
         # Try to extract from binary (run with --version if supported)
         echo "unknown"

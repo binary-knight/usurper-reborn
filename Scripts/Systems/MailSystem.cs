@@ -248,7 +248,7 @@ public static partial class MailSystem
         terminal.WriteLine("", "white");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("═══════════════════════════════════════", "bright_cyan");
-        terminal.WriteLine(GameConfig.ScreenReaderMode ? "YOUR MAIL" : "             YOUR MAIL                  ", "bright_cyan");
+        terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("mail.your_mail_sr") : Loc.Get("mail.your_mail"), "bright_cyan");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("═══════════════════════════════════════", "bright_cyan");
         terminal.WriteLine("", "white");
@@ -256,14 +256,14 @@ public static partial class MailSystem
         for (int i = 0; i < playerMail.Count; i++)
         {
             var mail = playerMail[i];
-            var status = mail.ReadFlag ? "READ" : "NEW";
+            var status = mail.ReadFlag ? Loc.Get("mail.status_read") : Loc.Get("mail.status_new");
             var statusColor = mail.ReadFlag ? "gray" : "bright_yellow";
             
             terminal.WriteLine($"[{i + 1}] {mail.Subject} - {mail.Sender} ({status})", statusColor);
         }
         
         terminal.WriteLine("", "white");
-        terminal.WriteLine("Select mail to read (1-" + playerMail.Count + "), or 0 to exit:", "white");
+        terminal.WriteLine(Loc.Get("mail.select_mail", playerMail.Count), "white");
         
         var input = await terminal.GetInputAsync("> ");
         
@@ -290,15 +290,15 @@ public static partial class MailSystem
         terminal.WriteLine("", "white");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("═══════════════════════════════════════", "bright_blue");
-        terminal.WriteLine(GameConfig.ScreenReaderMode ? "MAIL" : "                MAIL                    ", "bright_blue");
+        terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("mail.mail_sr") : Loc.Get("mail.mail_header"), "bright_blue");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("═══════════════════════════════════════", "bright_blue");
         terminal.WriteLine("", "white");
         
-        terminal.WriteLine($"From: {mail.Sender}", "yellow");
-        terminal.WriteLine($"To: {mail.Receiver}", "white");
-        terminal.WriteLine($"Subject: {mail.Subject}", "cyan");
-        terminal.WriteLine($"Date: {GameConfig.FormatDate(mail.Date, GameConfig.DateFormat, includeTime: true)}", "gray");
+        terminal.WriteLine(Loc.Get("mail.from", mail.Sender), "yellow");
+        terminal.WriteLine(Loc.Get("mail.to", mail.Receiver), "white");
+        terminal.WriteLine(Loc.Get("mail.subject", mail.Subject), "cyan");
+        terminal.WriteLine(Loc.Get("mail.date", GameConfig.FormatDate(mail.Date, GameConfig.DateFormat, includeTime: true)), "gray");
         terminal.WriteLine("", "white");
         terminal.WriteLine(new string('-', 50), "gray");
         terminal.WriteLine("", "white");
@@ -350,11 +350,11 @@ public static partial class MailSystem
     /// </summary>
     private static async Task ProcessBirthdayMail(MailRecord mail, TerminalUI terminal)
     {
-        terminal.WriteLine("Choose your birthday gift:", "bright_yellow");
-        terminal.WriteLine("(E)xperience", "white");
-        terminal.WriteLine("(L)ove", "white");
-        terminal.WriteLine("(A)dopt a child", "white");
-        terminal.WriteLine("(S)kip", "white");
+        terminal.WriteLine(Loc.Get("mail.birthday_choose"), "bright_yellow");
+        terminal.WriteLine(Loc.Get("mail.birthday_experience"), "white");
+        terminal.WriteLine(Loc.Get("mail.birthday_love"), "white");
+        terminal.WriteLine(Loc.Get("mail.birthday_adopt"), "white");
+        terminal.WriteLine(Loc.Get("mail.birthday_skip"), "white");
         
         var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
         var gameEngine = GameEngine.Instance;
@@ -366,25 +366,25 @@ public static partial class MailSystem
         {
             case "E":
                 player.Experience += GameConfig.BirthdayExperienceGift;
-                terminal.WriteLine($"You gained {GameConfig.BirthdayExperienceGift} experience!", "bright_green");
+                terminal.WriteLine(Loc.Get("mail.birthday_gained_xp", GameConfig.BirthdayExperienceGift), "bright_green");
                 break;
-                
+
             case "L":
                 player.Charisma += GameConfig.BirthdayLoveGift;
-                terminal.WriteLine($"Your charisma increased by {GameConfig.BirthdayLoveGift}!", "bright_green");
+                terminal.WriteLine(Loc.Get("mail.birthday_gained_cha", GameConfig.BirthdayLoveGift), "bright_green");
                 break;
-                
+
             case "A":
                 // Child adoption logic would go here
-                terminal.WriteLine("A child has been placed in your care!", "bright_green");
+                terminal.WriteLine(Loc.Get("mail.birthday_adopted"), "bright_green");
                 break;
-                
+
             case "S":
-                terminal.WriteLine("You politely declined all gifts.", "gray");
+                terminal.WriteLine(Loc.Get("mail.birthday_declined"), "gray");
                 break;
-                
+
             default:
-                terminal.WriteLine("Invalid choice. Gifts declined.", "red");
+                terminal.WriteLine(Loc.Get("mail.birthday_invalid"), "red");
                 break;
         }
     }
@@ -394,9 +394,9 @@ public static partial class MailSystem
     /// </summary>
     private static async Task ProcessRoyalGuardMail(MailRecord mail, TerminalUI terminal)
     {
-        terminal.WriteLine("Will you accept the position of Royal Guard?", "bright_yellow");
-        terminal.WriteLine("(Y)es - Accept the honor", "white");
-        terminal.WriteLine("(N)o - Decline politely", "white");
+        terminal.WriteLine(Loc.Get("mail.guard_accept_question"), "bright_yellow");
+        terminal.WriteLine(Loc.Get("mail.guard_yes"), "white");
+        terminal.WriteLine(Loc.Get("mail.guard_no"), "white");
         
         var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
         var gameEngine = GameEngine.Instance;
@@ -408,16 +408,16 @@ public static partial class MailSystem
         {
             case "Y":
                 player.BGuardNr = 1; // Assign guard position
-                terminal.WriteLine("You have accepted the position of Royal Guard!", "bright_green");
-                terminal.WriteLine("Report to the castle for your duties.", "cyan");
+                terminal.WriteLine(Loc.Get("mail.guard_accepted"), "bright_green");
+                terminal.WriteLine(Loc.Get("mail.guard_report"), "cyan");
                 break;
-                
+
             case "N":
-                terminal.WriteLine("You politely declined the position.", "gray");
+                terminal.WriteLine(Loc.Get("mail.guard_declined"), "gray");
                 break;
-                
+
             default:
-                terminal.WriteLine("No response given. Position declined.", "red");
+                terminal.WriteLine(Loc.Get("mail.guard_no_response"), "red");
                 break;
         }
     }
@@ -429,25 +429,25 @@ public static partial class MailSystem
     {
         if (mail.Subject.Contains("Proposal"))
         {
-            terminal.WriteLine("Will you accept this marriage proposal?", "bright_yellow");
-            terminal.WriteLine("(Y)es - Accept the proposal", "white");
-            terminal.WriteLine("(N)o - Decline the proposal", "white");
+            terminal.WriteLine(Loc.Get("mail.marriage_accept_question"), "bright_yellow");
+            terminal.WriteLine(Loc.Get("mail.marriage_yes"), "white");
+            terminal.WriteLine(Loc.Get("mail.marriage_no"), "white");
             
             var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
             
             switch (choice.ToUpper())
             {
                 case "Y":
-                    terminal.WriteLine("You have accepted the marriage proposal!", "bright_green");
-                    terminal.WriteLine("Visit the temple to complete the ceremony.", "cyan");
+                    terminal.WriteLine(Loc.Get("mail.marriage_accepted"), "bright_green");
+                    terminal.WriteLine(Loc.Get("mail.marriage_visit_temple"), "cyan");
                     break;
-                    
+
                 case "N":
-                    terminal.WriteLine("You have declined the marriage proposal.", "gray");
+                    terminal.WriteLine(Loc.Get("mail.marriage_declined"), "gray");
                     break;
-                    
+
                 default:
-                    terminal.WriteLine("No response given. Proposal declined.", "red");
+                    terminal.WriteLine(Loc.Get("mail.marriage_no_response"), "red");
                     break;
             }
         }
@@ -458,8 +458,8 @@ public static partial class MailSystem
     /// </summary>
     private static Task ProcessChildBirthMail(MailRecord mail, TerminalUI terminal)
     {
-        terminal.WriteLine("Congratulations on your new child!", "bright_green");
-        terminal.WriteLine("Visit the Royal Orphanage to see them.", "cyan");
+        terminal.WriteLine(Loc.Get("mail.child_congratulations"), "bright_green");
+        terminal.WriteLine(Loc.Get("mail.child_visit_orphanage"), "cyan");
         return Task.CompletedTask;
     }
     

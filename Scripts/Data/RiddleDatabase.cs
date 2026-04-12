@@ -90,17 +90,17 @@ namespace UsurperRemake.Data
             {
                 if (attempts < riddle.MaxAttempts)
                 {
-                    terminal.WriteLine($"({attempts} attempts remaining)", "yellow");
+                    terminal.WriteLine(Loc.Get("riddle.attempts_remaining", attempts), "yellow");
                 }
 
                 terminal.WriteLine("");
-                string input = await terminal.GetInputAsync("Your answer: ");
+                string input = await terminal.GetInputAsync(Loc.Get("riddle.your_answer"));
                 input = input.Trim().ToLower();
 
                 if (input == "quit" || input == "flee" || input == "leave")
                 {
                     terminal.WriteLine("");
-                    terminal.WriteLine("You turn away from the guardian.", "gray");
+                    terminal.WriteLine(Loc.Get("riddle.turn_away"), "gray");
                     await ApplyFleeConsequence(riddle, player, terminal);
                     return new RiddleResult { Solved = false, Fled = true };
                 }
@@ -146,19 +146,19 @@ namespace UsurperRemake.Data
         private void DisplayRiddler(Riddle riddle, TerminalEmulator terminal)
         {
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗", "bright_magenta");
-            terminal.WriteLine("║                   THE GUARDIAN SPEAKS                            ║", "bright_magenta");
+            terminal.WriteLine($"║                   {Loc.Get("riddle.guardian_speaks")}                            ║", "bright_magenta");
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝", "bright_magenta");
             terminal.WriteLine("");
 
             string guardianDesc = riddle.GuardianType switch
             {
-                GuardianType.Specter => "A ghostly figure materializes before you, its hollow eyes burning with ancient knowledge.",
-                GuardianType.Sphinx => "A massive sphinx reclines across your path, its human face twisted in an enigmatic smile.",
-                GuardianType.Demon => "A demon of shadow coalesces from the darkness, its voice echoing from everywhere at once.",
-                GuardianType.Spirit => "A spirit of pure light blocks your way, its form shifting between countless faces.",
-                GuardianType.Golem => "An ancient stone golem animates, runes glowing across its body as it speaks in grinding tones.",
-                GuardianType.VoidEntity => "The darkness itself speaks, a presence without form, without beginning, without end.",
-                _ => "An entity of unknown origin bars your passage, demanding tribute of wit."
+                GuardianType.Specter => Loc.Get("riddle.guardian_specter"),
+                GuardianType.Sphinx => Loc.Get("riddle.guardian_sphinx"),
+                GuardianType.Demon => Loc.Get("riddle.guardian_demon"),
+                GuardianType.Spirit => Loc.Get("riddle.guardian_spirit"),
+                GuardianType.Golem => Loc.Get("riddle.guardian_golem"),
+                GuardianType.VoidEntity => Loc.Get("riddle.guardian_void"),
+                _ => Loc.Get("riddle.guardian_unknown")
             };
 
             terminal.WriteLine(guardianDesc, "white");
@@ -179,11 +179,11 @@ namespace UsurperRemake.Data
         {
             var responses = new[]
             {
-                "The guardian's eyes narrow. 'That is not the answer I seek.'",
-                "'Incorrect,' the voice echoes. 'Think deeper.'",
-                "A cold laugh. 'Try again, mortal.'",
-                "The entity shakes its head slowly. 'You have not understood.'",
-                "'No. The truth eludes you still.'"
+                Loc.Get("riddle.wrong_1"),
+                Loc.Get("riddle.wrong_2"),
+                Loc.Get("riddle.wrong_3"),
+                Loc.Get("riddle.wrong_4"),
+                Loc.Get("riddle.wrong_5")
             };
             return responses[random.Next(responses.Length)];
         }
@@ -191,9 +191,9 @@ namespace UsurperRemake.Data
         private async Task DisplaySuccess(Riddle riddle, Character player, TerminalEmulator terminal)
         {
             terminal.WriteLine("");
-            terminal.WriteLine("The guardian bows its head in acknowledgment.", "bright_green");
+            terminal.WriteLine(Loc.Get("riddle.success_bow"), "bright_green");
             terminal.WriteLine("");
-            terminal.WriteLine("'You speak true. The way is open to you.'", "green");
+            terminal.WriteLine(Loc.Get("riddle.success_speak_true"), "green");
             terminal.WriteLine("");
 
             // Note: XP reward is handled by the calling encounter (RiddleGateEncounter/RiddleEncounter)
@@ -203,8 +203,8 @@ namespace UsurperRemake.Data
             if (riddle.IsOceanPhilosophy)
             {
                 terminal.WriteLine("");
-                terminal.WriteLine("As the guardian fades, you feel a strange resonance...", "bright_magenta");
-                terminal.WriteLine("A piece of forgotten truth settles into your soul.", "magenta");
+                terminal.WriteLine(Loc.Get("riddle.ocean_resonance"), "bright_magenta");
+                terminal.WriteLine(Loc.Get("riddle.ocean_truth"), "magenta");
                 OceanPhilosophySystem.Instance.CollectFragment(WaveFragment.TheCycle);
             }
 
@@ -214,18 +214,18 @@ namespace UsurperRemake.Data
         private async Task DisplayFailure(Riddle riddle, Character player, TerminalEmulator terminal)
         {
             terminal.WriteLine("");
-            terminal.WriteLine("'Your wit has failed you, mortal.'", "red");
+            terminal.WriteLine(Loc.Get("riddle.failure_wit"), "red");
             terminal.WriteLine("");
 
             if (riddle.FailureDamage > 0)
             {
                 int damage = Math.Min(riddle.FailureDamage, (int)player.HP - 1);
                 player.HP -= damage;
-                terminal.WriteLine($"The guardian's wrath strikes you for {damage} damage!", "bright_red");
+                terminal.WriteLine(Loc.Get("riddle.failure_damage", damage), "bright_red");
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"The answer was: {riddle.Answer}", "gray");
+            terminal.WriteLine(Loc.Get("riddle.answer_was", riddle.Answer), "gray");
 
             await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
         }
@@ -234,13 +234,13 @@ namespace UsurperRemake.Data
         {
             if (riddle.FleeAllowed)
             {
-                terminal.WriteLine("The guardian lets you pass... for now.", "yellow");
+                terminal.WriteLine(Loc.Get("riddle.flee_allowed"), "yellow");
             }
             else
             {
                 int damage = riddle.FailureDamage / 2;
                 player.HP = Math.Max(1, player.HP - damage);
-                terminal.WriteLine($"Fleeing angers the guardian! You take {damage} damage!", "red");
+                terminal.WriteLine(Loc.Get("riddle.flee_damage", damage), "red");
             }
             await Task.Delay(1000);
         }

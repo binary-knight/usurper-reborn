@@ -381,7 +381,7 @@ namespace UsurperRemake.Systems
                         if (sqlBackend != null && resolvedTarget == null)
                         {
                             terminal.SetColor("red");
-                            terminal.WriteLine($"Player '{targetPlayer}' not found.");
+                            terminal.WriteLine(Loc.Get("chat.player_not_found", targetPlayer));
                             await Task.Delay(1500);
                         }
                         else
@@ -409,7 +409,7 @@ namespace UsurperRemake.Systems
                 else
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine("Usage: /tell <player> <message>");
+                    terminal.WriteLine(Loc.Get("chat.tell_usage"));
                 }
                 return true;
             }

@@ -2922,16 +2922,16 @@ public partial class GameEngine
         if (!GameConfig.ScreenReaderMode)
         {
             terminal.WriteLine("╔══════════════════════════════════════════╗", "bright_yellow");
-            terminal.WriteLine("║         DAILY LOGIN STREAK               ║", "bright_yellow");
+            terminal.WriteLine($"║         {Loc.Get("engine.daily_login_streak")}               ║", "bright_yellow");
             terminal.WriteLine("╚══════════════════════════════════════════╝", "bright_yellow");
         }
         else
         {
-            terminal.WriteLine("--- DAILY LOGIN STREAK ---", "bright_yellow");
+            terminal.WriteLine($"--- {Loc.Get("engine.daily_login_streak")} ---", "bright_yellow");
         }
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  Day {streak} streak! (Best: {player.LongestLoginStreak})");
+        terminal.WriteLine($"  {Loc.Get("engine.day_streak", streak, player.LongestLoginStreak)}");
 
         if (!string.IsNullOrEmpty(specialMessage))
         {
@@ -2946,14 +2946,14 @@ public partial class GameEngine
         {
             player.Gold += goldReward;
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  +{goldReward:N0} gold", "bright_yellow");
+            terminal.WriteLine($"  +{goldReward:N0} {Loc.Get("ui.gold")}", "bright_yellow");
         }
 
         // Apply potions
         if (potionsReward > 0)
         {
             player.Healing = Math.Min(player.Healing + potionsReward, 99);
-            terminal.WriteLine($"  +{potionsReward} healing potions", "bright_green");
+            terminal.WriteLine($"  +{potionsReward} {Loc.Get("engine.healing_potions")}", "bright_green");
         }
 
         // Apply herbs (one of each type)
@@ -2964,7 +2964,7 @@ public partial class GameEngine
             player.HerbFirebloom = Math.Min(player.HerbFirebloom + herbsReward, 99);
             player.HerbSwiftthistle = Math.Min(player.HerbSwiftthistle + herbsReward, 99);
             player.HerbStarbloom = Math.Min(player.HerbStarbloom + herbsReward, 99);
-            terminal.WriteLine($"  +{herbsReward} of each herb type", "green");
+            terminal.WriteLine($"  +{herbsReward} {Loc.Get("engine.of_each_herb_type")}", "green");
         }
 
         terminal.WriteLine("");
@@ -2975,7 +2975,7 @@ public partial class GameEngine
         {
             int daysToNext = nextMilestone - streak;
             terminal.SetColor("gray");
-            terminal.WriteLine($"  Next milestone: Day {nextMilestone} ({daysToNext} day{(daysToNext != 1 ? "s" : "")} away)");
+            terminal.WriteLine($"  {Loc.Get("engine.next_milestone", nextMilestone, daysToNext)}");
         }
         terminal.WriteLine("");
 
@@ -3963,6 +3963,9 @@ public partial class GameEngine
 
             // Noble Title
             NobleTitle = playerData.NobleTitle,
+            // Migration: pre-0.54.6 saves stored IsKnighted as a computed property.
+            // If player has Sir/Dame title but IsKnighted is false, they were knighted before the flag existed.
+            IsKnighted = playerData.IsKnighted || playerData.NobleTitle == "Sir" || playerData.NobleTitle == "Dame",
 
             // Royal Mercenaries
             RoyalMercenaries = playerData.RoyalMercenaries?.Select(m => new RoyalMercenary
@@ -4458,6 +4461,8 @@ public partial class GameEngine
         player.FoodBuffCombats = playerData.FoodBuffCombats;
         player.FoodBuffValue = playerData.FoodBuffValue;
         player.MealsToday = playerData.MealsToday;
+        player.InnDuelsToday = playerData.InnDuelsToday;
+        player.TavernStrangerTalkedToday = playerData.TavernStrangerTalkedToday;
 
         // Dungeon Settlements & Wilderness (v0.49.4)
         player.VisitedSettlements = playerData.VisitedSettlements != null ? new HashSet<string>(playerData.VisitedSettlements) : new HashSet<string>();
@@ -5973,19 +5978,19 @@ public partial class GameEngine
 
         terminal.WriteLine("", "white");
         if (!GameConfig.ScreenReaderMode)
-            terminal.WriteLine("─── News from the Realm ───", "bright_yellow");
+            terminal.WriteLine($"─── {Loc.Get("engine.news_from_realm")} ───", "bright_yellow");
         else
-            terminal.WriteLine("--- News from the Realm ---", "bright_yellow");
+            terminal.WriteLine($"--- {Loc.Get("engine.news_from_realm")} ---", "bright_yellow");
         terminal.WriteLine("", "white");
 
-        ShowCatchUpCategory("Deaths & Departures", deaths, maxPerCat, "red");
-        ShowCatchUpCategory("Births & Coming of Age", births, maxPerCat, "bright_green");
-        ShowCatchUpCategory("Royal Affairs", political, maxPerCat, "bright_yellow");
-        ShowCatchUpCategory("Love & Scandal", social, maxPerCat, "bright_magenta");
-        ShowCatchUpCategory("The Outskirts", settlement, maxPerCat, "cyan");
-        ShowCatchUpCategory("World Events", worldEvents, maxPerCat, "white");
+        ShowCatchUpCategory(Loc.Get("engine.cat_deaths"), deaths, maxPerCat, "red");
+        ShowCatchUpCategory(Loc.Get("engine.cat_births"), births, maxPerCat, "bright_green");
+        ShowCatchUpCategory(Loc.Get("engine.cat_royal"), political, maxPerCat, "bright_yellow");
+        ShowCatchUpCategory(Loc.Get("engine.cat_love"), social, maxPerCat, "bright_magenta");
+        ShowCatchUpCategory(Loc.Get("engine.cat_outskirts"), settlement, maxPerCat, "cyan");
+        ShowCatchUpCategory(Loc.Get("engine.cat_world_events"), worldEvents, maxPerCat, "white");
 
-        terminal.WriteLine($"  Total events: {events.Count}", "gray");
+        terminal.WriteLine($"  {Loc.Get("engine.total_events", events.Count)}", "gray");
         terminal.WriteLine("", "white");
 
         await terminal.PressAnyKey();

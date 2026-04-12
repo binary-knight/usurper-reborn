@@ -55,9 +55,9 @@ function Log($msg) {
 
 # ─── Get current version ─────────────────────
 function Get-CurrentVersion {
-    # Try version.txt first (written by updater)
+    # Try version.txt first (written by updater) — read only the first line
     if (Test-Path $VersionFile) {
-        $v = (Get-Content $VersionFile -Raw).Trim()
+        $v = (Get-Content $VersionFile -TotalCount 1).Trim()
         if ($v) { return $v }
     }
     # Fall back to reading FileVersion from the exe

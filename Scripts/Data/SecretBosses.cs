@@ -583,7 +583,7 @@ namespace UsurperRemake.Data
         private async Task<bool> HandleBossChoice(SecretBossData boss, TerminalEmulator terminal)
         {
             terminal.WriteLine("");
-            terminal.WriteLine("The entity poses a question. You must answer:", "bright_yellow");
+            terminal.WriteLine(Loc.Get("riddle.entity_question"), "bright_yellow");
             terminal.WriteLine("");
 
             for (int i = 0; i < boss.ChoiceOptions.Length; i++)

@@ -517,23 +517,23 @@ namespace UsurperRemake.Systems
             if (type == OldGodType.Veloura && companionSystem.IsCompanionActive(CompanionId.Mira))
             {
                 terminal.WriteLine("");
-                terminal.WriteLine("Mira steps forward, her voice breaking.", "white");
+                terminal.WriteLine(Loc.Get("old_god.mira_steps_forward"), "white");
                 terminal.WriteLine("");
-                terminal.WriteLine("\"Veloura...\"", "bright_cyan");
+                terminal.WriteLine(Loc.Get("old_god.mira_veloura"), "bright_cyan");
                 await Task.Delay(2000);
                 terminal.WriteLine("");
-                terminal.WriteLine("\"I prayed to you every day for ten years. I healed the sick in your name.", "bright_cyan");
-                terminal.WriteLine(" I believed you were the light that guided my hands.\"", "bright_cyan");
+                terminal.WriteLine(Loc.Get("old_god.mira_prayed"), "bright_cyan");
+                terminal.WriteLine(Loc.Get("old_god.mira_believed"), "bright_cyan");
                 await Task.Delay(2500);
                 terminal.WriteLine("");
-                terminal.WriteLine("\"And then your temple burned. Your priests turned on each other.", "bright_cyan");
-                terminal.WriteLine(" I watched Sister Aldara — the kindest woman I ever knew — die screaming", "bright_cyan");
-                terminal.WriteLine(" because your corruption told her that mercy was weakness.\"", "bright_cyan");
+                terminal.WriteLine(Loc.Get("old_god.mira_temple_burned"), "bright_cyan");
+                terminal.WriteLine(Loc.Get("old_god.mira_sister_aldara"), "bright_cyan");
+                terminal.WriteLine(Loc.Get("old_god.mira_corruption"), "bright_cyan");
                 await Task.Delay(3000);
                 terminal.WriteLine("");
-                terminal.WriteLine("Mira turns to you, tears streaming.", "white");
-                terminal.WriteLine("\"Whatever you decide here... I'll follow you. But please —\"", "bright_cyan");
-                terminal.WriteLine("\"— remember that she wasn't always this.\"", "bright_cyan");
+                terminal.WriteLine(Loc.Get("old_god.mira_turns_to_you"), "white");
+                terminal.WriteLine(Loc.Get("old_god.mira_follow_you"), "bright_cyan");
+                terminal.WriteLine(Loc.Get("old_god.mira_not_always_this"), "bright_cyan");
                 terminal.WriteLine("");
                 await Task.Delay(2000);
             }

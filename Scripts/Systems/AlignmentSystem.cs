@@ -61,12 +61,12 @@ namespace UsurperRemake.Systems
             var alignment = GetAlignment(character);
             return alignment switch
             {
-                AlignmentType.Holy => ("Holy", "bright_yellow"),
-                AlignmentType.Good => ("Good", "bright_green"),
-                AlignmentType.Neutral => ("Neutral", "gray"),
-                AlignmentType.Dark => ("Dark", "red"),
-                AlignmentType.Evil => ("Evil", "bright_red"),
-                _ => ("Unknown", "white")
+                AlignmentType.Holy => (Loc.Get("alignment.holy"), "bright_yellow"),
+                AlignmentType.Good => (Loc.Get("alignment.good"), "bright_green"),
+                AlignmentType.Neutral => (Loc.Get("alignment.neutral"), "gray"),
+                AlignmentType.Dark => (Loc.Get("alignment.dark"), "red"),
+                AlignmentType.Evil => (Loc.Get("alignment.evil"), "bright_red"),
+                _ => (Loc.Get("alignment.unknown"), "white")
             };
         }
 
@@ -118,16 +118,16 @@ namespace UsurperRemake.Systems
                 case GameLocation.Church:
                 case GameLocation.Temple:
                     if (alignment == AlignmentType.Evil)
-                        return (false, "The holy wards repel your dark presence!");
+                        return (false, Loc.Get("alignment.wards_repel"));
                     if (alignment == AlignmentType.Dark && character.Darkness > 600)
-                        return (false, "The priests eye you suspiciously and bar the door.");
+                        return (false, Loc.Get("alignment.priests_bar_door"));
                     break;
 
                 case GameLocation.DarkAlley:
                 case GameLocation.Darkness:
                     // Anyone can enter, but good characters get warned
                     if (alignment == AlignmentType.Holy)
-                        return (true, "You feel your holy aura dimming as you enter this wretched place...");
+                        return (true, Loc.Get("alignment.holy_aura_dimming"));
                     break;
             }
 
@@ -216,34 +216,34 @@ namespace UsurperRemake.Systems
             switch (alignment)
             {
                 case AlignmentType.Holy:
-                    abilities.Add("Divine Protection - 10% damage reduction from evil creatures");
-                    abilities.Add("Holy Smite - Extra damage vs undead/demons");
-                    abilities.Add("Blessed Aura - Nearby allies gain +2 defense");
-                    abilities.Add("Temple Sanctuary - Free healing at temples");
+                    abilities.Add(Loc.Get("alignment.ability_divine_protection"));
+                    abilities.Add(Loc.Get("alignment.ability_holy_smite"));
+                    abilities.Add(Loc.Get("alignment.ability_blessed_aura"));
+                    abilities.Add(Loc.Get("alignment.ability_temple_sanctuary"));
                     break;
 
                 case AlignmentType.Good:
-                    abilities.Add("Righteous Fury - +10% damage vs evil creatures");
-                    abilities.Add("Merchant's Trust - 10% discount at shops");
-                    abilities.Add("Guard's Respect - Guards help you in combat");
+                    abilities.Add(Loc.Get("alignment.ability_righteous_fury"));
+                    abilities.Add(Loc.Get("alignment.ability_merchant_trust"));
+                    abilities.Add(Loc.Get("alignment.ability_guard_respect"));
                     break;
 
                 case AlignmentType.Neutral:
-                    abilities.Add("Diplomatic Immunity - No alignment restrictions");
-                    abilities.Add("Balanced Path - Access all locations freely");
+                    abilities.Add(Loc.Get("alignment.ability_diplomatic_immunity"));
+                    abilities.Add(Loc.Get("alignment.ability_balanced_path"));
                     break;
 
                 case AlignmentType.Dark:
-                    abilities.Add("Shadow Strike - +15% critical hit chance");
-                    abilities.Add("Fear Aura - Enemies may flee in terror");
-                    abilities.Add("Black Market Access - Better deals in shady shops");
+                    abilities.Add(Loc.Get("alignment.ability_shadow_strike"));
+                    abilities.Add(Loc.Get("alignment.ability_fear_aura"));
+                    abilities.Add(Loc.Get("alignment.ability_black_market"));
                     break;
 
                 case AlignmentType.Evil:
-                    abilities.Add("Soul Drain - Heal 10% of damage dealt");
-                    abilities.Add("Terror Incarnate - +20% damage, enemies may flee");
-                    abilities.Add("Dark Pact - Demons may aid you in battle");
-                    abilities.Add("Criminal Respect - Thieves won't target you");
+                    abilities.Add(Loc.Get("alignment.ability_soul_drain"));
+                    abilities.Add(Loc.Get("alignment.ability_terror_incarnate"));
+                    abilities.Add(Loc.Get("alignment.ability_dark_pact"));
+                    abilities.Add(Loc.Get("alignment.ability_criminal_respect"));
                     break;
             }
 
@@ -264,11 +264,11 @@ namespace UsurperRemake.Systems
             {
                 case AlignmentType.Holy:
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("A warm light surrounds you...");
+                    terminal.WriteLine(Loc.Get("alignment.event_warm_light"));
                     terminal.SetColor("white");
-                    terminal.WriteLine("The gods smile upon your righteousness!");
+                    terminal.WriteLine(Loc.Get("alignment.event_gods_smile"));
                     player.HP = Math.Min(player.MaxHP, player.HP + player.MaxHP / 10);
-                    terminal.WriteLine($"(+{player.MaxHP / 10} HP restored)");
+                    terminal.WriteLine(Loc.Get("alignment.event_hp_restored", player.MaxHP / 10));
                     await Task.Delay(2000);
                     return true;
 
@@ -276,10 +276,10 @@ namespace UsurperRemake.Systems
                     if (_random.Next(2) == 0)
                     {
                         terminal.SetColor("green");
-                        terminal.WriteLine("A grateful merchant approaches you...");
+                        terminal.WriteLine(Loc.Get("alignment.event_merchant_approaches"));
                         terminal.SetColor("white");
                         int gold = _random.Next(20, 100);
-                        terminal.WriteLine($"\"You helped me once. Take this as thanks!\" (+{gold} gold)");
+                        terminal.WriteLine(Loc.Get("alignment.event_merchant_thanks", gold));
                         player.Gold += gold;
                         await Task.Delay(2000);
                         return true;
@@ -290,7 +290,7 @@ namespace UsurperRemake.Systems
                     if (_random.Next(2) == 0)
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine("A shadowy figure whispers to you...");
+                        terminal.WriteLine(Loc.Get("alignment.event_shadow_whispers"));
                         terminal.SetColor("gray");
 
                         // Dynamic hints based on player level
@@ -323,7 +323,7 @@ namespace UsurperRemake.Systems
                         terminal.WriteLine(hints[_random.Next(hints.Count)]);
                         int xpGain = Math.Max(50, playerLevel * 10);
                         player.Experience += xpGain;
-                        terminal.WriteLine($"(+{xpGain} XP from forbidden knowledge)");
+                        terminal.WriteLine(Loc.Get("alignment.event_forbidden_xp", xpGain));
                         await Task.Delay(2000);
                         return true;
                     }
@@ -331,11 +331,11 @@ namespace UsurperRemake.Systems
 
                 case AlignmentType.Evil:
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine("Dark energy courses through your veins!");
+                    terminal.WriteLine(Loc.Get("alignment.event_dark_energy"));
                     terminal.SetColor("red");
-                    terminal.WriteLine("Your wickedness empowers you...");
+                    terminal.WriteLine(Loc.Get("alignment.event_wickedness_empowers"));
                     player.Strength += 1;
-                    terminal.WriteLine("(+1 Strength temporarily)");
+                    terminal.WriteLine(Loc.Get("alignment.event_str_temp"));
                     await Task.Delay(2000);
                     return true;
             }
@@ -388,7 +388,7 @@ namespace UsurperRemake.Systems
             if (GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"Chivalry: {character.Chivalry}/1000 — Darkness: {character.Darkness}/1000");
+                terminal.WriteLine(Loc.Get("alignment.sr_bar", character.Chivalry, character.Darkness));
             }
             else
             {

@@ -98,14 +98,14 @@ namespace UsurperRemake.Systems
                     DebugLogger.Instance.LogInfo("WORLD_BOSS", $"Spawned {bossDef.Name} (Lv{bossLevel}, HP:{scaledHP:N0}) with {onlineCount} players online");
 
                     // Broadcast spawn to all online players
-                    string spawnMsg = $"\n  *** {bossDef.Name}, {bossDef.Title} has appeared! ***\n  Type /boss to join the fight!";
+                    string spawnMsg = $"\n  *** {Loc.Get("world_boss.spawn_broadcast", bossDef.Name, bossDef.Title)} ***\n  {Loc.Get("world_boss.type_boss_to_join")}";
                     MudServer.Instance?.BroadcastToAll(spawnMsg);
 
                     // Post to news feed
                     if (OnlineStateManager.IsActive)
                     {
                         _ = OnlineStateManager.Instance!.AddNews(
-                            $"{bossDef.Name}, {bossDef.Title} has appeared! The realm needs heroes!", "world_boss");
+                            Loc.Get("world_boss.spawn_news", bossDef.Name, bossDef.Title), "world_boss");
                     }
                 }
             }
@@ -169,7 +169,7 @@ namespace UsurperRemake.Systems
 
                 // Menu
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  [A] {Loc.Get("world_boss.attack_boss")}    [Q] Back");
+                terminal.WriteLine($"  [A] {Loc.Get("world_boss.attack_boss")}    [Q] {Loc.Get("ui.back")}");
                 terminal.SetColor("white");
                 terminal.Write($"\n  {Loc.Get("ui.your_choice")}");
                 string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
@@ -268,8 +268,8 @@ namespace UsurperRemake.Systems
                 bool isPlayer = entry.PlayerName.Equals(playerName, StringComparison.OrdinalIgnoreCase);
 
                 string color = i == 0 ? "bright_yellow" : i < 3 ? "yellow" : isPlayer ? "bright_cyan" : "white";
-                string marker = i == 0 ? " MVP" : "";
-                string youTag = isPlayer ? " (YOU)" : "";
+                string marker = i == 0 ? $" {Loc.Get("world_boss.mvp_tag")}" : "";
+                string youTag = isPlayer ? $" ({Loc.Get("world_boss.you_tag")})" : "";
 
                 terminal.SetColor(color);
                 terminal.WriteLine($"  {i + 1,2}. {entry.PlayerName,-18} {entry.DamageDealt,10:N0} dmg  {pct,5:F1}%{marker}{youTag}");
@@ -358,27 +358,27 @@ namespace UsurperRemake.Systems
 
                 terminal.SetColor("white");
                 if (GameConfig.ScreenReaderMode)
-                    terminal.WriteLine($"  Round {state.Round}");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.round", state.Round)}");
                 else
-                    terminal.WriteLine($"  ─── Round {state.Round} ───");
+                    terminal.WriteLine($"  ─── {Loc.Get("world_boss.round", state.Round)} ───");
                 terminal.SetColor(hpColor);
                 if (GameConfig.ScreenReaderMode)
-                    terminal.WriteLine($"  Boss HP: {currentBoss.CurrentHP:N0}/{currentBoss.MaxHP:N0} ({hpPct:F1}%)");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.boss_hp_label")}: {currentBoss.CurrentHP:N0}/{currentBoss.MaxHP:N0} ({hpPct:F1}%)");
                 else
                 {
                     int barFilled = Math.Clamp((int)(hpPct / 5), 0, 20);
                     string hpBar = new string('█', barFilled) + new string('░', 20 - barFilled);
-                    terminal.WriteLine($"  Boss HP: [{hpBar}] {currentBoss.CurrentHP:N0}/{currentBoss.MaxHP:N0} ({hpPct:F1}%)");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.boss_hp_label")}: [{hpBar}] {currentBoss.CurrentHP:N0}/{currentBoss.MaxHP:N0} ({hpPct:F1}%)");
                 }
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  Your HP: {player.HP}/{player.MaxHP}  Mana: {player.Mana}/{player.MaxMana}  Phase: {bossData.CurrentPhase}");
+                terminal.WriteLine($"  {Loc.Get("world_boss.your_hp_label")}: {player.HP}/{player.MaxHP}  {Loc.Get("world_boss.mana_label")}: {player.Mana}/{player.MaxMana}  {Loc.Get("world_boss.phase_short_label")}: {bossData.CurrentPhase}");
 
                 // Show player status effects
                 if (player.ActiveStatuses.Count > 0)
                 {
                     var statusList = player.ActiveStatuses.Select(kv => $"{kv.Key}({kv.Value})");
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  Status: {string.Join(", ", statusList)}");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.status_label")}: {string.Join(", ", statusList)}");
                 }
                 terminal.WriteLine("");
 
@@ -432,13 +432,13 @@ namespace UsurperRemake.Systems
                             terminal.WriteLine($"  {Loc.Get("world_boss.killing_blow")}");
 
                             // Broadcast
-                            string killMsg = $"\n  *** {bossDef.Name} has been defeated! {player.DisplayName} struck the final blow! ***";
+                            string killMsg = $"\n  *** {Loc.Get("world_boss.defeat_broadcast", bossDef.Name, player.DisplayName)} ***";
                             MudServer.Instance?.BroadcastToAll(killMsg, playerKey);
 
                             // News
                             if (OnlineStateManager.IsActive)
                                 _ = OnlineStateManager.Instance!.AddNews(
-                                    $"{bossDef.Name} has been defeated! {player.DisplayName} struck the final blow!", "world_boss");
+                                    Loc.Get("world_boss.defeat_broadcast", bossDef.Name, player.DisplayName), "world_boss");
 
                             // Distribute rewards to all contributors
                             await DistributeWorldBossRewards(currentBoss.Id, bossDef, currentBoss.MaxHP,
@@ -476,7 +476,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("magenta");
                     terminal.WriteLine($"  {Loc.Get("world_boss.aura_damage", bossDef.Name, $"{auraDamage:N0}")}");
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  Your HP: {player.HP}/{player.MaxHP}");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.your_hp_label")}: {player.HP}/{player.MaxHP}");
                 }
 
                 // Decrement defend counter
@@ -859,8 +859,8 @@ namespace UsurperRemake.Systems
             if (hasHealing && hasMana)
             {
                 terminal.WriteLine($"  {Loc.Get("combat.which_potion")}", "cyan");
-                terminal.WriteLine($"    (H) Healing Potion  ({player.Healing}/{player.MaxPotions})", "green");
-                terminal.WriteLine($"    (M) Mana Potion     ({player.ManaPotions}/{player.MaxManaPotions})", "blue");
+                terminal.WriteLine($"    (H) {Loc.Get("world_boss.healing_potion")}  ({player.Healing}/{player.MaxPotions})", "green");
+                terminal.WriteLine($"    (M) {Loc.Get("world_boss.mana_potion")}     ({player.ManaPotions}/{player.MaxManaPotions})", "blue");
                 string choice = await terminal.GetInput("  > ");
                 if (choice.Equals("M", StringComparison.OrdinalIgnoreCase))
                 {
@@ -895,9 +895,9 @@ namespace UsurperRemake.Systems
             player.ManaPotions--;
 
             terminal.SetColor("bright_blue");
-            terminal.WriteLine($"  You drink a mana potion and recover {actualRestore} MP!");
+            terminal.WriteLine($"  {Loc.Get("world_boss.mana_potion_used", actualRestore)}");
             terminal.SetColor("gray");
-            terminal.WriteLine($"  Mana potions remaining: {player.ManaPotions}/{player.MaxManaPotions}");
+            terminal.WriteLine($"  {Loc.Get("world_boss.mana_potions_remaining", player.ManaPotions, player.MaxManaPotions)}");
         }
 
         private async Task<long> ProcessClassAbility(Character player, TerminalEmulator terminal,
@@ -1039,7 +1039,7 @@ namespace UsurperRemake.Systems
             {
                 player.HP = Math.Max(0, player.HP - abilityDmg);
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"  {ability.Description} ({abilityDmg:N0} damage!)");
+                terminal.WriteLine($"  {ability.Description} ({abilityDmg:N0} {Loc.Get("world_boss.damage_suffix")})");
             }
 
             // Apply status effect
@@ -1068,7 +1068,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  Your HP: {player.HP}/{player.MaxHP}");
+            terminal.WriteLine($"  {Loc.Get("world_boss.your_hp_label")}: {player.HP}/{player.MaxHP}");
         }
 
         private long CalculateBossBasicDamage(WorldBossRuntimeData bossData, Character player, Random rng,
@@ -1148,7 +1148,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
 
                 // Broadcast phase change
-                string phaseMsg = $"\n  *** {bossDef.Name} enters Phase {newPhase}! {GetPhaseDescription(newPhase)} ***";
+                string phaseMsg = $"\n  *** {Loc.Get("world_boss.phase_change_broadcast", bossDef.Name, newPhase, GetPhaseDescription(newPhase))} ***";
                 MudServer.Instance?.BroadcastToAll(phaseMsg);
             }
         }
@@ -1196,35 +1196,35 @@ namespace UsurperRemake.Systems
                         xpMult = GameConfig.WorldBossMVPXPMult;
                         goldMult = GameConfig.WorldBossMVPXPMult;
                         minRarity = LootGenerator.ItemRarity.Legendary;
-                        tierName = "MVP";
+                        tierName = Loc.Get("world_boss.tier_mvp");
                     }
                     else if (i < top3Cutoff)
                     {
                         xpMult = GameConfig.WorldBossTop3XPMult;
                         goldMult = GameConfig.WorldBossTop3XPMult;
                         minRarity = LootGenerator.ItemRarity.Epic;
-                        tierName = "Top 3";
+                        tierName = Loc.Get("world_boss.tier_top3");
                     }
                     else if (i < top25Cutoff)
                     {
                         xpMult = GameConfig.WorldBossTop25XPMult;
                         goldMult = GameConfig.WorldBossTop25XPMult;
                         minRarity = LootGenerator.ItemRarity.Rare;
-                        tierName = "Top 25%";
+                        tierName = Loc.Get("world_boss.tier_top25");
                     }
                     else if (i < top50Cutoff)
                     {
                         xpMult = GameConfig.WorldBossTop50XPMult;
                         goldMult = GameConfig.WorldBossTop50XPMult;
                         minRarity = LootGenerator.ItemRarity.Uncommon;
-                        tierName = "Top 50%";
+                        tierName = Loc.Get("world_boss.tier_top50");
                     }
                     else
                     {
                         xpMult = GameConfig.WorldBossBaseXPMult;
                         goldMult = GameConfig.WorldBossBaseXPMult;
                         minRarity = LootGenerator.ItemRarity.Common;
-                        tierName = "Contributor";
+                        tierName = Loc.Get("world_boss.tier_contributor");
                     }
 
                     // Calculate rewards
@@ -1251,8 +1251,8 @@ namespace UsurperRemake.Systems
                         killingTerminal.SetColor("bright_yellow");
                         killingTerminal.WriteLine($"\n  ═══ {Loc.Get("world_boss.rewards_header", tierName)} ═══");
                         killingTerminal.SetColor("white");
-                        killingTerminal.WriteLine($"  XP:   +{xpReward:N0}");
-                        killingTerminal.WriteLine($"  Gold: +{goldReward:N0}");
+                        killingTerminal.WriteLine($"  {Loc.Get("world_boss.reward_xp", $"{xpReward:N0}")}");
+                        killingTerminal.WriteLine($"  {Loc.Get("world_boss.reward_gold", $"{goldReward:N0}")}");
 
                         if (lootItem != null)
                         {
@@ -1264,7 +1264,7 @@ namespace UsurperRemake.Systems
                                 bool hasEpic = lootItem.LootEffects.Any(e => e.EffectType == (int)LootGenerator.SpecialEffect.TitanResolve);
                                 string rarityColor = hasLegendary ? "bright_yellow" : hasEpic ? "bright_magenta" : "bright_cyan";
                                 killingTerminal.SetColor(rarityColor);
-                                killingTerminal.WriteLine($"  Loot: {LootGenerator.GetUnidentifiedName(lootItem)}");
+                                killingTerminal.WriteLine($"  {Loc.Get("world_boss.reward_loot")}: {LootGenerator.GetUnidentifiedName(lootItem)}");
                             }
                         }
 
@@ -1297,8 +1297,7 @@ namespace UsurperRemake.Systems
                         }
 
                         // Send notification message
-                        string msg = $"World Boss Defeated! You earned {xpReward:N0} XP and {goldReward:N0} gold " +
-                                     $"for your contribution ({tierName}: {entry.DamageDealt:N0} damage).";
+                        string msg = Loc.Get("world_boss.reward_message", $"{xpReward:N0}", $"{goldReward:N0}", tierName, $"{entry.DamageDealt:N0}");
                         await backend.SendMessage("System", entry.PlayerName, "world_boss", msg);
 
                         // Deliver rewards and loot to online player's session
@@ -1319,12 +1318,12 @@ namespace UsurperRemake.Systems
                             {
                                 onlinePlayer.Inventory.Add(lootItem);
                                 session.EnqueueMessage(
-                                    $"\n  *** World Boss Rewards ({tierName}): +{xpReward:N0} XP, +{goldReward:N0} gold, {LootGenerator.GetUnidentifiedName(lootItem)} ***");
+                                    $"\n  *** {Loc.Get("world_boss.rewards_notification_loot", tierName, $"{xpReward:N0}", $"{goldReward:N0}", LootGenerator.GetUnidentifiedName(lootItem))} ***");
                             }
                             else
                             {
                                 session.EnqueueMessage(
-                                    $"\n  *** World Boss Rewards ({tierName}): +{xpReward:N0} XP, +{goldReward:N0} gold ***");
+                                    $"\n  *** {Loc.Get("world_boss.rewards_notification", tierName, $"{xpReward:N0}", $"{goldReward:N0}")} ***");
                             }
 
                             // Record stats for online players
@@ -1346,10 +1345,9 @@ namespace UsurperRemake.Systems
                 // Post summary to news
                 if (OnlineStateManager.IsActive)
                 {
-                    string mvpName = leaderboard.Count > 0 ? leaderboard[0].PlayerName : "unknown";
+                    string mvpName = leaderboard.Count > 0 ? leaderboard[0].PlayerName : Loc.Get("world_boss.unknown");
                     _ = OnlineStateManager.Instance!.AddNews(
-                        $"{bossDef.Name} defeated! MVP: {mvpName} ({leaderboard[0].DamageDealt:N0} dmg). " +
-                        $"{totalContributors} heroes participated.", "world_boss");
+                        Loc.Get("world_boss.defeat_news", bossDef.Name, mvpName, $"{leaderboard[0].DamageDealt:N0}", totalContributors), "world_boss");
                 }
             }
             catch (Exception ex)

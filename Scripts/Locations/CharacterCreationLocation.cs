@@ -31,16 +31,16 @@ public class CharacterCreationLocation : BaseLocation
         terminal.WriteLine("");
         WriteBoxHeader(Loc.Get("creation.welcome_to_usurper"), "bright_cyan", 79);
         terminal.WriteLine("");
-        terminal.WriteLine("You are about to enter the medieval world of Usurper, a realm of", "white");
-        terminal.WriteLine("magic, combat, politics, and intrigue. First, you must create", "white");
-        terminal.WriteLine("your character - the persona you will inhabit in this world.", "white");
+        terminal.WriteLine(Loc.Get("creation.intro_line1"), "white");
+        terminal.WriteLine(Loc.Get("creation.intro_line2"), "white");
+        terminal.WriteLine(Loc.Get("creation.intro_line3"), "white");
         terminal.WriteLine("");
-        terminal.WriteLine("Your character's race and class will determine their abilities,", "white");
-        terminal.WriteLine("strengths, and weaknesses. Choose wisely, as these decisions", "white");
-        terminal.WriteLine("will shape your entire adventure!", "white");
+        terminal.WriteLine(Loc.Get("creation.intro_line4"), "white");
+        terminal.WriteLine(Loc.Get("creation.intro_line5"), "white");
+        terminal.WriteLine(Loc.Get("creation.intro_line6"), "white");
         terminal.WriteLine("");
-        
-        await terminal.GetInputAsync("Press Enter to begin character creation...");
+
+        await terminal.GetInputAsync(Loc.Get("creation.press_enter_begin"));
         
         // Start character creation process
         await HandleCharacterCreation(player);
@@ -57,11 +57,11 @@ public class CharacterCreationLocation : BaseLocation
             {
                 // Character creation was aborted
                 terminal.WriteLine("");
-                terminal.WriteLine("Character creation was cancelled.", "yellow");
-                terminal.WriteLine("You will need to create a character to play Usurper.", "white");
+                terminal.WriteLine(Loc.Get("creation.cancelled"), "yellow");
+                terminal.WriteLine(Loc.Get("creation.need_character"), "white");
                 terminal.WriteLine("");
-                
-                var retry = await terminal.GetInputAsync("Would you like to try again? (Y/N): ");
+
+                var retry = await terminal.GetInputAsync(Loc.Get("creation.try_again_prompt"));
                 if (retry.ToUpper() == "Y")
                 {
                     await HandleCharacterCreation(player);
@@ -69,7 +69,7 @@ public class CharacterCreationLocation : BaseLocation
                 }
                 else
                 {
-                    terminal.WriteLine("Goodbye!", "cyan");
+                    terminal.WriteLine(Loc.Get("creation.goodbye"), "cyan");
                     await ExitToMainMenu();
                     return;
                 }
@@ -86,13 +86,13 @@ public class CharacterCreationLocation : BaseLocation
         }
         catch (OperationCanceledException)
         {
-            terminal.WriteLine("Character creation aborted.", "red");
+            terminal.WriteLine(Loc.Get("creation.aborted"), "red");
             await ExitToMainMenu();
         }
         catch (Exception ex)
         {
-            terminal.WriteLine($"An error occurred during character creation: {ex.Message}", "red");
-            terminal.WriteLine("Please try again.", "yellow");
+            terminal.WriteLine(Loc.Get("creation.error_occurred", ex.Message), "red");
+            terminal.WriteLine(Loc.Get("creation.please_try_again"), "yellow");
             await HandleCharacterCreation(player);
         }
     }
@@ -183,33 +183,33 @@ public class CharacterCreationLocation : BaseLocation
         terminal.WriteLine("");
         WriteBoxHeader(Loc.Get("creation.welcome_to_realm"), "bright_green", 79);
         terminal.WriteLine("");
-        terminal.WriteLine($"Greetings, {player.Name2}!", "bright_yellow");
+        terminal.WriteLine(Loc.Get("creation.greetings", player.Name2), "bright_yellow");
         terminal.WriteLine("");
-        terminal.WriteLine($"You are now {GameConfig.RaceDescriptions[player.Race]},", "white");
-        terminal.WriteLine($"a {GameConfig.ClassNames[(int)player.Class]} seeking fame and fortune", "white");
-        terminal.WriteLine("in the medieval realm of Usurper.", "white");
+        terminal.WriteLine(Loc.Get("creation.you_are_now", GameConfig.RaceDescriptions[player.Race]), "white");
+        terminal.WriteLine(Loc.Get("creation.class_seeking", GameConfig.ClassNames[(int)player.Class]), "white");
+        terminal.WriteLine(Loc.Get("creation.in_realm"), "white");
         terminal.WriteLine("");
-        terminal.WriteLine("Your adventure begins now in the bustling Main Street,", "cyan");
-        terminal.WriteLine("where merchants, adventurers, and nobles gather.", "cyan");
-        terminal.WriteLine("Explore the realm, gain experience, acquire wealth,", "cyan");
-        terminal.WriteLine("and perhaps one day claim the throne!", "cyan");
+        terminal.WriteLine(Loc.Get("creation.adventure_begins"), "cyan");
+        terminal.WriteLine(Loc.Get("creation.merchants_gather"), "cyan");
+        terminal.WriteLine(Loc.Get("creation.explore_realm"), "cyan");
+        terminal.WriteLine(Loc.Get("creation.claim_throne"), "cyan");
         terminal.WriteLine("");
         if (IsScreenReader)
-            terminal.WriteLine("HELPFUL HINTS", "yellow");
+            terminal.WriteLine(Loc.Get("creation.helpful_hints_sr"), "yellow");
         else
-            terminal.WriteLine("═══ HELPFUL HINTS ═══", "yellow");
-        terminal.WriteLine("- Visit the Inn to rest and recover", "white");
-        terminal.WriteLine("- Check the Weapon and Armor shops for equipment", "white");
-        terminal.WriteLine("- Enter the Dungeons to gain experience and gold", "white");
-        terminal.WriteLine("- Use the Bank to store your wealth safely", "white");
-        terminal.WriteLine("- Visit the Healer when wounded or diseased", "white");
-        terminal.WriteLine("- The Temple offers spiritual guidance and services", "white");
+            terminal.WriteLine(Loc.Get("creation.helpful_hints"), "yellow");
+        terminal.WriteLine(Loc.Get("creation.hint_inn"), "white");
+        terminal.WriteLine(Loc.Get("creation.hint_shops"), "white");
+        terminal.WriteLine(Loc.Get("creation.hint_dungeons"), "white");
+        terminal.WriteLine(Loc.Get("creation.hint_bank"), "white");
+        terminal.WriteLine(Loc.Get("creation.hint_healer"), "white");
+        terminal.WriteLine(Loc.Get("creation.hint_temple"), "white");
         terminal.WriteLine("");
-        terminal.WriteLine("Remember: Death is permanent in Usurper!", "red");
-        terminal.WriteLine("Fight wisely and choose your battles carefully.", "red");
+        terminal.WriteLine(Loc.Get("creation.death_warning"), "red");
+        terminal.WriteLine(Loc.Get("creation.fight_wisely"), "red");
         terminal.WriteLine("");
-        
-        await terminal.GetInputAsync("Press Enter to enter the realm...");
+
+        await terminal.GetInputAsync(Loc.Get("creation.press_enter_realm"));
     }
     
     /// <summary>
@@ -219,12 +219,12 @@ public class CharacterCreationLocation : BaseLocation
     {
         terminal.Clear();
         terminal.WriteLine("");
-        terminal.WriteLine("You step through the portal into the realm...", "cyan");
+        terminal.WriteLine(Loc.Get("creation.step_through_portal"), "cyan");
         terminal.WriteLine("");
         await Task.Delay(2000);
-        
-        terminal.WriteLine("The sights and sounds of Main Street greet you!", "green");
-        terminal.WriteLine("Your adventure begins now!", "bright_green");
+
+        terminal.WriteLine(Loc.Get("creation.main_street_greets"), "green");
+        terminal.WriteLine(Loc.Get("creation.adventure_begins_now"), "bright_green");
         await Task.Delay(1500);
         
         // Exit to main street location
@@ -237,13 +237,13 @@ public class CharacterCreationLocation : BaseLocation
     private async Task ExitToMainMenu()
     {
         terminal.Clear();
-        terminal.WriteLine("Returning to main menu...", "cyan");
+        terminal.WriteLine(Loc.Get("creation.returning_menu"), "cyan");
         await Task.Delay(1000);
-        
+
         // This would typically return to the main game menu
         // For now, we'll just clear and show a message
         terminal.Clear();
-        terminal.WriteLine("Please restart the game to try again.", "yellow");
+        terminal.WriteLine(Loc.Get("creation.restart_game"), "yellow");
     }
     
     public Task<bool> HandleInput(Character player, string input)
@@ -253,8 +253,8 @@ public class CharacterCreationLocation : BaseLocation
     
     public void ShowLocationHeader(Character player)
     {
-        terminal.WriteLine($"Welcome to {Name}, {player.DisplayName}!", "cyan");
-        terminal.WriteLine(Description, "white");
+        terminal.WriteLine(Loc.Get("creation.welcome_location", Name, player.DisplayName), "cyan");
+        terminal.WriteLine(Loc.Get("creation.location_desc"), "white");
         terminal.WriteLine("");
     }
     

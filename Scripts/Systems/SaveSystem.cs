@@ -629,6 +629,7 @@ namespace UsurperRemake.Systems
 
                 // Noble Title
                 NobleTitle = player.NobleTitle,
+                IsKnighted = player.IsKnighted,
 
                 // Royal Mercenaries
                 RoyalMercenaries = player.RoyalMercenaries?.Count > 0
@@ -843,6 +844,8 @@ namespace UsurperRemake.Systems
                 FoodBuffCombats = player.FoodBuffCombats,
                 FoodBuffValue = player.FoodBuffValue,
                 MealsToday = player.MealsToday,
+                InnDuelsToday = player.InnDuelsToday,
+                TavernStrangerTalkedToday = player.TavernStrangerTalkedToday,
 
                 // Dungeon Settlements & Wilderness (v0.49.4)
                 VisitedSettlements = player.VisitedSettlements?.ToList() ?? new List<string>(),

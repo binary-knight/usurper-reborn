@@ -1698,9 +1698,10 @@ public class HomeLocation : BaseLocation
             {
                 var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
                 var name = npc?.Name ?? spouse.NPCId;
-                var marriedDays = spouse.MarriedGameDay > 0
-                    ? Math.Max(0, DailySystemManager.Instance.CurrentDay - spouse.MarriedGameDay)
-                    : (int)(DateTime.Now - spouse.MarriedDate).TotalDays; // Fallback for old saves
+                // Use real wall-clock time for marriage duration (game day counters desync in online mode)
+                var marriedDays = spouse.MarriedDate > DateTime.MinValue
+                    ? Math.Max(0, (int)(DateTime.UtcNow - spouse.MarriedDate).TotalDays)
+                    : Math.Max(0, DailySystemManager.Instance.CurrentDay - spouse.MarriedGameDay);
 
                 terminal.Write($"    ");
                 terminal.SetColor("bright_red");

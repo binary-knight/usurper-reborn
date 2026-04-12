@@ -73,7 +73,7 @@ public class DungeonLocation : BaseLocation
         if (player.DaysInPrison > 0)
         {
             terminal.SetColor("red");
-            terminal.WriteLine("  You are a prisoner! The dungeon entrance is barred to you.");
+            terminal.WriteLine(Loc.Get("dungeon.prisoner_blocked"));
             await Task.Delay(2000);
             await NavigateToLocation(GameLocation.Prison);
             return;
@@ -2784,7 +2784,7 @@ public class DungeonLocation : BaseLocation
             if (currentPlayer.TotalHerbCount > 0)
                 WriteSRMenuOption("J", Loc.Get("dungeon.herbs", currentPlayer.TotalHerbCount.ToString()));
             if (teammates.Count > 0)
-                WriteSRMenuOption("Y", "Party");
+                WriteSRMenuOption("Y", Loc.Get("dungeon.party"));
             WriteSRMenuOption("=", Loc.Get("dungeon.status"));
             WriteSRMenuOption("Q", Loc.Get("dungeon.leave_dungeon"));
             terminal.WriteLine("");
@@ -2927,7 +2927,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.Write("Party  ");
+            terminal.Write($"{Loc.Get("dungeon.party")}  ");
         }
 
         terminal.SetColor("darkgray");
@@ -5232,7 +5232,7 @@ public class DungeonLocation : BaseLocation
                 {
                     player.ManaPotions += mpGained;
                     terminal.SetColor("blue");
-                    terminal.WriteLine($"You also find {mpGained} mana potion{(mpGained > 1 ? "s" : "")}!");
+                    terminal.WriteLine(Loc.Get("dungeon.find_mana_potions", mpGained));
                 }
             }
         }
@@ -5891,20 +5891,20 @@ public class DungeonLocation : BaseLocation
             var godType = GetOldGodForFloor(currentDungeonLevel);
             if (godType != null)
             {
-                return $"The {godType.Value} awaits in the boss chamber";
+                return Loc.Get("dungeon.clear_info_god_awaits", godType.Value);
             }
         }
 
         // Seal floors
         if (SealFloors.Contains(currentDungeonLevel))
         {
-            return "The ancient seal must be claimed";
+            return Loc.Get("dungeon.clear_info_seal_claim");
         }
 
         // Default: show monster room count
         int remaining = currentFloor.Rooms.Count(r => r.HasMonsters && !r.IsCleared);
         int total = currentFloor.Rooms.Count(r => r.HasMonsters);
-        return $"{remaining} of {total} monster rooms remain uncleared";
+        return Loc.Get("dungeon.clear_info_monsters_remain", remaining, total);
     }
 
     /// <summary>
@@ -6874,13 +6874,13 @@ public class DungeonLocation : BaseLocation
                     {
                         currentPlayer.ManaPotions += mpGained;
                         terminal.SetColor("blue");
-                        terminal.WriteLine($"You find {mpGained} mana potion{(mpGained > 1 ? "s" : "")}!");
+                        terminal.WriteLine(Loc.Get("dungeon.find_mana_potions", mpGained));
                     }
                 }
                 if (hpGained == 0 && (leftover == 0 || !currentPlayer.IsManaClass))
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine("You find some potions, but you're already fully stocked.");
+                    terminal.WriteLine(Loc.Get("dungeon.potions_fully_stocked"));
                 }
             }
             else if (roll < 90)
@@ -8421,12 +8421,12 @@ public class DungeonLocation : BaseLocation
             {
                 currentPlayer.ManaPotions += mpGained;
                 terminal.SetColor("blue");
-                terminal.WriteLine($"You also find {mpGained} mana potion{(mpGained > 1 ? "s" : "")}!");
+                terminal.WriteLine(Loc.Get("dungeon.find_mana_potions", mpGained));
             }
 
             terminal.WriteLine(Loc.Get("dungeon.potion_cache_count", currentPlayer.Healing, currentPlayer.MaxPotions), "cyan");
             if (currentPlayer.IsManaClass)
-                terminal.WriteLine($"Mana potions: {currentPlayer.ManaPotions}/{currentPlayer.MaxManaPotions}", "bright_blue");
+                terminal.WriteLine(Loc.Get("dungeon.mana_potions_count", currentPlayer.ManaPotions, currentPlayer.MaxManaPotions), "bright_blue");
 
             int totalGained = hpGained + mpGained;
             if (totalGained < potionsFound)
@@ -8623,7 +8623,7 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor(item.Sold ? "darkgray" : "bright_yellow");
                 if (item.Sold)
                 {
-                    terminal.WriteLine($"{item.Name} - SOLD");
+                    terminal.WriteLine($"{item.Name} - {Loc.Get("dungeon.sold")}");
                 }
                 else
                 {
@@ -9244,11 +9244,11 @@ public class DungeonLocation : BaseLocation
     {
         var phrases = terrain switch
         {
-            DungeonTerrain.Underground => new[] { "Trespasser!", "Attack!", "Kill them!", "No mercy!" },
-            DungeonTerrain.Mountains => new[] { "Give yourself up!", "Take no prisoners!", "For the clan!" },
-            DungeonTerrain.Desert => new[] { "No prisoners!", "Your gold or your life!", "Die, infidel!" },
-            DungeonTerrain.Forest => new[] { "Wrong way, lads!", "Protect the trees!", "Nature's revenge!" },
-            _ => new[] { "Grrargh!", "Attack!", "Die!", "No escape!" }
+            DungeonTerrain.Underground => new[] { Loc.Get("dungeon.phrase_underground_1"), Loc.Get("dungeon.phrase_underground_2"), Loc.Get("dungeon.phrase_underground_3"), Loc.Get("dungeon.phrase_underground_4") },
+            DungeonTerrain.Mountains => new[] { Loc.Get("dungeon.phrase_mountains_1"), Loc.Get("dungeon.phrase_mountains_2"), Loc.Get("dungeon.phrase_mountains_3") },
+            DungeonTerrain.Desert => new[] { Loc.Get("dungeon.phrase_desert_1"), Loc.Get("dungeon.phrase_desert_2"), Loc.Get("dungeon.phrase_desert_3") },
+            DungeonTerrain.Forest => new[] { Loc.Get("dungeon.phrase_forest_1"), Loc.Get("dungeon.phrase_forest_2"), Loc.Get("dungeon.phrase_forest_3") },
+            _ => new[] { Loc.Get("dungeon.phrase_default_1"), Loc.Get("dungeon.phrase_default_2"), Loc.Get("dungeon.phrase_default_3"), Loc.Get("dungeon.phrase_default_4") }
         };
         
         return phrases[dungeonRandom.Next(phrases.Length)];
@@ -9461,7 +9461,7 @@ public class DungeonLocation : BaseLocation
             {
                 var comp = inactiveCompanions[i];
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  [C{i + 1}] {comp.Name} ({comp.CombatRole}) - Level {comp.Level}");
+                terminal.WriteLine($"  [C{i + 1}] {comp.Name} ({comp.CombatRole}) - {Loc.Get("dungeon.level_label")} {comp.Level}");
             }
             terminal.WriteLine("");
         }
@@ -9477,12 +9477,12 @@ public class DungeonLocation : BaseLocation
                 bool isSpouse = spouseNpc != null && npc.ID == spouseNpc.ID;
                 bool isLover = romance?.CurrentLovers?.Any(l => l.NPCId == npc.ID) == true;
                 long fee = balanceSystem.CalculateEntryFee(player, npc);
-                string feeStr = fee > 0 ? $" [Fee: {fee:N0}g]" : "";
+                string feeStr = fee > 0 ? $" [{Loc.Get("dungeon.fee_label", fee)}]" : "";
 
                 if (isSpouse)
                 {
                     terminal.SetColor("bright_magenta");
-                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} (Spouse) - Level {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} ({Loc.Get("dungeon.spouse")}) - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
@@ -9490,14 +9490,14 @@ public class DungeonLocation : BaseLocation
                 else if (isLover)
                 {
                     terminal.SetColor("magenta");
-                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} (Lover) - Level {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} ({Loc.Get("dungeon.lover")}) - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
                 }
                 else
                 {
-                    terminal.Write($"  [{i + 1}] {npc.DisplayName} - Level {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.Write($"  [{i + 1}] {npc.DisplayName} - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
@@ -9692,7 +9692,7 @@ public class DungeonLocation : BaseLocation
         while (true)
         {
             terminal.ClearScreen();
-            WriteBoxHeader("PARTY MANAGEMENT", "bright_cyan", 57);
+            WriteBoxHeader(Loc.Get("dungeon.party_management_header"), "bright_cyan", 57);
             terminal.WriteLine("");
 
             // List party members with key stats
@@ -9707,13 +9707,13 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.Write($"{tm.DisplayName} ");
                 terminal.SetColor("gray");
-                terminal.Write($"Lv{tm.Level} {tm.ClassName}  ");
+                terminal.Write($"{Loc.Get("dungeon.lv_label")}{tm.Level} {tm.ClassName}  ");
                 terminal.SetColor(hpColor);
-                terminal.Write($"HP:{tm.HP}/{tm.MaxHP}");
+                terminal.Write($"{Loc.Get("dungeon.hp_label")}:{tm.HP}/{tm.MaxHP}");
                 if (tm.IsManaClass)
                 {
                     terminal.SetColor("cyan");
-                    terminal.Write($"  MP:{tm.Mana}/{tm.MaxMana}");
+                    terminal.Write($"  {Loc.Get("dungeon.mp_label")}:{tm.Mana}/{tm.MaxMana}");
                 }
                 terminal.WriteLine("");
 
@@ -9724,14 +9724,14 @@ public class DungeonLocation : BaseLocation
                 terminal.Write("     ");
                 if (mainHand != null)
                 {
-                    terminal.Write($"Wpn: ");
+                    terminal.Write($"{Loc.Get("dungeon.wpn_label")}: ");
                     terminal.SetColor("gray");
                     terminal.Write($"{(mainHand.IsIdentified ? mainHand.Name : "???")}");
                     terminal.SetColor("darkgray");
                 }
                 if (body != null)
                 {
-                    terminal.Write($"  Armor: ");
+                    terminal.Write($"  {Loc.Get("dungeon.armor_label")}: ");
                     terminal.SetColor("gray");
                     terminal.Write($"{(body.IsIdentified ? body.Name : "???")}");
                 }
@@ -9740,7 +9740,7 @@ public class DungeonLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine("  [#] View/equip member  [Q] Back");
+            terminal.WriteLine($"  [#] {Loc.Get("dungeon.view_equip_member")}  [Q] {Loc.Get("dungeon.back")}");
             terminal.WriteLine("");
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("ui.choice"));
@@ -9759,21 +9759,21 @@ public class DungeonLocation : BaseLocation
                 if (selectedMember.IsGroupedPlayer)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine("  Other players manage their own equipment.");
+                    terminal.WriteLine(Loc.Get("dungeon.other_players_manage_own"));
                     await Task.Delay(1500);
                     continue;
                 }
                 if (selectedMember.IsEcho)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine("  Echo characters cannot be managed.");
+                    terminal.WriteLine(Loc.Get("dungeon.echo_cannot_manage"));
                     await Task.Delay(1500);
                     continue;
                 }
                 if (selectedMember.IsMercenary)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine("  Royal bodyguards use their own equipment and cannot be re-equipped.");
+                    terminal.WriteLine(Loc.Get("dungeon.bodyguard_cannot_equip"));
                     await Task.Delay(1500);
                     continue;
                 }
@@ -9792,29 +9792,29 @@ public class DungeonLocation : BaseLocation
         while (true)
         {
             terminal.ClearScreen();
-            WriteBoxHeader($"EQUIPMENT: {target.DisplayName.ToUpper()}", "bright_cyan", 57);
+            WriteBoxHeader($"{Loc.Get("dungeon.equipment_header")}: {target.DisplayName.ToUpper()}", "bright_cyan", 57);
             terminal.WriteLine("");
 
             // Show target's stats
             terminal.SetColor("white");
-            terminal.WriteLine($"  Level: {target.Level}  Class: {target.ClassName}  Race: {target.Race}");
+            terminal.WriteLine($"  {Loc.Get("dungeon.level_label")}: {target.Level}  {Loc.Get("dungeon.class_label")}: {target.ClassName}  {Loc.Get("dungeon.race_label")}: {target.Race}");
             string hpColor = target.HP < target.MaxHP * 0.3 ? "red" : target.HP < target.MaxHP * 0.7 ? "yellow" : "bright_green";
             terminal.SetColor(hpColor);
-            terminal.Write($"  HP: {target.HP}/{target.MaxHP}");
+            terminal.Write($"  {Loc.Get("dungeon.hp_label")}: {target.HP}/{target.MaxHP}");
             if (target.IsManaClass)
             {
                 terminal.SetColor("cyan");
-                terminal.Write($"  MP: {target.Mana}/{target.MaxMana}");
+                terminal.Write($"  {Loc.Get("dungeon.mp_label")}: {target.Mana}/{target.MaxMana}");
             }
             terminal.WriteLine("");
             terminal.SetColor("white");
-            terminal.WriteLine($"  STR: {target.Strength}  DEX: {target.Dexterity}  AGI: {target.Agility}  CON: {target.Constitution}");
-            terminal.WriteLine($"  INT: {target.Intelligence}  WIS: {target.Wisdom}  CHA: {target.Charisma}  DEF: {target.Defence}");
+            terminal.WriteLine($"  {Loc.Get("stats.str")}: {target.Strength}  {Loc.Get("stats.dex")}: {target.Dexterity}  {Loc.Get("stats.agi")}: {target.Agility}  {Loc.Get("stats.con")}: {target.Constitution}");
+            terminal.WriteLine($"  {Loc.Get("stats.int")}: {target.Intelligence}  {Loc.Get("stats.wis")}: {target.Wisdom}  {Loc.Get("stats.cha")}: {target.Charisma}  {Loc.Get("stats.def")}: {target.Defence}");
             terminal.WriteLine("");
 
             // Show current equipment with stats
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine("  Equipment:");
+            terminal.WriteLine($"  {Loc.Get("dungeon.equipment_label")}:");
             terminal.SetColor("white");
 
             DisplayEquipmentSlotWithStats(target, EquipmentSlot.MainHand, "Main Hand");
@@ -9835,7 +9835,7 @@ public class DungeonLocation : BaseLocation
 
             // Options
             terminal.SetColor("cyan");
-            terminal.WriteLine("  [E] Equip item  [U] Unequip item  [Q] Back");
+            terminal.WriteLine($"  [E] {Loc.Get("dungeon.equip_item")}  [U] {Loc.Get("dungeon.unequip_item")}  [Q] {Loc.Get("dungeon.back")}");
             terminal.WriteLine("");
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("ui.choice"));
@@ -9864,7 +9864,7 @@ public class DungeonLocation : BaseLocation
     private async Task DungeonEquipItemToMember(Character target)
     {
         terminal.ClearScreen();
-        WriteBoxHeader($"EQUIP TO {target.DisplayName.ToUpper()}", "bright_cyan", 57);
+        WriteBoxHeader($"{Loc.Get("dungeon.equip_to_header")} {target.DisplayName.ToUpper()}", "bright_cyan", 57);
         terminal.WriteLine("");
 
         // Step 1: Pick a slot
@@ -9878,7 +9878,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.SetColor("yellow");
-            terminal.WriteLine("  No items available for this slot.");
+            terminal.WriteLine(Loc.Get("dungeon.no_items_for_slot"));
             await Task.Delay(2000);
             return;
         }
@@ -9887,30 +9887,30 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         var currentItem = target.GetEquipment(selectedSlot.Value);
         terminal.SetColor("white");
-        terminal.Write($"  Current: ");
+        terminal.Write($"  {Loc.Get("dungeon.current_label")}: ");
         if (currentItem != null)
         {
             terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-            terminal.Write(currentItem.IsIdentified ? currentItem.Name : "Unidentified");
+            terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("dungeon.unidentified"));
             if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
             terminal.WriteLine("");
         }
         else
         {
             terminal.SetColor("darkgray");
-            terminal.WriteLine("Empty");
+            terminal.WriteLine(Loc.Get("dungeon.empty"));
         }
         terminal.WriteLine("");
 
         // Step 4: Display matching items with full stats
         terminal.SetColor("white");
-        terminal.WriteLine("  Available items:");
+        terminal.WriteLine($"  {Loc.Get("dungeon.available_items")}:");
         terminal.WriteLine("");
         DisplayEquipmentItemList(equipmentItems, target);
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.Write("  Item # (Q to cancel): ");
+        terminal.Write($"  {Loc.Get("dungeon.item_number_prompt")}: ");
         terminal.SetColor("white");
 
         var input = await terminal.ReadLineAsync();
@@ -9928,7 +9928,7 @@ public class DungeonLocation : BaseLocation
         if (!selectedItem.IsIdentified)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("  Must identify the item first.");
+            terminal.WriteLine(Loc.Get("dungeon.must_identify_first"));
             await Task.Delay(2000);
             return;
         }
@@ -9937,7 +9937,7 @@ public class DungeonLocation : BaseLocation
         if (!selectedItem.CanEquip(target, out string equipReason))
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"  {target.DisplayName} cannot use this: {equipReason}");
+            terminal.WriteLine($"  {Loc.Get("dungeon.cannot_use_item", target.DisplayName, equipReason)}");
             await Task.Delay(2000);
             return;
         }
@@ -9979,7 +9979,7 @@ public class DungeonLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {target.DisplayName} equipped {selectedItem.Name}.");
+            terminal.WriteLine($"  {Loc.Get("dungeon.equipped_item", target.DisplayName, selectedItem.Name)}");
             if (!string.IsNullOrEmpty(message))
             {
                 terminal.SetColor("yellow");
@@ -10003,7 +10003,7 @@ public class DungeonLocation : BaseLocation
         {
             // Failed - item was never removed from player, nothing to return
             terminal.SetColor("red");
-            terminal.WriteLine($"  Failed: {message}");
+            terminal.WriteLine($"  {Loc.Get("dungeon.equip_failed", message)}");
         }
 
         await Task.Delay(2000);
@@ -10015,7 +10015,7 @@ public class DungeonLocation : BaseLocation
     private async Task DungeonUnequipItemFromMember(Character target)
     {
         terminal.ClearScreen();
-        WriteBoxHeader($"UNEQUIP FROM {target.DisplayName.ToUpper()}", "bright_cyan", 57);
+        WriteBoxHeader($"{Loc.Get("dungeon.unequip_from_header")} {target.DisplayName.ToUpper()}", "bright_cyan", 57);
         terminal.WriteLine("");
 
         var equippedSlots = new List<(EquipmentSlot slot, Equipment item)>();
@@ -10030,7 +10030,7 @@ public class DungeonLocation : BaseLocation
         if (equippedSlots.Count == 0)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"  {target.DisplayName} has no equipment.");
+            terminal.WriteLine(Loc.Get("dungeon.no_equipment", target.DisplayName));
             await Task.Delay(2000);
             return;
         }
@@ -10050,7 +10050,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.Write("  Unequip # (Q to cancel): ");
+        terminal.Write($"  {Loc.Get("dungeon.unequip_number_prompt")}: ");
         terminal.SetColor("white");
 
         var input = await terminal.ReadLineAsync();
@@ -10086,7 +10086,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  Took {selectedItem.Name} from {target.DisplayName}.");
+        terminal.WriteLine(Loc.Get("dungeon.took_item_from", selectedItem.Name, target.DisplayName));
         await Task.Delay(1500);
     }
 
@@ -10618,7 +10618,7 @@ public class DungeonLocation : BaseLocation
                     if (member.MaxMana > 0)
                     {
                         terminal.SetColor("bright_cyan");
-                        terminal.Write($"  MP:{member.Mana}/{member.MaxMana}");
+                        terminal.Write($"  {Loc.Get("dungeon.mp_label")}:{member.Mana}/{member.MaxMana}");
                     }
                     terminal.WriteLine("");
                 }
@@ -10661,7 +10661,7 @@ public class DungeonLocation : BaseLocation
                         WriteSRMenuOption("M", Loc.Get("dungeon.no_mana_potions"));
                 }
                 if (player.ManaPotions > 0 && allPartyMembers.Any(m => m.MaxMana > 0 && m.Mana < m.MaxMana))
-                    WriteSRMenuOption("G", $"Give mana potion to teammate ({player.ManaPotions} remaining)");
+                    WriteSRMenuOption("G", Loc.Get("dungeon.give_mana_teammate", player.ManaPotions));
                 if (player.Antidotes > 0 && player.Poison > 0)
                     WriteSRMenuOption("D", Loc.Get("dungeon.use_antidote", player.Antidotes));
                 else if (player.Antidotes > 0)
@@ -10776,7 +10776,7 @@ public class DungeonLocation : BaseLocation
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"Give mana potion to teammate ({player.ManaPotions} remaining)");
+                    terminal.WriteLine(Loc.Get("dungeon.give_mana_teammate", player.ManaPotions));
                 }
 
                 // Antidote option
@@ -10966,14 +10966,14 @@ public class DungeonLocation : BaseLocation
         if (manaTeammates.Count == 0)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("No teammates need mana.");
+            terminal.WriteLine(Loc.Get("dungeon.no_teammates_need_mana"));
             await Task.Delay(1500);
             return;
         }
 
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("Give mana potions to:");
+        terminal.WriteLine(Loc.Get("dungeon.give_mana_potions_to"));
         terminal.WriteLine("");
 
         for (int i = 0; i < manaTeammates.Count; i++)
@@ -10984,11 +10984,11 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("white");
             terminal.Write($"  [{i + 1}] {tm.DisplayName,-18} ");
             terminal.SetColor(mpColor);
-            terminal.WriteLine($"MP: {tm.Mana}/{tm.MaxMana}");
+            terminal.WriteLine($"{Loc.Get("dungeon.mp_label")}: {tm.Mana}/{tm.MaxMana}");
         }
 
         terminal.SetColor("gray");
-        terminal.WriteLine("  [0] Cancel");
+        terminal.WriteLine($"  [0] {Loc.Get("dungeon.cancel")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
         terminal.Write(Loc.Get("ui.choice"));
@@ -11005,14 +11005,14 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"{target.DisplayName} is missing {missingMP} MP. Each potion restores ~{restorePerPotion} MP.");
+        terminal.WriteLine(Loc.Get("dungeon.missing_mp_info", target.DisplayName, missingMP, restorePerPotion));
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine("[1] Give 1 potion");
+        terminal.WriteLine($"[1] {Loc.Get("dungeon.give_1_potion")}");
         if (potionsNeeded > 1)
-            terminal.WriteLine($"[F] Fully restore (up to {potionsNeeded} potions)");
+            terminal.WriteLine($"[F] {Loc.Get("dungeon.fully_restore_potions", potionsNeeded)}");
         terminal.SetColor("gray");
-        terminal.WriteLine("[0] Cancel");
+        terminal.WriteLine($"[0] {Loc.Get("dungeon.cancel")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
         terminal.Write(Loc.Get("ui.choice"));
@@ -11038,11 +11038,11 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("bright_blue");
         if (potionsToUse > 1)
-            terminal.WriteLine($"You give {potionsToUse} mana potions to {target.DisplayName}, restoring {totalRestore} MP! (MP: {target.Mana}/{target.MaxMana})");
+            terminal.WriteLine(Loc.Get("dungeon.give_mana_potions_many", potionsToUse, target.DisplayName, totalRestore, target.Mana, target.MaxMana));
         else
-            terminal.WriteLine($"You give a mana potion to {target.DisplayName}, restoring {totalRestore} MP! (MP: {target.Mana}/{target.MaxMana})");
+            terminal.WriteLine(Loc.Get("dungeon.give_mana_potion_one", target.DisplayName, totalRestore, target.Mana, target.MaxMana));
         terminal.SetColor("cyan");
-        terminal.WriteLine($"Mana potions remaining: {player.ManaPotions}");
+        terminal.WriteLine(Loc.Get("dungeon.mana_potions_remaining", player.ManaPotions));
         await Task.Delay(1500);
     }
 
@@ -11059,8 +11059,8 @@ public class DungeonLocation : BaseLocation
             int hpPercent = companion.MaxHP > 0 ? (int)(100 * companion.HP / companion.MaxHP) : 100;
             string hpColor = hpPercent < 25 ? "red" : hpPercent < 50 ? "yellow" : hpPercent < 100 ? "bright_green" : "green";
             terminal.SetColor(hpColor);
-            string status = hpPercent >= 100 ? " (Full)" : "";
-            terminal.WriteLine($"  [{i + 1}] {companion.DisplayName} - HP: {companion.HP}/{companion.MaxHP} ({hpPercent}%){status}");
+            string status = hpPercent >= 100 ? $" ({Loc.Get("dungeon.full")})" : "";
+            terminal.WriteLine($"  [{i + 1}] {companion.DisplayName} - {Loc.Get("dungeon.hp_label")}: {companion.HP}/{companion.MaxHP} ({hpPercent}%){status}");
         }
         terminal.SetColor("darkgray");
         terminal.Write("  [");
@@ -11469,14 +11469,14 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write("H");
             terminal.SetColor("darkgray");
-            terminal.Write("]");
+            terminal.Write("] ");
             terminal.SetColor("green");
-            terminal.WriteLine($"ealing Potions - {healCost}g each ({player.Healing}/{player.MaxPotions})");
+            terminal.WriteLine(Loc.Get("dungeon.monk_healing_option", healCost, player.Healing, player.MaxPotions));
         }
         else
         {
             terminal.SetColor("darkgray");
-            terminal.WriteLine($"[H]ealing Potions - FULL ({player.Healing}/{player.MaxPotions})");
+            terminal.WriteLine(Loc.Get("dungeon.monk_healing_full", player.Healing, player.MaxPotions));
         }
 
         if (canBuyMana)
@@ -11486,14 +11486,14 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write("M");
             terminal.SetColor("darkgray");
-            terminal.Write("]");
+            terminal.Write("] ");
             terminal.SetColor("blue");
-            terminal.WriteLine($"ana Potions - {manaCost}g each ({player.ManaPotions}/{player.MaxManaPotions})");
+            terminal.WriteLine(Loc.Get("dungeon.monk_mana_option", manaCost, player.ManaPotions, player.MaxManaPotions));
         }
         else if (SpellSystem.HasSpells(player))
         {
             terminal.SetColor("darkgray");
-            terminal.WriteLine($"[M]ana Potions - FULL ({player.ManaPotions}/{player.MaxManaPotions})");
+            terminal.WriteLine(Loc.Get("dungeon.monk_mana_full", player.ManaPotions, player.MaxManaPotions));
         }
 
         terminal.SetColor("darkgray");
@@ -11501,9 +11501,9 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("C");
         terminal.SetColor("darkgray");
-        terminal.Write("]");
+        terminal.Write("] ");
         terminal.SetColor("gray");
-        terminal.WriteLine("ancel");
+        terminal.WriteLine(Loc.Get("dungeon.cancel"));
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
@@ -11826,19 +11826,19 @@ public class DungeonLocation : BaseLocation
         // Current room info + boss status on one line
         var currentRoom = currentFloor.GetCurrentRoom();
         terminal.SetColor("white");
-        terminal.Write(" Location: ");
+        terminal.Write($" {Loc.Get("dungeon.location_label")}: ");
         terminal.SetColor("yellow");
-        terminal.Write(currentRoom?.Name ?? "Unknown");
+        terminal.Write(currentRoom?.Name ?? Loc.Get("dungeon.unknown"));
         if (currentFloor.BossDefeated)
         {
             terminal.SetColor("bright_green");
-            terminal.Write(GameConfig.ScreenReaderMode ? "  * BOSS DEFEATED" : "  ★ BOSS DEFEATED");
+            terminal.Write(GameConfig.ScreenReaderMode ? $"  * {Loc.Get("dungeon.boss_defeated_label")}" : $"  \u2605 {Loc.Get("dungeon.boss_defeated_label")}");
         }
         terminal.WriteLine("");
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(" Press Enter to continue...");
+        terminal.WriteLine($" {Loc.Get("dungeon.press_enter_continue")}");
         await terminal.GetInput("");
     }
 
@@ -11871,7 +11871,7 @@ public class DungeonLocation : BaseLocation
             var exitDirs = current.Exits.Keys.OrderBy(d => d).Select(d => d.ToString());
             terminal.WriteLine(Loc.Get("dungeon.guide_exits", string.Join(", ", exitDirs)), "gray");
         }
-        terminal.WriteLine($"{explored}/{total} explored, {cleared}/{total} cleared.", "gray");
+        terminal.WriteLine(Loc.Get("dungeon.explored_cleared_count", explored, total, cleared, total), "gray");
         if (currentFloor.BossDefeated)
             terminal.WriteLine(Loc.Get("dungeon.boss_defeated"), "bright_green");
         terminal.WriteLine("");
@@ -11933,15 +11933,15 @@ public class DungeonLocation : BaseLocation
         // Menu
         var options = new List<(string key, string label, string? targetId)>();
         if (nearestSafeHavenId != null)
-            options.Add(("H", "Nearest safe haven", nearestSafeHavenId));
+            options.Add(("H", Loc.Get("dungeon.nav_safe_haven"), nearestSafeHavenId));
         if (nearestUnexploredId != null)
-            options.Add(("U", "Nearest unexplored room", nearestUnexploredId));
+            options.Add(("U", Loc.Get("dungeon.nav_unexplored"), nearestUnexploredId));
         if (nearestUnclearedId != null)
-            options.Add(("C", "Nearest uncleared room", nearestUnclearedId));
+            options.Add(("C", Loc.Get("dungeon.nav_uncleared"), nearestUnclearedId));
         if (stairsRoomId != null)
-            options.Add(("S", "Stairs down", stairsRoomId));
+            options.Add(("S", Loc.Get("dungeon.nav_stairs"), stairsRoomId));
         if (bossRoomId != null)
-            options.Add(("B", "Boss room", bossRoomId));
+            options.Add(("B", Loc.Get("dungeon.nav_boss"), bossRoomId));
 
         if (options.Count == 0)
         {
@@ -11957,14 +11957,14 @@ public class DungeonLocation : BaseLocation
             var path = BuildDirectionPath(opt.targetId!, startId, parentMap);
             var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == opt.targetId);
             string roomName = room?.Name ?? "unknown";
-            string dist = path != null ? $"{path.Count} room{(path.Count == 1 ? "" : "s")}" : "?";
+            string dist = path != null ? Loc.Get("dungeon.nav_rooms_away", path.Count) : "?";
             terminal.Write($"  [{opt.key}] {opt.label}", "bright_cyan");
-            terminal.WriteLine($" - {roomName}, {dist} away", "gray");
+            terminal.WriteLine($" - {roomName}, {dist}", "gray");
         }
-        terminal.WriteLine("  [Enter] Return to dungeon", "gray");
+        terminal.WriteLine($"  [{Loc.Get("dungeon.enter_key")}] {Loc.Get("dungeon.return_to_dungeon")}", "gray");
         terminal.WriteLine("");
 
-        string choice = (await terminal.GetInput("Navigate to: ")).Trim().ToUpperInvariant();
+        string choice = (await terminal.GetInput(Loc.Get("dungeon.navigate_to_prompt"))).Trim().ToUpperInvariant();
 
         var selected = options.FirstOrDefault(o => o.key == choice);
         if (selected.targetId != null)
@@ -12447,7 +12447,7 @@ public class DungeonLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("cyan");
-        terminal.WriteLine("*** DUNGEON ENCOUNTER ***");
+        terminal.WriteLine(Loc.Get("dungeon.encounter_header"));
         terminal.WriteLine("");
 
         var player = GetCurrentPlayer();
@@ -13026,12 +13026,7 @@ public class DungeonLocation : BaseLocation
             do { pos = random.Next(puzzle.Solution.Count); } while (askedPositions.Contains(pos));
             askedPositions.Add(pos);
 
-            string ordinal = (pos + 1) switch
-            {
-                1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{pos + 1}th"
-            };
-
-            terminal.WriteLine($"What was the {ordinal} symbol in the sequence?", "white");
+            terminal.WriteLine(Loc.Get("dungeon.memory_what_symbol", pos + 1), "white");
             var input = await terminal.GetInput("> ");
 
             if (string.IsNullOrWhiteSpace(input) ||
@@ -13041,7 +13036,7 @@ public class DungeonLocation : BaseLocation
             }
 
             if (q < questionsNeeded - 1)
-                terminal.WriteLine("Correct!", "bright_green");
+                terminal.WriteLine(Loc.Get("dungeon.correct"), "bright_green");
         }
 
         return true;
@@ -13157,7 +13152,7 @@ public class DungeonLocation : BaseLocation
                 if (settlement.HasHealing)
                 {
                     long healCost = CalculateSettlementHealCost(player, settlement);
-                    WriteSRMenuOption("H", $"Heal - Restore HP & Mana ({healCost}g)");
+                    WriteSRMenuOption("H", Loc.Get("dungeon.settlement_heal_option", healCost));
                 }
                 if (settlement.HasTrading)
                     WriteSRMenuOption("T", Loc.Get("dungeon.trade_supplies"));
@@ -13170,7 +13165,7 @@ public class DungeonLocation : BaseLocation
                         string loreKey = $"{settlement.Id}_{System.Array.IndexOf(settlement.LoreFragments, frag)}";
                         if (player.SettlementLoreRead.Contains(loreKey)) readLore++;
                     }
-                    WriteSRMenuOption("L", $"Lore - Ask about the depths ({readLore}/{totalLore} heard)");
+                    WriteSRMenuOption("L", Loc.Get("dungeon.settlement_lore_option", readLore, totalLore));
                 }
                 terminal.SetColor("gray");
                 WriteSRMenuOption("R", Loc.Get("dungeon.return"));
@@ -13180,10 +13175,10 @@ public class DungeonLocation : BaseLocation
                 if (settlement.HasHealing)
                 {
                     long healCost = CalculateSettlementHealCost(player, settlement);
-                    terminal.WriteLine($"[H] Heal - Restore HP & Mana ({healCost}g)");
+                    terminal.WriteLine($"[H] {Loc.Get("dungeon.settlement_heal_option", healCost)}");
                 }
                 if (settlement.HasTrading)
-                    terminal.WriteLine("[T] Trade - Buy supplies");
+                    terminal.WriteLine($"[T] {Loc.Get("dungeon.trade_supplies")}");
                 if (settlement.HasLore)
                 {
                     int totalLore = settlement.LoreFragments.Length;
@@ -13193,10 +13188,10 @@ public class DungeonLocation : BaseLocation
                         string loreKey = $"{settlement.Id}_{System.Array.IndexOf(settlement.LoreFragments, frag)}";
                         if (player.SettlementLoreRead.Contains(loreKey)) readLore++;
                     }
-                    terminal.WriteLine($"[L] Lore - Ask about the depths ({readLore}/{totalLore} heard)");
+                    terminal.WriteLine($"[L] {Loc.Get("dungeon.settlement_lore_option", readLore, totalLore)}");
                 }
                 terminal.SetColor("gray");
-                terminal.WriteLine("[R] Return to dungeon");
+                terminal.WriteLine($"[R] {Loc.Get("dungeon.return_to_dungeon")}");
             }
             terminal.WriteLine("");
 
@@ -13223,7 +13218,7 @@ public class DungeonLocation : BaseLocation
                 case "Q":
                     stayInSettlement = false;
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"\"{(settlement.Id == "last_hearth" ? "Stay alive out there." : "Safe travels, friend.")}\"", "cyan");
+                    terminal.WriteLine($"\"{(settlement.Id == "last_hearth" ? Loc.Get("dungeon.settlement_farewell_hearth") : Loc.Get("dungeon.settlement_farewell"))}\"", "cyan");
                     await Task.Delay(1500);
                     break;
             }
@@ -13243,7 +13238,7 @@ public class DungeonLocation : BaseLocation
 
         if (player.Gold < cost)
         {
-            terminal.WriteLine($"\"{(settlement.Id == "rat_king_market" ? "No gold, no service. That's the rule down here." : "I'm sorry, you don't have enough gold.")}\"", "yellow");
+            terminal.WriteLine($"\"{(settlement.Id == "rat_king_market" ? Loc.Get("dungeon.settlement_no_gold_rat") : Loc.Get("dungeon.settlement_no_gold"))}\"", "yellow");
             await Task.Delay(2000);
             return;
         }
@@ -13450,9 +13445,9 @@ public class DungeonLocation : BaseLocation
         if (unreadText == null)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine($"\"{settlement.NPCName} leans back thoughtfully.\"", "cyan");
-            terminal.WriteLine("\"I've told you everything I know about these depths.", "white");
-            terminal.WriteLine(" You'll have to discover the rest yourself.\"", "white");
+            terminal.WriteLine(Loc.Get("dungeon.settlement_lore_exhausted_1", settlement.NPCName), "cyan");
+            terminal.WriteLine(Loc.Get("dungeon.settlement_lore_exhausted_2"), "white");
+            terminal.WriteLine(Loc.Get("dungeon.settlement_lore_exhausted_3"), "white");
             await terminal.PressAnyKey();
             return;
         }
@@ -13462,7 +13457,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"{settlement.NPCName} speaks...");
+        terminal.WriteLine(Loc.Get("dungeon.settlement_npc_speaks", settlement.NPCName));
         if (!GameConfig.ScreenReaderMode)
         {
             terminal.SetColor("gray");
@@ -13476,7 +13471,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine($"(Lore fragment discovered)");
+        terminal.WriteLine(Loc.Get("dungeon.lore_fragment_discovered"));
 
         // Broadcast to group
         BroadcastDungeonEvent($"\u001b[36m  {settlement.NPCName} shares knowledge of the depths.\u001b[0m");
@@ -13491,7 +13486,7 @@ public class DungeonLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("green");
-        terminal.WriteLine("*** SAFE HAVEN ***");
+        terminal.WriteLine(Loc.Get("dungeon.safe_haven_header"));
         terminal.WriteLine("");
 
         var player = GetCurrentPlayer();
@@ -13580,10 +13575,10 @@ public class DungeonLocation : BaseLocation
                     var ghost = fallen[dungeonRandom.Next(fallen.Count)];
                     terminal.WriteLine("");
                     terminal.SetColor("dark_cyan");
-                    terminal.WriteLine($"  A translucent figure shimmers beside you...");
+                    terminal.WriteLine(Loc.Get("dungeon.ghost_companion_appears"));
                     await Task.Delay(1000);
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine($"  {ghost.Companion.Name}: \"Still fighting, I see. Good.\"");
+                    terminal.WriteLine($"  {ghost.Companion.Name}: \"{Loc.Get("dungeon.ghost_companion_fighting")}\"");
                     await Task.Delay(1000);
 
                     // Grant a small combat buff
@@ -13592,25 +13587,25 @@ public class DungeonLocation : BaseLocation
                     {
                         player.TempAttackBonus += 15;
                         player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
-                        terminal.WriteLine($"  {ghost.Companion.Name}: \"Let me lend you my strength.\"");
+                        terminal.WriteLine($"  {ghost.Companion.Name}: \"{Loc.Get("dungeon.ghost_companion_strength")}\"");
                         terminal.SetColor("green");
-                        terminal.WriteLine($"  (+15 ATK for 3 combats)");
+                        terminal.WriteLine(Loc.Get("dungeon.ghost_companion_atk_buff"));
                     }
                     else if (ghostBuff == 1)
                     {
                         player.TempDefenseBonus += 15;
                         player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 3);
-                        terminal.WriteLine($"  {ghost.Companion.Name}: \"I'll watch your back. Like old times.\"");
+                        terminal.WriteLine($"  {ghost.Companion.Name}: \"{Loc.Get("dungeon.ghost_companion_watch_back")}\"");
                         terminal.SetColor("green");
-                        terminal.WriteLine($"  (+15 DEF for 3 combats)");
+                        terminal.WriteLine(Loc.Get("dungeon.ghost_companion_def_buff"));
                     }
                     else
                     {
                         long ghostHeal = player.MaxHP / 5;
                         player.HP = Math.Min(player.MaxHP, player.HP + ghostHeal);
-                        terminal.WriteLine($"  {ghost.Companion.Name}: \"Rest now. You'll need your strength.\"");
+                        terminal.WriteLine($"  {ghost.Companion.Name}: \"{Loc.Get("dungeon.ghost_companion_rest")}\"");
                         terminal.SetColor("green");
-                        terminal.WriteLine($"  (+{ghostHeal} HP)");
+                        terminal.WriteLine(Loc.Get("dungeon.ghost_companion_hp_buff", ghostHeal));
                     }
                     await Task.Delay(1500);
                 }
@@ -13621,34 +13616,34 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("bright_white");
-                terminal.WriteLine("  A gentle warmth fills the air...");
+                terminal.WriteLine(Loc.Get("dungeon.alethia_warmth"));
                 await Task.Delay(1500);
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("  A luminous figure appears — a woman of surpassing grace,");
-                terminal.WriteLine("  her form woven from fading starlight.");
+                terminal.WriteLine(Loc.Get("dungeon.alethia_appears_1"));
+                terminal.WriteLine(Loc.Get("dungeon.alethia_appears_2"));
                 await Task.Delay(1500);
 
                 var alethiaLines = new[]
                 {
                     new[] {
-                        "  \"He was my light, and I was his grace.\"",
-                        "  \"His sister... she loved him too. Not as a sister should.\"",
-                        "  \"When I close my eyes, I still smell night-blooming flowers.\""
+                        $"  \"{Loc.Get("dungeon.alethia_line_1a")}\"",
+                        $"  \"{Loc.Get("dungeon.alethia_line_1b")}\"",
+                        $"  \"{Loc.Get("dungeon.alethia_line_1c")}\""
                     },
                     new[] {
-                        "  \"Tell Aurelion... tell him his light is not gone.\"",
-                        "  \"It lives in everyone he ever healed.\"",
-                        "  \"Even in death, I am still his grace.\""
+                        $"  \"{Loc.Get("dungeon.alethia_line_2a")}\"",
+                        $"  \"{Loc.Get("dungeon.alethia_line_2b")}\"",
+                        $"  \"{Loc.Get("dungeon.alethia_line_2c")}\""
                     },
                     new[] {
-                        "  \"She came to me wearing shadows and smiling.\"",
-                        "  \"I did not fear her. She was his sister.\"",
-                        "  \"That was my mistake.\""
+                        $"  \"{Loc.Get("dungeon.alethia_line_3a")}\"",
+                        $"  \"{Loc.Get("dungeon.alethia_line_3b")}\"",
+                        $"  \"{Loc.Get("dungeon.alethia_line_3c")}\""
                     },
                     new[] {
-                        "  \"Do not hate her. She is consumed by something\"",
-                        "  \"older than hate. Older than love.\"",
-                        "  \"She could not have what she wanted. So she destroyed it.\""
+                        $"  \"{Loc.Get("dungeon.alethia_line_4a")}\"",
+                        $"  \"{Loc.Get("dungeon.alethia_line_4b")}\"",
+                        $"  \"{Loc.Get("dungeon.alethia_line_4c")}\""
                     }
                 };
 
@@ -13668,13 +13663,13 @@ public class DungeonLocation : BaseLocation
 
                 await Task.Delay(1000);
                 terminal.SetColor("bright_white");
-                terminal.WriteLine("  She touches your forehead. Warmth floods through you.");
+                terminal.WriteLine(Loc.Get("dungeon.alethia_touch"));
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  (+{alethiaHeal} HP restored. Mana restored.)");
+                terminal.WriteLine(Loc.Get("dungeon.alethia_restore", alethiaHeal));
                 await Task.Delay(1500);
 
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine("  The light fades. The warmth lingers.");
+                terminal.WriteLine(Loc.Get("dungeon.alethia_fades"));
                 await terminal.PressAnyKey();
             }
 
@@ -15139,7 +15134,9 @@ public class DungeonLocation : BaseLocation
         DungeonRoom room, UsurperRemake.Systems.StoryProgressionSystem story)
     {
         // Vex's quest can trigger anywhere, but depends on how close he is to death
-        int daysWithVex = UsurperRemake.Systems.StoryProgressionSystem.Instance.CurrentGameDay - vex.RecruitedDay;
+        int daysWithVex = vex.RecruitedDate != DateTime.MinValue
+            ? Math.Max(0, (int)(DateTime.UtcNow - vex.RecruitedDate).TotalDays)
+            : Math.Max(0, UsurperRemake.Systems.StoryProgressionSystem.Instance.CurrentGameDay - vex.RecruitedDay);
 
         // Only trigger if he's been with player for at least 10 days
         if (daysWithVex < 10)
@@ -15710,25 +15707,25 @@ public class DungeonLocation : BaseLocation
         string betrayedFor = player.BetrayedForGodName;
 
         terminal.SetColor("red");
-        terminal.WriteLine($"A cold presence fills the air...");
+        terminal.WriteLine(Loc.Get("dungeon.divine_cold_presence"));
         await Task.Delay(1000);
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"\"{player.Name2}... You dare worship at another's altar?\"");
+        terminal.WriteLine(Loc.Get("dungeon.divine_dare_worship", player.Name2));
         await Task.Delay(1500);
 
         terminal.SetColor("red");
         var punishments = new[]
         {
-            $"The voice of {godName} echoes in your mind, sapping your strength!",
-            $"{godName}'s displeasure manifests as a chilling weakness in your limbs!",
-            $"You feel {godName}'s watchful gaze - judging, disappointed, angry!"
+            Loc.Get("dungeon.divine_minor_1", godName),
+            Loc.Get("dungeon.divine_minor_2", godName),
+            Loc.Get("dungeon.divine_minor_3", godName)
         };
         terminal.WriteLine(punishments[dungeonRandom.Next(punishments.Length)]);
         await Task.Delay(1500);
 
         terminal.SetColor("yellow");
-        terminal.WriteLine("Your attacks will be weakened in the coming battle.");
+        terminal.WriteLine(Loc.Get("dungeon.divine_attacks_weakened"));
     }
 
     private async Task ApplyModerateDivinePunishment(Character player)
@@ -15737,11 +15734,11 @@ public class DungeonLocation : BaseLocation
         string betrayedFor = player.BetrayedForGodName;
 
         terminal.SetColor("bright_red");
-        terminal.WriteLine($"The dungeon trembles! Divine fury descends!");
+        terminal.WriteLine(Loc.Get("dungeon.divine_moderate_trembles"));
         await Task.Delay(1000);
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"\"FAITHLESS ONE! You gave to {betrayedFor} what was MINE!\"");
+        terminal.WriteLine(Loc.Get("dungeon.divine_moderate_faithless", betrayedFor));
         await Task.Delay(1500);
 
         // Deal HP damage
@@ -15749,16 +15746,16 @@ public class DungeonLocation : BaseLocation
         player.HP = Math.Max(1, player.HP - damage);
 
         terminal.SetColor("red");
-        terminal.WriteLine($"Divine lightning strikes you for {damage} damage!");
+        terminal.WriteLine(Loc.Get("dungeon.divine_lightning_damage", damage));
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}");
         await Task.Delay(1500);
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"\"Let this pain remind you of your broken vows!\"");
+        terminal.WriteLine(Loc.Get("dungeon.divine_broken_vows"));
         await Task.Delay(1000);
 
         terminal.SetColor("yellow");
-        terminal.WriteLine("Your strength and defense are significantly reduced!");
+        terminal.WriteLine(Loc.Get("dungeon.divine_strength_defense_reduced"));
     }
 
     private async Task ApplySevereDivinePunishment(Character player)
@@ -15769,12 +15766,12 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("bright_red");
         WriteThickDivider(66, "bright_red");
         terminal.SetColor("bright_red");
-        terminal.WriteLine("              THE HEAVENS THEMSELVES CRY OUT IN RAGE!");
+        terminal.WriteLine($"              {Loc.Get("dungeon.divine_heavens_rage")}");
         WriteThickDivider(66, "bright_red");
         await Task.Delay(1500);
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"\"WRETCHED TRAITOR! {betrayedFor.ToUpper()} CANNOT PROTECT YOU FROM MY WRATH!\"");
+        terminal.WriteLine(Loc.Get("dungeon.divine_severe_traitor", betrayedFor.ToUpper()));
         await Task.Delay(1500);
 
         // Severe HP damage
@@ -15782,7 +15779,7 @@ public class DungeonLocation : BaseLocation
         player.HP = Math.Max(1, player.HP - damage);
 
         terminal.SetColor("red");
-        terminal.WriteLine($"Divine fire consumes you for {damage} damage!");
+        terminal.WriteLine(Loc.Get("dungeon.divine_fire_damage", damage));
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}");
         await Task.Delay(1000);
 
@@ -15791,7 +15788,7 @@ public class DungeonLocation : BaseLocation
         {
             long manaDrain = player.Mana / 2;
             player.Mana = Math.Max(0, player.Mana - manaDrain);
-            terminal.WriteLine($"Your magical essence is torn away! -{manaDrain} Mana!");
+            terminal.WriteLine(Loc.Get("dungeon.divine_mana_torn", manaDrain));
         }
         await Task.Delay(1000);
 
@@ -15804,26 +15801,26 @@ public class DungeonLocation : BaseLocation
             {
                 case "Blind":
                     player.Blind = true;
-                    terminal.WriteLine("Divine light sears your eyes - you are BLINDED!");
+                    terminal.WriteLine(Loc.Get("dungeon.divine_blinded"));
                     break;
                 case "Plague":
                     player.Plague = true;
-                    terminal.WriteLine("Pestilence courses through your veins - you have the PLAGUE!");
+                    terminal.WriteLine(Loc.Get("dungeon.divine_plague"));
                     break;
                 case "Measles":
                     player.Measles = true;
-                    terminal.WriteLine("Your skin erupts in painful sores - MEASLES!");
+                    terminal.WriteLine(Loc.Get("dungeon.divine_measles"));
                     break;
             }
             await Task.Delay(1000);
         }
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"\"Remember this agony, {player.Name2}. My patience is NOT infinite.\"");
+        terminal.WriteLine(Loc.Get("dungeon.divine_remember_agony", player.Name2));
         await Task.Delay(1500);
 
         terminal.SetColor("red");
-        terminal.WriteLine("You are severely weakened. Survival is not guaranteed...");
+        terminal.WriteLine(Loc.Get("dungeon.divine_severely_weakened"));
     }
 
     #endregion
@@ -16435,7 +16432,7 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("gray");
                 term.WriteLine(" - Quickbar (spells/abilities)");
                 term.SetColor("white");
-                term.WriteLine("  Slash commands:");
+                term.WriteLine($"  {Loc.Get("dungeon.follower_slash_commands")}:");
                 term.SetColor("gray");
                 term.WriteLine("    /party  /stats  /health  /gold  /quests");
                 term.WriteLine("    /say  /tell  /who  /help");
@@ -16447,13 +16444,13 @@ public class DungeonLocation : BaseLocation
             case "stats":
             case "status":
                 term.SetColor("bright_cyan");
-                term.WriteLine($"  {player.DisplayName} — Level {player.Level} {player.Race} {player.ClassName}");
+                term.WriteLine($"  {player.DisplayName} — {Loc.Get("dungeon.level_label")} {player.Level} {player.Race} {player.ClassName}");
                 term.SetColor("white");
-                term.WriteLine($"  HP: {player.HP}/{player.MaxHP}  Mana: {player.Mana}/{player.MaxMana}  Sta: {player.CurrentCombatStamina}/{player.Stamina}");
+                term.WriteLine($"  {Loc.Get("dungeon.hp_label")}: {player.HP}/{player.MaxHP}  {Loc.Get("dungeon.mana_label")}: {player.Mana}/{player.MaxMana}  {Loc.Get("dungeon.sta_label")}: {player.CurrentCombatStamina}/{player.Stamina}");
                 term.SetColor("gray");
-                term.WriteLine($"  STR:{player.Strength} DEF:{player.Defense} DEX:{player.Dexterity} AGI:{player.Agility}");
-                term.WriteLine($"  CON:{player.Constitution} INT:{player.Intelligence} WIS:{player.Wisdom} CHA:{player.Charisma}");
-                term.WriteLine($"  XP: {player.Experience:N0}  Gold: {player.Gold:N0}");
+                term.WriteLine($"  {Loc.Get("stats.str")}:{player.Strength} {Loc.Get("stats.def")}:{player.Defense} {Loc.Get("stats.dex")}:{player.Dexterity} {Loc.Get("stats.agi")}:{player.Agility}");
+                term.WriteLine($"  {Loc.Get("stats.con")}:{player.Constitution} {Loc.Get("stats.int")}:{player.Intelligence} {Loc.Get("stats.wis")}:{player.Wisdom} {Loc.Get("stats.cha")}:{player.Charisma}");
+                term.WriteLine($"  {Loc.Get("dungeon.xp_label")}: {player.Experience:N0}  {Loc.Get("ui.gold")}: {player.Gold:N0}");
                 return true;
 
             case "h":
@@ -16463,19 +16460,19 @@ public class DungeonLocation : BaseLocation
                 int mpPct = player.MaxMana > 0 ? (int)(player.Mana * 100 / player.MaxMana) : 0;
                 string hpColor = hpPct > 50 ? "green" : hpPct > 25 ? "yellow" : "red";
                 term.SetColor(hpColor);
-                term.WriteLine($"  HP: {player.HP}/{player.MaxHP} ({hpPct}%)");
+                term.WriteLine($"  {Loc.Get("dungeon.hp_label")}: {player.HP}/{player.MaxHP} ({hpPct}%)");
                 term.SetColor("blue");
-                term.WriteLine($"  MP: {player.Mana}/{player.MaxMana} ({mpPct}%)");
+                term.WriteLine($"  {Loc.Get("dungeon.mp_label")}: {player.Mana}/{player.MaxMana} ({mpPct}%)");
                 term.SetColor("yellow");
-                term.WriteLine($"  Potions: HP={player.Healing}  MP={player.ManaPotions}");
+                term.WriteLine($"  {Loc.Get("dungeon.potions_label")}: {Loc.Get("dungeon.hp_label")}={player.Healing}  {Loc.Get("dungeon.mp_label")}={player.ManaPotions}");
                 return true;
 
             case "g":
             case "gold":
                 term.SetColor("yellow");
-                term.WriteLine($"  Gold on hand: {player.Gold:N0}");
+                term.WriteLine($"  {Loc.Get("dungeon.gold_on_hand")}: {player.Gold:N0}");
                 term.SetColor("gray");
-                term.WriteLine($"  Bank balance: {player.BankGold:N0}");
+                term.WriteLine($"  {Loc.Get("dungeon.bank_balance")}: {player.BankGold:N0}");
                 return true;
 
             case "p":
@@ -16511,7 +16508,7 @@ public class DungeonLocation : BaseLocation
                             ? (GameConfig.ScreenReaderMode ? "*" : "\u001b[1;33m★\u001b[0m")
                             : (GameConfig.ScreenReaderMode ? "-" : "·");
                         string suffix = isMe ? " \u001b[36m(you)\u001b[0m" : "";
-                        term.WriteLine($"  {prefix} \u001b[{mhpColor}m{memberPlayer.DisplayName}\u001b[0m Lv{memberPlayer.Level} {memberPlayer.ClassName} — HP:{memberPlayer.HP}/{memberPlayer.MaxHP} ({mhpPct}%) MP:{memberPlayer.Mana}/{memberPlayer.MaxMana}{suffix}");
+                        term.WriteLine($"  {prefix} \u001b[{mhpColor}m{memberPlayer.DisplayName}\u001b[0m {Loc.Get("dungeon.lv_label")}{memberPlayer.Level} {memberPlayer.ClassName} — {Loc.Get("dungeon.hp_label")}:{memberPlayer.HP}/{memberPlayer.MaxHP} ({mhpPct}%) {Loc.Get("dungeon.mp_label")}:{memberPlayer.Mana}/{memberPlayer.MaxMana}{suffix}");
                     }
                 }
                 return true;
@@ -16644,17 +16641,17 @@ public class DungeonLocation : BaseLocation
                 term.WriteLine("");
                 term.SetColor("white");
                 if (hasBackpackItems)
-                    term.Write("  [#] Equip item");
+                    term.Write($"  [#] {Loc.Get("dungeon.equip_item")}");
                 if (hasEquippedItems)
                 {
                     if (hasBackpackItems) term.Write("  ");
-                    term.Write("[U] Unequip");
+                    term.Write($"[U] {Loc.Get("dungeon.unequip_label")}");
                 }
                 term.WriteLine("");
             }
 
             term.SetColor("gray");
-            term.WriteLine("  [Enter] Close");
+            term.WriteLine($"  [{Loc.Get("dungeon.enter_key")}] {Loc.Get("dungeon.close")}");
             term.Write("  > ");
             var choice = await term.GetInput("");
             var trimChoice = choice.Trim();
@@ -16669,7 +16666,7 @@ public class DungeonLocation : BaseLocation
                 if (!item.CanUse(player))
                 {
                     term.SetColor("red");
-                    term.WriteLine($"  You cannot equip {item.Name}.");
+                    term.WriteLine(Loc.Get("dungeon.cannot_equip_item", item.Name));
                     await Task.Delay(1500);
                     continue;
                 }
@@ -16683,7 +16680,7 @@ public class DungeonLocation : BaseLocation
                     {
                         player.Inventory.RemoveAt(itemNum - 1);
                         term.SetColor("bright_green");
-                        term.WriteLine($"  Equipped {knownEquip.Name}!");
+                        term.WriteLine(Loc.Get("dungeon.equipped_item_self", knownEquip.Name));
                         if (!string.IsNullOrEmpty(equipMsg))
                         {
                             term.SetColor("gray");
@@ -16812,9 +16809,9 @@ public class DungeonLocation : BaseLocation
             player.Statistics.RecordPotionUsed(actualHeal);
 
             term.SetColor("bright_green");
-            term.WriteLine($"  You drink a healing potion and recover {actualHeal:N0} HP!");
+            term.WriteLine(Loc.Get("dungeon.follower_drink_potion", actualHeal));
             term.SetColor("cyan");
-            term.WriteLine($"  HP: {player.HP}/{player.MaxHP}    Potions: {player.Healing}/{player.MaxPotions}");
+            term.WriteLine($"  {Loc.Get("dungeon.hp_label")}: {player.HP}/{player.MaxHP}    {Loc.Get("dungeon.potions_label")}: {player.Healing}/{player.MaxPotions}");
         }
         await Task.Delay(1500);
     }
@@ -16826,15 +16823,15 @@ public class DungeonLocation : BaseLocation
     {
         term.ClearScreen();
         if (GameConfig.ScreenReaderMode)
-            term.WriteLine("CHARACTER STATUS", "bright_cyan");
+            term.WriteLine(Loc.Get("dungeon.character_status_header"), "bright_cyan");
         else
-            term.WriteLine("═══ CHARACTER STATUS ═══", "bright_cyan");
+            term.WriteLine($"\u2550\u2550\u2550 {Loc.Get("dungeon.character_status_header")} \u2550\u2550\u2550", "bright_cyan");
         term.WriteLine("");
 
         term.SetColor("white");
         term.WriteLine($"  {player.DisplayName}");
         term.SetColor("gray");
-        term.WriteLine($"  Level {player.Level} {player.Race} {player.ClassName}");
+        term.WriteLine($"  {Loc.Get("dungeon.level_label")} {player.Level} {player.Race} {player.ClassName}");
         term.WriteLine("");
 
         // HP bar
@@ -16842,7 +16839,7 @@ public class DungeonLocation : BaseLocation
         hpPct = Math.Clamp(hpPct, 0, 20);
         string hpBar = new string('#', hpPct) + new string('.', 20 - hpPct);
         term.SetColor("white");
-        term.Write("  HP:   ");
+        term.Write($"  {Loc.Get("dungeon.hp_label")}:   ");
         term.SetColor("red");
         term.Write($"[{hpBar}]");
         term.SetColor("white");
@@ -16852,7 +16849,7 @@ public class DungeonLocation : BaseLocation
         int mpPct = player.MaxMana > 0 ? (int)(player.Mana * 20 / player.MaxMana) : 0;
         mpPct = Math.Clamp(mpPct, 0, 20);
         string mpBar = new string('#', mpPct) + new string('.', 20 - mpPct);
-        term.Write("  Mana: ");
+        term.Write($"  {Loc.Get("dungeon.mana_label")}: ");
         term.SetColor("blue");
         term.Write($"[{mpBar}]");
         term.SetColor("white");
@@ -16862,7 +16859,7 @@ public class DungeonLocation : BaseLocation
         int stPct = player.MaxCombatStamina > 0 ? (int)(player.CurrentCombatStamina * 20 / player.MaxCombatStamina) : 0;
         stPct = Math.Clamp(stPct, 0, 20);
         string stBar = new string('#', stPct) + new string('.', 20 - stPct);
-        term.Write("  Stam: ");
+        term.Write($"  {Loc.Get("dungeon.sta_label")}: ");
         term.SetColor("green");
         term.Write($"[{stBar}]");
         term.SetColor("white");
@@ -16870,13 +16867,13 @@ public class DungeonLocation : BaseLocation
 
         term.WriteLine("");
         term.SetColor("gray");
-        term.WriteLine($"  STR: {player.Strength,-5} DEF: {player.Defence,-5} DEX: {player.Dexterity,-5} AGI: {player.Agility}");
-        term.WriteLine($"  CON: {player.Constitution,-5} INT: {player.Intelligence,-5} WIS: {player.Wisdom,-5} CHA: {player.Charisma}");
+        term.WriteLine($"  {Loc.Get("stats.str")}: {player.Strength,-5} {Loc.Get("stats.def")}: {player.Defence,-5} {Loc.Get("stats.dex")}: {player.Dexterity,-5} {Loc.Get("stats.agi")}: {player.Agility}");
+        term.WriteLine($"  {Loc.Get("stats.con")}: {player.Constitution,-5} {Loc.Get("stats.int")}: {player.Intelligence,-5} {Loc.Get("stats.wis")}: {player.Wisdom,-5} {Loc.Get("stats.cha")}: {player.Charisma}");
         term.WriteLine("");
         term.SetColor("yellow");
-        term.WriteLine($"  Gold: {player.Gold:N0}    XP: {player.Experience:N0}");
+        term.WriteLine($"  {Loc.Get("ui.gold")}: {player.Gold:N0}    {Loc.Get("dungeon.xp_label")}: {player.Experience:N0}");
         term.SetColor("green");
-        term.WriteLine($"  Potions: {player.Healing}/{player.MaxPotions}");
+        term.WriteLine($"  {Loc.Get("dungeon.potions_label")}: {player.Healing}/{player.MaxPotions}");
         term.WriteLine("");
         await term.PressAnyKey();
     }

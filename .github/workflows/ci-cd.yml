@@ -95,7 +95,7 @@ jobs:
 
       - name: Write version.txt
         run: |
-          VER=$(grep 'public const string Version' Scripts/Core/GameConfig.cs | sed 's/.*"\(.*\)".*/\1/')
+          VER=$(grep 'public const string Version =' Scripts/Core/GameConfig.cs | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo -n "$VER" > build/version.txt
           echo "Version: $VER"
 
@@ -750,6 +750,16 @@ jobs:
 
           # Upload tarball
           $SCP server.tar.gz "ubuntu@$HOST:/tmp/usurper-reborn-server.tar.gz"
+
+          # Warn players: insert shutdown command into admin_commands table (2 minute countdown)
+          # The MUD server polls admin_commands every 3 seconds and will broadcast warnings
+          $SSH "sudo sqlite3 /var/usurper/usurper_online.db \
+            \"INSERT INTO admin_commands (command, args) VALUES ('shutdown', '{\\\"seconds\\\": 120, \\\"reason\\\": \\\"Server update to ${VERSION}\\\"}');\"" \
+            || echo "Warning: Could not send shutdown warning (server may not be running)"
+
+          # Wait for the 2-minute countdown plus a small buffer
+          echo "Waiting 130 seconds for graceful shutdown..."
+          sleep 130
 
           # Stop services, extract, restart
           $SSH "\

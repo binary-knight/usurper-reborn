@@ -376,6 +376,7 @@ namespace UsurperRemake.Systems
 
         // Noble Title (knighthood from king)
         public string? NobleTitle { get; set; }
+        public bool IsKnighted { get; set; }
 
         // Royal Mercenaries (hired bodyguards for king's dungeon party)
         public List<RoyalMercenarySaveData>? RoyalMercenaries { get; set; }
@@ -558,6 +559,8 @@ namespace UsurperRemake.Systems
         public int FoodBuffCombats { get; set; }
         public float FoodBuffValue { get; set; }
         public int MealsToday { get; set; }
+        public int InnDuelsToday { get; set; }
+        public bool TavernStrangerTalkedToday { get; set; }
 
         // Dungeon Settlements & Wilderness (v0.49.4)
         public List<string> VisitedSettlements { get; set; } = new();
