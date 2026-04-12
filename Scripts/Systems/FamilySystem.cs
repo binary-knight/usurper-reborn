@@ -39,7 +39,7 @@ namespace UsurperRemake.Systems
         public void RegisterChild(Child child)
         {
             if (child == null) return;
-            if (_children.Any(c => c.Name == child.Name && c.MotherID == child.MotherID && c.FatherID == child.FatherID))
+            if (_children.Any(c => c.BirthDate == child.BirthDate && c.MotherID == child.MotherID && c.FatherID == child.FatherID))
                 return; // Prevent duplicates
 
             _children.Add(child);
@@ -646,8 +646,8 @@ namespace UsurperRemake.Systems
                     LastParentingDay = data.LastParentingDay
                 };
 
-                // Prevent duplicates (same name + same parents)
-                if (!_children.Any(c => c.Name == child.Name && c.MotherID == child.MotherID && c.FatherID == child.FatherID))
+                // Prevent duplicates (same birth date + same parents)
+                if (!_children.Any(c => c.BirthDate == child.BirthDate && c.MotherID == child.MotherID && c.FatherID == child.FatherID))
                     _children.Add(child);
             }
 

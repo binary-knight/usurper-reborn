@@ -1440,14 +1440,14 @@ public static class ClassAbilitySystem
         {
             Id = "flametongue",
             Name = "Flametongue",
-            Description = "Enchant your weapon with fire for 5 rounds. Melee attacks deal bonus fire damage.",
+            Description = "Enchant your weapon with fire for 5 rounds. Melee attacks deal bonus fire damage and gain +15% attack power.",
             LevelRequired = 1,
             ManaCost = 15,
             Cooldown = 0,
             Type = AbilityType.Buff,
             Duration = 5,
             SpecialEffect = "shaman_enchant_fire",
-            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Maul, WeaponType.Polearm },
+            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Hammer, WeaponType.Flail, WeaponType.Maul },
             AvailableToClasses = new[] { CharacterClass.MysticShaman }
         },
         ["healing_totem"] = new ClassAbility
@@ -1475,7 +1475,7 @@ public static class ClassAbilitySystem
             DefenseBonus = 50,
             Duration = 5,
             SpecialEffect = "shaman_enchant_earth",
-            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Maul, WeaponType.Polearm },
+            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Hammer, WeaponType.Flail, WeaponType.Maul },
             AvailableToClasses = new[] { CharacterClass.MysticShaman }
         },
         ["earthbind_totem"] = new ClassAbility
@@ -1516,7 +1516,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Buff,
             Duration = 5,
             SpecialEffect = "shaman_enchant_frost",
-            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Maul, WeaponType.Polearm },
+            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Hammer, WeaponType.Flail, WeaponType.Maul },
             AvailableToClasses = new[] { CharacterClass.MysticShaman }
         },
         ["searing_totem"] = new ClassAbility
@@ -1544,7 +1544,7 @@ public static class ClassAbilitySystem
             Type = AbilityType.Buff,
             Duration = 5,
             SpecialEffect = "shaman_enchant_storm",
-            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Maul, WeaponType.Polearm },
+            RequiredWeaponTypes = new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Hammer, WeaponType.Flail, WeaponType.Maul },
             AvailableToClasses = new[] { CharacterClass.MysticShaman }
         },
         ["windfury_totem"] = new ClassAbility

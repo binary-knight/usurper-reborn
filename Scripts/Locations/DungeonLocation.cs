@@ -1958,6 +1958,39 @@ public class DungeonLocation : BaseLocation
                     lines.Add((Loc.Get("dungeon.react_veloura_other_1"), "gray"));
                     lines.Add((Loc.Get("dungeon.react_veloura_other_2"), "white"));
                 }
+                // Mira's personal reaction to Veloura's fate
+                if (CompanionSystem.Instance?.IsCompanionActive(CompanionId.Mira) == true)
+                {
+                    lines.Add(("", "white")); // blank line
+                    if (outcome == BossOutcome.Saved)
+                    {
+                        lines.Add(("Mira sinks to her knees, sobbing.", "white"));
+                        lines.Add(("\"She remembered. At the end, she remembered who she was.\"", "bright_cyan"));
+                        lines.Add(("\"Thank you. For letting me see that.\"", "bright_cyan"));
+                        lines.Add(("Mira presses her hands together — the first real prayer she has made in years.", "white"));
+                    }
+                    else if (outcome == BossOutcome.Defeated)
+                    {
+                        if (approach == "aggressive")
+                        {
+                            lines.Add(("Mira stares at the place where Veloura fell. Her face is stone.", "white"));
+                            lines.Add(("\"She was already dead. The corruption killed her long before we did.\"", "bright_cyan"));
+                            lines.Add(("She says it like she's trying to convince herself.", "gray"));
+                        }
+                        else
+                        {
+                            lines.Add(("Mira kneels where Veloura fell and touches the ground.", "white"));
+                            lines.Add(("\"Rest now. No more corruption. No more pain.\"", "bright_cyan"));
+                            lines.Add(("\"I forgive you. For all of it.\"", "bright_cyan"));
+                        }
+                    }
+                    else if (outcome == BossOutcome.Allied)
+                    {
+                        lines.Add(("Mira's eyes are wide. \"An alliance? With her?\"", "bright_cyan"));
+                        lines.Add(("\"I... I don't know what to feel. The goddess I abandoned just became our ally.\"", "bright_cyan"));
+                        lines.Add(("\"Maybe faith isn't about certainty. Maybe it never was.\"", "bright_cyan"));
+                    }
+                }
                 break;
 
             case OldGodType.Thorgrim:
@@ -5180,9 +5213,28 @@ public class DungeonLocation : BaseLocation
         if (dungeonRandom.NextDouble() < 0.3)
         {
             int potions = dungeonRandom.Next(1, 3);
-            player.Healing = Math.Min(player.MaxPotions, player.Healing + potions);
-            terminal.SetColor("green");
-            terminal.WriteLine(Loc.Get("dungeon.treasure_potions", potions));
+            int hpRoom = player.MaxPotions - (int)player.Healing;
+            int hpGained = Math.Min(potions, Math.Max(0, hpRoom));
+            int leftover = potions - hpGained;
+
+            if (hpGained > 0)
+            {
+                player.Healing += hpGained;
+                terminal.SetColor("green");
+                terminal.WriteLine(Loc.Get("dungeon.treasure_potions", hpGained));
+            }
+            // Mana class overflow: leftover potions become mana potions
+            if (leftover > 0 && player.IsManaClass)
+            {
+                int mpRoom = player.MaxManaPotions - (int)player.ManaPotions;
+                int mpGained = Math.Min(leftover, Math.Max(0, mpRoom));
+                if (mpGained > 0)
+                {
+                    player.ManaPotions += mpGained;
+                    terminal.SetColor("blue");
+                    terminal.WriteLine($"You also find {mpGained} mana potion{(mpGained > 1 ? "s" : "")}!");
+                }
+            }
         }
 
         // Captain Aldric's Mission — treasure objective
@@ -6803,9 +6855,33 @@ public class DungeonLocation : BaseLocation
             else if (roll < 70)
             {
                 int potions = dungeonRandom.Next(1, 4);
-                currentPlayer.Healing = Math.Min(currentPlayer.Healing + potions, currentPlayer.MaxPotions);
-                terminal.SetColor("magenta");
-                terminal.WriteLine(Loc.Get("dungeon.find_healing_potions", potions));
+                int hpRoom = currentPlayer.MaxPotions - (int)currentPlayer.Healing;
+                int hpGained = Math.Min(potions, Math.Max(0, hpRoom));
+                int leftover = potions - hpGained;
+
+                if (hpGained > 0)
+                {
+                    currentPlayer.Healing += hpGained;
+                    terminal.SetColor("magenta");
+                    terminal.WriteLine(Loc.Get("dungeon.find_healing_potions", hpGained));
+                }
+                // Mana class overflow: leftover potions become mana potions
+                if (leftover > 0 && currentPlayer.IsManaClass)
+                {
+                    int mpRoom = currentPlayer.MaxManaPotions - (int)currentPlayer.ManaPotions;
+                    int mpGained = Math.Min(leftover, Math.Max(0, mpRoom));
+                    if (mpGained > 0)
+                    {
+                        currentPlayer.ManaPotions += mpGained;
+                        terminal.SetColor("blue");
+                        terminal.WriteLine($"You find {mpGained} mana potion{(mpGained > 1 ? "s" : "")}!");
+                    }
+                }
+                if (hpGained == 0 && (leftover == 0 || !currentPlayer.IsManaClass))
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("You find some potions, but you're already fully stocked.");
+                }
             }
             else if (roll < 90)
             {
@@ -8319,28 +8395,43 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         // Give 1-5 potions, but don't exceed max
+        // Mana classes can find mana potions too — healing potions prioritized, overflow goes to mana
         int potionsFound = dungeonRandom.Next(1, 6);
-        int currentPotions = (int)currentPlayer.Healing;
-        int maxPotions = currentPlayer.MaxPotions;
-        int roomAvailable = maxPotions - currentPotions;
+        int hpRoom = currentPlayer.MaxPotions - (int)currentPlayer.Healing;
+        int mpRoom = currentPlayer.IsManaClass ? currentPlayer.MaxManaPotions - (int)currentPlayer.ManaPotions : 0;
 
-        if (roomAvailable <= 0)
+        if (hpRoom <= 0 && mpRoom <= 0)
         {
             terminal.WriteLine(Loc.Get("dungeon.potion_cache_max"), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.potion_cache_leave"), "gray");
         }
         else
         {
-            int actualGained = Math.Min(potionsFound, roomAvailable);
-            currentPlayer.Healing += actualGained;
+            int hpGained = Math.Min(potionsFound, Math.Max(0, hpRoom));
+            int leftover = potionsFound - hpGained;
+            int mpGained = Math.Min(leftover, Math.Max(0, mpRoom));
 
-            terminal.SetColor("green");
-            terminal.WriteLine(Loc.Get("dungeon.potion_cache_collect", actualGained));
-            terminal.WriteLine(Loc.Get("dungeon.potion_cache_count", currentPlayer.Healing, currentPlayer.MaxPotions), "cyan");
-
-            if (actualGained < potionsFound)
+            if (hpGained > 0)
             {
-                terminal.WriteLine(Loc.Get("dungeon.potion_cache_left_behind", potionsFound - actualGained), "gray");
+                currentPlayer.Healing += hpGained;
+                terminal.SetColor("green");
+                terminal.WriteLine(Loc.Get("dungeon.potion_cache_collect", hpGained));
+            }
+            if (mpGained > 0)
+            {
+                currentPlayer.ManaPotions += mpGained;
+                terminal.SetColor("blue");
+                terminal.WriteLine($"You also find {mpGained} mana potion{(mpGained > 1 ? "s" : "")}!");
+            }
+
+            terminal.WriteLine(Loc.Get("dungeon.potion_cache_count", currentPlayer.Healing, currentPlayer.MaxPotions), "cyan");
+            if (currentPlayer.IsManaClass)
+                terminal.WriteLine($"Mana potions: {currentPlayer.ManaPotions}/{currentPlayer.MaxManaPotions}", "bright_blue");
+
+            int totalGained = hpGained + mpGained;
+            if (totalGained < potionsFound)
+            {
+                terminal.WriteLine(Loc.Get("dungeon.potion_cache_left_behind", potionsFound - totalGained), "gray");
             }
         }
 

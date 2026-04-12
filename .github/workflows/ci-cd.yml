@@ -93,6 +93,12 @@ jobs:
           echo "Build output:"
           ls -lh build/ | head -5
 
+      - name: Write version.txt
+        run: |
+          VER=$(grep 'public const string Version' Scripts/Core/GameConfig.cs | sed 's/.*"\(.*\)".*/\1/')
+          echo -n "$VER" > build/version.txt
+          echo "Version: $VER"
+
       - name: Add launchers (Windows)
         if: matrix.platform == 'windows'
         run: |
@@ -302,9 +308,8 @@ jobs:
 
       - name: Install wine + rcedit (for icon patching)
         run: |
-          sudo dpkg --add-architecture i386
           sudo apt-get update -qq
-          sudo apt-get install -y -qq wine64 > /dev/null 2>&1
+          sudo apt-get install -y -qq wine64
           curl -fSL -o /tmp/rcedit-x64.exe \
             "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
 
@@ -471,8 +476,8 @@ jobs:
           fi
 
           # Verify critical files
-          [ ! -f "steam-build/depot-windows/steam_api64.dll" ] && echo "CRITICAL: steam_api64.dll missing!"
-          [ ! -f "steam-build/depot-linux/libsteam_api.so" ] && echo "CRITICAL: libsteam_api.so missing!"
+          [ ! -f "steam-build/depot-windows/steam_api64.dll" ] && echo "CRITICAL: steam_api64.dll missing!" || true
+          [ ! -f "steam-build/depot-linux/libsteam_api.so" ] && echo "CRITICAL: libsteam_api.so missing!" || true
 
       - name: Bundle WezTerm into Steam depots
         run: |
@@ -508,9 +513,8 @@ jobs:
       # causing macOS Gatekeeper to block it with "damaged" error.
       - name: Patch WezTerm icon (Windows only)
         run: |
-          sudo dpkg --add-architecture i386
           sudo apt-get update -qq
-          sudo apt-get install -y -qq wine64 > /dev/null 2>&1
+          sudo apt-get install -y -qq wine64
           curl -fSL -o /tmp/rcedit-x64.exe \
             "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
           wine /tmp/rcedit-x64.exe \

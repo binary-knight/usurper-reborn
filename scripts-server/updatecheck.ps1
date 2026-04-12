@@ -55,8 +55,16 @@ function Log($msg) {
 
 # ─── Get current version ─────────────────────
 function Get-CurrentVersion {
+    # Try version.txt first (written by updater)
     if (Test-Path $VersionFile) {
-        return (Get-Content $VersionFile -Raw).Trim()
+        $v = (Get-Content $VersionFile -Raw).Trim()
+        if ($v) { return $v }
+    }
+    # Fall back to reading FileVersion from the exe
+    if (Test-Path $GameBinary) {
+        $info = (Get-Item $GameBinary).VersionInfo
+        if ($info.FileVersion) { return $info.FileVersion.Trim() }
+        if ($info.ProductVersion) { return $info.ProductVersion.Trim() }
     }
     return "unknown"
 }

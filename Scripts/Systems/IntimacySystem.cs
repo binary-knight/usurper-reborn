@@ -377,16 +377,33 @@ namespace UsurperRemake.Systems
             // Update spouse's child count in RomanceTracker
             RomanceTracker.Instance.AddChildToSpouse(partner.ID);
 
+            string babyGender = child.Sex == CharacterSex.Male ? Get("intimacy.baby_boy") : Get("intimacy.baby_girl");
+
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("  ════════════════════════════════════════════════════════════════");
             }
             terminal.SetColor("bright_green");
-            string babyGender = child.Sex == CharacterSex.Male ? Get("intimacy.baby_boy") : Get("intimacy.baby_girl");
             terminal.WriteLine($"  {Get("intimacy.baby_born", babyGender)}");
+
+            // Let the player name their child
+            terminal.WriteLine("");
             terminal.SetColor("bright_yellow");
             string babyPronoun = child.Sex == CharacterSex.Male ? Get("intimacy.pronoun_him") : Get("intimacy.pronoun_her");
+            terminal.WriteLine($"  What will you name {babyPronoun}? (Enter for {child.Name})");
+            terminal.SetColor("white");
+            string nameInput = (await terminal.GetInput("  Name: ")).Trim();
+            if (!string.IsNullOrEmpty(nameInput) && nameInput.Length <= 20)
+            {
+                // Extract surname from auto-generated name (everything after first space)
+                string surname = "";
+                int spaceIdx = child.Name.IndexOf(' ');
+                if (spaceIdx > 0) surname = child.Name.Substring(spaceIdx);
+                child.Name = nameInput + surname;
+            }
+
+            terminal.SetColor("bright_yellow");
             terminal.WriteLine($"  {Get("intimacy.baby_named", babyPronoun, child.Name)}");
             if (!GameConfig.ScreenReaderMode)
             {

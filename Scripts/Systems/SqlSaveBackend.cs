@@ -439,7 +439,23 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@displayName", displayName);
                 cmd.Parameters.AddWithValue("@data", json);
 
-                await cmd.ExecuteNonQueryAsync();
+                try
+                {
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 19)
+                {
+                    // UNIQUE constraint on display_name — another player already has this name.
+                    // Save without updating display_name (keep existing display_name in DB).
+                    cmd.CommandText = @"
+                        UPDATE players SET
+                            player_data = @data,
+                            last_login = datetime('now')
+                        WHERE LOWER(username) = LOWER(@username);
+                    ";
+                    await cmd.ExecuteNonQueryAsync();
+                    DebugLogger.Instance.LogWarning("SQL", $"Display name '{displayName}' conflicts with another player — saved data without updating display_name for '{playerName}'");
+                }
                 DebugLogger.Instance.LogDebug("SQL", $"Saved game data for '{playerName}'");
                 return true;
             }
@@ -1110,6 +1126,11 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@category", category);
                 cmd.Parameters.AddWithValue("@playerName", (object?)playerName ?? DBNull.Value);
                 await cmd.ExecuteNonQueryAsync();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Expected during session teardown — fire-and-forget news posts may outlive the session
+                DebugLogger.Instance.LogDebug("SQL", "AddNews skipped — connection disposed (session ended)");
             }
             catch (Exception ex)
             {
@@ -4780,6 +4801,10 @@ namespace UsurperRemake.Systems
                         Args = reader.IsDBNull(3) ? null : reader.GetString(3)
                     });
                 }
+            }
+            catch (ObjectDisposedException)
+            {
+                DebugLogger.Instance.LogDebug("SQL", "GetPendingAdminCommands skipped — connection disposed");
             }
             catch (Exception ex)
             {

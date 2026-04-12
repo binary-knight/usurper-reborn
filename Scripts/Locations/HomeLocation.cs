@@ -1926,6 +1926,45 @@ public class HomeLocation : BaseLocation
             selectedChild = children[idx - 1];
         }
 
+        // Child action menu
+        terminal.WriteLine();
+        terminal.Write("  [S] ", "bright_yellow");
+        terminal.WriteLine("Spend time", "white");
+        terminal.Write("  [N] ", "bright_yellow");
+        terminal.WriteLine($"Rename {selectedChild.Name}", "white");
+        terminal.WriteLine();
+        string action = (await GetChoice()).ToUpper().Trim();
+
+        if (action == "N")
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  Current name: {selectedChild.Name}");
+            // Extract surname
+            string surname = "";
+            int spIdx = selectedChild.Name.IndexOf(' ');
+            if (spIdx > 0) surname = selectedChild.Name.Substring(spIdx);
+
+            terminal.SetColor("white");
+            string newFirst = (await terminal.GetInput($"  New first name (Enter to keep): ")).Trim();
+            if (!string.IsNullOrEmpty(newFirst) && newFirst.Length <= 20)
+            {
+                string oldName = selectedChild.Name;
+                selectedChild.Name = newFirst + surname;
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {oldName} is now known as {selectedChild.Name}.");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Name unchanged.");
+            }
+            await terminal.WaitForKey();
+            return;
+        }
+
+        if (action != "S" && action != "")
+            return;
+
         // Check cooldown
         int currentDay = DailySystemManager.Instance?.CurrentDay ?? 0;
         if (selectedChild.LastParentingDay >= currentDay && currentDay > 0)

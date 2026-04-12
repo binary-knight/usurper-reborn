@@ -317,6 +317,9 @@ namespace UsurperRemake.Systems
                 // Play introduction
                 await PlayBossIntroduction(boss, player, terminal);
 
+                // Companion-specific reactions before dialogue
+                await PlayCompanionBossReaction(type, player, terminal);
+
                 // Run dialogue
                 var dialogueResult = await DialogueSystem.Instance.StartDialogue(
                     player, $"{type.ToString().ToLower()}_encounter", terminal);
@@ -501,6 +504,41 @@ namespace UsurperRemake.Systems
             // Option 2: Peace path (fails but shows character) - No modifier, normal fight
         }
 
+        /// <summary>
+        /// Companion-specific dialogue before an Old God boss encounter.
+        /// Fires after the boss introduction but before the player dialogue choices.
+        /// </summary>
+        private async Task PlayCompanionBossReaction(OldGodType type, Character player, TerminalEmulator terminal)
+        {
+            var companionSystem = CompanionSystem.Instance;
+            if (companionSystem == null) return;
+
+            // Mira reacts to Veloura — her former goddess
+            if (type == OldGodType.Veloura && companionSystem.IsCompanionActive(CompanionId.Mira))
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine("Mira steps forward, her voice breaking.", "white");
+                terminal.WriteLine("");
+                terminal.WriteLine("\"Veloura...\"", "bright_cyan");
+                await Task.Delay(2000);
+                terminal.WriteLine("");
+                terminal.WriteLine("\"I prayed to you every day for ten years. I healed the sick in your name.", "bright_cyan");
+                terminal.WriteLine(" I believed you were the light that guided my hands.\"", "bright_cyan");
+                await Task.Delay(2500);
+                terminal.WriteLine("");
+                terminal.WriteLine("\"And then your temple burned. Your priests turned on each other.", "bright_cyan");
+                terminal.WriteLine(" I watched Sister Aldara — the kindest woman I ever knew — die screaming", "bright_cyan");
+                terminal.WriteLine(" because your corruption told her that mercy was weakness.\"", "bright_cyan");
+                await Task.Delay(3000);
+                terminal.WriteLine("");
+                terminal.WriteLine("Mira turns to you, tears streaming.", "white");
+                terminal.WriteLine("\"Whatever you decide here... I'll follow you. But please —\"", "bright_cyan");
+                terminal.WriteLine("\"— remember that she wasn't always this.\"", "bright_cyan");
+                terminal.WriteLine("");
+                await Task.Delay(2000);
+            }
+        }
+
         private void ApplyVelouraModifiers(StoryProgressionSystem story, TerminalEmulator terminal)
         {
             // Aggressive approach
@@ -526,6 +564,14 @@ namespace UsurperRemake.Systems
                 activeCombatModifiers.BossWeakened = true;
                 activeCombatModifiers.BossDefenseMultiplier = 0.70; // She doesn't fully resist
                 terminal.WriteLine($"  {Loc.Get("old_god.mod_veloura_mercy")}", "bright_cyan");
+            }
+
+            // Mira's presence weakens Veloura's resolve — she recognizes her former priestess
+            if (CompanionSystem.Instance?.IsCompanionActive(CompanionId.Mira) == true)
+            {
+                activeCombatModifiers.BossDamageMultiplier *= 0.90; // Veloura hesitates
+                terminal.WriteLine("  Veloura's gaze falls on Mira. Something flickers in the corruption.", "bright_magenta");
+                terminal.WriteLine("  She hesitates.", "bright_magenta");
             }
         }
 

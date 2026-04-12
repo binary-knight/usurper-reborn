@@ -637,8 +637,8 @@ namespace UsurperRemake.BBS
                 var intPtrHandle = new IntPtr(handle);
                 LogVerbose($"IntPtr created: {intPtrHandle}");
 
-                var safeHandle = new SafeSocketHandle(intPtrHandle, ownsHandle: false);
-                LogVerbose($"SafeSocketHandle created. IsInvalid={safeHandle.IsInvalid}, IsClosed={safeHandle.IsClosed}");
+                var safeHandle = new SafeSocketHandle(intPtrHandle, ownsHandle: true);
+                LogVerbose($"SafeSocketHandle created (ownsHandle=true). IsInvalid={safeHandle.IsInvalid}, IsClosed={safeHandle.IsClosed}");
 
                 if (safeHandle.IsInvalid)
                 {
@@ -1287,14 +1287,30 @@ namespace UsurperRemake.BBS
         public void Dispose()
         {
             if (_disposed) return;
-
             _disposed = true;
 
-            _writer?.Dispose();
-            _reader?.Dispose();
-            _stream?.Dispose();
-            _rawHandleStream?.Dispose();
-            // Don't dispose the socket - we don't own it (BBS does)
+            try { _writer?.Flush(); } catch { }
+            try { _writer?.Dispose(); } catch { }
+            try { _reader?.Dispose(); } catch { }
+            try { _stream?.Dispose(); } catch { }
+            try { _rawHandleStream?.Dispose(); } catch { }
+
+            // Shutdown and close the socket so the BBS can reclaim the handle.
+            // The DOOR32.SYS spec requires the door process to close the inherited socket
+            // before exiting — otherwise the BBS can't reuse the connection and the player
+            // has to fully disconnect to play again.
+            if (_socket != null)
+            {
+                try
+                {
+                    if (_socket.Connected)
+                        _socket.Shutdown(SocketShutdown.Both);
+                }
+                catch { }
+                try { _socket.Close(); } catch { }
+                try { _socket.Dispose(); } catch { }
+                _socket = null;
+            }
         }
 
         #endregion

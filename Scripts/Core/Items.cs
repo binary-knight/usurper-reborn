@@ -986,6 +986,52 @@ public class Equipment
             return false;
         }
 
+        // Mystic Shaman weapon restrictions: swords, axes, maces, mauls only.
+        // Bows, staves, greatswords, greataxes, polearms, daggers, rapiers, scimitars, instruments are forbidden.
+        if (!isPrestige && character.Class == CharacterClass.MysticShaman &&
+            Slot == EquipmentSlot.MainHand && WeaponType != WeaponType.None)
+        {
+            bool allowed = WeaponType == WeaponType.Sword ||
+                           WeaponType == WeaponType.Axe ||
+                           WeaponType == WeaponType.Mace ||
+                           WeaponType == WeaponType.Hammer ||
+                           WeaponType == WeaponType.Flail ||
+                           WeaponType == WeaponType.Maul;
+            if (!allowed)
+            {
+                reason = Loc.Get("ui.cannot_use_class", character.Class);
+                return false;
+            }
+        }
+
+        // Companion weapon restrictions — each companion can only equip weapons matching their role
+        if (character.IsCompanion && character.CompanionId != null &&
+            Slot == EquipmentSlot.MainHand && WeaponType != WeaponType.None)
+        {
+            bool companionAllowed = character.CompanionId switch
+            {
+                UsurperRemake.Systems.CompanionId.Aldric => // Tank: swords, axes, maces, hammers, flails, mauls
+                    WeaponType is WeaponType.Sword or WeaponType.Axe or WeaponType.Mace
+                    or WeaponType.Hammer or WeaponType.Flail or WeaponType.Maul
+                    or WeaponType.Greatsword or WeaponType.Greataxe,
+                UsurperRemake.Systems.CompanionId.Mira => // Healer: maces, staves, hammers
+                    WeaponType is WeaponType.Mace or WeaponType.Staff or WeaponType.Hammer
+                    or WeaponType.Flail,
+                UsurperRemake.Systems.CompanionId.Lyris => // Ranger: bows, swords, daggers
+                    WeaponType is WeaponType.Bow or WeaponType.Sword or WeaponType.Dagger,
+                UsurperRemake.Systems.CompanionId.Vex => // Assassin: daggers, swords, rapiers
+                    WeaponType is WeaponType.Dagger or WeaponType.Sword or WeaponType.Rapier,
+                UsurperRemake.Systems.CompanionId.Melodia => // Bard: instruments, rapiers, daggers
+                    WeaponType is WeaponType.Instrument or WeaponType.Rapier or WeaponType.Dagger,
+                _ => true
+            };
+            if (!companionAllowed)
+            {
+                reason = $"{character.DisplayName} can't use that type of weapon";
+                return false;
+            }
+        }
+
         // Armor weight class restrictions
         if (!isPrestige && WeightClass != ArmorWeightClass.None)
         {

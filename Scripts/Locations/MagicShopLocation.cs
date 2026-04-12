@@ -572,7 +572,7 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        if (player.Healing >= GameConfig.MaxHealingPotions)
+        if (player.Healing >= player.MaxPotions)
         {
             DisplayMessage(Loc.Get("shop.max_potions"), "red");
             return;

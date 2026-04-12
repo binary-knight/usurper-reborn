@@ -6044,7 +6044,8 @@ public partial class CombatEngine
         // Monk potion purchase option - Pascal PLVSMON.PAS monk encounter
         await OfferMonkPotionPurchase(result.Player);
 
-        // Auto-save after combat victory
+        // Auto-save after combat victory — reset throttle so loot pickups are always persisted
+        SaveSystem.Instance.ResetAutoSaveThrottle();
         await SaveSystem.Instance.AutoSave(result.Player);
     }
 
@@ -6605,6 +6606,34 @@ public partial class CombatEngine
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// Class abilities whose SpecialEffect represents pure magical/divine damage.
+    /// These should NOT trigger weapon-based enchants (lifedrinker, mana siphon, elemental procs, poison coating)
+    /// because the damage doesn't actually come from the weapon — it's channeled magic/divine power.
+    /// Physical/melee abilities (backstab, power_strike, execute, last_stand, etc.) are NOT in this set
+    /// because they DO use the weapon and SHOULD proc weapon enchants.
+    /// </summary>
+    private static readonly HashSet<string> MagicalAbilityEffects = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Cleric / Paladin divine
+        "holy",
+        // Shaman elemental magic (single-target)
+        "shaman_lightning_bolt",
+        // Voidreaver / shadow magic
+        "shadow",
+        // Generic elemental "spell-like" ability effects
+        "fire", "frost", "ice", "lightning", "void",
+        // Mental / psionic
+        "psychic", "magic", "charm", "fear", "confusion",
+        // Necromantic
+        "necro", "drain",
+    };
+
+    private static bool IsMagicalAbilityEffect(string? specialEffect)
+    {
+        return !string.IsNullOrEmpty(specialEffect) && MagicalAbilityEffects.Contains(specialEffect);
     }
 
     /// <summary>
@@ -11516,7 +11545,8 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_you_deal_damage" : "combat.ability_npc_deals_damage", actorName, actualDamage, target.Name));
 
                 // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
-                ApplyPostHitEnchantments(player, target, actualDamage, result);
+                // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
+                ApplyPostHitEnchantments(player, target, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
 
                 if (target.HP <= 0)
                 {
@@ -13574,7 +13604,14 @@ public partial class CombatEngine
                 player.ShamanEnchantType = 1;
                 player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
                 player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
-                terminal.WriteLine(Loc.Get("combat.shaman_enchant_fire", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_red");
+                // Flametongue: +15% ATK bonus for the enchant duration (mirrors Rockbiter's +DEF)
+                {
+                    int fireAtkBonus = Math.Max(1, (int)(player.Strength * 0.15));
+                    player.TempAttackBonus += fireAtkBonus;
+                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, GameConfig.ShamanEnchantDuration);
+                    terminal.WriteLine(Loc.Get("combat.shaman_enchant_fire", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_red");
+                    terminal.WriteLine($"  Attack power increased by {fireAtkBonus}!", "bright_red");
+                }
                 break;
 
             case "shaman_enchant_frost":
@@ -17101,7 +17138,8 @@ public partial class CombatEngine
         BroadcastGroupCombatEvent(result,
             $"\u001b[90m  ── Combat over. Waiting for {result.Player.DisplayName} to continue... ──\u001b[0m");
 
-        // Auto-save after combat victory
+        // Auto-save after combat victory — reset throttle so loot pickups are always persisted
+        SaveSystem.Instance.ResetAutoSaveThrottle();
         await SaveSystem.Instance.AutoSave(result.Player);
     }
 
@@ -18534,7 +18572,8 @@ public partial class CombatEngine
             terminal.WriteLine($"You deal {actualDamage} damage to {monster.Name}!");
 
             // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
-            ApplyPostHitEnchantments(player, monster, actualDamage, result);
+            // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
+            ApplyPostHitEnchantments(player, monster, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
 
             if (monster.HP <= 0)
             {
@@ -20360,7 +20399,14 @@ public partial class CombatEngine
                 player.ShamanEnchantType = 1;
                 player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
                 player.ShamanEnchantPower = (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100);
-                terminal.WriteLine(Loc.Get("combat.shaman_enchant_fire", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_red");
+                // Flametongue: +15% ATK bonus for the enchant duration (mirrors Rockbiter's +DEF)
+                {
+                    int fireAtkBonus = Math.Max(1, (int)(player.Strength * 0.15));
+                    player.TempAttackBonus += fireAtkBonus;
+                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, GameConfig.ShamanEnchantDuration);
+                    terminal.WriteLine(Loc.Get("combat.shaman_enchant_fire", (int)(GameConfig.ShamanEnchantBaseDamage * 100 + player.Intelligence * GameConfig.ShamanElementalMastery * 100), GameConfig.ShamanEnchantDuration), "bright_red");
+                    terminal.WriteLine($"  Attack power increased by {fireAtkBonus}!", "bright_red");
+                }
                 break;
 
             case "shaman_enchant_frost":

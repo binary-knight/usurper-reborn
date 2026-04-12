@@ -522,6 +522,15 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Check if a companion is recruited, alive, and currently in the active party
+        /// </summary>
+        public bool IsCompanionActive(CompanionId id)
+        {
+            return activeCompanions.Contains(id) &&
+                   companions.TryGetValue(id, out var c) && c.IsRecruited && !c.IsDead;
+        }
+
+        /// <summary>
         /// Set active companions for dungeon
         /// </summary>
         public bool SetActiveCompanions(List<CompanionId> companionIds)
@@ -2410,6 +2419,31 @@ namespace UsurperRemake.Systems
                     if (afterCombat) pool.Add("Mira kneels beside a wound. \"Hold still. This will sting.\"");
                     if (player.HP < player.MaxHP / 2) pool.Add("\"You're hurt — come here, let me look at that.\"");
                     if (dungeonLevel >= 50) pool.Add("\"The deeper we go, the more I question. Is any god worth this?\"");
+                    // Veloura connection — Mira's tension builds near floor 40
+                    if (dungeonLevel >= 35 && dungeonLevel < 40)
+                    {
+                        pool.Add("Mira's hands are trembling. She notices you looking and clasps them together.");
+                        pool.Add("\"I can feel her. Veloura. The closer we get, the more I remember.\"");
+                        pool.Add("\"I used to sing hymns to her every morning. Now I can barely say her name.\"");
+                    }
+                    if (dungeonLevel == 40)
+                    {
+                        pool.Clear(); // Only Veloura-specific comments on her floor
+                        pool.Add("Mira has gone pale. \"She's here. I can feel the corruption like a fever.\"");
+                        pool.Add("\"I spent ten years in her temple. Ten years of prayers she never answered.\"");
+                        pool.Add("\"Whatever we find down here... whatever she's become... I need to see it.\"");
+                    }
+                    var story = StoryProgressionSystem.Instance;
+                    if (dungeonLevel > 40 && story.HasStoryFlag("veloura_encountered"))
+                    {
+                        if (story.OldGodStates.TryGetValue(OldGodType.Veloura, out var vState))
+                        {
+                            if (vState.Status == GodStatus.Saved)
+                                pool.Add("\"She's free now. Veloura is free.\" Mira wipes her eyes. \"Maybe I am too.\"");
+                            else if (vState.Status == GodStatus.Defeated)
+                                pool.Add("Mira is quiet. \"I thought killing her would feel like justice. It just feels like grief.\"");
+                        }
+                    }
                     break;
 
                 case CompanionId.Melodia:

@@ -3643,6 +3643,10 @@ public class InnLocation : BaseLocation
             BaseMaxMana = companion.BaseStats.MagicPower * 5
         };
 
+        // Mark as companion so CanEquip enforces weapon restrictions
+        wrapper.IsCompanion = true;
+        wrapper.CompanionId = companion.Id;
+
         // Copy companion's equipment
         foreach (var kvp in companion.EquippedItems)
             wrapper.EquippedItems[kvp.Key] = kvp.Value;
