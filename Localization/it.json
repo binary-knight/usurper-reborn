@@ -18181,5 +18181,14 @@
   "spec.jester.chaos.desc": "Giullare imprevedibile che infligge raffiche di danni casuali.",
   "spec.jester.trickster.desc": "Indebolatore astuto che confonde e indebolisce i nemici.",
   "spec.shaman.elemental.desc": "Incantatore elementale che canalizza i danni dei totem sui nemici.",
-  "spec.shaman.spiritwalker.desc": "Guaritore spirituale che cura gli alleati con potere ancestrale."
+  "spec.shaman.spiritwalker.desc": "Guaritore spirituale che cura gli alleati con potere ancestrale.",
+  "// === v0.56.0 Class Balance keys ===": "",
+  "combat.shield_wall_formation_buff": "  {0} si blocca in formazione a muro di scudi! Danni in entrata -{1}%.",
+  "combat.shield_wall_formation_absorbs": "  La Formazione a Muro di Scudi assorbe {0} danni!",
+  "combat.divine_mandate_buff": "  {0} invoca il giudizio divino! Gli attaccanti subiscono il {1}% di riflesso spinoso.",
+  "combat.divine_mandate_reflect": "  Il Mandato Divino riflette {1} danni contro {0}!",
+  "combat.rage_challenge_buff": "  {0} ruggisce una sfida, il corpo gonfio di rabbia! Rigenerazione +{1}% PS Max/round.",
+  "combat.rage_challenge_regen": "  La Sfida Rabbiosa rigenera {1} PS su {0}!",
+  "combat.tidesworn_weaken_bonus": "  L'indebolito {0} non può resistere all'ira della marea!",
+  "combat.ability_maelstrom_faithful": "  Il maelstrom indebolisce tutti i nemici presi nella sua corrente!"
 }

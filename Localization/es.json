@@ -18180,5 +18180,14 @@
   "spec.jester.chaos.desc": "Bromista impredecible que inflige rafagas de daño aleatorio.",
   "spec.jester.trickster.desc": "Debilitador astuto que confunde y debilita a los enemigos.",
   "spec.shaman.elemental.desc": "Lanzador elemental que canaliza el daño de totems contra los enemigos.",
-  "spec.shaman.spiritwalker.desc": "Sanador espiritual que cura aliados con poder ancestral."
+  "spec.shaman.spiritwalker.desc": "Sanador espiritual que cura aliados con poder ancestral.",
+  "// === v0.56.0 Class Balance keys ===": "",
+  "combat.shield_wall_formation_buff": "  ¡{0} adopta una formación de muro de escudos! Daño recibido -{1}%.",
+  "combat.shield_wall_formation_absorbs": "  ¡La Formación de Muro de Escudos absorbe {0} de daño!",
+  "combat.divine_mandate_buff": "  ¡{0} invoca el juicio divino! Los atacantes sufren un reflejo de espinas del {1}%.",
+  "combat.divine_mandate_reflect": "  ¡El Mandato Divino refleja {1} de daño contra {0}!",
+  "combat.rage_challenge_buff": "  ¡{0} ruge un desafío, su cuerpo hinchándose de furia! Regeneración +{1}% PV máx/ronda.",
+  "combat.rage_challenge_regen": "  ¡El Desafío de Furia regenera {1} PV a {0}!",
+  "combat.tidesworn_weaken_bonus": "  ¡El debilitado {0} no puede resistir la ira de la marea!",
+  "combat.ability_maelstrom_faithful": "  ¡La vorágine debilita a todos los enemigos atrapados en su corriente!"
 }

@@ -18181,5 +18181,14 @@
   "spec.jester.chaos.desc": "Kiszámíthatatlan tréfás, aki véletlenszerű sebzéslökéseket okoz.",
   "spec.jester.trickster.desc": "Ravasz gyengítő, aki megzavarja és legyengíti az ellenséget.",
   "spec.shaman.elemental.desc": "Elemi varázsló, aki totem sebzést csatornáz az ellenségre.",
-  "spec.shaman.spiritwalker.desc": "Szellemi gyógyító, aki ősi erővel gyógyítja a szövetségeseket."
+  "spec.shaman.spiritwalker.desc": "Szellemi gyógyító, aki ősi erővel gyógyítja a szövetségeseket.",
+  "// === v0.56.0 Class Balance keys ===": "",
+  "combat.shield_wall_formation_buff": "  {0} pajzsfal-alakzatba zárkózik! Bejövő sebzés -{1}%.",
+  "combat.shield_wall_formation_absorbs": "  A Pajzsfal-alakzat {0} sebzést nyel el!",
+  "combat.divine_mandate_buff": "  {0} isteni ítéletet hív le! A támadók {1}% tövis-visszaverődést szenvednek el.",
+  "combat.divine_mandate_reflect": "  Az Isteni Parancs {1} sebzést tükröz vissza {0} ellen!",
+  "combat.rage_challenge_buff": "  {0} kihívó bömbölést hallat, testét dühtől duzzasztja! Regeneráció +{1}% MaxHP/kör.",
+  "combat.rage_challenge_regen": "  A Düh Kihívása {1} HP-t regenerál {0} számára!",
+  "combat.tidesworn_weaken_bonus": "  A legyengült {0} nem állhat ellen az ár haragjának!",
+  "combat.ability_maelstrom_faithful": "  A forgatag meggyengíti az összes áramába kerülő ellenséget!"
 }

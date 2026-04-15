@@ -18181,5 +18181,14 @@
   "spec.jester.chaos.desc": "Farceur imprevisible infligeant des rafales de degats aleatoires.",
   "spec.jester.trickster.desc": "Affaiblisseur ruse qui confond et affaiblit les ennemis.",
   "spec.shaman.elemental.desc": "Lanceur elementaire canalisant les degats de totems sur les ennemis.",
-  "spec.shaman.spiritwalker.desc": "Guerisseur spirituel soignant les allies par le pouvoir ancestral."
+  "spec.shaman.spiritwalker.desc": "Guerisseur spirituel soignant les allies par le pouvoir ancestral.",
+  "// === v0.56.0 Class Balance keys ===": "",
+  "combat.shield_wall_formation_buff": "  {0} se met en formation mur de boucliers ! Degats recus -{1}%.",
+  "combat.shield_wall_formation_absorbs": "  La Formation Mur de Boucliers absorbe {0} degats !",
+  "combat.divine_mandate_buff": "  {0} appelle le jugement divin ! Les attaquants subissent {1}% de reflet d'epines.",
+  "combat.divine_mandate_reflect": "  Le Mandat Divin reflete {1} degats sur {0} !",
+  "combat.rage_challenge_buff": "  {0} rugit un defi, son corps gonfle de rage ! Regen +{1}% PV Max/tour.",
+  "combat.rage_challenge_regen": "  Le Defi Enrage regenere {1} PV sur {0} !",
+  "combat.tidesworn_weaken_bonus": "  Le {0} affaibli ne peut resister a la fureur de la maree !",
+  "combat.ability_maelstrom_faithful": "  Le maelstrom affaiblit tous les ennemis pris dans son courant !"
 }

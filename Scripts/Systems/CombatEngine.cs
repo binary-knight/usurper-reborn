@@ -4400,6 +4400,17 @@ public partial class CombatEngine
             actualDamage = Math.Max(1, (long)(actualDamage * (1.0 - GameConfig.AbysswardenPrisonWardResist)));
         }
 
+        // Shield Wall Formation: % incoming damage reduction (v0.56.0)
+        if (player.TempDamageReductionPercent > 0 && player.TempDamageReductionDuration > 0 && actualDamage > 1)
+        {
+            long reduced = (long)(actualDamage * (player.TempDamageReductionPercent / 100.0));
+            if (reduced > 0)
+            {
+                actualDamage = Math.Max(1, actualDamage - reduced);
+                terminal.WriteLine(Loc.Get("combat.shield_wall_formation_absorbs", reduced), "bright_cyan");
+            }
+        }
+
         // Check for divine intervention (save from lethal hit)
         bool wouldDie = player.HP - actualDamage <= 0;
         if (wouldDie && DivineBlessingSystem.Instance.CheckDivineIntervention(player, (int)actualDamage))
@@ -4433,6 +4444,17 @@ public partial class CombatEngine
 
         // Apply damage
         player.HP = Math.Max(0, player.HP - actualDamage);
+
+        // Divine Mandate thorn reflect: reflect % of damage taken back to attacker (v0.56.0)
+        if (player.TempThornReflectPercent > 0 && player.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
+        {
+            long reflect = (long)(actualDamage * (player.TempThornReflectPercent / 100.0));
+            if (reflect > 0)
+            {
+                monster.HP = Math.Max(0, monster.HP - reflect);
+                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
+            }
+        }
 
         // Voidreaver Death's Embrace: revive on lethal damage
         if (player.HP <= 0 && player.DeathsEmbraceActive)
@@ -11466,6 +11488,16 @@ public partial class CombatEngine
         if (abilityResult.Damage > 0 && target != null && target.IsAlive && !isAoEAbility)
         {
             long actualDamage = abilityResult.Damage;
+            bool abilityAlreadyCrit = false; // Guaranteed-crit abilities skip the follow-up crit roll
+
+            // Tidesworn weaken synergy (v0.56.0): Riptide Strike deals +40% damage vs already-weakened targets
+            if (player.Class == CharacterClass.Tidesworn && target != null && target.WeakenRounds > 0
+                && abilityResult.SpecialEffect == "riptide")
+            {
+                actualDamage = (long)(actualDamage * 1.40);
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(Loc.Get("combat.tidesworn_weaken_bonus", target.Name));
+            }
 
             // Handle special damage effects
             // NOTE: "execute" bonus damage is handled in the special effect switch below (tiered 30%/50%)
@@ -11482,9 +11514,10 @@ public partial class CombatEngine
             }
             else if (abilityResult.SpecialEffect == "backstab")
             {
-                actualDamage = (long)(actualDamage * 2.0); // Guaranteed critical hit
+                actualDamage = (long)(actualDamage * 1.75); // Guaranteed critical hit (no double-crit stacking)
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("combat.ability_backstab_crit"));
+                abilityAlreadyCrit = true; // Don't double-crit — the 1.75x IS the crit
             }
             else if (abilityResult.SpecialEffect == "aoe" || abilityResult.SpecialEffect == "aoe_confusion")
             {
@@ -11507,10 +11540,10 @@ public partial class CombatEngine
                 actualDamage = 0;
             }
 
-            // Critical hit roll for abilities
-            bool abilityCrit = StatEffectsSystem.RollCriticalHit(player);
+            // Critical hit roll for abilities — skip if ability already has guaranteed crit (e.g. Backstab)
+            bool abilityCrit = !abilityAlreadyCrit && StatEffectsSystem.RollCriticalHit(player);
             // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
-            if (!abilityCrit && actualDamage > 0 && player.Class == CharacterClass.Wavecaller
+            if (!abilityCrit && !abilityAlreadyCrit && actualDamage > 0 && player.Class == CharacterClass.Wavecaller
                 && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
             {
                 abilityCrit = random.Next(100) < (int)(GameConfig.WavecallerOceansVoiceCritBonus * 100);
@@ -11587,6 +11620,9 @@ public partial class CombatEngine
         // Apply healing (with ally targeting for CanTargetAlly abilities)
         if (abilityResult.Healing > 0)
         {
+            // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
+            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing);
+
             Character healTarget = player;
             bool healedAlly = false;
 
@@ -11889,6 +11925,24 @@ public partial class CombatEngine
                 }
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.taunt_aoe" : "combat.taunt_aoe_npc", actorName));
+                break;
+
+            case "shield_wall_formation":
+                // Warrior L40: AoE taunt + 30% incoming damage reduction (+10% for Protection spec)
+                ApplyTankTauntAndBuff(player, monsters, abilityResult, terminal, isPlayer, actorName,
+                    damageReductionPercent: 30 + (player is NPC pn && pn.Specialization == ClassSpecialization.Protection ? 10 : 0));
+                break;
+
+            case "divine_mandate":
+                // Paladin L40: AoE taunt + 15% thorn reflect (+5% for Guardian spec)
+                ApplyTankTauntAndBuff(player, monsters, abilityResult, terminal, isPlayer, actorName,
+                    thornReflectPercent: 15 + (player is NPC gn && gn.Specialization == ClassSpecialization.Guardian ? 5 : 0));
+                break;
+
+            case "rage_challenge":
+                // Barbarian L40: AoE taunt + 5% MaxHP regen per round (+3% for Juggernaut spec)
+                ApplyTankTauntAndBuff(player, monsters, abilityResult, terminal, isPlayer, actorName,
+                    percentRegenPerRound: 5 + (player is NPC jn && jn.Specialization == ClassSpecialization.Juggernaut ? 3 : 0));
                 break;
 
             // === DAMAGE ENHANCEMENT EFFECTS ===
@@ -12485,6 +12539,20 @@ public partial class CombatEngine
                 }
                 break;
 
+            case "maelstrom_faithful":
+                // v0.56.0: AoE damage + auto-apply weaken to all hit for 2 rounds
+                if (monsters != null)
+                {
+                    await ApplyAoEDamage(monsters, abilityResult.Damage, result, abilityResult.AbilityUsed?.Name ?? "Maelstrom", attacker: player);
+                    foreach (var m in monsters.Where(m => m.IsAlive))
+                    {
+                        m.WeakenRounds = Math.Max(m.WeakenRounds, 2);
+                    }
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine(Loc.Get("combat.ability_maelstrom_faithful"));
+                }
+                break;
+
             case "riptide":
                 // Target's next attack reduced by 25% (apply Weakened)
                 if (target != null && target.IsAlive)
@@ -12517,7 +12585,7 @@ public partial class CombatEngine
                 {
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
-                        m.TauntedBy = player.Name;
+                        m.TauntedBy = player.DisplayName;
                         m.TauntRoundsLeft = Math.Max(m.TauntRoundsLeft, tauntDur);
                         m.WeakenRounds = Math.Max(m.WeakenRounds, tauntDur);
                     }
@@ -12532,14 +12600,19 @@ public partial class CombatEngine
             case "sanctified_torrent":
             {
                 // AoE holy water. 2x vs undead/demons. Heals 20% dealt.
+                // v0.56.0: Apply standard AoE damage reduction curve (100%/75%/50%/25%) — was bypassing
                 int totalHeal = 0;
                 if (monsters != null)
                 {
+                    int targetIdx = 0;
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage;
                         bool isHoly = m.FamilyName?.IndexOf("undead", StringComparison.OrdinalIgnoreCase) >= 0 || m.FamilyName?.IndexOf("demon", StringComparison.OrdinalIgnoreCase) >= 0;
                         if (isHoly) dmg *= 2;
+                        // AoE diminishing returns per target
+                        float aoeMult = targetIdx switch { 0 => 1.0f, 1 => 0.75f, 2 => 0.50f, _ => 0.25f };
+                        dmg = Math.Max(1, (int)(dmg * aoeMult));
                         m.HP -= dmg;
                         totalHeal += (int)(dmg * 0.20);
                         terminal.SetColor(isHoly ? "bright_yellow" : "bright_cyan");
@@ -12550,6 +12623,7 @@ public partial class CombatEngine
                             if (!result.DefeatedMonsters.Contains(m))
                                 result.DefeatedMonsters.Add(m);
                         }
+                        targetIdx++;
                     }
                 }
                 if (totalHeal > 0)
@@ -15769,6 +15843,24 @@ public partial class CombatEngine
             if (affordableAbilities.Count == 0) return false;
         }
 
+        // Tank defensive-spread: if tank already has an active defensive buff (Shield Wall,
+        // Aura, Divine Shield, Formation/Mandate/Rage Challenge) AND is above 30% HP, don't
+        // stack another defensive buff this round. Prevents "taunt then burn all defenses then
+        // die" pattern. Check applies to NPC teammates only — player manages this manually.
+        double teammateHpPercent = (double)teammate.HP / Math.Max(1, teammate.MaxHP);
+        bool hasActiveDefensiveBuff = teammate.TempDefenseBonusDuration > 0
+            || teammate.TempDamageReductionDuration > 0
+            || teammate.TempThornReflectDuration > 0
+            || teammate.TempPercentRegenDuration > 0;
+        if (hasActiveDefensiveBuff && teammateHpPercent > 0.30)
+        {
+            var defensiveFiltered = affordableAbilities
+                .Where(a => a.Type != ClassAbilitySystem.AbilityType.Defense)
+                .ToList();
+            if (defensiveFiltered.Count > 0)
+                affordableAbilities = defensiveFiltered;
+        }
+
         // AI: Pick an ability with situational awareness + randomized variety
         ClassAbilitySystem.ClassAbility? chosenAbility = null;
 
@@ -16439,11 +16531,33 @@ public partial class CombatEngine
         }
         companion._hitsThisRound++;
 
+        // Shield Wall Formation: % incoming damage reduction (v0.56.0, NPC tank)
+        if (companion.TempDamageReductionPercent > 0 && companion.TempDamageReductionDuration > 0 && actualDamage > 1)
+        {
+            long reduced = (long)(actualDamage * (companion.TempDamageReductionPercent / 100.0));
+            if (reduced > 0)
+            {
+                actualDamage = Math.Max(1, actualDamage - reduced);
+                terminal.WriteLine(Loc.Get("combat.shield_wall_formation_absorbs", reduced), "bright_cyan");
+            }
+        }
+
         // Apply damage to companion
         companion.HP = Math.Max(0, companion.HP - actualDamage);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("combat.monster_hits_companion", monster.TheNameOrName, companion.DisplayName, actualDamage) + $" ({companion.HP}/{companion.MaxHP} HP)");
+
+        // Divine Mandate thorn reflect (v0.56.0, NPC tank)
+        if (companion.TempThornReflectPercent > 0 && companion.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
+        {
+            long reflect = (long)(actualDamage * (companion.TempThornReflectPercent / 100.0));
+            if (reflect > 0)
+            {
+                monster.HP = Math.Max(0, monster.HP - reflect);
+                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
+            }
+        }
 
         // Reflecting status: reflect damage back at attacker (same as player path)
         if (actualDamage > 0 && monster.IsAlive && companion.HasStatus(StatusEffect.Reflecting))
@@ -18581,6 +18695,15 @@ public partial class CombatEngine
         if (abilityResult.Damage > 0 && monster != null)
         {
             long actualDamage = abilityResult.Damage;
+            bool abilityAlreadyCrit = false; // Guaranteed-crit abilities skip the follow-up crit roll
+
+            // Tidesworn weaken synergy (v0.56.0): Riptide Strike +40% vs weakened
+            if (player.Class == CharacterClass.Tidesworn && monster.WeakenRounds > 0
+                && abilityResult.SpecialEffect == "riptide")
+            {
+                actualDamage = (long)(actualDamage * 1.40);
+                terminal.WriteLine(Loc.Get("combat.tidesworn_weaken_bonus", monster.Name), "bright_cyan");
+            }
 
             // Handle special damage effects
             if (abilityResult.SpecialEffect == "execute" && monster.HP < monster.MaxHP * 0.3)
@@ -18603,12 +18726,13 @@ public partial class CombatEngine
                 // Guaranteed critical hit from stealth
                 actualDamage = (long)(actualDamage * 2.0);
                 terminal.WriteLine(Loc.Get("combat.ability_backstab_crit"), "bright_yellow");
+                abilityAlreadyCrit = true; // Don't double-crit — the 1.75x IS the crit
             }
 
-            // Critical hit roll for abilities (same as regular attacks)
-            bool abilityCrit = StatEffectsSystem.RollCriticalHit(player);
+            // Critical hit roll for abilities — skip if ability already has guaranteed crit (e.g. Backstab)
+            bool abilityCrit = !abilityAlreadyCrit && StatEffectsSystem.RollCriticalHit(player);
             // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
-            if (!abilityCrit && player.Class == CharacterClass.Wavecaller
+            if (!abilityCrit && !abilityAlreadyCrit && player.Class == CharacterClass.Wavecaller
                 && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
             {
                 abilityCrit = random.Next(100) < (int)(GameConfig.WavecallerOceansVoiceCritBonus * 100);
@@ -18681,6 +18805,8 @@ public partial class CombatEngine
         // Apply healing
         if (abilityResult.Healing > 0)
         {
+            // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
+            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing);
             long actualHealing = Math.Min(abilityResult.Healing, player.MaxHP - player.HP);
             player.HP += actualHealing;
 
@@ -19420,6 +19546,33 @@ public partial class CombatEngine
                 }
                 break;
 
+            case "shield_wall_formation":
+                if (monster != null && monster.IsAlive)
+                {
+                    ApplyTankTauntAndBuff(player, new List<Monster> { monster }, abilityResult, terminal,
+                        isPlayer: (player == currentPlayer), actorName: player.DisplayName,
+                        damageReductionPercent: 30 + (player is NPC pn && pn.Specialization == ClassSpecialization.Protection ? 10 : 0));
+                }
+                break;
+
+            case "divine_mandate":
+                if (monster != null && monster.IsAlive)
+                {
+                    ApplyTankTauntAndBuff(player, new List<Monster> { monster }, abilityResult, terminal,
+                        isPlayer: (player == currentPlayer), actorName: player.DisplayName,
+                        thornReflectPercent: 15 + (player is NPC gn && gn.Specialization == ClassSpecialization.Guardian ? 5 : 0));
+                }
+                break;
+
+            case "rage_challenge":
+                if (monster != null && monster.IsAlive)
+                {
+                    ApplyTankTauntAndBuff(player, new List<Monster> { monster }, abilityResult, terminal,
+                        isPlayer: (player == currentPlayer), actorName: player.DisplayName,
+                        percentRegenPerRound: 5 + (player is NPC jn && jn.Specialization == ClassSpecialization.Juggernaut ? 3 : 0));
+                }
+                break;
+
             // ═══════════════════════════════════════════════════════════════════════
             // TIDESWORN PRESTIGE ABILITIES (single-monster)
             // ═══════════════════════════════════════════════════════════════════════
@@ -19433,6 +19586,16 @@ public partial class CombatEngine
                     monster.TauntRoundsLeft = Math.Max(monster.TauntRoundsLeft, abilityResult.Duration);
                     terminal.SetColor("cyan");
                     terminal.WriteLine(Loc.Get("combat.ability_undertow", monster.Name));
+                }
+                break;
+
+            case "maelstrom_faithful":
+                // v0.56.0: apply weaken to the single target in this path (damage already applied via base path)
+                if (monster != null && monster.IsAlive)
+                {
+                    monster.WeakenRounds = Math.Max(monster.WeakenRounds, 2);
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine(Loc.Get("combat.ability_maelstrom_faithful"));
                 }
                 break;
 
@@ -19466,7 +19629,7 @@ public partial class CombatEngine
                 int tauntDur2 = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                 if (monster != null && monster.IsAlive)
                 {
-                    monster.TauntedBy = player.Name;
+                    monster.TauntedBy = player.DisplayName;
                     monster.TauntRoundsLeft = Math.Max(monster.TauntRoundsLeft, tauntDur2);
                     monster.WeakenRounds = Math.Max(monster.WeakenRounds, tauntDur2);
                 }
@@ -20588,10 +20751,13 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.recover_mana", manaRegen, player.Mana, player.MaxMana));
         }
 
-        // Tidesworn Ocean's Resilience: regen 2% max HP/round when below 50% HP
-        if (player.Class == CharacterClass.Tidesworn && player.HP < player.MaxHP / 2 && player.HP > 0)
+        // Tidesworn Ocean's Resilience (v0.56.0): baseline 3% MaxHP/round + additional 2% when below 50% HP
+        if (player.Class == CharacterClass.Tidesworn && player.HP > 0 && player.HP < player.MaxHP)
         {
-            int oceansRegen = Math.Max(1, (int)(player.MaxHP * GameConfig.TideswornOceansResiliencePercent));
+            float regenPercent = GameConfig.TideswornOceansResiliencePercent;
+            if (player.HP < player.MaxHP / 2)
+                regenPercent += GameConfig.TideswornOceansResilienceBelowHalfBonus;
+            int oceansRegen = Math.Max(1, (int)(player.MaxHP * regenPercent));
             player.HP = Math.Min(player.MaxHP, player.HP + oceansRegen);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("combat.oceans_resilience_regen", oceansRegen, player.HP, player.MaxHP));
@@ -20672,6 +20838,14 @@ public partial class CombatEngine
             {
                 player.TempDefenseBonus = 0;
             }
+        }
+
+        // Tank ability buffs (v0.56.0 — Shield Wall Formation, Divine Mandate, Rage Challenge)
+        ProcessTankBuff(player);
+        if (currentTeammates != null)
+        {
+            foreach (var tm in currentTeammates.Where(t => t.IsAlive))
+                ProcessTankBuff(tm);
         }
 
         // Decrement teammate temporary buff durations
@@ -24337,6 +24511,97 @@ public partial class CombatEngine
         }
 
         await Task.Delay(GetCombatDelay(500));
+    }
+
+    /// <summary>
+    /// Apply the healer spec's +20% healing bonus, if the character has a healer specialization.
+    /// Used on ability healing and spell healing paths (v0.56.0).
+    /// </summary>
+    private static int ApplyHealerSpecBonus(Character caster, int baseHealing)
+    {
+        if (baseHealing <= 0 || caster is not NPC npc) return baseHealing;
+        if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(npc.Specialization)) return baseHealing;
+        return (int)(baseHealing * (1.0 + GameConfig.HealerSpecHealBonus));
+    }
+
+    /// <summary>
+    /// End-of-round processing for tank ability buffs. Applies regen tick and decrements durations.
+    /// </summary>
+    private void ProcessTankBuff(Character c)
+    {
+        // Rage Challenge: % MaxHP regen per round
+        if (c.TempPercentRegenPerRound > 0 && c.TempPercentRegenDuration > 0 && c.IsAlive)
+        {
+            long regen = (long)(c.MaxHP * (c.TempPercentRegenPerRound / 100.0));
+            if (regen > 0 && c.HP < c.MaxHP)
+            {
+                long actualRegen = Math.Min(regen, c.MaxHP - c.HP);
+                c.HP += actualRegen;
+                terminal?.WriteLine(Loc.Get("combat.rage_challenge_regen", c.DisplayName, actualRegen), "bright_green");
+            }
+            c.TempPercentRegenDuration--;
+            if (c.TempPercentRegenDuration <= 0)
+                c.TempPercentRegenPerRound = 0;
+        }
+
+        // Shield Wall Formation duration decrement
+        if (c.TempDamageReductionDuration > 0)
+        {
+            c.TempDamageReductionDuration--;
+            if (c.TempDamageReductionDuration <= 0)
+                c.TempDamageReductionPercent = 0;
+        }
+
+        // Divine Mandate duration decrement
+        if (c.TempThornReflectDuration > 0)
+        {
+            c.TempThornReflectDuration--;
+            if (c.TempThornReflectDuration <= 0)
+                c.TempThornReflectPercent = 0;
+        }
+    }
+
+    /// <summary>
+    /// Apply AoE taunt and a tank stat buff (damage reduction, thorn reflect, or HP regen).
+    /// Used by Shield Wall Formation, Divine Mandate, Rage Challenge (v0.56.0).
+    /// </summary>
+    private void ApplyTankTauntAndBuff(Character player, List<Monster> monsters, ClassAbilityResult abilityResult,
+        TerminalEmulator terminal, bool isPlayer, string actorName,
+        int damageReductionPercent = 0, int thornReflectPercent = 0, int percentRegenPerRound = 0)
+    {
+        int duration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+
+        // AoE taunt — all living monsters forced on the tank
+        foreach (var m in monsters.Where(m => m.IsAlive))
+        {
+            m.TauntedBy = player.DisplayName;
+            m.TauntRoundsLeft = duration;
+        }
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine(Loc.Get(isPlayer ? "combat.taunt_aoe" : "combat.taunt_aoe_npc", actorName));
+
+        // Apply the tank buff(s)
+        if (damageReductionPercent > 0)
+        {
+            player.TempDamageReductionPercent = Math.Max(player.TempDamageReductionPercent, damageReductionPercent);
+            player.TempDamageReductionDuration = Math.Max(player.TempDamageReductionDuration, duration);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("combat.shield_wall_formation_buff", actorName, damageReductionPercent));
+        }
+        if (thornReflectPercent > 0)
+        {
+            player.TempThornReflectPercent = Math.Max(player.TempThornReflectPercent, thornReflectPercent);
+            player.TempThornReflectDuration = Math.Max(player.TempThornReflectDuration, duration);
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine(Loc.Get("combat.divine_mandate_buff", actorName, thornReflectPercent));
+        }
+        if (percentRegenPerRound > 0)
+        {
+            player.TempPercentRegenPerRound = Math.Max(player.TempPercentRegenPerRound, percentRegenPerRound);
+            player.TempPercentRegenDuration = Math.Max(player.TempPercentRegenDuration, duration);
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("combat.rage_challenge_buff", actorName, percentRegenPerRound));
+        }
     }
 
     /// <summary>

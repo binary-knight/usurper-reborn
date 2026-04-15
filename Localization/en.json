@@ -18182,5 +18182,15 @@
   "spec.jester.chaos.desc": "Unpredictable trickster dealing random bursts of damage.",
   "spec.jester.trickster.desc": "Cunning debuffer confusing and weakening enemies.",
   "spec.shaman.elemental.desc": "Elemental caster channeling totem damage on enemies.",
-  "spec.shaman.spiritwalker.desc": "Spirit healer mending allies through ancestral power."
+  "spec.shaman.spiritwalker.desc": "Spirit healer mending allies through ancestral power.",
+
+  "// === v0.56.0 Class Balance keys ===": "",
+  "combat.shield_wall_formation_buff": "  {0} locks into a shield wall formation! Incoming damage -{1}%.",
+  "combat.shield_wall_formation_absorbs": "  Shield Wall Formation absorbs {0} damage!",
+  "combat.divine_mandate_buff": "  {0} calls down divine judgment! Attackers suffer {1}% thorn reflect.",
+  "combat.divine_mandate_reflect": "  Divine Mandate reflects {1} damage back at {0}!",
+  "combat.rage_challenge_buff": "  {0} roars a challenge, body swelling with rage! Regen +{1}% MaxHP/round.",
+  "combat.rage_challenge_regen": "  Rage Challenge regenerates {1} HP on {0}!",
+  "combat.tidesworn_weaken_bonus": "  The weakened {0} cannot withstand the tide's wrath!",
+  "combat.ability_maelstrom_faithful": "  The maelstrom weakens all foes caught in its pull!"
 }

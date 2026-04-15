@@ -271,6 +271,14 @@ public class Character
     public int TempDefenseBonus { get; set; } = 0;
     public int TempDefenseBonusDuration { get; set; } = 0;
     public bool DodgeNextAttack { get; set; } = false;
+
+    // Tank ability transient state (v0.56.0)
+    public int TempDamageReductionPercent { get; set; } = 0;    // Shield Wall Formation: % incoming damage reduced
+    public int TempDamageReductionDuration { get; set; } = 0;
+    public int TempThornReflectPercent { get; set; } = 0;       // Divine Mandate: % melee damage reflected to attacker
+    public int TempThornReflectDuration { get; set; } = 0;
+    public int TempPercentRegenPerRound { get; set; } = 0;       // Rage Challenge: % MaxHP regenerated per round
+    public int TempPercentRegenDuration { get; set; } = 0;
     /// <summary>Tracks hits taken this round for multi-hit damage reduction. Reset each combat round.</summary>
     public int _hitsThisRound = 0;
 

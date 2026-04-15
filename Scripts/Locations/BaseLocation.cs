@@ -5249,7 +5249,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine($"  - Ocean's Blessing: +{(int)(GameConfig.TideswornOceansBlessingBonus * 100)}% healing from abilities and spells");
-                terminal.WriteLine($"  - Ocean's Resilience: Regen {(int)(GameConfig.TideswornOceansResiliencePercent * 100)}% max HP/round when below 50% HP");
+                terminal.WriteLine($"  - Ocean's Resilience: Regen {(int)(GameConfig.TideswornOceansResiliencePercent * 100)}% max HP/round (+{(int)(GameConfig.TideswornOceansResilienceBelowHalfBonus * 100)}% below 50% HP)");
             }
             if (currentPlayer.Class == CharacterClass.Wavecaller)
             {

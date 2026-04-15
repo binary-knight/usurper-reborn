@@ -528,8 +528,11 @@ public static class SpellSystem
         // Spells don't auto-fail on natural 1 (unlike melee attacks) — only the flat fumble
         // chance from inexperience and failing to beat the DC cause failure. This follows
         // D&D 5e rules where nat 1/20 only apply to attack rolls, not ability checks.
-        bool spellFailed = (rollResult.IsCriticalFailure && rollResult.NaturalRoll == 0) || // Flat fumble from inexperience
-                           (!rollResult.Success && !rollResult.IsCriticalSuccess);           // Didn't beat DC (nat 1 with high mod can still succeed)
+        // v0.56.0: Healing spells never fizzle — dying because a heal fizzled is strictly bad UX.
+        bool isHealSpell = spellInfo.SpellType == "Heal";
+        bool spellFailed = !isHealSpell && (
+                           (rollResult.IsCriticalFailure && rollResult.NaturalRoll == 0) || // Flat fumble from inexperience
+                           (!rollResult.Success && !rollResult.IsCriticalSuccess));           // Didn't beat DC (nat 1 with high mod can still succeed)
         if (spellFailed)
         {
             result.Success = false;
@@ -1372,11 +1375,15 @@ public static class SpellSystem
     {
         switch (spellLevel)
         {
-            case 1: // Alethia's Ward - Protection +20, reflects 10% melee damage
-                result.ProtectionBonus = ScaleProtectionEffect(20 + (caster.Level / 8), caster, profMult);
+            case 1: // Alethia's Ward - Protection (scales with level) + thorn reflect (scales with INT)
+                // v0.56.0 rework: scaling protection (was +20 flat, now +15 + Level*2) and scaling reflect (was flat 10%, now 10% + INT*0.1%)
+                result.ProtectionBonus = ScaleProtectionEffect(15 + (caster.Level * 2), caster, profMult);
+                int reflectPct = 10 + (int)(caster.Intelligence * 0.1);
+                caster.TempThornReflectPercent = Math.Max(caster.TempThornReflectPercent, reflectPct);
+                caster.TempThornReflectDuration = 999;
                 result.Duration = 999;
                 result.SpecialEffect = "tidal_reflect";
-                result.Message += $" A barrier of living water surrounds {caster.Name2}! (+{result.ProtectionBonus} defense, reflects 10% melee damage)";
+                result.Message += $" A barrier of living water surrounds {caster.Name2}! (+{result.ProtectionBonus} defense, reflects {reflectPct}% melee damage)";
                 break;
             case 2: // Purifying Surge - 40-60 heal + cure disease/poison
                 int tideHeal2 = 40 + random.Next(21);

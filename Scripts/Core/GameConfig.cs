@@ -9,8 +9,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.55.1";
-    public const string VersionName = "The Specialist";
+    public const string Version = "0.56.0";
+    public const string VersionName = "Class Balance";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // Electron graphical client mode — emits JSON events via OSC sequences
@@ -898,13 +898,17 @@ public static partial class GameConfig
     public static readonly int[] HerbMaxCarry = { 0, 10, 5, 5, 3, 3 }; // Max carry per herb type (indexed by HerbType)
     // Alchemist Potion Mastery
     public const float AlchemistPotionMasteryBonus = 0.50f;  // Alchemist: +50% healing from potions and herbs
+
+    // Healer specialization heal bonus (v0.56.0) — applies to ability + spell heals cast by NPC healers
+    public const float HealerSpecHealBonus = 0.20f;   // +20% healing output for Holy/Restoration/Mystic/Minstrel/Apothecary/Spiritwalker specs
     // Magician Arcane Mastery
     public const float MagicianArcaneSpellBonus = 1.15f;     // Magician: +15% spell damage (Arcane Mastery passive)
     // Cleric Divine Grace
     public const float ClericDivineGraceBonus = 0.25f;       // Cleric: +25% healing from abilities and spells
     // Tidesworn Ocean's Blessing
     public const float TideswornOceansBlessingBonus = 0.25f;  // Tidesworn: +25% healing from abilities and spells
-    public const float TideswornOceansResiliencePercent = 0.02f; // Tidesworn: Regen 2% max HP/round when below 50% HP
+    public const float TideswornOceansResiliencePercent = 0.03f;       // Tidesworn: Regen 3% max HP/round (baseline)
+    public const float TideswornOceansResilienceBelowHalfBonus = 0.02f;  // Tidesworn: additional 2% max HP/round when below 50% HP (5% total)
     // Wavecaller Harmonic Resonance
     public const float WavecallerHarmonicResonanceBonus = 0.25f; // Wavecaller: +25% healing from abilities and spells
     public const float WavecallerReflectionPercent = 0.15f;      // Wavecaller: 15% damage reflection when Reflecting

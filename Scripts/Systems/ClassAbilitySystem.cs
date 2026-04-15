@@ -113,11 +113,52 @@ public static class ClassAbilitySystem
             Description = "A devastating war cry that forces all enemies to attack you for 3 rounds.",
             LevelRequired = 20,
             StaminaCost = 40,
-            Cooldown = 5,
+            Cooldown = 3,
             Type = AbilityType.Debuff,
             Duration = 3,
             SpecialEffect = "aoe_taunt",
             AvailableToClasses = new[] { CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Barbarian, CharacterClass.Tidesworn }
+        },
+        ["shield_wall_formation"] = new ClassAbility
+        {
+            Id = "shield_wall_formation",
+            Name = "Shield Wall Formation",
+            Description = "AoE taunt + 30% incoming damage reduction for 3 rounds. Protection spec: +10% extra reduction. Requires shield.",
+            LevelRequired = 40,
+            StaminaCost = 45,
+            Cooldown = 5,
+            Type = AbilityType.Defense,
+            Duration = 3,
+            SpecialEffect = "shield_wall_formation",
+            RequiresShield = true,
+            AvailableToClasses = new[] { CharacterClass.Warrior }
+        },
+        ["divine_mandate"] = new ClassAbility
+        {
+            Id = "divine_mandate",
+            Name = "Divine Mandate",
+            Description = "AoE taunt + 15% thorn reflect damage for 4 rounds. Guardian spec: +5% extra reflect. Requires shield.",
+            LevelRequired = 40,
+            StaminaCost = 50,
+            Cooldown = 5,
+            Type = AbilityType.Defense,
+            Duration = 4,
+            SpecialEffect = "divine_mandate",
+            RequiresShield = true,
+            AvailableToClasses = new[] { CharacterClass.Paladin }
+        },
+        ["rage_challenge"] = new ClassAbility
+        {
+            Id = "rage_challenge",
+            Name = "Rage Challenge",
+            Description = "AoE taunt + 5% MaxHP regen per round for 3 rounds. Juggernaut spec: +3% extra regen.",
+            LevelRequired = 40,
+            StaminaCost = 50,
+            Cooldown = 5,
+            Type = AbilityType.Defense,
+            Duration = 3,
+            SpecialEffect = "rage_challenge",
+            AvailableToClasses = new[] { CharacterClass.Barbarian }
         },
         ["execute"] = new ClassAbility
         {
@@ -339,12 +380,13 @@ public static class ClassAbilitySystem
         {
             Id = "lay_on_hands",
             Name = "Lay on Hands",
-            Description = "Channel divine power to heal your wounds.",
+            Description = "Channel divine power to heal yourself or a wounded ally.",
             LevelRequired = 1,
             StaminaCost = 25,
             Cooldown = 4,
             Type = AbilityType.Heal,
             BaseHealing = 35,  // Scales with CON/WIS
+            CanTargetAlly = true,
             AvailableToClasses = new[] { CharacterClass.Paladin }
         },
         ["divine_smite"] = new ClassAbility
@@ -648,10 +690,10 @@ public static class ClassAbilitySystem
         {
             Id = "backstab",
             Name = "Backstab",
-            Description = "Guaranteed critical hit from stealth. Requires dagger. 40 base damage x2 (crit), scales with STR+DEX.",
+            Description = "Guaranteed critical hit from stealth. Requires dagger. 40 base damage x1.75 (crit), scales with STR+DEX. Does not stack with regular crit rolls.",
             LevelRequired = 1,
-            StaminaCost = 20,
-            Cooldown = 2,
+            StaminaCost = 30,
+            Cooldown = 3,
             Type = AbilityType.Attack,
             BaseDamage = 40,
             SpecialEffect = "backstab",
@@ -955,14 +997,13 @@ public static class ClassAbilitySystem
         {
             Id = "song_of_rest",
             Name = "Song of Rest",
-            Description = "A soothing melody that heals the entire party.",
-            LevelRequired = 18,
+            Description = "A soothing melody that heals the entire party. Hummed if no instrument equipped.",
+            LevelRequired = 12,
             StaminaCost = 30,
             Cooldown = 4,
             Type = AbilityType.Heal,
             BaseHealing = 55,
             SpecialEffect = "party_song",
-            RequiredWeaponTypes = new[] { WeaponType.Instrument },
             AvailableToClasses = new[] { CharacterClass.Bard }
         },
         ["charm"] = new ClassAbility
@@ -1189,6 +1230,19 @@ public static class ClassAbilitySystem
             SpecialEffect = "fire",
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },
+        ["curative_tincture"] = new ClassAbility
+        {
+            Id = "curative_tincture",
+            Name = "Curative Tincture",
+            Description = "A simple healing draught for an ally. Early-game Alchemist heal.",
+            LevelRequired = 4,
+            StaminaCost = 15,
+            Cooldown = 2,
+            Type = AbilityType.Heal,
+            BaseHealing = 40,  // Scales with CON+WIS
+            CanTargetAlly = true,
+            AvailableToClasses = new[] { CharacterClass.Alchemist }
+        },
         ["healing_elixir"] = new ClassAbility
         {
             Id = "healing_elixir",
@@ -1198,9 +1252,22 @@ public static class ClassAbilitySystem
             StaminaCost = 20,
             Cooldown = 3,
             Type = AbilityType.Heal,
-            BaseHealing = 50,  // Healing - scales with CON+WIS, +50% from Potion Mastery
+            BaseHealing = 60,  // Healing - scales with CON+WIS, +50% from Potion Mastery
             CanTargetAlly = true,
             AvailableToClasses = new[] { CharacterClass.Alchemist }
+        },
+        ["mending_meditation"] = new ClassAbility
+        {
+            Id = "mending_meditation",
+            Name = "Mending Meditation",
+            Description = "Channel restorative energy into a wounded ally. Scales with WIS+INT.",
+            LevelRequired = 10,
+            StaminaCost = 20,
+            Cooldown = 3,
+            Type = AbilityType.Heal,
+            BaseHealing = 60,
+            CanTargetAlly = true,
+            AvailableToClasses = new[] { CharacterClass.Sage }
         },
         ["smoke_bomb"] = new ClassAbility
         {
@@ -1723,7 +1790,7 @@ public static class ClassAbilitySystem
         {
             Id = "riptide_strike",
             Name = "Riptide Strike",
-            Description = "A sweeping blow infused with tidal force. Target's next attack reduced by 25%.",
+            Description = "A sweeping blow infused with tidal force. Target's next attack reduced by 25%. Bonus damage vs weakened foes.",
             LevelRequired = 5, StaminaCost = 40, Cooldown = 2,
             Type = AbilityType.Attack, BaseDamage = 70,
             SpecialEffect = "riptide",
@@ -1753,10 +1820,10 @@ public static class ClassAbilitySystem
         {
             Id = "maelstrom_faithful",
             Name = "Maelstrom of the Faithful",
-            Description = "Holy maelstrom: damages all enemies. Self: +50 attack, +50 defense for 3 rounds.",
+            Description = "Holy maelstrom: damages all enemies and weakens them for 2 rounds. Self: +50 attack, +50 defense for 3 rounds.",
             LevelRequired = 40, StaminaCost = 90, Cooldown = 7,
             Type = AbilityType.Attack, BaseDamage = 70, AttackBonus = 50, DefenseBonus = 50, Duration = 3,
-            SpecialEffect = "aoe",
+            SpecialEffect = "maelstrom_faithful",
             AvailableToClasses = new[] { CharacterClass.Tidesworn }
         },
         ["abyssal_anchor"] = new ClassAbility
