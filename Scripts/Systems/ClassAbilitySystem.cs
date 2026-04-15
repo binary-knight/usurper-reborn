@@ -160,6 +160,39 @@ public static class ClassAbilitySystem
             SpecialEffect = "rage_challenge",
             AvailableToClasses = new[] { CharacterClass.Barbarian }
         },
+        ["shield_bash"] = new ClassAbility
+        {
+            // v0.57.0 Warrior L16 shield-scaling attack. Damage scales with weapon + shield block chance + half ArmPow.
+            // Gives Protection-spec warriors a damage ability that rewards investment in good shields.
+            Id = "shield_bash",
+            Name = "Shield Bash",
+            Description = "Slam your shield into the enemy. Damage scales with your shield's block chance. Requires a shield.",
+            LevelRequired = 16,
+            StaminaCost = 25,
+            Cooldown = 3,
+            Type = AbilityType.Attack,
+            BaseDamage = 30,
+            SpecialEffect = "shield_bash",
+            RequiresShield = true,
+            AvailableToClasses = new[] { CharacterClass.Warrior }
+        },
+        ["holy_shield_slam"] = new ClassAbility
+        {
+            // v0.57.0 Paladin L28 hybrid strike+heal. Damage scales with shield; small self-heal on hit.
+            // Guardian spec gets the shield damage/heal bonus stacked on top.
+            Id = "holy_shield_slam",
+            Name = "Holy Shield Slam",
+            Description = "Slam your shield with divine force. Damages the target and restores a small amount of your HP. Requires a shield.",
+            LevelRequired = 28,
+            StaminaCost = 35,
+            Cooldown = 4,
+            Type = AbilityType.Attack,
+            BaseDamage = 40,
+            BaseHealing = 20,
+            SpecialEffect = "holy_shield_slam",
+            RequiresShield = true,
+            AvailableToClasses = new[] { CharacterClass.Paladin }
+        },
         ["execute"] = new ClassAbility
         {
             Id = "execute",
@@ -231,13 +264,14 @@ public static class ClassAbilitySystem
         {
             Id = "iron_fortress",
             Name = "Iron Fortress",
-            Description = "Become an immovable bastion of steel.",
+            Description = "Become an immovable bastion of steel. Requires a shield.",
             LevelRequired = 85,
             StaminaCost = 80,
             Cooldown = 6,
             Type = AbilityType.Defense,
             DefenseBonus = 80,  // Scales with CON now
             Duration = 4,
+            RequiresShield = true,  // v0.57.0
             AvailableToClasses = new[] { CharacterClass.Warrior }
         },
         ["champion_strike"] = new ClassAbility
@@ -406,13 +440,14 @@ public static class ClassAbilitySystem
         {
             Id = "aura_of_protection",
             Name = "Aura of Protection",
-            Description = "Project a protective aura that increases defense. Scales with Wisdom.",
+            Description = "Project a protective aura that increases defense. Scales with Wisdom. Requires a shield.",
             LevelRequired = 20,
             StaminaCost = 40,
             Cooldown = 4,
             Type = AbilityType.Defense,
             DefenseBonus = 40,  // Scales with CON + WIS (Paladin)
             Duration = 4,
+            RequiresShield = true,  // v0.57.0
             AvailableToClasses = new[] { CharacterClass.Paladin }
         },
         ["holy_avenger"] = new ClassAbility
@@ -445,7 +480,7 @@ public static class ClassAbilitySystem
         {
             Id = "divine_shield",
             Name = "Divine Shield",
-            Description = "Become invulnerable for a short time.",
+            Description = "Become invulnerable for a short time. Requires a shield.",
             LevelRequired = 56,
             StaminaCost = 60,
             Cooldown = 7,
@@ -453,6 +488,7 @@ public static class ClassAbilitySystem
             DefenseBonus = 150,  // Near-invulnerable, scales with CON
             Duration = 2,
             SpecialEffect = "invulnerable",
+            RequiresShield = true,  // v0.57.0
             AvailableToClasses = new[] { CharacterClass.Paladin }
         },
         ["aurelion_blessing"] = new ClassAbility
@@ -2582,6 +2618,30 @@ public static class ClassAbilitySystem
             // This ensures abilities scale with gear and always beat basic attacks
             double weaponBonus = user.WeapPow * 0.25; // 25% of weapon power added
             double scaledDamage = (ability.BaseDamage + weaponBonus) * totalScale;
+
+            // v0.57.0 shield-scaling damage — Shield Bash / Holy Shield Slam use the equipped shield's
+            // BlockChance and half the armor power, so investment in a higher-tier shield directly
+            // increases the ability's damage. Missing shield is already blocked upstream by RequiresShield.
+            if (ability.SpecialEffect == "shield_bash" || ability.SpecialEffect == "holy_shield_slam")
+            {
+                var shield = user.GetEquipment(EquipmentSlot.OffHand);
+                if (shield != null)
+                {
+                    double shieldBonus = shield.BlockChance + (user.ArmPow * 0.5);
+                    scaledDamage += shieldBonus * levelScale;
+                }
+            }
+
+            // v0.57.0 spec tank shield damage bonus — Protection Warrior +20%, Guardian Paladin +15%
+            // when shield is equipped. Applies to ALL class-ability damage (not just shield abilities)
+            // so spec tanks get meaningfully better at everything they do while sword-and-board.
+            if (user is NPC specTankNpc && user.HasShieldEquipped)
+            {
+                float bonus = UsurperRemake.Data.SpecializationData.GetShieldDamageBonus(specTankNpc.Specialization);
+                if (bonus > 0f)
+                    scaledDamage *= 1.0 + bonus;
+            }
+
             result.Damage = (int)(scaledDamage * (0.9 + random.NextDouble() * 0.2));
         }
 
@@ -2596,6 +2656,14 @@ public static class ClassAbilitySystem
                 healingMultiplier += GameConfig.TideswornOceansBlessingBonus; // Ocean's Blessing: +25% healing
             if (user.Class == CharacterClass.Wavecaller)
                 healingMultiplier += GameConfig.WavecallerHarmonicResonanceBonus; // Harmonic Resonance: +25% healing
+
+            // v0.57.0 Guardian Paladin +15% heal while shield equipped
+            if (user is NPC specHealNpc && user.HasShieldEquipped)
+            {
+                float bonus = UsurperRemake.Data.SpecializationData.GetShieldHealBonus(specHealNpc.Specialization);
+                if (bonus > 0f) healingMultiplier += bonus;
+            }
+
             result.Healing = (int)(ability.BaseHealing * totalScale * healingMultiplier * (0.9 + random.NextDouble() * 0.2));
         }
 
@@ -2610,7 +2678,19 @@ public static class ClassAbilitySystem
         {
             // Defense bonuses scale with stats for defense-type abilities
             double defScale = ability.Type == AbilityType.Defense ? totalScale : levelScale;
-            result.DefenseBonus = (int)(ability.DefenseBonus * defScale);
+            double defBonus = ability.DefenseBonus * defScale;
+
+            // v0.57.0 — tank-class Defense abilities get multiplied by (1 + shield.BlockChance/100)
+            // when a shield is equipped. Higher-tier shields directly boost taunt/DEF ability values.
+            // Only applies when the bonus is positive (don't make rage penalties worse).
+            if (defBonus > 0 && ability.Type == AbilityType.Defense && user.HasShieldEquipped)
+            {
+                var shield = user.GetEquipment(EquipmentSlot.OffHand);
+                if (shield != null && shield.BlockChance > 0)
+                    defBonus *= 1.0 + (shield.BlockChance / 100.0);
+            }
+
+            result.DefenseBonus = (int)defBonus;
         }
 
         result.Duration = ability.Duration;

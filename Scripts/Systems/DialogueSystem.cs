@@ -208,10 +208,17 @@ namespace UsurperRemake.Systems
                     return !story.HasStoryFlag(condition.StringValue ?? "");
 
                 case ConditionType.AlignmentAbove:
+                    // v0.57.0 — Balanced players satisfy BOTH AlignmentAbove and AlignmentBelow gates
+                    // so NPCs with good-aligned dialogue branches open to them, matching the plan's
+                    // "access to both good and evil NPC dialogue paths" intent.
+                    if (UsurperRemake.Systems.AlignmentSystem.Instance.IsBalanced(currentPlayer))
+                        return true;
                     var netAlignment = currentPlayer.Chivalry - currentPlayer.Darkness;
                     return netAlignment > condition.IntValue;
 
                 case ConditionType.AlignmentBelow:
+                    if (UsurperRemake.Systems.AlignmentSystem.Instance.IsBalanced(currentPlayer))
+                        return true;
                     var netAlign2 = currentPlayer.Chivalry - currentPlayer.Darkness;
                     return netAlign2 < condition.IntValue;
 

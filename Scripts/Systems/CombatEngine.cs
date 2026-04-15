@@ -23734,6 +23734,23 @@ public partial class CombatEngine
                     return (fearBonus, "Your dark presence terrifies the enemy!");
                 }
                 break;
+
+            case AlignmentSystem.AlignmentType.Balanced:
+                // v0.57.0 — Balanced walks both paths. Their bonus is situational rather than target-gated:
+                // a smaller evil-target bonus (they still care about protecting the world), plus a chance to
+                // "see clearly" between the paths and find a weak point for a flat bonus. Falls through to
+                // no-bonus otherwise. Matches the symmetric +5%/+5% combat modifier parity with Good.
+                if (targetIsEvil)
+                {
+                    long balancedEvilBonus = (long)(baseDamage * 0.10);
+                    return (balancedEvilBonus, "Your clarity between light and shadow guides your strike!");
+                }
+                if (random.Next(100) < 10)
+                {
+                    long balancedInsightBonus = (long)(baseDamage * 0.10);
+                    return (balancedInsightBonus, "You see the path between — the enemy's weakness lies bare!");
+                }
+                break;
         }
 
         return (0, "");

@@ -1239,8 +1239,9 @@ public class BankLocation : BaseLocation
         terminal.WriteLine("");
 
         // Consequences happen regardless of outcome
+        // v0.57.0: bank robbery already zeros chivalry (kept for severity) but darkness gain is now paired-movement-style
         currentPlayer.Chivalry = 0;
-        currentPlayer.Darkness += 100;
+        UsurperRemake.Systems.AlignmentSystem.Instance.ModifyAlignment(currentPlayer, 0, 100, "bank robbery");
         currentPlayer.BankRobberyAttempts--;
         currentPlayer.WantedLvl += 5;
         _robberyAttemptsToday++;

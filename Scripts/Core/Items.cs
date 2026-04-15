@@ -966,13 +966,16 @@ public class Equipment
             return false;
         }
 
-        if (RequiresGood && character.Chivalry <= character.Darkness)
+        // v0.57.0 — Balanced characters (both > 100, diff < 100) can equip both Good-aligned AND
+        // Evil-aligned items. Plan intent: walking both paths earns you access to both sides' gear.
+        bool isBalanced = UsurperRemake.Systems.AlignmentSystem.Instance.IsBalanced(character);
+        if (RequiresGood && !isBalanced && character.Chivalry <= character.Darkness)
         {
             reason = Loc.Get("ui.requires_good");
             return false;
         }
 
-        if (RequiresEvil && character.Darkness <= character.Chivalry)
+        if (RequiresEvil && !isBalanced && character.Darkness <= character.Chivalry)
         {
             reason = Loc.Get("ui.requires_evil");
             return false;

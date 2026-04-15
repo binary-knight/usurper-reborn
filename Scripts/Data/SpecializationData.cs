@@ -525,4 +525,33 @@ public static class SpecializationData
         var def = GetSpec(spec);
         return def?.Role == SpecRole.Tank;
     }
+
+    /// <summary>
+    /// v0.57.0 — damage multiplier granted to spec tanks when a shield is equipped.
+    /// Protection (Warrior): +20%. Guardian (Paladin): +15%. Juggernaut (Barbarian) gets 0% —
+    /// Juggernauts are rage-based, no-shield by design.
+    /// </summary>
+    public static float GetShieldDamageBonus(ClassSpecialization spec)
+    {
+        return spec switch
+        {
+            ClassSpecialization.Protection => 0.20f,
+            ClassSpecialization.Guardian => 0.15f,
+            _ => 0f
+        };
+    }
+
+    /// <summary>
+    /// v0.57.0 — heal multiplier granted to spec tanks when a shield is equipped.
+    /// Only Guardian Paladin gets this — they're the hybrid tank/support spec that should be
+    /// meaningfully rewarded for sword-and-board play on the healing side too.
+    /// </summary>
+    public static float GetShieldHealBonus(ClassSpecialization spec)
+    {
+        return spec switch
+        {
+            ClassSpecialization.Guardian => 0.15f,
+            _ => 0f
+        };
+    }
 }

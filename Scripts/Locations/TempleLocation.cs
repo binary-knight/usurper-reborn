@@ -126,6 +126,10 @@ public partial class TempleLocation : BaseLocation
                     case GameConfig.TempleMenuContribute: // "C"
                         await ProcessContribute();
                         break;
+
+                    case GameConfig.TempleMenuConfess: // "O" — v0.57.0 confess sins (chivalry cleansing)
+                        await ProcessConfession();
+                        break;
                         
                     case GameConfig.TempleMenuStatus: // "S"
                         await DisplayPlayerStatus();
@@ -290,6 +294,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.sr_holy_news"));
             terminal.WriteLine(Loc.Get("temple.sr_altars"));
             terminal.WriteLine(Loc.Get("temple.sr_contribute"));
+            terminal.WriteLine(Loc.Get("temple.sr_confess"));
             terminal.WriteLine(Loc.Get("temple.sr_item_sacrifice"));
             terminal.WriteLine(Loc.Get("temple.sr_status"));
             terminal.WriteLine(Loc.Get("temple.sr_god_ranking"));
@@ -423,7 +428,17 @@ public partial class TempleLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("]");
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("temple.menu_item_sacrifice"));
+            terminal.Write(Loc.Get("temple.menu_item_sacrifice"));
+
+            // v0.57.0 [O] Confess sins (chivalry cleansing — counterpart to [D]esecrate)
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("O");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("temple.menu_confess"));
 
             // Row 3
             terminal.SetColor("darkgray");
@@ -845,6 +860,77 @@ public partial class TempleLocation : BaseLocation
         await PerformEnhancedDesecration(selectedGod);
     }
     
+    /// <summary>
+    /// <summary>
+    /// v0.57.0 confession — pay gold to reduce accumulated chivalry. Counterpart to desecration's
+    /// darkness cleanse. Lets players who over-accumulated chivalry (via paired alignment movement,
+    /// temple contributions, etc.) bring themselves back toward neutral without needing to commit
+    /// evil deeds. Rate: 100g per 1 chivalry, capped at 100 chivalry per visit.
+    /// </summary>
+    private async Task ProcessConfession()
+    {
+        terminal.WriteLine("");
+        if (currentPlayer.Chivalry <= 0)
+        {
+            terminal.WriteLine(Loc.Get("temple.confess_no_sins"), "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // v0.57.0 — daily cap matches desecration (2/day). Without this, a patient player could
+        // farm Temple visits to cleanse thousands of chivalry in one session, trivialising alignment.
+        if (currentPlayer.ConfessionsToday >= 2)
+        {
+            terminal.WriteLine(Loc.Get("temple.confess_daily_limit"), "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        int maxReducible = (int)Math.Min(currentPlayer.Chivalry, GameConfig.ConfessionMaxChivalryPerVisit);
+        long maxCost = (long)maxReducible * GameConfig.ConfessionGoldPerChivalry;
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(Loc.Get("temple.confess_header"));
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("temple.confess_intro"));
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("temple.confess_rate", GameConfig.ConfessionGoldPerChivalry));
+        terminal.WriteLine(Loc.Get("temple.confess_cap", GameConfig.ConfessionMaxChivalryPerVisit));
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("temple.confess_current", currentPlayer.Chivalry, currentPlayer.Gold));
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        var input = await terminal.GetInputAsync(Loc.Get("temple.confess_prompt", maxReducible));
+        if (!int.TryParse(input, out int requested) || requested <= 0)
+        {
+            terminal.WriteLine(Loc.Get("temple.confess_cancelled"), "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        int amount = Math.Min(requested, maxReducible);
+        long cost = (long)amount * GameConfig.ConfessionGoldPerChivalry;
+        if (currentPlayer.Gold < cost)
+        {
+            terminal.WriteLine(Loc.Get("temple.confess_too_poor", cost), "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        currentPlayer.Gold -= cost;
+        // v0.57.0 — route through AlignmentSystem so large confessions fire the news pipeline.
+        // Darkness isn't paired-raised — confession just cleanses chivalry, doesn't morally tarnish.
+        UsurperRemake.Systems.AlignmentSystem.Instance.ModifyAlignment(currentPlayer, -amount, 0, "confessed sins");
+        currentPlayer.ConfessionsToday++;
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("temple.confess_success", amount, cost), "bright_yellow");
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("temple.confess_flavor"));
+        await terminal.PressAnyKey();
+    }
+
     /// <summary>
     /// Process contribution/sacrifice to gods (Pascal TEMPLE.PAS contribute_to_god)
     /// </summary>
@@ -2037,11 +2123,11 @@ public partial class TempleLocation : BaseLocation
         // Process desecration in god system
         godSystem.ProcessAltarDesecration(god.Name, currentPlayer.Name2);
 
-        // Award darkness and XP (from Pascal)
-        int darknessGain = random.Next(10, 25);
+        // v0.57.0: desecrate altar bumped 10-25 → 15-30, plus paired chivalry loss via ChangeAlignment helper
+        int darknessGain = random.Next(15, 31);
         long xpGain = (long)(Math.Pow(currentPlayer.Level, 1.5) * 20);
 
-        currentPlayer.Darkness += darknessGain;
+        UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(currentPlayer, darknessGain, isGood: false, reason: $"desecrated altar of {god.Name}");
         currentPlayer.Experience += xpGain;
         currentPlayer.DarkNr--;
         currentPlayer.DesecrationsToday++;

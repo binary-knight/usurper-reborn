@@ -9,8 +9,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.56.1";
-    public const string VersionName = "Class Balance";
+    public const string Version = "0.57.0";
+    public const string VersionName = "Alignment and Shields";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // Electron graphical client mode — emits JSON events via OSC sequences
@@ -590,7 +590,7 @@ public static partial class GameConfig
 
     // NPC Murder/Assassination System (v0.40.2)
     public const float MurderGoldTheftPercent = 0.50f;       // Steal 50% of NPC's gold on murder
-    public const int MurderDarknessGain = 25;                // Darkness alignment shift for murder
+    public const int MurderDarknessGain = 50;                // v0.57.0: 25 → 50 (paired with -25 chivalry). Feedback: evil-deed rewards too stingy to make Darkness-focused builds viable.
     public const float MurderGuardInterventionChance = 0.30f; // 30% chance guard joins NPC's side
     public const float MurderGrudgeChance = 1.00f;           // 100% grudge encounter after murder (guaranteed)
     public const float MurderGrudgeRageBonusHP = 0.20f;      // +20% HP for murder revenge NPC
@@ -1455,7 +1455,12 @@ public static partial class GameConfig
     public const string TempleMenuStatus = "S";        // Status
     public const string TempleMenuGodRanking = "G";    // God ranking
     public const string TempleMenuHolyNews = "H";      // Holy news
+    public const string TempleMenuConfess = "O";       // v0.57.0: cOnfess sins — chivalry cleansing path
     public const string TempleMenuReturn = "R";        // Return
+
+    // v0.57.0 Temple confession — pay gold to reduce chivalry (opposite of desecrate for darkness)
+    public const int ConfessionGoldPerChivalry = 100;      // Gold cost per 1 chivalry reduced
+    public const int ConfessionMaxChivalryPerVisit = 100;  // Cap per visit
     
     // God World Menu Options (from Pascal GODWORLD.PAS)
     public const string GodWorldMenuImmortals = "I";       // List immortals

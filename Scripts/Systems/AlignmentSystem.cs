@@ -34,7 +34,8 @@ namespace UsurperRemake.Systems
             Good,           // High chivalry
             Neutral,        // Balanced or low both
             Dark,           // High darkness
-            Evil            // Very high darkness, no chivalry
+            Evil,           // Very high darkness, no chivalry
+            Balanced        // v0.57.0: both scales > 100 and within 100 of each other — walks between the light and the dark
         }
 
         /// <summary>
@@ -42,6 +43,9 @@ namespace UsurperRemake.Systems
         /// </summary>
         public AlignmentType GetAlignment(Character character)
         {
+            // v0.57.0 — null guard. IsBalanced and callers from tax/knighting/dialogue code can
+            // theoretically pass a null character during edge cases (dead NPC references, etc.).
+            if (character == null) return AlignmentType.Neutral;
             long chivalry = character.Chivalry;
             long darkness = character.Darkness;
             long diff = chivalry - darkness;
@@ -50,7 +54,21 @@ namespace UsurperRemake.Systems
             if (darkness >= 800 && chivalry < 100) return AlignmentType.Evil;
             if (diff >= 400) return AlignmentType.Good;
             if (diff <= -400) return AlignmentType.Dark;
+            // v0.57.0 Balanced: both scales materially accumulated AND within 100 of each other.
+            // This is the reward for walking both paths — access to dialogue/merchants on both sides.
+            if (chivalry > 100 && darkness > 100 && Math.Abs(diff) < 100) return AlignmentType.Balanced;
             return AlignmentType.Neutral;
+        }
+
+        /// <summary>
+        /// v0.57.0: true when the player has meaningfully accumulated both Chivalry and Darkness
+        /// and is walking the line between them — grants access to both good-aligned and evil-aligned
+        /// NPC dialogue/quests. Dialogue/faction code that previously checked only good-vs-evil should
+        /// also check `IsBalanced` to open both branches.
+        /// </summary>
+        public bool IsBalanced(Character character)
+        {
+            return GetAlignment(character) == AlignmentType.Balanced;
         }
 
         /// <summary>
@@ -66,6 +84,7 @@ namespace UsurperRemake.Systems
                 AlignmentType.Neutral => (Loc.Get("alignment.neutral"), "gray"),
                 AlignmentType.Dark => (Loc.Get("alignment.dark"), "red"),
                 AlignmentType.Evil => (Loc.Get("alignment.evil"), "bright_red"),
+                AlignmentType.Balanced => (Loc.Get("alignment.balanced"), "bright_magenta"),
                 _ => (Loc.Get("alignment.unknown"), "white")
             };
         }
@@ -80,12 +99,13 @@ namespace UsurperRemake.Systems
 
             if (isShadyShop)
             {
-                // Shady shops favor dark characters
+                // Shady shops favor dark characters (Balanced gets neutral — they walk in without trouble)
                 return alignment switch
                 {
                     AlignmentType.Holy => 1.5f,      // 50% markup for holy characters
                     AlignmentType.Good => 1.25f,    // 25% markup for good characters
                     AlignmentType.Neutral => 1.0f,  // Normal price
+                    AlignmentType.Balanced => 0.95f, // v0.57.0 — slight discount; they know the owners
                     AlignmentType.Dark => 0.9f,     // 10% discount
                     AlignmentType.Evil => 0.75f,    // 25% discount for evil
                     _ => 1.0f
@@ -93,12 +113,13 @@ namespace UsurperRemake.Systems
             }
             else
             {
-                // Legitimate shops favor good characters
+                // Legitimate shops favor good characters (Balanced accepted — not a pariah like evil)
                 return alignment switch
                 {
                     AlignmentType.Holy => 0.8f,     // 20% discount for holy
                     AlignmentType.Good => 0.9f,    // 10% discount for good
                     AlignmentType.Neutral => 1.0f, // Normal price
+                    AlignmentType.Balanced => 0.95f, // v0.57.0 — slight discount; they're respected on both sides
                     AlignmentType.Dark => 1.15f,   // 15% markup
                     AlignmentType.Evil => 1.4f,    // 40% markup for evil
                     _ => 1.0f
@@ -150,6 +171,11 @@ namespace UsurperRemake.Systems
             if ((playerAlignment == AlignmentType.Evil || playerAlignment == AlignmentType.Dark) && npcIsEvil)
                 return 1.5f; // Evil characters respect each other
 
+            // v0.57.0 Balanced — good NPCs and evil NPCs both treat the player better than strangers,
+            // because the player has meaningfully acted on both sides. Pragmatism earns respect.
+            if (playerAlignment == AlignmentType.Balanced && (npcIsGood || npcIsEvil))
+                return 1.3f;
+
             // Opposite alignments clash
             if ((playerAlignment == AlignmentType.Holy || playerAlignment == AlignmentType.Good) && npcIsEvil)
                 return 0.5f; // 50% worse reactions
@@ -175,6 +201,9 @@ namespace UsurperRemake.Systems
                 AlignmentType.Good => (1.05f, 1.05f),
                 // Neutral: No bonuses
                 AlignmentType.Neutral => (1.0f, 1.0f),
+                // v0.57.0 Balanced: both-sides player. Slight attack and defense bonus — their willingness to
+                // act on either moral path gives them breadth, matching the Good tier's symmetric bonus.
+                AlignmentType.Balanced => (1.05f, 1.05f),
                 // Dark: Attack boost, slight defense penalty
                 AlignmentType.Dark => (1.1f, 0.95f),
                 // Evil: Strong attack, defense penalty
@@ -206,6 +235,24 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v0.57.0 paired alignment movement — a good deed raises Chivalry AND lowers Darkness,
+        /// an evil deed raises Darkness AND lowers Chivalry. The opposite side moves 50% of the
+        /// primary amount (minimum 1 when amount > 0). Feedback from playtesters: without this,
+        /// staying neutral was almost impossible because nothing reduced one scale when the other
+        /// moved — paired movement lets evil deeds naturally cleanse accumulated chivalry and
+        /// vice versa, making "Balanced" a meaningful alignment target.
+        /// </summary>
+        public void ChangeAlignment(Character character, int amount, bool isGood, string reason)
+        {
+            if (amount <= 0) return;
+            int opposite = Math.Max(1, amount / 2);
+            if (isGood)
+                ModifyAlignment(character, amount, -opposite, reason);
+            else
+                ModifyAlignment(character, -opposite, amount, reason);
+        }
+
+        /// <summary>
         /// Get special abilities available based on alignment
         /// </summary>
         public List<string> GetAlignmentAbilities(Character character)
@@ -231,6 +278,14 @@ namespace UsurperRemake.Systems
                 case AlignmentType.Neutral:
                     abilities.Add(Loc.Get("alignment.ability_diplomatic_immunity"));
                     abilities.Add(Loc.Get("alignment.ability_balanced_path"));
+                    break;
+
+                case AlignmentType.Balanced:
+                    // v0.57.0 — walking both paths opens up dialogue, merchants, and quests on both sides.
+                    abilities.Add(Loc.Get("alignment.ability_walks_both_paths"));
+                    abilities.Add(Loc.Get("alignment.ability_diplomatic_immunity"));
+                    abilities.Add(Loc.Get("alignment.ability_merchant_trust"));
+                    abilities.Add(Loc.Get("alignment.ability_criminal_respect"));
                     break;
 
                 case AlignmentType.Dark:
@@ -338,6 +393,33 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("alignment.event_str_temp"));
                     await Task.Delay(2000);
                     return true;
+
+                case AlignmentType.Balanced:
+                    // v0.57.0 — Balanced players walk both paths, so their events are a coin flip
+                    // between a good-aligned merchant encounter and a dark-aligned XP whisper.
+                    // Without this case they'd never trigger events at all.
+                    if (_random.Next(2) == 0)
+                    {
+                        terminal.SetColor("green");
+                        terminal.WriteLine(Loc.Get("alignment.event_merchant_approaches"));
+                        terminal.SetColor("white");
+                        int gold = _random.Next(20, 100);
+                        terminal.WriteLine(Loc.Get("alignment.event_merchant_thanks", gold));
+                        player.Gold += gold;
+                        await Task.Delay(2000);
+                        return true;
+                    }
+                    else
+                    {
+                        terminal.SetColor("bright_magenta");
+                        terminal.WriteLine(Loc.Get("alignment.event_shadow_whispers"));
+                        terminal.SetColor("gray");
+                        int xpGain = Math.Max(50, player.Level * 10);
+                        player.Experience += xpGain;
+                        terminal.WriteLine(Loc.Get("alignment.event_forbidden_xp", xpGain));
+                        await Task.Delay(2000);
+                        return true;
+                    }
             }
 
             return false;

@@ -665,6 +665,7 @@ public class Character
     public int GamblingRoundsToday { get; set; } = 0;           // Daily gambling counter (max 10)
     public int PitFightsToday { get; set; } = 0;                // Daily pit fight counter (max 3)
     public int DesecrationsToday { get; set; } = 0;             // Daily desecration counter (max 2)
+    public int ConfessionsToday { get; set; } = 0;              // v0.57.0: Daily confession counter (max 2, matches desecration cadence)
     public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
     public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack
     public long LoanInterestAccrued { get; set; } = 0;          // Total interest accrued
@@ -697,9 +698,9 @@ public class Character
 
     public bool HasShieldEquipped =>
         EquippedItems.TryGetValue(EquipmentSlot.OffHand, out var offId) && offId > 0 &&
-        EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.Shield ||
-        EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.Buckler ||
-        EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.TowerShield;
+        (EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.Shield
+         || EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.Buckler
+         || EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.TowerShield);
 
     public bool IsTwoHanding =>
         EquippedItems.TryGetValue(EquipmentSlot.MainHand, out var mainId) && mainId > 0 &&

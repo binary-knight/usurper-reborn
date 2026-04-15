@@ -4556,6 +4556,7 @@ public partial class GameEngine
         player.GamblingRoundsToday = playerData.GamblingRoundsToday;
         player.PitFightsToday = playerData.PitFightsToday;
         player.DesecrationsToday = playerData.DesecrationsToday;
+        player.ConfessionsToday = playerData.ConfessionsToday;
         player.LoanAmount = playerData.LoanAmount;
         player.LoanDaysRemaining = playerData.LoanDaysRemaining;
         player.LoanInterestAccrued = playerData.LoanInterestAccrued;

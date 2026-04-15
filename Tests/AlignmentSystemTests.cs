@@ -71,8 +71,10 @@ public class AlignmentSystemTests
     }
 
     [Fact]
-    public void GetAlignment_Neutral_WhenValuesAreBalanced()
+    public void GetAlignment_Balanced_WhenBothAreHighAndCloseTogether()
     {
+        // v0.57.0: 300/300 now maps to "Balanced" (both > 100, diff < 100) — the explicit
+        // neutral-between-light-and-dark state that unlocks access to dialogue on both sides.
         var character = new Character
         {
             Chivalry = 300,
@@ -81,7 +83,7 @@ public class AlignmentSystemTests
 
         var alignment = _alignmentSystem.GetAlignment(character);
 
-        alignment.Should().Be(AlignmentSystem.AlignmentType.Neutral);
+        alignment.Should().Be(AlignmentSystem.AlignmentType.Balanced);
     }
 
     [Fact]
@@ -126,6 +128,7 @@ public class AlignmentSystemTests
     [InlineData(AlignmentSystem.AlignmentType.Neutral, "Neutral", "gray")]
     [InlineData(AlignmentSystem.AlignmentType.Dark, "Dark", "red")]
     [InlineData(AlignmentSystem.AlignmentType.Evil, "Evil", "bright_red")]
+    [InlineData(AlignmentSystem.AlignmentType.Balanced, "Balanced", "bright_magenta")]
     public void GetAlignmentDisplay_ReturnsCorrectTextAndColor(
         AlignmentSystem.AlignmentType targetAlignment,
         string expectedText,
@@ -148,6 +151,7 @@ public class AlignmentSystemTests
     [InlineData(AlignmentSystem.AlignmentType.Holy, 0.8f)]
     [InlineData(AlignmentSystem.AlignmentType.Good, 0.9f)]
     [InlineData(AlignmentSystem.AlignmentType.Neutral, 1.0f)]
+    [InlineData(AlignmentSystem.AlignmentType.Balanced, 0.95f)]
     [InlineData(AlignmentSystem.AlignmentType.Dark, 1.15f)]
     [InlineData(AlignmentSystem.AlignmentType.Evil, 1.4f)]
     public void GetPriceModifier_LegitimateShop_ReturnsCorrectValue(
@@ -181,6 +185,7 @@ public class AlignmentSystemTests
     [InlineData(AlignmentSystem.AlignmentType.Holy, 1.5f)]
     [InlineData(AlignmentSystem.AlignmentType.Good, 1.25f)]
     [InlineData(AlignmentSystem.AlignmentType.Neutral, 1.0f)]
+    [InlineData(AlignmentSystem.AlignmentType.Balanced, 0.95f)]
     [InlineData(AlignmentSystem.AlignmentType.Dark, 0.9f)]
     [InlineData(AlignmentSystem.AlignmentType.Evil, 0.75f)]
     public void GetPriceModifier_ShadyShop_ReturnsCorrectValue(
@@ -214,6 +219,7 @@ public class AlignmentSystemTests
     [InlineData(AlignmentSystem.AlignmentType.Holy, 1.0f, 1.1f)]
     [InlineData(AlignmentSystem.AlignmentType.Good, 1.05f, 1.05f)]
     [InlineData(AlignmentSystem.AlignmentType.Neutral, 1.0f, 1.0f)]
+    [InlineData(AlignmentSystem.AlignmentType.Balanced, 1.05f, 1.05f)]
     [InlineData(AlignmentSystem.AlignmentType.Dark, 1.1f, 0.95f)]
     [InlineData(AlignmentSystem.AlignmentType.Evil, 1.2f, 0.9f)]
     public void GetCombatModifiers_ReturnsCorrectValues(
@@ -369,10 +375,12 @@ public class AlignmentSystemTests
         {
             AlignmentSystem.AlignmentType.Holy => new Character { Chivalry = 850, Darkness = 50 },
             AlignmentSystem.AlignmentType.Good => new Character { Chivalry = 600, Darkness = 100 },
-            AlignmentSystem.AlignmentType.Neutral => new Character { Chivalry = 300, Darkness = 300 },
+            // v0.57.0: Neutral now means both scales low — 300/300 became "Balanced" under the new paired-movement rules.
+            AlignmentSystem.AlignmentType.Neutral => new Character { Chivalry = 50, Darkness = 50 },
+            AlignmentSystem.AlignmentType.Balanced => new Character { Chivalry = 300, Darkness = 300 },
             AlignmentSystem.AlignmentType.Dark => new Character { Chivalry = 100, Darkness = 600 },
             AlignmentSystem.AlignmentType.Evil => new Character { Chivalry = 50, Darkness = 850 },
-            _ => new Character { Chivalry = 300, Darkness = 300 }
+            _ => new Character { Chivalry = 50, Darkness = 50 }
         };
     }
 

@@ -3234,7 +3234,14 @@ public class MainStreetLocation : BaseLocation
         long chivalry = currentPlayer.Chivalry;
         string alignmentDesc;
         string alignColor;
-        if (chivalry >= 100)
+        // v0.57.0 — Balanced alignment is not representable by Chivalry alone; check the alignment
+        // system first and short-circuit before the chivalry-scale bucketing.
+        if (UsurperRemake.Systems.AlignmentSystem.Instance.IsBalanced(currentPlayer))
+        {
+            alignmentDesc = Loc.Get("alignment.balanced");
+            alignColor = "bright_magenta";
+        }
+        else if (chivalry >= 100)
         {
             alignmentDesc = Loc.Get("main_street.align_paragon");
             alignColor = "bright_cyan";

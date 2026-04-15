@@ -4613,7 +4613,8 @@ public abstract class BaseLocation
             }
 
             currentPlayer.PKills++;
-            currentPlayer.Darkness += GameConfig.MurderDarknessGain;
+            // v0.57.0 paired alignment movement — murder gains darkness AND burns chivalry
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(currentPlayer, GameConfig.MurderDarknessGain, isGood: false, reason: "murder");
 
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("base.attack_darkness", GameConfig.MurderDarknessGain));
@@ -4631,7 +4632,8 @@ public abstract class BaseLocation
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("base.attack_remember"));
             currentPlayer.PDefeats++;
-            currentPlayer.Darkness += 10; // Still get some darkness for the attempt
+            // v0.57.0 — failed murder attempt also goes through paired movement (intent matters).
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 10, isGood: false, reason: "attempted murder");
 
             // Even failed murder attempts have consequences
             if (!isBountyTarget)

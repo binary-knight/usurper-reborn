@@ -524,8 +524,12 @@ namespace UsurperRemake.Systems
                     return savedGods >= 2;
 
                 case "TeamBetrayal":
-                    // Demonstrated change through positive actions
-                    return player.Chivalry > player.Darkness && profile.ActsOfKindness.Count >= 5;
+                    // Demonstrated change through positive actions.
+                    // v0.57.0 — Balanced players qualify even with chivalry == darkness; what matters
+                    // for forgiveness is the kindness record, not which scale is numerically higher.
+                    bool netGoodOrBalanced = player.Chivalry > player.Darkness
+                        || UsurperRemake.Systems.AlignmentSystem.Instance.IsBalanced(player);
+                    return netGoodOrBalanced && profile.ActsOfKindness.Count >= 5;
 
                 case "KingsAdvisor":
                     // Proved commitment to realm

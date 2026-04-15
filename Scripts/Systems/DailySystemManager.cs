@@ -334,6 +334,7 @@ public class DailySystemManager
         player.GamblingRoundsToday = 0;
         player.PitFightsToday = 0;
         player.DesecrationsToday = 0;
+        player.ConfessionsToday = 0;  // v0.57.0
 
         // Reset session XP tracking (prevents bypass by logging out/in to clear diminishing returns)
         player.SessionXPEarned = 0;

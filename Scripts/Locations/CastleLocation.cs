@@ -6302,7 +6302,10 @@ public class CastleLocation : BaseLocation
         bool hasChivalry = currentPlayer.Chivalry >= 200;
         bool hasFame = currentPlayer.Fame >= 150;
         bool hasLevel = currentPlayer.Level >= 15;
-        bool notEvil = currentPlayer.Darkness < currentPlayer.Chivalry;
+        // v0.57.0 — Balanced players (both scales > 100, within 100 of each other) qualify for
+        // knighting via the "walks both paths" allowance, even if darkness briefly ≥ chivalry.
+        bool notEvil = currentPlayer.Darkness < currentPlayer.Chivalry
+            || UsurperRemake.Systems.AlignmentSystem.Instance.IsBalanced(currentPlayer);
 
         if (currentPlayer.IsKnighted)
         {

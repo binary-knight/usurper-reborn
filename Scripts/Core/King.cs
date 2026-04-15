@@ -140,11 +140,13 @@ public class King
             foreach (var npc in activeNPCs)
             {
                 var align = alignSys.GetAlignment(npc);
+                // v0.57.0 — Balanced NPCs count as both Good-tax and Evil-tax targets (they walk
+                // both paths) and also fit the Neutral bucket since they're not aligned either way.
                 bool taxable = TaxAlignment switch
                 {
-                    GameConfig.TaxAlignment.Good => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Good || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Holy,
-                    GameConfig.TaxAlignment.Evil => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Dark,
-                    GameConfig.TaxAlignment.Neutral => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Neutral,
+                    GameConfig.TaxAlignment.Good => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Good || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Holy || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Balanced,
+                    GameConfig.TaxAlignment.Evil => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Dark || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Balanced,
+                    GameConfig.TaxAlignment.Neutral => align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Neutral || align == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Balanced,
                     _ => true
                 };
                 if (taxable) npcCount++;
