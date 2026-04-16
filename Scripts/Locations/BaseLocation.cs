@@ -4622,6 +4622,10 @@ public abstract class BaseLocation
             // === MURDER CONSEQUENCES (non-bounty kills only) ===
             if (!result.WasBountyKill)
             {
+                if(currentPlayer is Player p)
+                {
+                    p.Darkness += 1000; // Crims are usualy low darkness but murder puts a stain on the soul much deeper than anything else
+                }
                 await ApplyMurderConsequences(currentPlayer, npc);
             }
         }
@@ -4652,6 +4656,13 @@ public abstract class BaseLocation
         await Task.Delay(2000);
     }
 
+    internal async Task MurderGuardEncounter(Character player)
+    {
+        /* 
+        Start a monster encounter
+        */
+    }
+
     /// <summary>
     /// Apply severe consequences for non-bounty NPC murder:
     /// 50% chance of execution (character deletion) or prison (3 days) + strip all belongings.
@@ -4673,6 +4684,85 @@ public abstract class BaseLocation
         terminal.WriteLine($"  \"{Loc.Get("base.arrest_for_murder", victim.Name2 ?? victim.Name)}\"");
         terminal.WriteLine("");
         await Task.Delay(2000);
+    
+        terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("street_encounter.guard.halt"));
+            terminal.SetColor("magenta");
+            terminal.WriteLine(Loc.Get("street_encounter.guard.looking_for_you", player.Darkness));
+            terminal.WriteLine("");
+
+            terminal.Write("  [", "white");
+            terminal.Write("S", "bright_yellow");
+            terminal.Write($"]{Loc.Get("street_encounter.guard.opt_surrender")}  [", "white");
+            terminal.Write("F", "bright_yellow");
+            terminal.Write($"]{Loc.Get("street_encounter.hostile.opt_fight")}  [", "white");
+
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
+
+        bool captured;
+
+        if (choice == "S")
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("street_encounter.guard.arrested"));
+                terminal.WriteLine("");
+
+                captured = true;
+            }
+            else
+            {
+                var guards = new Monster[5];
+
+                for (int i = 0; i < 5; i++)
+            {
+                //Values to be Tweaked
+                guards[i] = Monster.CreateMonster(
+                    nr: player.Level,
+            name: "Town Guard",
+            hps: (int)(player.HP * 2),
+            strength: (int)(player.Level * 10),
+            defence: (int)(player.Level * 10),
+            phrase: "",
+            grabweap: false,
+            grabarm: false,
+            weapon: "Town Guard Sword",
+            armor: "Armour of A Town Guard",
+            poisoned: false,
+            disease: false,
+            punch: (int)(player.Level * 1.5),
+            armpow: (int)(player.Level * 5),
+            weappow: (int)(player.Level * 5)
+                );
+                guards[i].IsProperName = true; // NPC — no "The" prefix
+                guards[i].CanSpeak = false; // Murderers Get the Silent Treatment
+            }
+
+            var combatEngine = new CombatEngine(terminal);
+        var result = await combatEngine.PlayerVsMonsters(player, guards.ToList());
+
+                if (result.Victory)
+                {
+                    player.Darkness += 300;
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("street_encounter.guard.darkness_guards"));
+
+                    captured = false;
+                }
+                else if (player.IsAlive)
+                {
+                    // Lost the fight but survived — arrested
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine(Loc.Get("street_encounter.guard.overpowered"));
+                    
+                    captured = true;
+                }
+                else
+                {
+                    // Lost the fight and died
+                    captured = false; // Died, so ressurect at temple
+                }
+            }
 
         // 50% execution, 50% prison + strip
         bool isExecuted = Random.Shared.Next(100) < 50;
@@ -4716,41 +4806,21 @@ public abstract class BaseLocation
             {
                 if (DoorMode.IsOnlineMode)
                 {
-                    // Delete from online database — character and all related data
+                    // Kill Player
                     try
                     {
-                        var connStr = $"Data Source={DoorMode.OnlineDatabasePath}";
-                        using var conn = new Microsoft.Data.Sqlite.SqliteConnection(connStr);
-                        conn.Open();
-                        // Try both display name (lowercase) and exact match
-                        var username = p.Name2.ToLower();
-                        using var tx = conn.BeginTransaction();
-                        foreach (var table in new[] { "players", "online_players", "sleeping_players", "guild_members" })
-                        {
-                            using var cmd = conn.CreateCommand();
-                            cmd.Transaction = tx;
-                            cmd.CommandText = $"DELETE FROM {table} WHERE username = @u";
-                            cmd.Parameters.AddWithValue("@u", username);
-                            cmd.ExecuteNonQuery();
-                        }
-                        // Also try display_name match for players table
-                        using var cmd2 = conn.CreateCommand();
-                        cmd2.Transaction = tx;
-                        cmd2.CommandText = "DELETE FROM players WHERE LOWER(display_name) = @d";
-                        cmd2.Parameters.AddWithValue("@d", username);
-                        cmd2.ExecuteNonQuery();
-                        tx.Commit();
-                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Info, "MURDER", $"Executed player {p.Name2} — deleted from database");
+                        p.Die();
+                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Info, "MURDER", $"Executed player {p.Name2}");
                     }
                     catch (Exception ex)
                     {
-                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Error, "MURDER", $"Failed to delete executed player: {ex.Message}");
+                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Error, "MURDER", $"Failed to Kill executed player: {ex.Message}");
                     }
                 }
                 else
                 {
-                    // Delete local save
-                    SaveSystem.Instance.DeleteSave(p.Name2);
+                    // Kill Player
+                    p.Die();
                 }
 
                 // Force disconnect
@@ -4787,6 +4857,7 @@ public abstract class BaseLocation
 
             if (player is Player p)
             {
+                /* Dont Strip Equipment because NPC who died lost equipment, 1 day of prison is enough of a punishment for murder
                 // Strip ALL equipment — unequip properly then clear the dictionary
                 // (UnequipSlot sets ID to 0 which corrupts saves; must clear entirely)
                 foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
@@ -4795,17 +4866,17 @@ public abstract class BaseLocation
                     p.UnequipSlot(slot);
                 }
                 p.EquippedItems.Clear(); // Remove all slot entries (prevents ID 0 in save)
-
-                // Clear inventory
+*/
+                // Clear inventory Take All Items
                 p.Inventory.Clear();
 
                 // Take all gold
                 long goldTaken = p.Gold;
                 p.Gold = 0;
-                p.BankGold = 0; // Bank seized too
+                // p.BankGold = 0; // Bank seized too Not because the NPC who died only lost ther current gold, not their bank gold
 
-                // Prison for 3 real days — maximum security, no escape
-                p.DaysInPrison = 3;
+                // Prison for 1 real days — maximum security, no escape
+                p.DaysInPrison = 1;
                 p.IsMurderConvict = true;
                 p.PrisonEscapes = 0;
                 p.CellDoorOpen = false;

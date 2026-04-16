@@ -1669,7 +1669,7 @@ public class StreetEncounterSystem
     /// <summary>
     /// Create a random hostile NPC
     /// </summary>
-    private NPC CreateRandomHostileNPC(int level)
+    public NPC CreateRandomHostileNPC(int level)
     {
         level = Math.Max(1, level);
 
