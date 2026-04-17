@@ -1302,7 +1302,17 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             var combatEngine = new CombatEngine(terminal);
+            // v0.57.2: Noctura betrayal is an Old God fight — set BossContext so the
+            // 75% teammate damage cap, spell immunity handling, and divine armor
+            // protections all apply (same as the main Old God encounters).
+            combatEngine.BossContext = new BossCombatContext
+            {
+                GodType = OldGodType.Noctura,
+                AttacksPerRound = 1,
+                CanSave = false,
+            };
             var result = await combatEngine.PlayerVsMonsters(player, new List<Monster> { noctura }, teammates);
+            combatEngine.BossContext = null;
 
             if (result.Outcome == CombatOutcome.Victory)
             {

@@ -4410,6 +4410,7 @@ public class InnLocation : BaseLocation
         {
             case CharacterClass.Warrior:
             case CharacterClass.Paladin:
+            case CharacterClass.Tidesworn:
                 // Tank classes: strongly prefer shields in off-hand; de-prioritize 1H weapons there
                 if (slot == EquipmentSlot.OffHand)
                 {
@@ -4420,11 +4421,11 @@ public class InnLocation : BaseLocation
 
             case CharacterClass.Cleric:
                 // Cleric fantasy is mace + shield. A 2H staff overrides that, so penalize 2H
-                // main-hand weapons and boost mace/shield.
+                // main-hand weapons and boost mace/flail + shield.
                 if (slot == EquipmentSlot.MainHand)
                 {
                     if (item.Handedness == WeaponHandedness.TwoHanded) return (int)(score * 0.5);
-                    if (item.WeaponType == WeaponType.Mace) return (int)(score * 1.4);
+                    if (item.WeaponType == WeaponType.Mace || item.WeaponType == WeaponType.Flail) return (int)(score * 1.4);
                 }
                 else if (slot == EquipmentSlot.OffHand)
                 {
@@ -4434,7 +4435,8 @@ public class InnLocation : BaseLocation
                 break;
 
             case CharacterClass.Assassin:
-                // Assassins scale off daggers (Backstab, Lethal Precision). Prefer them in both hands.
+            case CharacterClass.Abysswarden:
+                // Assassins + Abysswardens scale off daggers (Backstab, Lethal Precision, Umbral Step). Prefer them in both hands.
                 if (item.WeaponType == WeaponType.Dagger) return (int)(score * 1.5);
                 if (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand)
                     return (int)(score * 0.7);
@@ -4454,6 +4456,7 @@ public class InnLocation : BaseLocation
             case CharacterClass.Magician:
             case CharacterClass.Sage:
             case CharacterClass.MysticShaman:
+            case CharacterClass.Wavecaller:
                 // Full casters: staves boost spell power.
                 if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Staff)
                     return (int)(score * 1.4);

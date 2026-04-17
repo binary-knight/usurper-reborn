@@ -19057,7 +19057,7 @@ public partial class CombatEngine
 
             // v0.57.2 — Hidden status guaranteed crit on ability (Umbral Step, stealth attacks).
             // Previously only basic attacks honored Hidden; abilities skipped it.
-            bool stealthAbilityCritSingle = !abilityAlreadyCrit && player.HasStatus(StatusEffect.Hidden);
+            bool stealthAbilityCritSingle = !abilityAlreadyCrit && actualDamage > 0 && player.HasStatus(StatusEffect.Hidden);
             if (stealthAbilityCritSingle)
             {
                 player.RemoveStatus(StatusEffect.Hidden);
