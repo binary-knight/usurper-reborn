@@ -7419,6 +7419,11 @@ public partial class CombatEngine
                 terminal.WriteLine("");
             }
 
+            // v0.57.2 — when a companion is selected via </>, the [T] action transfers the item
+            // to THAT companion's inventory, not the player's. Label the option accordingly so the
+            // player isn't surprised to find their loot on a companion later. [E] also names the
+            // equip target when a companion is selected for the same reason.
+            bool takeTargetsCompanion = selectedCharacter != currentPlayer;
             if (lootItem.IsIdentified)
             {
                 if (party.Count > 1)
@@ -7426,13 +7431,12 @@ public partial class CombatEngine
 
                 if (canPlayerUseItem)
                 {
-                    terminal.WriteLine(Loc.Get("combat.loot_equip_option"));
+                    if (takeTargetsCompanion)
+                        terminal.WriteLine(Loc.Get("combat.loot_equip_on_companion_option", selectedCharacter.DisplayName));
+                    else
+                        terminal.WriteLine(Loc.Get("combat.loot_equip_option"));
                 }
             }
-            // v0.57.2 — when a companion is selected via </>, the [T] action transfers the item
-            // to THAT companion's inventory, not the player's. Label the option accordingly so the
-            // player isn't surprised to find their loot on a companion later.
-            bool takeTargetsCompanion = selectedCharacter != currentPlayer;
             if (selectedCharacter.IsInventoryFull)
                 terminal.WriteLine(Loc.Get("combat.loot_take_inventory_full", selectedCharacter.Inventory.Count, GameConfig.MaxInventoryItems), "red");
             else if (takeTargetsCompanion)
@@ -7780,7 +7784,12 @@ public partial class CombatEngine
                     else
                     {
                         terminal.SetColor("green");
-                        terminal.WriteLine(equipMsg);
+                        // v0.57.2 — append companion name when this was a companion equip so the
+                        // player can tell which party member now has the item.
+                        if (isCompanionEquip)
+                            terminal.WriteLine(equipMsg + Loc.Get("combat.loot_equipped_on_companion_suffix", player.DisplayName));
+                        else
+                            terminal.WriteLine(equipMsg);
                     }
                 }
                 else

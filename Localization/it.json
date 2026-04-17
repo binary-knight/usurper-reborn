@@ -855,6 +855,8 @@
   "combat.loot_equip_failed_inventory": "Impossibile equipaggiare: {0}. Aggiunto all'inventario.",
   "combat.loot_change_character_option": "(</>) Cambia personaggio",
   "combat.loot_equip_option": "(E)quipaggia subito",
+  "combat.loot_equip_on_companion_option": "(E)quipaggia a {0}",
+  "combat.loot_equipped_on_companion_suffix": " — a {0}",
   "combat.loot_found_on_corpse": "L'hai trovato sul cadavere del {0}.",
   "combat.loot_identify_hint": "  Portalo al Negozio di Magia per farlo identificare.",
   "combat.loot_invalid_choice": "Scelta non valida '{0}'. Inserisci E, T o P.",

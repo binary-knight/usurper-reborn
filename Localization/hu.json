@@ -855,6 +855,8 @@
   "combat.loot_equip_failed_inventory": "Nem sikerült felszerelni: {0}. A hátizsákba rakod.",
   "combat.loot_change_character_option": "(</>) Karakter módosítása",
   "combat.loot_equip_option": "(E) Felszerelés azonnal",
+  "combat.loot_equip_on_companion_option": "(E) Felszerelés {0} számára",
+  "combat.loot_equipped_on_companion_suffix": " — {0} viseli",
   "combat.loot_found_on_corpse": "Ezt a(z) {0} holttestén találtad.",
   "combat.loot_identify_hint": "  Vidd el a Varázsboltba, hogy azonosítsák.",
   "combat.loot_invalid_choice": "Érvénytelen választás: '{0}'. Kérlek, írj E-t, T-t vagy P-t.",

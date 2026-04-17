@@ -855,6 +855,8 @@
   "combat.loot_equip_failed_inventory": "Impossible d’équiper : {0}. Ajouté à l’inventaire.",
   "combat.loot_change_character_option": "(</>) Changer de personnage",
   "combat.loot_equip_option": "(E)quiper immédiatement",
+  "combat.loot_equip_on_companion_option": "(E)quiper à {0}",
+  "combat.loot_equipped_on_companion_suffix": " — à {0}",
   "combat.loot_found_on_corpse": "Vous trouvez ceci sur le cadavre du {0}.",
   "combat.loot_identify_hint": "  Apportez-le à la Boutique de Magie pour l’identifier.",
   "combat.loot_invalid_choice": "Choix invalide '{0}'. Entrez E, T, ou P.",
