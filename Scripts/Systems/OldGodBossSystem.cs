@@ -314,6 +314,14 @@ namespace UsurperRemake.Systems
                 bossDefeated = false;
                 dungeonTeammates = teammates;
 
+                // v0.57.2 — mark the god as encountered the moment the player enters the room.
+                // Covers cases where the player flees/disconnects before resolution (UpdateGodState
+                // would otherwise not fire, leaving the Progress screen showing "????" forever).
+                if (StoryProgressionSystem.Instance.OldGodStates.TryGetValue(type, out var encounterState))
+                {
+                    encounterState.HasBeenEncountered = true;
+                }
+
                 // Play introduction
                 await PlayBossIntroduction(boss, player, terminal);
 

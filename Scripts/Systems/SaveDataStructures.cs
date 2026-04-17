@@ -66,6 +66,10 @@ namespace UsurperRemake.Systems
         // Old God defeat states - OldGodType (int) -> GodStatus (int)
         // Tracks which Old Gods have been defeated, saved, allied, etc.
         public Dictionary<int, int> OldGodStates { get; set; } = new();
+        // v0.57.2 — per-god "has the player actually met this one" flag, separate from Status so
+        // players in non-terminal states (e.g. Maelketh starts Corrupted) still get proper
+        // encountered-tracking on the Main Street [P] Progress screen. List of god-type ints.
+        public List<int>? OldGodsEncountered { get; set; }
 
         // God worship - player name -> god name
         public Dictionary<string, string> PlayerGods { get; set; } = new();
@@ -402,6 +406,7 @@ namespace UsurperRemake.Systems
         public int DateFormatPreference { get; set; }  // 0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD
         public bool AutoRedistributeXP { get; set; } = true; // Auto-redistribute XP when teammates die
         public int[]? TeamXPPercent { get; set; }  // Per-slot XP percentage distribution (player + 4 teammates)
+        public bool TeamXPIsExplicit { get; set; }  // v0.57.2: player has explicitly set their XP split, so auto-distribute won't override it
         public int Loyalty { get; set; }    // Loyalty percentage (0-100)
         public int Haunt { get; set; }      // How many demons haunt player
         public char Master { get; set; }    // Level master player uses

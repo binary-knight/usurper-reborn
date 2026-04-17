@@ -697,6 +697,7 @@ namespace UsurperRemake.Systems
                 DateFormatPreference = player.DateFormatPreference,
                 AutoRedistributeXP = player.AutoRedistributeXP,
                 TeamXPPercent = player.TeamXPPercent,
+                TeamXPIsExplicit = player.TeamXPIsExplicit,
                 Loyalty = player.Loyalty,
                 Haunt = player.Haunt,
                 Master = player.Master,
@@ -1707,6 +1708,12 @@ namespace UsurperRemake.Systems
                     kvp => (int)kvp.Key,
                     kvp => (int)kvp.Value.Status
                 );
+                // v0.57.2 — persist HasBeenEncountered so Main Street [P] Progress shows
+                // correct encounter state even for non-terminal statuses.
+                data.OldGodsEncountered = story.OldGodStates
+                    .Where(kvp => kvp.Value.HasBeenEncountered)
+                    .Select(kvp => (int)kvp.Key)
+                    .ToList();
                 if (data.OldGodStates.Count > 0)
                 {
                 }
@@ -2178,6 +2185,19 @@ namespace UsurperRemake.Systems
                         {
                             DebugLogger.Instance?.LogWarning("SAVE",
                                 $"Saved OldGodState for unknown god type {(int)godType}, skipping");
+                        }
+                    }
+                }
+
+                // v0.57.2 — restore per-god HasBeenEncountered flags.
+                if (data.OldGodsEncountered != null)
+                {
+                    foreach (var godTypeInt in data.OldGodsEncountered)
+                    {
+                        var godType = (OldGodType)godTypeInt;
+                        if (story.OldGodStates.TryGetValue(godType, out var existingState))
+                        {
+                            existingState.HasBeenEncountered = true;
                         }
                     }
                 }
@@ -2744,6 +2764,19 @@ namespace UsurperRemake.Systems
                             godState.Status = GodStatus.Awakened;
                             migrationCount++;
                         }
+                    }
+
+                    // v0.57.2 — migrate HasBeenEncountered for players who resolved gods before
+                    // the flag-setting code existed. Any terminal state (Defeated/Saved/Allied/
+                    // Consumed/Awakened) necessarily means the player interacted with the god.
+                    if (!godState.HasBeenEncountered && (
+                        godState.Status == GodStatus.Defeated ||
+                        godState.Status == GodStatus.Saved ||
+                        godState.Status == GodStatus.Allied ||
+                        godState.Status == GodStatus.Awakened ||
+                        godState.Status == GodStatus.Consumed))
+                    {
+                        godState.HasBeenEncountered = true;
                     }
                 }
             }

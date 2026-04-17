@@ -569,8 +569,11 @@ public class DormitoryLocation : BaseLocation
         terminal.WriteLine($"\n  {Loc.Get("dormitory.creep_toward_npc", npcName)}\n");
         await Task.Delay(1500);
 
-        // Darkness penalty for attacking a sleeping NPC
-        currentPlayer.Darkness += 25;
+        // Darkness penalty for attacking a sleeping NPC.
+        // v0.57.2 — route through ChangeAlignment for paired chivalry loss + news (matches
+        // the v0.57.0 paired-alignment system used for murder/desecration).
+        UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(
+            currentPlayer, 25, isGood: false, reason: $"attacked sleeping {npcName}");
 
         // Combat — NPC is sleeping so they fight at a disadvantage (reduced stats)
         long origStr = npc.Strength;
@@ -677,8 +680,11 @@ public class DormitoryLocation : BaseLocation
         long victimGold = victim.Gold;
         victim.Gold = 0; // prevent CombatEngine from applying its own gold steal
 
-        // Backstab bonus: darkness for attacking a sleeper
-        currentPlayer.Darkness += 25;
+        // Backstab bonus: darkness for attacking a sleeper.
+        // v0.57.2 — paired chivalry loss via ChangeAlignment (killing a sleeping player is
+        // as morally heavy as altar desecration, so the -12 chivalry mirror is appropriate).
+        UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(
+            currentPlayer, 25, isGood: false, reason: $"attacked sleeping player {target.Username}");
 
         var combatEngine = new CombatEngine(terminal);
         var result = await combatEngine.PlayerVsPlayer(currentPlayer, victim);
@@ -853,7 +859,10 @@ public class DormitoryLocation : BaseLocation
 
         terminal.WriteLine(Loc.Get("dormitory.thunderous_shout"), "yellow");
         await Task.Delay(1000);
-        currentPlayer.Darkness += 10;
+        // v0.57.2 — route darkness gain through paired alignment movement. DarkNr is a
+        // separate god-favor counter (unrelated to the Chivalry/Darkness scales) and stays.
+        UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(
+            currentPlayer, 10, isGood: false, reason: "thunderous shout at sleepers");
         currentPlayer.DarkNr -= 1;
 
         var angry = sleepers.OrderBy(_ => rng.Next()).Take(rng.Next(1, Math.Min(3, sleepers.Count))).ToList();

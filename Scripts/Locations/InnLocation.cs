@@ -1250,11 +1250,14 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        // Create monster from NPC for combat
+        // Create monster from NPC for combat. v0.57.2 — use MaxHP, not current HP. If the NPC
+        // was recently defeated in world sim and is awaiting respawn (HP=0), using current HP
+        // would spawn the combat monster dead — Mystic reported this exact symptom, winning
+        // against Astrid Juniper in 2 rounds for 0 XP / 0 gold.
         var npcMonster = Monster.CreateMonster(
             nr: npc.Level,
             name: npc.Name2,
-            hps: npc.HP,
+            hps: npc.MaxHP > 0 ? npc.MaxHP : Math.Max(1, npc.HP),
             strength: npc.Strength,
             defence: npc.Defence,
             phrase: Loc.Get("inn.npc_readies", npc.Name2),
@@ -4259,14 +4262,14 @@ public class InnLocation : BaseLocation
                 continue;
             }
 
-            // Score each candidate by primary stat value
+            // Score each candidate by primary stat value (class-aware — see ScoreEquipment)
             var bestCandidate = candidates
-                .OrderByDescending(x => ScoreEquipment(x.item, slot))
+                .OrderByDescending(x => ScoreEquipment(x.item, slot, target))
                 .First();
 
             var currentItem = target.GetEquipment(slot);
-            int currentScore = currentItem != null ? ScoreEquipment(currentItem, slot) : 0;
-            int newScore = ScoreEquipment(bestCandidate.item, slot);
+            int currentScore = currentItem != null ? ScoreEquipment(currentItem, slot, target) : 0;
+            int newScore = ScoreEquipment(bestCandidate.item, slot, target);
 
             // Only equip if it's an upgrade (or slot is empty)
             if (newScore <= currentScore && currentItem != null)
@@ -4344,7 +4347,7 @@ public class InnLocation : BaseLocation
     /// Score an equipment item for auto-equip comparison.
     /// Weapons scored by weapon power, armor by AC, accessories by total stat bonuses.
     /// </summary>
-    private static int ScoreEquipment(Equipment item, EquipmentSlot slot)
+    private static int ScoreEquipment(Equipment item, EquipmentSlot slot, Character? target = null)
     {
         // Base score from primary stat
         int score = 0;
@@ -4376,6 +4379,97 @@ public class InnLocation : BaseLocation
         score += item.CriticalChanceBonus * 2;
         score += item.LifeSteal * 2;
         score += item.StaminaBonus * 2;
+
+        // v0.57.2 — class-aware weapon preference. Without this, auto-equip just picks the highest
+        // raw-stat weapon and ignores class fantasy: Warriors got 1H weapons in off-hand instead of
+        // shields, Assassins got swords instead of daggers, Clerics got 2H staves instead of
+        // mace+shield. Lumina reported all three.
+        if (target != null && (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand))
+        {
+            score = ApplyClassWeaponPreference(score, item, slot, target);
+        }
+
+        return score;
+    }
+
+    /// <summary>
+    /// v0.57.2 — adjust a weapon/shield score by class-role preference. Multipliers are applied
+    /// AFTER the raw stat score so they amplify whichever item already looked best within the
+    /// class's preferred category, instead of letting raw stats dominate role fantasy.
+    /// </summary>
+    private static int ApplyClassWeaponPreference(int score, Equipment item, EquipmentSlot slot, Character target)
+    {
+        var cls = target.Class;
+        bool isShield = item.WeaponType == WeaponType.Shield
+                     || item.WeaponType == WeaponType.Buckler
+                     || item.WeaponType == WeaponType.TowerShield;
+        bool isOneHandedWeapon = item.Slot == EquipmentSlot.MainHand
+                              && item.Handedness == WeaponHandedness.OneHanded;
+
+        switch (cls)
+        {
+            case CharacterClass.Warrior:
+            case CharacterClass.Paladin:
+                // Tank classes: strongly prefer shields in off-hand; de-prioritize 1H weapons there
+                if (slot == EquipmentSlot.OffHand)
+                {
+                    if (isShield) return (int)(score * 3.0);
+                    if (isOneHandedWeapon) return (int)(score * 0.3);
+                }
+                break;
+
+            case CharacterClass.Cleric:
+                // Cleric fantasy is mace + shield. A 2H staff overrides that, so penalize 2H
+                // main-hand weapons and boost mace/shield.
+                if (slot == EquipmentSlot.MainHand)
+                {
+                    if (item.Handedness == WeaponHandedness.TwoHanded) return (int)(score * 0.5);
+                    if (item.WeaponType == WeaponType.Mace) return (int)(score * 1.4);
+                }
+                else if (slot == EquipmentSlot.OffHand)
+                {
+                    if (isShield) return (int)(score * 2.5);
+                    if (isOneHandedWeapon) return (int)(score * 0.4);
+                }
+                break;
+
+            case CharacterClass.Assassin:
+                // Assassins scale off daggers (Backstab, Lethal Precision). Prefer them in both hands.
+                if (item.WeaponType == WeaponType.Dagger) return (int)(score * 1.5);
+                if (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand)
+                    return (int)(score * 0.7);
+                break;
+
+            case CharacterClass.Ranger:
+                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Bow)
+                    return (int)(score * 1.5);
+                break;
+
+            case CharacterClass.Barbarian:
+                // Barbarians favor big 2H weapons.
+                if (slot == EquipmentSlot.MainHand && item.Handedness == WeaponHandedness.TwoHanded)
+                    return (int)(score * 1.3);
+                break;
+
+            case CharacterClass.Magician:
+            case CharacterClass.Sage:
+            case CharacterClass.MysticShaman:
+                // Full casters: staves boost spell power.
+                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Staff)
+                    return (int)(score * 1.4);
+                break;
+
+            case CharacterClass.Bard:
+                // Bard songs require instruments; prefer them over regular weapons.
+                if (item.WeaponType == WeaponType.Instrument) return (int)(score * 1.5);
+                break;
+
+            case CharacterClass.Alchemist:
+                // Alchemist is INT-scaling but not a pure caster — mild staff preference.
+                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Staff)
+                    return (int)(score * 1.2);
+                break;
+        }
 
         return score;
     }

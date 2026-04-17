@@ -3521,6 +3521,18 @@ public partial class GameEngine
             // NG+ — StartNewCycle already reset story state while preserving cycle/endings/seals.
             // Don't call FullReset which would wipe cycle counter and completed endings.
             Console.Error.WriteLine($"[NG+] Preserving cycle data (skipping FullReset)");
+
+            // God worship does NOT carry across cycles. The fresh Character has WorshippedGod=""
+            // by default, but GodSystem.playerGods is a separate in-memory dict keyed by player
+            // name that survives the cycle (the old save was overwritten, not deleted, so the
+            // DeleteSave cleanup never ran). Without this clear, the player's old god still
+            // counts them as a believer and the temple / pantheon / /health screens report
+            // residual worship from the prior cycle.
+            try
+            {
+                UsurperRemake.GodSystemSingleton.Instance?.SetPlayerGod(playerName, "");
+            }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "NG+", $"GodSystem clear failed: {ex.Message}"); }
         }
         else
         {
@@ -4031,6 +4043,7 @@ public partial class GameEngine
             DateFormatPreference = playerData.DateFormatPreference,
             AutoRedistributeXP = playerData.AutoRedistributeXP,
             TeamXPPercent = playerData.TeamXPPercent ?? TeamXPConfig.DefaultTeamXPPercent.ToArray(),
+            TeamXPIsExplicit = playerData.TeamXPIsExplicit,
             Loyalty = playerData.Loyalty,
             Haunt = playerData.Haunt,
             Master = playerData.Master,

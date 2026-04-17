@@ -97,6 +97,7 @@ public class TeamCornerLocation : BaseLocation
         WriteMenuOption("Q", Loc.Get("team.menu_quit"), "A", Loc.Get("team.menu_apply"));
         WriteMenuOption("N", Loc.Get("team.menu_recruit_npc"), "2", Loc.Get("team.menu_sack"));
         WriteMenuOption("G", Loc.Get("team.menu_equip"), "X", Loc.Get("team.menu_specialize"));
+        WriteMenuOption("V", Loc.Get("team.menu_view_inventories"), "", "");
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
@@ -328,6 +329,10 @@ public class TeamCornerLocation : BaseLocation
 
             case "X":
                 await SpecializeMember();
+                return false;
+
+            case "V":
+                await ViewTeamInventories();
                 return false;
 
             case "W":
@@ -2614,6 +2619,39 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.withdrawal_failed"));
         }
         await Task.Delay(1500);
+    }
+
+    /// <summary>
+    /// v0.57.2 — show the party inventory viewer for team NPCs and active companions.
+    /// Lets the player see what loot items have accumulated on each party member and take
+    /// items back to their own inventory. Covers the "my item vanished into an NPC's bag"
+    /// confusion reported by Lumina and Aura.
+    /// </summary>
+    private async Task ViewTeamInventories()
+    {
+        var party = new List<Character>();
+
+        // Team NPCs (only if the player is on a team)
+        if (!string.IsNullOrEmpty(currentPlayer.Team) && NPCSpawnSystem.Instance?.ActiveNPCs != null)
+        {
+            var teamMembers = NPCSpawnSystem.Instance.ActiveNPCs
+                .Where(n => n.Team == currentPlayer.Team && n.IsAlive && !n.IsDead)
+                .Cast<Character>()
+                .ToList();
+            party.AddRange(teamMembers);
+        }
+
+        // Active companions (always include regardless of team status)
+        if (CompanionSystem.Instance != null)
+        {
+            foreach (var comp in CompanionSystem.Instance.GetCompanionsAsCharacters())
+            {
+                if (comp != null && !party.Contains(comp))
+                    party.Add(comp);
+            }
+        }
+
+        await ShowPartyInventoryViewer(party);
     }
 
     private async Task SpecializeMember()

@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.57.1";
+    public const string Version = "0.57.2";
     public const string VersionName = "Alignment and Shields";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -911,6 +911,7 @@ public static partial class GameConfig
     public const float OldGodSoloPlayerDamageReduction = 0.20f;         // Solo Old God fight: player takes -20% damage
     public const float BossFirstRoundsDamageCapPercent = 0.15f;        // First 3 rounds of boss fight: cap hit at 15% MaxHP
     public const int BossFirstRoundsDamageCapRounds = 3;
+    public const float OldGodTeammateDamageCapPercent = 0.75f;         // Old God fights: cap any single hit on a companion/NPC teammate at 75% MaxHP (prevents crits + AoE + channel damage from one-shotting party members)
     // Magician Arcane Mastery
     public const float MagicianArcaneSpellBonus = 1.15f;     // Magician: +15% spell damage (Arcane Mastery passive)
     // Cleric Divine Grace

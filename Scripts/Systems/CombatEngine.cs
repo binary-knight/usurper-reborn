@@ -3893,14 +3893,39 @@ public partial class CombatEngine
             int dmg = baseDmg + random.Next(1, player.Level / 5 + 2);
             monster.HP = Math.Max(0, monster.HP - dmg);
             monster.PoisonRounds--;
-            if (monster.IsBurning)
+            bool wasBurning = monster.IsBurning;
+            if (wasBurning)
                 terminal.WriteLine(Loc.Get("combat.fire_burn", monster.Name, dmg), "red");
             else
                 terminal.WriteLine(Loc.Get("combat.poison_burn", monster.Name, dmg), "dark_green");
-            if (monster.PoisonRounds == 0) { monster.Poisoned = false; monster.IsBurning = false; }
             if (!monster.IsAlive)
             {
-                terminal.WriteLine(monster.IsBurning ? $"{monster.Name} is consumed by flames!" : $"{monster.Name} succumbs to poison!", monster.IsBurning ? "red" : "dark_green");
+                terminal.WriteLine(wasBurning ? $"{monster.Name} is consumed by flames!" : $"{monster.Name} succumbs to poison!", wasBurning ? "red" : "dark_green");
+                if (!result.DefeatedMonsters.Contains(monster))
+                    result.DefeatedMonsters.Add(monster);
+                return;
+            }
+            if (monster.PoisonRounds == 0) { monster.Poisoned = false; monster.IsBurning = false; }
+        }
+
+        // v0.57.2 — Abysswarden Corrupting Touch DoT: damages target AND heals caster each round.
+        // The ability's description says "Each tick heals you"; previously the implementation used
+        // a generic Lifesteal status that only fired on player ATTACKS, not on DoT ticks, so the
+        // heal felt absent mid-fight. Now applied per-round here next to poison.
+        if (monster.CorruptingDotRounds > 0)
+        {
+            long corruptDmg = Math.Max(1, monster.CorruptingDotTickDamage);
+            monster.HP = Math.Max(0, monster.HP - corruptDmg);
+            long heal = Math.Max(1, corruptDmg / 2);
+            long oldHP = player.HP;
+            player.HP = Math.Min(player.MaxHP, player.HP + heal);
+            long actualHeal = player.HP - oldHP;
+            monster.CorruptingDotRounds--;
+            terminal.WriteLine(Loc.Get("combat.corrupting_tick", monster.Name, corruptDmg, actualHeal), "dark_red");
+            if (monster.CorruptingDotRounds == 0) monster.CorruptingDotTickDamage = 0;
+            if (!monster.IsAlive)
+            {
+                terminal.WriteLine(Loc.Get("combat.corrupting_kill", monster.Name), "dark_red");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
                 return;
@@ -7404,8 +7429,14 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.loot_equip_option"));
                 }
             }
+            // v0.57.2 — when a companion is selected via </>, the [T] action transfers the item
+            // to THAT companion's inventory, not the player's. Label the option accordingly so the
+            // player isn't surprised to find their loot on a companion later.
+            bool takeTargetsCompanion = selectedCharacter != currentPlayer;
             if (selectedCharacter.IsInventoryFull)
                 terminal.WriteLine(Loc.Get("combat.loot_take_inventory_full", selectedCharacter.Inventory.Count, GameConfig.MaxInventoryItems), "red");
+            else if (takeTargetsCompanion)
+                terminal.WriteLine(Loc.Get("combat.loot_take_to_companion_option", selectedCharacter.DisplayName));
             else
                 terminal.WriteLine(Loc.Get("combat.loot_take_option"));
             terminal.WriteLine(Loc.Get("combat.loot_pass_option"));
@@ -7715,16 +7746,27 @@ public partial class CombatEngine
                 // Try to equip the item
                 if (player.EquipItem(equipment, targetSlot, out string equipMsg))
                 {
-                    // Move any displaced items from companion's inventory to the actual player's inventory
+                    // Move any displaced items from companion's inventory to the actual player's inventory.
+                    // v0.57.1 — honor IsInventoryFull; previously this bypassed the cap and let players
+                    // inflate their inventory past MaxInventoryItems by repeatedly equipping upgrades on
+                    // companions (reported by Aura Maximillion as 127/50 carry).
                     if (isCompanionEquip && player.Inventory.Count > inventoryBefore)
                     {
                         var displacedItems = player.Inventory.Skip(inventoryBefore).ToList();
                         foreach (var displaced in displacedItems)
                         {
                             player.Inventory.Remove(displaced);
-                            actualPlayer.Inventory.Add(displaced);
-                            terminal.SetColor("cyan");
-                            terminal.WriteLine(Loc.Get("combat.loot_displaced_to_player", displaced.Name, player.DisplayName));
+                            if (actualPlayer.IsInventoryFull)
+                            {
+                                terminal.SetColor("red");
+                                terminal.WriteLine(Loc.Get("combat.loot_displaced_dropped", displaced.Name));
+                            }
+                            else
+                            {
+                                actualPlayer.Inventory.Add(displaced);
+                                terminal.SetColor("cyan");
+                                terminal.WriteLine(Loc.Get("combat.loot_displaced_to_player", displaced.Name, player.DisplayName));
+                            }
                         }
                     }
 
@@ -7771,7 +7813,13 @@ public partial class CombatEngine
                     player.Inventory.Add(lootItem);
                     terminal.SetColor("cyan");
                     string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
-                    terminal.WriteLine(Loc.Get("combat.loot_added_inventory", invName));
+                    // v0.57.2 — when Take targets a companion (via </> selector), the confirmation
+                    // message names them explicitly. The ambiguous "added to inventory" wording was
+                    // the source of the Lumina / Aura "my epic loot vanished" reports.
+                    if (player != (currentPlayer ?? player))
+                        terminal.WriteLine(Loc.Get("combat.loot_added_to_companion", invName, player.DisplayName));
+                    else
+                        terminal.WriteLine(Loc.Get("combat.loot_added_inventory", invName));
                 }
                 break;
 
@@ -7794,16 +7842,27 @@ public partial class CombatEngine
                             if (teammate.EquipItem(teammateEquip, out _))
                             {
                                 teammate.RecalculateStats();
-                                // Move displaced items from companion inventory to player inventory
+                                // Move displaced items from companion inventory to player inventory.
+                                // v0.57.1 — honor the player's inventory cap; previously this unconditionally
+                                // piled companion-displaced gear into the player's bag, letting carry grow
+                                // past MaxInventoryItems.
                                 if (teammate.Inventory != null && teammate.Inventory.Count > invBefore)
                                 {
                                     var displaced = teammate.Inventory.Skip(invBefore).ToList();
                                     foreach (var d in displaced)
                                     {
                                         teammate.Inventory.Remove(d);
-                                        player.Inventory?.Add(d);
+                                        if (player.IsInventoryFull)
+                                        {
+                                            terminal.SetColor("red");
+                                            terminal.WriteLine(Loc.Get("combat.loot_displaced_dropped", d.Name));
+                                        }
+                                        else
+                                        {
+                                            player.Inventory?.Add(d);
+                                        }
                                     }
-                                    if (displaced.Count > 0)
+                                    if (displaced.Count > 0 && !player.IsInventoryFull)
                                     {
                                         terminal.SetColor("cyan");
                                         terminal.WriteLine(Loc.Get("combat.loot_displaced_to_inventory", displaced[0].Name));
@@ -8230,15 +8289,24 @@ public partial class CombatEngine
                             {
                                 teammate.RecalculateStats();
                                 // Move displaced items from companion inventory to player inventory
+                                // (v0.57.1 cap-honoring variant — mirrors the main-player branch above)
                                 if (teammate.Inventory != null && teammate.Inventory.Count > invBefore)
                                 {
                                     var displaced = teammate.Inventory.Skip(invBefore).ToList();
                                     foreach (var d in displaced)
                                     {
                                         teammate.Inventory.Remove(d);
-                                        player.Inventory?.Add(d);
+                                        if (player.IsInventoryFull)
+                                        {
+                                            terminal.SetColor("red");
+                                            terminal.WriteLine(Loc.Get("combat.loot_displaced_dropped", d.Name));
+                                        }
+                                        else
+                                        {
+                                            player.Inventory?.Add(d);
+                                        }
                                     }
-                                    if (displaced.Count > 0)
+                                    if (displaced.Count > 0 && !player.IsInventoryFull)
                                     {
                                         terminal.SetColor("cyan");
                                         terminal.WriteLine(Loc.Get("combat.loot_displaced_to_inventory", displaced[0].Name));
@@ -10027,6 +10095,7 @@ public partial class CombatEngine
         var statuses = new List<string>();
 
         if (monster.PoisonRounds > 0) statuses.Add($"PSN({monster.PoisonRounds})");
+        if (monster.CorruptingDotRounds > 0) statuses.Add($"COR({monster.CorruptingDotRounds})");
         if (monster.StunRounds > 0) statuses.Add($"STN({monster.StunRounds})");
         if (monster.WeakenRounds > 0) statuses.Add($"WEK({monster.WeakenRounds})");
         if (monster.IsBoss) statuses.Add("[BOSS]");
@@ -10226,18 +10295,32 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Apply damage to single monster and track if defeated
+    /// Apply damage to single monster and track if defeated.
+    /// `isSpellDamage` controls which boss phase immunity applies — defaults to false (physical)
+    /// so the 15 physical-damage callers (regular attacks, backstab, power/precise strike, ranged,
+    /// smite, off-hand, teammate attacks) route through the physical-immunity reduction instead
+    /// of the magical one. Callers sending holy/spell damage (Soul Strike, spell cast path) set
+    /// this to true so the magical-immunity reduction fires instead.
     /// </summary>
-    private async Task ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null)
+    private async Task ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
         if (target == null || !target.IsAlive) return;
 
-        // Boss phase immunity check — magical spells reduced during magical immunity
-        if (target.IsMagicalImmune)
+        // Boss phase immunity — apply only the matching type. Previously this hardcoded
+        // isMagicalDamage:true and missed IsPhysicalImmune entirely, so physical abilities
+        // routed through this function took magical-immunity reduction during Manwe phase 3
+        // and ignored physical-immunity reduction during physical-immune phases.
+        if (isSpellDamage && target.IsMagicalImmune)
         {
             damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: true);
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", target.Name));
+        }
+        else if (!isSpellDamage && target.IsPhysicalImmune)
+        {
+            damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: false);
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine(Loc.Get("combat.physical_immunity_absorbs", target.Name));
         }
 
         // Divine armor reduction for Old God bosses (reduces player damage dealt)
@@ -10329,14 +10412,14 @@ public partial class CombatEngine
 
         // Use new colored combat messages - different message for player vs allies
         // Spell damage already shows its own flavor text — only show the final damage number
-        bool isSpellDamage = damageSource != "attack" && damageSource != "your attack"
+        bool suppressMeleeFlavor = damageSource != "attack" && damageSource != "your attack"
             && damageSource != "off-hand strike" && damageSource != "backstab"
             && damageSource != "power attack" && damageSource != "smite"
             && damageSource != "soul strike" && damageSource != "ranged attack"
             && !damageSource.Contains("'s attack") && !damageSource.Contains("'s off-hand");
 
         string attackMessage;
-        if (isSpellDamage)
+        if (suppressMeleeFlavor)
         {
             // Spell/ability — show damage without melee flavor verbs
             attackMessage = $"{target.Name} takes [bright_magenta]{actualDamage}[/] damage!";
@@ -11400,7 +11483,7 @@ public partial class CombatEngine
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("combat.soul_strike_damage", holyDamage));
 
-        await ApplySingleMonsterDamage(target, holyDamage, result, "soul strike", player);
+        await ApplySingleMonsterDamage(target, holyDamage, result, "soul strike", player, isSpellDamage: true);
     }
 
     private async Task ExecuteSmiteMultiMonster(Character player, List<Monster> monsters, int? targetIndex, CombatResult result)
@@ -11695,6 +11778,16 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.ability_backstab_crit"));
                 abilityAlreadyCrit = true; // Don't double-crit — the 1.75x IS the crit
             }
+            else if (abilityResult.SpecialEffect == "shadow_harvest" && target != null && target.HP < target.MaxHP / 2)
+            {
+                // v0.57.2 — Abysswarden Shadow Harvest: +50% damage when target is already below half HP.
+                // Previously the bonus check was in a separate post-damage handler that also double-applied
+                // damage and skipped entirely when base damage killed the target — the player would never
+                // actually see the bonus fire against low-HP enemies. Now applied inline like Execute.
+                actualDamage = (long)(actualDamage * 1.5);
+                terminal.SetColor("dark_red");
+                terminal.WriteLine(Loc.Get("combat.shadow_harvest_feast", target.Name));
+            }
             else if (abilityResult.SpecialEffect == "aoe" || abilityResult.SpecialEffect == "aoe_confusion")
             {
                 // AoE abilities hit all monsters
@@ -11716,7 +11809,21 @@ public partial class CombatEngine
                 actualDamage = 0;
             }
 
-            // Critical hit roll for abilities — skip if ability already has guaranteed crit (e.g. Backstab)
+            // v0.57.2 — Hidden status (Abysswarden Umbral Step, Assassin stealth) guarantees a crit
+            // on the next attack OR ability. Previously only the basic-attack path consumed Hidden
+            // for crits; abilities skipped the check entirely, so Umbral Step's "next ability crits"
+            // promise never fired on ability hits.
+            bool stealthAbilityCrit = !abilityAlreadyCrit && actualDamage > 0 && player.HasStatus(StatusEffect.Hidden);
+            if (stealthAbilityCrit)
+            {
+                player.RemoveStatus(StatusEffect.Hidden);
+                abilityAlreadyCrit = true; // Prevent double-crit stacking with rolled crit below
+                float stealthCritMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                actualDamage = (long)(actualDamage * stealthCritMult);
+                terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
+            }
+
+            // Critical hit roll for abilities — skip if ability already has guaranteed crit (e.g. Backstab, Umbral Step)
             bool abilityCrit = !abilityAlreadyCrit && StatEffectsSystem.RollCriticalHit(player);
             // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
             if (!abilityCrit && !abilityAlreadyCrit && actualDamage > 0 && player.Class == CharacterClass.Wavecaller
@@ -11754,6 +11861,22 @@ public partial class CombatEngine
                 // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
                 // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
                 ApplyPostHitEnchantments(player, target, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+
+                // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals the caster. Applied
+                // here so the heal fires even if the target died to the base damage (previously the
+                // post-damage handler skipped entirely on target.IsAlive=false).
+                if (abilityResult.SpecialEffect == "shadow_harvest" && actualDamage > 0 && player != null)
+                {
+                    long shadowHeal = (long)(actualDamage * 0.25);
+                    long oldShadowHP = player.HP;
+                    player.HP = Math.Min(player.MaxHP, player.HP + shadowHeal);
+                    long actualShadowHeal = player.HP - oldShadowHP;
+                    if (actualShadowHeal > 0)
+                    {
+                        terminal.SetColor("dark_red");
+                        terminal.WriteLine(Loc.Get("combat.shadow_harvest_drain", actualShadowHeal));
+                    }
+                }
 
                 if (target.HP <= 0)
                 {
@@ -13365,38 +13488,21 @@ public partial class CombatEngine
 
             // ═══════════════════════════════════════════════════════════════════════
             // ABYSSWARDEN PRESTIGE ABILITIES
+            // v0.57.2 — shadow_harvest bonus and lifesteal moved into the base damage block above.
+            // The old case here double-applied damage and skipped entirely when base damage killed
+            // the target, causing Mystic's reported "bonus doesn't fire below 50% HP" bug.
             // ═══════════════════════════════════════════════════════════════════════
-            case "shadow_harvest":
-            {
-                // +50% damage if target <50% HP, 25% lifesteal
-                if (target != null && target.IsAlive)
-                {
-                    int dmg = abilityResult.Damage;
-                    if (target.HP < target.MaxHP / 2) dmg = (int)(dmg * 1.5);
-                    target.HP -= dmg;
-                    int heal = (int)(dmg * 0.25);
-                    player.HP = Math.Min(player.MaxHP, player.HP + heal);
-                    terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_shadow_harvest", target.Name, dmg, heal));
-                    if (target.HP <= 0)
-                    {
-                        target.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(target))
-                            result.DefeatedMonsters.Add(target);
-                    }
-                }
-                break;
-            }
-
             case "corrupting_dot":
-                // Poison DoT + 15% lifesteal on attacks
+                // v0.57.2 — Corrupting Touch: custom DoT that damages the target and heals the caster
+                // each round (per-ability tick handler in ProcessMonsterAction). Previously this used
+                // the generic Poisoned status + Lifesteal on attacks, which meant the "each tick heals
+                // you" promise only delivered on player attacks, not on DoT ticks.
                 if (target != null && target.IsAlive)
                 {
-                    target.Poisoned = true;
-                    target.PoisonRounds = Math.Max(target.PoisonRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 5);
-                    if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
-                        player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
-                    player.StatusLifestealPercent = Math.Max(player.StatusLifestealPercent, 15);
+                    int dotRounds = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                    long tickDmg = Math.Max(1, abilityResult.Damage);
+                    target.CorruptingDotRounds = Math.Max(target.CorruptingDotRounds, dotRounds);
+                    target.CorruptingDotTickDamage = Math.Max(target.CorruptingDotTickDamage, tickDmg);
                     terminal.SetColor("dark_red");
                     terminal.WriteLine(Loc.Get("combat.ability_corrupting_dot", target.Name));
                 }
@@ -14363,7 +14469,7 @@ public partial class CombatEngine
                 if (damage > 0)
                 {
                     damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
-                    await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player);
+                    await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
                 }
 
                 // Apply self-healing from attack spells (e.g. Prison Siphon, Devour Essence)
@@ -15883,10 +15989,15 @@ public partial class CombatEngine
             long damagePerTarget = damage / livingMonsters.Count;
             damagePerTarget = Math.Max(damagePerTarget, damage / 3); // Min 1/3 damage each
 
+            bool immunityAnnounced = false;
             foreach (var monster in livingMonsters)
             {
-                long actualDamage = Math.Min(damagePerTarget, monster.HP);
-                monster.HP -= (int)actualDamage;
+                // Apply boss-layer protections (magical immunity + divine armor) — only
+                // announce the immunity-absorbs message once per AoE cast.
+                long adjustedDamage = ApplyBossSpellProtections(monster, damagePerTarget, announce: !immunityAnnounced);
+                if (monster.IsMagicalImmune) immunityAnnounced = true;
+                long actualDamage = Math.Min(adjustedDamage, monster.HP);
+                monster.HP -= actualDamage;
 
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.target_takes_damage", monster.Name, actualDamage));
@@ -15917,8 +16028,12 @@ public partial class CombatEngine
             var target = livingMonsters.OrderBy(m => m.HP).FirstOrDefault();
             if (target != null)
             {
-                long actualDamage = Math.Min(damage, target.HP);
-                target.HP -= (int)actualDamage;
+                // Apply boss-layer protections (magical immunity + divine armor) — previously
+                // bypassed here, allowing e.g. a companion Power Word: Kill to hit Manwe at
+                // full damage despite magical immunity.
+                long adjustedDamage = ApplyBossSpellProtections(target, damage, announce: true);
+                long actualDamage = Math.Min(adjustedDamage, target.HP);
+                target.HP -= actualDamage;
 
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", target.Name, actualDamage));
@@ -16548,6 +16663,7 @@ public partial class CombatEngine
                         if (actualDmg > abMaxDmg) actualDmg = abMaxDmg;
                         if (monster.IsBoss)
                             actualDmg = Math.Max(actualDmg, (long)(monster.Level * 1.5));
+                        actualDmg = CapTeammateDamageInOldGodFight(companion, actualDmg);
                         companion.HP = Math.Max(0, companion.HP - actualDmg);
                         terminal.WriteLine($"{companion.DisplayName} takes {actualDmg} damage!", "red");
                         result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {actualDmg}");
@@ -16578,6 +16694,7 @@ public partial class CombatEngine
                         if (dmg > dmMaxDmg) dmg = dmMaxDmg;
                         if (monster.IsBoss)
                             dmg = Math.Max(dmg, (long)(monster.Level * 1.5));
+                        dmg = CapTeammateDamageInOldGodFight(companion, dmg);
                         companion.HP = Math.Max(0, companion.HP - dmg);
                         if (abilityResult.LifeStealPercent > 0)
                         {
@@ -16617,6 +16734,7 @@ public partial class CombatEngine
                     // Old God abilities use custom names that don't match MonsterAbilities enum.
                     // Generate direct damage so these thematic attacks still hurt companions.
                     long bossDmg = (long)(monster.Level * 2) + random.Next(0, monster.Level);
+                    bossDmg = CapTeammateDamageInOldGodFight(companion, bossDmg);
                     companion.HP = Math.Max(0, companion.HP - bossDmg);
                     terminal.SetColor("bright_red");
                     terminal.WriteLine($"{monster.Name} unleashes {abilityName}!");
@@ -16734,6 +16852,9 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.shield_wall_formation_absorbs", reduced), "bright_cyan");
             }
         }
+
+        // Old God fight cap applied last so tightest cap wins
+        actualDamage = CapTeammateDamageInOldGodFight(companion, actualDamage);
 
         // Apply damage to companion
         companion.HP = Math.Max(0, companion.HP - actualDamage);
@@ -18924,8 +19045,29 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.ability_backstab_crit"), "bright_yellow");
                 abilityAlreadyCrit = true; // Don't double-crit — the 1.75x IS the crit
             }
+            else if (abilityResult.SpecialEffect == "shadow_harvest" && monster.HP < monster.MaxHP / 2)
+            {
+                // v0.57.2 — Abysswarden Shadow Harvest +50% vs targets already below half HP.
+                // Inlined here like Execute; previously a separate post-damage handler double-applied
+                // and silently skipped when the first hit killed the monster.
+                actualDamage = (long)(actualDamage * 1.5);
+                terminal.SetColor("dark_red");
+                terminal.WriteLine(Loc.Get("combat.shadow_harvest_feast", monster.Name));
+            }
 
-            // Critical hit roll for abilities — skip if ability already has guaranteed crit (e.g. Backstab)
+            // v0.57.2 — Hidden status guaranteed crit on ability (Umbral Step, stealth attacks).
+            // Previously only basic attacks honored Hidden; abilities skipped it.
+            bool stealthAbilityCritSingle = !abilityAlreadyCrit && player.HasStatus(StatusEffect.Hidden);
+            if (stealthAbilityCritSingle)
+            {
+                player.RemoveStatus(StatusEffect.Hidden);
+                abilityAlreadyCrit = true;
+                float stealthCritMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                actualDamage = (long)(actualDamage * stealthCritMult);
+                terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
+            }
+
+            // Critical hit roll for abilities — skip if ability already has guaranteed crit (e.g. Backstab, Umbral Step)
             bool abilityCrit = !abilityAlreadyCrit && StatEffectsSystem.RollCriticalHit(player);
             // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
             if (!abilityCrit && !abilityAlreadyCrit && player.Class == CharacterClass.Wavecaller
@@ -18958,6 +19100,20 @@ public partial class CombatEngine
             // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
             // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
             ApplyPostHitEnchantments(player, monster, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+
+            // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals caster even on killing blow.
+            if (abilityResult.SpecialEffect == "shadow_harvest" && actualDamage > 0)
+            {
+                long shadowHeal = (long)(actualDamage * 0.25);
+                long oldShadowHP = player.HP;
+                player.HP = Math.Min(player.MaxHP, player.HP + shadowHeal);
+                long actualShadowHeal = player.HP - oldShadowHP;
+                if (actualShadowHeal > 0)
+                {
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine(Loc.Get("combat.shadow_harvest_drain", actualShadowHeal));
+                }
+            }
 
             if (monster.HP <= 0)
             {
@@ -20389,39 +20545,17 @@ public partial class CombatEngine
 
             // ═══════════════════════════════════════════════════════════════════════
             // ABYSSWARDEN PRESTIGE ABILITIES (single-monster)
+            // v0.57.2 — shadow_harvest bonus and lifesteal moved into the base damage block.
             // ═══════════════════════════════════════════════════════════════════════
 
-            case "shadow_harvest":
-            {
-                // +50% damage if target <50% HP, 25% lifesteal
-                if (monster != null && monster.IsAlive)
-                {
-                    int dmg = abilityResult.Damage;
-                    if (monster.HP < monster.MaxHP / 2) dmg = (int)(dmg * 1.5);
-                    monster.HP -= dmg;
-                    int shHeal = (int)(dmg * 0.25);
-                    player.HP = Math.Min(player.MaxHP, player.HP + shHeal);
-                    terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_shadow_harvest", monster.Name, dmg, shHeal));
-                    if (monster.HP <= 0)
-                    {
-                        monster.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(monster))
-                            result.DefeatedMonsters.Add(monster);
-                    }
-                }
-                break;
-            }
-
             case "corrupting_dot":
-                // Poison DoT + 15% lifesteal on attacks
+                // v0.57.2 — same per-tick DoT+heal rewrite as the multi-monster path above.
                 if (monster != null && monster.IsAlive)
                 {
-                    monster.Poisoned = true;
-                    monster.PoisonRounds = Math.Max(monster.PoisonRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 5);
-                    if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
-                        player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
-                    player.StatusLifestealPercent = Math.Max(player.StatusLifestealPercent, 15);
+                    int dotRounds = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
+                    long tickDmg = Math.Max(1, abilityResult.Damage);
+                    monster.CorruptingDotRounds = Math.Max(monster.CorruptingDotRounds, dotRounds);
+                    monster.CorruptingDotTickDamage = Math.Max(monster.CorruptingDotTickDamage, tickDmg);
                     terminal.SetColor("dark_red");
                     terminal.WriteLine(Loc.Get("combat.ability_corrupting_dot", monster.Name));
                 }
@@ -22191,14 +22325,18 @@ public partial class CombatEngine
         // Apply damage to target
         if (spellResult.Damage > 0 && target != null)
         {
-            target.HP = Math.Max(0, target.HP - spellResult.Damage);
-            terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", target.Name, spellResult.Damage), "red");
+            // Apply boss-layer protections (magical immunity, divine armor) that were
+            // previously bypassed here — direct HP subtraction let spells hit Old God
+            // bosses at full damage regardless of their immunity phase.
+            long spellDamage = ApplyBossSpellProtections(target, spellResult.Damage, announce: true);
+            target.HP = Math.Max(0, target.HP - spellDamage);
+            terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", target.Name, spellDamage), "red");
 
             // Track spell damage dealt for boss kill summary / telemetry
             if (result != null)
             {
-                result.TotalDamageDealt += spellResult.Damage;
-                result.Player?.Statistics.RecordDamageDealt(spellResult.Damage, false);
+                result.TotalDamageDealt += spellDamage;
+                result.Player?.Statistics.RecordDamageDealt(spellDamage, false);
             }
 
             if (target.HP <= 0)
@@ -23221,10 +23359,33 @@ public partial class CombatEngine
             return;
         }
 
-        // Check if the player has a custom XP distribution set (any teammate slot > 0%)
-        // Note: player == 100% alone is NOT considered custom — it may be a stale solo-mode
-        // setting from before companions joined mid-dungeon. The player must have explicitly
-        // allocated some percentage to at least one teammate slot for it to be "custom".
+        // v0.57.2 — if the player has explicitly set their XP split via the UI (flag set on any
+        // edit in DungeonLocation.ShowXPDistribution), honor it regardless of shape. This fixes
+        // the 100/0/0/0 case Mystic reported: before, the code couldn't distinguish "I want 100%
+        // of the XP even with teammates" from "stale solo-mode default", so it always overrode
+        // to 50/50. With the explicit flag, first-time-with-teammate still gets the friendly
+        // auto-distribute, and deliberate settings stick.
+        if (player.TeamXPIsExplicit)
+        {
+            // Only zero out dead teammate slots and redistribute their share to the player
+            for (int s = 1; s < player.TeamXPPercent.Length; s++)
+            {
+                if (s - 1 < teammates.Count)
+                {
+                    var t = teammates[s - 1];
+                    bool isAlive = t != null && !t.IsGroupedPlayer && !t.IsEcho && t.IsAlive && t.HP > 0;
+                    if (!isAlive && player.TeamXPPercent[s] > 0)
+                    {
+                        player.TeamXPPercent[0] += player.TeamXPPercent[s];
+                        player.TeamXPPercent[s] = 0;
+                    }
+                }
+            }
+            return;
+        }
+
+        // Check if the player has a custom XP distribution set (any teammate slot > 0%).
+        // Legacy pre-flag path: if an older save has a custom-looking distribution, also honor it.
         bool hasCustomDistribution = false;
         for (int s = 1; s < player.TeamXPPercent.Length; s++)
         {
@@ -24614,6 +24775,7 @@ public partial class CombatEngine
                 foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                 {
                     long tmDmg = Math.Max(1, damage - (long)(Math.Sqrt(tm.Defence) * 3));
+                    tmDmg = CapTeammateDamageInOldGodFight(tm, tmDmg);
                     tm.HP = Math.Max(0, tm.HP - tmDmg);
                     terminal.WriteLine($"  {tm.DisplayName} takes {tmDmg} damage!");
                 }
@@ -24710,6 +24872,9 @@ public partial class CombatEngine
                 dmg = (long)(dmg * (1.0 + absorptionRate * 0.5));
             }
 
+            // Old God fight cap for non-player teammates so AoE can't one-shot companions
+            if (target != player)
+                dmg = CapTeammateDamageInOldGodFight(target, dmg);
             target.HP = Math.Max(0, target.HP - dmg);
             string tankTag = (tank != null && target == tank) ? " [ABSORBING]" : "";
             terminal.WriteLine($"  {target.DisplayName} takes {dmg} damage!{tankTag}");
@@ -24896,6 +25061,49 @@ public partial class CombatEngine
         terminal.WriteLine($"  {boss.Name} becomes immune to {immunityType} damage for {rounds} rounds!");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  Use {(physical ? "magical spells" : "physical attacks")} to deal damage!");
+    }
+
+    /// <summary>
+    /// Cap a single hit of incoming damage on a companion/NPC teammate at 75% MaxHP when
+    /// fighting an Old God boss (BossContext is non-null only during Old God encounters).
+    /// Several boss damage paths — the custom-ability fallback, boss AoE, boss channel —
+    /// historically had no per-hit cap, so a Maelketh crit or Creation's End AoE could
+    /// one-shot Aldric or a similar front-line companion. Does nothing outside Old God
+    /// fights; regular monster caps (85% boss, 75% trash) still apply where they already did.
+    /// </summary>
+    private long CapTeammateDamageInOldGodFight(Character target, long damage)
+    {
+        if (BossContext == null || damage <= 0 || target == null) return damage;
+        long cap = Math.Max(1, (long)(target.MaxHP * GameConfig.OldGodTeammateDamageCapPercent));
+        return damage > cap ? cap : damage;
+    }
+
+    /// <summary>
+    /// Apply boss magical immunity + divine armor reductions to direct-HP spell damage paths
+    /// (player single-monster spell cast via ApplySpellEffects, NPC teammate offensive spell
+    /// single-target + AoE branches). These paths historically bypassed boss protections
+    /// entirely — they just subtracted raw spell damage from monster HP — so e.g. a companion
+    /// casting Power Word: Kill dealt full damage to Manwe regardless of magical immunity.
+    /// This helper applies the same boss-layer reductions that `ApplySingleMonsterDamage`
+    /// applies, and optionally prints the immunity-absorbs message.
+    /// </summary>
+    private long ApplyBossSpellProtections(Monster target, long damage, bool announce)
+    {
+        if (target.IsMagicalImmune && damage > 0)
+        {
+            damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: true);
+            if (announce)
+            {
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", target.Name));
+            }
+        }
+        if (BossContext != null && BossContext.DivineArmorReduction > 0 && damage > 0)
+        {
+            damage = (long)(damage * (1.0 - BossContext.DivineArmorReduction));
+            damage = Math.Max(1, damage);
+        }
+        return damage;
     }
 
     /// <summary>

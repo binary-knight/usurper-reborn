@@ -3738,6 +3738,185 @@ public abstract class BaseLocation
     protected bool IsScreenReader => currentPlayer?.ScreenReaderMode == true;
 
     /// <summary>
+    /// v0.57.2 — Party Inventory Viewer (Phase 1 of the "mule" pattern).
+    /// Shows a list of party members (companions, spouse/lover, team NPCs) and lets the player
+    /// view what's in each one's inventory and take items back to their own inventory. Phase 1 is
+    /// view + take only; "give to companion" comes later.
+    ///
+    /// Called from TeamCorner, Home, Inn, and the Dungeon party-management menu. Caller supplies
+    /// the appropriate party list (e.g. Home supplies spouse+lover+companions, Dungeon supplies
+    /// current teammates). Empty-party case is handled — method just shows a message and returns.
+    /// </summary>
+    protected async Task ShowPartyInventoryViewer(List<Character> partyMembers)
+    {
+        if (partyMembers == null) partyMembers = new List<Character>();
+
+        // Filter out grouped players (they manage their own inventory) and echoes (read-only snapshots)
+        partyMembers = partyMembers
+            .Where(m => m != null && !m.IsGroupedPlayer && !m.IsEcho)
+            .ToList();
+
+        if (partyMembers.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("party_inv.no_members"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            WriteBoxHeader(Loc.Get("party_inv.header"), "bright_cyan", 60);
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("party_inv.subtitle"));
+            terminal.WriteLine("");
+
+            for (int i = 0; i < partyMembers.Count; i++)
+            {
+                var m = partyMembers[i];
+                int invCount = m.Inventory?.Count ?? 0;
+
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"  {i + 1}. ");
+                terminal.SetColor("white");
+                terminal.Write($"{m.DisplayName,-24}");
+                terminal.SetColor("gray");
+                terminal.Write($" {Loc.Get("ui.level")} {m.Level,-3} ");
+
+                if (invCount == 0)
+                {
+                    terminal.SetColor("dark_gray");
+                    terminal.WriteLine(Loc.Get("party_inv.empty_count"));
+                }
+                else
+                {
+                    terminal.SetColor(invCount > 10 ? "bright_green" : "cyan");
+                    terminal.WriteLine(Loc.Get("party_inv.item_count", invCount));
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("party_inv.select_member"));
+            terminal.WriteLine("");
+            terminal.Write(Loc.Get("ui.your_choice"));
+            terminal.SetColor("white");
+
+            var input = (await terminal.ReadLineAsync()).Trim().ToUpper();
+            if (input == "Q" || string.IsNullOrEmpty(input)) return;
+
+            if (!int.TryParse(input, out int idx) || idx < 1 || idx > partyMembers.Count)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("ui.invalid_choice"));
+                await Task.Delay(900);
+                continue;
+            }
+
+            await ShowSinglePartyMemberInventory(partyMembers[idx - 1]);
+        }
+    }
+
+    /// <summary>
+    /// Render one NPC's inventory list with take-back option. Items taken back are subject to
+    /// the player's normal inventory cap — if the player is full, the take is refused.
+    /// </summary>
+    private async Task ShowSinglePartyMemberInventory(Character member)
+    {
+        while (true)
+        {
+            terminal.ClearScreen();
+            WriteBoxHeader(Loc.Get("party_inv.member_header", member.DisplayName), "bright_cyan", 60);
+            terminal.WriteLine("");
+
+            var inv = member.Inventory ?? new List<Item>();
+            if (inv.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("party_inv.empty_inventory", member.DisplayName));
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+                return;
+            }
+
+            for (int i = 0; i < inv.Count; i++)
+            {
+                var item = inv[i];
+                string display = item.IsIdentified
+                    ? item.Name
+                    : LootGenerator.GetUnidentifiedName(item);
+
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"  {i + 1,2}. ");
+                terminal.SetColor(item.IsCursed ? "bright_red" : "white");
+                terminal.Write($"{display,-34}");
+                terminal.SetColor("gray");
+                if (item.Value > 0)
+                    terminal.Write($" {item.Value,8:N0}g");
+                if (item.IsCursed)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.Write(" [" + Loc.Get("ui.cursed") + "]");
+                }
+                terminal.WriteLine("");
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("party_inv.take_prompt"));
+            terminal.WriteLine("");
+            terminal.Write(Loc.Get("ui.your_choice"));
+            terminal.SetColor("white");
+
+            var input = (await terminal.ReadLineAsync()).Trim().ToUpper();
+            if (input == "Q" || string.IsNullOrEmpty(input)) return;
+
+            if (!int.TryParse(input, out int idx) || idx < 1 || idx > inv.Count)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("ui.invalid_choice"));
+                await Task.Delay(900);
+                continue;
+            }
+
+            var chosenItem = inv[idx - 1];
+
+            if (currentPlayer.IsInventoryFull)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("party_inv.player_inventory_full"));
+                await Task.Delay(1500);
+                continue;
+            }
+
+            // Transfer: remove from NPC, add to player.
+            member.Inventory!.Remove(chosenItem);
+            currentPlayer.Inventory.Add(chosenItem);
+
+            terminal.SetColor("bright_green");
+            string takenName = chosenItem.IsIdentified
+                ? chosenItem.Name
+                : LootGenerator.GetUnidentifiedName(chosenItem);
+            terminal.WriteLine(Loc.Get("party_inv.taken", takenName, member.DisplayName));
+
+            // Persist the change — NPC inventories live on the canonical NPC (world_state in online mode)
+            // so take-back needs to flush both save paths, mirroring the equip/unequip patterns.
+            CombatEngine.SyncNPCTeammateToActiveNPCs(member);
+            SaveSystem.Instance.ResetAutoSaveThrottle();
+            await SaveSystem.Instance.AutoSave(currentPlayer);
+            if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+            {
+                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+                catch (Exception ex) { DebugLogger.Instance.LogError("PARTYINV", $"SaveAllSharedState failed after take-back: {ex.Message}"); }
+            }
+
+            await Task.Delay(1200);
+        }
+    }
+
+    /// <summary>
     /// Write a centered box header (╔═══╗ / ║ TITLE ║ / ╚═══╝).
     /// In screen reader mode, outputs plain text title only.
     /// </summary>
