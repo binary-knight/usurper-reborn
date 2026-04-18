@@ -193,17 +193,46 @@ internal static class EditorIO
                 selected - viewportSize / 2));
             int viewEnd = Math.Min(labels.Count, viewStart + viewportSize);
 
-            string hint = numBuffer.Length > 0
-                ? $"[yellow]typing: {numBuffer}_[/]  [grey](Enter to commit, Esc to clear)[/]"
-                : $"[grey](arrows/PgUp/PgDn/Home/End, numbers, Enter picks, 0/Q/Esc back — showing {viewStart + 1}-{viewEnd}/{labels.Count})[/]";
+            // v0.57.4 (pass 6 — WezTerm regression): the title and hint used to
+            // share a single line, and the concatenation regularly exceeded 80
+            // chars. The terminal wrapped it to 2 rows, but our lineCount
+            // counted it as 1, so each arrow-key redraw moved up one row too
+            // few — leaving a stale line behind every keystroke and producing
+            // the "staircase" of stacked menus in the screenshot. Fix: emit
+            // title and hint on separate lines, keep each short enough to
+            // never wrap on an 80-col terminal.
             int lineCount = 0;
             AnsiConsole.MarkupLine(""); lineCount++;
-            AnsiConsole.MarkupLine($"  [bold yellow]{Markup.Escape(title)}[/]  {hint}");
+            // Title line — "TITLE   (N/M)" style. Title only ever runs to
+            // ~30 chars in practice; the counter tail adds ~12 more.
+            string counter = $"[grey]({viewStart + 1}-{viewEnd}/{labels.Count})[/]";
+            AnsiConsole.MarkupLine($"  [bold yellow]{Markup.Escape(title)}[/]   {counter}");
+            lineCount++;
+            // Hint line — short enough to always fit in 80 cols. Shows the
+            // numeric-entry buffer when one is active, otherwise the key
+            // reference. Plain ASCII separators only (no Unicode bullets) —
+            // not every bundled WezTerm font has the glyphs, and a missing
+            // glyph can render as a blank or double-wide space and push the
+            // visible width past 80.
+            string hint = numBuffer.Length > 0
+                ? $"[yellow]typing: {numBuffer}_[/]  [grey](Enter commits, Esc clears)[/]"
+                : $"[grey]arrows, numbers, Enter picks, 0/Q/Esc back[/]";
+            AnsiConsole.MarkupLine($"  {hint}");
             lineCount++;
             AnsiConsole.MarkupLine(""); lineCount++;
+            // v0.57.4 (pass 6): figure out the max printable width for each
+            // item row so long labels don't wrap and desynchronize our line
+            // count. Each row renders as "  {cursor} {numTag,3}  {label}" =
+            // 2 + 1 + 1 + 3 + 2 = 9 chars of visible prefix, give a 2-col
+            // safety margin so selected rows (which add a " " pad on each
+            // side of the label via reverse-video) don't wrap either.
+            int termWidth;
+            try { termWidth = Console.BufferWidth; } catch { termWidth = 80; }
+            if (termWidth <= 0) termWidth = 80;
+            int maxLabelWidth = Math.Max(20, termWidth - 11);
             if (viewStart > 0)
             {
-                AnsiConsole.MarkupLine($"  [grey]    ... {viewStart} more above (↑ / PgUp / Home)[/]");
+                AnsiConsole.MarkupLine($"  [grey]    ... {viewStart} more above[/]");
                 lineCount++;
             }
             for (int i = viewStart; i < viewEnd; i++)
@@ -215,15 +244,21 @@ internal static class EditorIO
                 // user knows a 2-key combo reaches them.
                 int num = i + 1;
                 string numTag = $"[cyan]{num,3}[/]";
+                // Truncate over-wide labels with "…" suffix. Done BEFORE
+                // Markup.Escape so we're measuring raw visible length, not
+                // escape sequences.
+                string rawLabel = labels[i] ?? "";
+                if (rawLabel.Length > maxLabelWidth)
+                    rawLabel = rawLabel.Substring(0, Math.Max(0, maxLabelWidth - 1)) + "…";
                 string text = isSelected
-                    ? $"[black on cyan] {Markup.Escape(labels[i])} [/]"
-                    : Markup.Escape(labels[i]);
+                    ? $"[black on cyan] {Markup.Escape(rawLabel)} [/]"
+                    : Markup.Escape(rawLabel);
                 AnsiConsole.MarkupLine($"  {cursor} {numTag}  {text}");
                 lineCount++;
             }
             if (viewEnd < labels.Count)
             {
-                AnsiConsole.MarkupLine($"  [grey]    ... {labels.Count - viewEnd} more below (↓ / PgDn / End)[/]");
+                AnsiConsole.MarkupLine($"  [grey]    ... {labels.Count - viewEnd} more below[/]");
                 lineCount++;
             }
             prevLines = lineCount;
