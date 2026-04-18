@@ -77,6 +77,32 @@ internal static class EquipmentEditor
 
     private static bool SaveCustomItems(List<Equipment> items)
     {
+        // v0.57.4: validate every item is in the custom ID range BEFORE writing.
+        // Built-in items (< 200000) get silently dropped by EquipmentData.Initialize,
+        // so saving a file that includes them looks successful but the game ignores
+        // those entries. Most commonly this happens when a user hand-edits the JSON
+        // between editor sessions. Duplicate IDs within the file have the same
+        // problem — second occurrence is dropped.
+        var offenders = items.Where(i => i.Id < GameDataLoader.ModdedEquipmentIdStart).ToList();
+        if (offenders.Count > 0)
+        {
+            EditorIO.Error($"{offenders.Count} item(s) use IDs below {GameDataLoader.ModdedEquipmentIdStart} (reserved for built-in items).");
+            foreach (var o in offenders.Take(10))
+                EditorIO.Info($"  #{o.Id} {o.Name}");
+            if (offenders.Count > 10) EditorIO.Info($"  ... and {offenders.Count - 10} more");
+            EditorIO.Info("Custom IDs must be >= 200000. Fix these entries before saving.");
+            EditorIO.Pause();
+            return false;
+        }
+        var dupIds = items.GroupBy(i => i.Id).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+        if (dupIds.Count > 0)
+        {
+            EditorIO.Error($"Duplicate IDs found: {string.Join(", ", dupIds.Take(10))}");
+            EditorIO.Info("Every item needs a unique ID. Edit the duplicates before saving.");
+            EditorIO.Pause();
+            return false;
+        }
+
         var path = GetEquipmentJsonPath();
         try
         {
@@ -186,25 +212,31 @@ internal static class EquipmentEditor
         e.Name = EditorIO.PromptString("Name", e.Name);
         e.Description = EditorIO.PromptString("Description", e.Description);
         e.Slot = EditorIO.PromptEnum("Slot", e.Slot);
+        // v0.57.4 (pass 4): bound-check the raw-stat fields where negatives
+        // produce nonsense (weapon deals negative damage, armor reduces AC,
+        // shield blocks -50%, item "costs" -200 gold). Stat-bonus fields
+        // (STR+/DEX+/etc.) stay unbounded — cursed items legitimately carry
+        // negative stat bonuses and modders might want -2 STR penalties on
+        // an iron-heavy cuirass, etc.
         if (e.Slot == EquipmentSlot.MainHand || e.Slot == EquipmentSlot.OffHand)
         {
             e.Handedness = EditorIO.PromptEnum("Handedness", e.Handedness);
             e.WeaponType = EditorIO.PromptEnum("WeaponType", e.WeaponType);
-            e.WeaponPower = EditorIO.PromptInt("WeaponPower", e.WeaponPower);
+            e.WeaponPower = EditorIO.PromptInt("WeaponPower", e.WeaponPower, min: 0);
             if (e.WeaponType == WeaponType.Shield || e.WeaponType == WeaponType.Buckler || e.WeaponType == WeaponType.TowerShield)
             {
-                e.ShieldBonus = EditorIO.PromptInt("ShieldBonus", e.ShieldBonus);
-                e.BlockChance = EditorIO.PromptInt("BlockChance", e.BlockChance);
+                e.ShieldBonus = EditorIO.PromptInt("ShieldBonus", e.ShieldBonus, min: 0);
+                e.BlockChance = EditorIO.PromptInt("BlockChance (percent)", e.BlockChance, min: 0, max: 100);
             }
         }
         else
         {
             e.ArmorType = EditorIO.PromptEnum("ArmorType", e.ArmorType);
             e.WeightClass = EditorIO.PromptEnum("WeightClass", e.WeightClass);
-            e.ArmorClass = EditorIO.PromptInt("ArmorClass", e.ArmorClass);
+            e.ArmorClass = EditorIO.PromptInt("ArmorClass", e.ArmorClass, min: 0);
         }
 
-        EditorIO.Info("— Primary stat bonuses (blank = skip) —");
+        EditorIO.Info("— Primary stat bonuses (negative allowed for cursed items) —");
         e.StrengthBonus = EditorIO.PromptInt("STR", e.StrengthBonus);
         e.DexterityBonus = EditorIO.PromptInt("DEX", e.DexterityBonus);
         e.ConstitutionBonus = EditorIO.PromptInt("CON", e.ConstitutionBonus);
@@ -219,7 +251,7 @@ internal static class EquipmentEditor
 
         EditorIO.Info("— Restrictions & economy —");
         e.MinLevel = EditorIO.PromptInt("MinLevel", e.MinLevel, min: 1, max: 100);
-        e.Value = EditorIO.PromptLong("Value (gold)", e.Value);
+        e.Value = EditorIO.PromptLong("Value (gold, 0 = unsellable)", e.Value, min: 0);
         e.Rarity = EditorIO.PromptEnum("Rarity", e.Rarity);
     }
 }

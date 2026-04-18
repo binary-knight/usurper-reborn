@@ -182,6 +182,10 @@ namespace UsurperRemake.Systems
         // Skill proficiency (stored as int values of TrainingSystem.ProficiencyLevel)
         public Dictionary<string, int> SkillProficiencies { get; set; } = new();
         public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();
+
+        // Companion's personal inventory ("bag"). Items transferred via combat loot,
+        // Home/Team Corner/dungeon Party Inventory viewer. v0.57.3+.
+        public List<InventoryItemData> Inventory { get; set; } = new();
     }
 
     public class CompanionDeathInfo
@@ -800,6 +804,14 @@ namespace UsurperRemake.Systems
 
         // Marketplace inventory - items NPC has to sell
         public List<MarketItemData> MarketInventory { get; set; } = new();
+
+        // Personal bag — items transferred to this NPC via the combat [T] prompt,
+        // Home / Team Corner / dungeon Party Inventory viewer. Separate from
+        // MarketInventory (shop stock) and EquippedItems (worn gear). Added
+        // v0.57.4 — same structural fix as CompanionSaveInfo.Inventory; pre-fix,
+        // items handed to NPC teammates evaporated on save/reload because there
+        // was no field to persist them through.
+        public List<InventoryItemData> Inventory { get; set; } = new();
 
         // Modern RPG Equipment System - equipped items on this NPC
         public Dictionary<int, int> EquippedItems { get; set; } = new(); // EquipmentSlot -> Equipment ID

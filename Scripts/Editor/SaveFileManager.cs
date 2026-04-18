@@ -62,13 +62,19 @@ internal static class SaveFileManager
         EditorIO.Section("Clone save");
         var saves = backend.GetAllSaves();
         if (saves.Count == 0) { EditorIO.Warn("No saves."); EditorIO.Pause(); return; }
-        var labels = saves.OrderByDescending(s => s.SaveTime)
-            .Select(s => $"{s.PlayerName,-24} L{s.Level} {s.ClassName}")
-            .ToList();
+        var ordered = saves.OrderByDescending(s => s.SaveTime).ToList();
+        var labels = ordered.Select(s => $"{s.PlayerName,-24} L{s.Level} {s.ClassName}").ToList();
         int pick = EditorIO.Menu("Source save:", labels);
         if (pick == 0) return;
-        var src = saves.OrderByDescending(s => s.SaveTime).ElementAt(pick - 1);
-        var srcFile = Path.Combine(saveDir, SanitizeFileName(src.PlayerName) + ".json");
+        var src = ordered[pick - 1];
+        // v0.57.4 (pass 4): trust the on-disk filename from SaveInfo.FileName
+        // instead of re-deriving it through the editor's sanitizer. Editor
+        // used char.IsLetterOrDigit while backend uses Path.GetInvalidFileNameChars,
+        // so names with hyphens / apostrophes mismatched and File.Exists failed.
+        // Same fix pattern used in PlayerSaveEditor earlier in v0.57.4.
+        var srcFile = !string.IsNullOrEmpty(src.FileName)
+            ? Path.Combine(saveDir, src.FileName)
+            : Path.Combine(saveDir, SanitizeFileName(src.PlayerName) + ".json");
         if (!File.Exists(srcFile)) { EditorIO.Error($"Source file missing: {srcFile}"); EditorIO.Pause(); return; }
 
         string newName = EditorIO.Prompt("New character name for the clone");
@@ -97,13 +103,15 @@ internal static class SaveFileManager
         EditorIO.Section("Delete save");
         var saves = backend.GetAllSaves();
         if (saves.Count == 0) { EditorIO.Warn("No saves."); EditorIO.Pause(); return; }
-        var labels = saves.OrderByDescending(s => s.SaveTime)
-            .Select(s => $"{s.PlayerName,-24} L{s.Level} {s.ClassName}  last {s.SaveTime:yyyy-MM-dd}")
-            .ToList();
+        var ordered = saves.OrderByDescending(s => s.SaveTime).ToList();
+        var labels = ordered.Select(s => $"{s.PlayerName,-24} L{s.Level} {s.ClassName}  last {s.SaveTime:yyyy-MM-dd}").ToList();
         int pick = EditorIO.Menu("Save to delete:", labels);
         if (pick == 0) return;
-        var tgt = saves.OrderByDescending(s => s.SaveTime).ElementAt(pick - 1);
-        var file = Path.Combine(saveDir, SanitizeFileName(tgt.PlayerName) + ".json");
+        var tgt = ordered[pick - 1];
+        // v0.57.4 (pass 4): trust SaveInfo.FileName over re-sanitizing the name.
+        var file = !string.IsNullOrEmpty(tgt.FileName)
+            ? Path.Combine(saveDir, tgt.FileName)
+            : Path.Combine(saveDir, SanitizeFileName(tgt.PlayerName) + ".json");
 
         EditorIO.Warn($"This will permanently delete: {file}");
         if (!EditorIO.Confirm($"Delete {tgt.PlayerName} (L{tgt.Level} {tgt.ClassName})?")) return;
@@ -159,10 +167,12 @@ internal static class SaveFileManager
         EditorIO.Pause();
     }
 
+    // v0.57.4 (pass 4): mirror FileSaveBackend.GetSaveFileName's sanitizer
+    // exactly — Path.GetInvalidFileNameChars, not char.IsLetterOrDigit — so
+    // cloned destination filenames land where the game expects them on load.
+    // The old letter-or-digit algorithm replaced valid filename chars
+    // (hyphens, apostrophes, periods) with underscores, producing paths that
+    // didn't match what FileSaveBackend would look for when reading back.
     private static string SanitizeFileName(string name)
-    {
-        var sb = new System.Text.StringBuilder();
-        foreach (var ch in name) sb.Append(char.IsLetterOrDigit(ch) ? ch : '_');
-        return sb.ToString();
-    }
+        => string.Join("_", name.Split(Path.GetInvalidFileNameChars()));
 }

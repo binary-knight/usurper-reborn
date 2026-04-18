@@ -5078,6 +5078,55 @@ public partial class GameEngine
                 }
             }
 
+            // v0.57.4: restore the NPC's personal bag (transferred via combat [T] /
+            // Home / Team Corner / dungeon viewer). Separate from MarketInventory
+            // (shop stock). Pre-fix, NPC teammate bags evaporated every save.
+            if (data.Inventory != null && data.Inventory.Count > 0)
+            {
+                // Pair with the save-side NPC_BAG log so the full round-trip is
+                // visible. If items vanish between save and load, this is where
+                // it'll show: either the restore doesn't fire (field missing) or
+                // the count differs.
+                var bagSummary = string.Join(", ", data.Inventory.Take(3).Select(i => i?.Name ?? "?"));
+                if (data.Inventory.Count > 3) bagSummary += $", +{data.Inventory.Count - 3} more";
+                DebugLogger.Instance.LogInfo("NPC_BAG",
+                    $"RestoreNPCs RESTORED {data.Name} bag ({data.Inventory.Count}): {bagSummary}");
+
+                npc.Inventory ??= new List<Item>();
+                foreach (var itemData in data.Inventory)
+                {
+                    var item = new global::Item
+                    {
+                        Name = itemData.Name,
+                        Value = itemData.Value,
+                        Type = itemData.Type,
+                        Attack = itemData.Attack,
+                        Armor = itemData.Armor,
+                        Strength = itemData.Strength,
+                        Dexterity = itemData.Dexterity,
+                        Wisdom = itemData.Wisdom,
+                        Defence = itemData.Defence,
+                        BlockChance = itemData.BlockChance,
+                        ShieldBonus = itemData.ShieldBonus,
+                        HP = itemData.HP,
+                        Mana = itemData.Mana,
+                        Charisma = itemData.Charisma,
+                        Agility = itemData.Agility,
+                        Stamina = itemData.Stamina,
+                        MinLevel = itemData.MinLevel,
+                        IsCursed = itemData.IsCursed,
+                        Cursed = itemData.Cursed,
+                        IsIdentified = itemData.IsIdentified,
+                        Shop = itemData.Shop,
+                        Dungeon = itemData.Dungeon,
+                        Description = itemData.Description?.ToList() ?? new List<string>(),
+                    };
+                    if (itemData.LootEffects != null && itemData.LootEffects.Count > 0)
+                        item.LootEffects = itemData.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
+                    npc.Inventory.Add(item);
+                }
+            }
+
             // Restore personality profile if available, then initialize AI systems
             if (data.PersonalityProfile != null)
             {

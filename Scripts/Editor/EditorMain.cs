@@ -95,7 +95,7 @@ public static class EditorMain
                 "NPCs             — town NPCs (npcs.json)",
                 "Monsters         — monster families and tiers (monster_families.json)",
                 "Dreams           — narrative dream sequences (dreams.json)",
-                "Achievements     — achievement definitions (achievements.json)",
+                "Achievements     — disabled (Steam integrity)",
                 "Dialogue         — NPC dialogue lines (dialogue.json)",
                 "Balance          — tuning constants (balance.json)",
             });
@@ -106,7 +106,19 @@ public static class EditorMain
                 case 2: NPCEditor.Run(); break;
                 case 3: MonsterEditor.Run(); break;
                 case 4: DreamEditor.Run(); break;
-                case 5: AchievementEditor.Run(); break;
+                case 5:
+                    // v0.57.4: achievement-definition editing removed. Since the game
+                    // loads achievements.json in place of the built-in list (see
+                    // AchievementSystem.Initialize), users could otherwise edit a
+                    // built-in like "first_steps" to have a 100000-gold reward and
+                    // unlock Steam achievements normally via TryUnlock. Modders who
+                    // want custom achievements can still write achievements.json by
+                    // hand — the editor just doesn't facilitate it.
+                    EditorIO.Warn("Achievement definition editing is disabled.");
+                    EditorIO.Info("Editing built-in achievement rewards would allow Steam-achievement cheating.");
+                    EditorIO.Info("Modders can still edit GameData/achievements.json directly if needed.");
+                    EditorIO.Pause();
+                    break;
                 case 6: DialogueEditor.Run(); break;
                 case 7: BalanceEditor.Run(); break;
             }

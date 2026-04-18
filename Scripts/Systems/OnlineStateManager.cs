@@ -1289,6 +1289,41 @@ namespace UsurperRemake.Systems
                         IsCursed = item.IsCursed
                     }).ToList() ?? new List<MarketItemData>(),
 
+                    // v0.57.4: personal bag — items the player transferred to this
+                    // NPC via combat [T] / Home / Team Corner / dungeon viewer.
+                    // Previously dropped on world-sim reload in MUD mode (the MUD
+                    // server persists shared NPC state to world_state SQLite; no
+                    // Inventory field = runtime items lost every tick).
+                    Inventory = npc.Inventory?.Where(i => i != null).Select(item => new InventoryItemData
+                    {
+                        Name = item.Name,
+                        Value = item.Value,
+                        Type = item.Type,
+                        Attack = item.Attack,
+                        Armor = item.Armor,
+                        Strength = item.Strength,
+                        Dexterity = item.Dexterity,
+                        Wisdom = item.Wisdom,
+                        Defence = item.Defence,
+                        BlockChance = item.BlockChance,
+                        ShieldBonus = item.ShieldBonus,
+                        HP = item.HP,
+                        Mana = item.Mana,
+                        Charisma = item.Charisma,
+                        Agility = item.Agility,
+                        Stamina = item.Stamina,
+                        MinLevel = item.MinLevel,
+                        IsCursed = item.IsCursed,
+                        Cursed = item.Cursed,
+                        IsIdentified = item.IsIdentified,
+                        Shop = item.Shop,
+                        Dungeon = item.Dungeon,
+                        Description = item.Description?.ToList() ?? new List<string>(),
+                        LootEffects = item.LootEffects?.Count > 0
+                            ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
+                            : null,
+                    }).ToList() ?? new List<InventoryItemData>(),
+
                     // Lifecycle
                     Age = npc.Age,
                     BirthDate = npc.BirthDate,

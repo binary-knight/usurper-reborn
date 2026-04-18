@@ -3895,6 +3895,13 @@ public abstract class BaseLocation
             member.Inventory!.Remove(chosenItem);
             currentPlayer.Inventory.Add(chosenItem);
 
+            // v0.57.4: forensic log for take-back — complement to combat [T]'s
+            // transfer log, so round-trips like "gave the item to companion,
+            // later took it back" are fully traceable through logs.
+            string takeBackCategory = member is NPC ? "NPC_BAG" : "COMPANION_BAG";
+            DebugLogger.Instance.LogInfo(takeBackCategory,
+                $"PartyInv TAKE-BACK ← {member.DisplayName}: \"{chosenItem.Name}\" (bag remaining: {member.Inventory.Count})");
+
             terminal.SetColor("bright_green");
             string takenName = chosenItem.IsIdentified
                 ? chosenItem.Name

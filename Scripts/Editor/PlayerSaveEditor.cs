@@ -32,6 +32,22 @@ namespace UsurperRemake.Editor;
 /// </summary>
 internal static class PlayerSaveEditor
 {
+    /// <summary>
+    /// JSON options that EXACTLY match the game's <see cref="FileSaveBackend"/>.
+    /// Critical: the game serializes with <c>camelCase</c> + <c>IncludeFields</c>,
+    /// and deserializes with the same policy (no case-insensitive fallback). If
+    /// the editor writes with default PascalCase names, the game re-loads the
+    /// file with every field missing — fields default to 0/null — and the next
+    /// autosave wipes the edit. v0.57.3 shipped with mismatched options; this
+    /// pins them to the same shape so edits survive.
+    /// </summary>
+    private static readonly JsonSerializerOptions GameSaveJsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        IncludeFields = true,
+    };
+
     public static async Task RunAsync()
     {
         EditorIO.Section("Player Saves");
@@ -55,8 +71,13 @@ internal static class PlayerSaveEditor
         if (pick == 0) return;
 
         var chosen = ordered[pick - 1];
-        var fileName = SanitizeFileName(chosen.PlayerName);
-        var path = Path.Combine(saveDir, fileName + ".json");
+        // v0.57.4: trust the on-disk filename reported by FileSaveBackend.GetAllSaves,
+        // rather than reconstructing it from PlayerName. Previous code used a different
+        // sanitizer than the backend uses (char.IsLetterOrDigit vs Path.GetInvalidFileNameChars),
+        // so names containing hyphens / apostrophes silently failed to locate the file.
+        var path = !string.IsNullOrEmpty(chosen.FileName)
+            ? Path.Combine(saveDir, chosen.FileName)
+            : Path.Combine(saveDir, SanitizeFileName(chosen.PlayerName) + ".json");
         if (!File.Exists(path))
         {
             EditorIO.Error($"Expected save file not found: {path}");
@@ -68,10 +89,9 @@ internal static class PlayerSaveEditor
         try
         {
             var json = await File.ReadAllTextAsync(path);
-            data = JsonSerializer.Deserialize<SaveGameData>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-            });
+            // v0.57.4: use the same JSON options as FileSaveBackend so we read
+            // the same fields the game reads (camelCase policy + IncludeFields).
+            data = JsonSerializer.Deserialize<SaveGameData>(json, GameSaveJsonOptions);
         }
         catch (Exception ex)
         {
@@ -85,6 +105,14 @@ internal static class PlayerSaveEditor
             EditorIO.Pause();
             return;
         }
+
+        // v0.57.4 (pass 3): register dynamic equipment from the save into
+        // EquipmentDatabase so ResolveItemName can display names for dungeon
+        // loot / enchanted drops (IDs above 10000 but below the custom-mod
+        // range). Previously equipped loot showed as "<unknown>" in the
+        // editor's equip views even though the save had full stat data for
+        // them. Mirror GameEngine.LoadSaveByFileName's single-player path.
+        RegisterDynamicEquipmentForEditor(data.Player);
 
         bool dirty = false;
         while (true)
@@ -100,7 +128,7 @@ internal static class PlayerSaveEditor
                 "Spells & Abilities       — learned spells, class abilities, quickbar",
                 "Companions               — recruit, revive, loyalty, romance",
                 "Quests                   — active, complete, reset, grant",
-                "Achievements             — grant, revoke, list",
+                "Achievements             — disabled (Steam integrity)",
                 "Old Gods & Story         — god states, cycle, seals, artifacts",
                 "Relationships & Family   — NPC relationships, marriages, children",
                 "Status & Cleanup         — diseases, divine wrath, daily limits, poison",
@@ -129,7 +157,17 @@ internal static class PlayerSaveEditor
                     case 5: EditSpellsAndAbilities(p); dirty = true; break;
                     case 6: EditCompanions(data); dirty = true; break;
                     case 7: EditQuests(p); dirty = true; break;
-                    case 8: EditAchievements(p); dirty = true; break;
+                    case 8:
+                        // v0.57.4: achievement editing removed — granting an achievement
+                        // via the editor would also unlock the corresponding Steam
+                        // achievement at runtime, which is straight-up cheating on the
+                        // Steam leaderboards. Hard-disabled on every platform for
+                        // consistency; players who want to grind can still grind.
+                        EditorIO.Warn("Achievement editing is disabled.");
+                        EditorIO.Info("Granting achievements via the editor would also unlock Steam achievements,");
+                        EditorIO.Info("which would be cheating on leaderboards. To earn achievements, play the game.");
+                        EditorIO.Pause();
+                        break;
                     case 9: EditStoryAndGods(data); dirty = true; break;
                     case 10: EditRelationshipsAndFamily(data); dirty = true; break;
                     case 11: EditStatusAndCleanup(p); dirty = true; break;
@@ -154,14 +192,14 @@ internal static class PlayerSaveEditor
         }
     }
 
-    // FileSaveBackend.SanitizeFileName is private; mirror its behavior here.
+    // v0.57.4 (pass 4): mirror FileSaveBackend.GetSaveFileName's sanitizer
+    // EXACTLY — Path.GetInvalidFileNameChars, not char.IsLetterOrDigit. The
+    // old implementation replaced hyphens / apostrophes / periods with
+    // underscores; the backend keeps those chars. This is the fallback path
+    // when SaveInfo.FileName isn't available; the main path already uses
+    // the backend's on-disk filename directly (see RunAsync).
     private static string SanitizeFileName(string name)
-    {
-        var sb = new System.Text.StringBuilder();
-        foreach (var ch in name)
-            sb.Append(char.IsLetterOrDigit(ch) ? ch : '_');
-        return sb.ToString();
-    }
+        => string.Join("_", name.Split(Path.GetInvalidFileNameChars()));
 
     private static bool SaveBack(string path, SaveGameData data)
     {
@@ -169,7 +207,9 @@ internal static class PlayerSaveEditor
         {
             var backupPath = path + ".bak";
             File.Copy(path, backupPath, overwrite: true);
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+            // v0.57.4: must match the game's FileSaveBackend options (camelCase +
+            // IncludeFields), or the game won't see the edited fields when it reloads.
+            var json = JsonSerializer.Serialize(data, GameSaveJsonOptions);
             File.WriteAllText(path, json);
             EditorIO.Success($"Saved. Backup at: {backupPath}");
             EditorIO.Pause();
@@ -204,16 +244,29 @@ internal static class PlayerSaveEditor
         p.Age = EditorIO.PromptInt("Age", p.Age, min: 1, max: 2000);
 
         EditorIO.Info("— Alignment —");
-        p.Chivalry = EditorIO.PromptLong("Chivalry (0-1000 in-game cap)", p.Chivalry, min: 0);
-        p.Darkness = EditorIO.PromptLong("Darkness (0-1000 in-game cap)", p.Darkness, min: 0);
+        // v0.57.4 (pass 4): actually enforce the 0-1000 cap. Game's
+        // AlignmentSystem.ChangeAlignment clamps to this range on every
+        // modification, but a raw file edit lets values above 1000 into the
+        // save. They load fine but clamp back to 1000 the first time the
+        // value is changed in-game. Write the cap at the boundary so the
+        // editor value matches what the game will end up with.
+        p.Chivalry = EditorIO.PromptLong("Chivalry (0-1000)", p.Chivalry, min: 0, max: 1000);
+        p.Darkness = EditorIO.PromptLong("Darkness (0-1000)", p.Darkness, min: 0, max: 1000);
 
         EditorIO.Info("— Social standing —");
         p.Fame = EditorIO.PromptInt("Fame", p.Fame, min: 0);
         p.IsKnighted = EditorIO.PromptBool("Knighted (Sir/Dame prefix)", p.IsKnighted);
         p.NobleTitle = EditorIO.PromptString("Noble title (blank = auto)", p.NobleTitle ?? "");
         if (string.IsNullOrWhiteSpace(p.NobleTitle)) p.NobleTitle = null;
+        // v0.57.4: King flag is authoritative in online mode via world_state's
+        // royal_court entry. Editing here affects the single-player save's
+        // notion of kingship only; on a server the throne is whatever the
+        // shared state says. Immortal ascension is similar — the online
+        // pantheon tracks immortals in a separate data store; flipping this
+        // bit won't register a local character with the server pantheon.
+        EditorIO.Info("(King / Immortal flags only apply to the single-player save being edited.)");
         p.King = EditorIO.PromptBool("Is the current king?", p.King);
-        p.Immortal = EditorIO.PromptBool("Immortal (ascended, online pantheon)", p.Immortal);
+        p.Immortal = EditorIO.PromptBool("Immortal (ascended, pantheon)", p.Immortal);
 
         EditorIO.Info("— Difficulty —");
         p.Difficulty = EditorIO.PromptEnum("Difficulty", p.Difficulty);
@@ -230,26 +283,45 @@ internal static class PlayerSaveEditor
         p.Level = EditorIO.PromptInt("Level", p.Level, min: 1, max: 100);
         p.Experience = EditorIO.PromptLong("Experience", p.Experience, min: 0);
 
-        EditorIO.Info("— Core stats (total = base + equipment bonuses; editor edits total) —");
-        p.Strength = EditorIO.PromptLong("STR", p.Strength, min: 0);
-        p.Dexterity = EditorIO.PromptLong("DEX", p.Dexterity, min: 0);
-        p.Constitution = EditorIO.PromptLong("CON", p.Constitution, min: 0);
-        p.Intelligence = EditorIO.PromptLong("INT", p.Intelligence, min: 0);
-        p.Wisdom = EditorIO.PromptLong("WIS", p.Wisdom, min: 0);
-        p.Charisma = EditorIO.PromptLong("CHA", p.Charisma, min: 0);
-        p.Defence = EditorIO.PromptLong("DEF", p.Defence, min: 0);
-        p.Agility = EditorIO.PromptLong("AGI", p.Agility, min: 0);
-        p.Stamina = EditorIO.PromptLong("STA", p.Stamina, min: 0);
+        // v0.57.4 — the editor MUST write to Base* fields, not the derived
+        // Strength/Dexterity/MaxHP/etc. The game's load path calls
+        // Character.RecalculateStats() after deserializing, which resets each
+        // derived stat to its Base* counterpart and then layers equipment
+        // bonuses on top. Earlier v0.57.4 edited the derived fields, which
+        // were then wiped on load — player saw their edits disappear. Writing
+        // Base* (and mirroring to the derived field so in-editor summary /
+        // preview makes sense) makes the edits survive.
+        EditorIO.Info("— Core stats (base values; equipment bonuses apply on top at runtime) —");
+        p.BaseStrength = EditorIO.PromptLong("STR", p.BaseStrength > 0 ? p.BaseStrength : p.Strength, min: 0);
+        p.Strength = p.BaseStrength;
+        p.BaseDexterity = EditorIO.PromptLong("DEX", p.BaseDexterity > 0 ? p.BaseDexterity : p.Dexterity, min: 0);
+        p.Dexterity = p.BaseDexterity;
+        p.BaseConstitution = EditorIO.PromptLong("CON", p.BaseConstitution > 0 ? p.BaseConstitution : p.Constitution, min: 0);
+        p.Constitution = p.BaseConstitution;
+        p.BaseIntelligence = EditorIO.PromptLong("INT", p.BaseIntelligence > 0 ? p.BaseIntelligence : p.Intelligence, min: 0);
+        p.Intelligence = p.BaseIntelligence;
+        p.BaseWisdom = EditorIO.PromptLong("WIS", p.BaseWisdom > 0 ? p.BaseWisdom : p.Wisdom, min: 0);
+        p.Wisdom = p.BaseWisdom;
+        p.BaseCharisma = EditorIO.PromptLong("CHA", p.BaseCharisma > 0 ? p.BaseCharisma : p.Charisma, min: 0);
+        p.Charisma = p.BaseCharisma;
+        p.BaseDefence = EditorIO.PromptLong("DEF", p.BaseDefence > 0 ? p.BaseDefence : p.Defence, min: 0);
+        p.Defence = p.BaseDefence;
+        p.BaseAgility = EditorIO.PromptLong("AGI", p.BaseAgility > 0 ? p.BaseAgility : p.Agility, min: 0);
+        p.Agility = p.BaseAgility;
+        p.BaseStamina = EditorIO.PromptLong("STA", p.BaseStamina > 0 ? p.BaseStamina : p.Stamina, min: 0);
+        p.Stamina = p.BaseStamina;
 
-        EditorIO.Info("— HP / Mana —");
-        p.MaxHP = EditorIO.PromptLong("MaxHP", p.MaxHP, min: 1);
-        p.HP = EditorIO.PromptLong("HP", p.HP, min: 0, max: p.MaxHP);
-        p.MaxMana = EditorIO.PromptLong("MaxMana", p.MaxMana, min: 0);
-        p.Mana = EditorIO.PromptLong("Mana", p.Mana, min: 0, max: p.MaxMana);
+        EditorIO.Info("— HP / Mana (base; CON bonus adds on top at runtime) —");
+        p.BaseMaxHP = EditorIO.PromptLong("MaxHP (base)", p.BaseMaxHP > 0 ? p.BaseMaxHP : p.MaxHP, min: 1);
+        p.MaxHP = p.BaseMaxHP;
+        p.HP = EditorIO.PromptLong("HP (current; will be clamped to final MaxHP on load)", p.HP, min: 0);
+        p.BaseMaxMana = EditorIO.PromptLong("MaxMana (base)", p.BaseMaxMana > 0 ? p.BaseMaxMana : p.MaxMana, min: 0);
+        p.MaxMana = p.BaseMaxMana;
+        p.Mana = EditorIO.PromptLong("Mana (current; clamped on load)", p.Mana, min: 0);
 
         EditorIO.Info("— Combat power —");
-        p.WeapPow = EditorIO.PromptLong("WeaponPower (flat weapon damage)", p.WeapPow, min: 0);
-        p.ArmPow = EditorIO.PromptLong("ArmorPower (flat armor)", p.ArmPow, min: 0);
+        EditorIO.Warn("WeapPow/ArmPow are derived from equipped items at runtime — editing them directly has no effect.");
+        EditorIO.Warn("To change combat power, edit your equipment (Inventory & Equipment menu) or give yourself better gear.");
 
         EditorIO.Info("— Resurrections —");
         p.Resurrections = EditorIO.PromptInt("Resurrections available", p.Resurrections, min: 0);
@@ -268,12 +340,17 @@ internal static class PlayerSaveEditor
     private static void EditGold(PlayerData p)
     {
         EditorIO.Section("Gold & Economy");
-        p.Gold = EditorIO.PromptLong("Gold on hand", p.Gold);
-        p.BankGold = EditorIO.PromptLong("Bank gold", p.BankGold);
-        p.BankLoan = EditorIO.PromptLong("Bank loan owed", p.BankLoan);
-        p.BankInterest = EditorIO.PromptLong("Bank interest earned", p.BankInterest);
-        p.BankWage = EditorIO.PromptLong("Bank wage", p.BankWage);
-        p.RoyalLoanAmount = EditorIO.PromptLong("Royal loan amount", p.RoyalLoanAmount);
+        // v0.57.4 (pass 3): min: 0 on every field. Gold is `long` so nothing
+        // stops negative values, but the game's shops / bank / loan checks
+        // don't handle them gracefully (negative gold fails affordability
+        // checks, negative bank loan produces weird interest, etc.). No
+        // legitimate reason to enter a negative value here.
+        p.Gold = EditorIO.PromptLong("Gold on hand", p.Gold, min: 0);
+        p.BankGold = EditorIO.PromptLong("Bank gold", p.BankGold, min: 0);
+        p.BankLoan = EditorIO.PromptLong("Bank loan owed", p.BankLoan, min: 0);
+        p.BankInterest = EditorIO.PromptLong("Bank interest earned", p.BankInterest, min: 0);
+        p.BankWage = EditorIO.PromptLong("Bank wage", p.BankWage, min: 0);
+        p.RoyalLoanAmount = EditorIO.PromptLong("Royal loan amount", p.RoyalLoanAmount, min: 0);
         p.RoyTaxPaid = EditorIO.PromptLong("Royal tax paid (lifetime)", p.RoyTaxPaid, min: 0);
     }
 
@@ -354,15 +431,41 @@ internal static class PlayerSaveEditor
         // stats into a new InventoryItemData. The resulting inventory entry is
         // a standalone stat block that doesn't depend on the database existing
         // on load, which also means deleting a mod won't orphan the save.
-        int id = EditorIO.PromptInt("Equipment ID to copy into inventory (built-ins start at 1000, custom at 200000)", 1000);
-        var eq = EquipmentDatabase.GetById(id);
-        if (eq == null)
-        {
-            EditorIO.Warn($"No equipment found with ID {id}.");
-            EditorIO.Pause();
-            return;
-        }
-        EditorIO.Info($"Found: {eq.Name} ({eq.Slot}, rarity={eq.Rarity}, value={eq.Value})");
+        //
+        // v0.57.4: replaced raw-ID prompt with an arrow-key picker. The old UX
+        // required users to know an internal integer ID, which nobody does.
+        // Slot filter narrows huge catalogs (hundreds of items) into a picker
+        // that fits in a viewport.
+        var all = EquipmentDatabase.GetAll().OrderBy(e => e.Slot).ThenBy(e => e.Id).ToList();
+        if (all.Count == 0) { EditorIO.Warn("No equipment registered."); EditorIO.Pause(); return; }
+
+        // Optional slot filter
+        var slotOptions = new List<string> { "(any slot)" };
+        slotOptions.AddRange(Enum.GetNames<EquipmentSlot>());
+        int slotPick = EditorIO.Menu("Filter by slot (speeds up search on big catalogs)", slotOptions);
+        if (slotPick == 0) return;
+        IEnumerable<Equipment> filtered = all;
+        if (slotPick > 1 && Enum.TryParse<EquipmentSlot>(slotOptions[slotPick - 1], out var slot))
+            filtered = filtered.Where(e => e.Slot == slot);
+
+        // Optional name substring filter — critical when the slot has hundreds
+        // of items (e.g. MainHand). Blank = show all.
+        string nameFilter = EditorIO.Prompt("Filter by name (blank = all, 'q' to cancel)");
+        if (nameFilter == "q") return;
+        if (!string.IsNullOrWhiteSpace(nameFilter))
+            filtered = filtered.Where(e => e.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase));
+
+        var shown = filtered.ToList();
+        if (shown.Count == 0) { EditorIO.Warn("No matches."); EditorIO.Pause(); return; }
+        if (shown.Count > 400) { EditorIO.Warn($"{shown.Count} matches — tighten the filter."); EditorIO.Pause(); return; }
+
+        var labels = shown.Select(e =>
+            $"#{e.Id,-7} [{e.Slot,-10}] [{e.Rarity,-8}] {e.Name,-38} MinL{e.MinLevel,-3} {e.Value,8:N0}g"
+        ).ToList();
+        int pick = EditorIO.Menu("Item to copy into inventory", labels);
+        if (pick == 0) return;
+        var eq = shown[pick - 1];
+
         p.Inventory ??= new List<InventoryItemData>();
         p.Inventory.Add(new InventoryItemData
         {
@@ -393,9 +496,16 @@ internal static class PlayerSaveEditor
     {
         if (p.Inventory == null || p.Inventory.Count == 0)
         { EditorIO.Warn("Inventory is empty."); EditorIO.Pause(); return; }
-        int idx = EditorIO.PromptInt($"Entry number to remove (1..{p.Inventory.Count})", 1, min: 1, max: p.Inventory.Count);
-        var match = p.Inventory[idx - 1];
-        p.Inventory.RemoveAt(idx - 1);
+        // v0.57.4: picker over inventory contents instead of "enter the index
+        // number" — the picker scrolls with the viewport so long inventories
+        // stay navigable and users can't off-by-one themselves.
+        var labels = p.Inventory.Select((inv, i) =>
+            $"{inv.Name,-38} type={inv.Type,-10} val={inv.Value,-7}{(inv.IsCursed ? " [cursed]" : "")}{(inv.IsIdentified ? "" : " [unid]")}"
+        ).ToList();
+        int pick = EditorIO.Menu("Item to remove", labels);
+        if (pick == 0) return;
+        var match = p.Inventory[pick - 1];
+        p.Inventory.RemoveAt(pick - 1);
         EditorIO.Success($"Removed \"{match.Name}\".");
         EditorIO.Pause();
     }
@@ -417,17 +527,47 @@ internal static class PlayerSaveEditor
 
     private static void EquipItemInSlot(PlayerData p)
     {
+        // v0.57.4: picker-based — list every item registered for the chosen
+        // slot. Raw ID prompt was broken UX (nobody knows IDs) and allowed
+        // entering non-existent IDs that load as "ghost" equips (RecalculateStats
+        // silently skips them, leaving the slot visually filled but contributing
+        // nothing).
         var slot = EditorIO.PromptEnum<EquipmentSlot>("Slot to equip", EquipmentSlot.MainHand);
-        int id = EditorIO.PromptInt("Item ID to equip", 1000);
-        var eq = EquipmentDatabase.GetById(id);
-        if (eq == null)
+        var candidates = EquipmentDatabase.GetAll()
+            .Where(e => e.Slot == slot)
+            .OrderBy(e => e.MinLevel)
+            .ThenBy(e => e.Id)
+            .ToList();
+        if (candidates.Count == 0)
         {
-            EditorIO.Warn($"No item #{id} registered. The equip will be written, but the game may reject it on load.");
-            if (!EditorIO.Confirm("Continue?")) return;
+            EditorIO.Warn($"No equipment registered for slot {slot}.");
+            EditorIO.Pause();
+            return;
         }
+
+        string nameFilter = EditorIO.Prompt("Filter by name (blank = all, 'q' to cancel)");
+        if (nameFilter == "q") return;
+        var shown = string.IsNullOrWhiteSpace(nameFilter)
+            ? candidates
+            : candidates.Where(e => e.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (shown.Count == 0) { EditorIO.Warn("No matches."); EditorIO.Pause(); return; }
+        if (shown.Count > 400) { EditorIO.Warn($"{shown.Count} matches — tighten the filter."); EditorIO.Pause(); return; }
+
+        var labels = shown.Select(e =>
+            $"#{e.Id,-7} [{e.Rarity,-8}] {e.Name,-38} MinL{e.MinLevel,-3} Pow={e.WeaponPower}/{e.ArmorClass} {e.Value,8:N0}g"
+        ).ToList();
+        int pick = EditorIO.Menu($"Item to equip in {slot}", labels);
+        if (pick == 0) return;
+        var eq = shown[pick - 1];
         p.EquippedItems ??= new Dictionary<int, int>();
-        p.EquippedItems[(int)slot] = id;
-        EditorIO.Success($"{slot} = #{id} ({eq?.Name ?? "?"})");
+        p.EquippedItems[(int)slot] = eq.Id;
+        EditorIO.Success($"{slot} = #{eq.Id} ({eq.Name})");
+        // Class/level restrictions are enforced at runtime (Character.CanEquip),
+        // not at load — so equipping out-of-class gear via editor writes fine
+        // but the game will block actual use (e.g. Warrior can't swing a Staff's
+        // magic bonuses). Let the user know rather than silently "allowing" it.
+        if (eq.MinLevel > p.Level)
+            EditorIO.Warn($"Warning: {eq.Name} has MinLevel={eq.MinLevel}, player is L{p.Level}. Item works on load but gameplay may restrict.");
         EditorIO.Pause();
     }
 
@@ -435,11 +575,18 @@ internal static class PlayerSaveEditor
     {
         if (p.EquippedItems == null || p.EquippedItems.Count == 0)
         { EditorIO.Warn("Nothing equipped."); EditorIO.Pause(); return; }
-        var slot = EditorIO.PromptEnum<EquipmentSlot>("Slot to clear", EquipmentSlot.MainHand);
-        if (p.EquippedItems.Remove((int)slot))
-            EditorIO.Success($"{slot} cleared.");
-        else
-            EditorIO.Warn("Slot was already empty.");
+        // v0.57.4: picker over only the slots that are actually filled, so the
+        // user never picks an already-empty slot and gets a "slot was empty"
+        // warning. Also shows the item name for context.
+        var filled = p.EquippedItems.Where(kv => kv.Value > 0).ToList();
+        var labels = filled.Select(kv =>
+            $"{(EquipmentSlot)kv.Key,-12} #{kv.Value,-7} {ResolveItemName(kv.Value) ?? "<unknown>"}"
+        ).ToList();
+        int pick = EditorIO.Menu("Slot to clear", labels);
+        if (pick == 0) return;
+        int slotKey = filled[pick - 1].Key;
+        p.EquippedItems.Remove(slotKey);
+        EditorIO.Success($"{(EquipmentSlot)slotKey} cleared.");
         EditorIO.Pause();
     }
 
@@ -454,6 +601,61 @@ internal static class PlayerSaveEditor
     {
         var eq = EquipmentDatabase.GetById(id);
         return eq?.Name;
+    }
+
+    /// <summary>
+    /// Register saved dynamic equipment (dungeon loot drops, IDs 10000+) into
+    /// <see cref="EquipmentDatabase"/> so the editor's equip displays can
+    /// resolve names. Mirrors the single-player path in
+    /// <see cref="GameEngine.LoadSaveByFileName"/>. Without this, equipped
+    /// loot IDs show as &lt;unknown&gt; because <c>EquipmentDatabase</c> only
+    /// contains built-ins plus custom-mod items at editor start.
+    /// </summary>
+    private static void RegisterDynamicEquipmentForEditor(PlayerData playerData)
+    {
+        if (playerData.DynamicEquipment == null || playerData.DynamicEquipment.Count == 0) return;
+        foreach (var equipData in playerData.DynamicEquipment)
+        {
+            try
+            {
+                // Skip if already registered (shouldn't happen but defensive)
+                if (EquipmentDatabase.GetById(equipData.Id) != null) continue;
+
+                var equipment = new Equipment
+                {
+                    Name = equipData.Name,
+                    Description = equipData.Description ?? "",
+                    Slot = (EquipmentSlot)equipData.Slot,
+                    WeaponPower = equipData.WeaponPower,
+                    ArmorClass = equipData.ArmorClass,
+                    ShieldBonus = equipData.ShieldBonus,
+                    BlockChance = equipData.BlockChance,
+                    StrengthBonus = equipData.StrengthBonus,
+                    DexterityBonus = equipData.DexterityBonus,
+                    ConstitutionBonus = equipData.ConstitutionBonus,
+                    IntelligenceBonus = equipData.IntelligenceBonus,
+                    WisdomBonus = equipData.WisdomBonus,
+                    CharismaBonus = equipData.CharismaBonus,
+                    MaxHPBonus = equipData.MaxHPBonus,
+                    MaxManaBonus = equipData.MaxManaBonus,
+                    DefenceBonus = equipData.DefenceBonus,
+                    MinLevel = equipData.MinLevel,
+                    Value = equipData.Value,
+                    IsCursed = equipData.IsCursed,
+                    Rarity = (EquipmentRarity)equipData.Rarity,
+                    WeaponType = (WeaponType)equipData.WeaponType,
+                    Handedness = (WeaponHandedness)equipData.Handedness,
+                    ArmorType = (ArmorType)equipData.ArmorType,
+                    IsIdentified = equipData.IsIdentified,
+                };
+                EquipmentDatabase.RegisterDynamicWithId(equipment, equipData.Id);
+            }
+            catch (Exception ex)
+            {
+                // Silent — one bad entry shouldn't block editing the rest.
+                EditorIO.Warn($"Skipped dynamic equipment #{equipData.Id}: {ex.Message}");
+            }
+        }
     }
 
     #endregion
@@ -561,6 +763,20 @@ internal static class PlayerSaveEditor
 
     private static void GrantAllSpells(PlayerData p, bool mastered)
     {
+        // v0.57.4: warn for non-caster classes. Spell matrix is per-level and
+        // RecalculateStats zeros MaxMana for IsManaClass == false, so a Warrior
+        // / Barbarian / Ranger / Jester granted "all spells" gets the matrix
+        // written but can never cast anything. This used to look like a bug to
+        // users ("I granted all spells but my Warrior can't cast!"); it's
+        // working as designed — the class just has no mana pool. Warn so the
+        // user understands the edit is effectively a no-op for them.
+        if (!IsCasterClass(p.Class))
+        {
+            EditorIO.Warn($"{p.Class} is not a caster class. Spells require a mana pool; granted spells won't be castable.");
+            EditorIO.Info("Caster classes: Cleric, Magician, Sage, MysticShaman, and all 5 prestige classes.");
+            EditorIO.Info("(Paladin, Bard, Alchemist use stamina, not mana — their class abilities live under 'Abilities' instead.)");
+            if (!EditorIO.Confirm("Write the spell entries anyway?")) return;
+        }
         // Fill spell matrix with [known=true, mastered=mastered] for a reasonable spell count.
         // Actual spell count is class-dependent and not trivially discoverable from save data,
         // so we set a healthy ceiling of 60 which covers every current caster class's spell list.
@@ -578,6 +794,25 @@ internal static class PlayerSaveEditor
         EditorIO.Pause();
     }
 
+    /// <summary>
+    /// Classes that have a mana pool and can cast spells. Matches
+    /// <see cref="UsurperRemake.Character.IsManaClass"/>'s list. Used by the
+    /// spell-grant flow to warn when the edit will be a no-op.
+    /// </summary>
+    // Mirrors Character.IsManaClass (see Scripts/Core/Character.cs). Paladin /
+    // Bard / Alchemist were moved to stamina in v0.49.5 and are deliberately
+    // excluded — their class toolkits live under LearnedAbilities, not Spells.
+    private static bool IsCasterClass(CharacterClass c) =>
+        c == CharacterClass.Cleric ||
+        c == CharacterClass.Magician ||
+        c == CharacterClass.Sage ||
+        c == CharacterClass.MysticShaman ||
+        c == CharacterClass.Tidesworn ||
+        c == CharacterClass.Wavecaller ||
+        c == CharacterClass.Cyclebreaker ||
+        c == CharacterClass.Abysswarden ||
+        c == CharacterClass.Voidreaver;
+
     #endregion
 
     #region Companions
@@ -586,6 +821,8 @@ internal static class PlayerSaveEditor
     {
         data.StorySystems ??= new StorySystemsData();
         data.StorySystems.Companions ??= new List<CompanionSaveInfo>();
+        data.StorySystems.ActiveCompanionIds ??= new List<int>();
+        data.StorySystems.FallenCompanions ??= new List<CompanionDeathInfo>();
         while (true)
         {
             int choice = EditorIO.Menu("Companions", new[]
@@ -606,7 +843,7 @@ internal static class PlayerSaveEditor
                     EditorIO.Pause();
                     break;
                 case 2:
-                    ReviveCompanion(data.StorySystems.Companions);
+                    ReviveCompanion(data);
                     break;
                 case 3:
                     SetCompanionRelationship(data.StorySystems.Companions);
@@ -615,10 +852,31 @@ internal static class PlayerSaveEditor
                     {
                         var picked = EditorIO.PromptEnum("Companion to recruit", UsurperRemake.Systems.CompanionId.Aldric);
                         int id = (int)picked;
+                        // v0.57.4 (pass 3): the editor must update BOTH the per-companion
+                        // IsActive flag AND the top-level ActiveCompanionIds list —
+                        // CompanionSystem.GetActiveCompanions() iterates the top-level
+                        // list, not the bool, so the bool-only edit in the previous
+                        // revision produced a "recruited but not actually in party"
+                        // ghost state. Also remove from FallenCompanions if revive-via-
+                        // recruit.
                         var ex = data.StorySystems.Companions.FirstOrDefault(c => c.Id == id);
                         if (ex == null) { ex = new CompanionSaveInfo { Id = id }; data.StorySystems.Companions.Add(ex); }
                         ex.IsRecruited = true; ex.IsDead = false; ex.IsActive = true;
-                        EditorIO.Success($"{picked} set to recruited+active.");
+                        if (!data.StorySystems.ActiveCompanionIds.Contains(id))
+                        {
+                            if (data.StorySystems.ActiveCompanionIds.Count >= 4)
+                            {
+                                EditorIO.Warn("Already at the 4-active-companion cap; not adding to active party.");
+                                EditorIO.Info("Dismiss one first, or the new companion will be recruited but inactive.");
+                                ex.IsActive = false;
+                            }
+                            else
+                            {
+                                data.StorySystems.ActiveCompanionIds.Add(id);
+                            }
+                        }
+                        data.StorySystems.FallenCompanions.RemoveAll(f => f.CompanionId == id);
+                        EditorIO.Success($"{picked} set to recruited{(ex.IsActive ? "+active" : "")}.");
                         EditorIO.Pause();
                         break;
                     }
@@ -629,30 +887,44 @@ internal static class PlayerSaveEditor
                         var ex = data.StorySystems.Companions.FirstOrDefault(c => c.Id == id);
                         if (ex == null) { EditorIO.Warn("Not found."); EditorIO.Pause(); break; }
                         ex.IsRecruited = false; ex.IsActive = false;
+                        data.StorySystems.ActiveCompanionIds.Remove(id);
                         EditorIO.Success($"{picked} dismissed.");
                         EditorIO.Pause();
                         break;
                     }
                 case 6:
+                    // Mark every companion alive AND drop them from FallenCompanions so
+                    // CompanionSystem.Deserialize doesn't rebuild the fallen-companions
+                    // dict from stale entries. Leaves IsRecruited/IsActive alone — this
+                    // is a revive-only operation, not a recruit.
                     foreach (var c in data.StorySystems.Companions.Where(c => c.IsDead))
                         c.IsDead = false;
-                    EditorIO.Success("All companions marked alive.");
+                    data.StorySystems.FallenCompanions.Clear();
+                    EditorIO.Success("All companions marked alive. (Use Recruit to re-add to active party.)");
                     EditorIO.Pause();
                     break;
             }
         }
     }
 
-    private static void ReviveCompanion(List<CompanionSaveInfo> companions)
+    private static void ReviveCompanion(SaveGameData data)
     {
+        var companions = data.StorySystems.Companions;
+        var fallen = data.StorySystems.FallenCompanions;
         var picked = EditorIO.PromptEnum("Companion to revive", UsurperRemake.Systems.CompanionId.Aldric);
         int id = (int)picked;
         var c = companions.FirstOrDefault(x => x.Id == id);
         if (c == null) { EditorIO.Warn($"{picked} is not in the save. Use 'Recruit' first."); EditorIO.Pause(); return; }
-        if (!c.IsDead) { EditorIO.Info($"{picked} is not dead."); EditorIO.Pause(); return; }
+        if (!c.IsDead && !fallen.Any(f => f.CompanionId == id))
+        { EditorIO.Info($"{picked} is not dead."); EditorIO.Pause(); return; }
         c.IsDead = false;
         c.IsRecruited = true;
-        EditorIO.Success($"{picked} revived.");
+        // v0.57.4 (pass 3): remove from FallenCompanions too — CompanionSystem
+        // rebuilds fallenCompanions dict from this list on Deserialize, so a
+        // stale entry keeps the companion "permanently dead" in the in-game
+        // UI/logic even after IsDead = false.
+        fallen.RemoveAll(f => f.CompanionId == id);
+        EditorIO.Success($"{picked} revived. Use Recruit to re-add them to the active party.");
         EditorIO.Pause();
     }
 
@@ -676,6 +948,15 @@ internal static class PlayerSaveEditor
     private static void EditQuests(PlayerData p)
     {
         p.ActiveQuests ??= new List<QuestData>();
+        // v0.57.4: QuestSystem.RestoreFromSaveData accepts whatever status the
+        // save says without re-validating objectives, so marking a quest
+        // Completed here doesn't also mark its objectives complete — reward
+        // fire-on-complete may miss, and the quest board may still show it as
+        // active depending on the quest type. Use Gold & Economy + Character
+        // Info menus for rewards instead of relying on quest-complete payouts.
+        EditorIO.Warn("Quest status edits are not re-validated by the game.");
+        EditorIO.Info("Marking 'Completed' does NOT re-fire rewards or objective hooks.");
+        EditorIO.Info("Use Gold & Economy / Achievements menus if you want rewards; treat quest edits as cosmetic.");
         while (true)
         {
             int choice = EditorIO.Menu("Quests", new[]
@@ -737,81 +1018,21 @@ internal static class PlayerSaveEditor
 
     #endregion
 
-    #region Achievements
-
-    private static void EditAchievements(PlayerData p)
-    {
-        p.Achievements ??= new Dictionary<string, bool>();
-        while (true)
-        {
-            int choice = EditorIO.Menu("Achievements", new[]
-            {
-                $"List unlocked ({p.Achievements.Count(kv => kv.Value)} of {p.Achievements.Count})",
-                "Grant an achievement by ID",
-                "Revoke an achievement",
-                "Grant ALL known achievements (uses built-in registry)",
-                "Revoke ALL",
-            });
-            if (choice == 0) return;
-            switch (choice)
-            {
-                case 1:
-                    foreach (var kv in p.Achievements.OrderBy(k => k.Key))
-                        EditorIO.Info($"  {(kv.Value ? "[X]" : "[ ]")} {kv.Key}");
-                    EditorIO.Pause();
-                    break;
-                case 2:
-                    {
-                        // Pick from the built-in achievement registry so the user sees
-                        // human-readable names and tiers.
-                        var all = AchievementSystem.GetBuiltInAchievements();
-                        var labels = all.Select(a => $"[{a.Tier}] {a.Name,-40} ({a.Id})").ToList();
-                        int pick = EditorIO.Menu("Achievement to grant", labels);
-                        if (pick == 0) break;
-                        p.Achievements[all[pick - 1].Id] = true;
-                        EditorIO.Success($"Granted {all[pick - 1].Name}.");
-                        EditorIO.Pause();
-                        break;
-                    }
-                case 3:
-                    {
-                        var granted = p.Achievements.Where(kv => kv.Value).Select(kv => kv.Key).ToList();
-                        if (granted.Count == 0) { EditorIO.Warn("No granted achievements to revoke."); EditorIO.Pause(); break; }
-                        int pick = EditorIO.Menu("Achievement to revoke", granted);
-                        if (pick == 0) break;
-                        p.Achievements[granted[pick - 1]] = false;
-                        EditorIO.Success($"Revoked {granted[pick - 1]}.");
-                        EditorIO.Pause();
-                        break;
-                    }
-                case 4:
-                    {
-                        foreach (var ach in AchievementSystem.GetBuiltInAchievements())
-                            p.Achievements[ach.Id] = true;
-                        EditorIO.Success($"Granted {p.Achievements.Count} achievements.");
-                        EditorIO.Pause();
-                        break;
-                    }
-                case 5:
-                    if (EditorIO.Confirm("Revoke every achievement?"))
-                    {
-                        foreach (var k in p.Achievements.Keys.ToList()) p.Achievements[k] = false;
-                        EditorIO.Success("Revoked.");
-                        EditorIO.Pause();
-                    }
-                    break;
-            }
-        }
-    }
-
-    #endregion
-
     #region Old Gods & Story
 
     private static void EditStoryAndGods(SaveGameData data)
     {
         data.StorySystems ??= new StorySystemsData();
         var s = data.StorySystems;
+        // v0.57.4: Old God states load without prerequisite validation — setting
+        // Manwe Defeated while Maelketh is Dormant produces a technically-valid
+        // save, but the progression flow (dungeon events, dialogue, endings)
+        // assumes gods fall in floor order (Maelketh 25 → Veloura 40 →
+        // Thorgrim 55 → Noctura 70 → Aurelion 85 → Terravok 95 → Manwe 100).
+        // Out-of-order states can soft-lock story events. Warn once.
+        EditorIO.Warn("Old God states load as-is — the game does NOT enforce prerequisites.");
+        EditorIO.Info("Floor order: Maelketh(25) → Veloura(40) → Thorgrim(55) → Noctura(70) → Aurelion(85) → Terravok(95) → Manwe(100).");
+        EditorIO.Info("Skipping gods may soft-lock dungeon events and endings. Use at your own risk.");
         while (true)
         {
             int choice = EditorIO.Menu("Story & Old Gods", new[]
@@ -869,7 +1090,29 @@ internal static class PlayerSaveEditor
                 case 8:
                     break; // display-only
                 case 9:
+                    // v0.57.4 (pass 3): CurrentCycle controls NG+ difficulty modifiers
+                    // (monster HP / gold multipliers via GameConfig.GetNGPlus*Multiplier)
+                    // AND the player's CycleExpMultiplier / CycleBonuses. Those are
+                    // normally applied in OpeningSequence.ApplyCycleBonusesToNewCharacter
+                    // at NG+ start. Setting the cycle number here updates the counter
+                    // but does NOT grant the matching XP multiplier / starting bonuses —
+                    // you'll face harder cycle-N monsters without the cycle-N perks.
+                    EditorIO.Warn("Setting NG+ cycle changes monster scaling but NOT XP multiplier or starting bonuses.");
+                    EditorIO.Info("Cycle bonuses normally apply at NG+ start (OpeningSequence). Editing this mid-character creates imbalance.");
                     s.CurrentCycle = EditorIO.PromptInt("NG+ cycle", s.CurrentCycle, min: 1);
+                    // Keep CycleExpMultiplier vaguely sane: match the new cycle
+                    // number linearly (cycle 1 = 1.0x, cycle 2 = 1.25x, etc.) so
+                    // the player isn't completely stuck at 1.0x if they bump it up.
+                    if (s.CurrentCycle > 1)
+                    {
+                        float suggested = 1.0f + (s.CurrentCycle - 1) * 0.25f;
+                        var p = data.Player;
+                        if (EditorIO.Confirm($"Also set CycleExpMultiplier to {suggested:F2}x (suggested for cycle {s.CurrentCycle})?"))
+                        {
+                            p.CycleExpMultiplier = suggested;
+                            EditorIO.Success($"CycleExpMultiplier = {suggested:F2}x");
+                        }
+                    }
                     break;
                 case 10:
                     break;
@@ -901,6 +1144,14 @@ internal static class PlayerSaveEditor
     {
         var p = data.Player;
         p.Relationships ??= new Dictionary<string, float>();
+        // v0.57.4: the per-NPC Relationship score is independent from marriage /
+        // lover / ex status, which live in RomanceTracker's Spouses / CurrentLovers
+        // / Exes collections (loaded separately at GameEngine.cs:4348). Setting
+        // Relationship["Ivy"] = -500 won't divorce Ivy — it only affects generic
+        // dialogue tone. For marriage / romance changes, the editor doesn't yet
+        // expose RomanceTracker; edit via in-game temple / church actions.
+        EditorIO.Info("Note: relationship score edits affect dialogue tone only.");
+        EditorIO.Info("Marriages / lovers / exes are tracked separately (RomanceTracker) and NOT edited here.");
         while (true)
         {
             int choice = EditorIO.Menu("Relationships & Family", new[]
@@ -939,6 +1190,15 @@ internal static class PlayerSaveEditor
                     break;
                 case 4: break; // display
                 case 5:
+                    // v0.57.4 (pass 3): p.Kids is only a counter. The actual
+                    // Children list (full ChildData objects with names, ages,
+                    // classes, parent links) lives on StorySystemsData.Children
+                    // and the FamilySystem uses THAT list for gameplay — reading
+                    // Kids count produces weird states (e.g. "you have 5 kids"
+                    // but Home Location shows 0 when spending time with a child).
+                    EditorIO.Warn("This only edits the Kids counter, NOT the actual Children list.");
+                    EditorIO.Info("FamilySystem reads the full Children list (names, ages) — setting Kids high produces a ghost counter.");
+                    EditorIO.Info("For real children, have them naturally via marriage or edit GameData directly.");
                     p.Kids = EditorIO.PromptInt("Kid count", p.Kids, min: 0);
                     break;
                 case 6: break;
@@ -1142,14 +1402,46 @@ internal static class PlayerSaveEditor
                     break;
                 case 6:
                     {
-                        string name = EditorIO.PromptChoice("Skill name", EditorVocab.CombatSkillNames, "");
-                        if (!string.IsNullOrWhiteSpace(name))
+                        // v0.57.4 (pass 3): the old picker used EditorVocab.CombatSkillNames
+                        // ("sword", "axe", "mace", ...) which has no relationship to the
+                        // actual skill IDs the game stores in SkillProficiencies. Real
+                        // skill IDs are "basic_attack", class ability IDs from
+                        // ClassAbilitySystem (e.g. "backstab", "power_attack"), and spell
+                        // IDs like "cleric_spell_3". Setting e.g. "sword" = 5 wrote a
+                        // dead key that nothing in the game reads.
+                        //
+                        // Build the picker from real registries: basic_attack + every
+                        // registered class ability. Spell proficiency ids depend on class
+                        // and spell level, so we offer spell-levels 1..12 for the player's
+                        // class when it's a caster.
+                        var skillIds = new List<string> { "basic_attack" };
+                        skillIds.AddRange(ClassAbilitySystem.GetAllAbilities().Select(a => a.Id));
+                        if (IsCasterClass(p.Class))
                         {
-                            int cur = p.SkillProficiencies.TryGetValue(name, out var v) ? v : 0;
-                            p.SkillProficiencies[name] = EditorIO.PromptInt("Level (0-10 typical)", cur, min: 0);
-                            EditorIO.Success("Set.");
-                            EditorIO.Pause();
+                            string classPrefix = p.Class switch
+                            {
+                                CharacterClass.Cleric => "cleric",
+                                CharacterClass.Magician => "magician",
+                                CharacterClass.Sage => "sage",
+                                _ => "spell",
+                            };
+                            for (int lvl = 1; lvl <= 12; lvl++)
+                                skillIds.Add($"{classPrefix}_spell_{lvl}");
                         }
+                        var labels = skillIds.Select(s =>
+                        {
+                            int cur = p.SkillProficiencies.TryGetValue(s, out var v) ? v : 0;
+                            return $"{s,-30}  current level: {cur}";
+                        }).ToList();
+                        int pick = EditorIO.Menu("Skill", labels);
+                        if (pick == 0) break;
+                        string skillId = skillIds[pick - 1];
+                        int prev = p.SkillProficiencies.TryGetValue(skillId, out var pv) ? pv : 0;
+                        // ProficiencyLevel enum: 0 Untrained, 1 Poor, 2 Average, 3 Good,
+                        // 4 Skilled, 5 Expert, 6 Superb, 7 Master, 8 Legendary (max).
+                        p.SkillProficiencies[skillId] = EditorIO.PromptInt("Level (0 Untrained .. 8 Legendary)", prev, min: 0, max: 8);
+                        EditorIO.Success($"{skillId} = {p.SkillProficiencies[skillId]}");
+                        EditorIO.Pause();
                         break;
                     }
                 case 7:
@@ -1191,6 +1483,14 @@ internal static class PlayerSaveEditor
     private static void EditTeamAndGuild(PlayerData p)
     {
         EditorIO.Section("Team / Guild");
+        // v0.57.4: Team and Guild are both backed by SQLite in online / MUD
+        // mode (teams table; guilds + guild_members tables via GuildSystem).
+        // Editing the local save's Team / IsTeamLeader fields does NOT update
+        // the server database — the player will still appear in the same
+        // server-side team / guild they were in when the save was taken.
+        // Single-player saves use these fields directly and edits work there.
+        EditorIO.Info("(Team / Guild fields are authoritative in SINGLE-PLAYER saves only.)");
+        EditorIO.Info("Online mode stores team and guild membership in the server's SQLite — edits here won't sync.");
         p.Team = EditorIO.PromptString("Team name (blank = no team)", p.Team);
         p.TeamPassword = EditorIO.PromptString("Team password", p.TeamPassword);
         p.IsTeamLeader = EditorIO.PromptBool("Is team leader", p.IsTeamLeader);
@@ -1224,7 +1524,23 @@ internal static class PlayerSaveEditor
         p.SkipIntimateScenes = EditorIO.PromptBool("Skip intimate scenes (fade to black)", p.SkipIntimateScenes);
         p.ScreenReaderMode = EditorIO.PromptBool("Screen reader mode", p.ScreenReaderMode);
         p.CompactMode = EditorIO.PromptBool("Compact mode (mobile/small-screen menus)", p.CompactMode);
-        p.Language = EditorIO.PromptString("Language code (en, es, fr, it, hu)", p.Language);
+        // v0.57.4: use live Loc.AvailableLanguages for the picker so the editor
+        // always offers exactly the languages actually installed — a typo'd
+        // language code used to silently fall back to English at runtime.
+        var availableLangs = UsurperRemake.Systems.Loc.AvailableLanguages;
+        if (availableLangs.Length > 0)
+        {
+            var langCodes = availableLangs.Select(l => l.Code).ToList();
+            var langLabels = availableLangs.Select(l => $"{l.Code}  —  {l.Name}").ToList();
+            int pick = EditorIO.Menu($"Language (current: {p.Language ?? "en"})", langLabels);
+            if (pick > 0) p.Language = langCodes[pick - 1];
+        }
+        else
+        {
+            // Fallback: free text if somehow no languages are registered (should
+            // never happen in a correctly-packaged build).
+            p.Language = EditorIO.PromptString("Language code", p.Language);
+        }
         p.ColorTheme = EditorIO.PromptEnum("ColorTheme", p.ColorTheme);
         p.AutoLevelUp = EditorIO.PromptBool("AutoLevelUp on XP threshold", p.AutoLevelUp);
         p.AutoEquipDisabled = EditorIO.PromptBool("AutoEquipDisabled (shop purchases go to inventory)", p.AutoEquipDisabled);
@@ -1240,7 +1556,17 @@ internal static class PlayerSaveEditor
     {
         data.WorldState ??= new WorldStateData();
         var w = data.WorldState;
-        EditorIO.Section("World State (single-player world)");
+        EditorIO.Section("World State");
+        // v0.57.4: in online / MUD mode the shared world (king, treasury, town
+        // pot, day, events, news) lives in the server's world_state SQLite and
+        // is restored at login from OnlineStateManager (overriding any
+        // WorldState block in a local save). This editor only touches local
+        // save files, so in practice these edits ARE single-player only — but
+        // users who dual-use (local save + server character) could be confused
+        // when their local edits don't reflect on the server.
+        EditorIO.Warn("These fields control the SINGLE-PLAYER world only.");
+        EditorIO.Info("In online / MUD mode, the shared world lives in the server's world_state database.");
+        EditorIO.Pause();
         w.CurrentRuler = EditorIO.PromptString("Current ruler name (blank = no king)", w.CurrentRuler ?? "");
         if (string.IsNullOrWhiteSpace(w.CurrentRuler)) w.CurrentRuler = null;
         w.BankInterestRate = EditorIO.PromptInt("BankInterestRate (percent)", w.BankInterestRate, min: 0, max: 100);

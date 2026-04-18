@@ -215,13 +215,25 @@ internal static class MonsterEditor
                         var tierLabels = f.Tiers.Select(t => $"{t.Name,-20} abilities={t.SpecialAbilities?.Count ?? 0}").ToList();
                         int pick = EditorIO.Menu("Tier to add ability to", tierLabels);
                         if (pick == 0) break;
-                        string a = EditorIO.Prompt("Ability ID (e.g. poison_bite, power_strike)");
-                        if (!string.IsNullOrWhiteSpace(a))
-                        {
-                            f.Tiers[pick - 1].SpecialAbilities ??= new List<string>();
-                            if (!f.Tiers[pick - 1].SpecialAbilities.Contains(a))
-                            { f.Tiers[pick - 1].SpecialAbilities.Add(a); anyChange = true; }
-                        }
+                        // v0.57.4 (pass 4): picker over the real MonsterAbilities.AbilityType
+                        // enum. The old free-text prompt ("poison_bite, power_strike") let
+                        // users type anything — typos silently fell through the
+                        // Enum.TryParse in CombatEngine.TryMonsterAbility and produced no
+                        // effect at runtime. The picker means invalid values are
+                        // structurally impossible.
+                        var abilityNames = Enum.GetNames<global::MonsterAbilities.AbilityType>()
+                            .Where(n => n != "None")
+                            .OrderBy(n => n)
+                            .ToList();
+                        int aPick = EditorIO.Menu("Ability to add", abilityNames);
+                        if (aPick == 0) break;
+                        string a = abilityNames[aPick - 1];
+                        f.Tiers[pick - 1].SpecialAbilities ??= new List<string>();
+                        if (!f.Tiers[pick - 1].SpecialAbilities.Contains(a))
+                        { f.Tiers[pick - 1].SpecialAbilities.Add(a); anyChange = true; EditorIO.Success($"Added {a}."); }
+                        else
+                            EditorIO.Info($"{a} already on this tier.");
+                        EditorIO.Pause();
                         break;
                     }
                 case 5:

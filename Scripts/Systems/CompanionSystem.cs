@@ -661,6 +661,11 @@ namespace UsurperRemake.Systems
                         charWrapper.EquippedItems[kvp.Key] = kvp.Value;
                 }
 
+                // Share inventory by reference — edits to the wrapper's Inventory (combat [T]
+                // transfer, Home/Team Corner/dungeon viewer take-back) mutate the companion's
+                // persistent bag, so items survive save/reload.
+                charWrapper.Inventory = companion.Inventory;
+
                 // RecalculateStats applies equipment bonuses on top of Base* values
                 charWrapper.RecalculateStats();
 
@@ -1059,36 +1064,8 @@ namespace UsurperRemake.Systems
             companion.IsActive = false;
             companion.DeathType = type;
 
-            // Return companion's equipment to player inventory
-            if (companion.EquippedItems.Count > 0)
-            {
-                var player = GameEngine.Instance?.CurrentPlayer;
-                if (player != null)
-                {
-                    int itemsReturned = 0;
-                    foreach (var kvp in companion.EquippedItems)
-                    {
-                        if (kvp.Value <= 0) continue;
-                        var equipment = EquipmentDatabase.GetById(kvp.Value);
-                        if (equipment != null)
-                        {
-                            player.Inventory.Add(player.ConvertEquipmentToLegacyItem(equipment));
-                            itemsReturned++;
-                        }
-                    }
-                    companion.EquippedItems.Clear();
-                    if (itemsReturned > 0 && terminal != null)
-                    {
-                        terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get("companion.equipment_returned", companion.Name, itemsReturned));
-                    }
-                }
-                else
-                {
-                    DebugLogger.Instance.LogError("COMPANION", $"KillCompanion: player is null, cannot return {companion.EquippedItems.Count} equipped items from {companion.Name}");
-                    companion.EquippedItems.Clear();
-                }
-            }
+            // Return companion's equipment AND bag contents to player inventory
+            ReturnCompanionGearOnDeath(companion, terminal);
 
             activeCompanions.Remove(id);
 
@@ -1279,30 +1256,10 @@ namespace UsurperRemake.Systems
             companion.IsActive = false;
             companion.DeathType = DeathType.ChoiceBased;
 
-            // Return companion's equipment to player inventory
-            if (companion.EquippedItems.Count > 0)
-            {
-                var player = GameEngine.Instance?.CurrentPlayer;
-                if (player != null)
-                {
-                    int itemsReturned = 0;
-                    foreach (var kvp in companion.EquippedItems)
-                    {
-                        if (kvp.Value <= 0) continue;
-                        var equipment = EquipmentDatabase.GetById(kvp.Value);
-                        if (equipment != null)
-                        {
-                            player.Inventory.Add(player.ConvertEquipmentToLegacyItem(equipment));
-                            itemsReturned++;
-                        }
-                    }
-                    companion.EquippedItems.Clear();
-                    if (itemsReturned > 0)
-                    {
-                        pendingNotifications.Enqueue(Loc.Get("companion.equipment_returned_notify", companion.Name, itemsReturned));
-                    }
-                }
-            }
+            // Return companion's equipment AND bag contents to player inventory
+            // (TerminalEmulator is null in this paradox path — helper falls back
+            // to pendingNotifications so the player still learns about it).
+            ReturnCompanionGearOnDeath(companion, terminal: null);
 
             activeCompanions.Remove(companion.Id);
 
@@ -1540,6 +1497,16 @@ namespace UsurperRemake.Systems
                     DebugLogger.Instance.LogInfo("COMPANION_EQUIP",
                         $"Serialize SAVING {c.Name} equipment: {slots}");
                 }
+                // v0.57.4: track bag contents on save so "my item is missing" reports
+                // can trace the item through save → load without needing a repro.
+                // Only logs when bag is non-empty to avoid flooding on every autosave.
+                if (c.Inventory != null && c.Inventory.Count > 0)
+                {
+                    var bagSummary = string.Join(", ", c.Inventory.Take(5).Select(i => i?.Name ?? "?"));
+                    if (c.Inventory.Count > 5) bagSummary += $", +{c.Inventory.Count - 5} more";
+                    DebugLogger.Instance.LogInfo("COMPANION_BAG",
+                        $"Serialize SAVING {c.Name} bag ({c.Inventory.Count}): {bagSummary}");
+                }
             }
 
             return new CompanionSystemData
@@ -1579,7 +1546,8 @@ namespace UsurperRemake.Systems
                     EquippedItemsSave = c.EquippedItems.ToDictionary(kvp => (int)kvp.Key, kvp => kvp.Value),
                     DisabledAbilities = c.DisabledAbilities.ToList(),
                     SkillProficiencies = c.SkillProficiencies?.Count > 0 ? new Dictionary<string, int>(c.SkillProficiencies) : new(),
-                    SkillTrainingProgress = c.SkillTrainingProgress?.Count > 0 ? new Dictionary<string, int>(c.SkillTrainingProgress) : new()
+                    SkillTrainingProgress = c.SkillTrainingProgress?.Count > 0 ? new Dictionary<string, int>(c.SkillTrainingProgress) : new(),
+                    Inventory = c.Inventory?.Where(i => i != null).Select(ItemToData).ToList() ?? new List<InventoryItemData>()
                 }).ToList(),
                 ActiveCompanions = activeCompanions.ToList(),
                 FallenCompanions = fallenCompanions.Values.ToList()
@@ -1619,6 +1587,7 @@ namespace UsurperRemake.Systems
                 companion.RecruitedDay = 0;
                 companion.History.Clear();
                 companion.EquippedItems.Clear();
+                companion.Inventory.Clear();
                 companion.DisabledAbilities.Clear();
                 companion.Level = Math.Max(1, companion.RecruitLevel + 5);
                 companion.Experience = GetExperienceForLevel(companion.Level);
@@ -1766,6 +1735,21 @@ namespace UsurperRemake.Systems
                     companion.SkillTrainingProgress = save.SkillTrainingProgress?.Count > 0
                         ? new Dictionary<string, int>(save.SkillTrainingProgress)
                         : new();
+
+                    // Restore companion's personal inventory (items transferred to them in combat,
+                    // Home, Team Corner, or dungeon). Must be a fresh list so GetCompanionsAsCharacters
+                    // shares a stable reference with the wrapper.
+                    companion.Inventory = save.Inventory?.Select(DataToItem).ToList() ?? new List<Item>();
+                    // v0.57.4: pair with the save-side COMPANION_BAG log so the full
+                    // save → load round-trip is visible in logs. Confirms items that
+                    // were written actually come back.
+                    if (companion.Inventory.Count > 0)
+                    {
+                        var bagSummary = string.Join(", ", companion.Inventory.Take(5).Select(i => i?.Name ?? "?"));
+                        if (companion.Inventory.Count > 5) bagSummary += $", +{companion.Inventory.Count - 5} more";
+                        DebugLogger.Instance.LogInfo("COMPANION_BAG",
+                            $"Deserialize RESTORED {companion.Name} bag ({companion.Inventory.Count}): {bagSummary}");
+                    }
                 }
             }
 
@@ -2543,6 +2527,170 @@ namespace UsurperRemake.Systems
             return StoryProgressionSystem.Instance.CurrentGameDay;
         }
 
+        /// <summary>
+        /// v0.57.4: when a companion dies permanently (either via combat KillCompanion
+        /// or the Moral Paradox trigger), hand back both their equipped gear AND
+        /// anything in their personal bag to the player. Pre-fix, only equipped
+        /// items transferred — bag contents (potions, herbs, unused loot) were
+        /// lost forever.
+        ///
+        /// Overflow past the player's MaxInventoryItems cap is reported but not
+        /// saved anywhere (treat as "dropped on the battlefield"). Clears both
+        /// collections on the companion after transfer so the paths that persist
+        /// dead companions don't keep ghost inventory.
+        /// </summary>
+        private void ReturnCompanionGearOnDeath(Companion companion, TerminalEmulator? terminal)
+        {
+            var player = GameEngine.Instance?.CurrentPlayer;
+            int equipmentReturned = 0;
+            int bagReturned = 0;
+            int dropped = 0;
+
+            // 1. Equipment (same logic as the original KillCompanion path, but
+            // centralized). Iterate a snapshot so we can Clear afterwards safely.
+            if (player != null && companion.EquippedItems.Count > 0)
+            {
+                foreach (var kvp in companion.EquippedItems.ToList())
+                {
+                    if (kvp.Value <= 0) continue;
+                    var equipment = EquipmentDatabase.GetById(kvp.Value);
+                    if (equipment == null) continue;
+                    if (player.Inventory.Count >= GameConfig.MaxInventoryItems)
+                    {
+                        dropped++;
+                        continue;
+                    }
+                    player.Inventory.Add(player.ConvertEquipmentToLegacyItem(equipment));
+                    equipmentReturned++;
+                }
+            }
+            companion.EquippedItems.Clear();
+
+            // 2. Personal bag (NEW in v0.57.4 — was never returned).
+            if (player != null && companion.Inventory != null && companion.Inventory.Count > 0)
+            {
+                foreach (var item in companion.Inventory.ToList())
+                {
+                    if (item == null) continue;
+                    if (player.Inventory.Count >= GameConfig.MaxInventoryItems)
+                    {
+                        dropped++;
+                        continue;
+                    }
+                    player.Inventory.Add(item);
+                    bagReturned++;
+                }
+            }
+            companion.Inventory?.Clear();
+
+            // 3. Report. The loc key `companion.equipment_returned` takes two args
+            // (name, count) and has always meant "gear returned" — reuse it, summing
+            // equipment + bag items, since from the player's POV it's one pile.
+            int total = equipmentReturned + bagReturned;
+            if (total > 0)
+            {
+                string msg = Loc.Get("companion.equipment_returned", companion.Name, total);
+                if (terminal != null)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(msg);
+                }
+                else
+                {
+                    pendingNotifications.Enqueue(Loc.Get("companion.equipment_returned_notify", companion.Name, total));
+                }
+            }
+            if (dropped > 0)
+            {
+                string drop = $"{dropped} item(s) dropped on the battlefield — your inventory was full.";
+                if (terminal != null)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(drop);
+                }
+                else
+                {
+                    pendingNotifications.Enqueue(drop);
+                }
+            }
+            // v0.57.4: single forensic line covering the whole permadeath bag return.
+            // If a player reports "I lost X legendary items when Vex died", this log
+            // line answers the question immediately — how many equipped, how many
+            // were in the bag, how many dropped from the player's cap.
+            DebugLogger.Instance.LogInfo("COMPANION_BAG",
+                $"PERMADEATH {companion.Name} → player: equipped={equipmentReturned}, bag={bagReturned}, dropped={dropped}");
+        }
+
+        /// <summary>
+        /// Convert in-memory Item to serializable InventoryItemData (same shape the player
+        /// uses, so companion bags round-trip through JSON like the player's does).
+        /// </summary>
+        private static InventoryItemData ItemToData(Item item)
+        {
+            return new InventoryItemData
+            {
+                Name = item.Name,
+                Value = item.Value,
+                Type = item.Type,
+                Attack = item.Attack,
+                Armor = item.Armor,
+                Strength = item.Strength,
+                Dexterity = item.Dexterity,
+                Wisdom = item.Wisdom,
+                Defence = item.Defence,
+                BlockChance = item.BlockChance,
+                ShieldBonus = item.ShieldBonus,
+                HP = item.HP,
+                Mana = item.Mana,
+                Charisma = item.Charisma,
+                Agility = item.Agility,
+                Stamina = item.Stamina,
+                MinLevel = item.MinLevel,
+                IsCursed = item.IsCursed,
+                Cursed = item.Cursed,
+                IsIdentified = item.IsIdentified,
+                Shop = item.Shop,
+                Dungeon = item.Dungeon,
+                Description = item.Description?.ToList() ?? new List<string>(),
+                LootEffects = item.LootEffects?.Count > 0
+                    ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
+                    : null
+            };
+        }
+
+        private static Item DataToItem(InventoryItemData d)
+        {
+            var item = new Item
+            {
+                Name = d.Name,
+                Value = d.Value,
+                Type = d.Type,
+                Attack = d.Attack,
+                Armor = d.Armor,
+                Strength = d.Strength,
+                Dexterity = d.Dexterity,
+                Wisdom = d.Wisdom,
+                Defence = d.Defence,
+                BlockChance = d.BlockChance,
+                ShieldBonus = d.ShieldBonus,
+                HP = d.HP,
+                Mana = d.Mana,
+                Charisma = d.Charisma,
+                Agility = d.Agility,
+                Stamina = d.Stamina,
+                MinLevel = d.MinLevel,
+                IsCursed = d.IsCursed,
+                Cursed = d.Cursed,
+                IsIdentified = d.IsIdentified,
+                Shop = d.Shop,
+                Dungeon = d.Dungeon,
+                Description = d.Description?.ToList() ?? new List<string>()
+            };
+            if (d.LootEffects != null)
+                item.LootEffects = d.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
+            return item;
+        }
+
         private int GetPlayerLevel()
         {
             // Get actual player level from GameEngine
@@ -2679,6 +2827,11 @@ namespace UsurperRemake.Systems
         // Equipment system - maps slot to equipment database ID (same as Character.EquippedItems)
         public Dictionary<EquipmentSlot, int> EquippedItems { get; set; } = new();
 
+        // Companion's personal inventory ("bag"). Shared by reference with the Character wrapper
+        // returned from GetCompanionsAsCharacters so items transferred to the companion in combat
+        // (via <>/T transfer), Home/Team Corner/dungeon viewers, and loot persist on the companion.
+        public List<Item> Inventory { get; set; } = new();
+
         // Disabled abilities - player can toggle off specific abilities via Inn menu
         // Companion AI will skip any ability whose Id is in this set
         public HashSet<string> DisabledAbilities { get; set; } = new();
@@ -2787,6 +2940,10 @@ namespace UsurperRemake.Systems
         // Skill proficiency (stored as int values of TrainingSystem.ProficiencyLevel)
         public Dictionary<string, int> SkillProficiencies { get; set; } = new();
         public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();
+
+        // Companion's personal inventory ("bag"). Items transferred to the companion via
+        // combat loot, Home/Team Corner equip, or Party Inventory viewer.
+        public List<InventoryItemData> Inventory { get; set; } = new();
     }
 
     #endregion

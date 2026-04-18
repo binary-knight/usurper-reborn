@@ -22,6 +22,18 @@ internal static class NPCEditor
         // the user navigated the menu without explicitly picking Save first.
         var npcs = LoadOrSeed();
         bool dirty = false;
+
+        // v0.57.4: in online/MUD mode NPC state lives in the world_state SQLite
+        // table and is restored from OnlineStateManager.LoadSharedNPCs at login
+        // (see GameEngine.LoadSaveByFileName), which OVERRIDES whatever
+        // npcs.json contains. Edits here are only visible in single-player /
+        // Steam builds. Warn once at entry so users don't think the editor is
+        // broken when their MUD-server NPC edits seem to revert.
+        EditorIO.Warn("NPC edits apply to SINGLE-PLAYER / Steam builds only.");
+        EditorIO.Info("In online / MUD mode, NPC state lives in the server's world_state database");
+        EditorIO.Info("and is restored at login — edits to npcs.json are overridden by the world sim.");
+        EditorIO.Pause();
+
         while (true)
         {
             EditorIO.Section($"NPCs  —  {npcs.Count} total{(dirty ? "  [UNSAVED]" : "")}");

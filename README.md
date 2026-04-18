@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.57.3** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.57.4** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -264,7 +264,7 @@ For detailed BBS setup instructions, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_
 - Additional companion personal quest storylines
 - Expanded faction recruitment ceremonies
 
-### v0.57.3 - Ancestral Spirits (Murder, NPC Survival & Bug Fixes)
+### v0.53.12 - Ancestral Spirits (Murder, NPC Survival & Bug Fixes)
 Murder punishment save corruption fix. Single-player NPC level diversity (spawn levels 1-80). "The Stranger" NPC removed (Noctura appears through events). Auto-update scripts for BBS sysops.
 
 ### v0.53.11 - Ancestral Spirits (Murder, NPC Survival & Bug Fixes)
@@ -399,7 +399,7 @@ Join our Discord server for discussions, feedback, and updates:
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (Alpha v0.57.3)
+## Known Issues (Alpha v0.57.4)
 - Save files from earlier alpha versions may not be fully compatible
 - BBS FOSSIL mode not supported (use `--stdio` flag for FOSSIL-based BBSes)
 - Steam features only work when game is launched through Steam client
@@ -409,4 +409,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.57.3 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.57.4 — The world is running. [Watch it live.](https://usurper-reborn.net)

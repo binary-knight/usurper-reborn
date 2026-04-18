@@ -136,6 +136,11 @@ internal static class EditorIO
     /// "erase display below" (CSI 0J). Relative movement is immune to the
     /// Windows-Terminal buffer-vs-viewport mismatch that broke absolute
     /// <see cref="Console.SetCursorPosition"/> tracking across menu resizes.
+    ///
+    /// v0.57.4: viewport-scrolled so long lists don't push the top rows off the
+    /// terminal. Only <c>viewportSize</c> rows are rendered at a time; arrow
+    /// keys move the window. Number shortcuts still work — they jump directly
+    /// to the target index and the viewport follows.
     /// </summary>
     private static int RunArrowMenu(string title, IList<string> labels)
     {
@@ -170,15 +175,38 @@ internal static class EditorIO
                 Console.Write($"\x1b[{prevLines}A\r\x1b[0J");
             }
 
+            // Size the viewport against the terminal — leave room for title,
+            // hint lines, overflow indicators, and a prompt line below. Fall
+            // back to a safe default when WindowHeight is unavailable (some
+            // redirected terminals return 0 / throw). Cap at labels.Count so
+            // short menus don't emit spurious overflow markers.
+            int terminalRows;
+            try { terminalRows = Console.WindowHeight; } catch { terminalRows = 24; }
+            if (terminalRows <= 0) terminalRows = 24;
+            const int chromeLines = 7;  // blank + title + blank + 2 overflow + breathing room
+            int viewportSize = Math.Max(5, Math.Min(labels.Count, terminalRows - chromeLines));
+
+            // Center the selected row in the viewport when possible; clamp to
+            // the ends otherwise so the list never renders off-array.
+            int viewStart = Math.Max(0, Math.Min(
+                labels.Count - viewportSize,
+                selected - viewportSize / 2));
+            int viewEnd = Math.Min(labels.Count, viewStart + viewportSize);
+
             string hint = numBuffer.Length > 0
                 ? $"[yellow]typing: {numBuffer}_[/]  [grey](Enter to commit, Esc to clear)[/]"
-                : "[grey](arrows or number keys, Enter picks, 0/Q/Esc back)[/]";
+                : $"[grey](arrows/PgUp/PgDn/Home/End, numbers, Enter picks, 0/Q/Esc back — showing {viewStart + 1}-{viewEnd}/{labels.Count})[/]";
             int lineCount = 0;
             AnsiConsole.MarkupLine(""); lineCount++;
             AnsiConsole.MarkupLine($"  [bold yellow]{Markup.Escape(title)}[/]  {hint}");
             lineCount++;
             AnsiConsole.MarkupLine(""); lineCount++;
-            for (int i = 0; i < labels.Count; i++)
+            if (viewStart > 0)
+            {
+                AnsiConsole.MarkupLine($"  [grey]    ... {viewStart} more above (↑ / PgUp / Home)[/]");
+                lineCount++;
+            }
+            for (int i = viewStart; i < viewEnd; i++)
             {
                 bool isSelected = i == selected;
                 string cursor = isSelected ? "[black on cyan]>[/]" : " ";
@@ -186,13 +214,16 @@ internal static class EditorIO
                 // get the plain digit; items 10+ get the two-digit tag so the
                 // user knows a 2-key combo reaches them.
                 int num = i + 1;
-                string numTag = num <= 9
-                    ? $"[cyan]{num,2}[/]"
-                    : $"[cyan]{num,2}[/]";
+                string numTag = $"[cyan]{num,3}[/]";
                 string text = isSelected
                     ? $"[black on cyan] {Markup.Escape(labels[i])} [/]"
                     : Markup.Escape(labels[i]);
                 AnsiConsole.MarkupLine($"  {cursor} {numTag}  {text}");
+                lineCount++;
+            }
+            if (viewEnd < labels.Count)
+            {
+                AnsiConsole.MarkupLine($"  [grey]    ... {labels.Count - viewEnd} more below (↓ / PgDn / End)[/]");
                 lineCount++;
             }
             prevLines = lineCount;
@@ -211,15 +242,25 @@ internal static class EditorIO
                 numBuffer = "";
                 selected = (selected + 1) % labels.Count;
             }
-            else if (key.Key == ConsoleKey.Home || key.Key == ConsoleKey.PageUp)
+            else if (key.Key == ConsoleKey.Home)
             {
                 numBuffer = "";
                 selected = 0;
             }
-            else if (key.Key == ConsoleKey.End || key.Key == ConsoleKey.PageDown)
+            else if (key.Key == ConsoleKey.End)
             {
                 numBuffer = "";
                 selected = labels.Count - 1;
+            }
+            else if (key.Key == ConsoleKey.PageUp)
+            {
+                numBuffer = "";
+                selected = Math.Max(0, selected - viewportSize);
+            }
+            else if (key.Key == ConsoleKey.PageDown)
+            {
+                numBuffer = "";
+                selected = Math.Min(labels.Count - 1, selected + viewportSize);
             }
             else if (key.Key == ConsoleKey.Enter)
             {
