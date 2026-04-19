@@ -22,7 +22,7 @@ public abstract class BaseLocation
     public List<GameLocation> PossibleExits { get; protected set; } = new();
     public List<NPC> LocationNPCs { get; protected set; } = new();
     public List<string> LocationActions { get; protected set; } = new();
-    
+
     // Pascal compatibility
     public bool RefreshRequired { get; set; } = true;
 
@@ -116,7 +116,7 @@ public abstract class BaseLocation
     {
         // Override in derived classes
     }
-    
+
     /// <summary>
     /// Enter the location - main entry point
     /// </summary>
@@ -474,7 +474,7 @@ public abstract class BaseLocation
             DebugLogger.Instance.LogError("LOCATION", $"[CheckGuardDefenseAlert] King system guard check failed: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// Main location loop - handles display and user input
     /// </summary>
@@ -1376,16 +1376,16 @@ public abstract class BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Description);
         terminal.WriteLine("");
-        
+
         // Show NPCs in location
         ShowNPCsInLocation();
-        
+
         // Show available actions
         ShowLocationActions();
-        
+
         // Show exits
         ShowExits();
-        
+
         // Status line
         ShowStatusLine();
     }
@@ -1835,7 +1835,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("base.available_actions"));
-            
+
             for (int i = 0; i < LocationActions.Count; i++)
             {
                 terminal.WriteLine($"  {i + 1}. {LocationActions[i]}");
@@ -1843,7 +1843,7 @@ public abstract class BaseLocation
             terminal.WriteLine("");
         }
     }
-    
+
     /// <summary>
     /// Show available exits (Pascal-compatible)
     /// </summary>
@@ -1853,7 +1853,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("base.exits"));
-            
+
             foreach (var exit in PossibleExits)
             {
                 var exitName = GetLocationName(exit);
@@ -1863,7 +1863,7 @@ public abstract class BaseLocation
             terminal.WriteLine("");
         }
     }
-    
+
     /// <summary>
     /// Show breadcrumb navigation at top of screen
     /// </summary>
@@ -1946,72 +1946,72 @@ public abstract class BaseLocation
         }
         else
         {
-        // HP with urgency coloring
-        terminal.SetColor("gray");
-        terminal.Write($"{Loc.Get("status.hp")}: ");
-        float hpPercent = currentPlayer.MaxHP > 0 ? (float)currentPlayer.HP / currentPlayer.MaxHP : 0;
-        string hpColor = hpPercent > 0.5f ? "bright_green" : hpPercent > 0.25f ? "yellow" : "bright_red";
-        terminal.SetColor(hpColor);
-        terminal.Write($"{currentPlayer.HP}");
-        terminal.SetColor("gray");
-        terminal.Write("/");
-        terminal.SetColor(hpColor);
-        terminal.Write($"{currentPlayer.MaxHP}");
-
-        terminal.SetColor("gray");
-        terminal.Write($" | {Loc.Get("status.gold_label")}: ");
-        terminal.SetColor("yellow");
-        terminal.Write($"{currentPlayer.Gold:N0}");
-
-        if (currentPlayer.IsManaClass)
-        {
+            // HP with urgency coloring
             terminal.SetColor("gray");
-            terminal.Write($" | {Loc.Get("status.mp")}: ");
-            terminal.SetColor("blue");
-            terminal.Write($"{currentPlayer.Mana}");
+            terminal.Write($"{Loc.Get("status.hp")}: ");
+            float hpPercent = currentPlayer.MaxHP > 0 ? (float)currentPlayer.HP / currentPlayer.MaxHP : 0;
+            string hpColor = hpPercent > 0.5f ? "bright_green" : hpPercent > 0.25f ? "yellow" : "bright_red";
+            terminal.SetColor(hpColor);
+            terminal.Write($"{currentPlayer.HP}");
             terminal.SetColor("gray");
             terminal.Write("/");
-            terminal.SetColor("blue");
-            terminal.Write($"{currentPlayer.MaxMana}");
-        }
-        else
-        {
+            terminal.SetColor(hpColor);
+            terminal.Write($"{currentPlayer.MaxHP}");
+
             terminal.SetColor("gray");
-            terminal.Write($" | {Loc.Get("status.sta")}: ");
+            terminal.Write($" | {Loc.Get("status.gold_label")}: ");
             terminal.SetColor("yellow");
-            terminal.Write($"{currentPlayer.CurrentCombatStamina}");
+            terminal.Write($"{currentPlayer.Gold:N0}");
+
+            if (currentPlayer.IsManaClass)
+            {
+                terminal.SetColor("gray");
+                terminal.Write($" | {Loc.Get("status.mp")}: ");
+                terminal.SetColor("blue");
+                terminal.Write($"{currentPlayer.Mana}");
+                terminal.SetColor("gray");
+                terminal.Write("/");
+                terminal.SetColor("blue");
+                terminal.Write($"{currentPlayer.MaxMana}");
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.Write($" | {Loc.Get("status.sta")}: ");
+                terminal.SetColor("yellow");
+                terminal.Write($"{currentPlayer.CurrentCombatStamina}");
+                terminal.SetColor("gray");
+                terminal.Write("/");
+                terminal.SetColor("yellow");
+                terminal.Write($"{currentPlayer.MaxCombatStamina}");
+            }
+
             terminal.SetColor("gray");
-            terminal.Write("/");
-            terminal.SetColor("yellow");
-            terminal.Write($"{currentPlayer.MaxCombatStamina}");
-        }
+            terminal.Write($" | {Loc.Get("ui.level")} ");
+            terminal.SetColor("cyan");
+            terminal.Write($"{currentPlayer.Level}");
 
-        terminal.SetColor("gray");
-        terminal.Write($" | {Loc.Get("ui.level")} ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{currentPlayer.Level}");
+            // XP progress to next level
+            if (currentPlayer.Level < GameConfig.MaxLevel)
+            {
+                long currentXP = currentPlayer.Experience;
+                long nextLevelXP = GetExperienceForLevel(currentPlayer.Level + 1);
+                long prevLevelXP = GetExperienceForLevel(currentPlayer.Level);
+                long xpIntoLevel = currentXP - prevLevelXP;
+                long xpNeeded = nextLevelXP - prevLevelXP;
+                int xpPercent = xpNeeded > 0 ? (int)((xpIntoLevel * 100) / xpNeeded) : 0;
+                xpPercent = Math.Clamp(xpPercent, 0, 100);
 
-        // XP progress to next level
-        if (currentPlayer.Level < GameConfig.MaxLevel)
-        {
-            long currentXP = currentPlayer.Experience;
-            long nextLevelXP = GetExperienceForLevel(currentPlayer.Level + 1);
-            long prevLevelXP = GetExperienceForLevel(currentPlayer.Level);
-            long xpIntoLevel = currentXP - prevLevelXP;
-            long xpNeeded = nextLevelXP - prevLevelXP;
-            int xpPercent = xpNeeded > 0 ? (int)((xpIntoLevel * 100) / xpNeeded) : 0;
-            xpPercent = Math.Clamp(xpPercent, 0, 100);
+                terminal.SetColor("gray");
+                terminal.Write(" (");
+                terminal.SetColor(xpPercent >= 90 ? "bright_green" : "white");
+                terminal.Write($"{xpPercent}%");
+                terminal.SetColor("gray");
+                terminal.Write(")");
+            }
 
-            terminal.SetColor("gray");
-            terminal.Write(" (");
-            terminal.SetColor(xpPercent >= 90 ? "bright_green" : "white");
-            terminal.Write($"{xpPercent}%");
-            terminal.SetColor("gray");
-            terminal.Write(")");
-        }
-
-        terminal.WriteLine("");
-        terminal.WriteLine("");
+            terminal.WriteLine("");
+            terminal.WriteLine("");
         } // end else (non-SR status line)
 
         // Quick command bar
@@ -2668,7 +2668,8 @@ public abstract class BaseLocation
         // Slash commands with aliases
         void WriteCmdAlias(string cmd, string alias, string desc)
         {
-            WriteBoxLine(() => {
+            WriteBoxLine(() =>
+            {
                 terminal.Write(" ");
                 terminal.SetColor("cyan");
                 terminal.Write(cmd.PadRight(10));
@@ -2684,7 +2685,8 @@ public abstract class BaseLocation
         // Slash commands without aliases
         void WriteCmd(string cmd, string desc)
         {
-            WriteBoxLine(() => {
+            WriteBoxLine(() =>
+            {
                 terminal.Write(" ");
                 terminal.SetColor("cyan");
                 terminal.Write(cmd.PadRight(18));
@@ -2717,7 +2719,8 @@ public abstract class BaseLocation
 
         void WriteQuickKey(string key, string desc)
         {
-            WriteBoxLine(() => {
+            WriteBoxLine(() =>
+            {
                 terminal.Write(" ");
                 terminal.SetColor("bright_yellow");
                 terminal.Write(key.PadRight(2));
@@ -2741,7 +2744,8 @@ public abstract class BaseLocation
 
             void WriteOnlineCmd(string cmd, string desc)
             {
-                WriteBoxLine(() => {
+                WriteBoxLine(() =>
+                {
                     terminal.Write(" ");
                     terminal.SetColor("bright_green");
                     terminal.Write(cmd.PadRight(20));
@@ -3187,7 +3191,7 @@ public abstract class BaseLocation
             return false;
 
         var upperChoice = choice.ToUpper().Trim();
-        
+
         // Check for exits first
         foreach (var exit in PossibleExits)
         {
@@ -3197,7 +3201,7 @@ public abstract class BaseLocation
                 return true;
             }
         }
-        
+
         // Check for numbered actions
         if (int.TryParse(upperChoice, out int actionIndex))
         {
@@ -3207,7 +3211,7 @@ public abstract class BaseLocation
                 return false;
             }
         }
-        
+
         // Check for special commands
         switch (upperChoice)
         {
@@ -3274,7 +3278,7 @@ public abstract class BaseLocation
 
         return false;
     }
-    
+
     /// <summary>
     /// Execute a location-specific action
     /// </summary>
@@ -3284,7 +3288,7 @@ public abstract class BaseLocation
         terminal.WriteLine(Loc.Get("base.nothing_happens"), "gray");
         await Task.Delay(1000);
     }
-    
+
     /// <summary>
     /// Navigate to another location
     /// </summary>
@@ -4147,181 +4151,181 @@ public abstract class BaseLocation
         npc.IsInConversation = true; // Protect from world sim during interaction
         try
         {
-        bool stayInConversation = true;
-        bool isFirstGreeting = true;
+            bool stayInConversation = true;
+            bool isFirstGreeting = true;
 
-        while (stayInConversation)
-        {
-            terminal.ClearScreen();
-            WriteBoxHeader(Loc.Get("base.talking_to", npc.Name2), "bright_cyan");
-            terminal.WriteLine("");
-
-            // Show NPC portrait (skip for screen readers)
-            if (!currentPlayer.ScreenReaderMode)
+            while (stayInConversation)
             {
-                var portrait = PortraitGenerator.GeneratePortrait(npc);
-                ANSIArt.DisplayArt(terminal, portrait);
+                terminal.ClearScreen();
+                WriteBoxHeader(Loc.Get("base.talking_to", npc.Name2), "bright_cyan");
                 terminal.WriteLine("");
-            }
 
-            // Show NPC info
-            terminal.SetColor("gray");
-            string sexDisplay = npc.Sex == CharacterSex.Female ? Loc.Get("base.female") : Loc.Get("base.male");
-            terminal.WriteLine($"  {Loc.Get("base.guard_level")} {npc.Level} {npc.Race} {sexDisplay} {npc.ClassName}");
-            terminal.WriteLine($"  {GetAlignmentDisplay(npc)}");
-            terminal.WriteLine("");
+                // Show NPC portrait (skip for screen readers)
+                if (!currentPlayer.ScreenReaderMode)
+                {
+                    var portrait = PortraitGenerator.GeneratePortrait(npc);
+                    ANSIArt.DisplayArt(terminal, portrait);
+                    terminal.WriteLine("");
+                }
 
-            // Get NPC's greeting (only on first interaction)
-            if (isFirstGreeting)
-            {
-                // Update talk-to-NPC quest objectives
-                QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name);
-                QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name2);
-
-                string greeting = npc.GetGreeting(currentPlayer);
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
-                terminal.SetColor("white");
-                terminal.WriteLine($"  \"{greeting}\"");
+                // Show NPC info
+                terminal.SetColor("gray");
+                string sexDisplay = npc.Sex == CharacterSex.Female ? Loc.Get("base.female") : Loc.Get("base.male");
+                terminal.WriteLine($"  {Loc.Get("base.guard_level")} {npc.Level} {npc.Race} {sexDisplay} {npc.ClassName}");
+                terminal.WriteLine($"  {GetAlignmentDisplay(npc)}");
                 terminal.WriteLine("");
-                isFirstGreeting = false;
-            }
 
-            // Show interaction options
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("base.what_do_you_do")}");
-            terminal.WriteLine("");
+                // Get NPC's greeting (only on first interaction)
+                if (isFirstGreeting)
+                {
+                    // Update talk-to-NPC quest objectives
+                    QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name);
+                    QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name2);
 
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("1");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine($" {Loc.Get("base.chat_with_them")}");
-
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("2");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine($" {Loc.Get("base.ask_rumors")}");
-
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("3");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine($" {Loc.Get("base.ask_dungeons")}");
-
-            // Only show challenge option if they're a fighter type
-            if (npc.Level > 0 && npc.IsAlive)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("  [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("4");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("white");
-                terminal.WriteLine($" {Loc.Get("base.challenge_duel")}");
-            }
-
-            // Full conversation option (visual novel style)
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("5");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("bright_magenta");
-            terminal.WriteLine($" {Loc.Get("base.deep_conversation")}");
-
-            // Attack option (murder/assassination)
-            if (npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("  [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("6");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("dark_red");
-                terminal.WriteLine($" {Loc.Get("base.attack_npc")}");
-            }
-
-            terminal.WriteLine("");
-            terminal.SetColor("white");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("0");
-            terminal.SetColor("white");
-            terminal.WriteLine($"] {Loc.Get("base.walk_away")}");
-
-            // Debug option
-            terminal.SetColor("dark_gray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("9");
-            terminal.SetColor("dark_gray");
-            terminal.WriteLine($"] {Loc.Get("base.debug_personality")}");
-            terminal.WriteLine("");
-
-            string action = await GetChoice();
-
-            switch (action)
-            {
-                case "1":
-                    await ChatWithNPC(npc);
-                    break;
-                case "2":
-                    await AskForRumors(npc);
-                    break;
-                case "3":
-                    await AskAboutDungeons(npc);
-                    break;
-                case "4":
-                    if (npc.Level > 0 && npc.IsAlive)
-                    {
-                        await ChallengeNPC(npc);
-                        stayInConversation = false; // Exit after combat
-                    }
-                    break;
-                case "5":
-                    // Full visual novel style conversation
-                    await UsurperRemake.Systems.VisualNovelDialogueSystem.Instance.StartConversation(currentPlayer, npc, terminal);
-                    break;
-                case "6":
-                    if (npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King)
-                    {
-                        await AttackNPC(npc);
-                        stayInConversation = false;
-                    }
-                    break;
-                case "9":
-                    await ShowNPCDebugTraits(npc);
-                    break;
-                case "0":
-                default:
-                    // Show NPC's farewell using dynamic dialogue system
-                    string farewell = npc.GetFarewell((currentPlayer as Player)!);
+                    string greeting = npc.GetGreeting(currentPlayer);
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"{farewell}\"");
+                    terminal.WriteLine($"  \"{greeting}\"");
                     terminal.WriteLine("");
-                    terminal.SetColor("gray");
-                    terminal.WriteLine($"  {Loc.Get("base.nod_walk_away")}");
-                    await Task.Delay(1500);
-                    stayInConversation = false;
-                    break;
+                    isFirstGreeting = false;
+                }
+
+                // Show interaction options
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  {Loc.Get("base.what_do_you_do")}");
+                terminal.WriteLine("");
+
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("1");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.WriteLine($" {Loc.Get("base.chat_with_them")}");
+
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("2");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.WriteLine($" {Loc.Get("base.ask_rumors")}");
+
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("3");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.WriteLine($" {Loc.Get("base.ask_dungeons")}");
+
+                // Only show challenge option if they're a fighter type
+                if (npc.Level > 0 && npc.IsAlive)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write("4");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("]");
+                    terminal.SetColor("white");
+                    terminal.WriteLine($" {Loc.Get("base.challenge_duel")}");
+                }
+
+                // Full conversation option (visual novel style)
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("5");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($" {Loc.Get("base.deep_conversation")}");
+
+                // Attack option (murder/assassination)
+                if (npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write("6");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("]");
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($" {Loc.Get("base.attack_npc")}");
+                }
+
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("0");
+                terminal.SetColor("white");
+                terminal.WriteLine($"] {Loc.Get("base.walk_away")}");
+
+                // Debug option
+                terminal.SetColor("dark_gray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("9");
+                terminal.SetColor("dark_gray");
+                terminal.WriteLine($"] {Loc.Get("base.debug_personality")}");
+                terminal.WriteLine("");
+
+                string action = await GetChoice();
+
+                switch (action)
+                {
+                    case "1":
+                        await ChatWithNPC(npc);
+                        break;
+                    case "2":
+                        await AskForRumors(npc);
+                        break;
+                    case "3":
+                        await AskAboutDungeons(npc);
+                        break;
+                    case "4":
+                        if (npc.Level > 0 && npc.IsAlive)
+                        {
+                            await ChallengeNPC(npc);
+                            stayInConversation = false; // Exit after combat
+                        }
+                        break;
+                    case "5":
+                        // Full visual novel style conversation
+                        await UsurperRemake.Systems.VisualNovelDialogueSystem.Instance.StartConversation(currentPlayer, npc, terminal);
+                        break;
+                    case "6":
+                        if (npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King)
+                        {
+                            await AttackNPC(npc);
+                            stayInConversation = false;
+                        }
+                        break;
+                    case "9":
+                        await ShowNPCDebugTraits(npc);
+                        break;
+                    case "0":
+                    default:
+                        // Show NPC's farewell using dynamic dialogue system
+                        string farewell = npc.GetFarewell((currentPlayer as Player)!);
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
+                        terminal.SetColor("white");
+                        terminal.WriteLine($"  \"{farewell}\"");
+                        terminal.WriteLine("");
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  {Loc.Get("base.nod_walk_away")}");
+                        await Task.Delay(1500);
+                        stayInConversation = false;
+                        break;
+                }
             }
-        }
         }
         finally { npc.IsInConversation = false; }
     }
@@ -4335,35 +4339,35 @@ public abstract class BaseLocation
         npc.IsInConversation = true; // Protect from world sim while chatting
         try
         {
-        terminal.WriteLine("");
+            terminal.WriteLine("");
 
-        // Use the dynamic dialogue system for small talk
-        var player = (currentPlayer as Player)!;
-        string smallTalk = npc.GetSmallTalk(player);
+            // Use the dynamic dialogue system for small talk
+            var player = (currentPlayer as Player)!;
+            string smallTalk = npc.GetSmallTalk(player);
 
-        terminal.SetColor("yellow");
-        terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
-        terminal.SetColor("white");
-        terminal.WriteLine($"  \"{smallTalk}\"");
-        await Task.Delay(800);
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
+            terminal.SetColor("white");
+            terminal.WriteLine($"  \"{smallTalk}\"");
+            await Task.Delay(800);
 
-        // Sometimes add a second line of dialogue for variety
-        if (Random.Shared.NextDouble() < 0.5)
-        {
-            await Task.Delay(600);
-            string moreTalk = npc.GetSmallTalk(player);
-            if (moreTalk != smallTalk) // Avoid repetition
+            // Sometimes add a second line of dialogue for variety
+            if (Random.Shared.NextDouble() < 0.5)
             {
-                terminal.WriteLine($"  \"{moreTalk}\"");
                 await Task.Delay(600);
+                string moreTalk = npc.GetSmallTalk(player);
+                if (moreTalk != smallTalk) // Avoid repetition
+                {
+                    terminal.WriteLine($"  \"{moreTalk}\"");
+                    await Task.Delay(600);
+                }
             }
-        }
 
-        // Small relationship boost for friendly chat
-        RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, 1, false, false);
+            // Small relationship boost for friendly chat
+            RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, 1, false, false);
 
-        terminal.WriteLine("");
-        await terminal.PressAnyKey();
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
         }
         finally { npc.IsInConversation = false; }
     }
@@ -4727,11 +4731,7 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.WriteLine($"  {Loc.Get("base.murder_arrested")}");
             terminal.WriteLine($"  {Loc.Get("base.murder_executed_chance")}");
-            terminal.SetColor("bright_red");
-            terminal.WriteLine($"    {Loc.Get("base.murder_char_deleted")}");
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("base.murder_lose_all")}");
-            terminal.WriteLine($"  {Loc.Get("base.murder_prison_3_days")}");
+            terminal.WriteLine($"  {Loc.Get("base.murder_prison_2_days")}");
             terminal.SetColor("red");
             terminal.WriteLine("");
             terminal.WriteLine($"  {Loc.Get("base.murder_cannot_undo")}");
@@ -4808,6 +4808,10 @@ public abstract class BaseLocation
             // === MURDER CONSEQUENCES (non-bounty kills only) ===
             if (!result.WasBountyKill)
             {
+                if (currentPlayer is Player p)
+                {
+                    UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(p, GameConfig.MurderDarknessGain, isGood: false, reason: "murder"); // Crimes are usualy low darkness but murder puts a stain on the soul much deeper than anything else
+                }
                 await ApplyMurderConsequences(currentPlayer, npc);
             }
         }
@@ -4837,10 +4841,9 @@ public abstract class BaseLocation
 
         await Task.Delay(2000);
     }
-
     /// <summary>
     /// Apply severe consequences for non-bounty NPC murder:
-    /// 50% chance of execution (character deletion) or prison (3 days) + strip all belongings.
+    /// 50% chance of execution or prison (2 days).
     /// Called from BaseLocation.AttackNPC and MagicShopLocation.CastDeathSpell.
     /// </summary>
     internal async Task ApplyMurderConsequences(Character player, NPC victim)
@@ -4860,10 +4863,84 @@ public abstract class BaseLocation
         terminal.WriteLine("");
         await Task.Delay(2000);
 
-        // 50% execution, 50% prison + strip
+        terminal.SetColor("red");
+        terminal.WriteLine(Loc.Get("street_encounter.guard.halt"));
+        terminal.SetColor("magenta");
+        terminal.WriteLine(Loc.Get("street_encounter.guard.looking_for_you", player.Darkness));
+        terminal.WriteLine("");
+
+        terminal.Write("  [", "white");
+        terminal.Write("S", "bright_yellow");
+        terminal.Write($"]{Loc.Get("street_encounter.guard.opt_surrender")}  [", "white");
+        terminal.Write("F", "bright_yellow");
+        terminal.Write($"]{Loc.Get("street_encounter.hostile.opt_fight")}", "white");
+
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
+
+        bool captured;
+
+        if (choice == "S")
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("street_encounter.guard.arrested"));
+            terminal.WriteLine("");
+
+            captured = true;
+        }
+        else
+        {
+            var guards = new Monster[5];
+            int level = currentPlayer.Level + 5;
+            for (int i = 0; i < 5; i++)
+            {
+                long guardHP = (long)(100 * level + Math.Pow(level, 1.4) * 25);
+                var guard = new Monster
+                {
+                    Name = "Murder Guard",
+                    Level = level,
+                    HP = guardHP,
+                    MaxHP = guardHP,
+                    Strength = 18 + level * 3,
+                    Defence = 15 + level * 2,
+                    WeapPow = 15 + level,
+                    ArmPow = 10 + level * 2 / 3,
+                    WeaponName = "Halberd",
+                    ArmorName = "Half-Plate"
+                };
+                guards[i] = guard;
+            }
+
+            var combatEngine = new CombatEngine(terminal);
+            var result = await combatEngine.PlayerVsMonsters(player, guards.ToList());
+
+            if (result.Victory)
+            {
+                AlignmentSystem.Instance.ChangeAlignment(player, 100, isGood: false, reason: "murder");
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("street_encounter.guard.darkness_guards"));
+
+                captured = false;
+            }
+            else if (player.IsAlive)
+            {
+                // Lost the fight but survived — arrested
+                terminal.SetColor("yellow");
+                terminal.WriteLine("");
+                terminal.WriteLine(Loc.Get("street_encounter.guard.overpowered"));
+
+                captured = true;
+            }
+            else
+            {
+                // Lost the fight and died
+                captured = false; // Died, so ressurect at temple
+            }
+        }
+
+        // 50% execution, 50% prison
         bool isExecuted = Random.Shared.Next(100) < 50;
 
-        if (isExecuted)
+        if (isExecuted && captured)
         {
             terminal.SetColor("bright_red");
             terminal.WriteLine("  ══════════════════════════════════════════");
@@ -4882,13 +4959,7 @@ public abstract class BaseLocation
             terminal.WriteLine("");
             await Task.Delay(3000);
 
-            terminal.SetColor("bright_red");
-            terminal.WriteLine("  ╔══════════════════════════════════════╗");
-            terminal.WriteLine($"  ║     {Loc.Get("base.char_deleted_1")}         ║");
-            terminal.WriteLine($"  ║     {Loc.Get("base.char_deleted_2")}             ║");
-            terminal.WriteLine("  ╚══════════════════════════════════════╝");
-            terminal.WriteLine("");
-            await Task.Delay(2000);
+
 
             // Broadcast the execution
             if (DoorMode.IsOnlineMode)
@@ -4897,46 +4968,26 @@ public abstract class BaseLocation
                     $"⚖ {player.Name2} was executed by the Crown for the murder of {victim.Name2 ?? victim.Name}. Justice is served.");
             }
 
-            // Delete the character
+            // Kill the character
             if (player is Player p)
             {
                 if (DoorMode.IsOnlineMode)
                 {
-                    // Delete from online database — character and all related data
+                    // Kill Player
                     try
                     {
-                        var connStr = $"Data Source={DoorMode.OnlineDatabasePath}";
-                        using var conn = new Microsoft.Data.Sqlite.SqliteConnection(connStr);
-                        conn.Open();
-                        // Try both display name (lowercase) and exact match
-                        var username = p.Name2.ToLower();
-                        using var tx = conn.BeginTransaction();
-                        foreach (var table in new[] { "players", "online_players", "sleeping_players", "guild_members" })
-                        {
-                            using var cmd = conn.CreateCommand();
-                            cmd.Transaction = tx;
-                            cmd.CommandText = $"DELETE FROM {table} WHERE username = @u";
-                            cmd.Parameters.AddWithValue("@u", username);
-                            cmd.ExecuteNonQuery();
-                        }
-                        // Also try display_name match for players table
-                        using var cmd2 = conn.CreateCommand();
-                        cmd2.Transaction = tx;
-                        cmd2.CommandText = "DELETE FROM players WHERE LOWER(display_name) = @d";
-                        cmd2.Parameters.AddWithValue("@d", username);
-                        cmd2.ExecuteNonQuery();
-                        tx.Commit();
-                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Info, "MURDER", $"Executed player {p.Name2} — deleted from database");
+                        p.Die();
+                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Info, "MURDER", $"Executed player {p.Name2}");
                     }
                     catch (Exception ex)
                     {
-                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Error, "MURDER", $"Failed to delete executed player: {ex.Message}");
+                        DebugLogger.Instance?.Log(DebugLogger.LogLevel.Error, "MURDER", $"Failed to Kill executed player: {ex.Message}");
                     }
                 }
                 else
                 {
-                    // Delete local save
-                    SaveSystem.Instance.DeleteSave(p.Name2);
+                    // Kill Player
+                    p.Die();
                 }
 
                 // Force disconnect
@@ -4951,9 +5002,9 @@ public abstract class BaseLocation
                     Environment.Exit(0);
             }
         }
-        else
+        else if (captured)
         {
-            // Prison + strip all belongings
+            // Prison
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("  ══════════════════════════════════════════");
             terminal.WriteLine($"              {Loc.Get("base.life_spared")}");
@@ -4973,25 +5024,12 @@ public abstract class BaseLocation
 
             if (player is Player p)
             {
-                // Strip ALL equipment — unequip properly then clear the dictionary
-                // (UnequipSlot sets ID to 0 which corrupts saves; must clear entirely)
-                foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
-                {
-                    if (slot == EquipmentSlot.None) continue;
-                    p.UnequipSlot(slot);
-                }
-                p.EquippedItems.Clear(); // Remove all slot entries (prevents ID 0 in save)
-
-                // Clear inventory
-                p.Inventory.Clear();
-
                 // Take all gold
-                long goldTaken = p.Gold;
-                p.Gold = 0;
-                p.BankGold = 0; // Bank seized too
+                long goldTaken = p.Gold / 2;
+                p.Gold = p.Gold / 2;
 
-                // Prison for 3 real days — maximum security, no escape
-                p.DaysInPrison = 3;
+                // Prison for 2 real days — maximum security, no escape
+                p.DaysInPrison = 2;
                 p.IsMurderConvict = true;
                 p.PrisonEscapes = 0;
                 p.CellDoorOpen = false;
@@ -5013,7 +5051,7 @@ public abstract class BaseLocation
             if (DoorMode.IsOnlineMode)
             {
                 NewsSystem.Instance?.Newsy(
-                    $"⚖ {player.Name2} was imprisoned for 3 days for the murder of {victim.Name2 ?? victim.Name}. All possessions confiscated.");
+                    $"⚖ {player.Name2} was imprisoned for 2 days for the murder of {victim.Name2 ?? victim.Name}.");
             }
 
             terminal.SetColor("gray");
@@ -5069,12 +5107,20 @@ public abstract class BaseLocation
                 sex = p.Sex,
                 level = p.Level,
                 experience = p.Experience,
-                hp = p.HP, maxHp = p.MaxHP,
-                mana = isMana ? p.Mana : 0, maxMana = isMana ? p.MaxMana : 0,
-                stamina = isMana ? 0 : p.Stamina, maxStamina = isMana ? 0 : p.BaseStamina,
-                str = p.Strength, dex = p.Dexterity, agi = p.Agility,
-                con = p.Constitution, intel = p.Intelligence, wis = p.Wisdom,
-                cha = p.Charisma, def = p.Defence,
+                hp = p.HP,
+                maxHp = p.MaxHP,
+                mana = isMana ? p.Mana : 0,
+                maxMana = isMana ? p.MaxMana : 0,
+                stamina = isMana ? 0 : p.Stamina,
+                maxStamina = isMana ? 0 : p.BaseStamina,
+                str = p.Strength,
+                dex = p.Dexterity,
+                agi = p.Agility,
+                con = p.Constitution,
+                intel = p.Intelligence,
+                wis = p.Wisdom,
+                cha = p.Charisma,
+                def = p.Defence,
                 gold = p.Gold,
                 potions = p is Player pl ? pl.Healing : 0,
                 maxPotions = p is Player pl2 ? pl2.MaxPotions : 0,
@@ -6565,7 +6611,7 @@ public abstract class BaseLocation
             _ => location.ToString()
         };
     }
-    
+
     /// <summary>
     /// Get location key for navigation
     /// </summary>
@@ -6593,7 +6639,7 @@ public abstract class BaseLocation
             _ => "?"
         };
     }
-    
+
     /// <summary>
     /// Add NPC to this location
     /// </summary>
@@ -6607,7 +6653,7 @@ public abstract class BaseLocation
             // Using LocationId.ToString().ToLower() produced broken names like "theinn".
         }
     }
-    
+
     /// <summary>
     /// Remove NPC from this location
     /// </summary>
@@ -6615,7 +6661,7 @@ public abstract class BaseLocation
     {
         LocationNPCs.Remove(npc);
     }
-    
+
     /// <summary>
     /// Get location description for online system (Pascal compatible)
     /// </summary>
@@ -9236,88 +9282,88 @@ public abstract class BaseLocation
         switch (filterChoice)
         {
             case "L":
-            {
-                // Level-based filter
-                terminal.WriteLine("");
-                terminal.SetColor("white");
-                terminal.Write(Loc.Get("shop.filter_enter_level_gap", defaultLevelGap));
-                var gapInput = (await terminal.GetInput("")).Trim();
-                int levelGap = int.TryParse(gapInput, out int g) && g > 0 ? g : defaultLevelGap;
-                int maxItemLevel = Math.Max(1, currentPlayer.Level - levelGap);
-
-                filtered = currentPlayer.Inventory
-                    .Where(i => i.IsIdentified && !i.IsCursed &&
-                           validTypes.Contains(i.Type) &&
-                           i.MinLevel <= maxItemLevel && i.MinLevel > 0)
-                    .ToList();
-
-                if (filtered.Count == 0)
                 {
-                    terminal.SetColor("gray");
+                    // Level-based filter
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("shop.filter_none_found"));
-                    terminal.WriteLine(Loc.Get("shop.filter_level_label", maxItemLevel));
-                    await terminal.WaitForKey();
-                    return false;
-                }
+                    terminal.SetColor("white");
+                    terminal.Write(Loc.Get("shop.filter_enter_level_gap", defaultLevelGap));
+                    var gapInput = (await terminal.GetInput("")).Trim();
+                    int levelGap = int.TryParse(gapInput, out int g) && g > 0 ? g : defaultLevelGap;
+                    int maxItemLevel = Math.Max(1, currentPlayer.Level - levelGap);
 
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("shop.filter_level_label", maxItemLevel));
-                break;
-            }
+                    filtered = currentPlayer.Inventory
+                        .Where(i => i.IsIdentified && !i.IsCursed &&
+                               validTypes.Contains(i.Type) &&
+                               i.MinLevel <= maxItemLevel && i.MinLevel > 0)
+                        .ToList();
+
+                    if (filtered.Count == 0)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("");
+                        terminal.WriteLine(Loc.Get("shop.filter_none_found"));
+                        terminal.WriteLine(Loc.Get("shop.filter_level_label", maxItemLevel));
+                        await terminal.WaitForKey();
+                        return false;
+                    }
+
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(Loc.Get("shop.filter_level_label", maxItemLevel));
+                    break;
+                }
 
             case "V":
-            {
-                // Value-based filter
-                terminal.WriteLine("");
-                terminal.SetColor("white");
-                terminal.Write(Loc.Get("shop.filter_enter_max_value"));
-                var valInput = (await terminal.GetInput("")).Trim();
-                if (!long.TryParse(valInput, out long maxValue) || maxValue <= 0)
                 {
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("ui.cancelled"));
-                    await terminal.WaitForKey();
-                    return false;
-                }
-
-                filtered = currentPlayer.Inventory
-                    .Where(i => i.IsIdentified && !i.IsCursed &&
-                           validTypes.Contains(i.Type) &&
-                           i.Value < maxValue)
-                    .ToList();
-
-                if (filtered.Count == 0)
-                {
-                    terminal.SetColor("gray");
+                    // Value-based filter
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("shop.filter_none_found"));
-                    await terminal.WaitForKey();
-                    return false;
+                    terminal.SetColor("white");
+                    terminal.Write(Loc.Get("shop.filter_enter_max_value"));
+                    var valInput = (await terminal.GetInput("")).Trim();
+                    if (!long.TryParse(valInput, out long maxValue) || maxValue <= 0)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine(Loc.Get("ui.cancelled"));
+                        await terminal.WaitForKey();
+                        return false;
+                    }
+
+                    filtered = currentPlayer.Inventory
+                        .Where(i => i.IsIdentified && !i.IsCursed &&
+                               validTypes.Contains(i.Type) &&
+                               i.Value < maxValue)
+                        .ToList();
+
+                    if (filtered.Count == 0)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("");
+                        terminal.WriteLine(Loc.Get("shop.filter_none_found"));
+                        await terminal.WaitForKey();
+                        return false;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case "C":
-            {
-                // Common rarity only - items with no special enchantments or loot effects
-                filtered = currentPlayer.Inventory
-                    .Where(i => i.IsIdentified && !i.IsCursed &&
-                           validTypes.Contains(i.Type) &&
-                           (i.LootEffects == null || i.LootEffects.Count == 0) &&
-                           !i.IsArtifact)
-                    .ToList();
-
-                if (filtered.Count == 0)
                 {
-                    terminal.SetColor("gray");
-                    terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("shop.filter_none_found"));
-                    await terminal.WaitForKey();
-                    return false;
+                    // Common rarity only - items with no special enchantments or loot effects
+                    filtered = currentPlayer.Inventory
+                        .Where(i => i.IsIdentified && !i.IsCursed &&
+                               validTypes.Contains(i.Type) &&
+                               (i.LootEffects == null || i.LootEffects.Count == 0) &&
+                               !i.IsArtifact)
+                        .ToList();
+
+                    if (filtered.Count == 0)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("");
+                        terminal.WriteLine(Loc.Get("shop.filter_none_found"));
+                        await terminal.WaitForKey();
+                        return false;
+                    }
+                    break;
                 }
-                break;
-            }
 
             default:
                 return false;
