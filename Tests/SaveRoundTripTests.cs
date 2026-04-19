@@ -1238,4 +1238,259 @@ public class SaveRoundTripTests
     }
 
     #endregion
+
+    #region Companion Bag (v0.57.3+) and NPC Teammate Bag (v0.57.4+)
+
+    // Guard-rails for the structural fix that landed across v0.57.3 and v0.57.4:
+    // items transferred to a companion (Lumina's "Mira's bag is empty" report) or
+    // to an NPC teammate (spouses, recruited citizens via Team Corner) via combat
+    // [T] / Home / dungeon Party Inventory viewer. Both paths used to populate a
+    // runtime-only Inventory list that no save field persisted, so transferred
+    // items evaporated on reload.
+    //
+    // Each bug was a missing serialization field on a save-data class. These
+    // tests fail hard if the field is dropped, renamed, or stops round-tripping
+    // (typical regression vectors: new naming policy, forgotten include, a
+    // refactor that swaps the field for a property without [JsonInclude]).
+
+    [Fact]
+    public void CompanionSaveInfo_RoundTrip_PreservesInventory()
+    {
+        // v0.57.3: Companion.Inventory was added to the Companion class AND to
+        // CompanionSaveInfo so items survive save/load. This test asserts the
+        // save-side contract.
+        var original = new CompanionSaveInfo
+        {
+            Id = 1,
+            IsRecruited = true,
+            IsActive = true,
+            Level = 25,
+            Inventory = new List<InventoryItemData>
+            {
+                new InventoryItemData
+                {
+                    Name = "Healing Potion",
+                    Type = ObjType.Potion,
+                    Value = 50,
+                    IsIdentified = true,
+                    HP = 100
+                },
+                new InventoryItemData
+                {
+                    Name = "Epic Warhammer",
+                    Type = ObjType.Weapon,
+                    Value = 15000,
+                    Attack = 120,
+                    Strength = 8,
+                    IsIdentified = true,
+                    IsCursed = false
+                },
+                new InventoryItemData
+                {
+                    Name = "Unidentified Cloak",
+                    Type = ObjType.Abody,  // Pascal "around body" — covers cloaks / robes
+                    Value = 500,
+                    IsIdentified = false
+                }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<CompanionSaveInfo>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.Inventory.Should().NotBeNull();
+        restored.Inventory.Should().HaveCount(3, "All three items must survive the round trip");
+        restored.Inventory[0].Name.Should().Be("Healing Potion");
+        restored.Inventory[0].HP.Should().Be(100);
+        restored.Inventory[1].Name.Should().Be("Epic Warhammer");
+        restored.Inventory[1].Attack.Should().Be(120);
+        restored.Inventory[1].Strength.Should().Be(8);
+        restored.Inventory[2].Name.Should().Be("Unidentified Cloak");
+        restored.Inventory[2].IsIdentified.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CompanionSaveInfo_RoundTrip_PreservesInventory_WithLootEffects()
+    {
+        // Dungeon-loot items carry a separate LootEffects list for CON / INT /
+        // AllStats bonuses that don't fit in the flat InventoryItemData fields.
+        // The v0.57.3 fix serializes them end-to-end; this guards the wire path.
+        var original = new CompanionSaveInfo
+        {
+            Id = 2,
+            IsRecruited = true,
+            Inventory = new List<InventoryItemData>
+            {
+                new InventoryItemData
+                {
+                    Name = "Amulet of Vitality",
+                    Type = ObjType.Neck,
+                    Value = 8000,
+                    IsIdentified = true,
+                    LootEffects = new List<LootEffectData>
+                    {
+                        new LootEffectData { EffectType = 1, Value = 15 },  // CON +15
+                        new LootEffectData { EffectType = 2, Value = 10 },  // INT +10
+                    }
+                }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<CompanionSaveInfo>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.Inventory.Should().HaveCount(1);
+        var amulet = restored.Inventory[0];
+        amulet.LootEffects.Should().NotBeNull();
+        amulet.LootEffects.Should().HaveCount(2, "Both CON and INT loot effects must round-trip");
+        amulet.LootEffects![0].EffectType.Should().Be(1);
+        amulet.LootEffects[0].Value.Should().Be(15);
+        amulet.LootEffects[1].EffectType.Should().Be(2);
+        amulet.LootEffects[1].Value.Should().Be(10);
+    }
+
+    [Fact]
+    public void CompanionSaveInfo_LegacySave_MissingInventoryField_LoadsAsEmpty()
+    {
+        // Saves written before v0.57.3 don't have an `inventory` field at all.
+        // They must still load cleanly with an empty list, not null, not crash.
+        const string legacyJson = @"{
+            ""id"": 3,
+            ""isRecruited"": true,
+            ""isActive"": true,
+            ""level"": 10
+        }";
+
+        var restored = JsonSerializer.Deserialize<CompanionSaveInfo>(legacyJson, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.Inventory.Should().NotBeNull("Missing inventory field must default to empty list, not null");
+        restored.Inventory.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NPCData_RoundTrip_PreservesInventory()
+    {
+        // v0.57.4 (fifth-pass fix): NPC teammates — spouses, recruited citizens,
+        // party members added via Team Corner — had no Inventory serialization
+        // field at all, despite the runtime NPC class inheriting Inventory from
+        // Character. Items transferred to them evaporated every save. This
+        // test locks in the serialization contract.
+        var original = new NPCData
+        {
+            Id = "npc_vex",
+            Name = "Vex",
+            Level = 15,
+            Inventory = new List<InventoryItemData>
+            {
+                new InventoryItemData
+                {
+                    Name = "Lockpick Set",
+                    Type = ObjType.Magic,  // catch-all for utility / scroll / misc items
+                    Value = 200,
+                    IsIdentified = true
+                },
+                new InventoryItemData
+                {
+                    Name = "Legendary Dagger",
+                    Type = ObjType.Weapon,
+                    Value = 20000,
+                    Attack = 85,
+                    Dexterity = 12,
+                    IsIdentified = true,
+                    IsCursed = false
+                }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<NPCData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.Inventory.Should().NotBeNull();
+        restored.Inventory.Should().HaveCount(2);
+        restored.Inventory[0].Name.Should().Be("Lockpick Set");
+        restored.Inventory[1].Name.Should().Be("Legendary Dagger");
+        restored.Inventory[1].Attack.Should().Be(85);
+        restored.Inventory[1].Dexterity.Should().Be(12);
+    }
+
+    [Fact]
+    public void NPCData_RoundTrip_PreservesInventory_WithLootEffects()
+    {
+        // Same LootEffects guard as the companion test, but on the NPC path.
+        var original = new NPCData
+        {
+            Id = "npc_teammate",
+            Name = "Test Teammate",
+            Inventory = new List<InventoryItemData>
+            {
+                new InventoryItemData
+                {
+                    Name = "Ring of the Old Gods",
+                    Type = ObjType.Fingers,
+                    Value = 50000,
+                    IsIdentified = true,
+                    LootEffects = new List<LootEffectData>
+                    {
+                        new LootEffectData { EffectType = 3, Value = 5 },  // AllStats +5
+                    }
+                }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<NPCData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.Inventory.Should().HaveCount(1);
+        restored.Inventory[0].LootEffects.Should().NotBeNull();
+        restored.Inventory[0].LootEffects.Should().HaveCount(1);
+        restored.Inventory[0].LootEffects![0].EffectType.Should().Be(3);
+        restored.Inventory[0].LootEffects[0].Value.Should().Be(5);
+    }
+
+    [Fact]
+    public void NPCData_LegacySave_MissingInventoryField_LoadsAsEmpty()
+    {
+        // Pre-v0.57.4 saves won't have the new `inventory` field on NPC blocks.
+        // Must load clean with an empty list — existing NPCs on live servers
+        // should upgrade transparently.
+        const string legacyJson = @"{
+            ""id"": ""npc_old"",
+            ""name"": ""Old NPC"",
+            ""level"": 10
+        }";
+
+        var restored = JsonSerializer.Deserialize<NPCData>(legacyJson, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.Inventory.Should().NotBeNull("Missing inventory field on NPCData must default to empty list");
+        restored.Inventory.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CompanionSaveInfo_AND_NPCData_Inventory_AreIndependent()
+    {
+        // Sanity check: the two classes have separate Inventory fields (they
+        // live on entirely different save blocks — CompanionSaveInfo is on the
+        // StorySystems block, NPCData is on the NPCs list). A refactor that
+        // collapsed them or accidentally shared an instance would corrupt
+        // save files, so this test pins the expectation that they don't alias.
+        var companion = new CompanionSaveInfo { Id = 1 };
+        var npc = new NPCData { Id = "npc_x" };
+
+        companion.Inventory.Add(new InventoryItemData { Name = "Companion Sword" });
+        npc.Inventory.Add(new InventoryItemData { Name = "NPC Shield" });
+
+        companion.Inventory.Should().HaveCount(1);
+        companion.Inventory[0].Name.Should().Be("Companion Sword");
+        npc.Inventory.Should().HaveCount(1);
+        npc.Inventory[0].Name.Should().Be("NPC Shield");
+        companion.Inventory.Should().NotBeSameAs(npc.Inventory);
+    }
+
+    #endregion
 }

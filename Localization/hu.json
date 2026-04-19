@@ -7544,6 +7544,8 @@
   "engine.menu_create_new": "Új karakter létrehozása",
   "engine.menu_new_overwrite_full": "Új karakter (FIGYELEM: Felülírja a fő karaktert!)",
   "engine.menu_online_full": "Online többjátékos mód - Közös világ",
+  "engine.menu_editor_full": "Játék szerkesztő - mod-ok és mentések módosítása",
+  "engine.main_editor": "Játék szerkesztő (mentések, mod-ok, egyensúly)",
   "engine.menu_story_full": "A történet eddig...",
   "engine.menu_history_full": "Az Usurper története",
   "engine.menu_bbs_full": "BBS és online szerverlista",

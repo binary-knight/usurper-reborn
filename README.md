@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.53.12** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.57.5** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -57,6 +57,9 @@ You wake with no memory. A letter in your own handwriting warns you: *"The gods 
 
 ### 30+ Locations
 Main Street, Inn, Bank, Weapon Shop, Armor Shop, Magic Shop, Healer, Temple, Church, Dark Alley, Level Master, Marketplace, Castle, Prison, Dungeons, Home, Arena, and more.
+
+### Mod Support & Game Editor
+Opt-in JSON mods drop into a `GameData/` folder next to the executable — NPCs, monster families, dreams, achievements, dialogue lines, balance constants, and custom equipment are all overridable without a recompile. A bundled menu-driven editor (`UsurperReborn --editor`, or `[G] Game Editor` from the main menu in single-player) is the sysop-tool analogue of the DOS-era `USEDIT.EXE` — arrow-key / number-key navigation, edits saves and mods from one UI, auto-backs up before writes. See `DOCS/MODDING.md` for the full guide.
 
 ---
 
@@ -396,7 +399,7 @@ Join our Discord server for discussions, feedback, and updates:
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (Alpha v0.53.12)
+## Known Issues (Alpha v0.57.5)
 - Save files from earlier alpha versions may not be fully compatible
 - BBS FOSSIL mode not supported (use `--stdio` flag for FOSSIL-based BBSes)
 - Steam features only work when game is launched through Steam client
@@ -406,4 +409,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.53.12 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.57.5 — The world is running. [Watch it live.](https://usurper-reborn.net)

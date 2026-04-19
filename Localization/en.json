@@ -7544,6 +7544,8 @@
   "engine.menu_create_new": "Create new character",
   "engine.menu_new_overwrite_full": "New character (WARNING: Overwrites main!)",
   "engine.menu_online_full": "Online Multiplayer - Shared World",
+  "engine.menu_editor_full": "Game Editor - Mod content, edit saves",
+  "engine.main_editor": "Game Editor (edit saves, mods, balance)",
   "engine.menu_story_full": "The Story So Far...",
   "engine.menu_history_full": "Usurper History",
   "engine.menu_bbs_full": "BBS & Online Server List",

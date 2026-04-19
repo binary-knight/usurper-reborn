@@ -1331,6 +1331,14 @@ public partial class GameEngine
                 if (!UsurperRemake.BBS.DoorMode.IsMudServerMode && !UsurperRemake.BBS.DoorMode.IsMudRelayMode
                     && !GameConfig.DisableOnlinePlay)
                     terminal.WriteLine(Loc.Get("engine.main_online_sr"), "bright_yellow");
+                // v0.57.3: Game Editor is a local single-player tool for modding/save editing.
+                // Hidden for BBS door sysops (they have their own admin tools), the MUD server
+                // process itself, and MUD relay sessions (editing saves while connected to the
+                // server makes no sense — the server owns the live state).
+                if (!UsurperRemake.BBS.DoorMode.IsInDoorMode
+                    && !UsurperRemake.BBS.DoorMode.IsMudServerMode
+                    && !UsurperRemake.BBS.DoorMode.IsMudRelayMode)
+                    terminal.WriteLine($"  G. {Loc.Get("engine.main_editor")}", "bright_magenta");
                 terminal.WriteLine("");
 
                 terminal.WriteLine(Loc.Get("engine.section_info"), "darkgray");
@@ -1385,6 +1393,24 @@ public partial class GameEngine
                     terminal.Write("] ");
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine(Loc.Get("engine.menu_online_full"));
+                }
+
+                // v0.57.3: Game Editor — only shown in local single-player / Steam contexts.
+                // Never shown inside a BBS door session (sysops already have their own tools)
+                // or when this process IS the MUD server / a relay client to one (editing a
+                // local save while connected to a shared server would just confuse things).
+                if (!UsurperRemake.BBS.DoorMode.IsInDoorMode
+                    && !UsurperRemake.BBS.DoorMode.IsMudServerMode
+                    && !UsurperRemake.BBS.DoorMode.IsMudRelayMode)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_magenta");
+                    terminal.Write("G");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine(Loc.Get("engine.menu_editor_full"));
                 }
 
                 terminal.WriteLine("");
@@ -1526,6 +1552,35 @@ public partial class GameEngine
                 case "S":
                 case "E": // Legacy fallback
                     await EnterGame();
+                    break;
+                case "G":
+                    // v0.57.3: Launch the standalone game editor without requiring the user to
+                    // re-launch with --editor. Locked behind the same single-player/Steam
+                    // eligibility as the menu item itself so accidentally hitting G during a
+                    // BBS door session or on the live MUD server just does nothing.
+                    if (!UsurperRemake.BBS.DoorMode.IsInDoorMode
+                        && !UsurperRemake.BBS.DoorMode.IsMudServerMode
+                        && !UsurperRemake.BBS.DoorMode.IsMudRelayMode)
+                    {
+                        // Save and restore console state so the editor's plain Console.ReadLine/
+                        // Write calls don't leave the terminal in a weird color / cursor state
+                        // when we return to the animated menu.
+                        var prevForeground = Console.ForegroundColor;
+                        terminal.ClearScreen();
+                        try
+                        {
+                            await UsurperRemake.Editor.EditorMain.RunAsync(System.Array.Empty<string>());
+                        }
+                        catch (System.Exception ex)
+                        {
+                            terminal.WriteLine($"Editor error: {ex.Message}", "red");
+                            await System.Threading.Tasks.Task.Delay(2000);
+                        }
+                        finally
+                        {
+                            Console.ForegroundColor = prevForeground;
+                        }
+                    }
                     break;
                 case "I":
                     await ShowInstructions();
@@ -5023,6 +5078,55 @@ public partial class GameEngine
                 }
             }
 
+            // v0.57.4: restore the NPC's personal bag (transferred via combat [T] /
+            // Home / Team Corner / dungeon viewer). Separate from MarketInventory
+            // (shop stock). Pre-fix, NPC teammate bags evaporated every save.
+            if (data.Inventory != null && data.Inventory.Count > 0)
+            {
+                // Pair with the save-side NPC_BAG log so the full round-trip is
+                // visible. If items vanish between save and load, this is where
+                // it'll show: either the restore doesn't fire (field missing) or
+                // the count differs.
+                var bagSummary = string.Join(", ", data.Inventory.Take(3).Select(i => i?.Name ?? "?"));
+                if (data.Inventory.Count > 3) bagSummary += $", +{data.Inventory.Count - 3} more";
+                DebugLogger.Instance.LogInfo("NPC_BAG",
+                    $"RestoreNPCs RESTORED {data.Name} bag ({data.Inventory.Count}): {bagSummary}");
+
+                npc.Inventory ??= new List<Item>();
+                foreach (var itemData in data.Inventory)
+                {
+                    var item = new global::Item
+                    {
+                        Name = itemData.Name,
+                        Value = itemData.Value,
+                        Type = itemData.Type,
+                        Attack = itemData.Attack,
+                        Armor = itemData.Armor,
+                        Strength = itemData.Strength,
+                        Dexterity = itemData.Dexterity,
+                        Wisdom = itemData.Wisdom,
+                        Defence = itemData.Defence,
+                        BlockChance = itemData.BlockChance,
+                        ShieldBonus = itemData.ShieldBonus,
+                        HP = itemData.HP,
+                        Mana = itemData.Mana,
+                        Charisma = itemData.Charisma,
+                        Agility = itemData.Agility,
+                        Stamina = itemData.Stamina,
+                        MinLevel = itemData.MinLevel,
+                        IsCursed = itemData.IsCursed,
+                        Cursed = itemData.Cursed,
+                        IsIdentified = itemData.IsIdentified,
+                        Shop = itemData.Shop,
+                        Dungeon = itemData.Dungeon,
+                        Description = itemData.Description?.ToList() ?? new List<string>(),
+                    };
+                    if (itemData.LootEffects != null && itemData.LootEffects.Count > 0)
+                        item.LootEffects = itemData.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
+                    npc.Inventory.Add(item);
+                }
+            }
+
             // Restore personality profile if available, then initialize AI systems
             if (data.PersonalityProfile != null)
             {
@@ -6280,6 +6384,13 @@ public partial class GameEngine
         terminal.Write("Synchronet  ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("bbs.a-net.online:1337 / ssh -p 1338");
+
+        terminal.SetColor("bright_white");
+        terminal.Write("  Nite Eyes BBS                  ");
+        terminal.SetColor("gray");
+        terminal.Write("Mystic      ");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("bbs.lizardmaster.com");
 
         // --- End BBS Entries ---
 

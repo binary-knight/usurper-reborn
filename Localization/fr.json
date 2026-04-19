@@ -7544,6 +7544,8 @@
   "engine.menu_create_new": "Créer un nouveau personnage",
   "engine.menu_new_overwrite_full": "Nouveau personnage (AVERTISSEMENT : Écrase le principal!)",
   "engine.menu_online_full": "Multijoueur en Ligne — Monde Partagé",
+  "engine.menu_editor_full": "Éditeur du Jeu — Modifier contenu et sauvegardes",
+  "engine.main_editor": "Éditeur du Jeu (sauvegardes, mods, équilibrage)",
   "engine.menu_story_full": "L’Histoire Jusqu’ici...",
   "engine.menu_history_full": "Historique d’Usurper",
   "engine.menu_bbs_full": "Liste BBS & Serveurs en Ligne",

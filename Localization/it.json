@@ -7544,6 +7544,8 @@
   "engine.menu_create_new": "Crea nuovo personaggio",
   "engine.menu_new_overwrite_full": "Nuovo personaggio (ATTENZIONE: Sovrascrive il principale!)",
   "engine.menu_online_full": "Multigiocatore online - Mondo condiviso",
+  "engine.menu_editor_full": "Editor del Gioco - Mod contenuti e salvataggi",
+  "engine.main_editor": "Editor del Gioco (salvataggi, mod, bilanciamento)",
   "engine.menu_story_full": "La storia finora...",
   "engine.menu_history_full": "Storia di Usurper",
   "engine.menu_bbs_full": "Lista BBS e server online",

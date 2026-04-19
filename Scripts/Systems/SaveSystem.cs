@@ -1091,6 +1091,23 @@ namespace UsurperRemake.Systems
             // Get current king for reference
             var currentKing = global::CastleLocation.GetCurrentKing();
 
+            // v0.57.4: log NPCs with non-empty bags before we serialize them so
+            // a player report like "I gave my spouse X and it disappeared" can
+            // be traced to: did we write X to disk, or was the NPC's bag already
+            // empty at save time? Only logs when bag has contents.
+            int loggedBags = 0;
+            foreach (var n in worldNPCs)
+            {
+                if (n?.Inventory == null || n.Inventory.Count == 0) continue;
+                var bagSummary = string.Join(", ", n.Inventory.Take(3).Select(i => i?.Name ?? "?"));
+                if (n.Inventory.Count > 3) bagSummary += $", +{n.Inventory.Count - 3} more";
+                DebugLogger.Instance.LogInfo("NPC_BAG",
+                    $"Serialize SAVING {n.DisplayName} bag ({n.Inventory.Count}): {bagSummary}");
+                loggedBags++;
+            }
+            if (loggedBags == 0)
+                DebugLogger.Instance.LogDebug("NPC_BAG", "Serialize: no NPCs have bag contents to save");
+
             foreach (var npc in worldNPCs)
             {
                 npcData.Add(new NPCData
@@ -1201,6 +1218,39 @@ namespace UsurperRemake.Systems
                         Defence = item.Defence,
                         IsCursed = item.IsCursed
                     }).ToList() ?? new List<MarketItemData>(),
+
+                    // v0.57.4: personal bag (items players transferred to this NPC
+                    // teammate via combat [T] / Home / Team Corner / dungeon viewer).
+                    // Same Item ↔ InventoryItemData round-trip the player uses.
+                    Inventory = npc.Inventory?.Where(i => i != null).Select(item => new InventoryItemData
+                    {
+                        Name = item.Name,
+                        Value = item.Value,
+                        Type = item.Type,
+                        Attack = item.Attack,
+                        Armor = item.Armor,
+                        Strength = item.Strength,
+                        Dexterity = item.Dexterity,
+                        Wisdom = item.Wisdom,
+                        Defence = item.Defence,
+                        BlockChance = item.BlockChance,
+                        ShieldBonus = item.ShieldBonus,
+                        HP = item.HP,
+                        Mana = item.Mana,
+                        Charisma = item.Charisma,
+                        Agility = item.Agility,
+                        Stamina = item.Stamina,
+                        MinLevel = item.MinLevel,
+                        IsCursed = item.IsCursed,
+                        Cursed = item.Cursed,
+                        IsIdentified = item.IsIdentified,
+                        Shop = item.Shop,
+                        Dungeon = item.Dungeon,
+                        Description = item.Description?.ToList() ?? new List<string>(),
+                        LootEffects = item.LootEffects?.Count > 0
+                            ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
+                            : null,
+                    }).ToList() ?? new List<InventoryItemData>(),
 
                     // Modern RPG Equipment System - save equipped items
                     EquippedItems = npc.EquippedItems?.ToDictionary(
@@ -1773,7 +1823,8 @@ namespace UsurperRemake.Systems
                     EquippedItemsSave = c.EquippedItemsSave,
                     DisabledAbilities = c.DisabledAbilities,
                     SkillProficiencies = c.SkillProficiencies ?? new(),
-                    SkillTrainingProgress = c.SkillTrainingProgress ?? new()
+                    SkillTrainingProgress = c.SkillTrainingProgress ?? new(),
+                    Inventory = c.Inventory ?? new List<InventoryItemData>()
                 }).ToList();
 
                 data.ActiveCompanionIds = companionData.ActiveCompanions.Select(c => (int)c).ToList();
@@ -2271,7 +2322,8 @@ namespace UsurperRemake.Systems
                             EquippedItemsSave = c.EquippedItemsSave ?? new Dictionary<int, int>(),
                             DisabledAbilities = c.DisabledAbilities ?? new List<string>(),
                             SkillProficiencies = c.SkillProficiencies ?? new(),
-                            SkillTrainingProgress = c.SkillTrainingProgress ?? new()
+                            SkillTrainingProgress = c.SkillTrainingProgress ?? new(),
+                            Inventory = c.Inventory ?? new List<InventoryItemData>()
                         }).ToList() ?? new List<CompanionSaveData>(),
 
                         ActiveCompanions = data.ActiveCompanionIds?.Select(id => (CompanionId)id).ToList() ?? new List<CompanionId>(),

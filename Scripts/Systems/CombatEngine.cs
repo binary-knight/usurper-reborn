@@ -7822,13 +7822,42 @@ public partial class CombatEngine
                     player.Inventory.Add(lootItem);
                     terminal.SetColor("cyan");
                     string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
+                    bool transferredToCompanion = player != (currentPlayer ?? player);
                     // v0.57.2 — when Take targets a companion (via </> selector), the confirmation
                     // message names them explicitly. The ambiguous "added to inventory" wording was
                     // the source of the Lumina / Aura "my epic loot vanished" reports.
-                    if (player != (currentPlayer ?? player))
+                    if (transferredToCompanion)
                         terminal.WriteLine(Loc.Get("combat.loot_added_to_companion", invName, player.DisplayName));
                     else
                         terminal.WriteLine(Loc.Get("combat.loot_added_inventory", invName));
+
+                    // v0.57.3 — companion bags now persist across sessions (Lumina report: items given
+                    // to Mira in the dungeon vanished). Flush state immediately when the transfer is
+                    // to a companion/teammate so a mid-dungeon disconnect before combat-end save still
+                    // keeps the item on the companion.
+                    if (transferredToCompanion)
+                    {
+                        // v0.57.4: forensic log at the transit point — paired with the
+                        // COMPANION_BAG / NPC_BAG serialize + deserialize logs, this lets
+                        // us follow a single item from "player gave it to X" through
+                        // "X's bag saved with N items" to "X's bag loaded with N items".
+                        string bagCategory = player is NPC ? "NPC_BAG" : "COMPANION_BAG";
+                        DebugLogger.Instance.LogInfo(bagCategory,
+                            $"Combat [T] TRANSFER → {player.DisplayName}: \"{lootItem.Name}\" (bag size now {player.Inventory.Count})");
+                        try
+                        {
+                            var realPlayer = currentPlayer ?? player;
+                            SyncNPCTeammateToActiveNPCs(player);
+                            SaveSystem.Instance.ResetAutoSaveThrottle();
+                            _ = SaveSystem.Instance.AutoSave(realPlayer);
+                            if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+                                _ = OnlineStateManager.Instance.SaveAllSharedState();
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugLogger.Instance.LogError("COMBAT_LOOT", $"Save after companion [T] transfer failed: {ex.Message}");
+                        }
+                    }
                 }
                 break;
 
@@ -23699,6 +23728,29 @@ public partial class CombatEngine
         foreach (var kvp in npcTeammate.EquippedItems)
         {
             canonical.EquippedItems[kvp.Key] = kvp.Value;
+        }
+
+        // v0.57.4: sync the NPC's personal bag. In MUD mode the world sim can
+        // rebuild ActiveNPCs from world_state between ticks, producing a fresh
+        // canonical NPC object while combat still holds the original teammate
+        // reference. Without this copy, any items the player transferred to
+        // the teammate during the fight would stay on the orphaned combat
+        // clone and never reach the persisted NPC.
+        canonical.Inventory ??= new List<Item>();
+        int teammateBagCount = npcTeammate.Inventory?.Count ?? 0;
+        if (teammateBagCount > 0 || canonical.Inventory.Count > 0)
+        {
+            // Only log when there's something to move (or clear) — keeps the
+            // log signal-to-noise high. Most syncs happen on NPCs with empty
+            // bags and nothing interesting to track.
+            DebugLogger.Instance.LogInfo("NPC_BAG",
+                $"Orphan sync {npcTeammate.DisplayName}: teammate={teammateBagCount}, canonical={canonical.Inventory.Count} → copying teammate bag to canonical");
+        }
+        canonical.Inventory.Clear();
+        if (npcTeammate.Inventory != null)
+        {
+            foreach (var item in npcTeammate.Inventory)
+                canonical.Inventory.Add(item);
         }
 
         canonical.RecalculateStats();

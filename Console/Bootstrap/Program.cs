@@ -82,6 +82,19 @@ namespace UsurperConsole
                 return;
             }
 
+            // --editor launches the standalone USEDIT-analog editor. Analogous to the
+            // DOS-era companion tool that shipped alongside the original Usurper.
+            // Edits GameData/*.json + save files; does NOT start any game systems
+            // or network stack, so it's safe to run even if a server process is
+            // live (though editing a save while the game holds it is not
+            // recommended — the editor warns about this).
+            if (args.Contains("--editor") || args.Contains("--usedit"))
+            {
+                var exitCode = await UsurperRemake.Editor.EditorMain.RunAsync(args);
+                System.Environment.Exit(exitCode);
+                return;
+            }
+
             // Handle --version flag: print version and exit immediately
             if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v" || args[0] == "-V"))
             {
