@@ -8789,8 +8789,35 @@ public partial class CombatEngine
                     : currentEquip.ArmorClass;
             }
 
-            // Empty slot is always an upgrade (any gear > nothing)
+            // v0.57.6: Lumina's Aldric-downgrade report — "Aldric auto-equipped
+            // Fine Tempered Blade WP:123 over Soldier's Sword of Thunder WP:407
+            // when I pressed Pass; the original weapon was in my inventory." The
+            // bug was in the next three lines: `slotIsEmpty` was computed solely
+            // from `currentEquip == null`. But GetEquipment can return null when
+            // the slot HAS an ID that EquipmentDatabase can't resolve — most
+            // commonly a dynamic-equipment registration gap in MUD mode or a
+            // stale wrapper snapshot from mid-combat. In that case the slot
+            // LOOKS empty to this logic, currentPower stays 0, and literally
+            // any weapon becomes a "100% upgrade" — bumping the real
+            // legendary/epic item out of the slot into the player's inventory.
+            //
+            // Conservative fix: if the slot's stored ID is > 0, treat it as
+            // occupied-but-unknown and REFUSE the auto-pickup rather than risk
+            // replacing something valuable we can't introspect. Better to skip
+            // a legitimate upgrade than downgrade a Soldier's Sword of Thunder.
             bool slotIsEmpty = currentEquip == null;
+            bool slotIsPhantom = false;
+            if (slotIsEmpty
+                && teammate.EquippedItems.TryGetValue(actualSlot, out var slotStoredId)
+                && slotStoredId > 0)
+            {
+                // Slot has an ID but GetById couldn't resolve it. Don't touch.
+                DebugLogger.Instance.LogWarning("COMPANION_EQUIP",
+                    $"Auto-pickup: {teammate.DisplayName} slot {actualSlot} has stored ID {slotStoredId} but EquipmentDatabase.GetById returned null — skipping to protect unresolved item. (Probable dynamic-equipment registration gap.)");
+                slotIsPhantom = true;
+            }
+            if (slotIsPhantom) continue;
+
             if (slotIsEmpty && itemPower == 0)
             {
                 // Item has no raw power but may have stat bonuses — count those

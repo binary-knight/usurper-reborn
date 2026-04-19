@@ -39,8 +39,18 @@ public class Child
     public string CursedByGodID { get; set; } = "";     // god's unique ID
     public int Royal { get; set; }                      // royal blood (0=no, 1=half, 2=full)
     
-    // Parenting interaction tracking
-    public int LastParentingDay { get; set; }           // game day of last parent interaction (cooldown)
+    // Parenting interaction tracking.
+    // LastParentingDay is kept for backward compatibility with saves prior to
+    // v0.57.7 but is no longer used for the cooldown check — it relied on
+    // DailySystemManager.Instance.CurrentDay, a process-wide singleton that
+    // gets clobbered across concurrent player sessions in MUD mode. Once
+    // LastParentingDay caught up to the singleton's value, it stayed >= for
+    // every subsequent session until a real-world daily reset ticked, which
+    // sometimes never happened — so players reported permanent cooldowns on
+    // "spend time with child" (Lumina: "can't spend time with any of them").
+    // v0.57.7: switched to wall-clock via LastParentingTime.
+    public int LastParentingDay { get; set; }           // legacy; unused post-v0.57.7
+    public DateTime LastParentingTime { get; set; }     // UTC time of last parent interaction (cooldown)
 
     // System tracking
     public int RecordNumber { get; set; }               // file position
@@ -68,6 +78,7 @@ public class Child
         Health = GameConfig.ChildHealthNormal;
         Soul = 0;
         LastParentingDay = 0;
+        LastParentingTime = DateTime.MinValue;
         MotherAccess = true;
         FatherAccess = true;
         Kidnapped = false;

@@ -608,7 +608,8 @@ namespace UsurperRemake.Systems
                 RansomDemanded = c.RansomDemanded,
                 CursedByGod = c.CursedByGod,
                 Royal = c.Royal,
-                LastParentingDay = c.LastParentingDay
+                LastParentingDay = c.LastParentingDay,
+                LastParentingTime = c.LastParentingTime
             }).ToList();
         }
 
@@ -646,7 +647,8 @@ namespace UsurperRemake.Systems
                     RansomDemanded = data.RansomDemanded,
                     CursedByGod = data.CursedByGod,
                     Royal = data.Royal,
-                    LastParentingDay = data.LastParentingDay
+                    LastParentingDay = data.LastParentingDay,
+                    LastParentingTime = data.LastParentingTime
                 };
 
                 // Prevent duplicates (same birth date + same parents)

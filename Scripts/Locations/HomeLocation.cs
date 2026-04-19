@@ -1970,9 +1970,21 @@ public class HomeLocation : BaseLocation
         if (action != "S" && action != "")
             return;
 
-        // Check cooldown
-        int currentDay = DailySystemManager.Instance?.CurrentDay ?? 0;
-        if (selectedChild.LastParentingDay >= currentDay && currentDay > 0)
+        // v0.57.7: wall-clock cooldown instead of DailySystemManager.CurrentDay.
+        // The old day-based check blocked indefinitely in MUD mode because
+        // DailySystemManager is a process-wide singleton whose currentDay gets
+        // overwritten on every player login (from the logging-in player's save)
+        // and doesn't reliably advance — so once `LastParentingDay` caught up
+        // to the singleton's value, the `>=` comparison kept returning true
+        // forever. Lumina: "The game claims I spent time with the chosen
+        // child, even if I did not that day. Now with any of them."
+        //
+        // Wall-clock avoids the singleton entirely — 20-hour gap between
+        // interactions gives a 4-hour tolerance before "tomorrow," robust to
+        // session churn and independent of any day counter.
+        var cooldown = TimeSpan.FromHours(20);
+        var sinceLast = DateTime.UtcNow - selectedChild.LastParentingTime;
+        if (selectedChild.LastParentingTime != DateTime.MinValue && sinceLast < cooldown)
         {
             terminal.WriteLine();
             terminal.WriteLine(Loc.Get("home.parenting_cooldown", selectedChild.Name), "yellow");
@@ -2046,8 +2058,10 @@ public class HomeLocation : BaseLocation
         terminal.Write(Loc.Get("home.parenting_soul_status", selectedChild.Name), "gray");
         terminal.WriteLine($" {selectedChild.GetSoulDescription()}", soulDescColor);
 
-        // Set cooldown
-        selectedChild.LastParentingDay = currentDay;
+        // Set cooldown — both the wall-clock (authoritative) and the legacy
+        // day counter (for older save-reader compatibility).
+        selectedChild.LastParentingTime = DateTime.UtcNow;
+        selectedChild.LastParentingDay = DailySystemManager.Instance?.CurrentDay ?? 0;
 
         await terminal.WaitForKey();
     }

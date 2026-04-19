@@ -1451,7 +1451,8 @@ namespace UsurperRemake.Systems
         public long RansomDemanded { get; set; }
         public string CursedByGod { get; set; } = "";
         public int Royal { get; set; }
-        public int LastParentingDay { get; set; }
+        public int LastParentingDay { get; set; }         // legacy; unused post-v0.57.7
+        public DateTime LastParentingTime { get; set; }   // v0.57.7: wall-clock cooldown
     }
 
     /// <summary>
