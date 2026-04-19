@@ -1352,6 +1352,55 @@ namespace UsurperRemake.Systems
                     }
                 }
 
+                // v0.57.4: restore NPC's personal bag (items from combat [T] /
+                // Home / Team Corner / dungeon viewer). World-sim ticks persist
+                // NPC state to world_state, so this runs every reload.
+                if (data.Inventory != null && data.Inventory.Count > 0)
+                {
+                    // Forensic log for the MUD-mode world-sim path. In MUD mode
+                    // the save → load cycle runs every tick (30s), so if items
+                    // do get lost they'd show up here — save written with N,
+                    // restore reads < N.
+                    var bagSummary = string.Join(", ", data.Inventory.Take(3).Select(i => i?.Name ?? "?"));
+                    if (data.Inventory.Count > 3) bagSummary += $", +{data.Inventory.Count - 3} more";
+                    DebugLogger.Instance.LogInfo("NPC_BAG",
+                        $"WorldSim RESTORED {data.Name} bag ({data.Inventory.Count}): {bagSummary}");
+
+                    npc.Inventory ??= new List<global::Item>();
+                    foreach (var itemData in data.Inventory)
+                    {
+                        var item = new global::Item
+                        {
+                            Name = itemData.Name,
+                            Value = itemData.Value,
+                            Type = itemData.Type,
+                            Attack = itemData.Attack,
+                            Armor = itemData.Armor,
+                            Strength = itemData.Strength,
+                            Dexterity = itemData.Dexterity,
+                            Wisdom = itemData.Wisdom,
+                            Defence = itemData.Defence,
+                            BlockChance = itemData.BlockChance,
+                            ShieldBonus = itemData.ShieldBonus,
+                            HP = itemData.HP,
+                            Mana = itemData.Mana,
+                            Charisma = itemData.Charisma,
+                            Agility = itemData.Agility,
+                            Stamina = itemData.Stamina,
+                            MinLevel = itemData.MinLevel,
+                            IsCursed = itemData.IsCursed,
+                            Cursed = itemData.Cursed,
+                            IsIdentified = itemData.IsIdentified,
+                            Shop = itemData.Shop,
+                            Dungeon = itemData.Dungeon,
+                            Description = itemData.Description?.ToList() ?? new List<string>(),
+                        };
+                        if (itemData.LootEffects != null && itemData.LootEffects.Count > 0)
+                            item.LootEffects = itemData.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
+                        npc.Inventory.Add(item);
+                    }
+                }
+
                 // Restore personality if available
                 if (data.PersonalityProfile != null)
                 {

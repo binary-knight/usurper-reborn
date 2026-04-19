@@ -44,6 +44,10 @@
         <PackageReference Include="System.IO.Ports" Version="10.0.2" />
         <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
         <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.3" />
+        <!-- Spectre.Console: powers the editor TUI (arrow-key menus, prompts,
+             tables, progress). Only used by the editor code; the game itself
+             still writes to its own TerminalEmulator for MUD/BBS sessions. -->
+        <PackageReference Include="Spectre.Console" Version="0.49.1" />
     </ItemGroup>
 
     <!-- Steamworks.NET - only included in Steam builds -->

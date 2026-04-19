@@ -29,6 +29,17 @@ namespace UsurperRemake.Systems
         public static BalanceConfig? Balance { get; private set; }
 
         /// <summary>
+        /// Modder-added custom equipment (v0.57.3). Loaded from equipment.json.
+        /// Appended to EquipmentDatabase at startup AFTER the built-in items, so
+        /// custom entries can reference any built-in concept but never collide
+        /// with built-in IDs. Modders must assign IDs in the 200000+ range.
+        /// </summary>
+        public static List<Equipment>? CustomEquipment { get; private set; }
+
+        /// <summary>ID range reserved for modder-added equipment. Below this = game-managed.</summary>
+        public const int ModdedEquipmentIdStart = 200000;
+
+        /// <summary>
         /// Shared JSON options with tolerant enum handling and camelCase naming.
         /// </summary>
         public static readonly JsonSerializerOptions JsonOptions = new()
@@ -65,6 +76,7 @@ namespace UsurperRemake.Systems
             Achievements = TryLoadFile<List<Achievement>>("achievements.json");
             DialogueLines = TryLoadFile<List<NPCDialogueDatabase.DialogueLine>>("dialogue.json");
             Balance = TryLoadFile<BalanceConfig>("balance.json");
+            CustomEquipment = TryLoadFile<List<Equipment>>("equipment.json");
 
             if (Balance != null)
             {
@@ -72,9 +84,9 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogInfo("GAMEDATA", "Balance config applied to GameConfig");
             }
 
-            int loaded = new object?[] { NPCs, MonsterFamilies, Dreams, Achievements, DialogueLines, Balance }
+            int loaded = new object?[] { NPCs, MonsterFamilies, Dreams, Achievements, DialogueLines, Balance, CustomEquipment }
                 .Count(x => x != null);
-            DebugLogger.Instance.LogInfo("GAMEDATA", $"Loaded {loaded}/6 moddable data files");
+            DebugLogger.Instance.LogInfo("GAMEDATA", $"Loaded {loaded}/7 moddable data files");
             } // lock
         }
 
@@ -92,7 +104,12 @@ namespace UsurperRemake.Systems
             ExportFile(outputDir, "dialogue.json", NPCDialogueDatabase.GetAllBuiltInLines());
             ExportFile(outputDir, "balance.json", new BalanceConfig());
 
-            DebugLogger.Instance.LogInfo("GAMEDATA", $"Exported 6 default data files to: {outputDir}");
+            // Equipment is additive-only: export a small example rather than all
+            // ~700 built-in items. Modders add NEW items at ID 200000+; built-ins
+            // stay read-only for save compatibility.
+            ExportFile(outputDir, "equipment.json", GetExampleCustomEquipment());
+
+            DebugLogger.Instance.LogInfo("GAMEDATA", $"Exported 7 default data files to: {outputDir}");
         }
 
         private static string? FindGameDataDirectory()
@@ -133,6 +150,46 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("GAMEDATA", $"Failed to load {fileName}: {ex.Message} — using defaults");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Example custom equipment set written on --export-data. Shows modders
+        /// the shape of the JSON and how to assign IDs in the 200000+ range.
+        /// Not loaded by the game unless the modder renames/edits this file.
+        /// </summary>
+        private static List<Equipment> GetExampleCustomEquipment()
+        {
+            return new List<Equipment>
+            {
+                new Equipment
+                {
+                    Id = ModdedEquipmentIdStart + 1,
+                    Name = "Modder's Test Sword",
+                    Description = "An example custom weapon. Edit equipment.json to change.",
+                    Slot = EquipmentSlot.MainHand,
+                    Handedness = WeaponHandedness.OneHanded,
+                    WeaponType = WeaponType.Sword,
+                    WeaponPower = 50,
+                    StrengthBonus = 5,
+                    Value = 10000,
+                    MinLevel = 10,
+                    Rarity = EquipmentRarity.Rare,
+                },
+                new Equipment
+                {
+                    Id = ModdedEquipmentIdStart + 2,
+                    Name = "Modder's Test Armor",
+                    Description = "An example custom chest armor.",
+                    Slot = EquipmentSlot.Body,
+                    ArmorType = ArmorType.Chain,
+                    WeightClass = ArmorWeightClass.Medium,
+                    ArmorClass = 40,
+                    ConstitutionBonus = 4,
+                    Value = 8000,
+                    MinLevel = 10,
+                    Rarity = EquipmentRarity.Rare,
+                },
+            };
         }
 
         private static void ExportFile<T>(string outputDir, string fileName, T data)

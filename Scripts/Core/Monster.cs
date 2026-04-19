@@ -122,6 +122,13 @@ public class Monster
     public bool IsCorroded { get; set; } = false;       // Armor corroded — reduced defence
     public int CorrodedDuration { get; set; } = 0;
 
+    // v0.57.2 — Abysswarden Corrupting Touch DoT. Separate from standard Poisoned so it can
+    // heal the caster each tick (per the ability description "Each tick heals you"). Previously
+    // the handler tried to hack this with the generic Lifesteal status, which only fires on
+    // ATTACKS — so the player saw healing only when they hit the target, not when the DoT ticked.
+    public int CorruptingDotRounds { get; set; } = 0;
+    public long CorruptingDotTickDamage { get; set; } = 0;
+
     // Boss end-game party mechanics (v0.52.1)
     public bool IsChanneling { get; set; } = false;        // Boss is charging a devastating ability
     public int ChannelingRoundsLeft { get; set; } = 0;     // Rounds until channel completes
@@ -621,6 +628,8 @@ public class Monster
         CombatRound = 0;
         Poisoned = false;
         IsBurning = false;
+        CorruptingDotRounds = 0;
+        CorruptingDotTickDamage = 0;
         Disease = false;
         Target = 0;
         Punch = 0;

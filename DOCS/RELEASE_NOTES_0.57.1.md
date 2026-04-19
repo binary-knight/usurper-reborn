@@ -32,6 +32,18 @@ The per-teammate combat-init block at [CombatEngine.cs:676+](Scripts/Systems/Com
 
 Fix: teammate init now mirrors the player-init block and resets every transient buff, not just the new tank ones.
 
+## Inventory Cap Bypass via Companion Displacement
+
+Reported by Aura Maximillion (L45 Mutant Assassin, Floor 40) with the receipt "inventory full 127/50 which definitly is wrong." Confirmed: three sites in `CombatEngine.cs` moved items displaced from a companion's equipment slots (during a loot auto-equip) into the player's inventory without checking `IsInventoryFull`, letting carry grow past `MaxInventoryItems`:
+
+- [CombatEngine.cs:7725](Scripts/Systems/CombatEngine.cs#L7725) — manual `[E]` equip on a companion via the loot prompt's `<`/`>` selector.
+- [CombatEngine.cs:7804](Scripts/Systems/CombatEngine.cs#L7804) — companion auto-pickup on the default (pass) branch when they want to upgrade.
+- [CombatEngine.cs:8239](Scripts/Systems/CombatEngine.cs#L8239) — grouped-follower auto-pickup (same pattern in the group-combat path).
+
+Every time a companion auto-equipped a dungeon drop, their old slot item cascaded into the player's bag unconditionally. Over a long dungeon run this compounded into the 127/50 Aura reported, and downstream shop code correctly treated the inventory as over-full.
+
+Fix: each of the three sites now honors `IsInventoryFull`. If the player's bag is full, the displaced item is dropped with a "couldn't fit" message instead of silently added. New localization key `combat.loot_displaced_dropped` added in all 5 language files.
+
 ## Companion Loot Pickup Save Race
 
 Two sites in `CombatEngine` (around [line 7820](Scripts/Systems/CombatEngine.cs#L7820) and [line 8257](Scripts/Systems/CombatEngine.cs#L8257)) persist companion loot pickups via fire-and-forget `_ = Task.Run(async () => { ... save ... })`. Both sites are inside an `async` method, so the fire-and-forget was gratuitous — and it opened a window where a player who disconnected immediately after their companion picked up rare loot would lose that equipment because the background save hadn't completed yet.
@@ -64,4 +76,5 @@ Fix: the `ManageCharacterEquipment` loop in HomeLocation now saves after each ed
 - `Scripts/Locations/HomeLocation.cs` — `ManageCharacterEquipment` now saves after each edit action (equip/unequip/take-all) instead of only on menu exit, matching TeamCornerLocation's per-action save cadence. Prevents spouse/lover equipment edits from being lost if the session disconnects mid-menu.
 - `Scripts/Locations/BaseLocation.cs` — `ShowAuctionItemDetails` purchase flow now deserializes the auction item JSON BEFORE deducting gold; on failure the listing is un-sold via `RefundAuctionListing` and the buyer keeps their gold. On success, a forced save persists the new item immediately.
 - `Scripts/Systems/SqlSaveBackend.cs` — New `RefundAuctionListing(listingId)` method flips a sold listing back to `active` status so a corrupt-JSON purchase can be safely rolled back.
-- `Scripts/Systems/CombatEngine.cs` — Companion loot-pickup save paths at lines 7820 and 8257 converted from fire-and-forget `_ = Task.Run(...)` to awaited calls. Prevents companion-equipped loot from being lost if the player disconnects immediately after the pickup.
+- `Scripts/Systems/CombatEngine.cs` — Companion loot-pickup save paths at lines 7820 and 8257 converted from fire-and-forget `_ = Task.Run(...)` to awaited calls. Prevents companion-equipped loot from being lost if the player disconnects immediately after the pickup. Three companion-displacement paths (manual `[E]` equip, default-branch auto-pickup, grouped-follower auto-pickup) now honor `IsInventoryFull` before adding displaced gear to the player's inventory — closes the cap-bypass Aura reported.
+- `Localization/*.json` — New `combat.loot_displaced_dropped` key for the "pack full, dropped" message, translated across all 5 languages.

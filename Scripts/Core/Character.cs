@@ -128,6 +128,7 @@ public class Character
     public int DateFormatPreference { get; set; }    // 0=MM/DD/YYYY, 1=DD/MM/YYYY, 2=YYYY-MM-DD
     public bool AutoRedistributeXP { get; set; } = true; // auto-redistribute XP when teammates die in combat
     public int[] TeamXPPercent { get; set; } = new int[] { 100, 0, 0, 0, 0 };  // per-slot XP percentage (player + 4 teammates, aggregate <= 100)
+    public bool TeamXPIsExplicit { get; set; } = false;  // v0.57.2: true once the player has manually set their XP split, so AutoDistributeTeamXP doesn't override intentional 100/0 (keep-all-xp) configs
     public CharacterClass Class { get; set; }       // class
 
     /// <summary>Display-friendly class name (handles multi-word names like "Mystic Shaman")</summary>

@@ -697,6 +697,7 @@ namespace UsurperRemake.Systems
                 DateFormatPreference = player.DateFormatPreference,
                 AutoRedistributeXP = player.AutoRedistributeXP,
                 TeamXPPercent = player.TeamXPPercent,
+                TeamXPIsExplicit = player.TeamXPIsExplicit,
                 Loyalty = player.Loyalty,
                 Haunt = player.Haunt,
                 Master = player.Master,
@@ -1090,6 +1091,23 @@ namespace UsurperRemake.Systems
             // Get current king for reference
             var currentKing = global::CastleLocation.GetCurrentKing();
 
+            // v0.57.4: log NPCs with non-empty bags before we serialize them so
+            // a player report like "I gave my spouse X and it disappeared" can
+            // be traced to: did we write X to disk, or was the NPC's bag already
+            // empty at save time? Only logs when bag has contents.
+            int loggedBags = 0;
+            foreach (var n in worldNPCs)
+            {
+                if (n?.Inventory == null || n.Inventory.Count == 0) continue;
+                var bagSummary = string.Join(", ", n.Inventory.Take(3).Select(i => i?.Name ?? "?"));
+                if (n.Inventory.Count > 3) bagSummary += $", +{n.Inventory.Count - 3} more";
+                DebugLogger.Instance.LogInfo("NPC_BAG",
+                    $"Serialize SAVING {n.DisplayName} bag ({n.Inventory.Count}): {bagSummary}");
+                loggedBags++;
+            }
+            if (loggedBags == 0)
+                DebugLogger.Instance.LogDebug("NPC_BAG", "Serialize: no NPCs have bag contents to save");
+
             foreach (var npc in worldNPCs)
             {
                 npcData.Add(new NPCData
@@ -1200,6 +1218,39 @@ namespace UsurperRemake.Systems
                         Defence = item.Defence,
                         IsCursed = item.IsCursed
                     }).ToList() ?? new List<MarketItemData>(),
+
+                    // v0.57.4: personal bag (items players transferred to this NPC
+                    // teammate via combat [T] / Home / Team Corner / dungeon viewer).
+                    // Same Item ↔ InventoryItemData round-trip the player uses.
+                    Inventory = npc.Inventory?.Where(i => i != null).Select(item => new InventoryItemData
+                    {
+                        Name = item.Name,
+                        Value = item.Value,
+                        Type = item.Type,
+                        Attack = item.Attack,
+                        Armor = item.Armor,
+                        Strength = item.Strength,
+                        Dexterity = item.Dexterity,
+                        Wisdom = item.Wisdom,
+                        Defence = item.Defence,
+                        BlockChance = item.BlockChance,
+                        ShieldBonus = item.ShieldBonus,
+                        HP = item.HP,
+                        Mana = item.Mana,
+                        Charisma = item.Charisma,
+                        Agility = item.Agility,
+                        Stamina = item.Stamina,
+                        MinLevel = item.MinLevel,
+                        IsCursed = item.IsCursed,
+                        Cursed = item.Cursed,
+                        IsIdentified = item.IsIdentified,
+                        Shop = item.Shop,
+                        Dungeon = item.Dungeon,
+                        Description = item.Description?.ToList() ?? new List<string>(),
+                        LootEffects = item.LootEffects?.Count > 0
+                            ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
+                            : null,
+                    }).ToList() ?? new List<InventoryItemData>(),
 
                     // Modern RPG Equipment System - save equipped items
                     EquippedItems = npc.EquippedItems?.ToDictionary(
@@ -1707,6 +1758,12 @@ namespace UsurperRemake.Systems
                     kvp => (int)kvp.Key,
                     kvp => (int)kvp.Value.Status
                 );
+                // v0.57.2 — persist HasBeenEncountered so Main Street [P] Progress shows
+                // correct encounter state even for non-terminal statuses.
+                data.OldGodsEncountered = story.OldGodStates
+                    .Where(kvp => kvp.Value.HasBeenEncountered)
+                    .Select(kvp => (int)kvp.Key)
+                    .ToList();
                 if (data.OldGodStates.Count > 0)
                 {
                 }
@@ -1766,7 +1823,8 @@ namespace UsurperRemake.Systems
                     EquippedItemsSave = c.EquippedItemsSave,
                     DisabledAbilities = c.DisabledAbilities,
                     SkillProficiencies = c.SkillProficiencies ?? new(),
-                    SkillTrainingProgress = c.SkillTrainingProgress ?? new()
+                    SkillTrainingProgress = c.SkillTrainingProgress ?? new(),
+                    Inventory = c.Inventory ?? new List<InventoryItemData>()
                 }).ToList();
 
                 data.ActiveCompanionIds = companionData.ActiveCompanions.Select(c => (int)c).ToList();
@@ -2182,6 +2240,19 @@ namespace UsurperRemake.Systems
                     }
                 }
 
+                // v0.57.2 — restore per-god HasBeenEncountered flags.
+                if (data.OldGodsEncountered != null)
+                {
+                    foreach (var godTypeInt in data.OldGodsEncountered)
+                    {
+                        var godType = (OldGodType)godTypeInt;
+                        if (story.OldGodStates.TryGetValue(godType, out var existingState))
+                        {
+                            existingState.HasBeenEncountered = true;
+                        }
+                    }
+                }
+
                 // MIGRATION: Sync OldGodStates from story flags for saves created before OldGodStates was saved
                 // This ensures backward compatibility with old saves
                 MigrateOldGodStatesFromStoryFlags(story, data.StoryFlags);
@@ -2251,7 +2322,8 @@ namespace UsurperRemake.Systems
                             EquippedItemsSave = c.EquippedItemsSave ?? new Dictionary<int, int>(),
                             DisabledAbilities = c.DisabledAbilities ?? new List<string>(),
                             SkillProficiencies = c.SkillProficiencies ?? new(),
-                            SkillTrainingProgress = c.SkillTrainingProgress ?? new()
+                            SkillTrainingProgress = c.SkillTrainingProgress ?? new(),
+                            Inventory = c.Inventory ?? new List<InventoryItemData>()
                         }).ToList() ?? new List<CompanionSaveData>(),
 
                         ActiveCompanions = data.ActiveCompanionIds?.Select(id => (CompanionId)id).ToList() ?? new List<CompanionId>(),
@@ -2744,6 +2816,19 @@ namespace UsurperRemake.Systems
                             godState.Status = GodStatus.Awakened;
                             migrationCount++;
                         }
+                    }
+
+                    // v0.57.2 — migrate HasBeenEncountered for players who resolved gods before
+                    // the flag-setting code existed. Any terminal state (Defeated/Saved/Allied/
+                    // Consumed/Awakened) necessarily means the player interacted with the god.
+                    if (!godState.HasBeenEncountered && (
+                        godState.Status == GodStatus.Defeated ||
+                        godState.Status == GodStatus.Saved ||
+                        godState.Status == GodStatus.Allied ||
+                        godState.Status == GodStatus.Awakened ||
+                        godState.Status == GodStatus.Consumed))
+                    {
+                        godState.HasBeenEncountered = true;
                     }
                 }
             }

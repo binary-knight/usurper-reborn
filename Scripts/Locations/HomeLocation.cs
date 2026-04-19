@@ -293,6 +293,7 @@ public class HomeLocation : BaseLocation
         // Row 5: Items
         WriteMenuCol(" ", "I", Loc.Get("dungeon.inventory"), true);
         WriteMenuCol("", "G", Loc.Get("home.gear_partner"), true);
+        WriteMenuCol("", "V", Loc.Get("home.view_party_inv"), true);
         WriteMenuNL("", "H", Loc.Get("home.heal_potion"), true);
 
         terminal.WriteLine("");
@@ -580,6 +581,9 @@ public class HomeLocation : BaseLocation
                 return false;
             case "G":
                 await EquipPartner();
+                return false;
+            case "V":
+                await ViewHomePartyInventories();
                 return false;
             case "S":
                 await ShowStatus();
@@ -4278,6 +4282,48 @@ toResurrect.IsDead = false;
     /// <summary>
     /// Equip a spouse or lover with items from your inventory
     /// </summary>
+    /// <summary>
+    /// v0.57.2 — show the party inventory viewer for spouse(s), lover(s), and active companions
+    /// from Home. Complements [G] Equip Partner by letting the player see what items have piled
+    /// up in an NPC's bag (e.g. from combat loot auto-pickup) and take them back.
+    /// </summary>
+    private async Task ViewHomePartyInventories()
+    {
+        var party = new List<Character>();
+        var romance = RomanceTracker.Instance;
+
+        // Spouses
+        if (romance?.Spouses != null)
+        {
+            foreach (var spouse in romance.Spouses)
+            {
+                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+                if (npc != null && npc.IsAlive && !party.Contains(npc)) party.Add(npc);
+            }
+        }
+
+        // Current lovers
+        if (romance?.CurrentLovers != null)
+        {
+            foreach (var lover in romance.CurrentLovers)
+            {
+                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+                if (npc != null && npc.IsAlive && !party.Contains(npc)) party.Add(npc);
+            }
+        }
+
+        // Active companions
+        if (CompanionSystem.Instance != null)
+        {
+            foreach (var comp in CompanionSystem.Instance.GetCompanionsAsCharacters())
+            {
+                if (comp != null && !party.Contains(comp)) party.Add(comp);
+            }
+        }
+
+        await ShowPartyInventoryViewer(party);
+    }
+
     private async Task EquipPartner()
     {
         var romance = RomanceTracker.Instance;

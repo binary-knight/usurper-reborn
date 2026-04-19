@@ -427,6 +427,12 @@ namespace UsurperRemake.Systems
                 var oldStatus = state.Status;
                 state.Status = newStatus;
 
+                // v0.57.2 — calling UpdateGodState means the player actively resolved the god
+                // (combat, dialogue, save quest, alliance). Mark encountered so MainStreet's
+                // [P] Progress screen shows the god as encountered instead of "????". This was
+                // previously only set by the admin console, so normal play left it false forever.
+                state.HasBeenEncountered = true;
+
                 LogEvent(new StoryEvent
                 {
                     Type = StoryEventType.GodStateChange,

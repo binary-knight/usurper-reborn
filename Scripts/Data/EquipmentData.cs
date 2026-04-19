@@ -59,6 +59,35 @@ public static class EquipmentDatabase
             AddEquipment(item);
         }
 
+        // v0.57.3: append modder-added custom equipment from GameData/equipment.json.
+        // IDs are validated to live in the 200000+ range so they can't collide with
+        // built-ins (1000..14999), shop-generated (50000..99999), or dynamic dungeon
+        // loot (100000..199999). Malformed entries log a warning and are skipped.
+        var custom = UsurperRemake.Systems.GameDataLoader.CustomEquipment;
+        if (custom != null)
+        {
+            int loaded = 0, skipped = 0;
+            foreach (var item in custom)
+            {
+                if (item == null)
+                {
+                    skipped++;
+                    continue;
+                }
+                if (item.Id < UsurperRemake.Systems.GameDataLoader.ModdedEquipmentIdStart)
+                {
+                    UsurperRemake.Systems.DebugLogger.Instance.LogWarning("GAMEDATA",
+                        $"equipment.json: skipping \"{item.Name}\" (Id={item.Id}) — modder IDs must be >= {UsurperRemake.Systems.GameDataLoader.ModdedEquipmentIdStart}");
+                    skipped++;
+                    continue;
+                }
+                AddEquipment(item);
+                loaded++;
+            }
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("GAMEDATA",
+                $"Loaded {loaded} custom equipment entries from equipment.json ({skipped} skipped)");
+        }
+
         _initialized = true;
     }
 
@@ -218,6 +247,13 @@ public static class EquipmentDatabase
     /// <summary>
     /// Get all armor for shop display (all slots)
     /// </summary>
+    /// <summary>Return every Equipment currently in the database (built-in, shop-generated, and custom-modded).</summary>
+    public static List<Equipment> GetAll()
+    {
+        EnsureInitialized();
+        lock (_lock) { return _allEquipment.Values.ToList(); }
+    }
+
     public static List<Equipment> GetAllArmor()
     {
         EnsureInitialized();

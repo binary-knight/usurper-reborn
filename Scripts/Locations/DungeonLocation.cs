@@ -9742,7 +9742,7 @@ public class DungeonLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  [#] {Loc.Get("dungeon.view_equip_member")}  [Q] {Loc.Get("dungeon.back")}");
+            terminal.WriteLine($"  [#] {Loc.Get("dungeon.view_equip_member")}  [I] {Loc.Get("party_inv.menu_dungeon")}  [Q] {Loc.Get("dungeon.back")}");
             terminal.WriteLine("");
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("ui.choice"));
@@ -9752,6 +9752,12 @@ public class DungeonLocation : BaseLocation
 
             if (choice == "Q" || string.IsNullOrEmpty(choice))
                 return;
+
+            if (choice == "I")
+            {
+                await ShowPartyInventoryViewer(teammates.ToList());
+                continue;
+            }
 
             if (int.TryParse(choice, out int idx) && idx >= 1 && idx <= teammates.Count)
             {
@@ -10356,6 +10362,7 @@ public class DungeonLocation : BaseLocation
                     else
                         player.TeamXPPercent[s] = 0;
                 }
+                player.TeamXPIsExplicit = true;  // v0.57.2: player touched the UI — honor going forward
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("dungeon.xp_even_split", evenShare + remainder, evenShare));
                 await GameEngine.Instance.SaveCurrentGame();
@@ -10400,6 +10407,7 @@ public class DungeonLocation : BaseLocation
                     else
                     {
                         player.TeamXPPercent[slot] = newPct;
+                        player.TeamXPIsExplicit = true;  // v0.57.2: player touched the UI — honor going forward
                         terminal.SetColor("green");
                         terminal.WriteLine(Loc.Get("dungeon.xp_set_to", slotName, newPct));
                         await GameEngine.Instance.SaveCurrentGame();

@@ -2380,6 +2380,9 @@ public static class ClassAbilitySystem
         }
     };
 
+    /// <summary>Return every registered class ability (every class, every level). Used by the editor.</summary>
+    public static IReadOnlyList<ClassAbility> GetAllAbilities() => AllAbilities.Values.ToList();
+
     /// <summary>
     /// Get all abilities available to a specific class
     /// </summary>

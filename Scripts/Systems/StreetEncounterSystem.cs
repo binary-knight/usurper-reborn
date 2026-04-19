@@ -1382,10 +1382,12 @@ public class StreetEncounterSystem
     {
         // Convert NPC to Monster for combat engine
         // Pass NPC's level as the 'nr' parameter so the monster displays the correct level
+        // v0.57.2 — use MaxHP (fallback to HP if MaxHP is somehow 0). Using current HP meant
+        // an NPC awaiting respawn after a world-sim defeat would enter the duel already dead.
         var monster = Monster.CreateMonster(
             nr: npc.Level,
             name: npc.Name,
-            hps: (int)npc.HP,
+            hps: (int)(npc.MaxHP > 0 ? npc.MaxHP : Math.Max(1, npc.HP)),
             strength: (int)npc.Strength,
             defence: (int)npc.Defence,
             phrase: GetHostilePhrase(npc),
