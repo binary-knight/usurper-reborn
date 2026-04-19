@@ -591,6 +591,7 @@ public static partial class GameConfig
     // NPC Murder/Assassination System (v0.40.2)
     public const float MurderGoldTheftPercent = 0.50f;       // Steal 50% of NPC's gold on murder
     public const int MurderDarknessGain = 250;                // 50 -> 250 (paired with -125 chivalry).
+    public const int MaxMurdersPerDay = 3;                    // v0.57.6: cap non-bounty NPC murders to prevent a dark-aligned player from wiping the town in a single play session.
     public const float MurderGuardInterventionChance = 0.30f; // 30% chance guard joins NPC's side
     public const float MurderGrudgeChance = 1.00f;           // 100% grudge encounter after murder (guaranteed)
     public const float MurderGrudgeRageBonusHP = 0.20f;      // +20% HP for murder revenge NPC

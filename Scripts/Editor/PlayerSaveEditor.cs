@@ -1300,6 +1300,7 @@ internal static class PlayerSaveEditor
         p.PlayerImprisonedToday = false;
         p.BankRobberyAttempts = 0;
         p.TempleResurrectionsUsed = 0;
+        p.MurdersToday = 0;
         EditorIO.Success("Daily counters reset. Play as if a new day began.");
         EditorIO.Pause();
     }

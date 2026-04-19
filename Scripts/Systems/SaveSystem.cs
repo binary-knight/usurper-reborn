@@ -899,6 +899,7 @@ namespace UsurperRemake.Systems
                 PitFightsToday = player.PitFightsToday,
                 DesecrationsToday = player.DesecrationsToday,
                 ConfessionsToday = player.ConfessionsToday,
+                MurdersToday = player.MurdersToday,
                 LoanAmount = player.LoanAmount,
                 LoanDaysRemaining = player.LoanDaysRemaining,
                 LoanInterestAccrued = player.LoanInterestAccrued,

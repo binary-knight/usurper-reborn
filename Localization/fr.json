@@ -17452,6 +17452,8 @@
   "base.chat_good_1": "L'honneur et le courage guident mon chemin.",
   "base.chat_good_2": "Nous devons protéger ceux qui ne peuvent se protéger eux-mêmes.",
   "base.murder_capital_offense": "⚠  CRIME CAPITAL  ⚠",
+  "base.murder_daily_cap_reached": "Vos mains tremblent. Vous avez déjà assassiné {0} âme(s) aujourd'hui — même votre conscience a ses limites.",
+  "base.murder_daily_cap_hint": "(Réessayez demain. Les contrats de prime ne comptent pas dans cette limite.)",
   "base.murder_serious_crime": "Le meurtre est le crime le plus grave du royaume.",
   "base.murder_crown_respond": "Si vous tuez cette personne, la Couronne RÉAGIRA :",
   "base.murder_arrested": "• Vous serez arrêté et emprisonné",

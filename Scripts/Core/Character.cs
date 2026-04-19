@@ -667,6 +667,7 @@ public class Character
     public int PitFightsToday { get; set; } = 0;                // Daily pit fight counter (max 3)
     public int DesecrationsToday { get; set; } = 0;             // Daily desecration counter (max 2)
     public int ConfessionsToday { get; set; } = 0;              // v0.57.0: Daily confession counter (max 2, matches desecration cadence)
+    public int MurdersToday { get; set; } = 0;                  // v0.57.6: Daily non-bounty NPC-murder counter (cap: GameConfig.MaxMurdersPerDay)
     public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
     public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack
     public long LoanInterestAccrued { get; set; } = 0;          // Total interest accrued

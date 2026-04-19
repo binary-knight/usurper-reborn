@@ -17452,6 +17452,8 @@
   "base.chat_good_1": "Honor and courage guide my path.",
   "base.chat_good_2": "We must protect those who cannot protect themselves.",
   "base.murder_capital_offense": "⚠  CAPITAL OFFENSE  ⚠",
+  "base.murder_daily_cap_reached": "Your hands tremble. You have already murdered {0} soul(s) today — even your conscience has limits.",
+  "base.murder_daily_cap_hint": "(Try again tomorrow. Bounty contracts do not count toward this limit.)",
   "base.murder_serious_crime": "Murder is the most serious crime in the realm.",
   "base.murder_crown_respond": "If you kill this person, the Crown WILL respond:",
   "base.murder_arrested": "• You will be arrested and imprisoned",

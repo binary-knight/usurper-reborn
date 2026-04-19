@@ -17452,6 +17452,8 @@
   "base.chat_good_1": "Becsület és bátorság vezérli az utam.",
   "base.chat_good_2": "Meg kell védenünk azokat, akik nem tudják megvédeni magukat.",
   "base.murder_capital_offense": "⚠  FŐBENJÁRÓ BŰN  ⚠",
+  "base.murder_daily_cap_reached": "Remeg a kezed. Már {0} lelket gyilkoltál meg ma — még a lelkiismeretednek is van határa.",
+  "base.murder_daily_cap_hint": "(Próbáld újra holnap. A fejvadász-szerződések nem számítanak bele ebbe a korlátba.)",
   "base.murder_serious_crime": "A gyilkosság a legsúlyosabb bűncselekmény a birodalomban.",
   "base.murder_crown_respond": "Ha megölöd ezt a személyt, a Korona VÁLASZOLNI FOG:",
   "base.murder_arrested": "• Letartóztatnak és bebörtönöznek",

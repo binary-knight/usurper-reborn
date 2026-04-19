@@ -17452,6 +17452,8 @@
   "base.chat_good_1": "Onore e coraggio guidano il mio cammino.",
   "base.chat_good_2": "Dobbiamo proteggere chi non può proteggersi da solo.",
   "base.murder_capital_offense": "⚠  REATO CAPITALE  ⚠",
+  "base.murder_daily_cap_reached": "Le tue mani tremano. Hai già assassinato {0} anima/e oggi — persino la tua coscienza ha dei limiti.",
+  "base.murder_daily_cap_hint": "(Riprova domani. I contratti di taglia non contano per questo limite.)",
   "base.murder_serious_crime": "L'omicidio è il crimine più grave del reame.",
   "base.murder_crown_respond": "Se uccidi questa persona, la Corona REAGIRÀ:",
   "base.murder_arrested": "• Verrai arrestato e imprigionato",

@@ -131,7 +131,8 @@ public class SaveRoundTripTests
             DesecrationsToday = 2,
             SethFightsToday = 4,
             ArmWrestlesToday = 1,
-            RoyQuestsToday = 2
+            RoyQuestsToday = 2,
+            MurdersToday = 2
         };
 
         var json = JsonSerializer.Serialize(original, _jsonOptions);
@@ -144,6 +145,7 @@ public class SaveRoundTripTests
         restored.SethFightsToday.Should().Be(4, "SethFightsToday must survive save/load");
         restored.ArmWrestlesToday.Should().Be(1, "ArmWrestlesToday must survive save/load");
         restored.RoyQuestsToday.Should().Be(2, "RoyQuestsToday must survive save/load");
+        restored.MurdersToday.Should().Be(2, "MurdersToday must survive save/load (v0.57.6 daily murder cap)");
     }
 
     [Fact]

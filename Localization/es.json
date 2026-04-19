@@ -17452,6 +17452,8 @@
   "base.chat_good_1": "El honor y el coraje guian mi camino.",
   "base.chat_good_2": "Debemos proteger a quienes no pueden protegerse.",
   "base.murder_capital_offense": "  DELITO CAPITAL  ",
+  "base.murder_daily_cap_reached": "Tus manos tiemblan. Ya has asesinado a {0} alma(s) hoy — incluso tu conciencia tiene limites.",
+  "base.murder_daily_cap_hint": "(Vuelve a intentarlo manana. Los contratos de recompensa no cuentan para este limite.)",
   "base.murder_serious_crime": "El asesinato es el crimen mas grave del reino.",
   "base.murder_crown_respond": "Si matas a esta persona, la Corona RESPONDERA:",
   "base.murder_arrested": "Seras arrestado y encarcelado",

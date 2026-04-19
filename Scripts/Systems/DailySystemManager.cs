@@ -335,6 +335,7 @@ public class DailySystemManager
         player.PitFightsToday = 0;
         player.DesecrationsToday = 0;
         player.ConfessionsToday = 0;  // v0.57.0
+        player.MurdersToday = 0;      // v0.57.6: non-bounty murder daily cap
 
         // Reset session XP tracking (prevents bypass by logging out/in to clear diminishing returns)
         player.SessionXPEarned = 0;

@@ -4715,6 +4715,23 @@ public abstract class BaseLocation
         var bountyInitiator = QuestSystem.GetActiveBountyInitiator(currentPlayer.Name2, npcName);
         bool isBountyTarget = bountyInitiator != null;
 
+        // === MURDER DAILY CAP (non-bounty kills only, v0.57.6) ===
+        // Block the interaction up front so the player doesn't waste time
+        // reading the full murder-consequences prompt, then get denied. Cap
+        // only applies to non-bounty kills — sanctioned bounty contracts
+        // aren't "murder" for the purposes of this limit.
+        if (!isBountyTarget && currentPlayer.MurdersToday >= GameConfig.MaxMurdersPerDay)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine("");
+            terminal.WriteLine($"  {Loc.Get("base.murder_daily_cap_reached", GameConfig.MaxMurdersPerDay)}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("base.murder_daily_cap_hint")}");
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+            return;
+        }
+
         // === MURDER WARNING (non-bounty kills only) ===
         if (!isBountyTarget)
         {
@@ -4811,6 +4828,12 @@ public abstract class BaseLocation
             // gain (e.g. MurderDarknessGain=250 → +500 per murder). Removed.
             if (!result.WasBountyKill)
             {
+                // v0.57.6: increment daily cap counter. Placed BEFORE
+                // ApplyMurderConsequences because that method can throw
+                // "CHARACTER_EXECUTED" to drop the session, which would
+                // skip any post-call work. Counter should reflect the
+                // murder regardless of what the crown does next.
+                currentPlayer.MurdersToday++;
                 await ApplyMurderConsequences(currentPlayer, npc);
             }
         }

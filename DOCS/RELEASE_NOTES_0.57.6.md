@@ -43,7 +43,15 @@ Players who cleared most rooms but couldn't beat the boss (the exact case the re
 
 Players with floors that have been stuck uncleared for hours will see monsters back immediately on next entry, with the thematic respawn message playing for the first time.
 
-## 4. Murder mechanics — no more permadeath (community PR #82 + cleanup)
+## 4. Daily murder cap (3 per day)
+
+With PR #82 removing the execution-deletion consequence, the remaining disincentive against a player going on a Crown-defying killing spree was "you might go to prison for 2 days" — not a huge deterrent for a committed evil build, and definitely not enough to protect the populated town when players could now respawn from "execution" via the normal resurrection flow.
+
+Added `GameConfig.MaxMurdersPerDay = 3`. `Character` gains a `MurdersToday` counter that increments on every successful non-bounty NPC kill and resets with the rest of the daily counters in `DailySystemManager.ApplyDailyReset`. `BaseLocation.AttackNPC` now blocks the interaction up front if the player has already murdered 3 people today — they see a short message ("Your hands tremble. You have already murdered N soul(s) today — even your conscience has limits.") and the attack is refused. Bounty contracts are exempt from the cap — sanctioned kills aren't "murder" for this purpose.
+
+The editor's "Reset daily counters" action also clears `MurdersToday`. A round-trip test in `SaveRoundTripTests` locks the save-persistence contract in.
+
+## 5. Murder mechanics — no more permadeath (community PR #82 + cleanup)
 
 **Huge thanks to [LowLevelJavaCoder](https://github.com/LowLevelJavaCoder)** for submitting [PR #82](https://github.com/binary-knight/usurper-reborn/pull/82) — the first external code contribution of this scale. They've been added to the in-game credits (press `[C]` at the main menu) and the project's credits pages on the website and Steam landing page.
 
@@ -62,7 +70,15 @@ The PR reworked the murder system to remove the character-deletion consequence i
 
 ### Files Changed
 
-- `Scripts/Core/GameConfig.cs` — Version 0.57.6. `MurderDarknessGain` 50 → 250 (PR #82).
+- `Scripts/Core/GameConfig.cs` — Version 0.57.6. `MurderDarknessGain` 50 → 250 (PR #82). New `MaxMurdersPerDay = 3` constant.
+- `Scripts/Core/Character.cs` — New `MurdersToday` daily counter.
+- `Scripts/Systems/SaveDataStructures.cs` — `MurdersToday` added to `PlayerData`.
+- `Scripts/Systems/SaveSystem.cs` — Serialize `MurdersToday`.
+- `Scripts/Core/GameEngine.cs` — Restore `MurdersToday` on load.
+- `Scripts/Systems/DailySystemManager.cs` — Reset `MurdersToday` with the other daily counters.
+- `Scripts/Editor/PlayerSaveEditor.cs` — Include `MurdersToday` in the editor's "Reset daily counters" action.
+- 5 localization files (en/es/fr/hu/it) — Two new keys: `base.murder_daily_cap_reached` and `base.murder_daily_cap_hint`.
+- `Tests/SaveRoundTripTests.cs` — `MurdersToday` added to the `PreservesDailyCounters_DarkAlley` round-trip test.
 - `Scripts/Systems/DungeonGenerator.cs` — `DungeonFloorState.ShouldRespawn` + `TimeUntilRespawn` now key on `LastVisitedAt` instead of `LastClearedAt`, so hourly respawn fires as originally intended even when the player hasn't fully cleared the floor.
 - `Scripts/Systems/CombatEngine.cs` — `TryTeammatePickupItem` phantom-slot guard for Lumina's Aldric bug.
 - `Scripts/Core/Child.cs` — New `DateTime LastParentingTime` field; old `LastParentingDay` kept for save-reader compatibility.
