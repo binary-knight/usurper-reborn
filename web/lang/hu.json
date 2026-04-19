@@ -373,6 +373,9 @@
   "credits.maxsond_name": "maxsond",
   "credits.maxsond_role": "Kódbeli közreműködés",
   "credits.maxsond_desc": "Közösségi közreműködő, aki segített a kódalap javításában.",
+  "credits.lowleveljavacoder_name": "LowLevelJavaCoder",
+  "credits.lowleveljavacoder_role": "Kódbeli közreműködés",
+  "credits.lowleveljavacoder_desc": "Gyilkossági mechanikák átdolgozása: permadeath nélküli kivégzési folyamat és a \"megadás vagy harc\" letartóztatási elágazás (PR #82).",
   "credits.thanks": "Köszönet minden Rendszeroperátornak, aki életben tartott egy boardot, és minden gyereknek, aki betárcsázott, hogy felfedezze Durunghins-t.",
   "credits.discord": "Csatlakozz hozzánk Discordon",
 

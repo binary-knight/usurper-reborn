@@ -16778,6 +16778,7 @@
   "castle.est_auctionhouse": "Auction House",
   "castle.est_church": "The Church",
   "engine.credits_xykier": "    Xykier                   - Code Contributions",
+  "engine.credits_lowleveljavacoder": "    LowLevelJavaCoder        - Code Contributions (Murder Mechanics)",
   "combat.ability_execute_critical": "  EXECUTE! {0} is critically wounded -- {1} bonus damage!",
   "combat.ability_execute_finishing": "  Finishing blow! {0} takes {1} bonus damage!",
   "combat.ability_execute_too_healthy": "  {0} is too healthy for a finishing blow.",

@@ -4806,12 +4806,11 @@ public abstract class BaseLocation
             terminal.WriteLine(Loc.Get("base.attack_darkness", GameConfig.MurderDarknessGain));
 
             // === MURDER CONSEQUENCES (non-bounty kills only) ===
+            // Darkness is already applied above (line 4803) — the PR #82 merge
+            // added a second ChangeAlignment call here which double-counted the
+            // gain (e.g. MurderDarknessGain=250 → +500 per murder). Removed.
             if (!result.WasBountyKill)
             {
-                if (currentPlayer is Player p)
-                {
-                    UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(p, GameConfig.MurderDarknessGain, isGood: false, reason: "murder"); // Crimes are usualy low darkness but murder puts a stain on the soul much deeper than anything else
-                }
                 await ApplyMurderConsequences(currentPlayer, npc);
             }
         }
@@ -4875,7 +4874,15 @@ public abstract class BaseLocation
         terminal.Write("F", "bright_yellow");
         terminal.Write($"]{Loc.Get("street_encounter.hostile.opt_fight")}", "white");
 
-        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
+        // v0.57.8: re-prompt on invalid keystroke. Original code treated any
+        // non-S input as "F" which silently threw the player into the guards
+        // fight on a misclick.
+        string choice;
+        while (true)
+        {
+            choice = (await terminal.GetKeyInput()).ToUpperInvariant();
+            if (choice == "S" || choice == "F") break;
+        }
 
         bool captured;
 
@@ -4933,7 +4940,7 @@ public abstract class BaseLocation
             else
             {
                 // Lost the fight and died
-                captured = false; // Died, so ressurect at temple
+                captured = false; // Died, so resurrect at temple
             }
         }
 
@@ -4990,16 +4997,21 @@ public abstract class BaseLocation
                     p.Die();
                 }
 
-                // Force disconnect
+                // v0.57.8: now that PR #82 changed execution from "delete save"
+                // to "p.Die()", the character survives and should go through
+                // the normal death / resurrection flow. No more force-quit in
+                // single-player (kicking the user out of the process is wrong
+                // UX when the character isn't actually gone). Online mode
+                // still throws to drop the session — the server routes that
+                // through the standard death handler.
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("base.press_key_exit")}");
                 await terminal.PressAnyKey();
 
-                // In MUD mode, throw to disconnect session; in single-player, exit
                 if (DoorMode.IsOnlineMode)
                     throw new Exception("CHARACTER_EXECUTED");
-                else
-                    Environment.Exit(0);
+                // Single-player: fall through — HP=0 from Die() will trigger
+                // the normal resurrection flow at the Temple / death screen.
             }
         }
         else if (captured)

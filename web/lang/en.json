@@ -377,6 +377,9 @@
   "credits.maxsond_name": "maxsond",
   "credits.maxsond_role": "Code Contributions",
   "credits.maxsond_desc": "Community contributor helping improve the codebase.",
+  "credits.lowleveljavacoder_name": "LowLevelJavaCoder",
+  "credits.lowleveljavacoder_role": "Code Contributions",
+  "credits.lowleveljavacoder_desc": "Murder mechanics rework: no-permadeath execution flow and the \"surrender or fight\" arrest branch (PR #82).",
   "credits.thanks": "Thanks to every SysOp who kept a board running, and every kid who dialed in to explore Durunghins.",
   "credits.discord": "Join us on Discord",
 

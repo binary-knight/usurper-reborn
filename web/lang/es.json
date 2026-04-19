@@ -373,6 +373,9 @@
   "credits.maxsond_name": "maxsond",
   "credits.maxsond_role": "Contribuciones al Código",
   "credits.maxsond_desc": "Colaborador de la comunidad ayudando a mejorar el código.",
+  "credits.lowleveljavacoder_name": "LowLevelJavaCoder",
+  "credits.lowleveljavacoder_role": "Contribuciones al Código",
+  "credits.lowleveljavacoder_desc": "Rediseño de mecánicas de asesinato: flujo de ejecución sin permadeath y la bifurcación \"rendirse o luchar\" del arresto (PR #82).",
   "credits.thanks": "Gracias a cada SysOp que mantuvo un tablón activo, y a cada chaval que se conectó a explorar Durunghins.",
   "credits.discord": "Únete a nosotros en Discord",
 

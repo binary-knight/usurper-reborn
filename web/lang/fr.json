@@ -377,6 +377,9 @@
   "credits.maxsond_name": "maxsond",
   "credits.maxsond_role": "Contributions au code",
   "credits.maxsond_desc": "Contributeur communautaire aidant à améliorer le code.",
+  "credits.lowleveljavacoder_name": "LowLevelJavaCoder",
+  "credits.lowleveljavacoder_role": "Contributions au code",
+  "credits.lowleveljavacoder_desc": "Refonte des mécaniques de meurtre : exécution sans mort permanente et l'embranchement \"se rendre ou se battre\" lors de l'arrestation (PR #82).",
   "credits.thanks": "Merci à chaque SysOp qui a maintenu un board en ligne, et à chaque gamin qui s'est connecté pour explorer Durunghins.",
   "credits.discord": "Rejoins-nous sur Discord",
 

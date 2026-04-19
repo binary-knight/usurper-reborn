@@ -1273,27 +1273,45 @@ namespace UsurperRemake.Systems
         public const int RESPAWN_HOURS = 1;
 
         /// <summary>
-        /// Check if this floor should respawn (monsters return)
-        /// Boss/seal floors never respawn once cleared
+        /// Check if this floor should respawn (monsters return).
+        /// Boss/seal floors never respawn once cleared.
+        ///
+        /// v0.57.6: keyed on LastVisitedAt, not LastClearedAt. The old gate
+        /// required the ENTIRE floor to have been cleared before the respawn
+        /// timer even started — `LastClearedAt` is only set inside the
+        /// `IsFloorCleared()` branch at DungeonLocation.cs:5720. Players who
+        /// cleared most rooms but couldn't beat the boss never triggered
+        /// that branch, so their floors never respawned and they ran out of
+        /// XP to grind before the boss fight. Player feedback: "I run out of
+        /// enemies to fight before the boss, making the battle very difficult
+        /// to unachievable." The hourly reset (and the "the dungeon stirs"
+        /// thematic message at DungeonLocation.cs:183) were coded correctly
+        /// but gated on a condition that rarely fired.
+        ///
+        /// LastVisitedAt is updated on every floor entry (not per-room), so
+        /// grinding on the floor without leaving doesn't trigger respawn —
+        /// only returning after a 1-hour absence does, which is the intuition
+        /// players have about a "dungeon reset."
         /// </summary>
         public bool ShouldRespawn()
         {
             if (IsPermanentlyClear) return false;
-            if (LastClearedAt == DateTime.MinValue) return false;
+            if (LastVisitedAt == DateTime.MinValue) return false;
 
-            var hoursSinceCleared = (DateTime.Now - LastClearedAt).TotalHours;
-            return hoursSinceCleared >= RESPAWN_HOURS;
+            var hoursSinceVisit = (DateTime.Now - LastVisitedAt).TotalHours;
+            return hoursSinceVisit >= RESPAWN_HOURS;
         }
 
         /// <summary>
-        /// Get time remaining until respawn (for display)
+        /// Get time remaining until respawn (for display).
+        /// v0.57.6: now uses LastVisitedAt to match ShouldRespawn.
         /// </summary>
         public TimeSpan TimeUntilRespawn()
         {
-            if (IsPermanentlyClear || LastClearedAt == DateTime.MinValue)
+            if (IsPermanentlyClear || LastVisitedAt == DateTime.MinValue)
                 return TimeSpan.Zero;
 
-            var respawnAt = LastClearedAt.AddHours(RESPAWN_HOURS);
+            var respawnAt = LastVisitedAt.AddHours(RESPAWN_HOURS);
             var remaining = respawnAt - DateTime.Now;
             return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
         }

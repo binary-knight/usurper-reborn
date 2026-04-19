@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**ALPHA v0.57.7** | **FREE AND OPEN SOURCE** | **GPL v2**
+**ALPHA v0.57.6** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 60+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age — all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -399,7 +399,7 @@ Join our Discord server for discussions, feedback, and updates:
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (Alpha v0.57.7)
+## Known Issues (Alpha v0.57.6)
 - Save files from earlier alpha versions may not be fully compatible
 - BBS FOSSIL mode not supported (use `--stdio` flag for FOSSIL-based BBSes)
 - Steam features only work when game is launched through Steam client
@@ -409,4 +409,4 @@ Join our Discord server for discussions, feedback, and updates:
 
 ---
 
-**Status**: ALPHA v0.57.7 — The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status**: ALPHA v0.57.6 — The world is running. [Watch it live.](https://usurper-reborn.net)

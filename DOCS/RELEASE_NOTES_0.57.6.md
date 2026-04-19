@@ -1,8 +1,10 @@
-# v0.57.6 - Auto-Pickup Downgrade Hotfix
+# v0.57.6 - Hotfix Rollup (Aldric / Mira / Murder / Dungeon Respawn)
 
-Follow-up for a report from Lumina (Lv.72 Elf Magician, online mode) immediately after v0.57.5 shipped.
+Rollup of four reports that came in after v0.57.5 shipped, plus the cleanup pass on community PR #82 (murder-mechanics rework).
 
-## The report
+## 1. Aldric auto-equipped a weak weapon over his Sword of Thunder
+
+**Report (Lumina, Lv.72 Elf Magician, online mode):**
 
 > "Aldric just auto equipped worst weapon than he was using. I choose Pass after a fight and he grabbed it.
 > Used: Soldier's Sword of Thunder (Blessed) [WP:407 AP:3 Def:+3 Str:+3 Dex:+3 Wis:+3 Crit:5% Leech:5%]
@@ -11,37 +13,62 @@ Follow-up for a report from Lumina (Lv.72 Elf Magician, online mode) immediately
 
 The auto-pickup code in `CombatEngine.TryTeammatePickupItem` is supposed to only equip items on teammates when they're strict upgrades. WP 123 < WP 407 — clearly not an upgrade — so something was bypassing the comparison.
 
-## Root cause
+**Root cause.** The upgrade check reads the teammate's current weapon via `GetEquipment(slot)`, which returns null for TWO distinct cases: genuinely empty slot, and "phantom slot" where an ID is stored in `EquippedItems` but `EquipmentDatabase.GetById()` can't resolve it. Case two happens in MUD mode when dynamic-equipment registration drifts between session ticks. The old code collapsed both cases to `slotIsEmpty = true`, which let any non-zero-power loot become a "100% upgrade."
 
-The upgrade check computes `currentPower` from `teammate.GetEquipment(slot)`. If that returns null, `currentPower` stays 0 and `slotIsEmpty = true`, which then treats ANY item with non-zero power as a "100% upgrade."
+**Fix.** `TryTeammatePickupItem` now distinguishes the two nulls. If `GetEquipment(slot)` returns null AND `EquippedItems[slot]` has a non-zero stored ID, the slot is treated as occupied-but-unknown and the auto-pickup skips it rather than risk replacing something valuable we can't introspect. A warning log under category `COMPANION_EQUIP` fires whenever the phantom path triggers, naming teammate + slot + unresolved ID, so future upstream registration gaps have concrete evidence.
 
-`GetEquipment` can return null for two reasons:
-1. The slot has no entry in `EquippedItems` (truly empty — correct to treat as upgrade).
-2. The slot HAS an entry, but `EquipmentDatabase.GetById()` can't resolve it (phantom slot).
+## 2. "Spending time with children is broken"
 
-Case 2 happens in MUD mode when dynamic-equipment registration drifts between session ticks — the ID is still stored on the teammate but the lookup table no longer has a matching Equipment object. The auto-pickup logic couldn't tell the difference, so a slot that actually held Aldric's Sword of Thunder looked "empty" and the first weak weapon to drop displaced it.
+**Report (Lumina):**
 
-The displacement logic at the call site moved the phantom's real item (Sword of Thunder) to the player's inventory — which is why Lumina was able to recover it manually. Without that safety net it would have been silently lost.
+> "The game claims I spent time with the chosen child, even if I did not that day. I could spend time with newly born child, but not the rest. Now with any of them."
 
-## Fix
+The "Spend Time with Child" interaction at Home has a daily cooldown. The old check compared `Child.LastParentingDay` against `DailySystemManager.Instance.CurrentDay` — a process-wide singleton. In MUD mode the singleton is reloaded from each logging-in player's save (`currentDay = saveData.CurrentDay`), so other players' logins flip its value, and `lastResetTime` is similarly reloaded so real daily ticks get deferred. Net effect: `currentDay` doesn't reliably advance per player, and once `LastParentingDay` caught up to the singleton's value, the `>=` stayed true indefinitely. A freshly-born child (default `LastParentingDay = 0`) worked exactly once — the first interaction set it to `N`, then `N >= N` blocked forever.
 
-`TryTeammatePickupItem` now distinguishes the two null cases:
+**Fix.** Wall-clock cooldown. `Child` gains a `LastParentingTime` DateTime field; the check requires 20 real hours elapsed since the last interaction. No singleton dependency, no cross-session contamination, advances by definition every real-world day. Legacy `LastParentingDay` kept for save-reader compatibility but no longer consulted for the check. Pre-v0.57.6 saves have `LastParentingTime = DateTime.MinValue` (~19 years ago) so the cooldown is trivially expired — any stuck children unblock on next interaction and the system self-heals from there.
 
-- If `GetEquipment(slot)` returns null AND `EquippedItems[slot]` has a non-zero ID, the slot is treated as occupied-but-unknown. Auto-pickup refuses to touch that slot for this loot item. Better to skip a legitimate upgrade than replace a valuable item we can't introspect.
-- If `GetEquipment(slot)` returns null AND `EquippedItems[slot]` is absent or 0, the slot is genuinely empty and auto-pickup proceeds as before.
+## 3. Dungeon hourly respawn never fired
 
-A warning-level log fires whenever the phantom-slot path triggers, under category `COMPANION_EQUIP`, naming the teammate, slot, and unresolved ID. If this log line starts appearing in production we have concrete evidence of a registration gap somewhere upstream — the actual fix for the gap is a separate investigation, but this guard prevents item-loss in the meantime.
+**Player report:** "I run out of enemies to fight before the boss, making the battle very very difficult to unachievable. Dungeons are already supposed to reset every hour with a thematic message — is that not happening?"
 
-## Why it didn't show up earlier
+It wasn't. The hourly-respawn logic was coded correctly and the thematic "the dungeon stirs" message was already wired up at [DungeonLocation.cs:183](Scripts/Locations/DungeonLocation.cs#L183), but the gate in `DungeonFloorState.ShouldRespawn()` checked `LastClearedAt` — a timestamp that's only set INSIDE `if (isNowCleared)` at [DungeonLocation.cs:5720](Scripts/Locations/DungeonLocation.cs#L5720), which requires every monster room on the floor to be cleared including the boss.
 
-The phantom-slot case needs all three conditions:
-1. A teammate with a dynamic-equipment item equipped (not default starting gear).
-2. Loot dropping that the player declines via `Pass`.
-3. The registration gap being active at the moment of comparison.
+Players who cleared most rooms but couldn't beat the boss (the exact case the reporter described) never triggered that branch, so `LastClearedAt` stayed at `DateTime.MinValue`, `ShouldRespawn()` short-circuited, and the respawn + thematic message never fired — leaving them to either push a boss they weren't ready for or give up on the floor.
 
-Dynamic gear on companions is common. Pass-on-loot is common. The registration gap appears sporadic in MUD mode, tied to concurrent player activity or world-sim tick timing. Most playthroughs never line up all three. Lumina did, and reported it in enough detail to reconstruct the chain.
+**Fix.** One-line change in `ShouldRespawn()` and `TimeUntilRespawn()` — both now key on `LastVisitedAt` instead of `LastClearedAt`. `LastVisitedAt` is already tracked and persisted, and updates on every floor entry (not per-room), so:
+
+- Clearing 3 rooms, retreating to town, and coming back 70 minutes later now correctly triggers the respawn + fires the thematic message.
+- Grinding straight through a floor without leaving doesn't loop "monsters respawn behind you," because `LastVisitedAt` isn't touched while you're on the floor.
+- Boss rooms and permanent-clear floors (seals, secret bosses) are unaffected — they still gate on `IsPermanentlyClear` / `BossDefeated` flags.
+
+Players with floors that have been stuck uncleared for hours will see monsters back immediately on next entry, with the thematic respawn message playing for the first time.
+
+## 4. Murder mechanics — no more permadeath (community PR #82 + cleanup)
+
+**Huge thanks to [LowLevelJavaCoder](https://github.com/LowLevelJavaCoder)** for submitting [PR #82](https://github.com/binary-knight/usurper-reborn/pull/82) — the first external code contribution of this scale. They've been added to the in-game credits (press `[C]` at the main menu) and the project's credits pages on the website and Steam landing page.
+
+The PR reworked the murder system to remove the character-deletion consequence introduced in v0.53.11. Merged with follow-up cleanup.
+
+**What the PR ships.** Executing the player no longer calls `SaveSystem.DeleteSave` or the matching multi-table online `DELETE` — instead it calls `Player.Die()`, routing the character through the normal death/resurrection flow. Prison sentence reduced 3 days → 2 days. Prison punishment softened: half of on-hand gold taken, equipment and inventory and bank gold kept (was: everything stripped, including BankGold). New mid-sentence "surrender or fight" branch — before the 50/50 execution/prison roll, the player can elect to fight 5 scaling "Murder Guards." Win and you escape capture entirely (at +100 darkness). Lose but survive and you're captured. Die and you go through normal resurrection. `MurderDarknessGain` constant bumped 50 → 250, paired with a matching -125 chivalry.
+
+**Cleanup on top of the merge.**
+
+- Removed a **duplicate `AlignmentSystem.ChangeAlignment(MurderDarknessGain, "murder")` call** that the PR added alongside the existing call at `BaseLocation.cs:4803`. With the bumped 250 value, the duplicate would have granted +500 darkness per murder, not +250.
+- Reverted `StreetEncounterSystem.CreateRandomHostileNPC` visibility `internal` → `private`. The PR bumped it but nothing in the PR calls it — the 5 Murder Guards are constructed as raw `new Monster { ... }` literals. Leftover from an earlier approach.
+- Wrapped the `[S]/[F]` prompt in an input-validation loop. The original code treated any non-S keystroke as "F," so a misclick silently threw the player into the guards fight.
+- Removed `Environment.Exit(0)` in the single-player execution path. PR changed execution from "delete save" to `Die()` — force-quitting the process afterward is wrong UX now that the character survives to revive at the Temple. Online mode still throws `"CHARACTER_EXECUTED"` to drop the session; the server routes that through the standard death handler.
+- Fixed typo `ressurect` → `resurrect` in an inline comment.
+- Dropped a second typo comment (`usualy`) along with the removed duplicate-alignment block.
 
 ### Files Changed
 
-- `Scripts/Core/GameConfig.cs` — Version 0.57.6.
-- `Scripts/Systems/CombatEngine.cs` — `TryTeammatePickupItem` now checks `teammate.EquippedItems[slot]` before treating a null `GetEquipment` result as "empty slot." Phantom-slot case logs a COMPANION_EQUIP warning and skips the pickup. Fixes the Lumina Aldric-downgrade report.
+- `Scripts/Core/GameConfig.cs` — Version 0.57.6. `MurderDarknessGain` 50 → 250 (PR #82).
+- `Scripts/Systems/DungeonGenerator.cs` — `DungeonFloorState.ShouldRespawn` + `TimeUntilRespawn` now key on `LastVisitedAt` instead of `LastClearedAt`, so hourly respawn fires as originally intended even when the player hasn't fully cleared the floor.
+- `Scripts/Systems/CombatEngine.cs` — `TryTeammatePickupItem` phantom-slot guard for Lumina's Aldric bug.
+- `Scripts/Core/Child.cs` — New `DateTime LastParentingTime` field; old `LastParentingDay` kept for save-reader compatibility.
+- `Scripts/Systems/SaveDataStructures.cs` — `LastParentingTime` added to `ChildData`.
+- `Scripts/Systems/FamilySystem.cs` — Serialize + deserialize the new field.
+- `Scripts/Locations/HomeLocation.cs` — `InteractWithChild` gates on wall-clock time, not day counter.
+- `Scripts/Locations/BaseLocation.cs` — PR #82 murder rework + five cleanup fixes (duplicate alignment removed, input loop on S/F, typo fix, single-player Environment.Exit removed).
+- `Scripts/Systems/StreetEncounterSystem.cs` — Reverted `CreateRandomHostileNPC` to `private`.
+- 5 localization files (en/es/fr/hu/it) — prison sentence text 3 days → 2 days + key rename from PR #82.

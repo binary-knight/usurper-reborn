@@ -16778,6 +16778,7 @@
   "castle.est_auctionhouse": "Maison de ventes",
   "castle.est_church": "L'Église",
   "engine.credits_xykier": "    Xykier                   - Contributions au code",
+  "engine.credits_lowleveljavacoder": "    LowLevelJavaCoder        - Contributions au code (mécaniques de meurtre)",
   "combat.ability_execute_critical": "  EXÉCUTION ! {0} est grièvement blessé -- {1} dégâts bonus !",
   "combat.ability_execute_finishing": "  Coup de grâce ! {0} subit {1} dégâts bonus !",
   "combat.ability_execute_too_healthy": "  {0} a trop de vie pour un coup de grâce.",

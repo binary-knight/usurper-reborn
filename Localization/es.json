@@ -16778,6 +16778,7 @@
   "castle.est_auctionhouse": "Casa de Subastas",
   "castle.est_church": "La Iglesia",
   "engine.credits_xykier": "    Xykier                   - Contribuciones de Código",
+  "engine.credits_lowleveljavacoder": "    LowLevelJavaCoder        - Contribuciones de Código (Mecánicas de Asesinato)",
   "combat.ability_execute_critical": "  ¡EJECUCIÓN! {0} está gravemente herido -- ¡{1} daño extra!",
   "combat.ability_execute_finishing": "  ¡Golpe final! ¡{0} recibe {1} daño extra!",
   "combat.ability_execute_too_healthy": "  {0} tiene demasiada salud para un golpe final.",
