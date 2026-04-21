@@ -7915,6 +7915,10 @@ public partial class CombatEngine
                                     }
                                     CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
                                     string teammateName = teammate.Name2 ?? teammate.Name1 ?? "Your ally";
+                                    // v0.57.8: "You nod. Aldric gears up." moved here from the confirm
+                                    // prompt so it only prints when the equip actually succeeds.
+                                    terminal.SetColor("gray");
+                                    terminal.WriteLine(Loc.Get("combat.loot_ally_approved", teammateName));
                                     terminal.SetColor("bright_green");
                                     terminal.WriteLine(Loc.Get("combat.loot_ally_picks_up", teammateName, lootItem.Name, upgradePercent));
                                     itemTaken = true;
@@ -8367,6 +8371,9 @@ public partial class CombatEngine
                                     }
                                     CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
                                     string teammateName = teammate.Name2 ?? teammate.Name1 ?? "Your ally";
+                                    // v0.57.8: "You nod. X gears up." only after the equip actually succeeds.
+                                    terminal.SetColor("gray");
+                                    terminal.WriteLine(Loc.Get("combat.loot_ally_approved", teammateName));
                                     terminal.SetColor("bright_green");
                                     terminal.WriteLine(Loc.Get("combat.loot_ally_picks_up", teammateName, lootItem.Name, upgradePercent));
                                     itemTaken = true;
@@ -8751,6 +8758,17 @@ public partial class CombatEngine
             var (canUseClass, _) = LootGenerator.CanClassUseLootItem(teammate.Class, lootItem);
             if (!canUseClass) continue;
 
+            // v0.57.8 (Krunch/Aldric report): the class-name-based CanClassUseLootItem only looks
+            // at weapon-template name matches; it doesn't see the companion-specific whitelist at
+            // Items.cs:1011-1022 (Aldric/Tank role = swords/axes/maces/etc, Mira/Healer = maces/
+            // staves, Lyris/Hybrid = bows, Vex/Damage = daggers, Melodia = instruments). Without
+            // this check, a "Fine Short Bow" would slip through and Aldric would get prompted to
+            // auto-equip a weapon he physically cannot use — and the actual EquipItem below would
+            // silently fail, leaving a contradictory "gears up"/"left behind" message.
+            // Build the hypothetical Equipment and ask CanEquip for the authoritative answer.
+            var candidateEquip = ConvertLootItemToEquipment(lootItem);
+            if (candidateEquip == null || !candidateEquip.CanEquip(teammate, out _)) continue;
+
             // Check level requirement
             if (lootItem.MinLevel > 0 && teammate.Level < lootItem.MinLevel) continue;
 
@@ -8958,10 +8976,15 @@ public partial class CombatEngine
         // French O (Oui), Italian S (Sì), Hungarian I (Igen). Falls through to N otherwise.
         bool approved = ch == "Y" || ch == "S" || ch == "O" || ch == "I";
 
-        terminal.SetColor("gray");
-        terminal.WriteLine(approved
-            ? Loc.Get("combat.loot_ally_approved", tname)
-            : Loc.Get("combat.loot_ally_declined"));
+        // v0.57.8: only print the declined message here. The "approved" line
+        // ("You nod. Aldric gears up.") is printed by the caller AFTER EquipItem
+        // succeeds, so the player never sees "gears up" followed by "left behind"
+        // when some late validation makes the equip fall through.
+        if (!approved)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("combat.loot_ally_declined"));
+        }
         return approved;
     }
 

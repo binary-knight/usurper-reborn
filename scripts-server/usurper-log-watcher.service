@@ -5,6 +5,9 @@ Wants=usurper-mud.service
 
 [Service]
 Type=simple
+# Loads DISCORD_WEBHOOK_URL. File lives outside this repo, 0640 root:usurper.
+# Sample at scripts-server/log-watcher.env.example.
+EnvironmentFile=/etc/usurper/log-watcher.env
 ExecStart=/opt/usurper/log-watcher.sh
 Restart=always
 RestartSec=10

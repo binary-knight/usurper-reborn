@@ -731,7 +731,6 @@ namespace UsurperRemake.Systems
             {
                 room.Name = settlement.Name;
                 room.Description = settlement.Description;
-                room.IsSafeRoom = true;
                 room.HasMonsters = false;
                 room.HasTrap = false;
                 room.HasTreasure = false;
@@ -835,7 +834,6 @@ namespace UsurperRemake.Systems
                         room.HasEvent = true;
                         room.EventType = DungeonEventType.RestSpot;
                         room.HasMonsters = false;
-                        room.IsSafeRoom = true;
                         room.GrantsInsight = floor.Level >= 30;
                         break;
 
@@ -1095,8 +1093,8 @@ namespace UsurperRemake.Systems
         public LoreFragmentType? LoreFragmentType { get; set; }
         public bool LoreCollected { get; set; } = false;
 
-        // Safe room / meditation properties
-        public bool IsSafeRoom { get; set; } = false;
+        // Meditation properties (v0.57.7: IsSafeRoom flag removed — redundant with RoomType.MeditationChamber
+        // / DungeonEventType.RestSpot, which still carry the mechanical + narrative payload via RestSpotEncounter.)
         public bool GrantsInsight { get; set; } = false;
         public bool InsightGranted { get; set; } = false;
 

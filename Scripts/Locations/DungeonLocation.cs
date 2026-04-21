@@ -11884,13 +11884,6 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.explored_cleared_count", explored, total, cleared, total), "gray");
         if (currentFloor.BossDefeated)
             terminal.WriteLine(Loc.Get("dungeon.boss_defeated"), "bright_green");
-        // v0.57.7 (Lumina): BFS below skips the starting room, so a player standing IN a
-        // designated safe haven used to be pointed at the NEXT-nearest one as if they had
-        // to travel. Surface the "you're already in one" state up-front so the guide's
-        // Safe Haven entry (if it still lists one) can't look contradictory.
-        bool currentRoomIsSafeHaven = current != null && current.IsSafeRoom;
-        if (currentRoomIsSafeHaven)
-            terminal.WriteLine(Loc.Get("dungeon.nav_safe_haven_here"), "bright_green");
         terminal.WriteLine("");
 
         // Build BFS parent map from current room through explored rooms
@@ -11926,7 +11919,6 @@ public class DungeonLocation : BaseLocation
         string? bossRoomId = null;
         string? nearestUnexploredId = null;
         string? nearestUnclearedId = null;
-        string? nearestSafeHavenId = null;
 
         // BFS order guarantees nearest first, so iterate parentMap keys in insertion order
         foreach (var roomId in bfsVisited)
@@ -11943,14 +11935,10 @@ public class DungeonLocation : BaseLocation
                 nearestUnexploredId = roomId;
             if (nearestUnclearedId == null && room.IsExplored && !room.IsCleared && room.HasMonsters)
                 nearestUnclearedId = roomId;
-            if (nearestSafeHavenId == null && room.IsSafeRoom && room.IsExplored)
-                nearestSafeHavenId = roomId;
         }
 
         // Menu
         var options = new List<(string key, string label, string? targetId)>();
-        if (nearestSafeHavenId != null)
-            options.Add(("H", Loc.Get("dungeon.nav_safe_haven"), nearestSafeHavenId));
         if (nearestUnexploredId != null)
             options.Add(("U", Loc.Get("dungeon.nav_unexplored"), nearestUnexploredId));
         if (nearestUnclearedId != null)
@@ -12053,8 +12041,6 @@ public class DungeonLocation : BaseLocation
             return Loc.Get("dungeon.status_monsters");
         if (room.HasStairsDown)
             return room.IsCleared ? Loc.Get("dungeon.status_stairs_cleared") : Loc.Get("dungeon.status_stairs");
-        if (room.IsSafeRoom)
-            return Loc.Get("dungeon.status_safe");
         if (room.IsCleared)
             return Loc.Get("dungeon.status_cleared");
         return Loc.Get("dungeon.status_explored");
@@ -12254,8 +12240,6 @@ public class DungeonLocation : BaseLocation
             return '#';
         if (room.HasMonsters)
             return '\u2588'; // █ solid block
-        if (room.IsSafeRoom)
-            return '~';
         return '\u00B7'; // · middle dot (explored, safe)
     }
 

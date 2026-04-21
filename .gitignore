@@ -62,6 +62,11 @@ CLAUDE.md
 telemetry_config.txt
 nul
 
+# Server env files (contain webhook URLs - never commit)
+# The .example sibling IS committed as a template.
+*.env
+!*.env.example
+
 # Dev/localization tooling scripts (not part of the game)
 tools/
 DOCS/FEEDBACK_PLAN_0.56.0.md

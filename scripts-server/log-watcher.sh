@@ -7,9 +7,17 @@
 # Service: sudo systemctl enable --now usurper-log-watcher
 
 LOG_FILE="/opt/usurper/logs/debug.log"
-WEBHOOK_URL="https://discord.com/api/webhooks/1491120732959277106/MP8oj8_BYCk9zeqLoV6sS6kIzTDf46RfPiOp8fQrS9Doj61EJD-zXWOpBFng_9m_xQbr"
+# DISCORD_WEBHOOK_URL is read from the environment — systemd sources
+# /etc/usurper/log-watcher.env via EnvironmentFile (see usurper-log-watcher.service).
+# Never commit the real URL to this repo. Rotate the webhook if the URL leaks.
+WEBHOOK_URL="${DISCORD_WEBHOOK_URL:-}"
 STATE_DIR="/var/usurper/log-watcher"
 COOLDOWN_SECONDS=300  # 5 min cooldown per unique error signature
+
+if [ -z "$WEBHOOK_URL" ]; then
+    echo "[$(date)] ERROR: DISCORD_WEBHOOK_URL is not set. Configure /etc/usurper/log-watcher.env." >&2
+    exit 1
+fi
 
 mkdir -p "$STATE_DIR"
 

@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.57.7";
+    public const string Version = "0.57.8";
     public const string VersionName = "Alignment and Shields";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
