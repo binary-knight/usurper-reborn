@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
 using System;
+using UsurperRemake.Server;
 
 /// <summary>
 /// Prison Location - The prisoner's perspective inside the Royal Prison
@@ -15,14 +16,14 @@ public partial class PrisonLocation : BaseLocation
     private readonly GameEngine gameEngine;
     private new readonly TerminalEmulator terminal;
     private bool refreshMenu = true;
-    
+
     public PrisonLocation(GameEngine engine, TerminalEmulator term) : base("prison")
     {
         gameEngine = engine;
         terminal = term;
         SetLocationProperties();
     }
-    
+
     // Add parameterless constructor for compatibility
     public PrisonLocation() : base("prison")
     {
@@ -30,7 +31,7 @@ public partial class PrisonLocation : BaseLocation
         terminal = GameEngine.Instance.Terminal;
         SetLocationProperties();
     }
-    
+
     private void SetLocationProperties()
     {
         LocationId = GameLocation.Prison;
@@ -38,14 +39,14 @@ public partial class PrisonLocation : BaseLocation
         LocationDescription = "You are locked in a cold, damp prison cell";
         AllowedClasses = new HashSet<CharacterClass>(); // All classes allowed
         LevelRequirement = 1;
-        
+
         // Add all character classes to allowed set
         foreach (CharacterClass charClass in System.Enum.GetValues<CharacterClass>())
         {
             AllowedClasses.Add(charClass);
         }
     }
-    
+
     /// <summary>
     /// Override base EnterLocation to handle prison-specific logic
     /// </summary>
@@ -65,7 +66,7 @@ public partial class PrisonLocation : BaseLocation
         refreshMenu = true;
         await ShowPrisonInterface(player);
     }
-    
+
     private async Task ShowPrisonInterface(Character player)
     {
         char choice = '?';
@@ -115,14 +116,48 @@ public partial class PrisonLocation : BaseLocation
             await DisplayPrisonMenu(player, true, true);
 
             // Get user input
-            choice = await terminal.GetCharAsync();
-            choice = char.ToUpper(choice);
+            string fullChoice = await terminal.ReadLineAsync();
+            choice = char.ToUpper(fullChoice[0]);
+
+            if ((fullChoice.StartsWith("/goss ") || fullChoice.StartsWith("/gossip ")) && SessionContext.IsActive)
+            {
+                var ctx = SessionContext.Current!;
+                var username = ctx.Username;
+                var spaceIndex = fullChoice.IndexOf(' ');
+                var message = spaceIndex > 0 ? fullChoice.Substring(spaceIndex + 1).Trim() : "";
+
+                var session = MudServer.Instance?.ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
+
+                if (session?.IsMuted == true)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine("  You have been silenced by the gods. You cannot speak.");
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(message))
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine("  Gossip what? Usage: /gossip <message>  (or /gos)");
+                    }
+
+                    // Show to sender
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine($"  [Gossip] You: {message}");
+
+                    // Broadcast to ALL connected players (global out-of-character channel)
+                    RoomRegistry.Instance!.BroadcastGlobal(
+                        $"\u001b[92m  [Gossip] {MudChatSystem.GetChatDisplayName(username)}): {message}\u001b[0m",
+                        excludeUsername: username);
+
+                }
+            }
 
             // Process user choice - returns true if player escaped/freed
             exitPrison = await ProcessPrisonChoice(player, choice);
         }
     }
-    
+
     private Task UpdatePrisonStatus(Character player)
     {
         // This would typically update the online player location
@@ -130,7 +165,7 @@ public partial class PrisonLocation : BaseLocation
         refreshMenu = true;
         return Task.CompletedTask;
     }
-    
+
     private async Task<bool> CanOpenCellDoor(Character player)
     {
         // In Pascal, this checks if onliner.location == onloc_prisonerop
@@ -139,7 +174,7 @@ public partial class PrisonLocation : BaseLocation
         await Task.CompletedTask;
         return player.CellDoorOpen;
     }
-    
+
     private async Task HandleCellDoorOpen(Character player)
     {
         await terminal.WriteLineAsync();
@@ -170,20 +205,20 @@ public partial class PrisonLocation : BaseLocation
         // Return to dormitory
         await Task.Delay(GameConfig.PrisonCellOpenDelay);
     }
-    
+
     private bool ShouldShowOthersHere(Character player)
     {
         // In Pascal: if player.ear = global_ear_all
         // For now, always show others
         return true;
     }
-    
+
     private Task ShowOthersHere(Character player)
     {
         // Online prisoner display not yet implemented
         return Task.CompletedTask;
     }
-    
+
     private async Task DisplayPrisonMenu(Character player, bool force, bool isShort)
     {
         if (isShort)
@@ -195,7 +230,7 @@ public partial class PrisonLocation : BaseLocation
                     refreshMenu = false;
                     await ShowPrisonMenuFull();
                 }
-                
+
                 await terminal.WriteLineAsync();
                 await terminal.WriteAsync(Loc.Get("prison.prompt_prefix"));
                 await terminal.WriteColorAsync("?", TerminalEmulator.ColorYellow);
@@ -215,12 +250,12 @@ public partial class PrisonLocation : BaseLocation
             }
         }
     }
-    
+
     private async Task ShowPrisonMenuFull()
     {
         await terminal.ClearScreenAsync();
         await terminal.WriteLineAsync();
-        
+
         // Prison header
         if (!IsScreenReader)
         {
@@ -233,7 +268,7 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteColorLineAsync(Loc.Get("prison.title"), TerminalEmulator.ColorCyan);
         }
         await terminal.WriteLineAsync();
-        
+
         // Prison atmosphere description
         await terminal.WriteLineAsync(Loc.Get("prison.atmo1"));
         await terminal.WriteLineAsync(Loc.Get("prison.atmo2"));
@@ -241,7 +276,7 @@ public partial class PrisonLocation : BaseLocation
         await terminal.WriteLineAsync(Loc.Get("prison.atmo4"));
         await terminal.WriteLineAsync(Loc.Get("prison.atmo5"));
         await terminal.WriteLineAsync();
-        
+
         // Menu options
         if (IsScreenReader)
         {
@@ -301,7 +336,7 @@ public partial class PrisonLocation : BaseLocation
 
         return true;
     }
-    
+
     private async Task<bool> ProcessPrisonChoice(Character player, char choice)
     {
         switch (choice)
@@ -610,7 +645,7 @@ public partial class PrisonLocation : BaseLocation
 
         refreshMenu = true;
     }
-    
+
     private async Task HandleMenuDisplay(Character player)
     {
         if (player.Expert)
@@ -618,12 +653,12 @@ public partial class PrisonLocation : BaseLocation
         else
             await DisplayPrisonMenu(player, false, false);
     }
-    
+
     private async Task HandleStatusDisplay(Character player)
     {
         await ShowCharacterStatus(player);
     }
-    
+
     private async Task ShowCharacterStatus(Character player)
     {
         await terminal.WriteLineAsync();
@@ -638,12 +673,12 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteLineAsync(Loc.Get("prison.released_tomorrow"));
         else
             await terminal.WriteLineAsync(Loc.Get("prison.days_left", player.DaysInPrison));
-            
+
         await terminal.WriteLineAsync();
         await terminal.WriteAsync(Loc.Get("ui.press_enter"));
         await terminal.GetCharAsync();
     }
-    
+
     private async Task<bool> HandleQuitConfirmation(Character player)
     {
         await terminal.WriteLineAsync();
@@ -666,7 +701,7 @@ public partial class PrisonLocation : BaseLocation
         // Save and quit - throw game exit exception
         throw new GameExitException("Player logging out from prison");
     }
-    
+
     private async Task HandleOpenCellDoor(Character player)
     {
         await terminal.WriteLineAsync();
@@ -691,7 +726,7 @@ public partial class PrisonLocation : BaseLocation
             await Task.Delay(1000);
         }
     }
-    
+
     private async Task HandleDemandRelease(Character player)
     {
         if (player.IsMurderConvict)
@@ -711,7 +746,7 @@ public partial class PrisonLocation : BaseLocation
         await terminal.WriteLineAsync();
         await terminal.WriteLineAsync();
         await terminal.WriteLineAsync(Loc.Get("prison.dark_voice"));
-        
+
         // Random guard response (Pascal: case random(5))
         var random = new System.Random();
         string response = random.Next(5) switch
@@ -722,7 +757,7 @@ public partial class PrisonLocation : BaseLocation
             3 => GameConfig.PrisonDemandResponse4,
             _ => GameConfig.PrisonDemandResponse5
         };
-        
+
         await terminal.WriteColorLineAsync(response, TerminalEmulator.ColorMagenta);
         await terminal.WriteLineAsync(Loc.Get("prison.released_probably"));
 
@@ -747,7 +782,7 @@ public partial class PrisonLocation : BaseLocation
             }
         }
     }
-    
+
     private async Task<bool> HandleEscapeAttempt(Character player)
     {
         await terminal.WriteLineAsync();
@@ -827,17 +862,17 @@ public partial class PrisonLocation : BaseLocation
             throw new LocationExitException(GameLocation.MainStreet);
         }
     }
-    
+
     private async Task HandleListPrisoners(Character player)
     {
         await terminal.WriteLineAsync();
         await terminal.WriteLineAsync();
         await terminal.WriteColorLineAsync(Loc.Get("prison.prisoners_header"), TerminalEmulator.ColorWhite);
         await terminal.WriteColorLineAsync("=========", TerminalEmulator.ColorWhite);
-        
+
         // List other prisoners
         var prisoners = await GetOtherPrisoners(player);
-        
+
         if (prisoners.Count == 0)
         {
             await terminal.WriteColorLineAsync(Loc.Get("prison.only_prisoner"), TerminalEmulator.ColorCyan);
@@ -849,16 +884,16 @@ public partial class PrisonLocation : BaseLocation
                 await ShowPrisonerInfo(prisoner);
             }
         }
-        
+
         // Show player's remaining time
         await terminal.WriteLineAsync();
         await terminal.WriteLineAsync(Loc.Get("prison.days_left_info", player.DaysInPrison));
-        
+
         await terminal.WriteLineAsync();
         await terminal.WriteAsync(Loc.Get("ui.press_enter"));
         await terminal.GetCharAsync();
     }
-    
+
     private async Task<List<Character>> GetOtherPrisoners(Character currentPlayer)
     {
         var prisoners = new List<Character>();
@@ -875,7 +910,7 @@ public partial class PrisonLocation : BaseLocation
 
         return prisoners;
     }
-    
+
     private async Task ShowPrisonerInfo(Character prisoner)
     {
         await terminal.WriteColorAsync(prisoner.DisplayName, TerminalEmulator.ColorCyan);
@@ -899,12 +934,12 @@ public partial class PrisonLocation : BaseLocation
         int daysLeft = prisoner.DaysInPrison > 0 ? prisoner.DaysInPrison : 1;
         await terminal.WriteLineAsync(Loc.Get("prison.days_left_parens", daysLeft));
     }
-    
+
     private string GetRaceDisplay(CharacterRace race)
     {
         return race.ToString();
     }
-    
+
     private Task<bool> IsPlayerOnline(Character player)
     {
         // Online player checking not yet implemented
@@ -1183,4 +1218,4 @@ public partial class PrisonLocation : BaseLocation
     }
 
     #endregion
-} 
+}

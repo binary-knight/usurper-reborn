@@ -179,7 +179,7 @@ public static class MudChatSystem
     /// Returns the display name for a player: character name (not login name).
     /// Gods: "DivineName the Lesser Spirit", others: Name2 → Name1 → login username fallback.
     /// </summary>
-    private static string GetChatDisplayName(string username)
+    public static string GetChatDisplayName(string username)
     {
         var server = MudServer.Instance;
         if (server != null && server.ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))
