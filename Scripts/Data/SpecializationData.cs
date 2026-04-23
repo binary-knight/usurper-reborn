@@ -499,6 +499,32 @@ public static class SpecializationData
     }
 
     /// <summary>
+    /// v0.57.11: Roles plausibly fillable by an unspecialized NPC of this class.
+    /// Most free NPCs (not yet on a player team) have `Specialization = None`, so
+    /// the recruitment role filter can't read their specs directly. This fallback
+    /// maps `CharacterClass` to the set of `SpecRole` values the class supports
+    /// via its two specs (or, for prestige classes, a hand-curated best-fit set).
+    /// Returns an array so recruitment filtering can match "any of these roles."
+    /// </summary>
+    public static SpecRole[] GetDefaultRolesForClass(CharacterClass charClass)
+    {
+        // Base classes — take the union of their two specs' roles.
+        var specRoles = GetSpecsForClass(charClass).Select(s => s.Role).Distinct().ToArray();
+        if (specRoles.Length > 0) return specRoles;
+
+        // Prestige classes (no specs defined) — hand-curated best-fit.
+        return charClass switch
+        {
+            CharacterClass.Tidesworn   => new[] { SpecRole.Tank, SpecRole.DPS },
+            CharacterClass.Wavecaller  => new[] { SpecRole.Healer, SpecRole.Utility },
+            CharacterClass.Cyclebreaker => new[] { SpecRole.DPS, SpecRole.Utility },
+            CharacterClass.Abysswarden => new[] { SpecRole.DPS, SpecRole.Debuff },
+            CharacterClass.Voidreaver  => new[] { SpecRole.DPS },
+            _ => new[] { SpecRole.DPS }, // safe fallback — every class can at least hit things
+        };
+    }
+
+    /// <summary>
     /// Check if a specialization is valid for a given class.
     /// </summary>
     public static bool IsValidSpecForClass(ClassSpecialization spec, CharacterClass charClass)

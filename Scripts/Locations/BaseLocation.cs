@@ -482,6 +482,23 @@ public abstract class BaseLocation
                 await terminal.PressAnyKey();
             }
         }
+        catch (LocationExitException)
+        {
+            // v0.57.11 fix for v0.57.10 regression: let the teleport propagate.
+            // The v0.57.10 Royal Guard fix replaced the old
+            // `NavigateToLocation(Castle)` call with
+            // `throw new LocationExitException(GameLocation.Castle)` to bypass
+            // the navigation-table walking-rules check. It worked for the
+            // teleport logic but didn't account for this method's outer
+            // `catch (Exception ex)` below, which was swallowing the
+            // LocationExitException (it inherits from Exception) and logging
+            // it as "King system guard check failed: Exiting to Castle" with
+            // the player stuck at their original location. The teleport signal
+            // needs to propagate up to LocationManager.EnterLocation's
+            // dedicated catch handler to actually move the player. Re-throwing
+            // here before the general catch sees it.
+            throw;
+        }
         catch (Exception ex)
         {
             // King system not available - ignore

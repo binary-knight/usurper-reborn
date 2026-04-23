@@ -16109,12 +16109,38 @@ public partial class CombatEngine
         var spells = SpellSystem.GetAllSpellsForClass(caster.Class);
         if (spells == null || spells.Count == 0) return null;
 
+        // v0.57.11: filter out spells the player has disabled on this companion
+        // at the Inn Combat Skills screen. Before this release the Inn UI only
+        // managed class abilities, so companions would keep casting spells
+        // (e.g. Mass Cure) even when the player had turned every ability OFF —
+        // reported by Glamdring: Mira was spamming group heal regardless.
+        var disabledSpells = GetDisabledSpellsFor(caster);
+
         return spells
             .Where(s => s.SpellType == "Heal" &&
                         caster.Level >= SpellSystem.GetLevelRequired(caster.Class, s.Level) &&
-                        caster.Mana >= s.ManaCost)
+                        caster.Mana >= s.ManaCost &&
+                        !disabledSpells.Contains(s.Name))
             .OrderByDescending(s => s.Level) // Prefer higher level heals
             .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// v0.57.11: returns the set of spell names the player has disabled on this
+    /// companion via the Inn Combat Skills UI. Returns an empty set for
+    /// non-companion characters or for companions with no disabled spells.
+    /// Looks at `Character.IsCompanion` + `CompanionId` (the enum) rather than
+    /// NPC type, because companion wrappers during combat are Character-typed.
+    /// </summary>
+    private static HashSet<string> GetDisabledSpellsFor(Character caster)
+    {
+        if (caster.IsCompanion && caster.CompanionId.HasValue && CompanionSystem.Instance != null)
+        {
+            var companion = CompanionSystem.Instance.GetCompanion(caster.CompanionId.Value);
+            if (companion?.DisabledSpells != null && companion.DisabledSpells.Count > 0)
+                return companion.DisabledSpells;
+        }
+        return new HashSet<string>();
     }
 
     /// <summary>
@@ -16126,10 +16152,15 @@ public partial class CombatEngine
         var spells = SpellSystem.GetAllSpellsForClass(caster.Class);
         if (spells == null || spells.Count == 0) return null;
 
+        // v0.57.11: parallel to `GetBestHealSpell` — drop spells the player has
+        // disabled on this companion at the Inn Combat Skills screen.
+        var disabledSpells = GetDisabledSpellsFor(caster);
+
         var availableAttacks = spells
             .Where(s => s.SpellType == "Attack" &&
                         caster.Level >= SpellSystem.GetLevelRequired(caster.Class, s.Level) &&
-                        caster.Mana >= SpellSystem.CalculateManaCost(s, caster))
+                        caster.Mana >= SpellSystem.CalculateManaCost(s, caster) &&
+                        !disabledSpells.Contains(s.Name))
             .ToList();
 
         if (availableAttacks.Count == 0) return null;

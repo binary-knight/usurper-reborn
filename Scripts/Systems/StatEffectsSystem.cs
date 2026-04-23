@@ -44,22 +44,60 @@ public static class StatEffectsSystem
     }
 
     /// <summary>
-    /// Critical hit chance from Dexterity + equipment bonuses
-    /// Base 5% + (Dexterity / 10)% + equipment crit bonus, clamped to 5-50%
-    /// Creator's Eye artifact: +50% crit chance (multiplicative), doubled during Manwe fight
+    /// Critical hit chance from Dexterity + equipment bonuses.
+    ///
+    /// Base formula: 5 + (Dexterity / 10) + equipment crit bonus.
+    ///
+    /// v0.57.11 — DEX-scaling cap + Creator's Eye rebalance.
+    ///
+    /// Before v0.57.11 the cap was a flat 50% for every character and the
+    /// Creator's Eye artifact applied a pre-clamp 1.5× multiplier. Two
+    /// feedback problems surfaced from that: (a) DEX-primary classes
+    /// (Assassin / Ranger / Jester / Abysswarden / Wayfarer) got nothing
+    /// out of stat investment past DEX ~450 because the cap pinned them,
+    /// and (b) the artifact was so strong it instantly floored any build
+    /// at 50% crit, making further DEX investment meaningless for every
+    /// other class too.
+    ///
+    /// New behavior:
+    ///   - Cap scales from 50 to 75 based on DEX: <c>cap = 50 + min(25, DEX/30)</c>.
+    ///     A DEX 750 Jester / Abysswarden hits the 75% ceiling. A DEX 100
+    ///     Warrior still caps at ~53%. DEX investment matters all the way up.
+    ///   - Creator's Eye drops from a 1.5× pre-clamp multiplier to a flat
+    ///     +10 crit chance. Low-DEX builds still benefit (free 10 points).
+    ///     High-DEX builds still benefit (it stacks under their raised cap).
+    ///     But it no longer trivializes the subsystem — the artifact is a
+    ///     strong complement to a crit build, not a replacement for one.
+    ///   - Manwe/Void Key bonus preserved: the artifact's flat bonus doubles
+    ///     (+20) during the Manwe battle with the Void Key, matching the
+    ///     prior "empowered artifact" narrative.
+    ///
+    /// Maximum crit ceiling with every source: DEX 750 (cap raised to 75)
+    /// + equipment bonuses already rolled into baseChance → 75%. A Wavecaller
+    /// with Ocean's Voice active still gets a sequential backup roll on top
+    /// (separate mechanic), bringing effective rate to ~80% in niche cases.
+    /// Guaranteed-crit abilities (Hidden, Backstab, Umbral Step, Temporal
+    /// Feint, Vanish) remain a separate 100%-for-one-hit mechanic.
     /// </summary>
     public static int GetCriticalHitChance(long dexterity, int equipmentCritBonus = 0)
     {
         int baseChance = 5 + (int)(dexterity / 10) + equipmentCritBonus;
 
-        // Creator's Eye: +50% critical hit chance (multiplicative)
+        // Creator's Eye: flat crit chance bonus. Doubles during Manwe fight
+        // with the Void Key to preserve the empowered-artifact moment.
         if (ArtifactSystem.Instance.HasCreatorsEye())
         {
-            float mult = ArtifactSystem.Instance.HasVoidKey() && CombatEngine.IsManweBattle ? 2.0f : 1.5f;
-            baseChance = (int)(baseChance * mult);
+            int eyeBonus = GameConfig.CreatorsEyeCritBonus;
+            if (ArtifactSystem.Instance.HasVoidKey() && CombatEngine.IsManweBattle)
+                eyeBonus *= 2;
+            baseChance += eyeBonus;
         }
 
-        return Math.Clamp(baseChance, 5, 50);
+        // DEX-scaling cap: 50 baseline, +1 per 30 DEX, cap at +25 (75% total).
+        // Keeps a hard ceiling (no 100% crit walkthroughs) while rewarding
+        // deep DEX investment for DEX-primary classes.
+        int cap = 50 + (int)Math.Min(25, dexterity / 30);
+        return Math.Clamp(baseChance, 5, cap);
     }
 
     /// <summary>

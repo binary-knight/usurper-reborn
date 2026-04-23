@@ -843,6 +843,140 @@ public partial class TeamSystem
         public Character Fighter1 { get; set; }
         public Character Fighter2 { get; set; }
     }
-    
+
     #endregion
-} 
+
+    #region Recruitment (v0.57.11)
+
+    /// <summary>
+    /// Classifies the relationship-band a potential recruit falls into,
+    /// relative to the recruiting player. Drives both the price multiplier
+    /// and the UI presentation (tag, sort order, refusal flavor).
+    /// </summary>
+    public enum RecruitmentBand
+    {
+        /// <summary>Hidden from recruitment entirely (lover/spouse/FWB/ex).</summary>
+        Hidden,
+        /// <summary>Discounted price (≤ Friendship / Trust / Respect).</summary>
+        Friend,
+        /// <summary>Baseline price (= Normal).</summary>
+        Neutral,
+        /// <summary>Surcharge price (≤ Suspicious / Anger).</summary>
+        Rival,
+        /// <summary>Refuses to join at any price (Enemy / Hate).</summary>
+        Refused
+    }
+
+    /// <summary>
+    /// v0.57.11: maps a recruit's relationship to the player into a band +
+    /// multiplier pair. The 5 spec bands (Friend / Neutral / Rival) collapse
+    /// eight numeric relationship tiers plus the `RomanceTracker` partner-filter
+    /// into presentation-layer buckets the UI can render cleanly.
+    ///
+    /// Romantic partners (spouse / lover / FWB / ex, via `RomanceTracker`) return
+    /// `(Hidden, 1.0)` regardless of numeric relationship score. The caller is
+    /// expected to drop Hidden entries before rendering.
+    /// </summary>
+    public static (RecruitmentBand band, double multiplier) GetRecruitmentBand(Character player, NPC npc)
+    {
+        // Partner filter: romantic relationships take NPCs out of the recruitable
+        // pool entirely, regardless of their numeric relationship score. Matches
+        // the spec — lovers / spouses / FWB / ex are life-partners, not hirelings.
+        var romanceType = RomanceTracker.Instance.GetRelationType(npc.ID);
+        if (romanceType == RomanceRelationType.Spouse
+         || romanceType == RomanceRelationType.Lover
+         || romanceType == RomanceRelationType.FWB
+         || romanceType == RomanceRelationType.Ex)
+        {
+            return (RecruitmentBand.Hidden, 1.0);
+        }
+
+        // Score-based bands. Lower score = better relationship. See
+        // GameConfig.Relation* constants for the numeric thresholds.
+        int score = RelationshipSystem.GetRelationshipStatus(player, npc);
+
+        if (score <= GameConfig.RelationFriendship) return (RecruitmentBand.Friend, GameConfig.RecruitPriceFriendship);
+        if (score <= GameConfig.RelationTrust)      return (RecruitmentBand.Friend, GameConfig.RecruitPriceTrust);
+        if (score <= GameConfig.RelationRespect)    return (RecruitmentBand.Friend, GameConfig.RecruitPriceRespect);
+        if (score <= GameConfig.RelationNormal)     return (RecruitmentBand.Neutral, GameConfig.RecruitPriceNormal);
+        if (score <= GameConfig.RelationSuspicious) return (RecruitmentBand.Rival, GameConfig.RecruitPriceSuspicious);
+        if (score <= GameConfig.RelationAnger)      return (RecruitmentBand.Rival, GameConfig.RecruitPriceAnger);
+
+        // Enemy (100) and Hate (110) both refuse per design decision.
+        return (RecruitmentBand.Refused, 1.0);
+    }
+
+    /// <summary>
+    /// v0.57.11: computes the base recruitment cost from level + stats, matching
+    /// the original formula at <c>TeamCornerLocation.CalculateRecruitmentCost</c>.
+    /// Extracted into <c>TeamSystem</c> so it's testable and shared between the
+    /// list render and the search-confirmation paths.
+    /// </summary>
+    public static long GetRecruitmentBaseCost(NPC npc, Character recruiter)
+    {
+        long baseCost = npc.Level * GameConfig.NpcRecruitmentCostPerLevel
+                      + (npc.Strength + npc.Defence + npc.Agility) * 20;
+
+        // Level-gap modifier preserves the pre-v0.57.11 behavior: overlevelled
+        // NPCs cost more, underlevelled NPCs cost less. Applied BEFORE the
+        // relationship multiplier so social standing layers on top.
+        if (npc.Level > recruiter.Level)
+            baseCost = (long)(baseCost * 1.5);
+        else if (npc.Level < recruiter.Level - 5)
+            baseCost = (long)(baseCost * 0.7);
+
+        return Math.Max(100, baseCost);
+    }
+
+    /// <summary>
+    /// v0.57.11: final recruitment cost (base × relationship multiplier). Returns
+    /// -1 when the NPC refuses at any price (Enemy / Hate / romantic partner).
+    /// Callers should check `band` separately and render refusal / hidden states
+    /// via <see cref="GetRecruitmentBand"/> — this helper's "-1 means refused"
+    /// return is a terse signal for cost-only consumers.
+    /// </summary>
+    public static long GetRecruitmentCost(Character player, NPC npc)
+    {
+        var (band, mult) = GetRecruitmentBand(player, npc);
+        if (band == RecruitmentBand.Refused || band == RecruitmentBand.Hidden)
+            return -1;
+        long baseCost = GetRecruitmentBaseCost(npc, player);
+        return Math.Max(100, (long)(baseCost * mult));
+    }
+
+    /// <summary>
+    /// v0.57.11: centralized filter deciding whether an NPC is a valid
+    /// recruitment candidate for the paginated list. Mirror logic also lives
+    /// in the name-search path — but search shows hidden/refused NPCs anyway
+    /// with a dedicated refusal message, so search calls <see cref="GetRecruitmentBand"/>
+    /// directly rather than this filter. Both paths use the same band mapping.
+    ///
+    /// Rules applied here:
+    ///   - NPC must be alive (HP > 0) and not permadead.
+    ///   - NPC must not already be on a team.
+    ///   - NPC cannot be a "special" scripted character (Seth Able, etc.).
+    ///   - NPC cannot be in prison.
+    ///   - NPC cannot be a romantic partner (filtered via band = Hidden).
+    ///
+    /// Hate/Enemy (`band == Refused`) NPCs DO appear in the list, tagged
+    /// "(won't join)" in the UI — the player gets narrative signal that a
+    /// specific NPC has it in for them. They just can't actually hire them.
+    /// That's a design call — if we wanted to hide refused NPCs too, change
+    /// this filter to also exclude `band == Refused`.
+    /// </summary>
+    public static bool IsRecruitable(Character player, NPC npc, out RecruitmentBand band)
+    {
+        band = RecruitmentBand.Neutral;
+        if (npc == null) return false;
+        if (!npc.IsAlive) return false;
+        if (npc.IsDead) return false;
+        if (!string.IsNullOrEmpty(npc.Team)) return false;
+        if (npc.IsSpecialNPC) return false;        // v0.57.11: Seth Able etc. — not recruitable
+        if (npc.DaysInPrison > 0) return false;    // v0.57.11: prisoners aren't available
+
+        (band, _) = GetRecruitmentBand(player, npc);
+        return band != RecruitmentBand.Hidden;     // refused bands still render, with a tag
+    }
+
+    #endregion
+}

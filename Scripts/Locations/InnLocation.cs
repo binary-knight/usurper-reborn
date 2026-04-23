@@ -4546,7 +4546,16 @@ public class InnLocation : BaseLocation
             var tempChar = new Character { Class = charClass, Level = companion.Level };
             var abilities = ClassAbilitySystem.GetAvailableAbilities(tempChar);
 
-            if (abilities.Count == 0)
+            // v0.57.11: also show spells the companion can cast. Players
+            // reported (Glamdring) that Mira was casting group heal regardless
+            // of which abilities they disabled, because spells were a parallel
+            // system the Inn UI never exposed. Now we list both.
+            var spells = SpellSystem.GetAllSpellsForClass(charClass)
+                ?.Where(s => companion.Level >= SpellSystem.GetLevelRequired(charClass, s.Level))
+                .OrderBy(s => s.Level)
+                .ToList() ?? new List<SpellSystem.SpellInfo>();
+
+            if (abilities.Count == 0 && spells.Count == 0)
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("inn.no_abilities_yet"));
@@ -4555,46 +4564,98 @@ public class InnLocation : BaseLocation
             }
 
             int enabledCount = 0;
-            for (int i = 0; i < abilities.Count; i++)
-            {
-                var ability = abilities[i];
-                bool isDisabled = companion.DisabledAbilities.Contains(ability.Id);
-                if (!isDisabled) enabledCount++;
+            int enabledSpells = 0;
 
-                terminal.SetColor("bright_yellow");
-                terminal.Write($"  [{i + 1,2}] ");
-                terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
-                terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
-                terminal.SetColor(isDisabled ? "gray" : "white");
-                terminal.Write($"{ability.Name,-24}");
-                terminal.SetColor("darkgray");
-                terminal.Write($" {ClassAbilitySystem.GetEffectiveStaminaCost(ability),2} ST  Lv{ability.LevelRequired,-3}  ");
-                terminal.SetColor(isDisabled ? "darkgray" : "gray");
-                if (IsScreenReader || ability.Description.Length <= 35)
+            // --- Abilities section ---
+            if (abilities.Count > 0)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {Loc.Get("inn.skills_abilities_header")}");
+                terminal.SetColor("gray");
+
+                for (int i = 0; i < abilities.Count; i++)
                 {
-                    // Screen reader: show full description (no truncation, SR doesn't care about columns)
-                    // Short descriptions: show as-is
-                    terminal.WriteLine(ability.Description);
+                    var ability = abilities[i];
+                    bool isDisabled = companion.DisabledAbilities.Contains(ability.Id);
+                    if (!isDisabled) enabledCount++;
+
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"  [{i + 1,2}] ");
+                    terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
+                    terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
+                    terminal.SetColor(isDisabled ? "gray" : "white");
+                    terminal.Write($"{ability.Name,-24}");
+                    terminal.SetColor("darkgray");
+                    terminal.Write($" {ClassAbilitySystem.GetEffectiveStaminaCost(ability),2} ST  Lv{ability.LevelRequired,-3}  ");
+                    terminal.SetColor(isDisabled ? "darkgray" : "gray");
+                    if (IsScreenReader || ability.Description.Length <= 35)
+                    {
+                        terminal.WriteLine(ability.Description);
+                    }
+                    else
+                    {
+                        int breakAt = ability.Description.LastIndexOf(' ', 35);
+                        if (breakAt <= 10) breakAt = 35;
+                        terminal.WriteLine(ability.Description[..breakAt]);
+                        terminal.SetColor("dark_gray");
+                        terminal.WriteLine($"        {ability.Description[breakAt..].TrimStart()}");
+                    }
                 }
-                else
+            }
+
+            // --- Spells section ---
+            if (spells.Count > 0)
+            {
+                if (abilities.Count > 0)
+                    terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {Loc.Get("inn.skills_spells_header")}");
+                terminal.SetColor("gray");
+
+                for (int i = 0; i < spells.Count; i++)
                 {
-                    // Visual mode: wrap at word boundary
-                    int breakAt = ability.Description.LastIndexOf(' ', 35);
-                    if (breakAt <= 10) breakAt = 35; // No good break point — force at 35
-                    terminal.WriteLine(ability.Description[..breakAt]);
-                    terminal.SetColor("dark_gray");
-                    terminal.WriteLine($"        {ability.Description[breakAt..].TrimStart()}");
+                    var spell = spells[i];
+                    int displayIdx = abilities.Count + i + 1;
+                    bool isDisabled = companion.DisabledSpells.Contains(spell.Name);
+                    if (!isDisabled) enabledSpells++;
+
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"  [{displayIdx,2}] ");
+                    terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
+                    terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
+                    terminal.SetColor(isDisabled ? "gray" : "white");
+                    terminal.Write($"{spell.Name,-24}");
+                    terminal.SetColor("darkgray");
+                    terminal.Write($" {spell.ManaCost,2} MP  Lv{SpellSystem.GetLevelRequired(charClass, spell.Level),-3}  ");
+                    terminal.SetColor(isDisabled ? "darkgray" : "gray");
+                    if (IsScreenReader || spell.Description.Length <= 35)
+                    {
+                        terminal.WriteLine(spell.Description);
+                    }
+                    else
+                    {
+                        int breakAt = spell.Description.LastIndexOf(' ', 35);
+                        if (breakAt <= 10) breakAt = 35;
+                        terminal.WriteLine(spell.Description[..breakAt]);
+                        terminal.SetColor("dark_gray");
+                        terminal.WriteLine($"        {spell.Description[breakAt..].TrimStart()}");
+                    }
                 }
             }
 
             terminal.WriteLine("");
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {enabledCount}/{abilities.Count} abilities enabled");
+            if (abilities.Count > 0 && spells.Count > 0)
+                terminal.WriteLine($"  {enabledCount}/{abilities.Count} abilities, {enabledSpells}/{spells.Count} spells enabled");
+            else if (abilities.Count > 0)
+                terminal.WriteLine($"  {enabledCount}/{abilities.Count} abilities enabled");
+            else
+                terminal.WriteLine($"  {enabledSpells}/{spells.Count} spells enabled");
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(IsScreenReader
-                ? "  1 through N. Toggle ability  A. Enable all  0. Return"
-                : "  [1-N] Toggle ability  [A] Enable all  [0] Return");
+                ? "  1 through N. Toggle  A. Enable all  0. Return"
+                : "  [1-N] Toggle  [A] Enable all  [0] Return");
             terminal.WriteLine("");
 
             var input = await terminal.GetInput(Loc.Get("ui.choice"));
@@ -4603,26 +4664,47 @@ public class InnLocation : BaseLocation
             if (input.Trim().ToUpper() == "A")
             {
                 companion.DisabledAbilities.Clear();
+                companion.DisabledSpells.Clear();
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("inn.all_abilities_enabled"));
                 await Task.Delay(800);
                 continue;
             }
 
-            if (int.TryParse(input.Trim(), out int idx) && idx >= 1 && idx <= abilities.Count)
+            // Indices 1..abilities.Count toggle abilities; indices beyond toggle spells.
+            if (int.TryParse(input.Trim(), out int idx) && idx >= 1 && idx <= abilities.Count + spells.Count)
             {
-                var ability = abilities[idx - 1];
-                if (companion.DisabledAbilities.Contains(ability.Id))
+                if (idx <= abilities.Count)
                 {
-                    companion.DisabledAbilities.Remove(ability.Id);
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine($"  Enabled: {ability.Name}");
+                    var ability = abilities[idx - 1];
+                    if (companion.DisabledAbilities.Contains(ability.Id))
+                    {
+                        companion.DisabledAbilities.Remove(ability.Id);
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  Enabled: {ability.Name}");
+                    }
+                    else
+                    {
+                        companion.DisabledAbilities.Add(ability.Id);
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"  Disabled: {ability.Name}");
+                    }
                 }
                 else
                 {
-                    companion.DisabledAbilities.Add(ability.Id);
-                    terminal.SetColor("red");
-                    terminal.WriteLine($"  Disabled: {ability.Name}");
+                    var spell = spells[idx - abilities.Count - 1];
+                    if (companion.DisabledSpells.Contains(spell.Name))
+                    {
+                        companion.DisabledSpells.Remove(spell.Name);
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine($"  Enabled: {spell.Name}");
+                    }
+                    else
+                    {
+                        companion.DisabledSpells.Add(spell.Name);
+                        terminal.SetColor("red");
+                        terminal.WriteLine($"  Disabled: {spell.Name}");
+                    }
                 }
                 await Task.Delay(600);
             }

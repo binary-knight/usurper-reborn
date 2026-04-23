@@ -1545,6 +1545,7 @@ namespace UsurperRemake.Systems
                     Agility = c.Agility,
                     EquippedItemsSave = c.EquippedItems.ToDictionary(kvp => (int)kvp.Key, kvp => kvp.Value),
                     DisabledAbilities = c.DisabledAbilities.ToList(),
+                    DisabledSpells = c.DisabledSpells.ToList(),
                     SkillProficiencies = c.SkillProficiencies?.Count > 0 ? new Dictionary<string, int>(c.SkillProficiencies) : new(),
                     SkillTrainingProgress = c.SkillTrainingProgress?.Count > 0 ? new Dictionary<string, int>(c.SkillTrainingProgress) : new(),
                     Inventory = c.Inventory?.Where(i => i != null).Select(ItemToData).ToList() ?? new List<InventoryItemData>()
@@ -1589,6 +1590,7 @@ namespace UsurperRemake.Systems
                 companion.EquippedItems.Clear();
                 companion.Inventory.Clear();
                 companion.DisabledAbilities.Clear();
+                companion.DisabledSpells.Clear();
                 companion.Level = Math.Max(1, companion.RecruitLevel + 5);
                 companion.Experience = GetExperienceForLevel(companion.Level);
             }
@@ -1726,6 +1728,16 @@ namespace UsurperRemake.Systems
                     {
                         foreach (var id in save.DisabledAbilities)
                             companion.DisabledAbilities.Add(id);
+                    }
+
+                    // v0.57.11: restore disabled spells (parallel to abilities).
+                    // Pre-v0.57.11 saves won't have this field; the empty default
+                    // is correct (all spells allowed, matching old behavior).
+                    companion.DisabledSpells.Clear();
+                    if (save.DisabledSpells != null)
+                    {
+                        foreach (var id in save.DisabledSpells)
+                            companion.DisabledSpells.Add(id);
                     }
 
                     // Restore skill proficiency
@@ -2836,6 +2848,14 @@ namespace UsurperRemake.Systems
         // Companion AI will skip any ability whose Id is in this set
         public HashSet<string> DisabledAbilities { get; set; } = new();
 
+        // v0.57.11: disabled spells — parallel to DisabledAbilities but for
+        // the spell system. Player reported (Glamdring) that Mira was spamming
+        // Mass Cure even with every ability turned OFF at the Inn, because the
+        // Inn UI only manages class abilities, not spells. The spell-selection
+        // helpers `GetBestHealSpell` / `GetBestOffensiveSpell` in CombatEngine
+        // filter candidates against this set by spell Name. Empty by default.
+        public HashSet<string> DisabledSpells { get; set; } = new();
+
         // Skill proficiency (stored as int values of TrainingSystem.ProficiencyLevel)
         public Dictionary<string, int> SkillProficiencies { get; set; } = new();
         public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();
@@ -2936,6 +2956,9 @@ namespace UsurperRemake.Systems
 
         // Disabled ability IDs
         public List<string> DisabledAbilities { get; set; } = new();
+
+        // v0.57.11: disabled spell names (parallel to DisabledAbilities)
+        public List<string> DisabledSpells { get; set; } = new();
 
         // Skill proficiency (stored as int values of TrainingSystem.ProficiencyLevel)
         public Dictionary<string, int> SkillProficiencies { get; set; } = new();

@@ -590,7 +590,7 @@ public class TeamCornerLocation : BaseLocation
             .OrderByDescending(n => n.Level)
             .ToList();
 
-        // Online mode: also get player members from database
+        // Online mode: also get player members from database.
         List<PlayerSummary> playerMembers = new();
         if (DoorMode.IsOnlineMode)
         {
@@ -600,6 +600,26 @@ public class TeamCornerLocation : BaseLocation
                 string myUsername = currentPlayer.DisplayName.ToLower();
                 playerMembers = await backend.GetPlayerTeamMembers(teamName, myUsername);
             }
+        }
+
+        // v0.57.11 (spudman report: "your character is not listed, and is not
+        // calculated in the total members"). The DB query above deliberately
+        // excludes the viewing player to avoid duplication when a caller wants
+        // "other members." For team-status / rankings / info screens we DO want
+        // the viewer included in the roster, so synthesize a PlayerSummary for
+        // the current player and prepend it when the viewer is on this team.
+        if (teamName == currentPlayer.Team)
+        {
+            playerMembers.Insert(0, new PlayerSummary
+            {
+                Username = currentPlayer.DisplayName.ToLower(),
+                DisplayName = currentPlayer.DisplayName,
+                Level = currentPlayer.Level,
+                ClassId = (int)currentPlayer.Class,
+                Experience = currentPlayer.Experience,
+                IsOnline = true, // the viewer is necessarily online to see this screen
+                NobleTitle = currentPlayer.NobleTitle,
+            });
         }
 
         bool hasMembers = teamMembers.Count > 0 || playerMembers.Count > 0;
@@ -1009,6 +1029,23 @@ public class TeamCornerLocation : BaseLocation
     /// <summary>
     /// Recruit an NPC to join your team
     /// </summary>
+    /// <summary>
+    /// v0.57.11: relationship-aware NPC recruitment UI. Replaces the old
+    /// "top 10 by level" flat list with a paginated, social-standing-sorted
+    /// list plus a partial-name search and a role filter. See
+    /// <c>DOCS/RELEASE_NOTES_0.57.11.md</c> for the design rationale.
+    ///
+    /// Recruitment flow:
+    ///   1. Check team-exists and team-not-full gates (unchanged from v0.57.10).
+    ///   2. Build candidate pool via <see cref="TeamSystem.IsRecruitable"/>.
+    ///      Filters out lovers / spouses / FWB / exes via RomanceTracker,
+    ///      scripted NPCs, prisoners, dead NPCs, NPCs already on other teams.
+    ///   3. Sort by relationship band (Friend > Neutral > Rival > Refused),
+    ///      then level descending within each band.
+    ///   4. Render page of 12 rows with relationship tags, price multipliers,
+    ///      and [S]earch / [F]ilter / [N]ext / [P]rev / [Q]uit footer.
+    ///   5. On digit select, show price-breakdown confirmation before charging.
+    /// </summary>
     private async Task RecruitNPCToTeam()
     {
         if (string.IsNullOrEmpty(currentPlayer.Team))
@@ -1036,30 +1073,336 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("team_corner.npc_recruit_header"), "bright_magenta");
-        terminal.WriteLine("");
+        // Flow loop — role filter and page state persist across re-renders
+        // within one recruit session. Exits via [Q], empty input, or a
+        // successful/failed recruit.
+        UsurperRemake.Data.SpecRole? roleFilter = null;
+        int pageIndex = 0;
 
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("team.team_label", currentPlayer.Team));
-        terminal.WriteLine(Loc.Get("team.current_size", currentTeamSize, MaxTeamSize));
-        terminal.WriteLine("");
-
-        // Find NPCs that are not in any team and are in town locations
-        var townLocations = new[] { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
-        var availableNPCs = allNPCs
-            .Where(n => n.IsAlive &&
-                   string.IsNullOrEmpty(n.Team) &&
-                   townLocations.Contains(n.CurrentLocation))
-            .OrderByDescending(n => n.Level)
-            .Take(10)
-            .ToList();
-
-        if (availableNPCs.Count == 0)
+        while (true)
         {
+            var candidates = BuildRecruitmentCandidates(allNPCs, roleFilter);
+
+            terminal.ClearScreen();
+            WriteBoxHeader(Loc.Get("team_corner.npc_recruit_header"), "bright_magenta");
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("team.team_label", currentPlayer.Team));
+            terminal.WriteLine(Loc.Get("team.current_size", currentTeamSize, MaxTeamSize));
+            if (roleFilter != null)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(Loc.Get("team.recruit_active_filter", GetRoleFilterLabel(roleFilter.Value)));
+            }
+            terminal.WriteLine("");
+
+            if (candidates.Count == 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(roleFilter != null
+                    ? Loc.Get("team.recruit_filter_none_match", GetRoleFilterLabel(roleFilter.Value))
+                    : Loc.Get("team.no_npcs_available"));
+                terminal.WriteLine(Loc.Get("team.try_again_later"));
+                terminal.WriteLine("");
+                terminal.SetColor("cyan");
+                terminal.Write(Loc.Get("team.recruit_nav_nofilter"));
+                terminal.SetColor("white");
+                string emptyInput = (await terminal.ReadLineAsync())?.Trim().ToUpperInvariant() ?? "";
+                if (emptyInput == "S") { await SearchAndRecruitByName(allNPCs); return; }
+                if (emptyInput == "F") { roleFilter = await PromptRoleFilter(roleFilter); pageIndex = 0; continue; }
+                return;
+            }
+
+            const int pageSize = 12;
+            int totalPages = (candidates.Count + pageSize - 1) / pageSize;
+            pageIndex = Math.Clamp(pageIndex, 0, totalPages - 1);
+            var pageRows = candidates.Skip(pageIndex * pageSize).Take(pageSize).ToList();
+
+            RenderRecruitmentHeader();
+            for (int i = 0; i < pageRows.Count; i++)
+            {
+                var row = pageRows[i];
+                RenderRecruitmentRow(pageIndex * pageSize + i + 1, row);
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("team.recruit_page_footer", pageIndex * pageSize + 1, pageIndex * pageSize + pageRows.Count, candidates.Count, pageIndex + 1, totalPages));
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("team.your_gold", $"{currentPlayer.Gold:N0}"));
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.Write(Loc.Get("team.recruit_page_nav"));
+            terminal.SetColor("white");
+            string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+            if (string.IsNullOrEmpty(input)) return;
+
+            string upper = input.ToUpperInvariant();
+            switch (upper)
+            {
+                case "Q": return;
+                case "N":
+                    if (pageIndex + 1 < totalPages) pageIndex++;
+                    continue;
+                case "P":
+                    if (pageIndex > 0) pageIndex--;
+                    continue;
+                case "S":
+                    await SearchAndRecruitByName(allNPCs);
+                    return;
+                case "F":
+                    roleFilter = await PromptRoleFilter(roleFilter);
+                    pageIndex = 0;
+                    continue;
+            }
+
+            // Numeric selection — interpret against the full (cross-page) index
+            if (int.TryParse(input, out int choice) && choice >= 1 && choice <= candidates.Count)
+            {
+                var picked = candidates[choice - 1];
+                await ConfirmAndRecruit(picked.Npc, picked.Band, picked.Multiplier, picked.Cost);
+                return;
+            }
+
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.invalid_choice_generic"));
+            await Task.Delay(1200);
+        }
+    }
+
+    /// <summary>
+    /// v0.57.11: a single recruitment list row pre-computed for rendering.
+    /// Captures the band + multiplier + final cost so the list render doesn't
+    /// have to re-query the relationship system per frame.
+    /// </summary>
+    private readonly struct RecruitmentRow
+    {
+        public NPC Npc { get; init; }
+        public TeamSystem.RecruitmentBand Band { get; init; }
+        public double Multiplier { get; init; }
+        public long Cost { get; init; }
+        public long DailyWage { get; init; }
+    }
+
+    /// <summary>
+    /// v0.57.11: build the candidate list filtered and sorted for presentation.
+    /// Lovers / spouses / FWB / exes / dead / prisoners / scripted NPCs / NPCs
+    /// already on other teams are excluded. Enemy / Hate tier NPCs are
+    /// INCLUDED (with band = Refused) so the player sees they exist and can't
+    /// be recruited — narrative signal. Sort: band asc (Friend first, Refused
+    /// last), then level desc within band.
+    /// </summary>
+    private List<RecruitmentRow> BuildRecruitmentCandidates(List<NPC> allNPCs, UsurperRemake.Data.SpecRole? roleFilter)
+    {
+        var townLocations = new[] { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+        var rows = new List<RecruitmentRow>();
+
+        foreach (var npc in allNPCs)
+        {
+            if (!townLocations.Contains(npc.CurrentLocation)) continue;
+            if (!TeamSystem.IsRecruitable(currentPlayer, npc, out var band)) continue;
+
+            if (roleFilter != null)
+            {
+                var roles = UsurperRemake.Data.SpecializationData.GetDefaultRolesForClass(npc.Class);
+                if (!roles.Contains(roleFilter.Value)) continue;
+            }
+
+            var (_, mult) = TeamSystem.GetRecruitmentBand(currentPlayer, npc);
+            long cost = band == TeamSystem.RecruitmentBand.Refused
+                ? -1
+                : Math.Max(100, (long)(TeamSystem.GetRecruitmentBaseCost(npc, currentPlayer) * mult));
+
+            rows.Add(new RecruitmentRow
+            {
+                Npc = npc,
+                Band = band,
+                Multiplier = mult,
+                Cost = cost,
+                DailyWage = npc.Level * GameConfig.NpcDailyWagePerLevel,
+            });
+        }
+
+        // Sort: Friend (1) → Neutral (2) → Rival (3) → Refused (4), then level desc.
+        int BandOrder(TeamSystem.RecruitmentBand b) => b switch
+        {
+            TeamSystem.RecruitmentBand.Friend   => 1,
+            TeamSystem.RecruitmentBand.Neutral  => 2,
+            TeamSystem.RecruitmentBand.Rival    => 3,
+            TeamSystem.RecruitmentBand.Refused  => 4,
+            _ => 99, // Hidden shouldn't appear — IsRecruitable filters it out
+        };
+
+        return rows
+            .OrderBy(r => BandOrder(r.Band))
+            .ThenByDescending(r => r.Npc.Level)
+            .ToList();
+    }
+
+    /// <summary>
+    /// v0.57.11: column header for the recruitment list.
+    /// </summary>
+    private void RenderRecruitmentHeader()
+    {
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("team.available_recruits"));
+        terminal.SetColor("white");
+        terminal.WriteLine($"{Loc.Get("team.col_num"),-3} {Loc.Get("team.col_name"),-20} {Loc.Get("team.col_class"),-12} {Loc.Get("team.col_level"),-4} {Loc.Get("team.recruit_col_rel"),-10} {Loc.Get("team.col_cost"),-13} {Loc.Get("team.col_wage"),-10}");
+        if (!IsScreenReader)
+        {
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(new string('─', 78));
+        }
+    }
+
+    /// <summary>
+    /// v0.57.11: one row of the recruitment list, colored by band.
+    /// </summary>
+    private void RenderRecruitmentRow(int displayIndex, RecruitmentRow row)
+    {
+        string color = row.Band switch
+        {
+            TeamSystem.RecruitmentBand.Friend  => "bright_green",
+            TeamSystem.RecruitmentBand.Neutral => "white",
+            TeamSystem.RecruitmentBand.Rival   => "yellow",
+            TeamSystem.RecruitmentBand.Refused => "red",
+            _ => "white",
+        };
+        terminal.SetColor(color);
+
+        string relTag = GetBandTag(row.Band);
+        string costCol = row.Band == TeamSystem.RecruitmentBand.Refused
+            ? Loc.Get("team.recruit_wont_join")
+            : $"{row.Cost:N0}g";
+
+        terminal.WriteLine($"{displayIndex,-3} {TruncateName(row.Npc.DisplayName, 20),-20} {row.Npc.ClassName,-12} {row.Npc.Level,-4} {relTag,-10} {costCol,-13} {row.DailyWage:N0}g");
+    }
+
+    private static string TruncateName(string name, int max)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        return name.Length <= max ? name : name.Substring(0, max - 1) + "…";
+    }
+
+    private static string GetBandTag(TeamSystem.RecruitmentBand band) => band switch
+    {
+        TeamSystem.RecruitmentBand.Friend   => Loc.Get("team.recruit_rel_friend"),
+        TeamSystem.RecruitmentBand.Neutral  => Loc.Get("team.recruit_rel_neutral"),
+        TeamSystem.RecruitmentBand.Rival    => Loc.Get("team.recruit_rel_rival"),
+        TeamSystem.RecruitmentBand.Refused  => Loc.Get("team.recruit_rel_enemy"),
+        _ => "",
+    };
+
+    /// <summary>
+    /// v0.57.11: localized label for a SpecRole — used in the role-filter
+    /// menu and the "active filter" banner.
+    /// </summary>
+    private static string GetRoleFilterLabel(UsurperRemake.Data.SpecRole role) => role switch
+    {
+        UsurperRemake.Data.SpecRole.Tank    => Loc.Get("team.recruit_filter_tank"),
+        UsurperRemake.Data.SpecRole.DPS     => Loc.Get("team.recruit_filter_dps"),
+        UsurperRemake.Data.SpecRole.Healer  => Loc.Get("team.recruit_filter_healer"),
+        UsurperRemake.Data.SpecRole.Utility => Loc.Get("team.recruit_filter_utility"),
+        UsurperRemake.Data.SpecRole.Debuff  => Loc.Get("team.recruit_filter_debuff"),
+        _ => role.ToString(),
+    };
+
+    /// <summary>
+    /// v0.57.11: prompts the player to pick a role to filter by, or clear the
+    /// filter. Returns the new filter value (null = "all roles").
+    /// </summary>
+    private async Task<UsurperRemake.Data.SpecRole?> PromptRoleFilter(UsurperRemake.Data.SpecRole? current)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("team.recruit_filter_prompt"));
+        terminal.SetColor("white");
+        terminal.WriteLine($"  0. {Loc.Get("team.recruit_filter_all")}");
+        terminal.WriteLine($"  1. {Loc.Get("team.recruit_filter_tank")}");
+        terminal.WriteLine($"  2. {Loc.Get("team.recruit_filter_dps")}");
+        terminal.WriteLine($"  3. {Loc.Get("team.recruit_filter_healer")}");
+        terminal.WriteLine($"  4. {Loc.Get("team.recruit_filter_utility")}");
+        terminal.WriteLine($"  5. {Loc.Get("team.recruit_filter_debuff")}");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_white");
+        string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        return input switch
+        {
+            "0" => null,
+            "1" => UsurperRemake.Data.SpecRole.Tank,
+            "2" => UsurperRemake.Data.SpecRole.DPS,
+            "3" => UsurperRemake.Data.SpecRole.Healer,
+            "4" => UsurperRemake.Data.SpecRole.Utility,
+            "5" => UsurperRemake.Data.SpecRole.Debuff,
+            _   => current, // unknown input keeps previous filter
+        };
+    }
+
+    /// <summary>
+    /// v0.57.11: partial-name search for a specific NPC. Cloned-in-shape from
+    /// <c>TempleLocation.SelectGod</c>: empty → cancel, zero matches →
+    /// "nobody by that name", one match → straight to confirmation, multiple
+    /// matches with a preferable StartsWith candidate → auto-resolve,
+    /// otherwise → disambiguation sub-list.
+    ///
+    /// Searches also consider NPCs that are filtered out of the paginated
+    /// list (lovers, spouses, exes, hate-tier enemies) — but instead of
+    /// silently returning no match, the search prints a dedicated refusal
+    /// flavor so the player knows why they can't recruit that person.
+    /// </summary>
+    private async Task SearchAndRecruitByName(List<NPC> allNPCs)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write(Loc.Get("team.recruit_search_prompt"));
+        terminal.SetColor("white");
+        string raw = (await terminal.ReadLineAsync())?.Trim() ?? "";
+        if (string.IsNullOrEmpty(raw)) return;
+
+        // Search the full NPC population, not just the eligible list, so we can
+        // tell the player "no, that's your spouse" instead of "no match found"
+        // when they type a specific name.
+        var lookup = raw;
+        var townLocations = new[] { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+        var pool = allNPCs.Where(n => n.IsAlive && !n.IsDead && string.IsNullOrEmpty(n.Team)
+                                   && townLocations.Contains(n.CurrentLocation)
+                                   && !n.IsSpecialNPC
+                                   && n.DaysInPrison == 0).ToList();
+
+        var matches = pool.Where(n => n.DisplayName.Contains(lookup, StringComparison.OrdinalIgnoreCase)
+                                   || n.Name2.Contains(lookup, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        // Prefer StartsWith hits (TempleLocation pattern).
+        var startsWith = matches.Where(n => n.DisplayName.StartsWith(lookup, StringComparison.OrdinalIgnoreCase)
+                                         || n.Name2.StartsWith(lookup, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        NPC? chosen = null;
+        if (startsWith.Count == 1) chosen = startsWith[0];
+        else if (matches.Count == 1) chosen = matches[0];
+        else if (startsWith.Count > 1 || matches.Count > 1)
+        {
+            // Disambiguation sub-list
+            var disamb = (startsWith.Count > 1 ? startsWith : matches).OrderBy(n => n.DisplayName).Take(12).ToList();
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("team.recruit_multiple_matches_header"));
+            terminal.SetColor("white");
+            for (int i = 0; i < disamb.Count; i++)
+                terminal.WriteLine($"  {i + 1}. {disamb[i].DisplayName} ({disamb[i].ClassName}, Lv.{disamb[i].Level})");
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.Write(Loc.Get("team.recruit_pick_match"));
+            terminal.SetColor("white");
+            string pickRaw = (await terminal.ReadLineAsync())?.Trim() ?? "";
+            if (int.TryParse(pickRaw, out int pickIdx) && pickIdx >= 1 && pickIdx <= disamb.Count)
+                chosen = disamb[pickIdx - 1];
+        }
+
+        if (chosen == null)
+        {
+            terminal.WriteLine("");
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("team.no_npcs_available"));
-            terminal.WriteLine(Loc.Get("team.try_again_later"));
+            terminal.WriteLine(Loc.Get("team.recruit_no_match", lookup));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.WriteLine(Loc.Get("ui.press_enter"));
@@ -1067,106 +1410,161 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("team.available_recruits"));
-        terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("team.col_num"),-3} {Loc.Get("team.col_name"),-18} {Loc.Get("team.col_class"),-12} {Loc.Get("team.col_level"),-5} {Loc.Get("team.col_cost"),-12} {Loc.Get("team.col_wage"),-10}");
-        if (!IsScreenReader)
+        // Now classify. If the match is a lover / spouse / FWB / ex, print a
+        // dedicated refusal; if Refused (Hate / Enemy), print the hate-tier
+        // refusal; otherwise go to confirmation.
+        var (band, mult) = TeamSystem.GetRecruitmentBand(currentPlayer, chosen);
+        if (band == TeamSystem.RecruitmentBand.Hidden)
         {
+            var romanceType = RomanceTracker.Instance.GetRelationType(chosen.ID);
+            terminal.WriteLine("");
+            terminal.SetColor("magenta");
+            string key = romanceType switch
+            {
+                RomanceRelationType.Spouse => "team.recruit_refuse_spouse_search",
+                RomanceRelationType.Lover  => "team.recruit_refuse_lover_search",
+                RomanceRelationType.FWB    => "team.recruit_refuse_fwb_search",
+                RomanceRelationType.Ex     => "team.recruit_refuse_ex_search",
+                _ => "team.recruit_refuse_spouse_search",
+            };
+            terminal.WriteLine(Loc.Get(key, chosen.DisplayName));
+            terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(new string('─', 65));
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
         }
-
-        terminal.SetColor("white");
-        for (int i = 0; i < availableNPCs.Count; i++)
+        if (band == TeamSystem.RecruitmentBand.Refused)
         {
-            var npc = availableNPCs[i];
-            long recruitCost = CalculateRecruitmentCost(npc, currentPlayer);
-            long dailyWage = npc.Level * GameConfig.NpcDailyWagePerLevel;
-
-            terminal.WriteLine($"{i + 1,-3} {npc.DisplayName,-18} {npc.Class,-12} {npc.Level,-5} {recruitCost:N0}g{"",-4} {dailyWage:N0}g");
+            int idx = Random.Shared.Next(5); // 5 flavor variants: team.recruit_refuse_hate_1..5
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get($"team.recruit_refuse_hate_{idx + 1}", chosen.DisplayName));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
         }
 
+        long cost = Math.Max(100, (long)(TeamSystem.GetRecruitmentBaseCost(chosen, currentPlayer) * mult));
+        await ConfirmAndRecruit(chosen, band, mult, cost);
+    }
+
+    /// <summary>
+    /// v0.57.11: shared confirmation + execution path. Shows the price
+    /// breakdown (base × multiplier = final), re-checks recruitability
+    /// immediately before deducting gold (closes the race window where an
+    /// NPC could die or join someone else between list render and confirm),
+    /// and fires the news + world-state save on success.
+    /// </summary>
+    private async Task ConfirmAndRecruit(NPC recruit, TeamSystem.RecruitmentBand band, double multiplier, long cost)
+    {
+        terminal.ClearScreen();
+        WriteBoxHeader(Loc.Get("team.recruit_confirm_header"), "bright_magenta");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("team.recruit_confirm_name", recruit.DisplayName, recruit.ClassName, recruit.Level));
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(Loc.Get("team.recruit_confirm_relationship", GetBandTag(band)));
+        terminal.WriteLine("");
+
+        long baseCost = TeamSystem.GetRecruitmentBaseCost(recruit, currentPlayer);
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("team.recruit_confirm_base_cost", $"{baseCost:N0}"));
+        if (Math.Abs(multiplier - 1.0) > 0.001)
+        {
+            string tone = multiplier < 1.0 ? "bright_green" : "yellow";
+            terminal.SetColor(tone);
+            terminal.WriteLine(Loc.Get("team.recruit_confirm_multiplier", $"{multiplier:0.00}", GetBandTag(band)));
+        }
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine(Loc.Get("team.recruit_confirm_final_cost", $"{cost:N0}"));
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("team.your_gold", $"{currentPlayer.Gold:N0}"));
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.Write(Loc.Get("team.enter_number_recruit"));
+        terminal.Write(Loc.Get("team.recruit_confirm_prompt", recruit.DisplayName, $"{cost:N0}"));
         terminal.SetColor("white");
-        string input = await terminal.ReadLineAsync();
-
-        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= availableNPCs.Count)
+        string response = (await terminal.ReadLineAsync())?.Trim().ToUpperInvariant() ?? "";
+        if (response != "Y" && response != "YES")
         {
-            var recruit = availableNPCs[choice - 1];
-            long cost = CalculateRecruitmentCost(recruit, currentPlayer);
-
-            if (currentPlayer.Gold < cost)
-            {
-                terminal.WriteLine("");
-                terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("ui.not_enough_gold_recruit", recruit.DisplayName));
-                terminal.WriteLine(Loc.Get("team.need_gold_recruit", $"{cost:N0}", $"{currentPlayer.Gold:N0}"));
-            }
-            else
-            {
-                // Recruitment success!
-                currentPlayer.Gold -= cost;
-                recruit.Team = currentPlayer.Team;
-                recruit.TeamPW = currentPlayer.TeamPW;
-                recruit.CTurf = currentPlayer.CTurf;
-
-                terminal.WriteLine("");
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("team.npc_joined", recruit.DisplayName));
-                terminal.WriteLine(Loc.Get("team.paid_recruitment", $"{cost:N0}"));
-                long wage = recruit.Level * GameConfig.NpcDailyWagePerLevel;
-                terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("team.daily_wage", $"{wage:N0}"));
-                terminal.WriteLine("");
-                terminal.SetColor("bright_cyan");
-                terminal.WriteLine(Loc.Get("team.recruit_quote", recruit.DisplayName));
-
-                NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} recruited {recruit.DisplayName} into team '{currentPlayer.Team}'!");
-
-                // Persist NPC team assignment immediately so world-sim reload doesn't wipe it
-                if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                        catch { /* best-effort */ }
-                    });
-                }
-            }
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("team.recruit_cancelled"));
+            await Task.Delay(800);
+            return;
         }
-        else if (choice != 0 && !string.IsNullOrEmpty(input))
+
+        // Live re-check (closes the race window): an NPC could have died or
+        // joined another team between list render and confirm, or the player's
+        // relationship could have changed (e.g. a companion quest fired between
+        // screens and shifted the NPC to Hate).
+        if (!TeamSystem.IsRecruitable(currentPlayer, recruit, out var liveBand))
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.invalid_choice_generic"));
+            terminal.WriteLine(Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
+        if (liveBand == TeamSystem.RecruitmentBand.Refused)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.recruit_refuse_hate_1", recruit.DisplayName));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
+
+        long liveCost = Math.Max(100, (long)(TeamSystem.GetRecruitmentBaseCost(recruit, currentPlayer) *
+                                             TeamSystem.GetRecruitmentBand(currentPlayer, recruit).multiplier));
+        if (currentPlayer.Gold < liveCost)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("ui.not_enough_gold_recruit", recruit.DisplayName));
+            terminal.WriteLine(Loc.Get("team.need_gold_recruit", $"{liveCost:N0}", $"{currentPlayer.Gold:N0}"));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
+
+        // Recruitment success
+        currentPlayer.Gold -= liveCost;
+        recruit.Team = currentPlayer.Team;
+        recruit.TeamPW = currentPlayer.TeamPW;
+        recruit.CTurf = currentPlayer.CTurf;
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get("team.npc_joined", recruit.DisplayName));
+        terminal.WriteLine(Loc.Get("team.paid_recruitment", $"{liveCost:N0}"));
+        long wage = recruit.Level * GameConfig.NpcDailyWagePerLevel;
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("team.daily_wage", $"{wage:N0}"));
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(Loc.Get("team.recruit_quote", recruit.DisplayName));
+
+        NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} recruited {recruit.DisplayName} into team '{currentPlayer.Team}'!");
+
+        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("RECRUIT", $"SaveAllSharedState failed: {ex.Message}"); }
         }
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
-    }
-
-    /// <summary>
-    /// Calculate the cost to recruit an NPC
-    /// </summary>
-    private long CalculateRecruitmentCost(NPC npc, Character recruiter)
-    {
-        long baseCost = npc.Level * GameConfig.NpcRecruitmentCostPerLevel;
-        baseCost += ((long)npc.Strength + (long)npc.Defence + (long)npc.Agility) * 20;
-
-        if (npc.Level > recruiter.Level)
-            baseCost = (long)(baseCost * 1.5);
-
-        if (npc.Level < recruiter.Level - 5)
-            baseCost = (long)(baseCost * 0.7);
-
-        return Math.Max(100, baseCost);
     }
 
     /// <summary>
@@ -1315,14 +1713,15 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.password_changed"));
             terminal.WriteLine("");
 
-            // Persist NPC password changes immediately so world-sim reload doesn't revert them
+            // Persist NPC password changes immediately. v0.57.11: changed from
+            // fire-and-forget `_ = Task.Run(...)` to `await` — if another
+            // session-driven world_state reload fires before the Task completes,
+            // the password change is silently lost. Same class of bug as the
+            // Coosh turf-reverts-on-relog problem fixed in v0.57.10.
             if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
             {
-                _ = Task.Run(async () =>
-                {
-                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                    catch { /* best-effort */ }
-                });
+                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+                catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after password change: {ex.Message}"); }
             }
         }
         else
@@ -1434,14 +1833,19 @@ public class TeamCornerLocation : BaseLocation
 
                 NewsSystem.Instance.Newsy(true, $"{member.DisplayName} was kicked out of team '{currentPlayer.Team}'!");
 
-                // Persist NPC team removal immediately so world-sim reload doesn't restore it
+                // Persist NPC team removal immediately. v0.57.11 (spudman
+                // report: "Sacking members that died didn't seem to have any
+                // effects other than history log"). Changed from fire-and-forget
+                // `_ = Task.Run(...)` to `await` because if another online
+                // session triggers a world_state reload between the `Team = ""`
+                // mutation and the Task completing, the cleared Team field
+                // gets overwritten from the stale snapshot and the sack is
+                // silently undone. Same class of bug as the v0.57.10 Coosh
+                // turf-reverts-on-relog issue.
                 if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
                 {
-                    _ = Task.Run(async () =>
-                    {
-                        try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                        catch { /* best-effort */ }
-                    });
+                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+                    catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after sack: {ex.Message}"); }
                 }
 
                 terminal.SetColor("darkgray");

@@ -1099,6 +1099,7 @@ public class DungeonLocation : BaseLocation
 
         int restoredCount = 0;
         int skippedCount = 0;
+        var arrestedNames = new List<string>();
         const int maxPartySize = 4;
 
         foreach (var npcId in savedNPCIds)
@@ -1113,11 +1114,33 @@ public class DungeonLocation : BaseLocation
             var npc = npcSystem.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId && n.IsAlive);
             if (npc != null && !teammates.Any(t => t is NPC existingNpc && existingNpc.ID == npcId))
             {
+                // v0.57.11 (Coosh report): teammates arrested between sessions
+                // (via Castle imprisonment, King's orders, etc.) must not silently
+                // rejoin the party on dungeon re-entry. Eject them with a notice
+                // so the player knows why their teammate disappeared.
+                if (npc.DaysInPrison > 0)
+                {
+                    arrestedNames.Add(npc.DisplayName);
+                    continue;
+                }
+
                 LevelMasterLocation.EnsureClassStatsForLevel(npc); // Retroactively fix legacy stat gaps
                 teammates.Add(npc);
                 npc.UpdateLocation("Dungeon");
                 restoredCount++;
             }
+        }
+
+        // v0.57.11: surface arrested teammates so the player isn't mystified
+        // about why their party shrank.
+        if (arrestedNames.Count > 0)
+        {
+            term.WriteLine("");
+            term.SetColor("yellow");
+            foreach (var name in arrestedNames)
+                term.WriteLine(Loc.Get("dungeon.teammate_arrested", name));
+            term.WriteLine("");
+            await Task.Delay(1500);
         }
 
         if (restoredCount > 0)
@@ -9437,17 +9460,25 @@ public class DungeonLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        // Get available NPC teammates from same team (only if player has a team)
+        // Get available NPC teammates from same team (only if player has a team).
+        // v0.57.11 (Coosh report: "Lysandra Dawnwhisper is supposed to be in
+        // prison but she is also out in a dungeon with spudman"): filter out
+        // NPCs with DaysInPrison > 0. Before this fix, an imprisoned NPC
+        // still appeared as a recruitable teammate and could be restored
+        // onto a dungeon party — producing the contradictory state where the
+        // Castle prison list and another player's active dungeon party both
+        // showed the same NPC.
         var npcTeammates = new List<NPC>();
         if (!string.IsNullOrEmpty(player.Team))
         {
             npcTeammates = UsurperRemake.Systems.NPCSpawnSystem.Instance.ActiveNPCs
-                .Where(n => n.Team == player.Team && n.IsAlive && !teammates.Contains(n))
+                .Where(n => n.Team == player.Team && n.IsAlive && n.DaysInPrison == 0 && !teammates.Contains(n))
                 .ToList();
         }
 
-        // Add spouse as potential teammate (if married) - spouse can always join
-        // Dead NPCs cannot join the party
+        // Add spouse as potential teammate (if married) — spouse can always join
+        // unless dead or imprisoned. Your spouse getting arrested doesn't grant
+        // jailbreak privileges.
         NPC? spouseNpc = null;
         var romance = UsurperRemake.Systems.RomanceTracker.Instance;
         if (romance?.IsMarried == true)
@@ -9456,7 +9487,7 @@ public class DungeonLocation : BaseLocation
             if (spouse != null)
             {
                 spouseNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
-                    .FirstOrDefault(n => n.ID == spouse.NPCId && n.IsAlive && !n.IsDead && !teammates.Contains(n) && !npcTeammates.Contains(n));
+                    .FirstOrDefault(n => n.ID == spouse.NPCId && n.IsAlive && !n.IsDead && n.DaysInPrison == 0 && !teammates.Contains(n) && !npcTeammates.Contains(n));
                 if (spouseNpc != null)
                 {
                     npcTeammates.Insert(0, spouseNpc); // Spouse first in list
@@ -9464,14 +9495,14 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        // Add lovers as potential party members too
-        // Dead NPCs cannot join the party
+        // Add lovers as potential party members too.
+        // Dead or imprisoned NPCs cannot join the party (v0.57.11).
         if (romance != null)
         {
             foreach (var lover in romance.CurrentLovers)
             {
                 var loverNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
-                    .FirstOrDefault(n => n.ID == lover.NPCId && n.IsAlive && !n.IsDead && !teammates.Contains(n) && !npcTeammates.Contains(n));
+                    .FirstOrDefault(n => n.ID == lover.NPCId && n.IsAlive && !n.IsDead && n.DaysInPrison == 0 && !teammates.Contains(n) && !npcTeammates.Contains(n));
                 if (loverNpc != null)
                 {
                     npcTeammates.Add(loverNpc);

@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.57.10";
+    public const string Version = "0.57.11";
     public const string VersionName = "Alignment and Shields";
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
@@ -887,6 +887,27 @@ public static partial class GameConfig
     public const int NpcRecruitmentCostPerLevel = 2000;       // Gold cost per NPC level to recruit (was hardcoded 500)
     public const int NpcDailyWagePerLevel = 100;              // Daily gold wage per NPC level for team members
     public const int MaxUnpaidWageDays = 3;                   // NPC leaves team after this many days of unpaid wages
+
+    // v0.57.11: Relationship-based recruitment price multipliers.
+    // Applied on top of the level+stat base price. Bands are keyed on
+    // RelationshipSystem.GetRelationshipStatus numeric thresholds (lower = better).
+    // Lovers / spouses / FWB / exes are filtered out entirely via RomanceTracker
+    // before this table is consulted; it only covers non-romantic social standing.
+    public const double RecruitPriceFriendship  = 0.75;  // ≤ RelationFriendship (40)
+    public const double RecruitPriceTrust       = 0.85;  // ≤ RelationTrust (50)
+    public const double RecruitPriceRespect     = 0.95;  // ≤ RelationRespect (60)
+    public const double RecruitPriceNormal      = 1.00;  // = RelationNormal (70), baseline
+    public const double RecruitPriceSuspicious  = 1.15;  // ≤ RelationSuspicious (80)
+    public const double RecruitPriceAnger       = 1.40;  // ≤ RelationAnger (90)
+    // Enemy (100) and Hate (110) refuse to join at any price.
+
+    // v0.57.11: Creator's Eye artifact crit chance — flat bonus (was 1.5×
+    // pre-clamp multiplier). Player feedback: the old multiplier pinned every
+    // build at the 50% cap the moment they got the artifact, making further
+    // DEX / crit investment pointless. A flat bonus lets the artifact remain
+    // strong without trivializing the rest of the crit subsystem.
+    // Doubled during the Manwe fight while the Void Key is held.
+    public const int CreatorsEyeCritBonus = 10;
 
     // Stat Training (v0.30.9)
     public const int StatTrainingBaseCostPerLevel = 500;      // Base gold cost = playerLevel * this value
