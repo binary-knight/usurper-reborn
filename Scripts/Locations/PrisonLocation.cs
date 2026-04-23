@@ -41,7 +41,7 @@ public partial class PrisonLocation : BaseLocation
         LevelRequirement = 1;
 
         // Add all character classes to allowed set
-        foreach (CharacterClass charClass in System.Enum.GetValues<CharacterClass>())
+        foreach (CharacterClass charClass in Enum.GetValues<CharacterClass>())
         {
             AllowedClasses.Add(charClass);
         }
@@ -116,42 +116,17 @@ public partial class PrisonLocation : BaseLocation
             await DisplayPrisonMenu(player, true, true);
 
             // Get user input
-            string fullChoice = await terminal.ReadLineAsync();
-            choice = char.ToUpper(fullChoice[0]);
 
-            if ((fullChoice.StartsWith("/goss ") || fullChoice.StartsWith("/gossip ")) && SessionContext.IsActive)
+            string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
+
+            if (input.StartsWith("/") && SessionContext.IsActive)
             {
-                var ctx = SessionContext.Current!;
-                var username = ctx.Username;
-                var spaceIndex = fullChoice.IndexOf(' ');
-                var message = spaceIndex > 0 ? fullChoice.Substring(spaceIndex + 1).Trim() : "";
-
-                var session = MudServer.Instance?.ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
-
-                if (session?.IsMuted == true)
-                {
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine("  You have been silenced by the gods. You cannot speak.");
-                }
-                else
-                {
-                    if (string.IsNullOrWhiteSpace(message))
-                    {
-                        terminal.SetColor("gray");
-                        terminal.WriteLine("  Gossip what? Usage: /gossip <message>  (or /gos)");
-                    }
-
-                    // Show to sender
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine($"  [Gossip] You: {message}");
-
-                    // Broadcast to ALL connected players (global out-of-character channel)
-                    RoomRegistry.Instance!.BroadcastGlobal(
-                        $"\u001b[92m  [Gossip] {MudChatSystem.GetChatDisplayName(username)}): {message}\u001b[0m",
-                        excludeUsername: username);
-
-                }
+                if (await MudChatSystem.TryProcessCommand(input, terminal))
+                    continue;
             }
+
+            if (input.Length == 0) continue;
+            choice = char.ToUpper(input[0]);
 
             // Process user choice - returns true if player escaped/freed
             exitPrison = await ProcessPrisonChoice(player, choice);
@@ -321,8 +296,8 @@ public partial class PrisonLocation : BaseLocation
     /// </summary>
     private bool CanMeetVex(Character player)
     {
-        var companionSystem = UsurperRemake.Systems.CompanionSystem.Instance;
-        var vex = companionSystem.GetCompanion(UsurperRemake.Systems.CompanionId.Vex);
+        var companionSystem = CompanionSystem.Instance;
+        var vex = companionSystem.GetCompanion(CompanionId.Vex);
 
         if (vex == null || vex.IsRecruited || vex.IsDead)
             return false;
@@ -900,7 +875,7 @@ public partial class PrisonLocation : BaseLocation
         await Task.CompletedTask;
 
         // Get NPC prisoners from the NPCSpawnSystem
-        var npcPrisoners = UsurperRemake.Systems.NPCSpawnSystem.Instance.GetPrisoners();
+        var npcPrisoners = NPCSpawnSystem.Instance.GetPrisoners();
         foreach (var npc in npcPrisoners)
         {
             prisoners.Add(npc);
@@ -990,8 +965,8 @@ public partial class PrisonLocation : BaseLocation
             return false;
         }
 
-        var companionSystem = UsurperRemake.Systems.CompanionSystem.Instance;
-        var vex = companionSystem.GetCompanion(UsurperRemake.Systems.CompanionId.Vex);
+        var companionSystem = CompanionSystem.Instance;
+        var vex = companionSystem.GetCompanion(CompanionId.Vex);
 
         await terminal.ClearScreenAsync();
         await terminal.WriteLineAsync();
@@ -1079,7 +1054,7 @@ public partial class PrisonLocation : BaseLocation
     /// </summary>
     private async Task<bool> VexHelpsEscape(Character player, UsurperRemake.Systems.Companion vex)
     {
-        var companionSystem = UsurperRemake.Systems.CompanionSystem.Instance;
+        var companionSystem = CompanionSystem.Instance;
 
         await terminal.WriteLineAsync();
         await terminal.WriteColorLineAsync(Loc.Get("prison.vex_excellent"), TerminalEmulator.ColorYellow);
@@ -1131,7 +1106,7 @@ public partial class PrisonLocation : BaseLocation
 
         // Recruit Vex
         bool success = await companionSystem.RecruitCompanion(
-            UsurperRemake.Systems.CompanionId.Vex, player, terminal);
+            CompanionId.Vex, player, terminal);
 
         if (success)
         {
