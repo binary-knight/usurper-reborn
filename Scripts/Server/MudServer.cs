@@ -913,8 +913,13 @@ public class MudServer
         await stream.WriteAsync(bytes, 0, bytes.Length);
     }
 
-    /// <summary>Broadcast a message to all active sessions.</summary>
-    public void BroadcastToAll(string message, string? excludeUsername = null)
+    /// <summary>
+    /// Broadcast a message to all active sessions.
+    /// v0.57.14: optional channelKey enables per-channel mutes — if a recipient has
+    /// the channel in their MutedChannels set, they don't receive this broadcast.
+    /// channelKey = null means "always deliver" (system messages, server events).
+    /// </summary>
+    public void BroadcastToAll(string message, string? excludeUsername = null, string? channelKey = null)
     {
         foreach (var kvp in ActiveSessions)
         {
@@ -932,6 +937,14 @@ public class MudServer
             // Don't send broadcasts to group followers (they see the leader's output)
             if (kvp.Value.IsGroupFollower)
                 continue;
+
+            // v0.57.14: per-channel mute filter
+            if (channelKey != null)
+            {
+                var recipientPlayer = kvp.Value.Context?.Engine?.CurrentPlayer;
+                if (recipientPlayer?.MutedChannels?.Contains(channelKey) == true)
+                    continue;
+            }
 
             kvp.Value.EnqueueMessage(message);
         }

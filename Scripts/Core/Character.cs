@@ -445,6 +445,12 @@ public class Character
     public Dictionary<string, TrainingSystem.ProficiencyLevel> SkillProficiencies { get; set; } = new();
     public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();
 
+    // v0.57.14: Per-channel chat mutes for online/MUD play. Channel keys are short
+    // strings: "gossip", "shout", "guild", "tell". Toggled by typing /gos, /shout, /gc,
+    // /tell with no message. Broadcast filter skips recipients whose set contains the
+    // channel key. Persisted across logins via PlayerData.MutedChannels.
+    public HashSet<string> MutedChannels { get; set; } = new();
+
     // Gold-based Stat Training (v0.30.9) - separate from TrainingPoints system
     public Dictionary<string, int> StatTrainingCounts { get; set; } = new();
 

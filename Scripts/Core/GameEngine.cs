@@ -4653,6 +4653,12 @@ public partial class GameEngine
             player.SkillTrainingProgress = new Dictionary<string, int>(playerData.SkillTrainingProgress);
         }
 
+        // v0.57.14: restore per-channel chat mutes
+        if (playerData.MutedChannels != null && playerData.MutedChannels.Count > 0)
+        {
+            player.MutedChannels = new HashSet<string>(playerData.MutedChannels, StringComparer.OrdinalIgnoreCase);
+        }
+
         // Restore gold-based stat training (v0.30.9)
         if (playerData.StatTrainingCounts?.Count > 0)
             player.StatTrainingCounts = new Dictionary<string, int>(playerData.StatTrainingCounts);

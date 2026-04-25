@@ -205,6 +205,53 @@ public static class MudChatSystem
         return string.IsNullOrEmpty(fallback) ? session.Username : fallback;
     }
 
+    /// <summary>
+    /// v0.57.14: Toggle a channel mute on the player attached to this session and
+    /// echo the new state. Returns true (always handled). Used when a player types
+    /// /gos / /shout / /gc / /tell with no message — empty args means "toggle mute"
+    /// rather than "show usage."
+    /// </summary>
+    private static bool ToggleChannelMute(string username, string channelKey, string friendlyName, string sendUsage, TerminalEmulator terminal)
+    {
+        var server = MudServer.Instance;
+        if (server == null || !server.ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {sendUsage}");
+            return true;
+        }
+
+        var player = session.Context?.Engine?.CurrentPlayer;
+        if (player == null)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {sendUsage}");
+            return true;
+        }
+
+        if (player.MutedChannels == null)
+            player.MutedChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (player.MutedChannels.Contains(channelKey))
+        {
+            player.MutedChannels.Remove(channelKey);
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  {friendlyName} channel UNMUTED. You will receive {friendlyName.ToLowerInvariant()} messages again.");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  ({sendUsage}; type the command alone to mute again.)");
+        }
+        else
+        {
+            player.MutedChannels.Add(channelKey);
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  {friendlyName} channel MUTED. You will no longer see {friendlyName.ToLowerInvariant()} messages.");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  ({sendUsage}; type the command alone to unmute.)");
+        }
+
+        return true;
+    }
+
     private static bool HandleSay(string username, string message, TerminalEmulator terminal)
     {
         if (string.IsNullOrWhiteSpace(message))
@@ -235,11 +282,10 @@ public static class MudChatSystem
 
     private static bool HandleShout(string username, string message, TerminalEmulator terminal)
     {
+        // v0.57.14: empty message toggles mute instead of showing usage hint.
         if (string.IsNullOrWhiteSpace(message))
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  Shout what? Usage: /shout <message>");
-            return true;
+            return ToggleChannelMute(username, "shout", "Shout", "Usage: /shout <message>", terminal);
         }
 
         // Show to sender
@@ -250,13 +296,20 @@ public static class MudChatSystem
         var displayName = GetChatDisplayName(username);
         RoomRegistry.Instance!.BroadcastGlobal(
             $"\u001b[1;33m  {displayName} shouts: {message}\u001b[0m",
-            excludeUsername: username);
+            excludeUsername: username,
+            channelKey: "shout");
 
         return true;
     }
 
     private static bool HandleTell(string username, string args, TerminalEmulator terminal)
     {
+        // v0.57.14: completely empty args toggles incoming-tell mute (anti-harassment).
+        if (string.IsNullOrWhiteSpace(args))
+        {
+            return ToggleChannelMute(username, "tell", "Incoming tells", "Usage: /tell <player> <message>", terminal);
+        }
+
         // Parse: /tell <playername> <message>
         var spaceIndex = args.IndexOf(' ');
         if (spaceIndex <= 0)
@@ -281,6 +334,16 @@ public static class MudChatSystem
         var targetSession = FindSessionByNameOrUsername(targetName);
         if (targetSession != null)
         {
+            // v0.57.14: respect target's incoming-tell mute.
+            var targetPlayer = targetSession.Context?.Engine?.CurrentPlayer;
+            if (targetPlayer?.MutedChannels?.Contains("tell") == true)
+            {
+                var blockedTargetName = GetSessionDisplayName(targetSession, targetName);
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {blockedTargetName} has private messages muted. Your tell was not delivered.");
+                return true;
+            }
+
             targetSession.EnqueueMessage($"\u001b[35m  {displayName} tells you: {message}\u001b[0m");
             var targetDisplayName = GetSessionDisplayName(targetSession, targetName);
             terminal.SetColor("magenta");
@@ -324,11 +387,10 @@ public static class MudChatSystem
 
     private static bool HandleGossip(string username, string message, TerminalEmulator terminal)
     {
+        // v0.57.14: empty message toggles mute instead of showing usage hint.
         if (string.IsNullOrWhiteSpace(message))
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  Gossip what? Usage: /gossip <message>  (or /gos)");
-            return true;
+            return ToggleChannelMute(username, "gossip", "Gossip", "Usage: /gossip <message>  (or /gos)", terminal);
         }
 
         // Show to sender
@@ -339,7 +401,8 @@ public static class MudChatSystem
         var displayName = GetChatDisplayName(username);
         RoomRegistry.Instance!.BroadcastGlobal(
             $"\u001b[92m  [Gossip] {displayName}: {message}\u001b[0m",
-            excludeUsername: username);
+            excludeUsername: username,
+            channelKey: "gossip");
 
         // v0.57.13: mirror to Discord #in-game-gossip if the bridge is configured.
         // No-op if DiscordBridge wasn't initialized (non-online modes, missing DB path).
@@ -1334,10 +1397,10 @@ public static class MudChatSystem
         var guildName = guild.GetPlayerGuild(username);
         if (guildName == null) { terminal.WriteLine($"  {Systems.Loc.Get("guild.not_in_guild")}", "yellow"); return true; }
 
+        // v0.57.14: empty args toggles guild-chat mute
         if (string.IsNullOrWhiteSpace(args))
         {
-            terminal.WriteLine($"  {Systems.Loc.Get("guild.usage_gc")}", "yellow");
-            return true;
+            return ToggleChannelMute(username, "guild", "Guild chat", Systems.Loc.Get("guild.usage_gc"), terminal);
         }
 
         string chatLabel = Systems.Loc.Get("guild.chat_label");
@@ -1348,6 +1411,11 @@ public static class MudChatSystem
         {
             if (string.Equals(member, username, StringComparison.OrdinalIgnoreCase)) continue;
             var memberSession = MudServer.Instance?.ActiveSessions.TryGetValue(member.ToLowerInvariant(), out var ms) == true ? ms : null;
+
+            // v0.57.14: skip recipients who have guild chat muted
+            var memberPlayer = memberSession?.Context?.Engine?.CurrentPlayer;
+            if (memberPlayer?.MutedChannels?.Contains("guild") == true) continue;
+
             try
             {
                 memberSession?.Context?.Terminal?.SetColor("bright_green");

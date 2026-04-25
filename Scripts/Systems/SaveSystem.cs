@@ -759,6 +759,9 @@ namespace UsurperRemake.Systems
                     kvp => (int)kvp.Value) ?? new Dictionary<string, int>(),
                 SkillTrainingProgress = player.SkillTrainingProgress ?? new Dictionary<string, int>(),
 
+                // v0.57.14: chat mutes
+                MutedChannels = player.MutedChannels?.ToList() ?? new List<string>(),
+
                 // Gold-based stat training (v0.30.9)
                 StatTrainingCounts = player.StatTrainingCounts ?? new Dictionary<string, int>(),
                 UnpaidWageDays = player.UnpaidWageDays ?? new Dictionary<string, int>(),

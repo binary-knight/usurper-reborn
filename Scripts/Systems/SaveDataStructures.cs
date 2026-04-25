@@ -454,6 +454,11 @@ namespace UsurperRemake.Systems
         public Dictionary<string, int> SkillProficiencies { get; set; } = new();  // Skill name -> proficiency level
         public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();  // Skill name -> progress
 
+        // v0.57.14: Per-channel chat mutes (gossip, shout, guild, tell). Persisted as a
+        // List<string> for simple JSON serialization; loaded into Character.MutedChannels
+        // (HashSet<string>) via SaveSystem on save/load.
+        public List<string> MutedChannels { get; set; } = new();
+
         // Gold-based stat training (v0.30.9)
         public Dictionary<string, int> StatTrainingCounts { get; set; } = new();
 

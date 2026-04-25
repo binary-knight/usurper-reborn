@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.57.14";
+    public const string Version = "0.57.15";
     public const string VersionName = "Alignment and Shields";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -965,6 +965,12 @@ public static partial class GameConfig
     public const float OldGodSoloPlayerDamageReduction = 0.20f;         // Solo Old God fight: player takes -20% damage
     public const float BossFirstRoundsDamageCapPercent = 0.15f;        // First 3 rounds of boss fight: cap hit at 15% MaxHP
     public const int BossFirstRoundsDamageCapRounds = 3;
+
+    // v0.57.15: minimum incoming damage as fraction of player MaxHP. Prevents
+    // extreme ArmPow stacking from reducing every monster hit to 1 dmg even when
+    // 5%-of-monster-attack floor is in place. 0.25% means a 6,686 HP tank takes
+    // ~17 minimum dmg/hit instead of 2-3; a 100 HP newbie takes 1 (unchanged).
+    public const double MinIncomingDamageMaxHpPercent = 0.0025;
     public const float OldGodTeammateDamageCapPercent = 0.75f;         // Old God fights: cap any single hit on a companion/NPC teammate at 75% MaxHP (prevents crits + AoE + channel damage from one-shotting party members)
     // Magician Arcane Mastery
     public const float MagicianArcaneSpellBonus = 1.15f;     // Magician: +15% spell damage (Arcane Mastery passive)

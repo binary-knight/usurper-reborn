@@ -153,11 +153,11 @@ public class RoomRegistry
     /// <summary>
     /// Broadcast a message to ALL connected players regardless of location.
     /// </summary>
-    public void BroadcastGlobal(string message, string? excludeUsername = null)
+    public void BroadcastGlobal(string message, string? excludeUsername = null, string? channelKey = null)
     {
         var server = MudServer.Instance;
         if (server != null)
-            server.BroadcastToAll(message, excludeUsername);
+            server.BroadcastToAll(message, excludeUsername, channelKey);
     }
 
     /// <summary>

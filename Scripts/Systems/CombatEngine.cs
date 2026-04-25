@@ -4447,8 +4447,10 @@ public partial class CombatEngine
         if (fearReduction > 0)
             monsterAttack = (long)(monsterAttack * (1.0 - fearReduction / 100.0));
 
-        // Minimum damage is 5% of monster attack to prevent defense stacking invulnerability
-        long minDamage = Math.Max(1, monsterAttack / 20);
+        // v0.57.14: Minimum incoming damage is now max(5% of monster attack, 0.25% of
+        // player MaxHP). The MaxHP component prevents extreme tank builds (2500+ ArmPow)
+        // from taking only 1-2 damage per hit and auto-battling indefinitely.
+        long minDamage = GetMinIncomingDamage(player, monsterAttack);
         long actualDamage = Math.Max(minDamage, monsterAttack - playerDefense);
 
         // Show defense calculation so player understands damage reduction
@@ -4743,7 +4745,8 @@ public partial class CombatEngine
             {
                 // Ability defense: Defence stat + 50% ArmPow + MagicACBonus (abilities partially bypass armor)
                 long abilityDefense = player.Defence + (player.ArmPow / 2) + player.MagicACBonus;
-                long actualDamage = Math.Max(1, abilityResult.DirectDamage - abilityDefense);
+                // v0.57.14: incoming-damage floor now scales with player MaxHP (see GetMinIncomingDamage)
+                long actualDamage = Math.Max(GetMinIncomingDamage(player, abilityResult.DirectDamage), abilityResult.DirectDamage - abilityDefense);
 
                 // Show defense calculation
                 if (abilityDefense > 0)
@@ -4867,8 +4870,9 @@ public partial class CombatEngine
             else
             {
                 // Do a regular attack with life steal
-                long damage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
-                damage = Math.Max(1, damage - player.Defence);
+                long rawLifeStealDamage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
+                // v0.57.14: incoming-damage floor scales with player MaxHP
+                long damage = Math.Max(GetMinIncomingDamage(player, rawLifeStealDamage), rawLifeStealDamage - player.Defence);
 
                 // v0.56.1 Old God solo: +15% boss damage, -20% player damage (life-steal ability path)
                 if (isSoloAgainstOldGodAbility)
@@ -4914,7 +4918,8 @@ public partial class CombatEngine
                 long rawDamage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
                 // Ability defense: Defence stat + 50% ArmPow + MagicACBonus
                 long abilityDef = player.Defence + (player.ArmPow / 2) + player.MagicACBonus;
-                long damage = Math.Max(1, rawDamage - abilityDef);
+                // v0.57.14: incoming-damage floor scales with player MaxHP
+                long damage = Math.Max(GetMinIncomingDamage(player, rawDamage), rawDamage - abilityDef);
 
                 // Show defense calculation
                 if (abilityDef > 0 && abilityDef < rawDamage)
@@ -17122,7 +17127,9 @@ public partial class CombatEngine
         companionDefense += companion.MagicACBonus;
         companionDefense += companion.TempDefenseBonus;
 
-        long actualDamage = Math.Max(1, monsterAttack - companionDefense);
+        // v0.57.14: companion incoming-damage floor scales with companion MaxHP for the same
+        // reason it does for the player — high-tank companions can't tank indefinitely.
+        long actualDamage = Math.Max(GetMinIncomingDamage(companion, monsterAttack), monsterAttack - companionDefense);
 
         // Show defense calculation
         if (companionDefense > 0 && companionDefense < monsterAttack)
@@ -24177,6 +24184,23 @@ public partial class CombatEngine
     private static long GetEffectiveArmPow(long armPow)
     {
         return armPow;
+    }
+
+    /// <summary>
+    /// v0.57.14: Compute the minimum incoming damage a target can take from a single
+    /// monster strike, regardless of how high their Defence/ArmPow stack. Two floors:
+    ///   1. 5% of the monster's raw attack (existing rule, prevents truly-zero hits)
+    ///   2. 0.25% of target's MaxHP (NEW — scales with the player so endgame tank
+    ///      builds with 2000+ ArmPow can't reduce every hit to a sliver)
+    /// The combined floor preserves tank value (still huge reduction) but ensures
+    /// long auto-battle sessions accumulate meaningful damage. Caller still applies
+    /// boss/ability damage caps and post-hit reductions on top.
+    /// </summary>
+    private static long GetMinIncomingDamage(Character target, long rawAttack)
+    {
+        long fivePctOfAttack = rawAttack / 20;
+        long quarterPctOfMaxHp = (long)(target.MaxHP * GameConfig.MinIncomingDamageMaxHpPercent);
+        return Math.Max(1, Math.Max(fivePctOfAttack, quarterPctOfMaxHp));
     }
 
     /// <summary>
