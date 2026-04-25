@@ -2,8 +2,6 @@
 
 ## NPC Memory Bloat (Single-Player Save Size Inflation)
 
-Player report (Xander, single-player Steam): brand new character, 30 minutes of dungeon play. Fresh save was 312 KB; after walking around clubbing monsters, picking up loot, selling loot, and sleeping at the inn, the save had grown to 1,615 KB. *"Pretty much just from playing normally it keeps growing."* Same root-cause family as the older Lin report (saves at 73 MB) — different scale, same shape.
-
 Root cause in `Scripts/AI/MemorySystem.cs`:
 
 ```csharp
@@ -39,7 +37,7 @@ Selling loot increases save size for the same reason — the act of saving runs 
 
 3. **Save-time defensive trim.** `SaveSystem.SerializeMemories` independently keeps top-30-by-importance even if the in-memory list is larger. Pre-fix saves loaded with bloated memory lists self-heal on next save: load → trim down to 30 highest-importance → write back at the new size.
 
-**For Xander's existing save:** load it once, save it (manually or via autosave), and the file shrinks. From his reported 1,615 KB it should drop back close to the 312 KB baseline plus actual story content. New saves stay small permanently.
+**For existing saves:** load it once, save it (manually or via autosave), and the file shrinks. From his reported 1,615 KB it should drop back close to the 312 KB baseline plus actual story content. New saves stay small permanently.
 
 This complements the v0.57.14 save-resilience fixes (which let players see and recover saves regardless of size) — together: bloated saves load and self-heal, fresh saves never grow this way again.
 
@@ -82,7 +80,7 @@ Below ~Lv 25 the new price is the same or slightly cheaper than before. The brea
 ## What This Means For Players
 
 - **Low-level (Lv 1-20):** essentially unchanged. Same or slightly lower prices.
-- **Mid-game (Lv 30-50):** noticeably more expensive. A Lv 50 player paying 1,350g/potion is paying ~2-3 kills' worth, vs the old 1 kill. Inventory cap of 20 forces shop trips between dungeon runs.
+- **Mid-game (Lv 30-50):** noticeably more expensive. A Lv 50 player paying 1,350g/potion is paying ~2-3 kills' worth, vs the old 1 kill. Inventory cap of 20 forces rebuying.
 - **Endgame (Lv 75+):** potions become a real gold sink. At Lv 100, filling the 20-potion cap costs 102,000g (vs the old 22,000g). Healer classes become the cheap-and-renewable option for sustained healing.
 - **Existing inventory:** if a player already has 35-50 potions stockpiled, those don't disappear — they just won't refill above 20 at vendors. Natural decay.
 

@@ -2781,21 +2781,23 @@ public partial class GameEngine
                 }
             }
 
-            // Failsafe: if player beat Manwe and triggered an ending but disconnected before
-            // completing the NG+/ascension prompt, re-trigger the ending sequence on login.
+            // Failsafe: if player beat Manwe but the ending sequence didn't complete (whether
+            // they disconnected mid-sequence OR something downstream crashed before the ending
+            // could fire), re-trigger the ending sequence on login.
+            // v0.57.16: dropped the `hasEndingFlag` precondition. Spudman report — the
+            // post-Manwe Noctura betrayal NRE'd before any ending flag got set, leaving the
+            // player permanently stuck (Manwe resolved, no immortality, no ending recorded,
+            // no NG+ option, no way to retrigger). Now Manwe-resolved + not-immortal +
+            // sequence-not-completed is enough to fire DetermineEnding on login.
             if (currentPlayer != null && !currentPlayer.IsImmortal)
             {
                 var storySystem = StoryProgressionSystem.Instance;
                 bool manweResolved = storySystem.OldGodStates.TryGetValue(OldGodType.Manwe, out var manweState) &&
                     (manweState.Status == GodStatus.Defeated || manweState.Status == GodStatus.Allied ||
                      manweState.Status == GodStatus.Saved || manweState.Status == GodStatus.Consumed);
-                bool hasEndingFlag = storySystem.HasStoryFlag("ending_usurper_achieved") ||
-                    storySystem.HasStoryFlag("ending_savior_achieved") ||
-                    storySystem.HasStoryFlag("ending_defiant_achieved") ||
-                    storySystem.HasStoryFlag("ending_trueending_achieved");
                 bool sequenceCompleted = storySystem.HasStoryFlag("ending_sequence_completed");
 
-                if (manweResolved && hasEndingFlag && !sequenceCompleted)
+                if (manweResolved && !sequenceCompleted)
                 {
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine("");

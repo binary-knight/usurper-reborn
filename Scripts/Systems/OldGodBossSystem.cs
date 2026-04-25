@@ -1193,15 +1193,38 @@ namespace UsurperRemake.Systems
             // === NOCTURA BETRAYAL — Post-Manwe surprise boss fight ===
             if (boss.Type == OldGodType.Manwe && StoryProgressionSystem.Instance.HasStoryFlag("noctura_ally"))
             {
-                // Trigger the betrayal
-                var betrayalResult = await HandleNocturaBetrayal(player, terminal, dungeonTeammates);
+                // v0.57.16: wrap the betrayal in a try/catch. Spudman report — the betrayal
+                // combat NRE'd mid-fight, so HandleNocturaBetrayal never returned, the
+                // post-betrayal flags never got set, and the caller never got back to fire
+                // the post-Manwe ending sequence. The player ended up immortal-soft-locked:
+                // can't NG+, can't retrigger the encounter, no ending flag for the failsafe.
+                // Now: any exception here treats the betrayal as "Noctura escaped with power"
+                // (the loss outcome) and continues normally so the ending sequence fires.
+                bool betrayalResult = false;
+                try
+                {
+                    betrayalResult = await HandleNocturaBetrayal(player, terminal, dungeonTeammates);
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Instance.LogError("BETRAYAL", $"HandleNocturaBetrayal crashed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+                    terminal.WriteLine("");
+                    terminal.SetColor("dark_magenta");
+                    terminal.WriteLine("  As you reach for Noctura, the world fractures around you...");
+                    terminal.WriteLine("  Her form dissolves into shadow, slipping through your fingers.");
+                    terminal.WriteLine("  She has escaped — for now.");
+                    terminal.WriteLine("");
+                    await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+                    betrayalResult = false; // treat as escape
+                }
 
                 // Set story flags regardless of outcome
                 story.SetStoryFlag("noctura_betrayed", true);
                 story.SetStoryFlag("noctura_ally", false); // Alliance is over
 
                 // Record in MetaProgression (persists across NG+ cycles)
-                MetaProgressionSystem.Instance.RecordNocturaBetrayal(betrayalResult);
+                try { MetaProgressionSystem.Instance.RecordNocturaBetrayal(betrayalResult); }
+                catch (Exception ex) { DebugLogger.Instance.LogWarning("BETRAYAL", $"RecordNocturaBetrayal failed: {ex.Message}"); }
 
                 if (betrayalResult)
                 {
