@@ -473,6 +473,34 @@ Player report: "The drinking game at the inn has no limit per day and no carry o
 
 5 wins/day × `Lv*700` XP = `Lv*3500` XP/day from the inn (Lv.50 = 175k XP/day, Lv.100 = 350k XP/day) — meaningful but not a leveling primary. Players who want more XP need to actually fight monsters.
 
+## Power Strike Was Often Weaker Than Basic Attack
+
+Player report: "Power Strike seems to deal less damage than basic attack more often than not."
+
+**Root cause: `ExecutePowerAttack` skipped every multiplier `ExecuteSingleAttack` stacked.** The 1.75x base looked bigger on paper, but a basic attack with even a moderate crit chance would average more damage at higher levels — which made the 15-stamina cost feel like a tax for less damage.
+
+Specifically, Power Strike was missing:
+
+- Crit roll (DEX-based, stealth, Ocean's Voice — none of them rolled).
+- Basic-attack proficiency multiplier.
+- Status modifiers (Blessed `+Level/5+2`, Royal Blessing `1.10x`, Raging `1.5x`, Weakened penalty).
+- Flat `+Level` damage scaling.
+- Bard / Jester / Wavecaller CHA-based attack power.
+- Sunforged Blade `2x` / `3x` vs undead / demons.
+- Paladin Divine Resolve `+10%` vs undead / demons.
+
+Quick napkin math at Lv.100 / STR 200 / WeapPow 800:
+- Basic ≈ `(1.25*STR + 1.25*WeapPow + Level + variance) × ~1.6 (crit-weighted avg)` → ~2,160
+- Power ≈ `1.75*STR + 1.75*WeapPow + variance` → ~1,750 flat
+
+Power Strike *paid 15 stamina to do less average damage*.
+
+**Fix:** `ExecutePowerAttack` and `ExecutePowerAttackMultiMonster` now mirror the basic-attack damage stack — primary stat (STR or CHA depending on class), level scaling, status buffs/debuffs, weapon power with variance, weapon-config modifier, basic-attack proficiency, Sunforged / Paladin specials. The 1.75x signature multiplier is layered on top of all that. Crit roll runs at half the basic-attack rate (DEX crit only fires when `RollCriticalHit && random.Next(2)==0`) — Power Strike already gets a flat 1.75x so it shouldn't double-dip on crits at full rate, but a guaranteed-zero crit chance was the bug.
+
+After the fix at the same Lv.100 example: basic ≈ 2,160, power ≈ 2,800-3,000 typical with the new stacks. The 15-stamina cost finally pays off — Power Strike is now the single strongest melee tool when you can afford the stamina, and the always-hits guarantee is icing rather than the only reason to use it.
+
+The off-hand follow-up for dual-wielders and the existing PowerStance status (which gives +50% damage on subsequent same-round attacks) are unchanged — they were already working.
+
 ## Files Changed
 
 - `Scripts/Core/GameConfig.cs` — version bump 0.57.16 → 0.57.17.
@@ -502,6 +530,7 @@ Player report: "The drinking game at the inn has no limit per day and no carry o
 - `Scripts/Core/GameConfig.cs` / `Scripts/Core/Character.cs` / `Scripts/Systems/SaveDataStructures.cs` / `Scripts/Systems/SaveSystem.cs` / `Scripts/Core/GameEngine.cs` / `Scripts/Systems/DailySystemManager.cs` / `Scripts/Editor/PlayerSaveEditor.cs` — `DrinkingGamesToday` daily counter (mirrors `MurdersToday` / `TeamWarsToday` plumbing) + `MaxDrinkingGamesPerDay = 5` constant.
 - `Scripts/Locations/InnLocation.cs` — `PlayDrinkingGame` enforces the cap and shows remaining count after entry.
 - `Localization/{en,es,fr,hu,it}.json` — `inn.drinking_daily_cap`, `inn.drinking_remaining_today`.
+- `Scripts/Systems/CombatEngine.cs` — `ExecutePowerAttack` and `ExecutePowerAttackMultiMonster` now mirror basic-attack's full multiplier stack (primary stat with bonus, level scaling, status buffs/debuffs, weapon variance, weapon-config modifier, basic-attack proficiency, half-rate DEX/stealth crit, Sunforged Blade, Paladin Divine Resolve) before applying the 1.75x signature multiplier. Power Strike no longer gets out-DPS'd by basic attack at high levels.
 
 ## Deploy Notes
 

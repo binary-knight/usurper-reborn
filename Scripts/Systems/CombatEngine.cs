@@ -11770,11 +11770,88 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.power_attack_windup", target.Name));
         await Task.Delay(GetCombatDelay(500));
 
-        // Power Attack: 1.75x damage (with weapon soft cap), no defense penalty
-        long powerDamage = (long)((player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 1.75);
-        powerDamage += random.Next(5, 25);
+        // Mirror the basic-attack damage stack so Power Strike doesn't lose to it just
+        // because it skipped every multiplier (player report). Same fix as the single-
+        // monster ExecutePowerAttack — see comments there.
 
-        // Apply defense calculation (was missing)
+        // === Base attack power ===
+        long powerDamage;
+        if (player.Class == CharacterClass.Bard || player.Class == CharacterClass.Jester || player.Class == CharacterClass.Wavecaller)
+        {
+            powerDamage = player.Charisma;
+            powerDamage += player.Charisma / 4;
+        }
+        else
+        {
+            powerDamage = player.Strength;
+            powerDamage += StatEffectsSystem.GetStrengthDamageBonus(player.Strength);
+        }
+        powerDamage += player.Level;
+
+        // Status modifiers
+        if (player.IsRaging)
+            powerDamage = (long)(powerDamage * 1.5);
+        if (player.HasStatus(StatusEffect.Blessed))
+            powerDamage += player.Level / 5 + 2;
+        if (player.HasStatus(StatusEffect.RoyalBlessing))
+            powerDamage = (long)(powerDamage * 1.10);
+        if (player.HasStatus(StatusEffect.Weakened))
+            powerDamage = Math.Max(1, powerDamage - player.Level / 10 - 4);
+
+        // Weapon power with variance
+        if (player.WeapPow > 0)
+        {
+            long effectiveWeap = GetEffectiveWeapPow(player.WeapPow);
+            powerDamage += effectiveWeap + random.Next(0, (int)Math.Min(int.MaxValue, effectiveWeap / 2 + 1));
+        }
+        int variationMax = Math.Max(21, player.Level / 2);
+        powerDamage += random.Next(1, variationMax);
+
+        // 1.75x EVERYTHING (Power Strike's signature)
+        powerDamage = (long)(powerDamage * 1.75);
+
+        // Weapon config + proficiency
+        double damageModifier = GetWeaponConfigDamageModifier(player);
+        powerDamage = (long)(powerDamage * damageModifier);
+        var basicProficiency = TrainingSystem.GetSkillProficiency(player, "basic_attack");
+        powerDamage = (long)(powerDamage * TrainingSystem.GetEffectMultiplier(basicProficiency));
+
+        // Crit roll at half basic rate
+        float rollMultiplier = 1.0f;
+        bool stealthCrit = player.HasStatus(StatusEffect.Hidden);
+        if (stealthCrit)
+        {
+            player.RemoveStatus(StatusEffect.Hidden);
+            rollMultiplier = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("combat.stealth_crit"));
+        }
+        else if (StatEffectsSystem.RollCriticalHit(player) && random.Next(2) == 0)
+        {
+            rollMultiplier = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+        }
+        powerDamage = (long)(powerDamage * rollMultiplier);
+
+        // Difficulty
+        powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage);
+
+        // Sunforged Blade vs undead/demons
+        if (ArtifactSystem.Instance.HasSunforgedBlade() &&
+            (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
+        {
+            float holyMult = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 3.0f : 2.0f;
+            powerDamage = (long)(powerDamage * holyMult);
+            terminal.WriteLine(Loc.Get("combat.sunforged_blazes"), "bright_yellow");
+        }
+
+        // Paladin Divine Resolve vs undead/demons
+        if (player.Class == CharacterClass.Paladin &&
+            (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
+        {
+            powerDamage = (long)(powerDamage * (1.0 + GameConfig.PaladinDivineResolveDamageBonus));
+        }
+
+        // Defense
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
         if (target.ArmPow > 0)
         {
@@ -11784,7 +11861,6 @@ public partial class CombatEngine
             defense += armBase + random.Next(0, armVariance + 1);
         }
         powerDamage = Math.Max(1, powerDamage - defense);
-        powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage);
 
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("combat.power_attack_hit", target.Name, powerDamage));
@@ -23403,23 +23479,101 @@ public partial class CombatEngine
         // Apply PowerStance status so any extra attacks this round follow the same rules
         attacker.ApplyStatus(StatusEffect.PowerStance, 1);
 
-        // Empowered main-hand strike: 1.75x STR + 1.75x WeapPow
-        long originalStrength = attacker.Strength;
-        long attackPower = (long)(originalStrength * 1.75);
+        // Empowered main-hand strike. Player follow-up: "Power Strike seems to deal less
+        // damage than basic attack more often than not." Root: this method historically
+        // skipped every multiplier basic attack stacked (crits, proficiency, Blessed/
+        // Royal/Raging buffs, Level bonus, Sunforged/Paladin specials), so the flat
+        // 1.75x base lost to a basic attack with even a moderate crit chance. Now we
+        // mirror the basic-attack stack — crits roll at half the basic rate so it's
+        // still less twitchy than a full attack roll, and the 1.75x base sits on top.
 
+        // === Base attack power (mirror basic attack's primary stat selection) ===
+        long attackPower;
+        if (attacker.Class == CharacterClass.Bard || attacker.Class == CharacterClass.Jester || attacker.Class == CharacterClass.Wavecaller)
+        {
+            attackPower = attacker.Charisma;
+            attackPower += attacker.Charisma / 4;
+        }
+        else
+        {
+            attackPower = attacker.Strength;
+            attackPower += StatEffectsSystem.GetStrengthDamageBonus(attacker.Strength);
+        }
+
+        // Level scaling (was missing — basic attack adds this)
+        attackPower += attacker.Level;
+
+        // Status modifiers — mirror basic attack
+        if (attacker.IsRaging)
+            attackPower = (long)(attackPower * 1.5);
+        if (attacker.HasStatus(StatusEffect.Blessed))
+            attackPower += attacker.Level / 5 + 2;
+        if (attacker.HasStatus(StatusEffect.RoyalBlessing))
+            attackPower = (long)(attackPower * 1.10);
+        if (attacker.HasStatus(StatusEffect.Weakened))
+            attackPower = Math.Max(1, attackPower - attacker.Level / 10 - 4);
+
+        // Weapon power (with variance like basic attack)
         if (attacker.WeapPow > 0)
         {
             long effectiveWeap = GetEffectiveWeapPow(attacker.WeapPow);
-            attackPower += (long)(effectiveWeap * 1.75) + random.Next(0, (int)Math.Min(effectiveWeap + 1, int.MaxValue));
+            attackPower += effectiveWeap + random.Next(0, (int)Math.Min(int.MaxValue, effectiveWeap / 2 + 1));
         }
 
-        attackPower += random.Next(1, 21); // variation
+        // Random variation — match basic attack's level-scaled max
+        int variationMax = Math.Max(21, attacker.Level / 2);
+        attackPower += random.Next(1, variationMax);
+
+        // === Power Strike's signature: 1.75x EVERYTHING above ===
+        attackPower = (long)(attackPower * 1.75);
 
         // Apply weapon configuration damage modifier (2H bonus)
         double damageModifier = GetWeaponConfigDamageModifier(attacker);
         attackPower = (long)(attackPower * damageModifier);
 
-        // Normal defense calculation (no accuracy penalty — stamina cost is the tradeoff)
+        // Apply basic-attack proficiency (Power Strike piggybacks on the basic skill)
+        var basicProficiency = TrainingSystem.GetSkillProficiency(attacker, "basic_attack");
+        float proficiencyMultiplier = TrainingSystem.GetEffectMultiplier(basicProficiency);
+        attackPower = (long)(attackPower * proficiencyMultiplier);
+
+        // === Crit roll — half the basic-attack rate (Power Strike already gets 1.75x base) ===
+        // Stealth crit: Hidden status forces a crit and is consumed (same as basic).
+        float rollMultiplier = 1.0f;
+        bool stealthCrit = attacker.HasStatus(StatusEffect.Hidden);
+        if (stealthCrit)
+        {
+            attacker.RemoveStatus(StatusEffect.Hidden);
+            rollMultiplier = StatEffectsSystem.GetCriticalDamageMultiplier(attacker.Dexterity, attacker.GetEquipmentCritDamageBonus());
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("combat.stealth_crit"));
+        }
+        else if (StatEffectsSystem.RollCriticalHit(attacker) && random.Next(2) == 0)
+        {
+            // Half-rate DEX crit (matches the "half basic rate" design choice)
+            rollMultiplier = StatEffectsSystem.GetCriticalDamageMultiplier(attacker.Dexterity, attacker.GetEquipmentCritDamageBonus());
+        }
+        attackPower = (long)(attackPower * rollMultiplier);
+
+        // Difficulty modifier
+        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+
+        // Sunforged Blade artifact bonus vs undead/demons
+        if (ArtifactSystem.Instance.HasSunforgedBlade() &&
+            (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
+        {
+            float holyMult = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 3.0f : 2.0f;
+            attackPower = (long)(attackPower * holyMult);
+            terminal.WriteLine(Loc.Get("combat.sunforged_blazes"), "bright_yellow");
+        }
+
+        // Paladin Divine Resolve bonus vs undead/demons
+        if (attacker.Class == CharacterClass.Paladin &&
+            (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
+        {
+            attackPower = (long)(attackPower * (1.0 + GameConfig.PaladinDivineResolveDamageBonus));
+        }
+
+        // Normal defense calculation
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
         if (target.ArmPow > 0)
         {
@@ -23430,7 +23584,6 @@ public partial class CombatEngine
         }
 
         long damage = Math.Max(1, attackPower - defense);
-        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
 
         terminal.SetColor("magenta");
         terminal.WriteLine(Loc.Get("combat.power_attack_smash", target.Name, damage));
